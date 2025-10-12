@@ -3,9 +3,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from pipelex import log
 from pipelex.tools.func_registry import func_registry
 from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
-from pipelex.tools.typing.module_inspector import import_module_from_file
+from pipelex.tools.typing.module_inspector import ModuleFileError, import_module_from_file
 
 
 class FuncRegistryUtils:
@@ -52,9 +53,17 @@ class FuncRegistryUtils:
                     name=func.__name__,
                     should_warn_if_already_registered=True,
                 )
-        except Exception as e:
-            # Log error but continue processing other files
-            print(f"Error processing file {file_path}: {e}")
+        except ModuleFileError:
+            # Expected: file validation issues (directories with .py extension, etc.)
+            # log.verbose(f"Skipping file {file_path}: {e}")
+            pass
+        except ImportError:
+            # Common: missing dependencies, circular imports, relative imports
+            # log.verbose(f"Could not import {file_path}: {e}")
+            pass
+        except SyntaxError as exc:
+            # Potentially problematic: invalid Python syntax may indicate broken code
+            log.warning(f"Syntax error in {file_path}: {exc}")
 
     @classmethod
     def _find_functions_in_module(cls, module: Any) -> list[Callable[..., Any]]:

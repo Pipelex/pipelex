@@ -3,8 +3,7 @@
 from typing import Any, ClassVar
 
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
-
-from .registry import Fruit
+from tests.cases.registry import Fruit
 
 
 class JINJA2TestCases:

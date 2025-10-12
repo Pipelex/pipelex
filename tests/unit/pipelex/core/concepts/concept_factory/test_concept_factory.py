@@ -8,8 +8,7 @@ from pipelex.core.concepts.concept_blueprint import (
 )
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.exceptions import StructureClassError
-
-from .data import TestCases
+from tests.unit.pipelex.core.concepts.concept_factory.data import TestCases
 
 
 class TestConceptFactory:

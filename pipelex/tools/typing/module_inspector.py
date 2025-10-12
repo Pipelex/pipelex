@@ -2,6 +2,7 @@ import importlib.util
 import inspect
 import os
 import sys
+from pathlib import Path
 from typing import Any
 
 
@@ -25,6 +26,12 @@ def import_module_from_file(file_path: str) -> Any:
     # Validate that the file is a Python file
     if not file_path.endswith(".py"):
         msg = f"File {file_path} is not a Python file (must end with .py)"
+        raise ModuleFileError(msg)
+
+    # Validate that the path exists and is a file, not a directory
+    path = Path(file_path)
+    if path.exists() and not path.is_file():
+        msg = f"Path {file_path} exists but is not a file (it may be a directory)"
         raise ModuleFileError(msg)
 
     # Convert file path to module-style path to use as the actual module name
@@ -52,15 +59,45 @@ def import_module_from_file(file_path: str) -> Any:
 
 
 def _convert_file_path_to_module_path(file_path: str) -> str:
-    """Convert a file path to a module-style path."""
+    """Convert a file path to a valid module identifier.
+
+    The module name doesn't need to match the actual package structure since
+    we're using spec_from_file_location - it just needs to be a unique, valid
+    Python identifier for registration in sys.modules.
+
+    Args:
+        file_path: Path to the Python file
+
+    Returns:
+        A unique, valid Python module name derived from the absolute file path
+    """
+    # Convert to absolute path for uniqueness and consistency
+    abs_path = os.path.abspath(file_path)
+
     # Remove .py extension
-    module_path = file_path.removesuffix(".py")
+    module_path = abs_path.removesuffix(".py")
 
-    # Replace path separators with dots
-    module_path = module_path.replace(os.sep, ".")
+    # Replace all non-alphanumeric characters with underscores to create a valid identifier
+    # This handles path separators, dots, hyphens, spaces, etc.
+    valid_chars: list[str] = []
+    for char in module_path:
+        if char.isalnum():
+            valid_chars.append(char)
+        else:
+            valid_chars.append("_")
 
-    # Handle __init__.py files by removing the __init__ part
-    return module_path.removesuffix(".__init__")
+    result = "".join(valid_chars)
+
+    # Ensure it doesn't start with a number (Python requirement)
+    if result and result[0].isdigit():
+        result = "_" + result
+
+    # Handle edge case of empty result
+    if not result:
+        msg = f"Cannot create valid module name from file path: {file_path}"
+        raise ModuleFileError(msg)
+
+    return result
 
 
 def find_classes_in_module(

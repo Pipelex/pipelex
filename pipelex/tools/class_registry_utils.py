@@ -1,6 +1,7 @@
 import inspect
 import sys
 import types
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
 from pipelex import log
-from pipelex.tools.typing.module_inspector import find_classes_in_module, import_module_from_file
+from pipelex.tools.typing.module_inspector import ModuleFileError, find_classes_in_module, import_module_from_file
 
 _NoneType = type(None)
 _UnionType = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType
@@ -194,9 +195,17 @@ class ClassRegistryUtils:
         for python_file in python_files:
             try:
                 import_module_from_file(str(python_file))
-            except Exception as e:
-                # Log but don't fail - some files might not be importable
-                log.debug(f"Could not import {python_file}: {e}")
+            except ModuleFileError:
+                # Expected: file validation issues (directories with .py extension, etc.)
+                # log.debug(f"Skipping file {python_file}: {e}")
+                pass
+            except ImportError:
+                # Common: missing dependencies, circular imports, relative imports
+                # log.debug(f"Could not import {python_file}: {e}"
+                pass
+            except SyntaxError as exc:
+                # Potentially problematic: invalid Python syntax may indicate broken code
+                log.warning(f"Syntax error in {python_file}: {exc}")
 
     @classmethod
     def auto_register_all_subclasses(
@@ -225,16 +234,22 @@ class ClassRegistryUtils:
         # Iterate through all loaded modules
         for module in modules_snapshot:
             try:
-                # Find all classes in this module
-                for _, obj in inspect.getmembers(module, inspect.isclass):
-                    # Check if it's a subclass of base_class (but not the base_class itself)
-                    if obj is not base_class and issubclass(obj, base_class):
-                        # Register if not already registered
-                        if not class_registry.has_class(name=obj.__name__):
-                            class_registry.register_class(obj)
-                            registered_count += 1
-            except Exception as e:
-                # Skip modules that can't be inspected
-                log.debug(f"Could not inspect module for auto-registration: {e}")
+                # Suppress all warnings during inspection (deprecation warnings from dependencies)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    # Find all classes in this module
+                    for _, obj in inspect.getmembers(module, inspect.isclass):
+                        # Check if it's a subclass of base_class (but not the base_class itself)
+                        if obj is not base_class and issubclass(obj, base_class):
+                            # Register if not already registered
+                            if not class_registry.has_class(name=obj.__name__):
+                                class_registry.register_class(obj)
+                                registered_count += 1
+            except (AttributeError, ImportError, TypeError):
+                # Expected: some modules in sys.modules can't be inspected
+                # - Built-in/native modules (ImportError)
+                # - Modules without expected attributes (AttributeError)
+                # - Non-module objects (TypeError)
+                pass
 
         return registered_count

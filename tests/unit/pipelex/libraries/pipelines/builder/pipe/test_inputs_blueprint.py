@@ -1,8 +1,7 @@
 import pytest
 
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
-
-from .test_data_inputs import InputRequirementTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.test_data_inputs import InputRequirementTestCases
 
 
 class TestInputRequirementBlueprintConversion:

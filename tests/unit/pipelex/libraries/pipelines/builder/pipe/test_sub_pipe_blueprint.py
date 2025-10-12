@@ -2,8 +2,7 @@ import pytest
 
 from pipelex.libraries.pipelines.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
-
-from .test_data_sub_pipe import SubPipeTestCases
+from tests.unit.pipelex.libraries.pipelines.builder.pipe.test_data_sub_pipe import SubPipeTestCases
 
 
 class TestSubPipeBlueprintConversion:
