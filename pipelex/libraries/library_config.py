@@ -10,14 +10,6 @@ class LibraryConfig(ConfigModel):
     package_name: ClassVar[str] = "pipelex"
     config_dir_path: str = "pipelex_libraries"
 
-    # @property
-    # def pipelines_dir_path(self) -> str:
-    #     return f"{self.config_dir_path}/pipelines"
-
-    # @property
-    # def base_pipelines_dir_path(self) -> str:
-    #     return f"{self.config_dir_path}/pipelines/base_library"
-
     @property
     def test_pipelines_dir_path(self) -> str:
         return "tests/test_pipelines"

@@ -249,7 +249,6 @@ class ContentGenerator(ContentGeneratorProtocol):
         templating_style: TemplatingStyle | None = None,
         template_category: TemplateCategory | None = None,
     ) -> str:
-        log.debug(f"context: {context}")
         templating_assignment = TemplatingAssignment(
             context=context,
             template=template,

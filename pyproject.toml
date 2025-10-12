@@ -212,6 +212,11 @@ addopts = "--import-mode=importlib -ra -m 'not (inference or llm or img_gen or e
 asyncio_default_fixture_loop_scope = "session"
 filterwarnings = [
     "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
+    "ignore:websockets.*is deprecated:DeprecationWarning",
+    "ignore:typing\\.io is deprecated:DeprecationWarning",
+    "ignore:typing\\.re is deprecated:DeprecationWarning",
+    "ignore:.*has been moved to cryptography.*",
+    "ignore:Use.*Types instead",
 ]
 markers = [
     "needs_output: tests that need output to be displayed",
