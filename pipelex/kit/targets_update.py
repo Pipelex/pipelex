@@ -60,17 +60,17 @@ def build_merged_rules(agents_dir: Traversable, idx: KitIndex, agent_set: str | 
         Merged markdown content with demoted headings
     """
     if agent_set is None:
-        agent_set = idx.agents.default_set
+        agent_set = idx.agent_rules.default_set
 
-    if agent_set not in idx.agents.sets:
-        msg = f"Agent set '{agent_set}' not found in index.toml. Available sets: {list(idx.agents.sets.keys())}"
+    if agent_set not in idx.agent_rules.sets:
+        msg = f"Agent set '{agent_set}' not found in index.toml. Available sets: {list(idx.agent_rules.sets.keys())}"
         raise ValueError(msg)
 
     parts: list[str] = []
 
-    for name in idx.agents.sets[agent_set]:
+    for name in idx.agent_rules.sets[agent_set]:
         md = _read_agent_file(agents_dir, name)
-        demoted = _demote_headings(md, idx.agents.demote)
+        demoted = _demote_headings(md, idx.agent_rules.demote)
         parts.append(demoted.rstrip())
 
     return ("\n\n".join(parts)).strip() + "\n"

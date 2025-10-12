@@ -45,7 +45,7 @@ def sync(
             typer.echo("📝 Building merged agent documentation...")
             merged_md = build_merged_rules(agents_dir, idx)
             typer.echo("📝 Updating target files...")
-            update_targets(repo_root, merged_md, idx.targets, dry_run=dry_run, diff=diff, backup=backup)
+            update_targets(repo_root, merged_md, idx.agent_rules.targets, dry_run=dry_run, diff=diff, backup=backup)
 
         if dry_run:
             typer.echo("✅ Dry run completed - no changes made")

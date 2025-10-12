@@ -5,14 +5,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class AgentsMerge(BaseModel):
-    """Configuration for merging agent documentation files."""
-
-    sets: dict[str, list[str]] = Field(description="Named sets of agent_rules files (e.g., coding_standards, pipelex_language, all)")
-    default_set: str = Field(default="pipelex_language", description="Default set to use when syncing")
-    demote: int = Field(default=1, description="Number of levels to demote headings when merging")
-
-
 class CursorFileOverride(BaseModel):
     """Per-file front-matter overrides for Cursor export."""
 
@@ -36,10 +28,18 @@ class Target(BaseModel):
     heading_1: str | None = Field(default=None, description="Main title (H1) to add when inserting into empty file or file with no H1 headings")
 
 
+class AgentRules(BaseModel):
+    """Configuration for merging agent documentation files."""
+
+    sets: dict[str, list[str]] = Field(description="Named sets of agent_rules files (e.g., coding_standards, pipelex_language, all)")
+    default_set: str = Field(default="pipelex_language", description="Default set to use when syncing")
+    demote: int = Field(default=1, description="Number of levels to demote headings when merging")
+    cursor: CursorSpec = Field(description="Cursor rules export configuration")
+    targets: dict[str, Target] = Field(description="Dictionary of single-file merge targets keyed by ID")
+
+
 class KitIndex(BaseModel):
     """Root configuration model for kit index.toml."""
 
     meta: dict[str, Any] = Field(default_factory=dict, description="Metadata about the kit configuration")
-    agents: AgentsMerge = Field(description="Agent documentation merge configuration")
-    cursor: CursorSpec = Field(description="Cursor rules export configuration")
-    targets: dict[str, Target] = Field(description="Dictionary of single-file merge targets keyed by ID")
+    agent_rules: AgentRules = Field(description="Agent documentation merge configuration")

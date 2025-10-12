@@ -2,11 +2,11 @@
 version = "1.0.0"
 description = "Pipelex kit configuration for agent rules"
 
-[agents]
+[agent_rules]
 demote = 1
 default_set = "pipelex_language"
 
-[agents.sets]
+[agent_rules.sets]
 coding_standards = [
     "python_standards.md",
     "pytest_standards.md",
@@ -24,66 +24,66 @@ all = [
     "tdd.md",
 ]
 
-[cursor.front_matter]
+[agent_rules.cursor.front_matter]
 alwaysApply = false
 
-[cursor.files.python_standards.front_matter]
+[agent_rules.cursor.files.python_standards.front_matter]
 description = "Python coding standards and best practices"
 globs = ["**/*.py"]
 
-[cursor.files.pytest_standards.front_matter]
+[agent_rules.cursor.files.pytest_standards.front_matter]
 description = "Guidelines for writing unit tests"
 globs = ["tests/**/*.py"]
 
-[cursor.files.docs.front_matter]
+[agent_rules.cursor.files.docs.front_matter]
 description = "Guidelines for writing documentation"
 globs = ["docs/**/*.md"]
 
-[cursor.files.tdd.front_matter]
+[agent_rules.cursor.files.tdd.front_matter]
 description = "Guidelines for writing test-driven development code"
 globs = []
 
-[cursor.files.write_pipelex.front_matter]
+[agent_rules.cursor.files.write_pipelex.front_matter]
 description = "Guidelines for writing Pipelex pipelines"
 globs = ["**/*.plx", "**/pipelines/**/*.py"]
 
-[cursor.files.run_pipelex.front_matter]
+[agent_rules.cursor.files.run_pipelex.front_matter]
 description = "Guidelines for running Pipelex pipelines"
 globs = ["examples/**/*.py"]
 
-[cursor.files.llms.front_matter]
+[agent_rules.cursor.files.llms.front_matter]
 description = "LLM configuration and usage guidelines"
 globs = ["*.plx", "*.toml"]
 
-[targets.agents]
+[agent_rules.targets.agents]
 path = "AGENTS.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
 heading_1 = "# Pipelex Rules"
 
-[targets.claude]
+[agent_rules.targets.claude]
 path = "CLAUDE.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
 heading_1 = "# Pipelex Rules"
 
-[targets.github_copilot]
+[agent_rules.targets.github_copilot]
 path = ".github/copilot-instructions.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
 heading_1 = "# Pipelex Rules"
 
-[targets.windsurf]
+[agent_rules.targets.windsurf]
 path = ".windsurfrules.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
 heading_1 = "# Pipelex Rules"
 
-[targets.blackbox]
+[agent_rules.targets.blackbox]
 path = "BLACKBOX_RULES.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"

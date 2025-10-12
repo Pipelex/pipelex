@@ -17,9 +17,9 @@ def get_agents_dir() -> Traversable:
     """Get the agents directory within the kit package.
 
     Returns:
-        Traversable object pointing to pipelex.kit/agents
+        Traversable object pointing to pipelex.kit/agent_rules
     """
-    return get_kit_root() / "agents"
+    return get_kit_root() / "agent_rules"
 
 
 def get_configs_dir() -> Traversable:

@@ -35,10 +35,10 @@ def _front_matter_for(name: str, idx: KitIndex) -> dict[str, Any]:
     Returns:
         Merged front-matter dictionary
     """
-    base = dict(idx.cursor.front_matter)
+    base = dict(idx.agent_rules.cursor.front_matter)
     key = name.removesuffix(".md")
-    if key in idx.cursor.files:
-        base |= idx.cursor.files[key].front_matter
+    if key in idx.agent_rules.cursor.files:
+        base |= idx.agent_rules.cursor.files[key].front_matter
     return base
 
 
