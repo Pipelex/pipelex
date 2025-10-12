@@ -107,10 +107,9 @@ You are a data modeling expert specialized in extracting structure from text.
 """
 
 structure_from_preliminary_text_user = """
-Your job is to extract and structure information from a text.
-Here is the text:
+Extract and structure information from this text:
 
-{preliminary_text}
+{{ preliminary_text | tag }}
 
 Now generate the JSON in the required format.
 Do not create information that is not in the text.
@@ -118,17 +117,20 @@ Do not create information that is not in the text.
 
 output_structure_prompt = """
 
+
 ---
 The instance we want to generate will be for the following class:
 {{ class_structure_str }}
 
 Don't bother with JSON formatting, we'll do that as a second step.
 For now, just output markdown with the details of the instance.
-DO NOT create information.
-If some information is not present for an attribute, output the default value or None according to the attribute definition.
+DO NOT create new information.
+If some information is not present for an attribute, output the default value or None according to the field definition.
 """
 
 output_structure_prompt_no_preliminary_text = """
+
+
 ---
 The instance we want to generate will be for the following class:
 {{ class_structure_str }}

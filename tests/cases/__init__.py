@@ -6,8 +6,8 @@ Each module exposes only data constants that can be imported cleanly.
 
 from .documents import PDFTestCases
 from .images import ImageTestCases
+from .jinja2_templates import JINJA2TestCases
 from .registry import ClassRegistryTestCases, FileHelperTestCases, Fruit
-from .templates import JINJA2TestCases
 from .urls import TestURLs
 
 __all__ = [
