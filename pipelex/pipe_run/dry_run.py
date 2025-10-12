@@ -12,6 +12,7 @@ from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedI
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.exceptions import PipeStackOverflowError
 from pipelex.hub import get_class_registry
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -26,7 +27,6 @@ class DryRunError(Exception):
 class DryRunStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
-    WARNING = "WARNING"
 
     @property
     def is_failure(self) -> bool:
@@ -35,15 +35,12 @@ class DryRunStatus(StrEnum):
                 return True
             case DryRunStatus.SUCCESS:
                 return False
-            case DryRunStatus.WARNING:
-                return False
 
 
 class DryRunOutput(BaseModel):
     pipe_code: str
     status: DryRunStatus
     error_message: str | None = None
-    warning_message: str | None = None
 
 
 async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
@@ -60,17 +57,14 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
-    except Exception as exc:
+    except PipeStackOverflowError as exc:
         if pipe.code in allowed_to_fail_pipes:
-            warning_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"
-            log.warning(warning_message)
-            return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.WARNING, warning_message=warning_message)
-
-        if raise_on_failure:
+            error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"
+            return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
+        elif raise_on_failure:
             raise
 
         error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
-        log.error(error_message)
         return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
     log.info(f"Pipe '{pipe.code}' dry run completed successfully")
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
@@ -117,8 +111,14 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
         for pipe in pipes:
             results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
 
-    successful_pipes = [pipe_code for pipe_code, status in results.items() if status.status == DryRunStatus.SUCCESS]
-    failed_pipes = [pipe_code for pipe_code, status in results.items() if status.status != DryRunStatus.SUCCESS]
+    successful_pipes: list[str] = []
+    failed_pipes: list[str] = []
+    for pipe_code, dry_run_output in results.items():
+        match dry_run_output.status:
+            case DryRunStatus.SUCCESS:
+                successful_pipes.append(pipe_code)
+            case DryRunStatus.FAILURE:
+                failed_pipes.append(pipe_code)
 
     unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
 

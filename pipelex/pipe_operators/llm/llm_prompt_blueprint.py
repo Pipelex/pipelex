@@ -115,8 +115,8 @@ class LLMPromptBlueprint(BaseModel):
             if not extra_params:
                 extra_params = {}
             for image_index, image_name in enumerate(prompt_user_images.keys()):
+                # Replacing image variable '{image_name}' with numbered tag '[Image {image_index + 1}]'
                 extra_params[image_name] = f"[Image {image_index + 1}]"
-                log.warning(f"Replacing image variable '{image_name}' with numbered tag '[Image {image_index + 1}]'")
         user_text: str | None = None
         if self.prompt_blueprint:
             user_text = await self._unravel_text(
@@ -162,9 +162,6 @@ class LLMPromptBlueprint(BaseModel):
         if (templating_style := self.templating_style) and not jinja2_blueprint.templating_style:
             jinja2_blueprint.templating_style = templating_style
             log.verbose(f"Setting prompting style to {templating_style}")
-
-        log.info(f"extra_params: {extra_params}")
-        log.info(f"jinja2_blueprint.extra_context: {jinja2_blueprint.extra_context}")
 
         context: dict[str, Any] = context_provider.generate_jinja2_context()
         if extra_params:

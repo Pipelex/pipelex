@@ -193,11 +193,6 @@ class WorkingMemoryFactory(BaseModel):
         working_memory = cls.make_empty()
 
         for requirement in needed_inputs:
-            log.debug(
-                f"Creating dry run mock for '{requirement.variable_name}' with concept "
-                f"'{requirement.concept.code}' and class '{requirement.structure_class.__name__}'",
-            )
-
             try:
                 if not requirement.multiplicity:
                     mock_content = cls.create_mock_content(requirement)
