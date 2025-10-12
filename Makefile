@@ -7,14 +7,15 @@ PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"
 
 # The "?" is used to make the variable optional, so that it can be overridden by the user.
 PYTHON_VERSION ?= 3.11
-VENV_PYTHON := $(VIRTUAL_ENV)/bin/python
-VENV_PYTEST := $(VIRTUAL_ENV)/bin/pytest
-VENV_RUFF := $(VIRTUAL_ENV)/bin/ruff
-VENV_PYRIGHT := $(VIRTUAL_ENV)/bin/pyright
-VENV_MYPY := $(VIRTUAL_ENV)/bin/mypy
-VENV_PIPELEX := $(VIRTUAL_ENV)/bin/pipelex
-VENV_MKDOCS := $(VIRTUAL_ENV)/bin/mkdocs
-VENV_PYLINT := $(VIRTUAL_ENV)/bin/pylint
+# Note: VENV_* variables include quotes to handle paths with spaces (e.g., "My Projects/pipelex")
+VENV_PYTHON := "$(VIRTUAL_ENV)/bin/python"
+VENV_PYTEST := "$(VIRTUAL_ENV)/bin/pytest"
+VENV_RUFF := "$(VIRTUAL_ENV)/bin/ruff"
+VENV_PYRIGHT := "$(VIRTUAL_ENV)/bin/pyright"
+VENV_MYPY := "$(VIRTUAL_ENV)/bin/mypy"
+VENV_PIPELEX := "$(VIRTUAL_ENV)/bin/pipelex"
+VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
+VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -132,17 +133,17 @@ check-uv:
 
 env: check-uv
 	$(call PRINT_TITLE,"Creating virtual environment")
-	@if [ ! -d $(VIRTUAL_ENV) ]; then \
+	@if [ ! -d "$(VIRTUAL_ENV)" ]; then \
 		echo "Creating Python virtual env in \`${VIRTUAL_ENV}\`"; \
-		uv venv $(VIRTUAL_ENV) --python $(PYTHON_VERSION); \
+		uv venv "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
 	else \
 		echo "Python virtual env already exists in \`${VIRTUAL_ENV}\`"; \
 	fi
-	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(which $$(readlink -f $(VENV_PYTHON)))"
+	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(readlink $(VENV_PYTHON) 2>/dev/null || echo $(VENV_PYTHON))"
 
 install: env
 	$(call PRINT_TITLE,"Installing dependencies")
-	@. $(VIRTUAL_ENV)/bin/activate && \
+	@. "$(VIRTUAL_ENV)/bin/activate" && \
 	uv sync --all-extras && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
 
@@ -406,7 +407,7 @@ merge-check-ruff-lint: env check-unused-imports
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VIRTUAL_ENV)/bin/python3
+	$(VENV_PYRIGHT) --pythonpath "$(VIRTUAL_ENV)/bin/python3"
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
