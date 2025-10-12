@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Guide for writing Python code
+globs: *.py
 alwaysApply: true
 ---
 # Coding Standards & Best Practices

@@ -1,0 +1,52 @@
+[meta]
+version = "1.0.0"
+description = "Pipelex kit configuration for agent documentation and cursor rules"
+
+[agents]
+order = [
+    "python_standards.md",
+    "pytest_standards.md",
+    "write_pipelex.md",
+    "run_pipelines.md",
+]
+demote = 1
+
+[cursor.front_matter]
+alwaysApply = false
+
+[cursor.files.python_standards]
+front_matter = { description = "Python coding standards and best practices", globs = [
+    "**/*.py",
+] }
+
+[cursor.files.pytest_standards]
+front_matter = { description = "Pytest testing standards", globs = [
+    "tests/**/*.py",
+] }
+
+[cursor.files.write_pipelex]
+front_matter = { description = "Guidelines for writing Pipelex pipelines", globs = [
+    "**/*.plx",
+    "**/pipelines/**/*.py",
+] }
+
+[cursor.files.run_pipelines]
+front_matter = { description = "Guidelines for running Pipelex pipelines", globs = [
+    "examples/**/*.py",
+] }
+
+[[targets]]
+id = "agents_md"
+path = "AGENTS.md"
+strategy = "merge"
+marker_begin = "<!-- BEGIN_PIPELEX_KIT_RULES -->"
+marker_end = "<!-- END_PIPELEX_KIT_RULES -->"
+parent = "# Coding Standards & Best Practices"
+
+[[targets]]
+id = "claude_md"
+path = "CLAUDE.md"
+strategy = "merge"
+marker_begin = "<!-- BEGIN_PIPELEX_KIT_RULES -->"
+marker_end = "<!-- END_PIPELEX_KIT_RULES -->"
+parent = "# Coding Standards & Best Practices"

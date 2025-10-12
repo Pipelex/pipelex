@@ -6,6 +6,7 @@ from typing import Annotated
 import typer
 
 from pipelex.exceptions import PipelexCLIError
+from pipelex.kit.paths import get_configs_dir
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.config.manager import config_manager
 
@@ -32,7 +33,7 @@ def do_init_libraries(directory: str = ".", overwrite: bool = False) -> None:
 
 def do_init_config(reset: bool = False) -> None:
     """Initialize pipelex configuration in the current directory."""
-    config_template_dir = os.path.join(config_manager.pipelex_root_dir, "config_template")
+    config_template_dir = str(get_configs_dir())
     target_config_dir = config_manager.pipelex_config_dir
 
     os.makedirs(target_config_dir, exist_ok=True)

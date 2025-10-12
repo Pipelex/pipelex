@@ -1,3 +1,9 @@
+---
+alwaysApply: false
+description: Guidelines for running Pipelex pipelines
+globs:
+- examples/**/*.py
+---
 # Guide to execute a pipeline and write example code
 
 ## Example to execute a pipeline with text output
