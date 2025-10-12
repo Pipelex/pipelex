@@ -3,8 +3,6 @@ import os
 from configparser import ConfigParser
 from typing import Any
 
-import toml
-
 from pipelex.tools.config.config_root import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
@@ -98,7 +96,7 @@ class ConfigManager:
 
             return None
 
-        pyproject = toml.load(pyproject_path)
+        pyproject = load_toml_from_path(path=pyproject_path)
         if "tool" in pyproject and "pipelex" in pyproject["tool"] and "config_inheritance" in pyproject["tool"]["pipelex"]:
             for config_name in pyproject["tool"]["pipelex"]["config_inheritance"]:
                 package_path = _find_package_path(config_name)
@@ -179,30 +177,16 @@ class ConfigManager:
         """
         # First check pipelex's pyproject.toml
         pipelex_pyproject_path = os.path.join(os.path.dirname(self.local_root_dir), "pyproject.toml")
-        try:
-            pyproject = toml.load(pipelex_pyproject_path)
-            if (project_name := pyproject.get("project", {}).get("name")) and isinstance(project_name, str):
+        if pipelex_pyproject := load_toml_from_path_if_exists(path=pipelex_pyproject_path):
+            if (project_name := pipelex_pyproject.get("project", {}).get("name")) and isinstance(project_name, str):
                 return str(project_name)
-        except FileNotFoundError:
-            pass
-        except toml.TomlDecodeError as exc:
-            print(f"Failed to parse pipelex pyproject.toml at {pipelex_pyproject_path}: {exc}")
-        except (KeyError, TypeError, AttributeError) as exc:
-            print(f"Invalid structure in pipelex pyproject.toml at {pipelex_pyproject_path}: {exc}")
 
         # Check local pyproject.toml
-        pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
-        try:
-            pyproject = toml.load(pyproject_path)
-            name_obj: object = pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name")
+        local_pyproject_path = os.path.join(self.local_root_dir, "pyproject.toml")
+        if local_pyproject := load_toml_from_path_if_exists(local_pyproject_path):
+            name_obj: object = local_pyproject.get("project", {}).get("name") or local_pyproject.get("tool", {}).get("poetry", {}).get("name")
             if isinstance(name_obj, str):
                 return name_obj
-        except FileNotFoundError as exc:
-            print(f"Local pyproject.toml not found at {pyproject_path}: {exc}")
-        except toml.TomlDecodeError as exc:
-            print(f"Failed to parse local pyproject.toml at {pyproject_path}: {exc}")
-        except (KeyError, TypeError, AttributeError) as exc:
-            print(f"Invalid structure in local pyproject.toml at {pyproject_path}: {exc}")
 
         # Check setup.cfg
         setup_cfg_path = os.path.join(self.local_root_dir, "setup.cfg")
