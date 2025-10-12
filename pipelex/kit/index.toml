@@ -3,37 +3,57 @@ version = "1.0.0"
 description = "Pipelex kit configuration for agent documentation and cursor rules"
 
 [agents]
-order = [
+demote = 1
+default_set = "pipelex_language"
+
+[agents.sets]
+coding_standards = [
     "python_standards.md",
     "pytest_standards.md",
-    "write_pipelex.md",
-    "run_pipelines.md",
+    "docs.md",
+    "tdd.md",
 ]
-demote = 1
+pipelex_language = ["write_pipelex.md", "run_pipelex.md", "llms.md"]
+all = [
+    "python_standards.md",
+    "pytest_standards.md",
+    "docs.md",
+    "tdd.md",
+    "write_pipelex.md",
+    "run_pipelex.md",
+    "llms.md",
+]
 
 [cursor.front_matter]
 alwaysApply = false
 
-[cursor.files.python_standards]
-front_matter = { description = "Python coding standards and best practices", globs = [
-    "**/*.py",
-] }
+[cursor.files.python_standards.front_matter]
+description = "Python coding standards and best practices"
+globs = ["**/*.py"]
 
-[cursor.files.pytest_standards]
-front_matter = { description = "Pytest testing standards", globs = [
-    "tests/**/*.py",
-] }
+[cursor.files.pytest_standards.front_matter]
+description = "Guidelines for writing unit tests"
+globs = ["tests/**/*.py"]
 
-[cursor.files.write_pipelex]
-front_matter = { description = "Guidelines for writing Pipelex pipelines", globs = [
-    "**/*.plx",
-    "**/pipelines/**/*.py",
-] }
+[cursor.files.docs.front_matter]
+description = "Guidelines for writing documentation"
+globs = ["docs/**/*.md"]
 
-[cursor.files.run_pipelines]
-front_matter = { description = "Guidelines for running Pipelex pipelines", globs = [
-    "examples/**/*.py",
-] }
+[cursor.files.tdd.front_matter]
+description = "Guidelines for writing test-driven development code"
+globs = []
+
+[cursor.files.write_pipelex.front_matter]
+description = "Guidelines for writing Pipelex pipelines"
+globs = ["**/*.plx", "**/pipelines/**/*.py"]
+
+[cursor.files.run_pipelex.front_matter]
+description = "Guidelines for running Pipelex pipelines"
+globs = ["examples/**/*.py"]
+
+[cursor.files.llms.front_matter]
+description = "LLM configuration and usage guidelines"
+globs = ["*.plx", "*.toml"]
 
 [[targets]]
 id = "agents_md"

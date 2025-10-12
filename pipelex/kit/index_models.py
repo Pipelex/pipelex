@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field
 class AgentsMerge(BaseModel):
     """Configuration for merging agent documentation files."""
 
-    order: list[str] = Field(description="Ordered list of agent markdown files to merge")
+    sets: dict[str, list[str]] = Field(description="Named sets of agent_rules files (e.g., coding_standards, pipelex_language, all)")
+    default_set: str = Field(default="pipelex_language", description="Default set to use when syncing")
     demote: int = Field(default=1, description="Number of levels to demote headings when merging")
 
 

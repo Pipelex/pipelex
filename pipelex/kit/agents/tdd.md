@@ -1,8 +1,3 @@
----
-alwaysApply: false
-description: ''
-globs: []
----
 # Test-Driven Development Guide
 
 This document outlines our test-driven development (TDD) process and the tools available for testing.

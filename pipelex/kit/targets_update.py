@@ -48,19 +48,27 @@ def _demote_headings(md_content: str, levels: int) -> str:
     return re.sub(pattern, demote_match, md_content, flags=re.MULTILINE)
 
 
-def build_merged_rules(agents_dir: Traversable, idx: KitIndex) -> str:
+def build_merged_rules(agents_dir: Traversable, idx: KitIndex, agent_set: str | None = None) -> str:
     """Build merged agent documentation from ordered files.
 
     Args:
         agents_dir: Traversable pointing to agents directory
         idx: Kit index configuration
+        agent_set: Name of the agent set to use (defaults to idx.agents.default_set)
 
     Returns:
         Merged markdown content with demoted headings
     """
+    if agent_set is None:
+        agent_set = idx.agents.default_set
+
+    if agent_set not in idx.agents.sets:
+        msg = f"Agent set '{agent_set}' not found in index.toml. Available sets: {list(idx.agents.sets.keys())}"
+        raise ValueError(msg)
+
     parts: list[str] = []
 
-    for name in idx.agents.order:
+    for name in idx.agents.sets[agent_set]:
         md = _read_agent_file(agents_dir, name)
         demoted = _demote_headings(md, idx.agents.demote)
         parts.append(demoted.rstrip())

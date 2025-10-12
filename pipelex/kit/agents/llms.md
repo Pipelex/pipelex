@@ -1,9 +1,3 @@
----
-alwaysApply: false
-globs:
-- '*.plx'
-- '*.toml'
----
 # Rules to choose LLM models used in PipeLLMs.
 
 ## LLM Configuration System

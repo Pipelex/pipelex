@@ -1,7 +1,8 @@
 ---
-description: Guide for writing unit tests
-globs: tests/**/*.py
 alwaysApply: false
+description: Pytest testing standards
+globs:
+- tests/**/*.py
 ---
 # Writing unit tests
 
@@ -9,10 +10,7 @@ alwaysApply: false
 
 NEVER USE unittest.mock or MagicMock. YOU MUST USE pytest-mock instead.
 
-These rules apply when writing unit tests.
-- Always use pytest
-
-## Test file structure
+### Test file structure
 
 - Name test files with `test_` prefix
 - Use descriptive names that match the functionality being tested
@@ -26,12 +24,12 @@ These rules apply when writing unit tests.
 - Always put test inside Test classes.
 - The pipelex pipelines should be stored in `tests/test_pipelines` as well as the related structured Output classes that inherit from `StructuredContent`
 
-## Markers
+### Markers
 
 Apply the appropriate markers:
 - "llm: uses an LLM to generate text or objects"
 - "img_gen: uses an image generation AI"
-- "extract: uses ocr models"
+- "extract: uses text/image extraction from documents"
 - "inference: uses either an LLM or an image generation AI"
 - "gha_disabled: will not be able to run properly on GitHub Actions"
 
@@ -41,7 +39,7 @@ Several markers may be applied. For instance, if the test uses an LLM, then it u
 
 - Never use the unittest.mock. Use pytest-mock.
 
-## Test Class Structure
+### Test Class Structure
 
 Always group the tests of a module into a test class:
 
