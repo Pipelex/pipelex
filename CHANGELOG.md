@@ -84,6 +84,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Added `MissingDependencyError` exception for missing optional dependencies
 
 ### Changed
+ - Replaced package `toml` by `tomli` which is more modern and faster
  - Updated Gemini 2.0 model from `gemini-2.0-flash-exp` to `gemini-2.0-flash` with new pricing (input: $0.10, output: $0.40 per million tokens)
  - Updated Gemini 2.5 Series comment from '(when available)' to stable release
  - Updated `base-claude` from `claude-4-sonnet` to `claude-4.5-sonnet` across all presets
