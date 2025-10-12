@@ -16,6 +16,7 @@ from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringOrCo
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.tools.func_registry import pipe_func
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
 from pipelex.types import Self, StrEnum
 
@@ -250,6 +251,7 @@ class ConceptSpec(StructuredContent):
         return ConceptBlueprint(description=self.description, structure=converted_structure, refines=self.refines)
 
 
+@pipe_func()
 async def create_concept_spec(working_memory: WorkingMemory) -> ConceptSpec:
     concept_spec_draft = working_memory.get_stuff_as(name="concept_spec_draft", content_type=ConceptSpecDraft)
     concept_spec_structures_stuff = working_memory.get_stuff_as_list(name="concept_spec_structures", item_type=ConceptStructureSpec)

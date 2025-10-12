@@ -34,6 +34,7 @@ from pipelex.exceptions import (
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.config.manager import config_manager
+from pipelex.tools.func_registry import pipe_func
 from pipelex.tools.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.types import StrEnum
@@ -272,9 +273,14 @@ class LibraryManager(LibraryManagerAbstract):
             # Only import files that contain StructuredContent subclasses (uses AST pre-check)
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=str(library_dir),
-                base_class_names=["StructuredContent"],
+                base_class_names=[StructuredContent.__name__],
             )
-            FuncRegistryUtils.register_funcs_in_folder(folder_path=str(library_dir))
+            # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
+            FuncRegistryUtils.register_funcs_in_folder(
+                folder_path=str(library_dir),
+                decorator_names=[pipe_func.__name__],
+                require_decorator=True,
+            )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
         num_registered = ClassRegistryUtils.auto_register_all_subclasses(base_class=StructuredContent)

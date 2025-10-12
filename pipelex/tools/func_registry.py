@@ -13,9 +13,49 @@ FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
 T = TypeVar("T")
 FuncRegistryDict = dict[str, Callable[..., Any]]
 
+# Attribute name used by the decorator to mark functions for registration
+PIPE_FUNC_MARKER = "_is_pipe_func"
+
 
 class FuncRegistryError(ToolException):
     pass
+
+
+def pipe_func(name: str | None = None) -> Callable[[T], T]:
+    """Decorator to mark a function for automatic registration in the func_registry.
+
+    This decorator marks functions to be discovered and registered for use in PipeFunc operators.
+    Functions marked with this decorator must follow the PipeFunc signature:
+    - Accept exactly one parameter named "working_memory" of type WorkingMemory
+    - Return a StuffContent or subclass
+
+    Args:
+        name: Optional custom name for registration. If not provided, uses function's __name__
+
+    Returns:
+        The decorated function unchanged, but marked for registration
+
+    Example:
+        @pipe_func()
+        async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
+            result = working_memory.get_stuff("input")
+            return TextContent(text=f"Processed: {result}")
+
+        @pipe_func(name="custom_name")
+        async def another_function(working_memory: WorkingMemory) -> MyContent:
+            return MyContent(data="example")
+
+    """
+
+    def decorator(func: T) -> T:
+        # Mark the function with the attribute
+        setattr(func, PIPE_FUNC_MARKER, True)
+        # Store custom name if provided
+        if name is not None:
+            func._pipe_func_name = name  # type: ignore[attr-defined] # noqa: SLF001
+        return func
+
+    return decorator
 
 
 class FuncRegistry(RootModel[FuncRegistryDict]):
@@ -113,13 +153,38 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         """Checks if a function is in the registry by its name."""
         return name in self.root
 
-    def is_eligible_function(self, func: Any) -> bool:
+    def is_marked_pipe_func(self, func: Any) -> bool:
+        """Checks if a function is marked with the @pipe_func decorator.
+
+        Args:
+            func: The function to check
+
+        Returns:
+            True if the function has the pipe_func marker attribute
+
+        """
+        return hasattr(func, PIPE_FUNC_MARKER) and getattr(func, PIPE_FUNC_MARKER) is True
+
+    def is_eligible_function(self, func: Any, require_decorator: bool = False) -> bool:
         """Checks if a function matches the criteria for PipeFunc registration:
         - Must be callable
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
+        - Optionally must be marked with @pipe_func decorator if require_decorator=True
+
+        Args:
+            func: The function to check
+            require_decorator: If True, only functions marked with @pipe_func are eligible
+
+        Returns:
+            True if the function meets all eligibility criteria
+
         """
         if not callable(func):
+            return False
+
+        # If decorator is required, check for it first (fast check)
+        if require_decorator and not self.is_marked_pipe_func(func):
             return False
 
         the_function = cast("Callable[..., Any]", func)

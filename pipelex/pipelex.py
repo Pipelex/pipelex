@@ -88,7 +88,9 @@ class Pipelex(metaclass=MetaSingleton):
         try:
             self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig)
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+            validation_error_msg = report_validation_error(
+                category="config", validation_error=validation_error
+            )
             msg = f"Could not setup config because of: {validation_error_msg}"
             raise PipelexConfigError(msg) from validation_error
 
@@ -115,7 +117,9 @@ class Pipelex(metaclass=MetaSingleton):
 
         self.reporting_delegate: ReportingProtocol
         if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager(reporting_config=get_config().pipelex.reporting_config)
+            self.reporting_delegate = reporting_delegate or ReportingManager(
+                reporting_config=get_config().pipelex.reporting_config
+            )
         else:
             self.reporting_delegate = ReportingNoOp()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
@@ -140,7 +144,9 @@ class Pipelex(metaclass=MetaSingleton):
         if pipeline_tracker:
             self.pipeline_tracker = pipeline_tracker
         elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
-            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
+            self.pipeline_tracker = PipelineTracker(
+                tracker_config=get_config().pipelex.tracker_config
+            )
         else:
             self.pipeline_tracker = PipelineTrackerNoOp()
         self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
@@ -164,7 +170,9 @@ class Pipelex(metaclass=MetaSingleton):
         return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
 
     @staticmethod
-    def _get_validation_error_msg(component_name: str, validation_exc: Exception) -> str:
+    def _get_validation_error_msg(
+        component_name: str, validation_exc: Exception
+    ) -> str:
         """Generate error message for invalid config files."""
         msg = ""
         cause_exc = validation_exc.__cause__
@@ -209,10 +217,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = self._get_config_not_found_error_msg("model deck")
             raise PipelexSetupError(msg) from deck_not_found_exc
         except RoutingProfileValidationError as routing_validation_exc:
-            msg = self._get_validation_error_msg("routing profile library", routing_validation_exc)
+            msg = self._get_validation_error_msg(
+                "routing profile library", routing_validation_exc
+            )
             raise PipelexSetupError(msg) from routing_validation_exc
         except InferenceBackendLibraryValidationError as backend_validation_exc:
-            msg = self._get_validation_error_msg("inference backend library", backend_validation_exc)
+            msg = self._get_validation_error_msg(
+                "inference backend library", backend_validation_exc
+            )
             raise PipelexSetupError(msg) from backend_validation_exc
         except ModelDeckValidationError as deck_validation_exc:
             msg = self._get_validation_error_msg("model deck", deck_validation_exc)
@@ -251,27 +263,37 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         observer_provider = observer_provider or LocalObserver()
         self.pipelex_hub.set_observer_provider(observer_provider=observer_provider)
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer_provider=observer_provider))
+        self.pipelex_hub.set_pipe_router(
+            pipe_router or PipeRouter(observer_provider=observer_provider)
+        )
 
         # pipeline
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
+        log.debug(
+            f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}"
+        )
 
     def setup_libraries(self):
         self.library_manager.setup()
         self.library_manager.load_libraries()
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
+        log.debug(
+            f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}"
+        )
 
     def validate_libraries(self):
         try:
             self.library_manager.validate_libraries()
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+            validation_error_msg = report_validation_error(
+                category="plx", validation_error=validation_error
+            )
             msg = f"Could not validate libraries because of: {validation_error_msg}"
             raise PipelexSetupError(msg) from validation_error
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}")
+        log.debug(
+            f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}"
+        )
 
     def teardown(self):
         # pipelex
@@ -290,7 +312,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.class_registry.teardown()
         func_registry.teardown()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)")
+        log.debug(
+            f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)"
+        )
         self.pipelex_hub.reset_config()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:
