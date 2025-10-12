@@ -459,7 +459,116 @@ make check
 make tp
 ```
 
-## 10. Common Issues
+## 10. Python API Changes for Client Projects
+
+These changes affect Python code that imports from or uses pipelex.
+
+### Renamed Base Library Pipes
+
+**Find:** `ocr_page_contents_from_pdf`
+**Replace with:** `extract_page_contents_from_pdf`
+
+**Find:** `ocr_page_contents_and_views_from_pdf`
+**Replace with:** `extract_page_contents_and_views_from_pdf`
+
+**Before:**
+```python
+pipe_output = await execute_pipeline(
+    pipe_code="ocr_page_contents_from_pdf",
+    input_memory={
+        "ocr_input": PDFContent(url=pdf_url),
+    },
+)
+```
+
+**After:**
+```python
+pipe_output = await execute_pipeline(
+    pipe_code="extract_page_contents_from_pdf",
+    input_memory={
+        "document": PDFContent(url=pdf_url),
+    },
+)
+```
+
+### Removed Methods and Classes
+
+The following methods and classes have been removed. If your code uses them, you'll need to refactor:
+
+- `PipeLibrary.add_or_update_pipe()` - Removed
+- `PipelexHub.get_optional_library_manager()` - Removed
+- Hub methods: `get_optional_domain_provider()` and `get_optional_concept_provider()` - Removed
+
+### Renamed Internal Classes (if used)
+
+If your project directly imports these internal classes:
+
+- `ConceptProviderAbstract` → `ConceptLibraryAbstract`
+- `DomainProviderAbstract` → `DomainLibraryAbstract`
+- `PipeProviderAbstract` → `PipeLibraryAbstract`
+- `PipeInputSpec` → `InputRequirements`
+- `PipeInputSpecFactory` → `InputRequirementsFactory`
+- `PipelexError` → `PipelexException` (base exception class)
+
+### Hub Method Renames
+
+If you use hub methods directly:
+
+**Find:** `get_*_provider()`
+**Replace with:** `get_*_library()`
+
+**Find:** `set_*_provider()`
+**Replace with:** `set_*_library()`
+
+### External Plugin API Changes
+
+If you're using external LLM plugins:
+
+**Find:** `llm_handle` parameter
+**Replace with:** `model` parameter
+
+**Before:**
+```python
+get_inference_manager().set_llm_worker_from_external_plugin(
+    llm_handle="my_custom_llm",
+    llm_worker_class=MyLLMWorker,
+)
+```
+
+**After:**
+```python
+get_inference_manager().set_llm_worker_from_external_plugin(
+    model="my_custom_llm",
+    llm_worker_class=MyLLMWorker,
+)
+```
+
+## 11. File Cleanup
+
+### Remove Deprecated Files
+
+Remove the following files if they exist in your project:
+
+```bash
+# Remove old template file (moved to .pipelex/pipelex.toml)
+rm -f pipelex_libraries/templates/base_templates.toml
+rm -rf pipelex_libraries/templates/  # If empty after removal
+```
+
+### Update Documentation Files
+
+If your project has `AGENTS.md` or `CLAUDE.md` files with Pipelex examples:
+
+1. Update all PLX syntax examples following sections 1-8 of this guide
+2. Update Python code examples following section 10
+3. Search for and update:
+   - `ocr_page_contents_from_pdf` → `extract_page_contents_from_pdf`
+   - `type = "PipeOcr"` → `type = "PipeExtract"`
+   - `ocr_model` → `model`
+   - `llm = ` → `model = `
+   - `prompt_template = ` → `prompt = `
+
+## 12. Common Issues
 
 ### Issue: Pipeline validation fails with "unknown field"
 
@@ -479,7 +588,19 @@ make tp
 
 **Solution:** Rename sections and fields in your .pipelex/ configuration files.
 
-## 11. Automated Migration Script
+### Issue: Import errors for renamed classes
+
+**Cause:** Code imports classes that were renamed (e.g., `ConceptProviderAbstract`).
+
+**Solution:** Update imports to use new names (`ConceptLibraryAbstract`, etc.) or refactor to avoid using internal classes.
+
+### Issue: base_templates.toml not found
+
+**Cause:** The `base_templates.toml` file has been removed. Generic prompts moved to `.pipelex/pipelex.toml`.
+
+**Solution:** Remove references to this file. The templates are now auto-loaded from the config.
+
+## 13. Automated Migration Script
 
 You can use this bash script to automatically apply most changes:
 
@@ -499,6 +620,21 @@ find . -name "*.plx" -type f -exec sed -i '' \
   -e 's/default_pipe_code = /default_outcome = /g' \
   {} +
 
+# Update Python files with renamed pipe codes
+find . -name "*.py" -type f -exec sed -i '' \
+  -e 's/ocr_page_contents_from_pdf/extract_page_contents_from_pdf/g' \
+  -e 's/ocr_page_contents_and_views_from_pdf/extract_page_contents_and_views_from_pdf/g' \
+  {} +
+
+# Update documentation files
+find . \( -name "AGENTS.md" -o -name "CLAUDE.md" \) -type f -exec sed -i '' \
+  -e 's/definition = "/description = "/g' \
+  -e 's/type = "PipeOcr"/type = "PipeExtract"/g' \
+  -e 's/ocr_model = /model = /g' \
+  -e 's/ocr_page_contents_from_pdf/extract_page_contents_from_pdf/g' \
+  -e 's/ocr_page_contents_and_views_from_pdf/extract_page_contents_and_views_from_pdf/g' \
+  {} +
+
 # Find all .toml files in .pipelex and apply replacements
 find .pipelex -name "*.toml" -type f -exec sed -i '' \
   -e 's/llm_handle = /model = /g' \
@@ -516,6 +652,9 @@ find .pipelex -name "*.toml" -type f -exec sed -i '' \
 find tests -name "*.py" -type f -exec sed -i '' \
   -e 's/@pytest\.mark\.ocr/@pytest.mark.extract/g' \
   {} +
+
+# Remove deprecated files
+rm -f pipelex_libraries/templates/base_templates.toml
 
 echo "Automated migration complete. Please review changes and:"
 echo "1. Manually add default_outcome to all PipeCondition pipes"
@@ -547,6 +686,14 @@ Get-ChildItem -Path . -Filter *.plx -Recurse | ForEach-Object {
     Set-Content -Path $_.FullName -Value $content -NoNewline
 }
 
+# Update Python files with renamed pipe codes
+Get-ChildItem -Path . -Filter *.py -Recurse | ForEach-Object {
+    $content = Get-Content $_.FullName -Raw
+    $content = $content -replace 'ocr_page_contents_from_pdf', 'extract_page_contents_from_pdf'
+    $content = $content -replace 'ocr_page_contents_and_views_from_pdf', 'extract_page_contents_and_views_from_pdf'
+    Set-Content -Path $_.FullName -Value $content -NoNewline
+}
+
 # Find all .toml files in .pipelex and apply replacements
 Get-ChildItem -Path .pipelex -Filter *.toml -Recurse | ForEach-Object {
     $content = Get-Content $_.FullName -Raw
@@ -569,6 +716,9 @@ Get-ChildItem -Path tests -Filter *.py -Recurse | ForEach-Object {
     Set-Content -Path $_.FullName -Value $content -NoNewline
 }
 
+# Remove deprecated files
+Remove-Item -Path "pipelex_libraries/templates/base_templates.toml" -ErrorAction SilentlyContinue
+
 Write-Host "Automated migration complete. Please review changes and:"
 Write-Host "1. Manually add default_outcome to all PipeCondition pipes"
 Write-Host "2. Tag image inputs in PipeLLM prompts"
@@ -576,7 +726,7 @@ Write-Host "3. Remove nb_steps from PipeImgGen if present"
 Write-Host "4. Run 'make validate' to check for errors"
 ```
 
-## 12. Additional Resources
+## 14. Additional Resources
 
 - See AGENTS.md for complete documentation of the current syntax
 - Run `make validate` frequently to catch issues early
