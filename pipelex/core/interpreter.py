@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, model_validator
 
@@ -7,8 +6,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import (
     PipelexConfigurationError,
 )
-from pipelex.tools.misc.file_utils import load_text_from_path
-from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content
+from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
 from pipelex.types import Self
 
 
@@ -43,16 +41,6 @@ class PipelexInterpreter(BaseModel):
             msg = "Either file_path or file_content must be provided"
             raise PipelexConfigurationError(msg)
         return self
-
-    def _get_content(self) -> str:
-        """Load PLX content from file_path or use file_content directly."""
-        if self.file_path:
-            return load_text_from_path(path=str(self.file_path))
-        elif self.file_content:
-            return self.file_content
-        else:
-            msg = "file_content must be provided if file_path is not provided"
-            raise PipelexConfigurationError(msg)
 
     @staticmethod
     def is_pipelex_file(file_path: Path) -> bool:
@@ -89,19 +77,18 @@ class PipelexInterpreter(BaseModel):
             # If we can't read the file, it's not a valid Pipelex file
             return False
 
-    def _parse_plx_content(self, content: str) -> dict[str, Any]:
-        """Parse PLX content and return the dictionary."""
-        try:
-            return load_toml_from_content(content=content)
-        except TomlError as exc:
-            file_path_str = str(self.file_path) if self.file_path else "string content"
-            msg = f"PLX parsing error in '{file_path_str}': {exc}"
-            raise PLXDecodeError(message=msg, doc=exc.doc, pos=exc.pos) from exc
-
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
-        file_content = self._get_content()
-        blueprint_dict = self._parse_plx_content(file_content)
-        if self.file_path:
-            blueprint_dict.update(source=str(self.file_path))
+        # Load PLX content from file_path or use file_content directly.
+        try:
+            if self.file_path:
+                blueprint_dict = load_toml_from_path(path=str(self.file_path))
+                blueprint_dict.update(source=str(self.file_path))
+            elif self.file_content:
+                blueprint_dict = load_toml_from_content(content=self.file_content)
+            else:
+                msg = "Could not make PipelexBundleBlueprint: either file_path or file_content must be provided"
+                raise PipelexConfigurationError(msg)
+        except TomlError as exc:
+            raise PLXDecodeError(message=exc.message, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
         return PipelexBundleBlueprint.model_validate(blueprint_dict)
