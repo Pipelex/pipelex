@@ -83,7 +83,7 @@ inputs = { "invoice_page.page_view" = "Page", invoice_details = "InvoiceDetails"
 output = "Invoice"
 # The output is constrained to the "Invoice" model
 model = "llm_to_extract_invoice" 
-prompt_template = """
+prompt = """
 Extract invoice information from this invoice:
 
 The category of this invoice is: $invoice_details.category.

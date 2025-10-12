@@ -82,7 +82,7 @@ inputs = { gantt_chart_image = "GanttChartImage", gantt_timescale = "GanttTimesc
 output = "GanttTaskDetails" # The output is structured as a GanttTaskDetails object
 structuring_method = "preliminary_text"
 model = "llm_to_extract_diagram"
-prompt_template = """
+prompt = """
 I am sharing an image of a Gantt chart.
 Please analyse the image and for a given task name (and only this task), extract the information of the task, if relevant.
 

@@ -16,12 +16,12 @@ coding_standards = [
 pipelex_language = ["write_pipelex.md", "run_pipelex.md", "llms.md"]
 all = [
     "python_standards.md",
-    "pytest_standards.md",
-    "docs.md",
-    "tdd.md",
     "write_pipelex.md",
     "run_pipelex.md",
+    "docs.md",
     "llms.md",
+    "pytest_standards.md",
+    "tdd.md",
 ]
 
 [cursor.front_matter]
@@ -56,17 +56,41 @@ description = "LLM configuration and usage guidelines"
 globs = ["*.plx", "*.toml"]
 
 [[targets]]
-id = "agents_md"
+id = "agents"
 path = "AGENTS.md"
 strategy = "merge"
-marker_begin = "<!-- BEGIN_PIPELEX_KIT_RULES -->"
-marker_end = "<!-- END_PIPELEX_KIT_RULES -->"
+marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
+marker_end = "<!-- END_PIPELEX_RULES -->"
 parent = "# Coding Standards & Best Practices"
 
 [[targets]]
-id = "claude_md"
+id = "claude"
 path = "CLAUDE.md"
 strategy = "merge"
-marker_begin = "<!-- BEGIN_PIPELEX_KIT_RULES -->"
-marker_end = "<!-- END_PIPELEX_KIT_RULES -->"
+marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
+marker_end = "<!-- END_PIPELEX_RULES -->"
+parent = "# Coding Standards & Best Practices"
+
+[[targets]]
+id = "github_copilot"
+path = ".github/copilot-instructions.md"
+strategy = "merge"
+marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
+marker_end = "<!-- END_PIPELEX_RULES -->"
+parent = "# Coding Standards & Best Practices"
+
+[[targets]]
+id = "windsurf"
+path = ".windsurfrules.md"
+strategy = "merge"
+marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
+marker_end = "<!-- END_PIPELEX_RULES -->"
+parent = "# Coding Standards & Best Practices"
+
+[[targets]]
+id = "blackbox"
+path = "BLACKBOX_RULES.md"
+strategy = "merge"
+marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
+marker_end = "<!-- END_PIPELEX_RULES -->"
 parent = "# Coding Standards & Best Practices"

@@ -82,7 +82,7 @@ system_prompt = """
 You are an expert in social media optimization, particularly for tech content on Twitter/X.
 Your role is to analyze tech tweets and check if they display typical startup communication pitfalls.
 """
-prompt_template = """
+prompt = """
 Evaluate the tweet for these key issues:
 
 **Fluffiness** - Overuse of buzzwords without concrete meaning...

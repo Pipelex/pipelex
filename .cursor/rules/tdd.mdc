@@ -1,6 +1,6 @@
 ---
 alwaysApply: false
-description: ''
+description: Guidelines for writing test-driven development code
 globs: []
 ---
 # Test-Driven Development Guide

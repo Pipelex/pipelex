@@ -1,6 +1,6 @@
 ---
 alwaysApply: false
-description: Pytest testing standards
+description: Guidelines for writing unit tests
 globs:
 - tests/**/*.py
 ---

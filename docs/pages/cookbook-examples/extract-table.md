@@ -77,7 +77,7 @@ type = "PipeLLM"
 description = "Review an HTML table"
 inputs = { table_screenshot = "TableScreenshot", html_table = "HtmlTable" }
 output = "HtmlTable"
-prompt_template = """
+prompt = """
 Your role is to correct an html_table to make sure that it matches the one in the provided image.
 
 @html_table

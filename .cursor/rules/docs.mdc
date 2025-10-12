@@ -1,6 +1,6 @@
 ---
 alwaysApply: false
-description: ''
+description: Guidelines for writing documentation
 globs:
 - docs/**/*.md
 ---

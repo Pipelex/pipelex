@@ -35,7 +35,7 @@ type = "PipeLLM"
 description = "Write text about Hello World."
 output = "Text"
 model = { model = "gpt-5", temperature = 0.9 }
-prompt_template = """
+prompt = """
 Write a haiku about Hello World.
 """
 ```
@@ -61,7 +61,7 @@ description = "Extract invoice information from an invoice text transcript"
 inputs = { invoice_text = "InvoiceText" }
 output = "Invoice"
 model = "llm_to_extract_invoice"
-prompt_template = """
+prompt = """
 Extract invoice information from this invoice:
 
 The category of this invoice is: $invoice_details.category.

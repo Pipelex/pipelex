@@ -21,7 +21,7 @@ type = "PipeLLM"
 description = "Answer a question"
 inputs = { question = "tutorial.Question" }
 output = "tutorial.Answer"
-prompt_template = """
+prompt = """
 Please answer the following question:
 
 @question

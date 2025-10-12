@@ -1,156 +1,29 @@
-# Coding Standards & Best Practices
-
-This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
-
-## Type Hints
-
-1. **Always Use Type Hints**
-
-    - Every function parameter must be typed
-    - Every function return must be typed
-    - Use type hints for all variables where type is not obvious
-    - Use dict, list, tupele types with lowercase first letter: dict[], list[], tuple[]
-    - Use type hints for all fields
-    - Use the `|` syntax for union types (e.g `str | int`) and `| None` for optionals
-    - Use Field(default_factory=...) for mutable defaults and if it's a list of something else than str, use `empty_list_factory_of()` to make a factory: `number_list: list[int] = Field(default_factory=empty_list_factory_of(int), description="A list of numbers")`
-    - Use `BaseModel` and respect Pydantic v2 standards, in particular use the modern `ConfigDict` when needed, e.g. `model_config = ConfigDict(extra="forbid", strict=True)`
-    - Keep models focused and single-purpose
-
-2. **StrEnum**
-   - Import from `pipelex.types`:
-   ```python
-   from pipelex.types import StrEnum
-   ```
-
-3. **Self type**
-   - Import from `pipelex.types`:
-   ```python
-   from pipelex.types import Self
-   ```
-
-## Factory Pattern
-
-    - Use Factory Pattern for object creation when dealing with multiple implementations
-    - Our factory methods are named `make_from_...` and such
-
-## Error Handling
-
-    - Always catch exceptions at the place where you can add useful context to it.
-    - Use try/except blocks with specific exceptions
-    - Convert third-party exceptions to our custom ones
-    - Never catch Exception, only catch specific exceptions
-    - Always add `from exc` to the exception
-   
-   ```python
-   try:
-       self.models_manager.setup()
-   except RoutingProfileLibraryNotFoundError as exc:
-       msg = "The routing library could not be found, please call `pipelex init config` to create it"
-       raise PipelexSetupError(msg) from exc
-   ```
-
-   **Note**: Following Ruff rules, we set the error message as a variable before raising it, for cleaner error traces.
-
-## Documentation
-
-1. **Docstring Format**
-   ```python
-   def process_image(image_path: str, size: Tuple[int, int]) -> bytes:
-       """Process and resize an image.
-       
-       Args:
-           image_path: Path to the source image
-           size: Tuple of (width, height) for resizing
-           
-       Returns:
-           Processed image as bytes
-       """
-       pass
-   ```
-
-2. **Class Documentation**
-   ```python
-   class ImageProcessor:
-       """Handles image processing operations.
-       
-       Provides methods for resizing, converting, and optimizing images.
-       """
-   ```
-
-## Code Quality Checks
-
-### Linting and Type Checking
-
-Before finalizing a task, run:
-```bash
-make fix-unused-imports
-make check
-```
-
-This runs multiple code quality tools:
-- Pyright: Static type checking
-- Ruff: Fast Python linter  
-- Mypy: Static type checker
-
-Always fix any issues reported by these tools before proceeding.
-
-### Running Tests
-
-1. **Quick Test Run** (no LLM/image generation):
-   ```bash
-   make tp
-   ```
-   Runs tests with markers: `(dry_runnable or not (inference or llm or img_gen or extract)) and not (needs_output or pipelex_api)`
-
-2. **Specific Tests**:
-   ```bash
-   make tp TEST=TestClassName
-   # or
-   make tp TEST=test_function_name
-   ```
-   Note: Matches names starting with the provided string.
-
-**Important**: Never run `make ti`, `make test-inference`, `make te`, `make test-extract`, `make tg`, or `make test-img-gen` - these use costly inference.
-
-## Pipelines
-
-- All pipeline definitions go in `pipelex/libraries/pipelines/`
-- Always validate pipelines after creation/edit with `make validate`.
-  Iterate if there are errors.
-
-## Project Structure
-
-- **Pipelines**: `pipelex/libraries/pipelines/`
-- **Tests**: `tests/` directory
-- **Documentation**: `docs/` directory
-
----
-
-# Guide to write or edit pipelines using the Pipelex language in .plx files
+<!-- BEGIN_PIPELEX_RULES -->
+## Guide to write or edit pipelines using the Pipelex language in .plx files
 
 - Always first write your "plan" in natural langage, then transcribe it in pipelex.
 - You should ALWAYS RUN the terminal command `make validate` when you are writing or editing a `.plx` file. It will ensure the pipe is runnable. If not, iterate.
 - Please use POSIX standard for files. (enmpty lines, no trailing whitespaces, etc.)
 
-## Pipeline File Naming
+### Pipeline File Naming
 - Files must be `.plx` for pipelines (Always add an empty line at the end of the file, and do not add trailing whitespaces to PLX files at all)
 - Files must be `.py` for structures
 - Use descriptive names in `snake_case`
 
-## Pipeline File Structure
+### Pipeline File Structure
 A pipeline file has three main sections:
 1. Domain statement
 2. Concept definitions
 3. Pipe definitions
 
-### Domain Statement
+#### Domain Statement
 ```plx
 domain = "domain_name"
 description = "Description of the domain" # Optional
 ```
 Note: The domain name usually matches the plx filename for single-file domains. For multi-file domains, use the subdirectory name.
 
-### Concept Definitions
+#### Concept Definitions
 ```plx
 [concept]
 ConceptName = "Description of the concept" # Should be the same name as the Structure ClassName you want to output
@@ -162,9 +35,9 @@ Important Rules:
 - Avoid adjectives (no "LargeText", use "Text")
 - Don't redefine native concepts (Text, Image, PDF, TextAndImages, Number)
 yes 
-### Pipe Definitions
+#### Pipe Definitions
 
-## Pipe Base Structure
+### Pipe Base Structure
 
 ```plx
 [pipe.your_pipe_name]
@@ -207,14 +80,14 @@ inputs = {
 
 - `output`: The name of the concept to output. The `ConceptName` should have the same name as the python class if you want structured output:
 
-## Structuring Models
+### Structuring Models
 
-### Model Location and Registration
+#### Model Location and Registration
 
 - Create models for structured generations related to "some_domain" in `pipelex_libraries/pipelines/<some_domain>.py`
 - Models must inherit from `StructuredContent` or appropriate content type
 
-## Model Structure
+### Model Structure
 
 Concepts and their structure classes are meant to indicate an idea.
 A Concept MUST NEVER be a plural noun and you should never create a SomeConceptList: lists and arrays are implicitly handled by Pipelex according to the context. Just define SomeConcept.
@@ -247,7 +120,7 @@ from pydantic import Field
 
 from pipelex.core.stuffs.structured_content import StructuredContent
 
-# IMPORTANT: THE CLASS MUST BE A SUBCLASS OF StructuredContent
+## IMPORTANT: THE CLASS MUST BE A SUBCLASS OF StructuredContent
 class YourModel(StructuredContent): # Always be a subclass of StructuredContent
     # Required fields
     field1: str
@@ -260,21 +133,21 @@ class YourModel(StructuredContent): # Always be a subclass of StructuredContent
     # Date fields should remove timezone
     date_field: Optional[datetime] = None
 ```
-### Usage
+#### Usage
 
 Structures are meant to indicate what class to use for a particular Concept. In general they use the same name as the concept.
 
 Structure classes defined within `pipelex_libraries/pipelines/` are automatically loaded into the class_registry when setting up Pipelex, no need to do it manually.
 
 
-### Best Practices for structures
+#### Best Practices for structures
 
 - Respect Pydantic v2 standards
 - Use type hints for all fields
 - Use `Field` declaration and write the description
 
 
-## Pipe Controllers and Pipe Operators
+### Pipe Controllers and Pipe Operators
 
 Look at the Pipes we have in order to adapt it. Pipes are organized in two categories:
 
@@ -290,11 +163,11 @@ Look at the Pipes we have in order to adapt it. Pipes are organized in two categ
    - `PipeImgGen` - Generate Images
    - `PipeFunc` - For running classic python scripts
 
-## PipeSequence controller
+### PipeSequence controller
 
 Purpose: PipeSequence executes multiple pipes in a defined order, where each step can use results from original inputs or from previous steps.
 
-### Basic Structure
+#### Basic Structure
 ```plx
 [pipe.your_sequence_name]
 type = "PipeSequence"
@@ -308,13 +181,13 @@ steps = [
 ]
 ```
 
-### Key Components
+#### Key Components
 
 1. **Steps Array**: List of pipes to execute in sequence
    - `pipe`: Name of the pipe to execute
    - `result`: Name to assign to the pipe's output that will be in the working memory
 
-### Using PipeBatch in Steps
+#### Using PipeBatch in Steps
 
 You can use PipeBatch functionality within steps using `batch_over` and `batch_as`:
 
@@ -335,11 +208,11 @@ steps = [
 
 The result of a batched step will be a `ListContent` containing the outputs from processing each item.
 
-## PipeCondition controller
+### PipeCondition controller
 
 The PipeCondition controller allows you to implement conditional logic in your pipeline, choosing which pipe to execute based on an evaluated expression. It supports both direct expressions and expression templates.
 
-### Basic usage
+#### Basic usage
 
 ```plx
 [pipe.conditional_operation]
@@ -371,7 +244,7 @@ medium = "process_medium"
 large = "process_large"
 ```
 
-### Key Parameters
+#### Key Parameters
 
 - `expression`: Direct boolean or string expression (mutually exclusive with expression_template)
 - `expression_template`: Jinja2 template for more complex conditional logic (mutually exclusive with expression)
@@ -395,13 +268,13 @@ approved = "process_approved"
 rejected = "process_rejected"
 ```
 
-## PipeLLM operator
+### PipeLLM operator
 
 PipeLLM is used to:
 1. Generate text or objects with LLMs
 2. Process images with Vision LLMs
 
-### Basic Usage
+#### Basic Usage
 
 Simple Text Generation:
 ```plx
@@ -437,7 +310,7 @@ system_prompt = "You are a data analysis expert"
 prompt = "Analyze this data"
 ```
 
-### Multiple Outputs
+#### Multiple Outputs
 
 Generate multiple outputs (fixed number):
 ```plx
@@ -457,7 +330,7 @@ output = "Idea"
 multiple_output = true  # Let the LLM decide how many to generate
 ```
 
-### Vision
+#### Vision
 
 Process images with VLMs (image inputs must be tagged in the prompt):
 ```plx
@@ -483,7 +356,7 @@ output = "Analysis"
 prompt = "Analyze the colors in $photo and the shapes in $painting."
 ```
 
-### Writing prompts for PipeLLM
+#### Writing prompts for PipeLLM
 
 **Insert stuff inside a tagged block**
 
@@ -527,11 +400,11 @@ DO NOT write "$topic" alone in an isolated line.
 DO write things like "Write an essay about $topic" to include text into an actual sentence.
 
 
-## PipeExtract operator
+### PipeExtract operator
 
 The PipeExtract operator is used to extract text and images from an image or a PDF
 
-### Simple Text Extraction
+#### Simple Text Extraction
 ```plx
 [pipe.extract_info]
 type = "PipeExtract"
@@ -567,11 +440,11 @@ class PageContent(StructuredContent): # CONCEPT IS "Page"
 - `text_and_images` are the text, and the related images found in the input image or PDF.
 - `page_view` is the screenshot of the whole pdf page/image.
 
-## PipeCompose operator
+### PipeCompose operator
 
 The PipeCompose operator is used to compose text using Jinja2 templates. It supports various output formats including HTML, Markdown, Mermaid diagrams, and more.
 
-### Basic Usage
+#### Basic Usage
 
 Simple Template Composition:
 ```plx
@@ -581,7 +454,7 @@ description = "Compose a report using template"
 inputs = { data = "ReportData" }
 output = "Text"
 template = """
-# Report Summary
+## Report Summary
 
 Based on the analysis:
 $data
@@ -653,7 +526,7 @@ $sales_rep.phone | $sales_rep.email
 """
 ```
 
-### Key Parameters
+#### Key Parameters
 
 - `template`: Inline template string (mutually exclusive with template_name)
 - `template_name`: Name of a predefined template (mutually exclusive with template)
@@ -666,17 +539,17 @@ For more control, you can use a nested `template` section instead of the `templa
 - `template.category`: Template type
 - `template.templating_style`: Styling options
 
-### Template Variables
+#### Template Variables
 
 Use the same variable insertion rules as PipeLLM:
 - `@variable` for block insertion (multi-line content)
 - `$variable` for inline insertion (short text)
 
-## PipeImgGen operator
+### PipeImgGen operator
 
 The PipeImgGen operator is used to generate images using AI image generation models.
 
-### Basic Usage
+#### Basic Usage
 
 Simple Image Generation:
 ```plx
@@ -726,7 +599,7 @@ is_raw = false
 safety_tolerance = 3
 ```
 
-### Key Parameters
+#### Key Parameters
 
 **Image Generation Settings:**
 - `model`: Model choice (preset name or inline settings with model name)
@@ -744,7 +617,7 @@ safety_tolerance = 3
 - `is_moderated`: Enable content moderation
 - `safety_tolerance`: Content safety level (1-6)
 
-### Input Requirements
+#### Input Requirements
 
 PipeImgGen requires exactly one input that must be either:
 - An `ImgGenPrompt` concept
@@ -752,11 +625,11 @@ PipeImgGen requires exactly one input that must be either:
 
 The input can be named anything but must contain the prompt text for image generation.
 
-## PipeFunc operator
+### PipeFunc operator
 
 The PipeFunc operator is used to run custom Python functions within a pipeline. This allows integration of classic Python scripts and custom logic.
 
-### Basic Usage
+#### Basic Usage
 
 Simple Function Call:
 ```plx
@@ -778,11 +651,11 @@ output = "FileContent"
 function_name = "read_file_content"
 ```
 
-### Key Parameters
+#### Key Parameters
 
 - `function_name`: Name of the Python function to call (must be registered in func_registry)
 
-### Function Requirements
+#### Function Requirements
 
 The Python function must:
 
@@ -799,7 +672,7 @@ The Python function must:
    - `list[StuffContent]`: Multiple content objects (becomes ListContent)
    - `str`: Simple string (becomes TextContent)
 
-### Function Registration
+#### Function Registration
 
 Functions must be registered in the function registry before use:
 
@@ -818,7 +691,7 @@ async def my_custom_function(working_memory: WorkingMemory) -> StuffContent:
     return MyResultContent(data=result)
 ```
 
-### Working Memory Access
+#### Working Memory Access
 
 Inside the function, access pipeline inputs through working memory:
 
@@ -837,9 +710,9 @@ async def process_function(working_memory: WorkingMemory) -> TextContent:
 
 ---
 
-## Rules to choose LLM models used in PipeLLMs.
+### Rules to choose LLM models used in PipeLLMs.
 
-### LLM Configuration System
+#### LLM Configuration System
 
 In order to use it in a pipe, an LLM is referenced by its llm_handle (alias) and possibly by an llm_preset.
 LLM configurations are managed through the new inference backend system with files located in `.pipelex/inference/`:
@@ -848,7 +721,7 @@ LLM configurations are managed through the new inference backend system with fil
 - **Backends**: `.pipelex/inference/backends.toml` and `.pipelex/inference/backends/*.toml`
 - **Routing**: `.pipelex/inference/routing_profiles.toml`
 
-### LLM Handles
+#### LLM Handles
 
 An llm_handle can be either:
 1. **A direct model name** (like "gpt-4o-mini", "claude-3-sonnet") - automatically available for all models loaded by the inference backend system
@@ -864,7 +737,7 @@ base-mistral = "mistral-medium"
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
 
-### Using an LLM Handle in a PipeLLM
+#### Using an LLM Handle in a PipeLLM
 
 Here is an example of using a model to specify which LLM to use in a PipeLLM:
 
@@ -881,7 +754,7 @@ Write a haiku about Hello World.
 
 As you can see, to use the LLM, you must also indicate the temperature (float between 0 and 1) and max_tokens (either an int or the string "auto").
 
-### LLM Presets
+#### LLM Presets
 
 Presets are meant to record the choice of an llm with its hyper parameters (temperature and max_tokens) if it's good for a particular task. LLM Presets are skill-oriented.
 
@@ -920,11 +793,9 @@ ALWAYS RUN `make validate` when you are finished writing pipelines: This checks 
 Then, create an example file to run the pipeline in the `examples` folder.
 But don't write documentation unless asked explicitly to.
 
----
+## Guide to execute a pipeline and write example code
 
-# Guide to write an example to execute a pipeline
-
-## Example to execute a pipeline with text output
+### Example to execute a pipeline with text output
 
 ```python
 import asyncio
@@ -946,14 +817,14 @@ async def hello_world() -> str:
     return pipe_output.main_stuff_as_str
 
 
-# start Pipelex
+## start Pipelex
 Pipelex.make()
-# run sample using asyncio
+## run sample using asyncio
 output_text = asyncio.run(hello_world())
 pretty_print(output_text, title="Your first Pipelex output")
 ```
 
-## Example to execute a pipeline with structured output
+### Example to execute a pipeline with structured output
 
 ```python
 import asyncio
@@ -983,17 +854,17 @@ async def extract_gantt(image_url: str) -> GanttChart:
     return pipe_output.main_stuff_as(content_type=GanttChart)
 
 
-# start Pipelex
+## start Pipelex
 Pipelex.make()
 
-# run sample using asyncio
+## run sample using asyncio
 gantt_chart = asyncio.run(extract_gantt(image_url=IMAGE_URL))
 pretty_print(gantt_chart, title="Gantt Chart")
 ```
 
-## Setting up the input memory
+### Setting up the input memory
 
-### Explanation of input memory
+#### Explanation of input memory
 
 The input memory is a dictionary, where the key is the name of the input variable and the value provides details to make it a stuff object. The relevant definitions are:
 ```python
@@ -1002,13 +873,13 @@ ImplicitMemory = Dict[str, StuffContentOrData]
 ```
 As you can seen, we made it so different ways can be used to define that stuff using structured content or data.
 
-### Different ways to set up the input memory
+#### Different ways to set up the input memory
 
 So here are a few concrete examples of calls to execute_pipeline with various ways to set up the input memory:
 
 ```python
-# Here we have a single input and it's a Text.
-# If you assign a string, by default it will be considered as a TextContent.
+## Here we have a single input and it's a Text.
+## If you assign a string, by default it will be considered as a TextContent.
     pipe_output = await execute_pipeline(
         pipe_code="master_advisory_orchestrator",
         input_memory={
@@ -1016,9 +887,9 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
         },
     )
 
-# Here we have a single input and it's a PDF.
-# Because PDFContent is a native concept, we can use it directly as a value,
-# the system knows what content it corresponds to:
+## Here we have a single input and it's a PDF.
+## Because PDFContent is a native concept, we can use it directly as a value,
+## the system knows what content it corresponds to:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_dpe",
         input_memory={
@@ -1026,8 +897,8 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
         },
     )
 
-# Here we have a single input and it's an Image.
-# Because ImageContent is a native concept, we can use it directly as a value:
+## Here we have a single input and it's an Image.
+## Because ImageContent is a native concept, we can use it directly as a value:
     pipe_output = await execute_pipeline(
         pipe_code="fashion_variation_pipeline",
         input_memory={
@@ -1035,9 +906,9 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
         },
     )
 
-# Here we have a single input, it's an image but
-# its actually a more specific concept gantt.GanttImage which refines Image,
-# so we must provide it using a dict with the concept and the content:
+## Here we have a single input, it's an image but
+## its actually a more specific concept gantt.GanttImage which refines Image,
+## so we must provide it using a dict with the concept and the content:
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
         input_memory={
@@ -1048,7 +919,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
         },
     )
 
-# Here is a more complex example with multiple inputs assigned using different ways:
+## Here is a more complex example with multiple inputs assigned using different ways:
     pipe_output = await execute_pipeline(
         pipe_code="retrieve_then_answer",
         dynamic_output_concept_code="contracts.Fees",
@@ -1063,7 +934,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
     )
 ```
 
-## Using the outputs of a pipeline
+### Using the outputs of a pipeline
 
 All pipe executions return a `PipeOutput` object.
 It's a BaseModel which contains the resulting working memory at the end of the execution and the pipeline run id.
@@ -1119,7 +990,7 @@ class PipeOutput(BaseModel):
 
 As you can see, you can extarct any variable from the output working memory.
 
-### Getting the main stuff as a specific type
+#### Getting the main stuff as a specific type
 
 Simple text as a string:
 
@@ -1146,161 +1017,81 @@ result_list = pipe_output.main_stuff_as_items(item_type=GanttChart)
 
 ---
 
-# Writing unit tests
+## Rules to choose LLM models used in PipeLLMs.
 
-## Unit test generalities
+### LLM Configuration System
 
-NEVER USE unittest.mock or MagicMock. YOU MUST USE pytest-mock instead.
+In order to use it in a pipe, an LLM is referenced by its llm_handle (alias) and possibly by an llm_preset.
+LLM configurations are managed through the new inference backend system with files located in `.pipelex/inference/`:
 
-### Test file structure
+- **Model Deck**: `.pipelex/inference/deck/base_deck.toml` and `.pipelex/inference/deck/overrides.toml`
+- **Backends**: `.pipelex/inference/backends.toml` and `.pipelex/inference/backends/*.toml`
+- **Routing**: `.pipelex/inference/routing_profiles.toml`
 
-- Name test files with `test_` prefix
-- Use descriptive names that match the functionality being tested
-- Place test files in the appropriate test category directory:
-    - `tests/unit/` - for unit tests that test individual functions/classes in isolation
-    - `tests/integration/` - for integration tests that test component interactions
-    - `tests/e2e/` - for end-to-end tests that test complete workflows
-    - `tests/test_pipelines/` - for test pipeline definitions (PLX files and their structuring python files)
-- Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
-- Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `tests.pipelex.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
-- Always put test inside Test classes.
-- The pipelex pipelines should be stored in `tests/test_pipelines` as well as the related structured Output classes that inherit from `StructuredContent`
+### LLM Handles
 
-### Markers
+An llm_handle can be either:
+1. **A direct model name** (like "gpt-4o-mini", "claude-3-sonnet") - automatically available for all models loaded by the inference backend system
+2. **An alias** - user-defined shortcuts that map to model names, defined in the `[aliases]` section:
 
-Apply the appropriate markers:
-- "llm: uses an LLM to generate text or objects"
-- "img_gen: uses an image generation AI"
-- "extract: uses text/image extraction from documents"
-- "inference: uses either an LLM or an image generation AI"
-- "gha_disabled: will not be able to run properly on GitHub Actions"
-
-Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
-
-### Important rules
-
-- Never use the unittest.mock. Use pytest-mock.
-
-### Test Class Structure
-
-Always group the tests of a module into a test class:
-
-```python
-@pytest.mark.llm
-@pytest.mark.inference
-@pytest.mark.asyncio(loop_scope="class")
-class TestFooBar:
-    @pytest.mark.parametrize(
-        "topic test_case_blueprint",
-        [
-            TestCases.CASE_1,
-            TestCases.CASE_2,
-        ],
-    )
-    async def test_pipe_processing(
-        self,
-        request: FixtureRequest,
-        topic: str,
-        test_case_blueprint: StuffBlueprint,
-    ):
-        # Test implementation
+```toml
+[aliases]
+base-claude = "claude-4.5-sonnet"
+base-gpt = "gpt-5"
+base-gemini = "gemini-2.5-flash"
+base-mistral = "mistral-medium"
 ```
 
-Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
+The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
 
-## Writing integration test to test pipes
+### Using an LLM Handle in a PipeLLM
 
-### Required imports for pipe tests
+Here is an example of using an llm_handle to specify which LLM to use in a PipeLLM:
 
-```python
-import pytest
-from pytest import FixtureRequest
-from pipelex import log, pretty_print
-from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
-from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_report_delegate
-from pipelex.libraries.pipelines.base_library.retrieve import RetrievedExcerpt
-from pipelex.config_pipelex import get_config
-
-from pipelex.core.pipe import PipeAbstract, update_job_metadata_for_pipe
-from pipelex.core.pipes.pipe_output import PipeOutput, PipeOutputType
-from pipelex.core.pipes.pipe_run_params import PipeRunParams
-from pipelex.core.pipes.pipe_run_params import PipeRunParams
-from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+```plx
+[pipe.hello_world]
+type = "PipeLLM"
+description = "Write text about Hello World."
+output = "Text"
+model = { model = "gpt-5", temperature = 0.9 }
+prompt = """
+Write a haiku about Hello World.
+"""
 ```
 
-### Pipe test implementation steps
+As you can see, to use the LLM, you must also indicate the temperature (float between 0 and 1) and max_tokens (either an int or the string "auto").
 
-1. Create Stuff from blueprint:
+### LLM Presets
 
-```python
-stuff = StuffFactory.make_stuff(
-    concept_code="RetrievedExcerpt",
-    domain="retrieve",
-    content=RetrievedExcerpt(text="<Some retrieved text>", justification="<Some justification>")
-    name="retrieved_text",
-)
+Presets are meant to record the choice of an llm with its hyper parameters (temperature and max_tokens) if it's good for a particular task. LLM Presets are skill-oriented.
+
+Examples:
+```toml
+llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 
-2. Create Working Memory:
+The interest is that these presets can be used to set the LLM choice in a PipeLLM, like this:
 
-```python
-working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+```plx
+[pipe.extract_invoice]
+type = "PipeLLM"
+description = "Extract invoice information from an invoice text transcript"
+inputs = { invoice_text = "InvoiceText" }
+output = "Invoice"
+model = "llm_to_extract_invoice"
+prompt = """
+Extract invoice information from this invoice:
+
+The category of this invoice is: $invoice_details.category.
+
+@invoice_text
+"""
 ```
 
-3. Run the pipe:
+The setting here `model = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
+You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.
 
-```python
-pipe_output = await pipe_router.run_pipe(
-    pipe_code="pipe_name",
-    pipe_run_params=PipeRunParamsFactory.make_run_params(),
-    working_memory=working_memory,
-    job_metadata=JobMetadata(),
-)
-```
 
-4. Basic assertions:
-
-```python
-assert pipe_output is not None
-assert pipe_output.working_memory is not None
-assert pipe_output.main_stuff is not None
-```
-
-### Test Data Organization
-
-- If it's not already there, create a `test_data.py` file in the test directory
-- Define test cases using `StuffBlueprint`:
-
-```python
-class TestCases:
-    CASE_BLUEPRINT_1 = StuffBlueprint(
-        name="test_case_1",
-        concept_code="domain.ConceptName1",
-        value="test_value"
-    )
-    CASE_BLUEPRINT_2 = StuffBlueprint(
-        name="test_case_2",
-        concept_code="domain.ConceptName2",
-        value="test_value"
-    )
-
-    CASE_BLUEPRINTS: ClassVar[List[Tuple[str, str]]] = [  # topic, blueprint"
-        ("topic1", CASE_BLUEPRINT_1),
-        ("topic2", CASE_BLUEPRINT_2),
-    ]
-```
-
-Note how we avoid initializing a default mutable value within a class instance, instead we use ClassVar.
-Also note that we provide a topic for the test case, which is purely for convenience.
-
-## Best Practices for Testing
-
-- Use parametrize for multiple test cases
-- Test both success and failure cases
-- Verify working memory state
-- Check output structure and content
-- Use meaningful test case names
-- Include docstrings explaining test purpose
-- Log outputs for debugging
-- Generate reports for cost tracking
+You can override the predefined llm presets by setting them in `.pipelex/inference/deck/overrides.toml`.
+<!-- END_PIPELEX_RULES -->

@@ -84,7 +84,7 @@ domain = "characters"
 type = "PipeLLM"
 description = "Creates a character."
 output = "Text"
-prompt_template = """You are a book writer. Your task is to create a character.
+prompt = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
@@ -131,7 +131,7 @@ type = "PipeLLM"
 description = "Create a character."
 output = "Text"
 model = { model = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
-prompt_template = """You are a book writer. Your task is to create a character.
+prompt = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
@@ -143,7 +143,7 @@ type = "PipeLLM"
 description = "Create a character."
 output = "Text"
 model = "llm_for_creative_writing"
-prompt_template = """You are a book writer. Your task is to create a character.
+prompt = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 
 # The llm deck above is defined in `.pipelex/inference/deck/base_deck.toml` as:
@@ -195,7 +195,7 @@ Character = "A character is a fiction story" # <- Define here your output concep
 type = "PipeLLM"
 description = "Create a character. Get a structured result."
 output = "Character"    # <- This is the output concept for your pipe
-prompt_template = """You are a book writer. Your task is to create a character.
+prompt = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
@@ -253,7 +253,7 @@ type = "PipeLLM"
 description = "Get character information from a description."
 inputs = { character = "Character" }  # <- These are the inputs of your pipe, usable in the prompt_template
 output = "CharacterMetadata"
-prompt_template = """
+prompt = """
 You are given a text description of a character.
 Your task is to extract specific data from the following description.
 
