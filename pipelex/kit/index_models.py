@@ -29,12 +29,11 @@ class CursorSpec(BaseModel):
 class Target(BaseModel):
     """Configuration for a single-file merge target."""
 
-    id: str = Field(description="Unique identifier for this target")
     path: str = Field(description="Path to the target file relative to repo root")
     strategy: str = Field(description="Merge strategy (currently only 'merge' supported)")
     marker_begin: str = Field(description="Beginning marker for content insertion")
     marker_end: str = Field(description="Ending marker for content insertion")
-    parent: str | None = Field(default=None, description="Parent heading to insert under if markers not found")
+    heading_1: str | None = Field(default=None, description="Main title (H1) to add when inserting into empty file or file with no H1 headings")
 
 
 class KitIndex(BaseModel):
@@ -43,4 +42,4 @@ class KitIndex(BaseModel):
     meta: dict[str, Any] = Field(default_factory=dict, description="Metadata about the kit configuration")
     agents: AgentsMerge = Field(description="Agent documentation merge configuration")
     cursor: CursorSpec = Field(description="Cursor rules export configuration")
-    targets: list[Target] = Field(description="List of single-file merge targets")
+    targets: dict[str, Target] = Field(description="Dictionary of single-file merge targets keyed by ID")

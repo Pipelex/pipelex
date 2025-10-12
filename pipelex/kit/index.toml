@@ -1,6 +1,6 @@
 [meta]
 version = "1.0.0"
-description = "Pipelex kit configuration for agent documentation and cursor rules"
+description = "Pipelex kit configuration for agent rules"
 
 [agents]
 demote = 1
@@ -55,42 +55,37 @@ globs = ["examples/**/*.py"]
 description = "LLM configuration and usage guidelines"
 globs = ["*.plx", "*.toml"]
 
-[[targets]]
-id = "agents"
+[targets.agents]
 path = "AGENTS.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
-parent = "# Coding Standards & Best Practices"
+heading_1 = "# Pipelex Rules"
 
-[[targets]]
-id = "claude"
+[targets.claude]
 path = "CLAUDE.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
-parent = "# Coding Standards & Best Practices"
+heading_1 = "# Pipelex Rules"
 
-[[targets]]
-id = "github_copilot"
+[targets.github_copilot]
 path = ".github/copilot-instructions.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
-parent = "# Coding Standards & Best Practices"
+heading_1 = "# Pipelex Rules"
 
-[[targets]]
-id = "windsurf"
+[targets.windsurf]
 path = ".windsurfrules.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
-parent = "# Coding Standards & Best Practices"
+heading_1 = "# Pipelex Rules"
 
-[[targets]]
-id = "blackbox"
+[targets.blackbox]
 path = "BLACKBOX_RULES.md"
 strategy = "merge"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
-parent = "# Coding Standards & Best Practices"
+heading_1 = "# Pipelex Rules"

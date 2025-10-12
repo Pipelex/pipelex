@@ -76,13 +76,13 @@ def build_merged_rules(agents_dir: Traversable, idx: KitIndex, agent_set: str | 
     return ("\n\n".join(parts)).strip() + "\n"
 
 
-def _insert_block_with_ast(target_md: str, block_md: str, parent: str | None, markers: tuple[str, str]) -> str:
-    """Insert block into target markdown with heuristic placement.
+def _insert_block_with_markers(target_md: str, block_md: str, main_title: str | None, markers: tuple[str, str]) -> str:
+    """Insert block into target markdown using marker-based logic.
 
     Args:
         target_md: Existing target markdown content
         block_md: Block to insert
-        parent: Parent heading to insert under (if specified)
+        main_title: Main title (H1) to add when inserting into empty file or file with no H1 headings
         markers: Tuple of (begin_marker, end_marker)
 
     Returns:
@@ -91,30 +91,22 @@ def _insert_block_with_ast(target_md: str, block_md: str, parent: str | None, ma
     marker_begin, marker_end = markers
     wrapped_block = wrap(marker_begin, marker_end, block_md)
 
-    if not target_md:
-        # Empty file - just insert the wrapped block
-        return wrapped_block + "\n"
-
-    # If parent heading is specified, try to find it and insert after
-    if parent:
-        # Escape special regex characters in parent
-        escaped_parent = re.escape(parent.strip())
-        # Look for the parent heading line
-        pattern = rf"^({escaped_parent})\s*$"
-        match = re.search(pattern, target_md, flags=re.MULTILINE | re.IGNORECASE)
-        if match:
-            # Insert after the parent heading line
-            insert_pos = match.end()
-            return target_md[:insert_pos] + "\n\n" + wrapped_block + "\n" + target_md[insert_pos:]
-
-    # Fallback: insert after first H1 heading
+    # Check if file is empty or has no H1 heading
+    is_empty = not target_md or not target_md.strip()
     h1_pattern = r"^#\s+.+$"
-    match = re.search(h1_pattern, target_md, flags=re.MULTILINE)
-    if match:
-        insert_pos = match.end()
-        return target_md[:insert_pos] + "\n\n" + wrapped_block + "\n" + target_md[insert_pos:]
+    has_h1 = bool(target_md) and bool(re.search(h1_pattern, target_md, flags=re.MULTILINE))
 
-    # Last resort: append at the end
+    # If empty or no H1 heading, add main_title at top if provided
+    if (is_empty or not has_h1) and main_title:
+        if is_empty:
+            return f"{main_title}\n\n{wrapped_block}\n"
+        else:
+            # File has content but no H1 - add title at top, preserve content, append wrapped block
+            return f"{main_title}\n\n{target_md.rstrip()}\n\n{wrapped_block}\n"
+
+    # Otherwise append at the end
+    if is_empty:
+        return wrapped_block + "\n"
     return target_md.rstrip() + "\n\n" + wrapped_block + "\n"
 
 
@@ -142,7 +134,7 @@ def _diff(before: str, after: str, path: str) -> str:
 def update_targets(
     repo_root: Path,
     merged_rules: str,
-    targets: list[Target],
+    targets: dict[str, Target],
     dry_run: bool,
     diff: bool,
     backup: str | None,
@@ -152,12 +144,12 @@ def update_targets(
     Args:
         repo_root: Repository root directory
         merged_rules: Merged markdown content to insert
-        targets: List of target file configurations
+        targets: Dictionary of target file configurations keyed by ID
         dry_run: If True, only print what would be done
         diff: If True, show unified diff
         backup: Backup suffix (e.g., ".bak"), or None for no backup
     """
-    for target in targets:
+    for target in targets.values():
         target_path = repo_root / target.path
         before = target_path.read_text(encoding="utf-8") if target_path.exists() else ""
 
@@ -168,11 +160,11 @@ def update_targets(
             wrapped_block = wrap(target.marker_begin, target.marker_end, merged_rules)
             after = replace_span(before, span, wrapped_block)
         else:
-            # No markers - insert via AST and add markers
-            after = _insert_block_with_ast(
+            # No markers - insert with markers
+            after = _insert_block_with_markers(
                 before,
                 merged_rules,
-                target.parent,
+                target.heading_1,
                 (target.marker_begin, target.marker_end),
             )
 
