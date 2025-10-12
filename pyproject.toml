@@ -358,7 +358,6 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
     "INP001", # Allow test files to not have __init__.py in their directories (avoids namespace collisions)
-    "T201",   # Allow print statements in test files
 ]
 
 [tool.uv]
