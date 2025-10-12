@@ -13,8 +13,6 @@ from pipelex.tools.runtime_manager import runtime_manager
 
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
-CONFIG_TEMPLATE_SUBPATH = "config_template"
-INFERENCE_CONFIG_SUBPATH = "inference"
 
 
 class ConfigError(Exception):

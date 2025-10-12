@@ -27,6 +27,7 @@ dependencies = [
     "json2html>=1.3.0",
     "kajson==0.3.1",
     "markdown>=3.6",
+    "markdown-parser-py==1.0.1",
     "networkx>=3.4.2",
     "openai>=1.60.1",
     "openpyxl>=3.1.5",

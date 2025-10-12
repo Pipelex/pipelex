@@ -14,7 +14,7 @@ from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists, load_toml_from_content, TomlError
 
 
 class ModelManager(ModelManagerAbstract):
