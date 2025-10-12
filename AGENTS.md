@@ -100,7 +100,7 @@ Always fix any issues reported by these tools before proceeding.
    ```bash
    make tp
    ```
-   Runs tests with markers: `(dry_runnable or not (inference or llm or img_gen or ocr)) and not (needs_output or pipelex_api)`
+   Runs tests with markers: `(dry_runnable or not (inference or llm or img_gen or extract)) and not (needs_output or pipelex_api)`
 
 2. **Specific Tests**:
    ```bash
@@ -110,7 +110,7 @@ Always fix any issues reported by these tools before proceeding.
    ```
    Note: Matches names starting with the provided string.
 
-**Important**: Never run `make ti`, `make test-inference`, `make to`, `make test-ocr`, `make tg`, or `make test-img-gen` - these use costly inference.
+**Important**: Never run `make ti`, `make test-inference`, `make te`, `make test-extract`, `make tg`, or `make test-img-gen` - these use costly inference.
 
 ## Pipelines
 
@@ -348,8 +348,9 @@ description = "A conditonal pipe to decide wheter..."
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
+default_outcome = "process_medium"
 
-[pipe.conditional_operation.pipe_map]
+[pipe.conditional_operation.outcomes]
 small = "process_small"
 medium = "process_medium"
 large = "process_large"
@@ -362,8 +363,9 @@ description = "A conditonal pipe to decide wheter..."
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression_template = "{{ input_data.category }}" # Jinja2 code
+default_outcome = "process_medium"
 
-[pipe.conditional_operation.pipe_map]
+[pipe.conditional_operation.outcomes]
 small = "process_small"
 medium = "process_medium"
 large = "process_large"
@@ -373,9 +375,25 @@ large = "process_large"
 
 - `expression`: Direct boolean or string expression (mutually exclusive with expression_template)
 - `expression_template`: Jinja2 template for more complex conditional logic (mutually exclusive with expression)
-- `pipe_map`: Dictionary mapping expression results to pipe codes : 
-1 - The key on the left (`small`, `medium`) is the result of `expression` or `expression_template`.
-2 - The value on the right (`process_small`, `process_medium`, ..) is the name of the pipce to trigger
+- `outcomes`: Dictionary mapping expression results to pipe codes:
+  1. The key on the left (`small`, `medium`) is the result of `expression` or `expression_template`
+  2. The value on the right (`process_small`, `process_medium`, etc.) is the name of the pipe to trigger
+- `default_outcome`: **Required** - The pipe to execute if the expression doesn't match any key in outcomes. Use `"fail"` if you want the pipeline to fail when no match is found
+
+Example with fail as default:
+```plx
+[pipe.strict_validation]
+type = "PipeCondition"
+description = "Validate with strict matching"
+inputs = { status = "Status" }
+output = "Text"
+expression = "status.value"
+default_outcome = "fail"
+
+[pipe.strict_validation.outcomes]
+approved = "process_approved"
+rejected = "process_rejected"
+```
 
 ## PipeLLM operator
 
@@ -391,7 +409,7 @@ Simple Text Generation:
 type = "PipeLLM"
 description = "Write a short story"
 output = "Text"
-prompt_template = """
+prompt = """
 Write a short story about a programmer.
 """
 ```
@@ -403,7 +421,7 @@ type = "PipeLLM"
 description = "Extract information"
 inputs = { text = "Text" }
 output = "PersonInfo"
-prompt_template = """
+prompt = """
 Extract person information from this text:
 @text
 """
@@ -416,7 +434,7 @@ type = "PipeLLM"
 description = "Expert analysis"
 output = "Analysis"
 system_prompt = "You are a data analysis expert"
-prompt_template = "Analyze this data"
+prompt = "Analyze this data"
 ```
 
 ### Multiple Outputs
@@ -441,14 +459,28 @@ multiple_output = true  # Let the LLM decide how many to generate
 
 ### Vision
 
-Process images with VLMs:
+Process images with VLMs (image inputs must be tagged in the prompt):
 ```plx
 [pipe.analyze_image]
 type = "PipeLLM"
 description = "Analyze image"
-inputs = { image = "Image" } # `image` is the name of the stuff that contains the Image. If its in an attribute within a stuff, you can add something like `{ "page.image": "Image" }
+inputs = { image = "Image" }
 output = "ImageAnalysis"
-prompt_template = "Describe what you see in this image"
+prompt = """
+Describe what you see in this image:
+
+$image
+"""
+```
+
+You can also reference images inline in meaningful sentences to guide the Visual LLM:
+```plx
+[pipe.compare_images]
+type = "PipeLLM"
+description = "Compare two images"
+inputs = { photo = "Image", painting = "Image" }
+output = "Analysis"
+prompt = "Analyze the colors in $photo and the shapes in $painting."
 ```
 
 ### Writing prompts for PipeLLM
@@ -459,7 +491,7 @@ If the inserted text is supposedly a long text, made of several lines or paragra
 
 Example template:
 ```plx
-prompt_template = """
+prompt = """
 Match the expense with its corresponding invoice:
 
 @expense
@@ -467,7 +499,7 @@ Match the expense with its corresponding invoice:
 @invoices
 """
 ```
-In the example above, the expense data and the invoices data are obviously made of several lines each, that's why it makes sense to use the "@" prefix in order to have them delimited inside a block. Note that our preprocessor will automatically include the block's title, so it doens't need to be explictly written in the prompt template.
+In the example above, the expense data and the invoices data are obviously made of several lines each, that's why it makes sense to use the "@" prefix in order to have them delimited inside a block. Note that our preprocessor will automatically include the block's title, so it doens't need to be explictly written in the prompt.
 
 DO NOT write things like "Here is the expense: @expense".
 DO write simply "@expense" alone in an isolated line.
@@ -478,7 +510,7 @@ If the inserted text is short text and it makes sense to have it inserted direct
 
 Example template:
 ```plx
-prompt_template = """
+prompt = """
 Your goal is to summarize everything related to $topic in the provided text:
 
 @text
@@ -508,7 +540,17 @@ inputs = { document = "PDF" } # or { image = "Image" } if it's an image. This is
 output = "Page"
 ```
 
-Only one input is allowed and it must either be an `Image` or a `PDF`.
+Using Extract Model Settings:
+```plx
+[pipe.extract_with_model]
+type = "PipeExtract"
+description = "Extract with specific model"
+inputs = { document = "PDF" }
+output = "Page"
+model = "base_extract_mistral"  # Use predefined extract preset or model alias
+```
+
+Only one input is allowed and it must either be an `Image` or a `PDF`. The input can be named anything.
 
 The output concept `Page` is a native concept, with the structure `PageContent`:
 It corresponds to 1 page. Therefore, the PipeExtract is outputing a `ListContent` of `Page`
@@ -538,7 +580,7 @@ type = "PipeCompose"
 description = "Compose a report using template"
 inputs = { data = "ReportData" }
 output = "Text"
-jinja2 = """
+template = """
 # Report Summary
 
 Based on the analysis:
@@ -555,7 +597,21 @@ type = "PipeCompose"
 description = "Use a predefined template"
 inputs = { content = "Text" }
 output = "Text"
-jinja2_name = "standard_report_template"
+template_name = "standard_report_template"
+```
+
+Using Nested Template Section (for more control):
+```plx
+[pipe.advanced_template]
+type = "PipeCompose"
+description = "Use advanced template settings"
+inputs = { data = "ReportData" }
+output = "Text"
+
+[pipe.advanced_template.template]
+template = "Report: $data"
+category = "html"
+templating_style = { tag_style = "square_brackets", text_format = "html" }
 ```
 
 CRM Email Template:
@@ -567,7 +623,7 @@ inputs = { customer = "Customer", deal = "Deal", sales_rep = "SalesRep" }
 output = "Text"
 template_category = "html"
 templating_style = { tag_style = "square_brackets", text_format = "html" }
-jinja2 = """
+template = """
 Subject: Following up on our $deal.product_name discussion
 
 Hi $customer.first_name,
@@ -599,11 +655,16 @@ $sales_rep.phone | $sales_rep.email
 
 ### Key Parameters
 
-- `jinja2`: Inline Jinja2 template (mutually exclusive with jinja2_name)
-- `jinja2_name`: Name of a predefined template (mutually exclusive with jinja2)
+- `template`: Inline template string (mutually exclusive with template_name)
+- `template_name`: Name of a predefined template (mutually exclusive with template)
 - `template_category`: Template type ("llm_prompt", "html", "markdown", "mermaid", etc.)
 - `templating_style`: Styling options for template rendering
 - `extra_context`: Additional context variables for template
+
+For more control, you can use a nested `template` section instead of the `template` field:
+- `template.template`: The template string
+- `template.category`: Template type
+- `template.templating_style`: Styling options
 
 ### Template Variables
 
@@ -633,9 +694,9 @@ type = "PipeImgGen"
 description = "Generate a high-quality photo"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Photo"
-model = { model = "fast-img-gen", quality = "hd" }
+model = { model = "fast-img-gen" }
 aspect_ratio = "16:9"
-nb_steps = 8
+quality = "hd"
 ```
 
 Multiple Image Generation:
@@ -668,11 +729,8 @@ safety_tolerance = 3
 ### Key Parameters
 
 **Image Generation Settings:**
-- `img_gen`: ImgGenChoice (preset name or inline settings)
-- `img_gen_handle`: Direct model handle (legacy)
+- `model`: Model choice (preset name or inline settings with model name)
 - `quality`: Image quality ("standard", "hd")
-- `nb_steps`: Number of generation steps
-- `guidance_scale`: How closely to follow the prompt
 
 **Output Configuration:**
 - `nb_output`: Number of images to generate
@@ -808,7 +866,7 @@ The system first looks for direct model names, then checks aliases if no direct 
 
 ### Using an LLM Handle in a PipeLLM
 
-Here is an example of using an llm_handle to specify which LLM to use in a PipeLLM:
+Here is an example of using a model to specify which LLM to use in a PipeLLM:
 
 ```plx
 [pipe.hello_world]
@@ -816,7 +874,7 @@ type = "PipeLLM"
 description = "Write text about Hello World."
 output = "Text"
 model = { model = "gpt-5", temperature = 0.9 }
-prompt_template = """
+prompt = """
 Write a haiku about Hello World.
 """
 ```
@@ -842,7 +900,7 @@ description = "Extract invoice information from an invoice text transcript"
 inputs = { invoice_text = "InvoiceText" }
 output = "Invoice"
 model = "llm_to_extract_invoice"
-prompt_template = """
+prompt = """
 Extract invoice information from this invoice:
 
 The category of this invoice is: $invoice_details.category.
@@ -1113,6 +1171,7 @@ NEVER USE unittest.mock or MagicMock. YOU MUST USE pytest-mock instead.
 Apply the appropriate markers:
 - "llm: uses an LLM to generate text or objects"
 - "img_gen: uses an image generation AI"
+- "extract: uses text/image extraction from documents"
 - "inference: uses either an LLM or an image generation AI"
 - "gha_disabled: will not be able to run properly on GitHub Actions"
 
