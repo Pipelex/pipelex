@@ -227,12 +227,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             error_msg: str
             if secrets_provider:
                 error_msg = (
-                    f"Could not get credentials for inference backend {backend_name}:\n{credentials_exc},"
+                    f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},"
                     f"\ncheck that secret '{var_name}' is available from your secrets provider."
                 )
             else:
                 error_msg = (
-                    f"Could not get credentials for inference backend {backend_name}:\n{credentials_exc},\n"
+                    f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},\n"
                     f"you need to add '{var_name}' to your environment variables or to your .env file."
                 )
             if credentials_exc.backend_name == "pipelex_inference":
@@ -240,7 +240,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     "\nYou can check the project's README about getting a Pipelex Inference API key,\n\n"
                     "or you can bring your own 'OPENAI_API_KEY', "
                     "'AZURE_OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'MISTRAL_API_KEY' etc.\n"
-                    "--> choose which inference backends to enable in .pipelex/inference/backends.toml\n"
+                    "--> choose which inference backends to enable in '.pipelex/inference/backends.toml'\n"
                 )
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())

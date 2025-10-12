@@ -68,7 +68,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 ) from var_fallback_pattern_exc
             except VarNotFoundError as var_not_found_exc:
                 msg = (
-                    f"Variable substitution failed due to a variable not found error in file '{backends_library_path}':"
+                    f"Variable substitution failed due to a 'variable not found' error in file '{backends_library_path}':"
                     f"\n{var_not_found_exc}\nRun mode: '{runtime_manager.run_mode}'"
                 )
                 raise InferenceBackendCredentialsError(
