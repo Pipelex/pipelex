@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from pipelex.tools.func_registry import func_registry
+from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
 from pipelex.tools.typing.module_inspector import import_module_from_file
 
 
@@ -74,7 +75,7 @@ class FuncRegistryUtils:
 
     @classmethod
     def _find_files_in_dir(cls, dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
-        """Find files matching a pattern in a directory.
+        """Find files matching a pattern in a directory, excluding common build/cache directories.
 
         Args:
             dir_path: Directory path to search in
@@ -82,10 +83,21 @@ class FuncRegistryUtils:
             is_recursive: Whether to search recursively in subdirectories
 
         Returns:
-            List of matching Path objects
+            List of matching Path objects, filtered to exclude problematic directories
 
         """
-        path = Path(dir_path)
-        if is_recursive:
-            return list(path.rglob(pattern))
-        return list(path.glob(pattern))
+        # Get all files using the base utility
+        all_files = base_find_files_in_dir(dir_path, pattern, is_recursive)
+
+        # Directories to exclude from scanning to avoid import issues
+        exclude_dirs = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
+
+        # Filter out files in excluded directories
+        filtered_files: list[Path] = []
+        for file_path in all_files:
+            # Check if any parent directory is in the exclude list
+            should_exclude = any(part in exclude_dirs for part in file_path.parts)
+            if not should_exclude:
+                filtered_files.append(file_path)
+
+        return filtered_files

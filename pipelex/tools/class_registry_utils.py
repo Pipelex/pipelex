@@ -1,12 +1,17 @@
+import inspect
+import sys
 import types
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 
 from kajson.kajson_manager import KajsonManager
 
+from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
+
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
+from pipelex import log
 from pipelex.tools.typing.module_inspector import find_classes_in_module, import_module_from_file
 
 _NoneType = type(None)
@@ -67,7 +72,7 @@ class ClassRegistryUtils:
 
     @classmethod
     def find_files_in_dir(cls, dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
-        """Find files matching a pattern in a directory.
+        """Find files matching a pattern in a directory, excluding common build/cache directories.
 
         Args:
             dir_path: Directory path to search in
@@ -75,13 +80,24 @@ class ClassRegistryUtils:
             is_recursive: Whether to search recursively in subdirectories
 
         Returns:
-            List of matching Path objects
+            List of matching Path objects, filtered to exclude problematic directories
 
         """
-        path = Path(dir_path)
-        if is_recursive:
-            return list(path.rglob(pattern))
-        return list(path.glob(pattern))
+        # Get all files using the base utility
+        all_files = base_find_files_in_dir(dir_path, pattern, is_recursive)
+
+        # Directories to exclude from scanning to avoid import issues
+        exclude_dirs = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
+
+        # Filter out files in excluded directories
+        filtered_files: list[Path] = []
+        for file_path in all_files:
+            # Check if any parent directory is in the exclude list
+            should_exclude = any(part in exclude_dirs for part in file_path.parts)
+            if not should_exclude:
+                filtered_files.append(file_path)
+
+        return filtered_files
 
     @staticmethod
     def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
@@ -152,3 +168,73 @@ class ClassRegistryUtils:
                 return False
 
         return any(_is_compatible(field.annotation) for field in fields.values())
+
+    @classmethod
+    def import_modules_in_folder(
+        cls,
+        folder_path: str,
+        is_recursive: bool = True,
+    ) -> None:
+        """Import Python modules without registering their classes.
+
+        This loads modules into sys.modules so their classes are available
+        for discovery by auto_register_all_subclasses().
+
+        Args:
+            folder_path: Path to folder containing Python files
+            is_recursive: Whether to search recursively in subdirectories
+
+        """
+        python_files = cls.find_files_in_dir(
+            dir_path=folder_path,
+            pattern="*.py",
+            is_recursive=is_recursive,
+        )
+
+        for python_file in python_files:
+            try:
+                import_module_from_file(str(python_file))
+            except Exception as e:
+                # Log but don't fail - some files might not be importable
+                log.debug(f"Could not import {python_file}: {e}")
+
+    @classmethod
+    def auto_register_all_subclasses(
+        cls,
+        base_class: type[Any],
+    ) -> int:
+        """Scan all loaded modules in sys.modules and register all subclasses of base_class.
+
+        This enables auto-discovery of classes that are already in memory,
+        making them available to concepts without explicit registration.
+
+        Args:
+            base_class: Base class to filter by (e.g., StructuredContent)
+
+        Returns:
+            Number of classes registered
+
+        """
+        registered_count = 0
+        class_registry = KajsonManager.get_class_registry()
+
+        # Create a snapshot of modules to avoid "dictionary changed size during iteration" error
+        # (inspect.getmembers can trigger imports which modify sys.modules)
+        modules_snapshot = list(sys.modules.values())
+
+        # Iterate through all loaded modules
+        for module in modules_snapshot:
+            try:
+                # Find all classes in this module
+                for _, obj in inspect.getmembers(module, inspect.isclass):
+                    # Check if it's a subclass of base_class (but not the base_class itself)
+                    if obj is not base_class and issubclass(obj, base_class):
+                        # Register if not already registered
+                        if not class_registry.has_class(name=obj.__name__):
+                            class_registry.register_class(obj)
+                            registered_count += 1
+            except Exception as e:
+                # Skip modules that can't be inspected
+                log.debug(f"Could not inspect module for auto-registration: {e}")
+
+        return registered_count

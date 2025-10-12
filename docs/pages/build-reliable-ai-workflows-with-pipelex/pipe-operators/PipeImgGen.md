@@ -76,7 +76,7 @@ ImagePrompt = "A text prompt for generating an image"
 [pipe.generate_logo_variations]
 type = "PipeImgGen"
 description = "Generate three logo variations from a prompt"
-inputs = { prompt = "images.ImgGenPrompt" }
+inputs = { prompt = "ImgGenPrompt" }
 output = "Image"
 nb_output = 3
 model = "base_img_gen"

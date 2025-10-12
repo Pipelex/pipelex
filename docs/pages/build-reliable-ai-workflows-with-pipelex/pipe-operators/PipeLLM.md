@@ -42,7 +42,7 @@ You can use any concept that refines `Image` as an input, and choose descriptive
 [pipe.analyze_wedding]
 type = "PipeLLM"
 description = "Analyze wedding photo"
-inputs = { wedding_photo = "images.Photo" }
+inputs = { wedding_photo = "Photo" }
 output = "PhotoAnalysis"
 prompt = """
 Analyze this wedding photo and describe the key moments captured.

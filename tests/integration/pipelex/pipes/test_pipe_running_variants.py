@@ -122,6 +122,8 @@ class TestPipeRunningVariants:
     ):
         failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
         library_manager = get_library_manager()
+        # Reset library to avoid pipe name collisions from previous test runs
+        library_manager.reset()
         library_manager.load_libraries(
             library_file_paths=[Path(failing_pipeline_file_path) for failing_pipeline_file_path in failing_pipelines_file_paths],
         )

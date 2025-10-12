@@ -18,6 +18,7 @@ from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_library import PipeLibrary
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import (
     ConceptDefinitionError,
@@ -34,9 +35,9 @@ from pipelex.exceptions import (
 from pipelex.libraries.library_config import LibraryConfig
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
+from pipelex.tools.config.manager import config_manager
 from pipelex.tools.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.file_utils import find_files_in_dir
-from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.types import StrEnum
 
 
@@ -98,22 +99,50 @@ class LibraryManager(LibraryManagerAbstract):
         self.setup()
 
     def _get_pipeline_library_dirs(self) -> list[Path]:
-        library_dirs = [Path(self.library_config.pipelines_dir_path)]
-        if runtime_manager.is_unit_testing:
-            log.debug("Registering test pipeline structures for unit testing")
-            library_dirs += [Path(self.library_config.test_pipelines_dir_path)]
-        return library_dirs
+        # Scan the entire project root for .plx files
+        project_root = Path(config_manager.local_root_dir)
+        return [project_root]
+
+    def _find_plx_files_in_dir(self, dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
+        """Find PLX files matching a pattern in a directory, excluding problematic directories.
+
+        Args:
+            dir_path: Directory path to search in
+            pattern: File pattern to match (e.g. "*.plx")
+            is_recursive: Whether to search recursively in subdirectories
+
+        Returns:
+            List of matching Path objects, filtered to exclude problematic directories
+
+        """
+        # Get all files using the base utility
+        all_files = find_files_in_dir(dir_path, pattern, is_recursive)
+
+        # Directories to exclude from scanning to avoid loading invalid PLX files
+        exclude_dirs = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
+
+        # Filter out files in excluded directories
+        filtered_files: list[Path] = []
+        for file_path in all_files:
+            # Check if any parent directory is in the exclude list
+            should_exclude = any(part in exclude_dirs for part in file_path.parts)
+            if not should_exclude:
+                filtered_files.append(file_path)
+
+        return filtered_files
 
     def _get_pipelex_plx_files_from_dirs(self, dirs: list[Path]) -> list[Path]:
         """Get all valid Pipelex PLX files from the given directories."""
         all_plx_paths: list[Path] = []
+        seen_files: set[str] = set()  # Track by absolute path to avoid duplicates
+
         for dir_path in dirs:
             if not dir_path.exists():
-                msg = f"Directory does not exist: {dir_path}"
-                raise LibraryError(msg)
+                log.debug(f"Directory does not exist, skipping: {dir_path}")
+                continue
 
-            # Find all TOML files in the directory
-            plx_files = find_files_in_dir(
+            # Find all .plx files in the directory, excluding problematic directories
+            plx_files = self._find_plx_files_in_dir(
                 dir_path=str(dir_path),
                 pattern="*.plx",
                 is_recursive=True,
@@ -121,8 +150,16 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Filter to only include valid Pipelex files
             for plx_file in plx_files:
+                absolute_path = str(plx_file.resolve())
+
+                # Skip if already seen
+                if absolute_path in seen_files:
+                    log.debug(f"Skipping duplicate PLX file: {plx_file}")
+                    continue
+
                 if PipelexInterpreter.is_pipelex_file(plx_file):
                     all_plx_paths.append(plx_file)
+                    seen_files.add(absolute_path)
                 else:
                     log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")
 
@@ -233,10 +270,14 @@ class LibraryManager(LibraryManagerAbstract):
             failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
             valid_plx_paths = [path for path in all_plx_paths if path not in failing_pipelines_file_paths]
 
-        # Register classes in the directories
+        # Import modules to load them into sys.modules (but don't register classes yet)
         for library_dir in dirs_to_use:
-            ClassRegistryUtils.register_classes_in_folder(folder_path=str(library_dir))
+            ClassRegistryUtils.import_modules_in_folder(folder_path=str(library_dir))
             FuncRegistryUtils.register_funcs_in_folder(folder_path=str(library_dir))
+
+        # Auto-discover and register all StructuredContent classes from sys.modules
+        num_registered = ClassRegistryUtils.auto_register_all_subclasses(base_class=StructuredContent)
+        log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
         # Parse all blueprints first
         blueprints: list[PipelexBundleBlueprint] = []

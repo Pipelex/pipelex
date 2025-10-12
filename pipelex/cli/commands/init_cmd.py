@@ -7,7 +7,6 @@ import typer
 
 from pipelex.exceptions import PipelexCLIError
 from pipelex.kit.paths import get_configs_dir
-from pipelex.libraries.library_config import LibraryConfig
 from pipelex.tools.config.manager import config_manager
 
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
@@ -15,20 +14,21 @@ PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
 
 def do_init_libraries(directory: str = ".", overwrite: bool = False) -> None:
-    try:
-        target_dir = os.path.join(directory, "pipelex_libraries")
-        os.makedirs(directory, exist_ok=True)
+    # try:
+    #     target_dir = os.path.join(directory, "pipelex_libraries")
+    #     os.makedirs(directory, exist_ok=True)
 
-        library_config = LibraryConfig(config_dir_path=target_dir)
-        library_config.export_libraries(overwrite=overwrite)
+    #     library_config = LibraryConfig(config_dir_path=target_dir)
+    #     library_config.export_libraries(overwrite=overwrite)
 
-        if overwrite:
-            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (all files overwritten)")
-        else:
-            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (only created non-existing files)")
-    except Exception as exc:
-        msg = f"Failed to initialize libraries at '{directory}': {exc}"
-        raise PipelexCLIError(msg) from exc
+    #     if overwrite:
+    #         typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (all files overwritten)")
+    #     else:
+    #         typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (only created non-existing files)")
+    # except Exception as exc:
+    #     msg = f"Failed to initialize libraries at '{directory}': {exc}"
+    #     raise PipelexCLIError(msg) from exc
+    pass
 
 
 def do_init_config(reset: bool = False) -> None:

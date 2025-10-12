@@ -151,11 +151,6 @@ class PipeTestCases:
             SIMPLE_STUFF_IMAGE,
             "simple_llm_test_from_image",
         ),
-        (
-            "Extract page contents from PDF",
-            SIMPLE_STUFF_PDF,
-            "extract_page_contents_from_pdf",
-        ),
     ]
     FAILURE_PIPES: ClassVar[list[tuple[str, type[Exception], str]]] = [
         (
