@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Any
 
-import toml
 from pydantic import BaseModel, model_validator
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -9,10 +8,11 @@ from pipelex.core.exceptions import (
     PipelexConfigurationError,
 )
 from pipelex.tools.misc.file_utils import load_text_from_path
+from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content
 from pipelex.types import Self
 
 
-class PLXDecodeError(toml.TomlDecodeError):
+class PLXDecodeError(TomlError):
     """Raised when PLX decoding fails."""
 
 
@@ -92,11 +92,11 @@ class PipelexInterpreter(BaseModel):
     def _parse_plx_content(self, content: str) -> dict[str, Any]:
         """Parse PLX content and return the dictionary."""
         try:
-            return toml.loads(content)
-        except toml.TomlDecodeError as exc:
-            file_path_str = str(self.file_path) if self.file_path else "content"
+            return load_toml_from_content(content=content)
+        except TomlError as exc:
+            file_path_str = str(self.file_path) if self.file_path else "string content"
             msg = f"PLX parsing error in '{file_path_str}': {exc}"
-            raise PLXDecodeError(msg, exc.doc, exc.pos) from exc
+            raise PLXDecodeError(message=msg, doc=exc.doc, pos=exc.pos) from exc
 
     def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
         """Make a PipelexBundleBlueprint from the file_path or file_content"""
