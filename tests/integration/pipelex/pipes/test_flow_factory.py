@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.libraries.pipelines.builder.flow_factory import FlowFactory
+from pipelex.builder.flow_factory import FlowFactory
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder
 from pipelex.tools.misc.json_utils import save_as_json_to_path

@@ -5,11 +5,11 @@ from typing import Annotated
 import typer
 
 from pipelex import pretty_print
+from pipelex.builder.builder import PipelexBundleSpec
+from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.flow_factory import FlowFactory
 from pipelex.hub import get_report_delegate
 from pipelex.language.plx_factory import PlxFactory
-from pipelex.libraries.pipelines.builder.builder import PipelexBundleSpec
-from pipelex.libraries.pipelines.builder.builder_loop import BuilderLoop
-from pipelex.libraries.pipelines.builder.flow_factory import FlowFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
