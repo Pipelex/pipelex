@@ -6,9 +6,6 @@ Pipelex provides powerful tools to automatically generate complete, working pipe
 
 The pipeline creation system creates a fully working pipeline that has been both statically and dynamically validated. The system automatically handles all aspects of pipeline generation, from understanding requirements to producing executable code.
 
-!!! warning "Execution Time"
-    Pipeline generation can take 4 to 7 minutes to complete, as the system performs comprehensive validation and testing to ensure the pipeline works correctly.
-
 ## Core Commands
 
 ### Build Blueprint
