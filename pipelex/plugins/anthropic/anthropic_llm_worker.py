@@ -69,12 +69,8 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
 
         # Verify if the sdk_instance is compatible with the current LLM platform
         if isinstance(sdk_instance, (AsyncAnthropic, AsyncAnthropicBedrock)):
-            if (
-                inference_model.sdk == AnthropicSdkVariant.ANTHROPIC
-                and not (isinstance(sdk_instance, AsyncAnthropic))
-            ) or (
-                inference_model.sdk == AnthropicSdkVariant.BEDROCK_ANTHROPIC
-                and not (isinstance(sdk_instance, AsyncAnthropicBedrock))
+            if (inference_model.sdk == AnthropicSdkVariant.ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropic))) or (
+                inference_model.sdk == AnthropicSdkVariant.BEDROCK_ANTHROPIC and not (isinstance(sdk_instance, AsyncAnthropicBedrock))
             ):
                 msg = f"Provided sdk_instance does not match LLMEngine platform:{sdk_instance}"
                 raise SdkTypeError(msg)
@@ -85,29 +81,21 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         self.anthropic_async_client = sdk_instance
         if structure_method:
             instructor_mode = structure_method.as_instructor_mode()
-            log.debug(
-                f"Anthropic structure mode: {structure_method} --> {instructor_mode}"
-            )
-            self.instructor_for_objects = instructor.from_anthropic(
-                client=sdk_instance, mode=instructor_mode
-            )
+            log.debug(f"Anthropic structure mode: {structure_method} --> {instructor_mode}")
+            self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance, mode=instructor_mode)
         else:
             self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance)
 
         instructor_config = get_config().cogt.llm_config.instructor_config
         if instructor_config.is_dump_kwargs_enabled:
-            self.instructor_for_objects.on(
-                hook_name="completion:kwargs", handler=dump_kwargs
-            )
+            self.instructor_for_objects.on(hook_name="completion:kwargs", handler=dump_kwargs)
         if instructor_config.is_dump_response_enabled:
             self.instructor_for_objects.on(
                 hook_name="completion:response",
                 handler=dump_response_from_structured_gen,
             )
         if instructor_config.is_dump_error_enabled:
-            self.instructor_for_objects.on(
-                hook_name="completion:error", handler=dump_error
-            )
+            self.instructor_for_objects.on(hook_name="completion:error", handler=dump_error)
 
     #########################################################
     # Instance methods
@@ -117,15 +105,9 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def _adapt_max_tokens(self, max_tokens: int | None) -> int:
         max_tokens = max_tokens or self.default_max_tokens
 
-        if (
-            claude_4_tokens_limit := self.extra_config.get(
-                AnthropicExtraField.CLAUDE_4_TOKENS_LIMIT
-            )
-        ) and max_tokens > claude_4_tokens_limit:
+        if (claude_4_tokens_limit := self.extra_config.get(AnthropicExtraField.CLAUDE_4_TOKENS_LIMIT)) and max_tokens > claude_4_tokens_limit:
             max_tokens = claude_4_tokens_limit
-            log.warning(
-                f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}"
-            )
+            log.warning(f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}")
         if not max_tokens:
             msg = f"Max tokens is None for model {self.inference_model.desc}"
             raise AnthropicWorkerConfigurationError(msg)
@@ -158,12 +140,8 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg)
         full_reply_content = single_content_block.text
 
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (
-            usage := response.usage
-        ):
-            llm_tokens_usage.nb_tokens_by_category = (
-                AnthropicFactory.make_nb_tokens_by_category(usage=usage)
-            )
+        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
+            llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 
         return full_reply_content
 
@@ -186,11 +164,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             temperature=llm_job.job_params.temperature,
             max_tokens=max_tokens,
         )
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (
-            usage := completion.usage
-        ):
-            llm_tokens_usage.nb_tokens_by_category = (
-                AnthropicFactory.make_nb_tokens_by_category(usage=usage)
-            )
+        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
+            llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 
         return result_object

@@ -126,13 +126,9 @@ class ModelDeck(ConfigModel):
     @classmethod
     def final_validate(cls, deck: Self):
         for llm_preset_id, llm_setting in deck.llm_presets.items():
-            inference_model = deck.get_required_inference_model(
-                model_handle=llm_setting.model
-            )
+            inference_model = deck.get_required_inference_model(model_handle=llm_setting.model)
             try:
-                cls._validate_llm_setting(
-                    llm_setting=llm_setting, inference_model=inference_model
-                )
+                cls._validate_llm_setting(llm_setting=llm_setting, inference_model=inference_model)
             except ConfigValidationError as exc:
                 msg = f"LLM preset '{llm_preset_id}' is invalid: {exc}"
                 raise ModelDeckValidatonError(msg) from exc
@@ -142,22 +138,15 @@ class ModelDeck(ConfigModel):
     ############################################################
 
     @classmethod
-    def _validate_llm_setting(
-        cls, llm_setting: LLMSetting, inference_model: InferenceModelSpec
-    ):
-        if inference_model.max_tokens is not None and (
-            llm_setting_max_tokens := llm_setting.max_tokens
-        ):
+    def _validate_llm_setting(cls, llm_setting: LLMSetting, inference_model: InferenceModelSpec):
+        if inference_model.max_tokens is not None and (llm_setting_max_tokens := llm_setting.max_tokens):
             if llm_setting_max_tokens > inference_model.max_tokens:
                 msg = (
                     f"LLM setting '{llm_setting.model}' has a max_tokens of {llm_setting_max_tokens}, "
                     f"which is greater than the model's max_tokens of {inference_model.max_tokens}"
                 )
                 raise LLMSettingsValidationError(msg)
-        if (
-            ModelConstraints.TEMPERATURE_MUST_BE_1 in inference_model.constraints
-            and llm_setting.temperature != 1
-        ):
+        if ModelConstraints.TEMPERATURE_MUST_BE_1 in inference_model.constraints and llm_setting.temperature != 1:
             msg = (
                 f"LLM setting '{llm_setting.model}' has a temperature of {llm_setting.temperature}, "
                 f"which is not allowed by the model's constraints: it must be 1"
@@ -166,9 +155,7 @@ class ModelDeck(ConfigModel):
 
     @field_validator("llm_choice_defaults", mode="after")
     @classmethod
-    def validate_llm_choice_defaults(
-        cls, llm_choice_defaults: LLMSettingChoices
-    ) -> LLMSettingChoices:
+    def validate_llm_choice_defaults(cls, llm_choice_defaults: LLMSettingChoices) -> LLMSettingChoices:
         if llm_choice_defaults.for_text is None:
             msg = "llm_choice_defaults.for_text cannot be None"
             raise ConfigValidationError(msg)
@@ -179,9 +166,7 @@ class ModelDeck(ConfigModel):
 
     @field_validator("llm_choice_overrides", mode="after")
     @classmethod
-    def validate_llm_choice_overrides(
-        cls, value: LLMSettingChoices
-    ) -> LLMSettingChoices:
+    def validate_llm_choice_overrides(cls, value: LLMSettingChoices) -> LLMSettingChoices:
         if value.for_text == LLM_PRESET_DISABLED:
             value.for_text = None
         if value.for_object == LLM_PRESET_DISABLED:
@@ -204,9 +189,7 @@ class ModelDeck(ConfigModel):
         for llm_setting in llm_choices.list_choices():
             self.check_llm_setting(llm_setting_or_preset_id=llm_setting)
 
-    def get_optional_inference_model(
-        self, model_handle: str
-    ) -> InferenceModelSpec | None:
+    def get_optional_inference_model(self, model_handle: str) -> InferenceModelSpec | None:
         if inference_model := self.inference_models.get(model_handle):
             return inference_model
         if redirection := self.aliases.get(model_handle):
@@ -216,13 +199,9 @@ class ModelDeck(ConfigModel):
             else:
                 alias_list = redirection
             for alias in alias_list:
-                if inference_model := self.get_optional_inference_model(
-                    model_handle=alias
-                ):
+                if inference_model := self.get_optional_inference_model(model_handle=alias):
                     return inference_model
-        log.warning(
-            f"Skipping model handle '{model_handle}' because it's not found in deck"
-        )
+        log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck")
         return None
 
     def is_handle_defined(self, model_handle: str) -> bool:
@@ -234,7 +213,5 @@ class ModelDeck(ConfigModel):
             msg = f"Model handle '{model_handle}' not found in deck"
             raise ModelNotFoundError(msg)
         if model_handle not in self.inference_models:
-            log.dev(
-                f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'"
-            )
+            log.dev(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
         return inference_model
