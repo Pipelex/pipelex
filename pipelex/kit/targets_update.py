@@ -84,29 +84,28 @@ def _insert_block_with_markers(target_md: str, block_md: str, main_title: str | 
     Args:
         target_md: Existing target markdown content
         block_md: Block to insert
-        main_title: Main title (H1) to add when inserting into empty file or file with no H1 headings
+        main_title: Main title (H1) to add inside markers when inserting into empty file or file with no H1 headings
         markers: Tuple of (begin_marker, end_marker)
 
     Returns:
         Updated markdown with block inserted and markers added
     """
     marker_begin, marker_end = markers
-    wrapped_block = wrap(marker_begin, marker_end, block_md)
 
     # Check if file is empty or has no H1 heading
     is_empty = not target_md or not target_md.strip()
     h1_pattern = r"^#\s+.+$"
     has_h1 = bool(target_md) and bool(re.search(h1_pattern, target_md, flags=re.MULTILINE))
 
-    # If empty or no H1 heading, add main_title at top if provided
+    # If empty or no H1 heading, add main_title INSIDE the markers
     if (is_empty or not has_h1) and main_title:
-        if is_empty:
-            return f"{main_title}\n\n{wrapped_block}\n"
-        else:
-            # File has content but no H1 - add title at top, preserve content, append wrapped block
-            return f"{main_title}\n\n{target_md.rstrip()}\n\n{wrapped_block}\n"
+        content_with_heading = f"{main_title}\n\n{block_md}"
+        wrapped_block = wrap(marker_begin, marker_end, content_with_heading)
+    else:
+        # File already has H1 heading, don't add another one
+        wrapped_block = wrap(marker_begin, marker_end, block_md)
 
-    # Otherwise append at the end
+    # Append at the end
     if is_empty:
         return wrapped_block + "\n"
     return target_md.rstrip() + "\n\n" + wrapped_block + "\n"
@@ -190,3 +189,95 @@ def update_targets(
                 diff_output = _diff(before, after, str(target_path))
                 if diff_output:
                     typer.echo(diff_output)
+
+
+def remove_from_targets(
+    repo_root: Path,
+    targets: dict[str, Target],
+    delete_files: bool,
+    dry_run: bool,
+    diff: bool,
+    backup: str | None,
+) -> None:
+    """Remove agent documentation from target files.
+
+    Args:
+        repo_root: Repository root directory
+        targets: Dictionary of target file configurations keyed by ID
+        delete_files: If True, delete entire files; if False, only remove marked sections
+        dry_run: If True, only print what would be done
+        diff: If True, show unified diff
+        backup: Backup suffix (e.g., ".bak"), or None for no backup
+    """
+    for target in targets.values():
+        target_path = repo_root / target.path
+
+        if not target_path.exists():
+            typer.echo(f"⚠️  File {target_path} does not exist - skipping")
+            continue
+
+        if delete_files:
+            # Delete the entire file
+            if dry_run:
+                typer.echo(f"[DRY] delete {target_path}")
+            else:
+                if backup:
+                    backup_path = target_path.with_suffix(target_path.suffix + backup)
+                    target_path.rename(backup_path)
+                    typer.echo(f"📦 Backup saved to {backup_path}")
+                else:
+                    target_path.unlink()
+                typer.echo(f"🗑️  Deleted {target_path}")
+        else:
+            # Remove only the marked section
+            before = target_path.read_text(encoding="utf-8")
+            span = find_span(before, target.marker_begin, target.marker_end)
+
+            if not span:
+                typer.echo(f"⚠️  No marked section found in {target_path} - skipping")
+                continue
+
+            # Remove the marked section entirely
+            before_section = before[: span[0]].rstrip()
+            after_section = before[span[1] :].lstrip()
+
+            # If there's content before or after, join them
+            if before_section and after_section:
+                after = before_section + "\n\n" + after_section
+            elif before_section:
+                after = before_section + "\n"
+            elif after_section:
+                after = after_section
+            else:
+                # File only contained the marked section - delete the file
+                if dry_run:
+                    typer.echo(f"[DRY] delete {target_path} (file only contained marked section)")
+                else:
+                    if backup:
+                        backup_path = target_path.with_suffix(target_path.suffix + backup)
+                        target_path.rename(backup_path)
+                        typer.echo(f"📦 Backup saved to {backup_path}")
+                    else:
+                        target_path.unlink()
+                    typer.echo(f"🗑️  Deleted {target_path} (file only contained marked section)")
+                continue
+
+            if dry_run:
+                typer.echo(f"[DRY] remove marked section from {target_path}")
+                if diff:
+                    diff_output = _diff(before, after, str(target_path))
+                    if diff_output:
+                        typer.echo(diff_output)
+            else:
+                if backup:
+                    backup_path = target_path.with_suffix(target_path.suffix + backup)
+                    backup_path.write_text(before, encoding="utf-8")
+                    typer.echo(f"📦 Backup saved to {backup_path}")
+
+                target_path.write_text(after, encoding="utf-8")
+                typer.echo(f"✅ Removed marked section from {target_path}")
+
+                if diff:
+                    diff_output = _diff(before, after, str(target_path))
+                    if diff_output:
+                        typer.echo(diff_output)

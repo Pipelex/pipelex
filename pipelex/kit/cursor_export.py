@@ -69,3 +69,33 @@ def export_cursor_rules(repo_root: Path, idx: KitIndex, dry_run: bool = False) -
         else:
             out_path.write_text(mdc, encoding="utf-8")
             typer.echo(f"✅ Exported {out_path}")
+
+
+def remove_cursor_rules(repo_root: Path, dry_run: bool = False) -> None:
+    """Remove Cursor .mdc files that correspond to agent markdown files.
+
+    Args:
+        repo_root: Repository root directory
+        dry_run: If True, only print what would be done
+    """
+    agents_dir = get_agents_dir()
+    out_dir = repo_root / ".cursor" / "rules"
+
+    if not out_dir.exists():
+        typer.echo(f"⚠️  Directory {out_dir} does not exist - nothing to remove")
+        return
+
+    removed_count = 0
+    for fname, _ in _iter_agent_files(agents_dir):
+        out_path = out_dir / (fname.removesuffix(".md") + ".mdc")
+
+        if out_path.exists():
+            if dry_run:
+                typer.echo(f"[DRY] delete {out_path}")
+            else:
+                out_path.unlink()
+                typer.echo(f"🗑️  Deleted {out_path}")
+            removed_count += 1
+
+    if removed_count == 0:
+        typer.echo("⚠️  No Cursor rules found to remove")
