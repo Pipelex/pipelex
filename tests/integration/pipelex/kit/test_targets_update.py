@@ -2,7 +2,6 @@ from pathlib import Path
 
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.markers import find_span
-from pipelex.kit.paths import get_agents_dir
 from pipelex.kit.targets_update import build_merged_rules, update_targets
 
 
@@ -12,7 +11,6 @@ class TestTargetsUpdate:
     def test_update_targets_dry_run(self, tmp_path: Path):
         """Test updating targets in dry-run mode."""
         idx = load_index()
-        agents_dir = get_agents_dir()
 
         # Create a temporary repo root with a target file
         repo_root = tmp_path / "repo"
@@ -20,7 +18,7 @@ class TestTargetsUpdate:
         target_file = repo_root / "test_target.md"
         target_file.write_text("# Test\n\nOriginal content\n", encoding="utf-8")
 
-        merged_rules = build_merged_rules(agents_dir, idx)
+        merged_rules = build_merged_rules(idx)
 
         # Create a test target
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
@@ -35,14 +33,13 @@ class TestTargetsUpdate:
     def test_update_targets_inserts_with_markers(self, tmp_path: Path):
         """Test that update_targets inserts content with markers."""
         idx = load_index()
-        agents_dir = get_agents_dir()
 
         repo_root = tmp_path / "repo"
         repo_root.mkdir()
         target_file = repo_root / "test_target.md"
         target_file.write_text("# Test\n\nOriginal content\n", encoding="utf-8")
 
-        merged_rules = build_merged_rules(agents_dir, idx)
+        merged_rules = build_merged_rules(idx)
 
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 
@@ -62,7 +59,6 @@ class TestTargetsUpdate:
     def test_update_targets_replaces_existing_markers(self, tmp_path: Path):
         """Test that update_targets replaces content between existing markers."""
         idx = load_index()
-        agents_dir = get_agents_dir()
 
         repo_root = tmp_path / "repo"
         repo_root.mkdir()
@@ -74,7 +70,7 @@ class TestTargetsUpdate:
         initial_content = f"# Test\n\n{marker_begin}\nOld content\n{marker_end}\n"
         target_file.write_text(initial_content, encoding="utf-8")
 
-        merged_rules = build_merged_rules(agents_dir, idx)
+        merged_rules = build_merged_rules(idx)
 
         test_targets = {
             "test": idx.agent_rules.targets["agents"].model_copy(
@@ -100,7 +96,6 @@ class TestTargetsUpdate:
     def test_update_targets_creates_backup(self, tmp_path: Path):
         """Test that update_targets creates backup files when requested."""
         idx = load_index()
-        agents_dir = get_agents_dir()
 
         repo_root = tmp_path / "repo"
         repo_root.mkdir()
@@ -108,7 +103,7 @@ class TestTargetsUpdate:
         original_content = "# Test\n\nOriginal content\n"
         target_file.write_text(original_content, encoding="utf-8")
 
-        merged_rules = build_merged_rules(agents_dir, idx)
+        merged_rules = build_merged_rules(idx)
 
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 

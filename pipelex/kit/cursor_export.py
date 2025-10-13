@@ -9,6 +9,7 @@ import typer
 import yaml
 
 from pipelex.kit.index_models import KitIndex
+from pipelex.kit.paths import get_agents_dir
 
 
 def _iter_agent_files(agents_dir: Traversable) -> Iterable[tuple[str, str]]:
@@ -42,15 +43,16 @@ def _front_matter_for(name: str, idx: KitIndex) -> dict[str, Any]:
     return base
 
 
-def export_cursor_rules(agents_dir: Traversable, out_dir: Path, idx: KitIndex, dry_run: bool = False) -> None:
+def export_cursor_rules(repo_root: Path, idx: KitIndex, dry_run: bool = False) -> None:
     """Export agent markdown files to Cursor .mdc files with YAML front-matter.
 
     Args:
-        agents_dir: Traversable pointing to agents directory
-        out_dir: Output directory for .mdc files
+        repo_root: Repository root directory
         idx: Kit index configuration
         dry_run: If True, only print what would be done
     """
+    agents_dir = get_agents_dir()
+    out_dir = repo_root / ".cursor" / "rules"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for fname, body in _iter_agent_files(agents_dir):

@@ -9,6 +9,7 @@ import typer
 
 from pipelex.kit.index_models import KitIndex, Target
 from pipelex.kit.markers import find_span, replace_span, wrap
+from pipelex.kit.paths import get_agents_dir
 
 
 def _read_agent_file(agents_dir: Traversable, name: str) -> str:
@@ -48,17 +49,18 @@ def _demote_headings(md_content: str, levels: int) -> str:
     return re.sub(pattern, demote_match, md_content, flags=re.MULTILINE)
 
 
-def build_merged_rules(agents_dir: Traversable, idx: KitIndex, agent_set: str | None = None) -> str:
+def build_merged_rules(idx: KitIndex, agent_set: str | None = None) -> str:
     """Build merged agent documentation from ordered files.
 
     Args:
-        agents_dir: Traversable pointing to agents directory
         idx: Kit index configuration
         agent_set: Name of the agent set to use (defaults to idx.agents.default_set)
 
     Returns:
         Merged markdown content with demoted headings
     """
+    agents_dir = get_agents_dir()
+
     if agent_set is None:
         agent_set = idx.agent_rules.default_set
 

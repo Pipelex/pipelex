@@ -29,3 +29,12 @@ def get_configs_dir() -> Traversable:
         Traversable object pointing to pipelex.kit/configs
     """
     return get_kit_root() / "configs"
+
+
+def get_migrations_dir() -> Traversable:
+    """Get the migrations directory within the kit package.
+
+    Returns:
+        Traversable object pointing to pipelex.kit/migrations
+    """
+    return get_kit_root() / "migrations"
