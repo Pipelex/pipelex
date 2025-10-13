@@ -53,7 +53,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
 Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [Kick off a Knowledge Pipeline Project](kick-off-a-knowledge-pipeline-project.md#what-are-domains).
 
 ```plx
-# pipelex_libraries/pipelines/finance.plx
+# finance.plx
 domain = "finance"
 description = "Financial document processing"
 
@@ -76,7 +76,7 @@ While text definitions help LLMs understand your concepts, Python models ensure 
 For each concept that needs structured output, create a corresponding Python class:
 
 ```python
-# pipelex_libraries/pipelines/finance.py
+# finance.py
 from datetime import datetime
 from typing import List, Optional
 from pydantic import Field
@@ -148,7 +148,7 @@ class Meeting(StructuredContent):
 The connection between PLX definitions and Python models happens automatically through naming:
 
 ```plx
-# pipelex_libraries/pipelines/hr.plx
+# hr.plx
 domain = "hr"
 
 [concept]
@@ -159,7 +159,7 @@ Department = "An organizational unit within a company"  # No Python model => tex
 ```
 
 ```python
-# pipelex_libraries/pipelines/hr.py
+# hr.py
 from pipelex.core.stuffs.structured_content import StructuredContent
 from datetime import datetime
 from typing import List, Optional

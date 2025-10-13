@@ -72,8 +72,7 @@ For illustration purposes, let's build **a character generator**. Each example r
 
 ### Write your first pipeline
 
-First, create a `.plx` library file in the `pipelex_libraries/pipelines` directory to store your pipe definition.
-Run `pipelex init libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
+Create a `.plx` file to store your pipe definition. You can place it anywhere in your project - we recommend creating a `pipelines` directory for organization.
 
 `character.plx`
 ```plx
@@ -162,9 +161,9 @@ Let's say that we no longer want plain text as output but a rigorously structure
 
 ### Define the model
 
-Using the [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class, in the `pipelex_libraries/pipelines` directory:
+Using the [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class in your project:
 
-`pipelex_libraries/pipelines/characters.py`
+`characters.py`
 ```python
 from pipelex.core.stuffs.structured_content import StructuredContent
 
@@ -183,7 +182,7 @@ It's time to specify that your output be a `Character` instance. Use the `output
 
 💡 Here, the concept name matches the class name (ie. `Character`), the `Character` class will automatically be considered as the structure to output.
 
-`pipelex_libraries/pipelines/characters.plx`
+`characters.plx`
 ```plx
 domain = "characters"
 
@@ -220,7 +219,7 @@ We want to extract structured information from the description field. Thus we ha
 ### Define the output structure
 
 ```python
-# pipelex_libraries/pipelines/character_model.py
+# character_model.py
 from pipelex.core.stuffs.structured_content import StructuredContent
 
 # input class
@@ -275,7 +274,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
-from pipelex.libraries.pipelines.screenplay import Character, CharacterMetadata
+from character_model import Character, CharacterMetadata
 
 
 async def process_existing_character():

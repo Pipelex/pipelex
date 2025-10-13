@@ -5,12 +5,18 @@ This guide will help you migrate your Pipelex pipelines and configurations to th
 ## Overview
 
 This release introduces several breaking changes to make the Pipelex language more declarative, intuitive, and consistent. The changes affect:
+- Project structure and organization
 - Pipeline definitions (.plx files)
 - Configuration files (.pipelex/ directory)
+- Python code initialization
 - Test markers
 
 ## Migration Checklist
 
+- [ ] **Migrate from pipelex_libraries system (CRITICAL)**
+- [ ] Move .plx files to appropriate locations in your project
+- [ ] Update Pipelex.make() calls (remove config path parameters)
+- [ ] Add @pipe_func() decorators to custom functions used in PipeFunc operators
 - [ ] Update PipeCompose (formerly PipeJinja2)
 - [ ] Update PipeExtract (formerly PipeOCR)
 - [ ] Update PipeLLM prompts and fields
@@ -20,7 +26,246 @@ This release introduces several breaking changes to make the Pipelex language mo
 - [ ] Update test markers
 - [ ] Run validation
 
-## 1. General Changes
+## 1. Library System Removal (CRITICAL)
+
+The centralized `pipelex_libraries` folder system has been removed in favor of automatic pipeline discovery throughout your project.
+
+### Key Changes
+
+1. **No more `pipelex init libraries` command**
+2. **No centralized `pipelex_libraries` directory required**
+3. **Pipelines are auto-discovered** from anywhere in your project
+4. **No config path parameters** needed in commands or code
+5. **Custom functions require `@pipe_func()` decorator**
+6. **Structure classes are auto-discovered**
+
+### Step 1: Move Pipeline Files (Flexible Organization)
+
+**The key change:** `.plx` files can now live ANYWHERE in your project. No special directory required!
+
+**Recommendation:** Put `.plx` files with related code. If you have topic-based organization, keep pipelines with their topics.
+
+**Example Migration Patterns:**
+
+**Pattern A: Topic-Based (Recommended if you have domain modules)**
+```
+Before:
+pipelex_libraries/pipelines/
+├── finance.plx
+├── finance.py
+├── legal.plx
+└── legal.py
+
+After - Keep with related code:
+my_project/
+├── finance/
+│   ├── models.py
+│   ├── services.py
+│   ├── invoices.plx          # Pipeline with finance code
+│   └── invoices_struct.py    # Structure classes
+└── legal/
+    ├── models.py
+    ├── services.py
+    ├── contracts.plx         # Pipeline with legal code
+    └── contracts_struct.py
+```
+
+**Pattern B: Centralized Pipelines (If you prefer grouping)**
+```
+After - Group pipelines together:
+my_project/
+├── pipelines/
+│   ├── finance.plx
+│   ├── finance_struct.py
+│   ├── legal.plx
+│   └── legal_struct.py
+└── core/
+    └── (your other code)
+```
+
+**Pattern C: Flat (Small projects)**
+```
+After - Just put them in your source directory:
+my_project/
+├── finance_pipeline.plx
+├── finance_struct.py
+└── main.py
+```
+
+**Action Items:**
+
+1. **Choose your organization** (any of the above patterns work)
+
+2. **Move .plx files** to where they make sense for YOUR project:
+   ```bash
+   # Example: Moving to topic-based structure
+   mv pipelex_libraries/pipelines/finance.plx my_project/finance/
+   ```
+
+3. **Rename structure files** with `_struct.py` suffix:
+   ```bash
+   # Example
+   mv my_project/finance/finance.py my_project/finance/finance_struct.py
+   ```
+
+4. **Clean up:**
+   ```bash
+   # After all files are moved
+   rm -rf pipelex_libraries/
+   
+   # Remove from .gitignore if present
+   sed -i '/^\/pipelex_libraries$/d' .gitignore
+   ```
+
+**Remember:** Configuration (`.pipelex/`) stays at repository root.
+
+### Step 2: Update Python Code Initialization
+
+**Before:**
+```python
+from pipelex.pipelex import Pipelex
+
+pipelex_instance = Pipelex.make(
+    relative_config_folder_path="../../../pipelex/libraries",
+    from_file=True
+)
+```
+
+**After:**
+```python
+from pipelex.pipelex import Pipelex
+
+# No path needed - automatic discovery
+pipelex_instance = Pipelex.make()
+```
+
+**Find and replace in all Python files:**
+- Remove `relative_config_folder_path` parameter
+- Remove `config_folder_path` parameter
+- Remove `from_file` parameter
+
+### Step 3: Update Custom Functions
+
+All custom functions used in `PipeFunc` operators must now have the `@pipe_func()` decorator for auto-discovery.
+
+**Before:**
+```python
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+
+async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
+    input_data = working_memory.get_stuff("input_name")
+    return TextContent(text=f"Processed: {input_data.content.text}")
+```
+
+**After:**
+```python
+from pipelex.tools.func_registry import pipe_func
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+
+@pipe_func()  # Add this decorator
+async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
+    input_data = working_memory.get_stuff("input_name")
+    return TextContent(text=f"Processed: {input_data.content.text}")
+
+# Optional: specify a custom name
+@pipe_func(name="custom_processor")
+async def another_function(working_memory: WorkingMemory) -> TextContent:
+    # Implementation
+    pass
+```
+
+### Step 4: Update CLI Commands
+
+**Before:**
+```bash
+# You had to specify config folder path
+pipelex validate all -c path/to/pipelex/libraries
+pipelex build blueprint "..." -c your/path/to/pipelex/libraries
+```
+
+**After:**
+```bash
+# No config path needed - automatic discovery
+pipelex validate all
+pipelex build blueprint "..."
+```
+
+### Step 5: Update Imports in Python Code
+
+Update imports from the old library structure:
+
+**Before:**
+```python
+from pipelex.libraries.pipelines.finance import Invoice, InvoiceData
+```
+
+**After:**
+```python
+# Import from your own project structure
+from my_project.pipelines.finance_struct import Invoice, InvoiceData
+```
+
+### Step 6: Update Concept References (Optional)
+
+While domain-prefixed concept references still work, you can now use simpler references:
+
+**Before:**
+```plx
+inputs = { prompt = "images.ImgGenPrompt" }
+inputs = { wedding_photo = "images.Photo" }
+```
+
+**After:**
+```plx
+# Simpler references (domain prefix optional)
+inputs = { prompt = "ImgGenPrompt" }
+inputs = { wedding_photo = "Photo" }
+```
+
+### Auto-Discovery Explained
+
+**The big change:** Pipelex now scans your entire project and finds:
+
+- **`.plx` files** - Pipeline definitions (wherever they are!)
+- **Structure classes** - Classes inheriting from `StructuredContent`
+- **Custom functions** - Functions decorated with `@pipe_func()`
+
+**This means:**
+- No special `pipelex_libraries/pipelines/` folder needed
+- Put `.plx` files where they logically belong in YOUR codebase
+- Keep related things together (pipelines with their code)
+
+**Excluded directories** (automatically skipped):
+- `.venv`, `.git`, `__pycache__`
+- `.pytest_cache`, `.mypy_cache`, `.ruff_cache`
+- `node_modules`, `.env`, `results`
+
+### Troubleshooting
+
+**Issue: Pipelines not found**
+
+Solution: Ensure `.plx` files are not in excluded directories and run:
+```bash
+pipelex show pipes  # See what was discovered
+```
+
+**Issue: Structure classes not registered**
+
+Solution:
+1. Ensure classes inherit from `StructuredContent`
+2. Check class names match concept names exactly
+3. Use `_struct.py` suffix for structure files
+
+**Issue: Custom functions not found**
+
+Solution:
+1. Add `@pipe_func()` decorator
+2. Ensure function is `async` and accepts `working_memory`
+3. Verify function is in a discoverable location
+
+## 2. General Changes
 
 ### Rename `definition` to `description`
 
@@ -43,7 +288,7 @@ type = "PipeLLM"
 description = "Process data"
 ```
 
-## 2. PipeCompose (formerly PipeJinja2)
+## 3. PipeCompose (formerly PipeJinja2)
 
 ### Rename pipe type
 
@@ -105,7 +350,7 @@ category = "html"
 templating_style = { tag_style = "square_brackets", text_format = "html" }
 ```
 
-## 3. PipeExtract (formerly PipeOCR)
+## 4. PipeExtract (formerly PipeOCR)
 
 ### Rename pipe type
 
@@ -151,7 +396,7 @@ If you're using these functions in Python code:
 **Find:** `ocr_page_contents_and_views_from_pdf`
 **Replace with:** `extract_page_contents_and_views_from_pdf`
 
-## 4. PipeLLM Changes
+## 5. PipeLLM Changes
 
 ### Rename prompt field
 
@@ -229,7 +474,7 @@ Extract person information from this text:
 """
 ```
 
-## 5. PipeImgGen Changes
+## 6. PipeImgGen Changes
 
 ### Rename model field
 
@@ -269,7 +514,7 @@ Or use a preset:
 model = "img_gen_preset_name"
 ```
 
-## 6. PipeCondition Changes
+## 7. PipeCondition Changes
 
 ### Rename outcome fields
 
@@ -319,7 +564,7 @@ To fail when no match:
 default_outcome = "fail"
 ```
 
-## 7. Configuration Files (.pipelex/ directory)
+## 8. Configuration Files (.pipelex/ directory)
 
 ### LLM presets in deck files
 
@@ -406,7 +651,7 @@ is_auto_setup_preset_extract = true
 nb_extract_pages = 10
 ```
 
-## 8. Test Markers
+## 9. Test Markers
 
 ### Update pytest markers
 
@@ -441,25 +686,51 @@ class TestExtractPipeline:
 **Find:** `make test-ocr` or `make to`
 **Replace with:** `make test-extract` or `make te`
 
-## 9. Validation
+## 10. Validation
 
-After making all changes, run validation:
+After making changes, thoroughly test your migration:
+
+### Activate Virtual Environment
 
 ```bash
-# Fix any unused imports
-make fix-unused-imports
-
-# Validate all pipelines
-make validate
-
-# Run type checking and linting
-make check
-
-# Run tests (non-inference)
-make tp
+# Activate your virtual environment first
+source .venv/bin/activate  # Unix/macOS
+# or
+.venv\Scripts\activate  # Windows
 ```
 
-## 10. Python API Changes for Client Projects
+### Validation Steps
+
+1. **Validate pipeline syntax:**
+   ```bash
+   pipelex validate all
+   ```
+
+2. **Check specific pipes:**
+   ```bash
+   pipelex show pipes  # List all discovered pipes
+   pipelex show pipe YOUR_PIPE_CODE  # Inspect specific pipe
+   ```
+
+3. **Run your test suite:**
+   ```bash
+   pytest tests/
+   # or if using make:
+   make test
+   ```
+
+4. **Test pipeline execution:**
+   - Run your application
+   - Execute example pipelines
+   - Verify outputs are as expected
+
+5. **Check for issues:**
+   - Review any validation errors
+   - Check imports are working
+   - Verify structure classes are discovered
+   - Confirm custom functions are registered
+
+## 11. Python API Changes for Client Projects
 
 These changes affect Python code that imports from or uses pipelex.
 
@@ -543,7 +814,7 @@ get_inference_manager().set_llm_worker_from_external_plugin(
 )
 ```
 
-## 11. File Cleanup
+## 12. File Cleanup
 
 ### Remove Deprecated Files
 
@@ -568,7 +839,7 @@ If your project has `AGENTS.md` or `CLAUDE.md` files with Pipelex examples:
    - `llm = ` → `model = `
    - `prompt_template = ` → `prompt = `
 
-## 12. Common Issues
+## 13. Common Issues
 
 ### Issue: Pipeline validation fails with "unknown field"
 
@@ -600,133 +871,71 @@ If your project has `AGENTS.md` or `CLAUDE.md` files with Pipelex examples:
 
 **Solution:** Remove references to this file. The templates are now auto-loaded from the config.
 
-## 13. Automated Migration Script
+## 14. Automation Tools
 
-You can use this bash script to automatically apply most changes:
+You can automate many of these text replacements using standard tools available on your platform:
 
-```bash
-#!/bin/bash
+### Available Tools by Platform
 
-# Find all .plx files and apply replacements
-find . -name "*.plx" -type f -exec sed -i '' \
-  -e 's/definition = "/description = "/g' \
-  -e 's/type = "PipeJinja2"/type = "PipeCompose"/g' \
-  -e 's/type = "PipeOCR"/type = "PipeExtract"/g' \
-  -e 's/prompt_template = /prompt = /g' \
-  -e 's/jinja2 = /template = /g' \
-  -e 's/jinja2_name = /template_name = /g' \
-  -e 's/ocr_model = /model = /g' \
-  -e 's/\[pipe\.\([^.]*\)\.pipe_map\]/[pipe.\1.outcomes]/g' \
-  -e 's/default_pipe_code = /default_outcome = /g' \
-  {} +
+**Unix/Linux/macOS:**
+- `sed` - Stream editor for find/replace in files
+- `find` - Locate files and execute commands on them
+- `grep` - Search for patterns in files
 
-# Update Python files with renamed pipe codes
-find . -name "*.py" -type f -exec sed -i '' \
-  -e 's/ocr_page_contents_from_pdf/extract_page_contents_from_pdf/g' \
-  -e 's/ocr_page_contents_and_views_from_pdf/extract_page_contents_and_views_from_pdf/g' \
-  {} +
+**Windows:**
+- PowerShell's `Get-Content` and `-replace` operator
+- Git Bash (includes Unix tools)
+- WSL (Windows Subsystem for Linux)
 
-# Update documentation files
-find . \( -name "AGENTS.md" -o -name "CLAUDE.md" \) -type f -exec sed -i '' \
-  -e 's/definition = "/description = "/g' \
-  -e 's/type = "PipeOcr"/type = "PipeExtract"/g' \
-  -e 's/ocr_model = /model = /g' \
-  -e 's/ocr_page_contents_from_pdf/extract_page_contents_from_pdf/g' \
-  -e 's/ocr_page_contents_and_views_from_pdf/extract_page_contents_and_views_from_pdf/g' \
-  {} +
+### What Can Be Automated
 
-# Find all .toml files in .pipelex and apply replacements
-find .pipelex -name "*.toml" -type f -exec sed -i '' \
-  -e 's/llm_handle = /model = /g' \
-  -e 's/img_gen_handle = /model = /g' \
-  -e 's/ocr_handle = /model = /g' \
-  -e 's/\[presets\.ocr\]/[presets.extract]/g' \
-  -e 's/base_ocr_pypdfium2/base_extract_pypdfium2/g' \
-  -e 's/base_ocr_mistral/base_extract_mistral/g' \
-  -e 's/ocr_config/extract_config/g' \
-  -e 's/is_auto_setup_preset_ocr/is_auto_setup_preset_extract/g' \
-  -e 's/nb_ocr_pages/nb_extract_pages/g' \
-  {} +
+The following replacements can be done with find/replace tools:
 
-# Find all test files and update markers
-find tests -name "*.py" -type f -exec sed -i '' \
-  -e 's/@pytest\.mark\.ocr/@pytest.mark.extract/g' \
-  {} +
+**In `.plx` files:**
+- `definition = "` → `description = "`
+- `type = "PipeJinja2"` → `type = "PipeCompose"`
+- `type = "PipeOCR"` → `type = "PipeExtract"`
+- `prompt_template = ` → `prompt = `
+- `jinja2 = ` → `template = `
+- `ocr_model = ` → `model = `
+- `[pipe.X.pipe_map]` → `[pipe.X.outcomes]`
+- `default_pipe_code = ` → `default_outcome = `
 
-# Remove deprecated files
-rm -f pipelex_libraries/templates/base_templates.toml
+**In `.py` files:**
+- `ocr_page_contents_from_pdf` → `extract_page_contents_from_pdf`
+- Remove `relative_config_folder_path` parameters from `Pipelex.make()`
+- Remove `config_folder_path` parameters from `Pipelex.make()`
 
-echo "Automated migration complete. Please review changes and:"
-echo "1. Manually add default_outcome to all PipeCondition pipes"
-echo "2. Tag image inputs in PipeLLM prompts"
-echo "3. Remove nb_steps from PipeImgGen if present"
-echo "4. Run 'make validate' to check for errors"
-```
+**In `.toml` files:**
+- `llm_handle = ` → `model = `
+- `img_gen_handle = ` → `model = `
+- `ocr_handle = ` → `model = `
+- `[presets.ocr]` → `[presets.extract]`
+- `base_ocr_*` → `base_extract_*`
 
-**Note:** 
-- macOS: Use `sed -i ''` (as shown above)
-- Linux: Replace `sed -i ''` with `sed -i`
-- Windows: Use Git Bash, WSL, or the PowerShell script below
+**In test files:**
+- `@pytest.mark.ocr` → `@pytest.mark.extract`
 
-### Windows PowerShell Migration Script
+### What CANNOT Be Automated
 
-```powershell
-# Find all .plx files and apply replacements
-Get-ChildItem -Path . -Filter *.plx -Recurse | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    $content = $content -replace 'definition = "', 'description = "'
-    $content = $content -replace 'type = "PipeJinja2"', 'type = "PipeCompose"'
-    $content = $content -replace 'type = "PipeOCR"', 'type = "PipeExtract"'
-    $content = $content -replace 'prompt_template = ', 'prompt = '
-    $content = $content -replace 'jinja2 = ', 'template = '
-    $content = $content -replace 'jinja2_name = ', 'template_name = '
-    $content = $content -replace 'ocr_model = ', 'model = '
-    $content = $content -replace '\[pipe\.([^.]+)\.pipe_map\]', '[pipe.$1.outcomes]'
-    $content = $content -replace 'default_pipe_code = ', 'default_outcome = '
-    Set-Content -Path $_.FullName -Value $content -NoNewline
-}
+These require manual intervention:
 
-# Update Python files with renamed pipe codes
-Get-ChildItem -Path . -Filter *.py -Recurse | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    $content = $content -replace 'ocr_page_contents_from_pdf', 'extract_page_contents_from_pdf'
-    $content = $content -replace 'ocr_page_contents_and_views_from_pdf', 'extract_page_contents_and_views_from_pdf'
-    Set-Content -Path $_.FullName -Value $content -NoNewline
-}
+1. Moving `.plx` files to appropriate locations (project-specific)
+2. Renaming structure files to `*_struct.py` suffix
+3. Adding `@pipe_func()` decorator to custom functions
+4. Updating imports to match your new structure
+5. Adding `default_outcome` to `PipeCondition` pipes
+6. Tagging image inputs in `PipeLLM` prompts with `$` or `@`
+7. Reviewing and testing all changes
 
-# Find all .toml files in .pipelex and apply replacements
-Get-ChildItem -Path .pipelex -Filter *.toml -Recurse | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    $content = $content -replace 'llm_handle = ', 'model = '
-    $content = $content -replace 'img_gen_handle = ', 'model = '
-    $content = $content -replace 'ocr_handle = ', 'model = '
-    $content = $content -replace '\[presets\.ocr\]', '[presets.extract]'
-    $content = $content -replace 'base_ocr_pypdfium2', 'base_extract_pypdfium2'
-    $content = $content -replace 'base_ocr_mistral', 'base_extract_mistral'
-    $content = $content -replace 'ocr_config', 'extract_config'
-    $content = $content -replace 'is_auto_setup_preset_ocr', 'is_auto_setup_preset_extract'
-    $content = $content -replace 'nb_ocr_pages', 'nb_extract_pages'
-    Set-Content -Path $_.FullName -Value $content -NoNewline
-}
+### Recommendation
 
-# Find all test files and update markers
-Get-ChildItem -Path tests -Filter *.py -Recurse | ForEach-Object {
-    $content = Get-Content $_.FullName -Raw
-    $content = $content -replace '@pytest\.mark\.ocr', '@pytest.mark.extract'
-    Set-Content -Path $_.FullName -Value $content -NoNewline
-}
+1. **Test incrementally:** Apply changes to one file type at a time
+2. **Use version control:** Commit before migrating so you can revert if needed
+3. **Activate your virtual environment** before running Pipelex commands
+4. **Validate after each change** (see Validation section)
 
-# Remove deprecated files
-Remove-Item -Path "pipelex_libraries/templates/base_templates.toml" -ErrorAction SilentlyContinue
-
-Write-Host "Automated migration complete. Please review changes and:"
-Write-Host "1. Manually add default_outcome to all PipeCondition pipes"
-Write-Host "2. Tag image inputs in PipeLLM prompts"
-Write-Host "3. Remove nb_steps from PipeImgGen if present"
-Write-Host "4. Run 'make validate' to check for errors"
-```
-
-## 14. Additional Resources
+## 15. Additional Resources
 
 - See AGENTS.md for complete documentation of the current syntax
 - Run `make validate` frequently to catch issues early

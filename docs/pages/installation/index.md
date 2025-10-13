@@ -36,29 +36,37 @@ OPENAI_API_KEY=sk_...
 All the secret keys used by `pipelex` are specified in the `.env.example` file. However, by default, only the `OPENAI_API_KEY` is required.
 
 
-- **Make sure you run the init commands:**
+- **Initialize configuration:**
 
-In order to set the pipelex configuration files, you need to run 2 commands using the CLI (we recommend to run it at the root of your project):
+To set up the Pipelex configuration files, run this command at the root of your project:
 
-- `pipelex init libraries`: This will create a `pipelex_libraries` folder, with the base llm configuration and the base pipelines. 
-This is the directory where you should add your pipelines. 
+- `pipelex init config`: This CLI command will create a `.pipelex/` directory with configuration files including `pipelex.toml`. This configuration file contains settings for feature flags, logging, cost reporting, and more. Learn more in our [Configuration documentation](../configuration/index.md)
 
-The structure is like this:
+- **Create your pipelines:**
+
+You can now create `.plx` pipeline files **anywhere** in your project. Pipelex automatically discovers them (excluding `.venv`, `.git`, `node_modules`, etc.).
+
+**Keep pipelines with related code** - that's usually the best organization:
 
 ```bash
-├── pipelex_libraries           
-│   ├── __init__.py
-│   ├── pipelines/                          # The pipelines and the structured output are stored here
-│   │   ├── __init__.py
-│   │   └── base_library/                   # The base library with basic pipelines
-│   ├── templates/                          # Those are template prompt libraries
-│   ├── llm_deck/                           # A llm deck is a simple way to name a llm and its configuration.
-│   └── llm_integrations/                   # This directory regroups the configuration of the different models
+your_project/
+├── my_project/             # Your Python package
+│   ├── finance/
+│   │   ├── services.py
+│   │   ├── invoices.plx           # Pipeline with finance code
+│   │   └── invoices_struct.py     # Structure classes
+│   └── legal/
+│       ├── services.py
+│       ├── contracts.plx          # Pipeline with legal code
+│       └── contracts_struct.py
+├── .pipelex/                      # Config at repo root (created by init config)
+│   └── pipelex.toml
+└── requirements.txt
 ```
 
-Learn more about pipelex_libraries in our [Libraries documentation](../build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md)
+Or centralize if you prefer: `my_project/pipelines/*.plx`
 
-- `pipelex init config`: This cli command will create a `pipelex.toml` file at the root of the project, with basic configuration. This configuration file gathers all configuration for feature flags, logging, cost reporting, and so on... Learn more in our [Configuration documentation](../configuration/index.md)
+Learn more about flexible organization in our [Project Structure documentation](../build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md)
 
 
 💡 _Any troubles? Have a look at our [Cookbook](https://github.com/Pipelex/pipelex-cookbook)! 

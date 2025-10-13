@@ -47,7 +47,7 @@ class ModelManager(ModelManagerAbstract):
         deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
         full_deck_dict: dict[str, Any] = {}
         if not deck_paths:
-            msg = "No Model deck paths found. Please run `pipelex init-libraries` to create the set up the base deck."
+            msg = "No Model deck paths found. Please run `pipelex init config` to create the set up the base deck."
             raise ModelDeckNotFoundError(msg)
 
         for deck_path in deck_paths:
