@@ -2,23 +2,25 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from pipelex.config import ConfigModel
 
 
-class CursorFileOverride(BaseModel):
+class CursorFileOverride(ConfigModel):
     """Per-file front-matter overrides for Cursor export."""
 
     front_matter: dict[str, Any] = Field(default_factory=dict, description="Front-matter to override for this file")
 
 
-class CursorSpec(BaseModel):
+class CursorSpec(ConfigModel):
     """Configuration for Cursor rules export."""
 
     front_matter: dict[str, Any] = Field(default_factory=dict, description="Default YAML front-matter for all Cursor files")
     files: dict[str, CursorFileOverride] = Field(default_factory=dict, description="Per-file front-matter overrides")
 
 
-class Target(BaseModel):
+class Target(ConfigModel):
     """Configuration for a single-file merge target."""
 
     path: str = Field(description="Path to the target file relative to repo root")
@@ -28,7 +30,7 @@ class Target(BaseModel):
     heading_1: str | None = Field(default=None, description="Main title (H1) to add when inserting into empty file or file with no H1 headings")
 
 
-class AgentRules(BaseModel):
+class AgentRules(ConfigModel):
     """Configuration for merging agent documentation files."""
 
     sets: dict[str, list[str]] = Field(description="Named sets of agent_rules files (e.g., coding_standards, pipelex_language, all)")
@@ -38,7 +40,7 @@ class AgentRules(BaseModel):
     targets: dict[str, Target] = Field(description="Dictionary of single-file merge targets keyed by ID")
 
 
-class KitIndex(BaseModel):
+class KitIndex(ConfigModel):
     """Root configuration model for kit index.toml."""
 
     meta: dict[str, Any] = Field(default_factory=dict, description="Metadata about the kit configuration")

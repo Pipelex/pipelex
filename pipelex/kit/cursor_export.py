@@ -36,10 +36,13 @@ def _front_matter_for(name: str, idx: KitIndex) -> dict[str, Any]:
     Returns:
         Merged front-matter dictionary
     """
-    base = dict(idx.agent_rules.cursor.front_matter)
+    base = idx.agent_rules.cursor.front_matter.copy()
     key = name.removesuffix(".md")
     if key in idx.agent_rules.cursor.files:
         base |= idx.agent_rules.cursor.files[key].front_matter
+    # Remove globs if it's an empty list
+    if "globs" in base and base["globs"] == []:
+        del base["globs"]
     return base
 
 

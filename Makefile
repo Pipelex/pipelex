@@ -58,8 +58,7 @@ make cft                      - Shorthand -> config-template
 
 make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
-make cleanlibraries           - Remove pipelex_libraries
-make cleanall                 - Remove all -> cleanenv + cleanderived + cleanlibraries
+make cleanall                 - Remove all -> cleanenv + cleanderived
 
 make merge-check-ruff-lint    - Run ruff merge check without updating files
 make merge-check-ruff-format  - Run ruff merge check without updating files
@@ -107,7 +106,7 @@ export HELP
 .PHONY: \
 	all help env lock install update build \
 	format lint pyright mypy pylint \
-	cleanderived cleanenv cleanlibraries cleanall \
+	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
@@ -200,17 +199,12 @@ cleanenv:
 	find . -type d -wholename './.venv' -exec rm -rf {} + && \
 	echo "Cleaned up virtual env and dependency lock files";
 
-cleanlibraries:
-	$(call PRINT_TITLE,"Erasing derived files and directories")
-	@find . -type d -wholename './pipelex_libraries' -exec rm -rf {} + && \
-	echo "Cleaned up pipelex_libraries";
-
 cleanconfig:
 	$(call PRINT_TITLE,"Erasing config files and directories")
 	@find . -type d -wholename './.pipelex' -exec rm -rf {} + && \
 	echo "Cleaned up .pipelex";
 
-cleanall: cleanderived cleanenv cleanlibraries cleanconfig
+cleanall: cleanderived cleanenv cleanconfig
 	@echo "Cleaned up all derived files and directories";
 
 ##########################################################################################

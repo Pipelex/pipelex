@@ -307,9 +307,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         Raises:
             if setup fails
 
-        Note:
-            If neither path is provided, defaults to "./pipelex_libraries".
-
         """
         if cls.get_optional_instance() is not None:
             msg = "Pipelex is already initialized"

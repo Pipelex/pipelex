@@ -6,10 +6,10 @@
 
 ## Pipeline File Naming
 - Files must be `.plx` for pipelines (Always add an empty line at the end of the file, and do not add trailing whitespaces to PLX files at all)
-- Files must be `.py` for structures
+- Files must be `.py` for code defining the data structures
 - Use descriptive names in `snake_case`
 
-## Pipeline File Structure
+## Pipeline File Outline
 A pipeline file has three main sections:
 1. Domain statement
 2. Concept definitions
@@ -36,7 +36,7 @@ Important Rules:
 yes 
 ### Pipe Definitions
 
-## Pipe Base Structure
+## Pipe Base Definition
 
 ```plx
 [pipe.your_pipe_name]
@@ -83,8 +83,9 @@ inputs = {
 
 ### Model Location and Registration
 
-- Create models for structured generations related to "some_domain" in `pipelex_libraries/pipelines/<some_domain>.py`
+- Create models for structured generations related to "some_domain" in your project (e.g., `my_project/some_domain/some_domain_struct.py`)
 - Models must inherit from `StructuredContent` or appropriate content type
+- Structure classes are automatically discovered by Pipelex - no manual registration needed
 
 ## Model Structure
 
@@ -136,7 +137,7 @@ class YourModel(StructuredContent): # Always be a subclass of StructuredContent
 
 Structures are meant to indicate what class to use for a particular Concept. In general they use the same name as the concept.
 
-Structure classes defined within `pipelex_libraries/pipelines/` are automatically loaded into the class_registry when setting up Pipelex, no need to do it manually.
+Structure classes that inherit from `StructuredContent` are automatically discovered and loaded into the class_registry when setting up Pipelex, no need to do it manually.
 
 
 ### Best Practices for structures
@@ -166,7 +167,7 @@ Look at the Pipes we have in order to adapt it. Pipes are organized in two categ
 
 Purpose: PipeSequence executes multiple pipes in a defined order, where each step can use results from original inputs or from previous steps.
 
-### Basic Structure
+### Basic Definition
 ```plx
 [pipe.your_sequence_name]
 type = "PipeSequence"

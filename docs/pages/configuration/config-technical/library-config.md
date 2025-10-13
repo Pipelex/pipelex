@@ -283,15 +283,3 @@ pipelex show pipe YOUR_PIPE_CODE
 2. Check concept references are spelled correctly
 3. Verify pipe configurations match expected format
 4. Ensure all required fields are present
-
-## Migration from Old System
-
-If you're migrating from the old `pipelex_libraries` system, see the [Migration Guide](https://github.com/Pipelex/pipelex/blob/main/no_more_pipelex_libraries.md) for detailed instructions.
-
-Key changes:
-
-- No `pipelex init libraries` command needed
-- No `pipelex_libraries` directory required
-- No `-c/--config-folder-path` flags needed
-- Structure classes are auto-discovered
-- Custom functions need `@pipe_func()` decorator
