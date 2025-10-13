@@ -115,7 +115,6 @@ Only create a Python structure class when you need to add specific fields:
 
 ```python
 from datetime import datetime
-from typing import List, Optional
 from pydantic import Field
 
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -127,11 +126,11 @@ class YourModel(StructuredContent): # Always be a subclass of StructuredContent
     field2: int
 
     # Optional fields with defaults
-    field3: Optional[str] = Field(None, "Description of field3")
-    field4: List[str] = Field(default_factory=list)
+    field3: str | None = Field(None, "Description of field3")
+    field4: list[str] = Field(default_factory=list)
 
     # Date fields should remove timezone
-    date_field: Optional[datetime] = None
+    date_field: datetime | None = None
 ```
 ### Usage
 
@@ -430,12 +429,12 @@ It corresponds to 1 page. Therefore, the PipeExtract is outputing a `ListContent
 
 ```python
 class TextAndImagesContent(StuffContent):
-    text: Optional[TextContent]
-    images: Optional[List[ImageContent]]
+    text: TextContent | None
+    images: list[ImageContent] | None
 
 class PageContent(StructuredContent): # CONCEPT IS "Page"
     text_and_images: TextAndImagesContent
-    page_view: Optional[ImageContent] = None
+    page_view: ImageContent | None = None
 ```
 - `text_and_images` are the text, and the related images found in the input image or PDF.
 - `page_view` is the screenshot of the whole pdf page/image.

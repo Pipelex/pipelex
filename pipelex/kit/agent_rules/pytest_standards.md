@@ -137,7 +137,7 @@ class TestCases:
         value="test_value"
     )
 
-    CASE_BLUEPRINTS: ClassVar[List[Tuple[str, str]]] = [  # topic, blueprint"
+    CASE_BLUEPRINTS: ClassVar[list[tuple[str, str]]] = [  # topic, blueprint"
         ("topic1", CASE_BLUEPRINT_1),
         ("topic2", CASE_BLUEPRINT_2),
     ]

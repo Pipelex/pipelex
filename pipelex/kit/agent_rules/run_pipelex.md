@@ -74,8 +74,8 @@ pretty_print(gantt_chart, title="Gantt Chart")
 
 The input memory is a dictionary, where the key is the name of the input variable and the value provides details to make it a stuff object. The relevant definitions are:
 ```python
-StuffContentOrData = Dict[str, Any] | StuffContent | List[Any] | str
-ImplicitMemory = Dict[str, StuffContentOrData]
+StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
+ImplicitMemory = dict[str, StuffContentOrData]
 ```
 As you can seen, we made it so different ways can be used to define that stuff using structured content or data.
 
