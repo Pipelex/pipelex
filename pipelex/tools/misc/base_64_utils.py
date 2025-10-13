@@ -31,19 +31,24 @@ async def encode_to_base64_async(data_bytes: bytes) -> bytes:
     return await asyncio.to_thread(base64.b64encode, data_bytes)
 
 
-def save_base64_to_binary_file(
-    b64: str,
+def strip_base64_str_if_needed(base64_str: str) -> str:
+    if "," in base64_str:
+        return base64_str.split(",", 1)[1]
+    if "data:" in base64_str and ";base64," in base64_str:
+        return base64_str.split(";base64,", 1)[1]
+    return base64_str
+
+
+# def prefixed_base64_str_from_base64_bytes(b64_bytes: bytes) -> str:
+
+
+def save_base_64_str_to_binary_file(
+    base_64_str: str,
     file_path: str,
 ):
-    # Ensure we're getting clean base64 data without any prefixes
-    base64_str = b64
-    # Remove potential data URL prefix if present
-    if "," in base64_str:
-        base64_str = base64_str.split(",", 1)[1]
-    if "data:" in base64_str and ";base64," in base64_str:
-        base64_str = base64_str.split(";base64,", 1)[1]
+    stripped_base_64_str = strip_base64_str_if_needed(base_64_str)
 
     # Decode base64
-    byte_data = base64.b64decode(base64_str)
+    byte_data = base64.b64decode(stripped_base_64_str)
 
     save_bytes_to_binary_file(file_path=file_path, byte_data=byte_data)

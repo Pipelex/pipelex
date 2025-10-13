@@ -8,7 +8,7 @@ from pipelex.tools.misc.base_64_utils import (
     encode_to_base64_async,
     load_binary_as_base64,
     load_binary_as_base64_async,
-    save_base64_to_binary_file,
+    save_base_64_str_to_binary_file,
 )
 from tests.cases import FileHelperTestCases
 
@@ -53,7 +53,7 @@ class TestBase64Utils:
         b64 = base64.b64encode(data).decode()
         out_file = tmp_path / "out.bin"
 
-        save_base64_to_binary_file(b64=b64, file_path=str(out_file))
+        save_base_64_str_to_binary_file(base_64_str=b64, file_path=str(out_file))
 
         with open(out_file, "rb") as f:
             assert f.read() == data
@@ -64,7 +64,7 @@ class TestBase64Utils:
         data_url = f"data:application/octet-stream;base64,{b64}"
         out_file = tmp_path / "out.bin"
 
-        save_base64_to_binary_file(b64=data_url, file_path=str(out_file))
+        save_base_64_str_to_binary_file(base_64_str=data_url, file_path=str(out_file))
 
         with open(out_file, "rb") as f:
             assert f.read() == data

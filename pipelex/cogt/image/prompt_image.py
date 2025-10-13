@@ -6,7 +6,13 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
-from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_base64, detect_file_type_from_bytes, detect_file_type_from_path
+from pipelex.tools.misc.file_utils import save_bytes_to_binary_file
+from pipelex.tools.misc.filetype_utils import (
+    FileType,
+    detect_file_type_from_base64,
+    detect_file_type_from_bytes,
+    detect_file_type_from_path,
+)
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 
@@ -53,6 +59,7 @@ class PromptImageBase64(PromptImage):
     base_64: bytes
 
     def get_file_type(self) -> FileType:
+        save_bytes_to_binary_file("test.png", base64.b64decode(self.base_64))
         return detect_file_type_from_base64(self.base_64)
 
     def get_mime_type(self) -> str:

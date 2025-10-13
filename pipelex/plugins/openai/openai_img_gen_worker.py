@@ -13,7 +13,7 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
+from pipelex.tools.misc.base_64_utils import save_base_64_str_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path
 
 TEMP_OUTPUTS_DIR = "temp/img_gen_by_gpt_image"
@@ -80,7 +80,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             folder_path = TEMP_OUTPUTS_DIR
             ensure_path(folder_path)
             img_path = f"{folder_path}/{image_id}_{image_index}.png"
-            save_base64_to_binary_file(b64=image_base64, file_path=img_path)
+            save_base_64_str_to_binary_file(base_64_str=image_base64, file_path=img_path)
             log.debug(f"Saved image to {img_path}")
             generated_image_list.append(
                 GeneratedImage(

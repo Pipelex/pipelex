@@ -8,7 +8,7 @@ from yattag import Doc
 
 from pipelex.cogt.extract.extract_output import ExtractedImage
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
+from pipelex.tools.misc.base_64_utils import save_base_64_str_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_directory_exists, get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.path_utils import InterpretedPathOrUrl, interpret_path_or_url
@@ -83,7 +83,7 @@ class ImageContent(StuffContent):
                 extension=extension,
                 avoid_suffix_if_possible=True,
             )
-            save_base64_to_binary_file(b64=base_64, file_path=file_path)
+            save_base_64_str_to_binary_file(base_64_str=base_64, file_path=file_path)
 
         if caption := self.caption:
             caption_file_path = get_incremental_file_path(
