@@ -1,12 +1,18 @@
 from pipelex.cogt.exceptions import PromptImageFactoryError
-from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageBinary, PromptImagePath, PromptImageUrl
+from pipelex.cogt.image.prompt_image import (
+    PromptImage,
+    PromptImageBase64,
+    PromptImageBinary,
+    PromptImagePath,
+    PromptImageUrl,
+)
 from pipelex.tools.misc.base_64_utils import (
     encode_to_base64_async,
     load_binary_as_base64_async,
     load_binary_async,
+    strip_base_64_str_if_needed,
 )
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
-from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
 class PromptImageFactory:
@@ -16,27 +22,20 @@ class PromptImageFactory:
         file_path: str | None = None,
         url: str | None = None,
         base_64: bytes | None = None,
+        base_64_str: str | None = None,
     ) -> PromptImage:
-        if file_path:
+        if base_64:
+            return PromptImageBase64(base_64=base_64)
+        elif base_64_str:
+            stripped_base_64_str = strip_base_64_str_if_needed(base_64_str)
+            return PromptImageBase64(base_64=stripped_base_64_str.encode())
+        elif file_path:
             return PromptImagePath(file_path=file_path)
         elif url:
             return PromptImageUrl(url=url)
-        elif base_64:
-            return PromptImageBase64(base_64=base_64)
         else:
             msg = "PromptImageFactory requires one of file_path, url, or image_bytes"
             raise PromptImageFactoryError(msg)
-
-    @classmethod
-    def make_prompt_image_from_uri(
-        cls,
-        uri: str,
-    ) -> PromptImage:
-        file_path, url = clarify_path_or_url(path_or_uri=uri)
-        return PromptImageFactory.make_prompt_image(
-            file_path=file_path,
-            url=url,
-        )
 
     @classmethod
     async def make_promptimagebase64_from_url_async(

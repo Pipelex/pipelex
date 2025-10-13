@@ -6,7 +6,12 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
-from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_base64, detect_file_type_from_bytes, detect_file_type_from_path
+from pipelex.tools.misc.filetype_utils import (
+    FileType,
+    detect_file_type_from_base64,
+    detect_file_type_from_bytes,
+    detect_file_type_from_path,
+)
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 
@@ -38,6 +43,14 @@ class PromptImagePath(PromptImage):
 
 class PromptImageUrl(PromptImage):
     url: str
+
+    # @field_validator("url")
+    # @classmethod
+    # def validate_url(cls, value: str) -> str:
+    #     if not (value.startswith(("http", "file", "data:image/"))):
+    #         msg = f"Image url must start with http, file, or data:image/, here it starts with '{value[:100]}'"
+    #         raise PromptImageDefinitionError(msg)
+    #     return value
 
     @override
     def __str__(self) -> str:

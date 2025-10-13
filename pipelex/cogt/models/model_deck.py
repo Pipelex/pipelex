@@ -201,7 +201,7 @@ class ModelDeck(ConfigModel):
             for alias in alias_list:
                 if inference_model := self.get_optional_inference_model(model_handle=alias):
                     return inference_model
-        log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck")
+        log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck, it could be an external plugin.")
         return None
 
     def is_handle_defined(self, model_handle: str) -> bool:

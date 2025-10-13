@@ -18,7 +18,7 @@ from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 class TestLLMVision:
     @pytest.mark.parametrize(("topic", "image_uri"), LLMVisionTestCases.IMAGE_URLS)
     async def test_gen_text_from_vision_by_url(self, llm_handle_for_vision: str, topic: str, image_uri: str):
-        prompt_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
+        prompt_image = PromptImageFactory.make_prompt_image(url=image_uri)
         llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job(

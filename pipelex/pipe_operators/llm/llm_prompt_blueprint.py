@@ -13,6 +13,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
+from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
@@ -76,12 +77,8 @@ class LLMPromptBlueprint(BaseModel):
                 # Try to get as a single ImageContent first
                 try:
                     prompt_image_content = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)
-                    if prompt_image_content is not None:  # An ImageContent can be optional
-                        if base_64 := prompt_image_content.base_64:
-                            user_image = PromptImageFactory.make_prompt_image(base_64=base_64)
-                        else:
-                            image_uri = prompt_image_content.url
-                            user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
+                    if isinstance(prompt_image_content, ImageContent):
+                        user_image = PromptImageFactory.make_prompt_image(url=prompt_image_content.url, base_64_str=prompt_image_content.base_64)
                         prompt_user_images[user_image_name] = user_image
                 except ContextProviderException:
                     # If single image failed, try to get as a collection (list or tuple)
@@ -91,12 +88,7 @@ class LLMPromptBlueprint(BaseModel):
                         if isinstance(image_collection, (list, tuple)):
                             for image_item in image_collection:  # type: ignore[assignment]
                                 if isinstance(image_item, ImageContent):
-                                    item_base_64 = image_item.base_64
-                                    if item_base_64:
-                                        user_image = PromptImageFactory.make_prompt_image(base_64=item_base_64)  # type: ignore[arg-type]
-                                    else:
-                                        image_uri = image_item.url
-                                        user_image = PromptImageFactory.make_prompt_image_from_uri(uri=image_uri)
+                                    user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
                                     prompt_user_images[user_image_name] = user_image
                         else:
                             msg = (
@@ -114,7 +106,8 @@ class LLMPromptBlueprint(BaseModel):
         if prompt_user_images:
             if not extra_params:
                 extra_params = {}
-            for image_index, image_name in enumerate(prompt_user_images.keys()):
+            image_names = list(prompt_user_images.keys())
+            for image_index, image_name in enumerate(image_names):
                 # Replacing image variable '{image_name}' with numbered tag '[Image {image_index + 1}]'
                 extra_params[image_name] = f"[Image {image_index + 1}]"
         user_text: str | None = None
@@ -165,7 +158,7 @@ class LLMPromptBlueprint(BaseModel):
 
         context: dict[str, Any] = context_provider.generate_jinja2_context()
         if extra_params:
-            context.update(**extra_params)
+            context = substitute_nested_in_context(context=context, extra_params=extra_params)
         if jinja2_blueprint.extra_context:
             context.update(**jinja2_blueprint.extra_context)
 

@@ -21,6 +21,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
+DRY_BASE_64_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC"
+
 
 class ContentGeneratorDry(ContentGeneratorProtocol):
     """This class is used to generate mock content for testing purposes.
@@ -222,7 +224,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                     extracted_images=[],
                     page_view=ExtractedImageFromPage(
                         image_id=f"page_view_{page_index}",
-                        base_64="",
+                        base_64=DRY_BASE_64_IMAGE,
                         caption="DRY RUN: OCR text",
                     ),
                 )

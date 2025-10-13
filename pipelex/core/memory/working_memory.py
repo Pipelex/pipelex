@@ -197,8 +197,8 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         # TODO: Add unit tests for this method
         artefact_dict: StuffArtefactDict = {}
         for name, stuff in self.root.items():
-            a = stuff.make_artefact()
-            artefact_dict[name] = a
+            artefact = stuff.make_artefact()
+            artefact_dict[name] = artefact
         for alias, target in self.aliases.items():
             artefact_dict[alias] = artefact_dict[target]
         return artefact_dict
