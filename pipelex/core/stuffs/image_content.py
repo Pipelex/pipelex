@@ -9,7 +9,7 @@ from yattag import Doc
 from pipelex.cogt.exceptions import ImageContentError
 from pipelex.cogt.extract.extract_output import ExtractedImage
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_bytes
+from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 from pipelex.tools.misc.path_utils import interpret_path_or_url
 from pipelex.types import Self
 
@@ -48,7 +48,7 @@ class ImageContent(StuffContent):
     @classmethod
     def make_from_extracted_image(cls, extracted_image: ExtractedImage) -> Self:
         if base_64 := extracted_image.base_64:
-            prefixed_base64_str = prefixed_base64_str_from_base64_bytes(b64_bytes=base_64.encode())
+            prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
             return cls(
                 url=prefixed_base64_str,
                 base_64=extracted_image.base_64,
@@ -63,7 +63,7 @@ class ImageContent(StuffContent):
         buffer = BytesIO()
         image.save(buffer, format="PNG")
         base_64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-        prefixed_base64_str = prefixed_base64_str_from_base64_bytes(b64_bytes=base_64.encode())
+        prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
         return cls(
             url=prefixed_base64_str,
             base_64=base_64,

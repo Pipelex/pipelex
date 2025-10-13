@@ -1,3 +1,4 @@
+from pipelex import log
 from pipelex.cogt.exceptions import PromptImageFactoryError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
@@ -10,7 +11,7 @@ from pipelex.tools.misc.base_64_utils import (
     encode_to_base64_async,
     load_binary_as_base64_async,
     load_binary_async,
-    strip_base64_str_if_needed,
+    strip_base_64_str_if_needed,
 )
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 
@@ -25,9 +26,11 @@ class PromptImageFactory:
         base_64_str: str | None = None,
     ) -> PromptImage:
         if base_64:
+            log.debug(f"Base 64: {base_64[:100]!r}")
             return PromptImageBase64(base_64=base_64)
         elif base_64_str:
-            stripped_base_64_str = strip_base64_str_if_needed(base_64_str)
+            stripped_base_64_str = strip_base_64_str_if_needed(base_64_str)
+            log.debug(f"Stripped base 64 str: {stripped_base_64_str[:100]}")
             return PromptImageBase64(base_64=stripped_base_64_str.encode())
         elif file_path:
             return PromptImagePath(file_path=file_path)
