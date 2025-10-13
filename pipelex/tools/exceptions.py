@@ -14,6 +14,10 @@ class ToolException(RootException):
     pass
 
 
+class NestedKeyConflictError(ToolException):
+    """Raised when attempting to create nested keys under a non-dict value."""
+
+
 class CredentialsError(RootException):
     pass
 

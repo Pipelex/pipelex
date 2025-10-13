@@ -101,29 +101,3 @@ class ImageContent(StuffContent):
                 avoid_suffix_if_possible=True,
             )
             save_text_to_path(text=source_prompt, path=source_prompt_file_path)
-
-
-class PDFContent(StuffContent):
-    url: str
-
-    @property
-    @override
-    def short_desc(self) -> str:
-        url_desc = interpret_path_or_url(path_or_uri=self.url).desc
-        return f"{url_desc} of a PDF document"
-
-    @override
-    def rendered_plain(self) -> str:
-        return self.url
-
-    @override
-    def rendered_html(self) -> str:
-        doc = Doc()
-        doc.stag("a", href=self.url, klass="msg-pdf")
-        doc.text(self.url)
-
-        return doc.getvalue()
-
-    @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        return f"[{self.url}]({self.url})"

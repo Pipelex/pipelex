@@ -62,7 +62,7 @@ class TestImageInputs:
         """
         # Create the page content
         image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
-        text_and_images = TextAndImagesContent(text=TextContent(text="This is the description of the page blablabla"), images=[])
+        text_and_images = TextAndImagesContent(text=TextContent(text="It was designed by Slartibartfast, a famous designer"), images=[])
         page_content = PageContent(text_and_images=text_and_images, page_view=image_content)
 
         # Create stuff from page content

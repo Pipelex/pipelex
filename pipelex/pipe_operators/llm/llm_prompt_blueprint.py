@@ -13,6 +13,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
+from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
@@ -157,7 +158,7 @@ class LLMPromptBlueprint(BaseModel):
 
         context: dict[str, Any] = context_provider.generate_jinja2_context()
         if extra_params:
-            context.update(**extra_params)
+            context = substitute_nested_in_context(context=context, extra_params=extra_params)
         if jinja2_blueprint.extra_context:
             context.update(**jinja2_blueprint.extra_context)
 
