@@ -20,20 +20,6 @@ class PipelexInterpreter(BaseModel):
     file_path: Path | None = None
     file_content: str | None = None
 
-    # @staticmethod
-    # def escape_plx_string(value: str | None) -> str:
-    #     """Escape a string for plx serialization."""
-    #     if value is None:
-    #         return ""
-    #     # Escape backslashes first (must be done first)
-    #     value = value.replace("\\", "\\\\")
-    #     # Escape quotes
-    #     value = value.replace('"', '\\"')
-    #     # Replace actual newlines with escaped newlines
-    #     value = value.replace("\n", "\\n")
-    #     value = value.replace("\r", "\\r")
-    #     return value.replace("\t", "\\t")
-
     @model_validator(mode="after")
     def check_file_path_or_file_content(self) -> Self:
         """Need to check if there is at least one of file_path or file_content"""

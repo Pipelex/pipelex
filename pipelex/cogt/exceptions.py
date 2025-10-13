@@ -10,6 +10,10 @@ class LLMConfigError(CogtError):
     pass
 
 
+class ImageContentError(CogtError):
+    pass
+
+
 class InferenceManagerWorkerSetupError(CogtError, FatalError):
     pass
 
@@ -107,6 +111,10 @@ class LLMPromptParameterError(CogtError):
 
 
 class PromptImageFactoryError(CogtError):
+    pass
+
+
+class PromptImageDefinitionError(CogtError):
     pass
 
 

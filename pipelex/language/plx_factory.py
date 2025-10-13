@@ -329,18 +329,6 @@ class PlxFactory:
             return cls.add_spaces_to_inline_tables(toml_output)
         return toml_output
 
-    # @classmethod
-    # def _remove_pipe_category_from_pipes(cls, data: dict[str, Any]) -> dict[str, Any]:
-    #     """Remove the technical pipe_category field from all pipe definitions."""
-    #     if "pipe" in data and isinstance(data["pipe"], dict):
-    #         pipe_section = cast("dict[str, Any]", data["pipe"])
-    #         for pipe_def in pipe_section.values():
-    #             if isinstance(pipe_def, dict):
-    #                 pipe_def_dict = cast("dict[str, Any]", pipe_def)
-    #                 if "pipe_category" in pipe_def_dict:
-    #                     del pipe_def_dict["pipe_category"]
-    #     return data
-
     @classmethod
     def make_plx_content(cls, blueprint: PipelexBundleBlueprint) -> str:
         blueprint_dict = blueprint.model_dump(serialize_as_any=True)

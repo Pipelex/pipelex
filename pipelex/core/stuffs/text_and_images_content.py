@@ -3,7 +3,6 @@ from typing_extensions import override
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.tools.misc.file_utils import ensure_directory_exists
 
 
 class TextAndImagesContent(StuffContent):
@@ -33,10 +32,10 @@ class TextAndImagesContent(StuffContent):
             rendered = ""
         return rendered
 
-    def save_to_directory(self, directory: str):
-        ensure_directory_exists(directory)
-        if text_content := self.text:
-            text_content.save_to_directory(directory=directory)
-        if images := self.images:
-            for image_content in images:
-                image_content.save_to_directory(directory=directory)
+    # def save_to_directory(self, directory: str):
+    #     ensure_directory_exists(directory)
+    #     if text_content := self.text:
+    #         text_content.save_to_directory(directory=directory)
+    #     if images := self.images:
+    #         for image_content in images:
+    #             image_content.save_to_directory(directory=directory)
