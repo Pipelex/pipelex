@@ -9,6 +9,7 @@ This release introduces several breaking changes to make the Pipelex language mo
 - Pipeline definitions (.plx files)
 - Configuration files (.pipelex/ directory)
 - Python code initialization
+- Python import paths (module refactoring)
 - Test markers
 
 ## Migration Checklist
@@ -24,6 +25,10 @@ This release introduces several breaking changes to make the Pipelex language mo
 - [ ] Update PipeCondition fields
 - [ ] Update configuration files
 - [ ] Update test markers
+- [ ] **Update Python imports for StuffContent subclasses**
+- [ ] **Update imports for core module relocations (pipe_works, pipe_input, etc.)**
+- [ ] **Update all OCR-related imports to Extract equivalents**
+- [ ] **Update Provider → Library class names and hub method calls**
 - [ ] Run validation
 
 ## 1. Library System Removal (CRITICAL)
@@ -734,6 +739,125 @@ source .venv/bin/activate  # Unix/macOS
 
 These changes affect Python code that imports from or uses pipelex.
 
+### Refactoring of `StuffContent` Subclasses
+
+The monolithic `pipelex.core.stuffs.stuff_content` module has been split into individual files for each core content type. This improves modularity and clarity.
+
+**You must update your imports for these classes:**
+
+| Class Name | Old Import Path | New Import Path |
+| :--- | :--- | :--- |
+| `StructuredContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.structured_content` |
+| `TextContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.text_content` |
+| `ImageContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.image_content` |
+| `ListContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.list_content` |
+| `PDFContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.pdf_content` |
+| `PageContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.page_content` |
+| `NumberContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.number_content` |
+| `HtmlContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.html_content` |
+| `MermaidContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.mermaid_content` |
+| `TextAndImagesContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.text_and_images_content` |
+
+**Example Migration:**
+
+**Before:**
+```python
+from pipelex.core.stuffs.stuff_content import StructuredContent, TextContent, ImageContent
+
+class MyData(StructuredContent):
+    text_field: TextContent
+    image_field: ImageContent
+```
+
+**After:**
+```python
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.image_content import ImageContent
+
+class MyData(StructuredContent):
+    text_field: TextContent
+    image_field: ImageContent
+```
+
+### Core Module Relocations
+
+Several core modules related to pipe execution and input handling have been moved to more logical packages.
+
+#### Pipe Execution (`pipe_works` → `pipe_run`)
+
+The `pipelex.pipe_works` package has been renamed to `pipelex.pipe_run`. Additionally, `PipeRunParams` and its factory have been moved into this new package.
+
+| Old Path | New Path | Description |
+| :--- | :--- | :--- |
+| `pipelex.core.pipes.pipe_run_params` | `pipelex.pipe_run.pipe_run_params` | Contains `PipeRunParams`, `PipeRunMode`, etc. |
+| `pipelex.core.pipes.pipe_run_params_factory` | `pipelex.pipe_run.pipe_run_params_factory` | Factory for creating `PipeRunParams`. |
+| `pipelex.pipe_works.pipe_router_protocol` | `pipelex.pipe_run.pipe_router_protocol` | The abstract protocol for the pipe router. |
+
+**Example Migration:**
+
+**Before:**
+```python
+from pipelex.core.pipes.pipe_run_params import PipeRunParams
+from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+```
+
+**After:**
+```python
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+```
+
+#### Pipe Input Specifications (`pipe_input` → `input_requirements`)
+
+Modules for defining pipe inputs have been renamed for clarity. The main class `PipeInputSpec` is now `InputRequirements`.
+
+| Old Path | New Path | Description |
+| :--- | :--- | :--- |
+| `pipelex.core.pipes.pipe_input` | `pipelex.core.pipes.input_requirements` | Contains `InputRequirements` (formerly `PipeInputSpec`). |
+| `pipelex.core.pipes.pipe_input_blueprint` | `pipelex.core.pipes.input_requirement_blueprint` | Contains `InputRequirementBlueprint`. |
+| `pipelex.core.pipes.pipe_input_factory` | `pipelex.core.pipes.input_requirements_factory` | Contains `InputRequirementsFactory`. |
+
+**Example Migration:**
+
+**Before:**
+```python
+from pipelex.core.pipes.pipe_input import PipeInputSpec
+from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
+```
+
+**After:**
+```python
+from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+```
+
+#### Comprehensive OCR → Extract Renaming
+
+All modules, classes, and configurations related to `ocr` have been renamed to `extract` to better reflect capabilities beyond OCR.
+
+| Old Path / Name | New Path / Name | Description |
+| :--- | :--- | :--- |
+| `pipelex.cogt.ocr` | `pipelex.cogt.extract` | Main package for extraction logic. |
+| `pipelex.pipe_operators.ocr` | `pipelex.pipe_operators.extract` | Package for the `PipeExtract` operator. |
+| `pipelex.cogt.ocr.ocr_input` | `pipelex.cogt.extract.extract_input` | Contains `ExtractInput` (formerly `OcrInput`). |
+| `pipelex.cogt.ocr.ocr_job` | `pipelex.cogt.extract.extract_job` | Contains `ExtractJob` (formerly `OcrJob`). |
+| `pipelex.cogt.ocr.ocr_worker_abstract` | `pipelex.cogt.extract.extract_worker_abstract` | Contains `ExtractWorkerAbstract`. |
+
+**Example Migration:**
+
+**Before:**
+```python
+from pipelex.cogt.ocr.ocr_input import OcrInput
+from pipelex.cogt.ocr.ocr_worker_abstract import OcrWorkerAbstract
+```
+
+**After:**
+```python
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+```
+
 ### Renamed Base Library Pipes
 
 **Find:** `ocr_page_contents_from_pdf`
@@ -762,6 +886,58 @@ pipe_output = await execute_pipeline(
 )
 ```
 
+### Builder Module Relocation
+
+The pipeline builder has been promoted to a top-level package:
+
+**Old:** `pipelex.libraries.pipelines.builder`
+**New:** `pipelex.builder`
+
+**Note:** This change only affects internal Pipelex code. Most users won't need to update anything related to the builder module.
+
+### Core Abstractions (`Provider` → `Library`)
+
+The abstract base classes for core components have been renamed for consistency. Hub accessor methods have been updated accordingly.
+
+| Old Class Name | New Class Name | Hub Accessor Method |
+| :--- | :--- | :--- |
+| `ConceptProviderAbstract` | `ConceptLibraryAbstract` | `get_concept_library()` |
+| `DomainProviderAbstract` | `DomainLibraryAbstract` | `get_domain_library()` |
+| `PipeProviderAbstract` | `PipeLibraryAbstract` | `get_pipe_library()` |
+
+**Example Migration:**
+
+**Before:**
+```python
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
+concept_provider = hub.get_concept_provider()
+```
+
+**After:**
+```python
+from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
+concept_library = hub.get_concept_library()
+```
+
+### Templating Refactoring
+
+The `pipelex.tools.templating` package has been refactored:
+
+- Core logic now resides in `pipelex.cogt.templating`
+- Jinja2-specific utilities are in `pipelex.tools.jinja2`
+
+**Example Migration:**
+
+**Before:**
+```python
+from pipelex.tools.templating.template_processor import TemplateProcessor
+```
+
+**After:**
+```python
+from pipelex.cogt.templating.template_processor import TemplateProcessor
+```
+
 ### Removed Methods and Classes
 
 The following methods and classes have been removed. If your code uses them, you'll need to refactor:
@@ -769,17 +945,6 @@ The following methods and classes have been removed. If your code uses them, you
 - `PipeLibrary.add_or_update_pipe()` - Removed
 - `PipelexHub.get_optional_library_manager()` - Removed
 - Hub methods: `get_optional_domain_provider()` and `get_optional_concept_provider()` - Removed
-
-### Renamed Internal Classes (if used)
-
-If your project directly imports these internal classes:
-
-- `ConceptProviderAbstract` → `ConceptLibraryAbstract`
-- `DomainProviderAbstract` → `DomainLibraryAbstract`
-- `PipeProviderAbstract` → `PipeLibraryAbstract`
-- `PipeInputSpec` → `InputRequirements`
-- `PipeInputSpecFactory` → `InputRequirementsFactory`
-- `PipelexError` → `PipelexException` (base exception class)
 
 ### Hub Method Renames
 
@@ -871,6 +1036,40 @@ If your project has `AGENTS.md` or `CLAUDE.md` files with Pipelex examples:
 
 **Solution:** Remove references to this file. The templates are now auto-loaded from the config.
 
+### Issue: ImportError for StuffContent subclasses
+
+**Cause:** Imports still use the old monolithic `pipelex.core.stuffs.stuff_content` module.
+
+**Solution:** Update imports to use individual modules. See Section 11 for the complete mapping table.
+
+**Example:**
+```python
+# Old (will fail)
+from pipelex.core.stuffs.stuff_content import StructuredContent, TextContent
+
+# New (correct)
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.text_content import TextContent
+```
+
+### Issue: ImportError for pipe execution classes
+
+**Cause:** Code imports from old `pipelex.pipe_works` package or old pipe input modules.
+
+**Solution:** Update to use new package names:
+- `pipelex.pipe_works` → `pipelex.pipe_run`
+- `pipelex.core.pipes.pipe_input` → `pipelex.core.pipes.input_requirements`
+- `PipeInputSpec` → `InputRequirements`
+
+### Issue: ImportError for OCR-related classes
+
+**Cause:** Code still imports from `pipelex.cogt.ocr` or `pipelex.pipe_operators.ocr`.
+
+**Solution:** Update all OCR imports to Extract:
+- `pipelex.cogt.ocr` → `pipelex.cogt.extract`
+- `pipelex.pipe_operators.ocr` → `pipelex.pipe_operators.extract`
+- All class names: `Ocr*` → `Extract*`
+
 ## 14. Automation Tools
 
 You can automate many of these text replacements using standard tools available on your platform:
@@ -905,6 +1104,16 @@ The following replacements can be done with find/replace tools:
 - `ocr_page_contents_from_pdf` → `extract_page_contents_from_pdf`
 - Remove `relative_config_folder_path` parameters from `Pipelex.make()`
 - Remove `config_folder_path` parameters from `Pipelex.make()`
+- `from pipelex.core.stuffs.stuff_content import` → Update to specific module imports
+- `from pipelex.pipe_works` → `from pipelex.pipe_run`
+- `from pipelex.core.pipes.pipe_input` → `from pipelex.core.pipes.input_requirements`
+- `from pipelex.cogt.ocr` → `from pipelex.cogt.extract`
+- `PipeInputSpec` → `InputRequirements`
+- `ConceptProviderAbstract` → `ConceptLibraryAbstract`
+- `DomainProviderAbstract` → `DomainLibraryAbstract`
+- `PipeProviderAbstract` → `PipeLibraryAbstract`
+- `.get_*_provider()` → `.get_*_library()`
+- `.set_*_provider()` → `.set_*_library()`
 
 **In `.toml` files:**
 - `llm_handle = ` → `model = `
@@ -924,9 +1133,10 @@ These require manual intervention:
 2. Renaming structure files to `*_struct.py` suffix
 3. Adding `@pipe_func()` decorator to custom functions
 4. Updating imports to match your new structure
-5. Adding `default_outcome` to `PipeCondition` pipes
-6. Tagging image inputs in `PipeLLM` prompts with `$` or `@`
-7. Reviewing and testing all changes
+5. Splitting `StuffContent` imports into individual module imports (requires analyzing which classes are used)
+6. Adding `default_outcome` to `PipeCondition` pipes
+7. Tagging image inputs in `PipeLLM` prompts with `$` or `@`
+8. Reviewing and testing all changes
 
 ### Recommendation
 
