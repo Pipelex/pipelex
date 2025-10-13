@@ -2237,7 +2237,7 @@ mistralai = [
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'bedrock'", specifier = ">=13.4.0" },
     { name = "aiofiles", specifier = ">=23.2.1" },
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.49.0" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.60.0" },
     { name = "backports-strenum", marker = "python_full_version < '3.11'", specifier = ">=1.3.0" },
     { name = "boto3", marker = "extra == 'bedrock'", specifier = ">=1.34.131" },
     { name = "boto3-stubs", marker = "extra == 'dev'", specifier = ">=1.35.24" },
