@@ -176,6 +176,23 @@ class Character(StructuredContent):
     description: str
 ```
 
+💡 **Alternative: Inline Structure Definition**
+
+Instead of creating a separate Python file, you can define structures directly in your `.plx` file using TOML syntax:
+
+```plx
+[concept.Character]
+description = "A character in a fiction story"
+
+[concept.Character.structure]
+name = "The character's name"
+age = { type = "integer", description = "The character's age", required = true }
+gender = "The character's gender"
+description = "A description of the character"
+```
+
+Learn more about inline structures and when to use them in [Structuring Concepts](../build-reliable-ai-workflows-with-pipelex/structuring-concepts.md).
+
 ### Improve the pipeline
 
 It's time to specify that your output be a `Character` instance. Use the `output` field for that purpose.

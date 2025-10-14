@@ -23,17 +23,34 @@ description = "Description of the domain" # Optional
 Note: The domain name usually matches the plx filename for single-file domains. For multi-file domains, use the subdirectory name.
 
 ### Concept Definitions
+
+Concepts represent ideas and semantic entities in your pipeline. They define what something *is*, not how it's structured.
+
 ```plx
 [concept]
-ConceptName = "Description of the concept" # Should be the same name as the Structure ClassName you want to output
+ConceptName = "Description of the concept"
 ```
 
-Important Rules:
+**Naming Rules:**
 - Use PascalCase for concept names
-- Never use plurals (no "Stories", use "Story")
-- Avoid adjectives (no "LargeText", use "Text")
-- Don't redefine native concepts (Text, Image, PDF, TextAndImages, Number)
-yes 
+- Never use plurals (no "Stories", use "Story") - lists are handled implicitly by Pipelex
+- Avoid circumstantial adjectives (no "LargeText", use "Text") - focus on the essence of what the concept represents
+- Don't redefine native concepts (Text, Image, PDF, TextAndImages, Number, Page)
+
+**Native Concepts:**
+Pipelex provides built-in native concepts: `Text`, `Image`, `PDF`, `TextAndImages`, `Number`, `Page`. Use these directly or refine them when appropriate.
+
+**Refining Native Concepts:**
+To create a concept that specializes a native concept without adding fields:
+
+```plx
+[concept.Landscape]
+description = "A scenic outdoor photograph"
+refines = "Image"
+```
+
+For details on how to structure concepts with fields, see the "Structuring Models" section below.
+
 ### Pipe Definitions
 
 ## Pipe Base Definition
@@ -46,21 +63,7 @@ inputs = { input_1 = "ConceptName1", input_2 = "ConceptName2" }
 output = "ConceptName"
 ```
 
-DO NOT WRITE:
-```plx
-[pipe.your_pipe_name]
-type = "pipe_sequence"
-```
-
-But it should be:
-
-```plx
-[pipe.your_pipe_name]
-type = "PipeSequence"
-description = "....."
-```
-
-The pipes will all have at least this base structure. 
+The pipes will all have at least this base definition. 
 - `inputs`: Dictionnary of key behing the variable used in the prompts, and the value behing the ConceptName. It should ALSO LIST THE INPUTS OF THE INTERMEDIATE STEPS (if PipeSequence) or of the conditionnal pipes (if PipeCondition).
 So If you have this error:
 `StaticValidationError: missing_input_variable • domain='expense_validator' • pipe='validate_expense' • 
@@ -81,69 +84,103 @@ inputs = {
 
 ## Structuring Models
 
-### Model Location and Registration
+Once you've defined your concepts semantically (see "Concept Definitions" above), you need to specify their structure if they have fields.
 
-- Create models for structured generations related to "some_domain" in your project (e.g., `my_project/some_domain/some_domain_struct.py`)
-- Models must inherit from `StructuredContent` or appropriate content type
-- Structure classes are automatically discovered by Pipelex - no manual registration needed
+### Three Ways to Structure Concepts
 
-## Model Structure
+**1. No Structure Needed**
 
-Concepts and their structure classes are meant to indicate an idea.
-A Concept MUST NEVER be a plural noun and you should never create a SomeConceptList: lists and arrays are implicitly handled by Pipelex according to the context. Just define SomeConcept.
+If a concept only refines a native concept without adding fields, use the TOML table syntax shown in "Concept Definitions" above. No structure section is needed.
 
-**IMPORTANT: Never create unnecessary structure classes that only refine native concepts without adding fields.**
+**2. Inline Structure Definition (RECOMMENDED for most cases)**
 
-DO NOT create structures like:
-```python
-class Joke(TextContent):
-    """A humorous text that makes people laugh."""
-    pass
-```
+For concepts with structured fields, define them inline using TOML syntax:
 
-If a concept only refines a native concept (like Text, Image, etc.) without adding new fields, simply declare it in the .plx file:
 ```plx
-[concept]
-Joke = "A humorous text that makes people laugh."
+[concept.Invoice]
+description = "A commercial document issued by a seller to a buyer"
+
+[concept.Invoice.structure]
+invoice_number = "The unique invoice identifier"
+issue_date = { type = "date", description = "The date the invoice was issued", required = true }
+total_amount = { type = "number", description = "The total invoice amount", required = true }
+vendor_name = "The name of the vendor"
+line_items = { type = "list", item_type = "text", description = "List of items", required = false }
 ```
-If you simply need to refine another native concept, construct it like this:
+
+**Supported inline field types:** `text`, `integer`, `boolean`, `number`, `date`, `list`, `dict`
+
+**Field properties:** `type`, `description`, `required` (default: true), `default_value`, `choices`, `item_type` (for lists), `key_type` and `value_type` (for dicts)
+
+**Simple syntax** (creates required text field):
 ```plx
-[concept.Landscape]
-refines = "Image"
+field_name = "Field description"
 ```
-Only create a Python structure class when you need to add specific fields:
+
+**Detailed syntax** (with explicit properties):
+```plx
+field_name = { type = "text", description = "Field description", required = false, default_value = "default" }
+```
+
+**3. Python StructuredContent Class (For Advanced Features)**
+
+Create a Python class when you need:
+- Custom validation logic (@field_validator, @model_validator)
+- Computed properties (@property methods)
+- Custom methods or class methods
+- Complex cross-field validation
+- Reusable structures across multiple domains
 
 ```python
-from datetime import datetime
-from pydantic import Field
-
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pydantic import Field, field_validator
 
-# IMPORTANT: THE CLASS MUST BE A SUBCLASS OF StructuredContent
-class YourModel(StructuredContent): # Always be a subclass of StructuredContent
-    # Required fields
-    field1: str
-    field2: int
-
-    # Optional fields with defaults
-    field3: str | None = Field(None, "Description of field3")
-    field4: list[str] = Field(default_factory=list)
-
-    # Date fields should remove timezone
-    date_field: datetime | None = None
+class Invoice(StructuredContent):
+    """A commercial invoice with validation."""
+    
+    invoice_number: str = Field(description="The unique invoice identifier")
+    total_amount: float = Field(ge=0, description="The total invoice amount")
+    tax_amount: float = Field(ge=0, description="Tax amount")
+    
+    @field_validator('tax_amount')
+    @classmethod
+    def validate_tax(cls, v, info):
+        """Ensure tax doesn't exceed total."""
+        total = info.data.get('total_amount', 0)
+        if v > total:
+            raise ValueError('Tax amount cannot exceed total amount')
+        return v
 ```
-### Usage
 
-Structures are meant to indicate what class to use for a particular Concept. In general they use the same name as the concept.
+**Location:** Create models in `my_project/some_domain/some_domain_struct.py`. Classes inheriting from `StructuredContent` are automatically discovered.
 
-Structure classes that inherit from `StructuredContent` are automatically discovered and loaded into the class_registry when setting up Pipelex, no need to do it manually.
+### Decision Rules for Agents
 
+**If concept already exists:**
+- If it's already inline → KEEP IT INLINE unless user explicitly asks to convert or features require Python class
+- If it's already a Python class → KEEP IT as Python class
 
-### Best Practices for structures
+**If creating new concept:**
+1. Does it only refine a native concept without adding fields? → Use concept-only declaration
+2. Does it need custom validation, computed properties, or methods? → Use Python class
+3. Otherwise → Use inline structure (fastest and simplest)
 
-- Respect Pydantic v2 standards
-- Use type hints for all fields
-- Use `Field` declaration and write the description
+**When to suggest conversion to Python class:**
+- User needs validation logic beyond type checking
+- User needs computed properties or custom methods
+- Structure needs to be reused across multiple domains
+- Complex type relationships or inheritance required
+
+### Inline Structure Limitations
+
+Inline structures:
+- ✅ Support all common field types (text, number, date, list, dict, etc.)
+- ✅ Support required/optional fields, defaults, choices
+- ✅ Generate full Pydantic models with validation
+- ❌ Cannot have custom validators or complex validation logic
+- ❌ Cannot have computed properties or custom methods
+- ❌ Cannot refine custom (non-native) concepts
+- ❌ Limited IDE autocomplete compared to explicit Python classes
 
 
 ## Pipe Controllers and Pipe Operators

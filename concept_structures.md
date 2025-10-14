@@ -312,7 +312,6 @@ When the structure needs to be shared:
 
 ```python
 # shared_models.py
-from typing import Optional
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
 
@@ -333,7 +332,7 @@ class Address(StructuredContent):
 When you need sophisticated typing:
 
 ```python
-from typing import Union, Literal, Optional
+from typing import Literal
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
 
@@ -341,9 +340,9 @@ class ApiResponse(StructuredContent):
     """A flexible API response structure."""
     
     status: Literal["success", "error", "pending"]
-    data: Optional[dict] = Field(default=None, description="Response data")
-    error_message: Optional[str] = Field(default=None, description="Error details if status is error")
-    metadata: dict[str, Union[str, int, float]] = Field(default_factory=dict, description="Additional metadata")
+    data: dict | None = Field(default=None, description="Response data")
+    error_message: str | None = Field(default=None, description="Error details if status is error")
+    metadata: dict[str, str | int | float] = Field(default_factory=dict, description="Additional metadata")
 ```
 
 #### 5. Better Developer Experience
@@ -396,7 +395,6 @@ Iterate quickly, adjusting the structure as needed.
 ```python
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field, field_validator
-from typing import Optional
 import re
 
 class UserProfile(StructuredContent):
@@ -404,7 +402,7 @@ class UserProfile(StructuredContent):
     
     username: str = Field(description="The user's username")
     email: str = Field(description="The user's email address")
-    age: Optional[int] = Field(default=None, description="User's age")
+    age: int | None = Field(default=None, description="User's age")
     
     @field_validator('email')
     @classmethod
@@ -476,7 +474,6 @@ categories = { type = "list", item_type = "text", description = "Product categor
 Create `ecommerce_struct.py` in your project:
 
 ```python
-from typing import Optional, List
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
 
@@ -487,7 +484,7 @@ class Product(StructuredContent):
     name: str = Field(description="Product name")
     price: float = Field(ge=0, description="Product price")
     in_stock: bool = Field(default=True, description="Stock availability")
-    categories: Optional[List[str]] = Field(default=None, description="Product categories")
+    categories: list[str] | None = Field(default=None, description="Product categories")
 ```
 
 **3. Remove the inline structure from .plx**
@@ -516,7 +513,6 @@ Run your pipeline to ensure everything works. The behavior should be identical, 
 Now you can add validators, computed properties, or other Python features:
 
 ```python
-from typing import Optional, List
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field, field_validator
 
@@ -527,7 +523,7 @@ class Product(StructuredContent):
     name: str = Field(description="Product name")
     price: float = Field(ge=0, description="Product price")
     in_stock: bool = Field(default=True, description="Stock availability")
-    categories: Optional[List[str]] = Field(default=None, description="Product categories")
+    categories: list[str] | None = Field(default=None, description="Product categories")
     
     @field_validator('price')
     @classmethod

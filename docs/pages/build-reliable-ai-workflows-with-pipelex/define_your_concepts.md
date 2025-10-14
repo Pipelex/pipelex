@@ -65,20 +65,64 @@ PaymentTerms = "Conditions under which payment is to be made"
 LineItem = "An individual item or service listed in a financial document"
 ```
 
+## How to Structure Your Concepts
+
+Once you've defined your concepts semantically, you may need to add structure if they have specific fields. Pipelex offers three approaches:
+
+### 1. No Structure (Concept Only)
+
+For concepts that only refine native concepts without adding fields, just declare them with a description. They default to text-based content.
+
+```plx
+[concept]
+ProductReview = "A customer's evaluation of a product or service"
+```
+
+### 2. Inline TOML Structures (Recommended)
+
+Define structured concepts directly in your `.plx` files using TOML syntax. This is the fastest and simplest approach for most use cases.
+
+```plx
+[concept.Invoice]
+description = "A commercial document issued by a seller to a buyer"
+
+[concept.Invoice.structure]
+invoice_number = "The unique invoice identifier"
+total_amount = { type = "number", description = "Total invoice amount", required = true }
+vendor_name = "The name of the vendor"
+```
+
+Behind the scenes, Pipelex generates a complete Pydantic model with validation.
+
+### 3. Python StructuredContent Classes
+
+Create explicit Python classes when you need custom validation, computed properties, or advanced features.
+
+```python
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pydantic import Field
+
+class Invoice(StructuredContent):
+    invoice_number: str
+    total_amount: float = Field(ge=0, description="Total invoice amount")
+    vendor_name: str
+```
+
+**For detailed guidance on choosing and implementing these approaches, see [Structuring Concepts](structuring-concepts.md).**
+
 ## Adding Structure with Python Models
 
-While text definitions help LLMs understand your concepts, Python models ensure structured, validated outputs. This combination gives you the best of both worlds: AI flexibility with software reliability.
+This section covers the Python class approach for structured concepts. For a simpler alternative using inline TOML syntax, see [Structuring Concepts](structuring-concepts.md).
 
-**Important**: If you don't create a Python class for a concept, it defaults to text-based content. Only create Python models when you need structured output with specific fields.
+While text definitions help LLMs understand your concepts, Python models ensure structured, validated outputs when you need custom validation, computed properties, or advanced features.
 
-### Creating Your First Structured Model
+### Creating a Python Structured Model
 
-For each concept that needs structured output, create a corresponding Python class:
+For concepts that need custom logic, create a Python class that inherits from `StructuredContent`:
 
 ```python
 # finance.py
 from datetime import datetime
-from typing import List, Optional
 from pydantic import Field
 from pipelex.core.stuffs.structured_content import StructuredContent
 
@@ -90,14 +134,15 @@ class Invoice(StructuredContent):
     customer_name: str
     total_amount: float = Field(ge=0, description="Total invoice amount")
     currency: str = Field(default="USD", description="Three-letter currency code")
-    line_items: List[str] = Field(default_factory=list)
 ```
 
 The model name must match the concept name exactly: `Invoice` concept → `Invoice` class.
 
-### Basic Validation Examples
+Python classes are automatically discovered and registered by Pipelex.
 
-Use Pydantic's validation features to ensure data quality:
+### With Custom Validation
+
+Use Pydantic's validation features for complex rules:
 
 ```python
 from pydantic import field_validator
@@ -115,37 +160,11 @@ class Employee(StructuredContent):
         if "@" not in v:
             raise ValueError("Invalid email format")
         return v.lower()
-
-class ProductReview(StructuredContent):
-    product_name: str
-    reviewer_name: str
-    rating: int = Field(ge=1, le=5, description="Rating from 1 to 5 stars")
-    review_text: str
-    verified_purchase: bool = False
-```
-
-### Working with Optional Fields
-
-Not all data is always available. Use Optional fields with sensible defaults:
-
-```python
-from typing import Optional
-from datetime import datetime
-from pipelex.core.stuffs.structured_content import StructuredContent
-
-class Meeting(StructuredContent):
-    title: str
-    scheduled_date: datetime
-    duration_minutes: int = Field(ge=15, le=480, description="Meeting duration")
-    location: Optional[str] = None
-    attendees: List[str] = Field(default_factory=list)
-    notes: Optional[str] = None
-    is_recurring: bool = False
 ```
 
 ### Linking Concepts to Models
 
-The connection between PLX definitions and Python models happens automatically through naming:
+The connection between `.plx` definitions and Python models happens automatically through naming:
 
 ```plx
 # hr.plx
@@ -154,7 +173,6 @@ domain = "hr"
 [concept]
 Employee = "A person employed by an organization"
 Meeting = "A scheduled gathering of people for discussion"
-PerformanceReview = "An evaluation of an employee's work performance"
 Department = "An organizational unit within a company"  # No Python model => text-based
 ```
 
@@ -162,9 +180,7 @@ Department = "An organizational unit within a company"  # No Python model => tex
 # hr.py
 from pipelex.core.stuffs.structured_content import StructuredContent
 from datetime import datetime
-from typing import List, Optional
 
-# Only define models for concepts that need structure
 class Employee(StructuredContent):
     name: str
     email: str
@@ -175,17 +191,12 @@ class Meeting(StructuredContent):
     title: str
     scheduled_date: datetime
     duration_minutes: int
-    attendees: List[str]
-
-class PerformanceReview(StructuredContent):
-    employee_name: str
-    review_period: str
-    rating: int = Field(ge=1, le=5)
-    strengths: List[str]
-    areas_for_improvement: List[str]
+    attendees: list[str]
 
 # Note: Department concept has no Python model, so it's text-based
 ```
+
+**For more examples, advanced features, and guidance on when to use Python classes vs inline structures, see [Structuring Concepts](structuring-concepts.md).**
 
 ## Concept Refinement and Inheritance
 
