@@ -5,8 +5,8 @@ from importlib.resources import files
 from pathlib import Path
 
 from pipelex import log
+from pipelex.config import get_config
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.tools.misc.common_exclusions import EXCLUDED_SCAN_DIRS
 from pipelex.tools.misc.file_utils import find_files_in_dir
 
 
@@ -24,6 +24,7 @@ def get_pipelex_plx_files_from_package() -> list[Path]:
 
     def _find_plx_in_traversable(traversable: Traversable, collected: list[Path]) -> None:
         """Recursively find .plx files in a Traversable."""
+        excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
         try:
             if not traversable.is_dir():
                 return
@@ -37,7 +38,7 @@ def get_pipelex_plx_files_from_package() -> list[Path]:
                         log.verbose(f"Found pipelex package PLX file: {plx_path_str}")
                 elif child.is_dir():
                     # Skip excluded directories
-                    if child.name not in EXCLUDED_SCAN_DIRS:
+                    if child.name not in excluded_dirs:
                         _find_plx_in_traversable(child, collected)
         except (PermissionError, OSError) as exc:
             log.warning(f"Could not access {traversable}: {exc}")
@@ -80,9 +81,10 @@ def find_plx_files_in_dir(dir_path: str, pattern: str, is_recursive: bool) -> li
 
     # Filter out files in excluded directories
     filtered_files: list[Path] = []
+    excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
     for file_path in all_files:
         # Check if any parent directory is in the exclude list
-        should_exclude = any(part in EXCLUDED_SCAN_DIRS for part in file_path.parts)
+        should_exclude = any(part in excluded_dirs for part in file_path.parts)
         if not should_exclude:
             filtered_files.append(file_path)
 

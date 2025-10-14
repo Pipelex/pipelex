@@ -4,6 +4,23 @@
 [pipelex.observer_config]
 observer_dir = "results/observer"
 
+[pipelex.scan_config]
+excluded_dirs = [
+    ".venv",
+    "venv",
+    "env",
+    ".env",
+    "virtualenv",
+    ".virtualenv",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    "results",
+]
+
 [pipelex.feature_config]
 # WIP/Experimental feature flags
 is_pipeline_tracking_enabled = false

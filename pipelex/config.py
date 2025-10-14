@@ -94,6 +94,17 @@ class ObserverConfig(ConfigModel):
     observer_dir: str
 
 
+class ScanConfig(ConfigModel):
+    excluded_dirs: frozenset[str]
+
+    @field_validator("excluded_dirs", mode="before")
+    @classmethod
+    def validate_excluded_dirs(cls, value: list[str] | frozenset[str]) -> frozenset[str]:
+        if isinstance(value, frozenset):
+            return value
+        return frozenset(value)
+
+
 class Pipelex(ConfigModel):
     feature_config: FeatureConfig
     log_config: LogConfig
@@ -109,6 +120,7 @@ class Pipelex(ConfigModel):
     pipe_run_config: PipeRunConfig
     reporting_config: ReportingConfig
     observer_config: ObserverConfig
+    scan_config: ScanConfig
 
 
 class MigrationConfig(ConfigModel):

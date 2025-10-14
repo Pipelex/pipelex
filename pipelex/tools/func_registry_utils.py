@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from pipelex import log
+from pipelex.config import get_config
 from pipelex.tools.func_registry import func_registry, pipe_func
-from pipelex.tools.misc.common_exclusions import EXCLUDED_SCAN_DIRS
 from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
 from pipelex.tools.typing.module_inspector import (
     ModuleFileError,
@@ -207,9 +207,10 @@ class FuncRegistryUtils:
 
         # Filter out files in excluded directories
         filtered_files: list[Path] = []
+        excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
         for file_path in all_files:
             # Check if any parent directory is in the exclude list
-            should_exclude = any(part in EXCLUDED_SCAN_DIRS for part in file_path.parts)
+            should_exclude = any(part in excluded_dirs for part in file_path.parts)
             if not should_exclude:
                 filtered_files.append(file_path)
 
