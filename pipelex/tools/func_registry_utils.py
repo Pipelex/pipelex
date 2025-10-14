@@ -4,11 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from pipelex import log
-from pipelex.tools.func_registry import func_registry
+from pipelex.tools.func_registry import func_registry, pipe_func
 from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
 from pipelex.tools.typing.module_inspector import (
     ModuleFileError,
-    import_module_from_file,
     import_module_from_file_if_has_decorated_functions,
 )
 
@@ -19,30 +18,23 @@ class FuncRegistryUtils:
         cls,
         folder_path: str,
         is_recursive: bool = True,
-        decorator_names: list[str] | None = None,
-        require_decorator: bool = False,
     ) -> None:
         """Discovers and attempts to register all functions in Python files within a folder.
         Only functions that meet the eligibility criteria will be registered:
         - Must be an async function
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
         - Return type that is a subclass of StuffContent
-        - Optionally must be marked with a decorator (if decorator_names provided)
+        - Must be marked with the @pipe_func decorator
 
-        If decorator_names is provided, uses AST parsing to first check if files
-        contain decorated functions before importing them. This avoids executing
-        module-level code in files that don't contain the functions you're looking for.
+        Uses AST parsing to first check if files contain @pipe_func decorated functions
+        before importing them. This avoids executing module-level code in files that
+        don't contain the functions you're looking for.
 
-        The function name is used as the registry key.
+        The function name is used as the registry key (or custom name if provided to decorator).
 
         Args:
             folder_path: Path to folder containing Python files
             is_recursive: Whether to search recursively in subdirectories
-            decorator_names: Optional list of decorator names (e.g. ["pipe_func"]).
-                           If provided, only imports files that contain functions with these decorators.
-                           If None, imports all Python files.
-            require_decorator: If True, only functions with decorators in decorator_names are registered.
-                             Only used if decorator_names is provided.
 
         """
         python_files = cls._find_files_in_dir(
@@ -52,45 +44,34 @@ class FuncRegistryUtils:
         )
 
         for python_file in python_files:
-            cls._register_funcs_in_file(
-                file_path=str(python_file),
-                decorator_names=decorator_names,
-                require_decorator=require_decorator,
-            )
+            cls._register_funcs_in_file(file_path=str(python_file))
 
     @classmethod
     def _register_funcs_in_file(
         cls,
         file_path: str,
-        decorator_names: list[str] | None = None,
-        require_decorator: bool = False,
     ) -> None:
-        """Processes a Python file to find and register eligible functions.
+        """Processes a Python file to find and register eligible @pipe_func decorated functions.
+
+        Uses AST parsing to check if the file contains @pipe_func decorated functions before
+        importing. Only functions marked with @pipe_func decorator are registered.
 
         Args:
             file_path: Path to the Python file
-            decorator_names: Optional list of decorator names to filter by
-            require_decorator: If True, only functions with the specified decorators are registered
 
         """
         try:
-            # Import the module (potentially with AST pre-check if decorator_names provided)
-            if decorator_names is not None:
-                module = import_module_from_file_if_has_decorated_functions(
-                    file_path,
-                    decorator_names=decorator_names,
-                )
-                # If no decorated functions found, module will be None
-                if module is None:
-                    return
-            else:
-                module = import_module_from_file(file_path)
+            # Import the module only if it has @pipe_func decorated functions
+            module = import_module_from_file_if_has_decorated_functions(
+                file_path,
+                decorator_names=[pipe_func.__name__],
+            )
+            # If no decorated functions found, module will be None
+            if module is None:
+                return
 
             # Find functions that match criteria
-            functions_to_register = cls._find_functions_in_module(
-                module,
-                require_decorator=require_decorator,
-            )
+            functions_to_register = cls._find_functions_in_module(module)
 
             for func in functions_to_register:
                 # Check for custom name from decorator
@@ -118,16 +99,17 @@ class FuncRegistryUtils:
     def _find_functions_in_module(
         cls,
         module: Any,
-        require_decorator: bool = False,
     ) -> list[Callable[..., Any]]:
-        """Finds all functions in a module (eligibility will be checked during registration).
+        """Finds all @pipe_func decorated functions in a module.
+
+        Only functions marked with @pipe_func decorator are included.
+        Full eligibility (signature, return type) will be checked during registration.
 
         Args:
             module: The module to search for functions
-            require_decorator: If True, only functions marked with @pipe_func are included
 
         Returns:
-            List of functions found in the module
+            List of @pipe_func decorated functions found in the module
 
         """
         functions: list[Callable[..., Any]] = []
@@ -139,8 +121,8 @@ class FuncRegistryUtils:
             if obj.__module__ != module_name:
                 continue
 
-            # If decorator is required, check for it
-            if require_decorator and not func_registry.is_marked_pipe_func(obj):
+            # Only include functions marked with @pipe_func
+            if not func_registry.is_marked_pipe_func(obj):
                 continue
 
             # Add function - full eligibility will be checked by func_registry.register_function

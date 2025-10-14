@@ -40,7 +40,6 @@ from pipelex.libraries.library_utils import (
 )
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.config.manager import config_manager
-from pipelex.tools.func_registry import pipe_func
 from pipelex.tools.func_registry_utils import FuncRegistryUtils
 from pipelex.types import StrEnum
 
@@ -284,8 +283,6 @@ class LibraryManager(LibraryManagerAbstract):
             # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
             FuncRegistryUtils.register_funcs_in_folder(
                 folder_path=str(library_dir),
-                decorator_names=[pipe_func.__name__],
-                require_decorator=True,
             )
 
         # Import from pipelex package
@@ -313,8 +310,6 @@ class LibraryManager(LibraryManagerAbstract):
             )
             FuncRegistryUtils.register_funcs_in_folder(
                 folder_path=str(pipelex_pkg_dir),
-                decorator_names=[pipe_func.__name__],
-                require_decorator=True,
             )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
