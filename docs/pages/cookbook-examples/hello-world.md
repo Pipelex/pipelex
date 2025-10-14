@@ -17,14 +17,16 @@ The `hello_world` function demonstrates the simplest possible Pipelex pipeline. 
 ```python
 import asyncio
 
-from pipelex.tools.misc.pretty import pretty_print
+from pipelex import pretty_print
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
 
 async def hello_world():
-
-    # Execute the pipeline
+    """
+    This function demonstrates the use of a super simple Pipelex pipeline to generate text.
+    """
+    # Run the pipe
     pipe_output = await execute_pipeline(
         pipe_code="hello_world",
     )
