@@ -1,10 +1,5 @@
-import importlib
-import inspect
-import pkgutil
-from importlib.abc import Traversable
-from importlib.resources import files
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -37,11 +32,16 @@ from pipelex.exceptions import (
     PipeLoadingError,
 )
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
+from pipelex.libraries.library_utils import (
+    find_plx_files_in_dir,
+    get_pipelex_package_dir_for_imports,
+    get_pipelex_plx_files_from_package,
+    register_pipe_funcs_from_package,
+)
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.config.manager import config_manager
 from pipelex.tools.func_registry import pipe_func
 from pipelex.tools.func_registry_utils import FuncRegistryUtils
-from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.types import StrEnum
 
 
@@ -100,34 +100,6 @@ class LibraryManager(LibraryManagerAbstract):
         self.teardown()
         self.setup()
 
-    def _find_plx_files_in_dir(self, dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
-        """Find PLX files matching a pattern in a directory, excluding problematic directories.
-
-        Args:
-            dir_path: Directory path to search in
-            pattern: File pattern to match (e.g. "*.plx")
-            is_recursive: Whether to search recursively in subdirectories
-
-        Returns:
-            List of matching Path objects, filtered to exclude problematic directories
-
-        """
-        # Get all files using the base utility
-        all_files = find_files_in_dir(dir_path, pattern, is_recursive)
-
-        # Directories to exclude from scanning to avoid loading invalid PLX files
-        exclude_dirs = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
-
-        # Filter out files in excluded directories
-        filtered_files: list[Path] = []
-        for file_path in all_files:
-            # Check if any parent directory is in the exclude list
-            should_exclude = any(part in exclude_dirs for part in file_path.parts)
-            if not should_exclude:
-                filtered_files.append(file_path)
-
-        return filtered_files
-
     def _get_pipelex_plx_files_from_dirs(self, dirs: set[Path]) -> list[Path]:
         """Get all valid Pipelex PLX files from the given directories."""
         all_plx_paths: list[Path] = []
@@ -139,7 +111,7 @@ class LibraryManager(LibraryManagerAbstract):
                 continue
 
             # Find all .plx files in the directory, excluding problematic directories
-            plx_files = self._find_plx_files_in_dir(
+            plx_files = find_plx_files_in_dir(
                 dir_path=str(dir_path),
                 pattern="*.plx",
                 is_recursive=True,
@@ -250,119 +222,17 @@ class LibraryManager(LibraryManagerAbstract):
                 pipes.append(pipe)
         return pipes
 
-    def _get_pipelex_plx_files_from_package(self) -> list[Path]:
-        """Get all PLX files from the pipelex package using importlib.resources.
-
-        This works reliably whether pipelex is installed as a wheel, from source,
-        or as a relative path import.
-
-        Returns:
-            List of Path objects to PLX files in pipelex package
-        """
-        plx_files: list[Path] = []
-        pipelex_package = files("pipelex")
-
-        def _find_plx_in_traversable(traversable: Traversable, collected: list[Path]) -> None:
-            """Recursively find .plx files in a Traversable."""
-            try:
-                if not traversable.is_dir():
-                    return
-
-                for child in traversable.iterdir():
-                    if child.is_file() and child.name.endswith(".plx"):
-                        # Convert to path string for validation
-                        plx_path_str = str(child)
-                        if PipelexInterpreter.is_pipelex_file(Path(plx_path_str)):
-                            collected.append(Path(plx_path_str))
-                            log.debug(f"Found pipelex package PLX file: {plx_path_str}")
-                    elif child.is_dir():
-                        # Skip excluded directories
-                        excluded = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
-                        if child.name not in excluded:
-                            _find_plx_in_traversable(child, collected)
-            except (PermissionError, OSError) as exc:
-                log.debug(f"Could not access {traversable}: {exc}")
-
-        _find_plx_in_traversable(pipelex_package, plx_files)
-        log.debug(f"Found {len(plx_files)} PLX files in pipelex package")
-        return plx_files
-
-    def _get_pipelex_package_dir_for_imports(self) -> Path | None:
-        """Get the pipelex package directory as a Path for importing Python modules.
-
-        Returns:
-            Path to the pipelex package directory, or None if not accessible as filesystem
-        """
-        pipelex_package = files("pipelex")
-        try:
-            # Try to convert to Path (works for filesystem paths)
-            pkg_path = Path(str(pipelex_package))
-            if pkg_path.exists() and pkg_path.is_dir():
-                return pkg_path
-        except (TypeError, ValueError, OSError) as exc:
-            log.debug(f"Could not convert importlib.resources Traversable to filesystem Path: {exc}")
-        return None
-
     def _import_pipelex_modules_directly(self) -> None:
-        """Import pipelex modules directly to register @pipe_func decorated functions.
+        """Import pipelex modules to register @pipe_func decorated functions.
 
         This ensures critical pipelex functions are registered regardless of how pipelex
         is installed (wheel, source, relative path, etc.).
-
-        Uses pkgutil.walk_packages to auto-discover all pipelex.builder modules.
         """
         import pipelex.builder  # noqa: PLC0415 - intentional local import
-        from pipelex.tools.func_registry import func_registry  # noqa: PLC0415 - intentional local import
 
-        log.info("Starting pipelex.builder module discovery for @pipe_func registration")
-
-        try:
-            # Walk all submodules in pipelex.builder to discover @pipe_func decorated functions
-            if hasattr(pipelex.builder, "__path__"):
-                log.info(f"pipelex.builder has __path__: {pipelex.builder.__path__}")
-                module_count = 0
-                functions_registered = 0
-
-                for _importer, modname, _ispkg in pkgutil.walk_packages(
-                    path=pipelex.builder.__path__, prefix="pipelex.builder.", onerror=lambda _: None
-                ):
-                    module_count += 1
-                    try:
-                        # Import the module
-                        module = importlib.import_module(modname)
-                        log.info(f"Successfully imported {modname}")
-
-                        # Find @pipe_func decorated functions in this module
-                        for _name, obj in inspect.getmembers(module, inspect.isfunction):
-                            # Skip functions imported from other modules
-                            if obj.__module__ != modname:
-                                continue
-
-                            # Only process functions marked with @pipe_func
-                            if not func_registry.is_marked_pipe_func(obj):
-                                continue
-
-                            # Check for custom name from decorator
-                            custom_name = getattr(obj, "_pipe_func_name", None)
-                            func_name = custom_name if custom_name is not None else obj.__name__
-
-                            # Register the function
-                            func_registry.register_function(
-                                func=obj,
-                                name=func_name,
-                                should_warn_if_already_registered=False,
-                            )
-                            functions_registered += 1
-                            log.info(f"Registered @pipe_func: {func_name} from {modname}")
-
-                    except Exception as exc:
-                        log.warning(f"Could not process {modname}: {exc}")
-
-                log.info(f"Discovered {module_count} modules and registered {functions_registered} @pipe_func functions")
-            else:
-                log.error("Could not walk pipelex.builder package - no __path__ attribute")
-        except ImportError as exc:
-            log.error(f"Could not import pipelex.builder package: {exc}")
+        log.info("Registering @pipe_func functions from pipelex.builder")
+        functions_count = register_pipe_funcs_from_package("pipelex.builder", pipelex.builder)
+        log.info(f"Registered {functions_count} @pipe_func functions from pipelex.builder")
 
     @override
     def load_libraries(
@@ -386,7 +256,7 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Get PLX files from pipelex package using importlib.resources
             # This works reliably in all installation modes (wheel, source, relative)
-            pipelex_plx_paths: list[Path] = self._get_pipelex_plx_files_from_package()
+            pipelex_plx_paths: list[Path] = get_pipelex_plx_files_from_package()
 
             # Combine and deduplicate
             all_plx_paths = user_plx_paths + pipelex_plx_paths
@@ -434,7 +304,7 @@ class LibraryManager(LibraryManagerAbstract):
                 log.error(f"✗ Function '{func_name}' NOT registered - this will cause errors!")
 
         # Then try filesystem-based scanning if package is accessible (for completeness)
-        pipelex_pkg_dir = self._get_pipelex_package_dir_for_imports()
+        pipelex_pkg_dir = get_pipelex_package_dir_for_imports()
         if pipelex_pkg_dir:
             log.debug(f"Additionally scanning pipelex package filesystem: {pipelex_pkg_dir}")
             ClassRegistryUtils.import_modules_in_folder(
