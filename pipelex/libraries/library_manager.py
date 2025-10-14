@@ -228,9 +228,9 @@ class LibraryManager(LibraryManagerAbstract):
         """
         import pipelex.builder  # noqa: PLC0415 - intentional local import
 
-        log.info("Registering @pipe_func functions from pipelex.builder")
+        log.verbose("Registering @pipe_func functions from pipelex.builder")
         functions_count = FuncRegistryUtils.register_pipe_funcs_from_package("pipelex.builder", pipelex.builder)
-        log.info(f"Registered {functions_count} @pipe_func functions from pipelex.builder")
+        log.verbose(f"Registered {functions_count} @pipe_func functions from pipelex.builder")
 
     @override
     def load_libraries(
@@ -286,7 +286,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Import from pipelex package
         # Always directly import critical builder modules first (works in all installation modes)
-        log.info("About to import pipelex.builder modules for @pipe_func registration")
+        log.verbose("About to import pipelex.builder modules for @pipe_func registration")
         self._import_pipelex_modules_directly()
 
         # Verify critical functions were registered
@@ -295,7 +295,7 @@ class LibraryManager(LibraryManagerAbstract):
         critical_functions = ["create_concept_spec", "assemble_pipelex_bundle_spec"]
         for func_name in critical_functions:
             if func_registry.has_function(func_name):
-                log.info(f"✓ Function '{func_name}' successfully registered")
+                log.verbose(f"✓ Function '{func_name}' successfully registered")
             else:
                 log.error(f"✗ Function '{func_name}' NOT registered - this will cause errors!")
 
