@@ -19,6 +19,14 @@ class PipeRunMode(StrEnum):
     LIVE = "live"
     DRY = "dry"
 
+    @property
+    def is_dry(self) -> bool:
+        match self:
+            case PipeRunMode.DRY:
+                return True
+            case PipeRunMode.LIVE:
+                return False
+
 
 FORCE_DRY_RUN_MODE_ENV_KEY = "PIPELEX_FORCE_DRY_RUN_MODE"
 

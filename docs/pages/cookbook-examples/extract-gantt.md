@@ -12,19 +12,16 @@ The pipeline takes an image as input, creates a working memory, and then execute
 
 ```python
 async def extract_gantt(image_url: str) -> GanttChart:
-    # Create Working Memory
-    working_memory = WorkingMemoryFactory.make_from_image(
-        image_url=image_url,
-        concept_string="gantt.GanttImage",
-        name="gantt_chart_image",
-    )
-
     # Run the pipe
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
-        working_memory=working_memory,
+        input_memory={
+            "gantt_chart_image": {
+                "concept": "gantt.GanttChartImage",
+                "content": ImageContent(url=image_url),
+            }
+        },
     )
-
     # Output the result
     return pipe_output.main_stuff_as(content_type=GanttChart)
 ```
@@ -74,16 +71,15 @@ steps = [
     { pipe = "gather_in_a_gantt_chart", result = "gantt_chart" },
 ]
 
-# This is the pipe that extracts the details for a single task
 [pipe.extract_details_of_task]
 type = "PipeLLM"
 description = "Extract the precise dates of the task, start_date and end_date"
 inputs = { gantt_chart_image = "GanttChartImage", gantt_timescale = "GanttTimescaleDescription", gantt_task_name = "GanttTaskName" }
-output = "GanttTaskDetails" # The output is structured as a GanttTaskDetails object
+output = "GanttTaskDetails"
 structuring_method = "preliminary_text"
 model = "llm_to_extract_diagram"
-prompt_template = """
-I am sharing an image of a Gantt chart.
+prompt = """
+I am sharing an image of a Gantt chart: $gantt_chart_image.
 Please analyse the image and for a given task name (and only this task), extract the information of the task, if relevant.
 
 Be careful, the time unit is this:

@@ -7,5 +7,5 @@ from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 class PipeFuncBlueprint(PipeBlueprint):
     type: Literal["PipeFunc"] = "PipeFunc"
-    category: Literal["PipeOperator"] = "PipeOperator"
+    pipe_category: Literal["PipeOperator"] = "PipeOperator"
     function_name: str = Field(description="The name of the function to call.")

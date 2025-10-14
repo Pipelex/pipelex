@@ -31,17 +31,15 @@ class ModelLister:
     async def list_models(
         cls,
         backend_name: str,
-        relative_config_folder_path: str = "./pipelex_libraries",
         flat: bool = False,
     ) -> None:
         """List available models for a specific backend.
 
         Args:
             backend_name: Name of the backend to list models for
-            relative_config_folder_path: Path to pipelex libraries config
             flat: Whether to output in flat CSV format
         """
-        Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+        Pipelex.make()
 
         try:
             backend = get_models_manager().get_required_inference_backend(backend_name)

@@ -1,10 +1,10 @@
-import os
 from typing import Any
 
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ModelDeckNotFoundError, ModelsManagerError
+from pipelex.cogt.exceptions import ModelDeckNotFoundError, ModelDeckValidationError, ModelManagerError
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -47,23 +47,22 @@ class ModelManager(ModelManagerAbstract):
         deck_paths = get_config().cogt.inference_config.get_model_deck_paths()
         full_deck_dict: dict[str, Any] = {}
         if not deck_paths:
-            msg = "No LLM deck paths found. Please run `pipelex init-libraries` to create it."
+            msg = "No Model deck paths found. Please run `pipelex init config` to create the set up the base deck."
             raise ModelDeckNotFoundError(msg)
 
         for deck_path in deck_paths:
-            if not os.path.exists(deck_path):
-                msg = f"LLM deck path `{deck_path}` not found. Please run `pipelex init-libraries` to create it."
-                raise ModelDeckNotFoundError(msg)
             try:
                 deck_dict = load_toml_from_path(path=deck_path)
-                log.debug(f"Loaded LLM deck from {deck_path}")
-                deep_update(full_deck_dict, deck_dict)
-            except Exception as exc:
-                msg = f"Failed to load LLM deck file '{deck_path}': {exc}"
-                log.error(msg)
-                raise
+            except FileNotFoundError as not_found_exc:
+                msg = f"Could not find Model Deck file at '{deck_path}': {not_found_exc}"
+                raise ModelDeckNotFoundError(msg) from not_found_exc
+            deep_update(full_deck_dict, deck_dict)
 
-        return ModelDeckBlueprint.model_validate(full_deck_dict)
+        try:
+            return ModelDeckBlueprint.model_validate(full_deck_dict)
+        except ValidationError as exc:
+            msg = f"Invalid Model Deck configuration in {deck_paths}: {exc}"
+            raise ModelDeckValidationError(msg) from exc
 
     def build_deck(self, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
@@ -80,7 +79,7 @@ class ModelManager(ModelManagerAbstract):
             backend = self.inference_backend_library.get_inference_backend(backend_name=matched_backend_name)
             if backend is None:
                 msg = f"Backend '{matched_backend_name}', requested for model '{model_name}', could not be found"
-                raise ModelsManagerError(msg)
+                raise ModelManagerError(msg)
             model_spec = backend.get_model_spec(model_name)
             if model_spec is None:
                 # Not finding the model spec can be an error or not according to the matching method
@@ -90,7 +89,7 @@ class ModelManager(ModelManagerAbstract):
                             f"Model spec '{model_name}' not found in backend '{matched_backend_name}' "
                             f"which was matched exactly in routing profile '{backend_match_for_model.routing_profile_name}'"
                         )
-                        raise ModelsManagerError(msg)
+                        raise ModelManagerError(msg)
                     case BackendMatchingMethod.PATTERN_MATCH:
                         log.verbose(
                             f"Model spec '{model_name}' not found in backend '{matched_backend_name}' but it's OK because "
@@ -109,7 +108,7 @@ class ModelManager(ModelManagerAbstract):
                             backend = self.inference_backend_library.get_inference_backend(backend_name=available_backend)
                             if backend is None:
                                 msg = f"Backend '{available_backend}' not found for model '{model_name}'"
-                                raise ModelsManagerError(msg)
+                                raise ModelManagerError(msg)
                             model_spec = backend.get_model_spec(model_name)
                             if model_spec is not None:
                                 break
@@ -118,7 +117,7 @@ class ModelManager(ModelManagerAbstract):
                                 f"Model spec '{model_name}' not found in any of the available backends '{available_backends}' "
                                 f"which was set as default in routing profile '{backend_match_for_model.routing_profile_name}'"
                             )
-                            raise ModelsManagerError(msg)
+                            raise ModelManagerError(msg)
             inference_models[model_name] = model_spec
 
         return ModelDeck(
@@ -145,5 +144,5 @@ class ModelManager(ModelManagerAbstract):
         backend = self.inference_backend_library.get_inference_backend(backend_name)
         if backend is None:
             msg = f"Inference backend '{backend_name}' not found"
-            raise ModelsManagerError(msg)
+            raise ModelManagerError(msg)
         return backend

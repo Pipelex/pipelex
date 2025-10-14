@@ -1,7 +1,7 @@
 from pydantic import Field, RootModel, ValidationError
 
 from pipelex import log
-from pipelex.cogt.exceptions import RoutingProfileLibraryError, RoutingProfileLibraryNotFoundError
+from pipelex.cogt.exceptions import RoutingProfileLibraryError, RoutingProfileLibraryNotFoundError, RoutingProfileValidationError
 from pipelex.cogt.model_routing.routing_models import BackendMatchForModel
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_factory import (
@@ -45,14 +45,14 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         try:
             catalog_dict = load_toml_from_path(path=routing_profile_library_path)
         except FileNotFoundError as not_found_exc:
-            msg = f"Failed to load routing profile library from file '{routing_profile_library_path}': {not_found_exc}"
+            msg = f"Could not find routing profile library at '{routing_profile_library_path}': {not_found_exc}"
             raise RoutingProfileLibraryNotFoundError(msg) from not_found_exc
 
         try:
             catalog_blueprint = RoutingProfileLibraryBlueprint.model_validate(catalog_dict)
         except ValidationError as exc:
             msg = f"Invalid routing profile library configuration in '{routing_profile_library_path}': {exc}"
-            raise RoutingProfileLibraryError(msg) from exc
+            raise RoutingProfileValidationError(msg) from exc
 
         # Validate that the active config exists
         if catalog_blueprint.active not in catalog_blueprint.profiles:

@@ -40,7 +40,7 @@ type = "PipeLLM"
 description = "Generate a catchy tagline for a product"
 inputs = { description = "ProductDescription" }
 output = "Tagline"
-prompt_template = """
+prompt = """
 Product Description:
 @description
 
@@ -76,7 +76,7 @@ description = "Extract keywords from a product description"
 inputs = { description = "ProductDescription" }
 output = "Keyword"
 multiple_output = true
-prompt_template = """
+prompt = """
 Please extract the most relevant keywords from the following product description:
 
 @description
@@ -89,7 +89,7 @@ type = "PipeLLM"
 description = "Generate a tagline from keywords"
 inputs = { keywords = "Keyword" }
 output = "Tagline"
-prompt_template = """
+prompt = """
 Here are the key product keywords:
 @keywords
 

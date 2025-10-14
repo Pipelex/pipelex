@@ -12,14 +12,11 @@ The `power_extractor` pipeline is at the heart of this example. After its execut
 
 ```python
 async def extract_generic(pdf_url: str) -> TextAndImagesContent:
-    working_memory = WorkingMemoryFactory.make_from_pdf(
-        pdf_url=pdf_url,
-        concept_string="PDF",
-        name="pdf",
-    )
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor",
-        working_memory=working_memory,
+        input_memory={
+            "document": PDFContent(url=pdf_url),
+        },
     )
     working_memory = pipe_output.working_memory
     markdown_and_images: TextAndImagesContent = merge_markdown_and_images(working_memory)
@@ -38,7 +35,7 @@ def merge_markdown_and_images(working_memory: WorkingMemory) -> TextAndImagesCon
     # ... (check for length equality)
 
     # Concatenate the markdown text
-    concatenated_markdown_text: str = "\\n".join([page_markdown.text for page_markdown in page_markdown_list.items])
+    concatenated_markdown_text: str = "\n".join([page_markdown.text for page_markdown in page_markdown_list.items])
 
     # Aggregate the images from the page contents
     image_contents: List[ImageContent] = []

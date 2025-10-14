@@ -18,9 +18,9 @@ class PipeSorterTestCases:
 
     # Test case 1: No dependencies - all operators
     NO_DEPENDENCIES_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
-        "pipe_c": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="C", inputs={}, output="Text"),
-        "pipe_a": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="A", inputs={}, output="Text"),
-        "pipe_b": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="B", inputs={}, output="Text"),
+        "pipe_c": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="C", inputs={}, output="Text"),
+        "pipe_a": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="A", inputs={}, output="Text"),
+        "pipe_b": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="B", inputs={}, output="Text"),
     }
     NO_DEPENDENCIES_EXPECTED: ClassVar[list[str]] = ["pipe_a", "pipe_b", "pipe_c"]  # Alphabetical order (all are roots)
 
@@ -28,16 +28,16 @@ class PipeSorterTestCases:
     SIMPLE_CHAIN_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
         "pipe_c": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="C depends on B",
             inputs={},
             output="Text",
             steps=[SubPipeBlueprint(pipe="pipe_b", result="result_b")],
         ),
-        "pipe_a": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="A no deps", inputs={}, output="Text"),
+        "pipe_a": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="A no deps", inputs={}, output="Text"),
         "pipe_b": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="B depends on A",
             inputs={},
             output="Text",
@@ -55,7 +55,7 @@ class PipeSorterTestCases:
     DIAMOND_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
         "pipe_d": PipeParallelBlueprint(
             type="PipeParallel",
-            category="PipeController",
+            pipe_category="PipeController",
             description="D depends on B and C",
             inputs={},
             output="Text",
@@ -65,10 +65,10 @@ class PipeSorterTestCases:
             ],
             add_each_output=True,
         ),
-        "pipe_a": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="A", inputs={}, output="Text"),
+        "pipe_a": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="A", inputs={}, output="Text"),
         "pipe_c": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="C depends on A",
             inputs={},
             output="Text",
@@ -76,7 +76,7 @@ class PipeSorterTestCases:
         ),
         "pipe_b": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="B depends on A",
             inputs={},
             output="Text",
@@ -92,23 +92,23 @@ class PipeSorterTestCases:
         # Chain 1: A -> B
         "pipe_b": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="B depends on A",
             inputs={},
             output="Text",
             steps=[SubPipeBlueprint(pipe="pipe_a", result="result_a")],
         ),
-        "pipe_a": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="A", inputs={}, output="Text"),
+        "pipe_a": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="A", inputs={}, output="Text"),
         # Chain 2: X -> Y
         "pipe_y": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="Y depends on X",
             inputs={},
             output="Text",
             steps=[SubPipeBlueprint(pipe="pipe_x", result="result_x")],
         ),
-        "pipe_x": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="X", inputs={}, output="Text"),
+        "pipe_x": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="X", inputs={}, output="Text"),
     }
     # Depth-first from roots (pipe_b, pipe_y alphabetically): pipe_b -> pipe_a, then pipe_y -> pipe_x
     MULTIPLE_CHAINS_EXPECTED: ClassVar[list[str]] = ["pipe_b", "pipe_a", "pipe_y", "pipe_x"]
@@ -117,13 +117,13 @@ class PipeSorterTestCases:
     PIPE_BATCH_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
         "batch_pipe": PipeBatchBlueprint(
             type="PipeBatch",
-            category="PipeController",
+            pipe_category="PipeController",
             description="Batch depends on process",
             inputs={},
             output="Text",
             branch_pipe_code="process_item",
         ),
-        "process_item": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="Process", inputs={}, output="Text"),
+        "process_item": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="Process", inputs={}, output="Text"),
     }
     PIPE_BATCH_EXPECTED: ClassVar[list[str]] = ["batch_pipe", "process_item"]
 
@@ -131,7 +131,7 @@ class PipeSorterTestCases:
     PIPE_CONDITION_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
         "router": PipeConditionBlueprint(
             type="PipeCondition",
-            category="PipeController",
+            pipe_category="PipeController",
             description="Routes to different pipes",
             inputs={},
             output="Text",
@@ -142,9 +142,9 @@ class PipeSorterTestCases:
             },
             default_outcome="process_default",
         ),
-        "process_large": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="Large", inputs={}, output="Text"),
-        "process_small": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="Small", inputs={}, output="Text"),
-        "process_default": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="Default", inputs={}, output="Text"),
+        "process_large": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="Large", inputs={}, output="Text"),
+        "process_small": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="Small", inputs={}, output="Text"),
+        "process_default": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="Default", inputs={}, output="Text"),
     }
     # Router first, then its dependencies in alphabetical order
     PIPE_CONDITION_EXPECTED: ClassVar[list[str]] = ["router", "process_default", "process_large", "process_small"]
@@ -153,7 +153,7 @@ class PipeSorterTestCases:
     CIRCULAR_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
         "pipe_a": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="A depends on C (circular!)",
             inputs={},
             output="Text",
@@ -161,7 +161,7 @@ class PipeSorterTestCases:
         ),
         "pipe_b": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="B depends on A",
             inputs={},
             output="Text",
@@ -169,7 +169,7 @@ class PipeSorterTestCases:
         ),
         "pipe_c": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="C depends on B",
             inputs={},
             output="Text",
@@ -181,7 +181,7 @@ class PipeSorterTestCases:
     MISSING_DEPENDENCY_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
         "pipe_b": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="B depends on A and Z (Z doesn't exist)",
             inputs={},
             output="Text",
@@ -190,7 +190,7 @@ class PipeSorterTestCases:
                 SubPipeBlueprint(pipe="pipe_z", result="result_z"),  # Z doesn't exist in this bundle
             ],
         ),
-        "pipe_a": PipeLLMBlueprint(type="PipeLLM", category="PipeOperator", description="A", inputs={}, output="Text"),
+        "pipe_a": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="A", inputs={}, output="Text"),
     }
     MISSING_DEPENDENCY_EXPECTED: ClassVar[list[str]] = ["pipe_b", "pipe_a"]  # Z is ignored as it's not in the bundle
 
@@ -198,35 +198,35 @@ class PipeSorterTestCases:
     IMAGE_INVERSION_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
         "analyze_image_content": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Analyzes the input photo to understand visual elements, composition, mood, etc.",
             inputs={"input_photo": "Image"},
             output="ImageAnalysis",
         ),
         "define_opposite_concept": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Determines what constitutes the opposite for the analyzed image",
             inputs={"image_analysis": "ImageAnalysis"},
             output="OppositeDefinition",
         ),
         "generate_image_prompt": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Crafts a detailed image generation prompt from the opposite definition",
             inputs={"opposite_definition": "OppositeDefinition"},
             output="ImagePrompt",
         ),
         "generate_opposite_image": PipeImgGenBlueprint(
             type="PipeImgGen",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Generates the opposite image using AI",
             inputs={"generation_prompt": "ImagePrompt"},
             output="Image",
         ),
         "photo_opposite_pipeline": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="Main pipeline that generates the opposite of an input photo",
             inputs={"input_photo": "Image"},
             output="Image",
@@ -252,7 +252,7 @@ class PipeSorterTestCases:
         # Main sequence with nested controllers
         "main_pipeline": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="Main pipeline with nested controllers",
             inputs={"input": "Text"},
             output="Text",
@@ -265,7 +265,7 @@ class PipeSorterTestCases:
         # Nested sequence
         "nested_sequence": PipeSequenceBlueprint(
             type="PipeSequence",
-            category="PipeController",
+            pipe_category="PipeController",
             description="Nested preparation sequence",
             inputs={"input": "Text"},
             output="Text",
@@ -277,7 +277,7 @@ class PipeSorterTestCases:
         # Condition router
         "router": PipeConditionBlueprint(
             type="PipeCondition",
-            category="PipeController",
+            pipe_category="PipeController",
             description="Routes based on size",
             inputs={"prepared": "Text"},
             output="Text",
@@ -291,42 +291,42 @@ class PipeSorterTestCases:
         # LLM operators
         "prepare_data": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Prepare the data",
             inputs={"input": "Text"},
             output="Text",
         ),
         "validate_data": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Validate the prepared data",
             inputs={"prepared_data": "Text"},
             output="Text",
         ),
         "process_small": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Process small items",
             inputs={"item": "Text"},
             output="Text",
         ),
         "process_large": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Process large items",
             inputs={"item": "Text"},
             output="Text",
         ),
         "process_default": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Default processing",
             inputs={"item": "Text"},
             output="Text",
         ),
         "final_process": PipeLLMBlueprint(
             type="PipeLLM",
-            category="PipeOperator",
+            pipe_category="PipeOperator",
             description="Final processing step",
             inputs={"processed": "Text"},
             output="Text",

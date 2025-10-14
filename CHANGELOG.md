@@ -2,12 +2,80 @@
 
 ## [Unreleased]
 
-### Highlights
+### Highlights - Moving fast and breaking things
 
-- In the `PipeLLM`, the image inputs can now be used and tagged in the prompt like all other concepts.
-- Use claude-4.5-sonnet instead of claude-4-sonnet in the base deck.
+- Added the new builder pipeline system for auto-generating Pipelex bundles from user briefs
+  - it's a pipeline to generate pipelines, and it works!
+  - the pipeline definitions are in `pipelex_libraries/pipelines/base_library/builder/`
+  - removed the previous draft which was named `meta_pipeline.plx`
+
+**Breaking changes... for good!**
+
+We tried to group all the renamings we wanted to do which impact our language, so that you get one migration to apply and then we will be way more stable in the future releases.
+
+This is all in the spirit of making Pipelex a declarative language, where you express what you want to do, and the system will figure out how to do it. So our focus inwas to make the Pipelex language easier to understand and use for non-technical users, and at the same time use more consistent and obvious words that developers are used to.
+
+**💡 Pro tip:** To make migration easier, pass the [migration guide](https://github.com/PipelexLab/pipelex/blob/main/pipelex/kit/migrations/migrate_0.11.0_0.12.0.md) to your favorite SWE agent (Cursor, Claude Code, github copilot, etc.) and let it handle the bulk of the changes!
+
+- **Removed centralized `pipelex_libraries` folder system**
+  - Pipelines are now auto-discovered from anywhere in your project—no special directory required
+  - No config path parameters needed in `Pipelex.make()` or CLI commands (just call `Pipelex.make()`)
+  - Custom functions require `@pipe_func()` decorator for auto-discovery
+  - Structure classes auto-discovered (must inherit from `StructuredContent`)
+  - Configuration stays at repository root in `.pipelex/` directory
+  - See [migration guide](https://github.com/PipelexLab/pipelex/blob/main/pipelex/kit/migrations/migrate_0.11.0_0.12.0.md) for details on reorganizing your project structure
+
+- General changes
+  - renamed `definition` fields to `description` across all cases
+
+- Renamed **PipeJinja2** to **PipeCompose**
+  - the fact that our templating engine is Jinja2 is a technnical detail, not fundamental to the language, especially since we included a pre-processor enabling insertion of variables in prompts using `@variable` or `$variable`, in addition to the jinja2 syntax `{{ variable }}`
+  - renamed `jinja2` field to `template` for the same reason
+  - for more control, instead of providing a string for the `template` field, you can also use a nested `template` section with `template`, `category` and `templating_style` fields
+
+- Renamed **PipeOCR** to **PipeExtract**
+  - this is to account for various text extraction techniques from images and docs, including but not only OCR; e.g. we now have integrated the `pypdfium2` package which can extract text and images from PDF, when it's actually real text (not an image), and soon we'll add support for other document extraction models solutions
+  - removed obligation to name your document input `ocr_input`, it can now be named whatever you want as long as it's a single input and it's either an `Image` or a `PDF` or some concept refining PDF or Image
+  - renamed `ocr_page_contents_from_pdf` to `extract_page_contents_from_pdf`
+  - renamed `ocr_page_contents_and_views_from_pdf` to `extract_page_contents_and_views_from_pdf`
+  - introduced model settings and presets for extract models like we had for LLMs
+  - renamed `ocr_model` to `model` for choice of model, preset, or explicit setting and introduced `base_ocr_mistral` as an alias to `mistral-ocr`
+
+- **PipeLLM** field renames
+  - image inputs must now be tagged in the prompt like all other inputs; you can just drop their names at the beginning or end of the prompt, or you can reference them in meaningful sentences to guide the Visual LLM, e.g. "Analyze the colors in $some_photo and the shapes in $some_painting." 
+  - renamed `prompt_template` field to `prompt`
+  - renamed `llm` field to `model`
+  - renamed `llm_to_structure` field to `model_to_structure`
+
+- **PipeImgGen** field renames
+  - renamed `img_gen` field to `model` for choice of model, preset, or explicit setting
+  - removed some technical settings such as `nb_steps` from the pipe attributes, instead you can set these as model settings or model presets
+  - introduced model settings and presets for image generation models like we had for LLMs
+
+- **PipeCondition** field renames
+  - renamed `pipe_map` to `outcomes`
+  - renamed `default_pipe_code` to `default_outcome` and it's now a required field, because we need to know what to do if the expression doesn't match any key in the outcomes map; if you don't know what to do in that case, then it's a failure and you can use the `fail` value
+
+- **Configuration file changes** (`.pipelex/` directory)
+  - Renamed parameter `llm_handle` to `model` across all LLM presets in deck files
+  - Renamed parameter `img_gen_handle` to `model` across all image generation presets in deck files
+  - Renamed parameter `ocr_handle` to `model` in extraction presets
+  - Renamed `ocr` section to `extract` throughout configuration files
+  - Renamed `ocr_config` to `extract_config` in `pipelex.toml`
+  - Renamed `base_ocr_pypdfium2` to `base_extract_pypdfium2`
+  - Renamed `is_auto_setup_preset_ocr` to `is_auto_setup_preset_extract`
+  - Renamed `nb_ocr_pages` to `nb_extract_pages`
+  - Updated pytest marker from 'ocr' to 'extract'
 
 ### Added
+ - Added `cheap-gpt` model alias for `gpt-4o-mini`
+ - Added `cheap_llm_for_vision` preset using `gemini-2.5-flash-lite`
+ - Added `llm_for_testing_vision` and `llm_for_testing_vision_structured` presets for vision testing
+ - Added `is_dump_text_prompts_enabled` and `is_dump_response_text_enabled` configuration flags to have the console display everything that goes in and out of the LLMs
+ - Added `generic_templates` section in `llm_config` with structure extraction prompts
+ - Added useful error messages with migration configuration maps pin-pointing the fields to rename for config and plx files
+ - Added improved error message for `PipeFunc` when function not found in registry, mentioning `@pipe_func()` decorator requirement since v0.12.0
+ - Added pytest filterwarnings to ignore deprecated class-based config warnings
  - Added `Flow` class that represents the flow of pipe signatures
  - Added `pipe-builder` command `flow` to generate flow view from pipeline brief
  - Added `FlowFactory` class to create Flow from PipelexBundleSpec or PLX files
@@ -26,10 +94,15 @@
  - Added `MissingDependencyError` exception for missing optional dependencies
 
 ### Changed
+ - Replaced package `toml` by `tomli` which is more modern and faster
+ - Updated Gemini 2.0 model from `gemini-2.0-flash-exp` to `gemini-2.0-flash` with new pricing (input: $0.10, output: $0.40 per million tokens)
+ - Updated Gemini 2.5 Series comment from '(when available)' to stable release
+ - Updated `base-claude` from `claude-4-sonnet` to `claude-4.5-sonnet` across all presets
+ - Updated kajson dependency from version `0.3.0` to `0.3.1`
  - Cleanup env example and better explain how to set up keys in README and docs
- - Changed Gemini model configuration from `gemini-2.0-flash-exp` (free tier) to `gemini-2.0-flash` with pricing ($0.10 input, $0.40 output per million tokens)
- - Removed Gemini 1.5 series models (gemini-1.5-pro, gemini-1.5-flash, gemini-1.5-flash-8b) from configuration
  - Changed Gemini routing from `google` backend to `pipelex_inference` backend
+ - **BREAKING:** Split `pipelex.core.stuffs.stuff_content` module into individual files per content type (affects imports: `StructuredContent`, `TextContent`, `ImageContent`, `ListContent`, `PDFContent`, `PageContent`, `NumberContent`, `HtmlContent`, `MermaidContent`, `TextAndImagesContent`)
+ - **BREAKING:** Renamed package `pipelex.pipe_works` to `pipelex.pipe_run` and moved `PipeRunParams` classes into it
  - Renamed `ConceptProviderAbstract` to `ConceptLibraryAbstract`
  - Renamed `DomainProviderAbstract` to `DomainLibraryAbstract`
  - Renamed `PipeProviderAbstract` to `PipeLibraryAbstract`
@@ -43,12 +116,13 @@
  - Changed `PipeLLM` validation to check all inputs are in required variables
  - Updated `LLMPromptSpec` to handle image collections (lists/tuples) in addition to single images
  - Changed Mermaid diagram URL generation from `/img/` to `/svg/` endpoint
- - Updated kajson dependency from 0.3.0 to 0.3.1
  - Changed `PipeLLMPromptTemplate.make_llm_prompt()` to private method `_make_llm_prompt()`
  - Updated pipe-builder prompts to include concept specs for better context
  - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
  - Changed exception base class from `PipelexError` to `PipelexException` throughout codebase
  - Updated Makefile pyright target to use `--pythonpath` flag correctly
+ - Updated PipeFunc documentation to reflect `@pipe_func()` decorator requirement and auto-discovery from anywhere in project
+ - Added warnings about module-level code execution during auto-discovery to PipeFunc and StructuredContent documentation
 
 ### Fixed
  - Fixed Makefile target `pyright` to use correct pythonpath flag
@@ -59,12 +133,17 @@
  - Updated README badge URL to point to main branch instead of feature/pipe-builder branch
 
 ### Removed
+ - Removed centralized `pipelex_libraries` folder system and `pipelex init libraries` command
+ - Removed config path parameters from `Pipelex.make()` (`relative_config_folder_path`, `config_folder_path`, `from_file`)
+ - Removed Gemini 1.5 series models: `gemini-1.5-pro`, `gemini-1.5-flash`, and `gemini-1.5-flash-8b`
+ - Removed `base_templates.toml` file (generic prompts moved to `pipelex.toml`)
  - Removed `gpt-5-mini` from possible models in pipe-builder
  - Removed useless functions in `LLMJobFactory`: `make_llm_job_from_prompt_factory()`, `make_llm_job_from_prompt_template()`, `make_llm_job_from_prompt_contents()`
  - Removed `add_or_update_pipe()` method from PipeLibrary
  - Removed `get_optional_library_manager()` method from PipelexHub
  - Removed `get_optional_domain_provider()` and `get_optional_concept_provider()` methods from hub
  - Removed unused test fixtures (apple, cherry, blueberry, concept_provider, pretty) from conftest.py
+ - Removed some Vision/Image description pipes from the base library, because we doubt they were useful as they were
 
 ## [v0.11.0] - 2025-10-01
 

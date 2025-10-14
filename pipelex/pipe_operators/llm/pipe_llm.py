@@ -256,11 +256,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
 
         the_content: StuffContent
-        log.debug(f"output_concept.structure_class_name: {output_concept.structure_class_name}")
-        log.debug(f"TextContent.__class__.__name__: {TextContent.__class__.__name__}")
-        log.debug(f"is_multiple_output: {is_multiple_output}")
         if output_concept.structure_class_name == "TextContent" and not is_multiple_output:
-            log.info(f"PipeLLM generating a single text output: {self.__class__.__name__}_gen_text")
             llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
                 output_concept_string=output_concept.concept_string,
                 context_provider=working_memory,

@@ -21,6 +21,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
+DRY_BASE_64_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC"
+
 
 class ContentGeneratorDry(ContentGeneratorProtocol):
     """This class is used to generate mock content for testing purposes.
@@ -33,7 +35,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_llm_text(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_llm_text(
         self,
         job_metadata: JobMetadata,
         llm_setting_main: LLMSetting,
@@ -46,7 +48,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_object_direct(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_object_direct(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -70,7 +72,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_text_then_object(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_text_then_object(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -91,7 +93,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_object_list_direct(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_object_list_direct(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -114,7 +116,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_text_then_object_list(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_text_then_object_list(
         self,
         job_metadata: JobMetadata,
         object_class: type[BaseModelTypeVar],
@@ -136,7 +138,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_single_image(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_single_image(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,
@@ -156,7 +158,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
     @override
     @update_job_metadata
-    async def make_image_list(  # pyright: ignore[reportIncompatibleMethodOverride]
+    async def make_image_list(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,
@@ -222,7 +224,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                     extracted_images=[],
                     page_view=ExtractedImageFromPage(
                         image_id=f"page_view_{page_index}",
-                        base_64="",
+                        base_64=DRY_BASE_64_IMAGE,
                         caption="DRY RUN: OCR text",
                     ),
                 )

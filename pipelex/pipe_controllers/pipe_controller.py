@@ -12,7 +12,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeController(PipeAbstract):
-    category: Literal["PipeController"] = "PipeController"
+    pipe_category: Literal["PipeController"] = "PipeController"
 
     @property
     def class_name(self) -> str:

@@ -11,17 +11,12 @@ This example provides a comprehensive pipeline for processing invoices. It takes
 The `process_invoice` pipeline is a complete workflow for invoice processing.
 
 ```python
-async def process_expense_report() -> ListContent[Invoice]:
-    invoice_pdf_path = "assets/invoice_extractor/invoice_1.pdf"
-
-    # Create Stuff objects
-    working_memory = WorkingMemoryFactory.make_from_pdf(
-        pdf_url=invoice_pdf_path,
-        name="invoice_pdf",
-    )
+async def process_invoice(pdf_url: str) -> ListContent[Invoice]:
     pipe_output = await execute_pipeline(
         pipe_code="process_invoice",
-        working_memory=working_memory,
+        input_memory={
+            "document": PDFContent(url=pdf_url),
+        },
     )
 
     return pipe_output.main_stuff_as_list(item_type=Invoice)
@@ -62,28 +57,31 @@ class Invoice(StructuredContent):
 The entire workflow is defined in a PLX file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.plx`:
 
 ```plx
-# The main pipeline, a sequence of steps
 [pipe.process_invoice]
 type = "PipeSequence"
 description = "Process relevant information from an invoice"
-inputs = { invoice_pdf = "PDF" }
+inputs = { document = "PDF" }
 output = "Invoice"
 steps = [
-    # First, run OCR on the PDF
     { pipe = "extract_text_from_image", result = "invoice_pages" },
-    # Then, run the invoice extraction on each page
     { pipe = "extract_invoice", batch_over = "invoice_pages", batch_as = "invoice_page", result = "invoice" },
 ]
 
-# A sub-pipeline that uses an LLM to extract the data
+[pipe.extract_text_from_image]
+type = "PipeExtract"
+description = "Extract page contents from an image"
+inputs = { document = "PDF" }
+output = "Page"
+page_views = true
+model = "base_extract_mistral"
+
 [pipe.extract_invoice_data]
 type = "PipeLLM"
 description = "Extract invoice information from an invoice text transcript"
-inputs = { "invoice_page.page_view" = "Page", invoice_details = "InvoiceDetails" }
+inputs = { "invoice_page.page_view" = "Image", invoice_details = "InvoiceDetails", invoice_page = "Page" }
 output = "Invoice"
-# The output is constrained to the "Invoice" model
-model = "llm_to_extract_invoice" 
-prompt_template = """
+model = "llm_to_extract_invoice"
+prompt = """
 Extract invoice information from this invoice:
 
 The category of this invoice is: $invoice_details.category.
@@ -91,7 +89,8 @@ The category of this invoice is: $invoice_details.category.
 @invoice_page.text_and_images.text.text
 """
 ```
-This shows how a complex workflow, including OCR and LLM calls, can be defined in a simple, readable format. The `model = "llm_to_extract_invoice"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
+
+This shows how a complex workflow, including text extraction with `PipeExtract` and LLM calls, can be defined in a simple, readable format. The `model = "llm_to_extract_invoice"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
 
 ## The Pipeline Flowchart
 

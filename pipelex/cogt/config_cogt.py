@@ -65,7 +65,7 @@ class InferenceConfig(ConfigModel):
         return f"{self.inference_config_path}/backends/{backend_name}.toml"
 
     def get_model_deck_paths(self) -> list[str]:
-        """Get all LLM deck TOML file paths sorted alphabetically."""
+        """Get all Model deck TOML file paths sorted alphabetically."""
         model_deck_paths = [
             str(path)
             for path in find_files_in_dir(

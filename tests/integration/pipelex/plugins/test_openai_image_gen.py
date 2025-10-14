@@ -4,7 +4,7 @@ from pipelex.cogt.exceptions import ImgGenGenerationError
 from pipelex.hub import get_models_manager
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
+from pipelex.tools.misc.base_64_utils import save_base_64_str_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from tests.conftest import TEST_OUTPUTS_DIR
 from tests.integration.pipelex.test_data import ImageGenTestCases
@@ -51,4 +51,4 @@ class TestImgGenByOpenAIGpt:
                 extension="png",
                 avoid_suffix_if_possible=True,
             )
-            save_base64_to_binary_file(b64=image_base64, file_path=img_path)
+            save_base_64_str_to_binary_file(base_64_str=image_base64, file_path=img_path)

@@ -20,14 +20,26 @@ def empty_list_factory_of(_: type[T]) -> Callable[[], list[T]]:
     return _factory
 
 
-def format_pydantic_validation_error(exc: ValidationError) -> str:
-    """Format a Pydantic ValidationError into a readable string with detailed error information.
+class PydanticValidationErrorAnalysis(BaseModel):
+    error_msg: str
+
+    missing_fields: list[str]
+    extra_fields: list[str]
+    type_errors: list[str]
+    value_errors: list[str]
+    enum_errors: list[str]
+    union_tag_errors: list[str]
+    model_type_errors: list[str]
+
+
+def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidationErrorAnalysis:
+    """Analyze a Pydantic ValidationError into a readable string with detailed error information.
 
     Args:
         exc: The Pydantic ValidationError exception
 
     Returns:
-        A formatted string containing categorized validation errors
+        A PydanticValidationErrorAnalysis object containing categorized validation errors
 
     """
     error_msg = "Validation error(s):"
@@ -60,27 +72,49 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
 
     # Add each type of error to the message if present
     if missing_fields:
-        error_msg += f"\nMissing required fields: {missing_fields}"
+        error_msg += f"\n\nMissing required fields: {missing_fields}"
     if extra_fields:
-        error_msg += f"\nExtra forbidden fields: {extra_fields}"
+        error_msg += f"\n\nExtra forbidden fields: {extra_fields}"
     if type_errors:
-        error_msg += f"\nType errors: {type_errors}"
+        error_msg += f"\n\nType errors: {type_errors}"
     if value_errors:
-        error_msg += f"\nValue errors: {value_errors}"
+        error_msg += f"\n\nValue errors: {value_errors}"
     if enum_errors:
-        error_msg += f"\nEnum errors: {enum_errors}"
+        error_msg += f"\n\nEnum errors: {enum_errors}"
     if union_tag_errors:
-        error_msg += f"\nUnion discriminator errors: {union_tag_errors}"
+        error_msg += f"\n\nUnion discriminator errors: {union_tag_errors}"
     if model_type_errors:
-        error_msg += f"\nModel type errors: {model_type_errors}"
+        error_msg += f"\n\nModel type errors: {model_type_errors}"
 
     # If none of the specific error types were found, add the raw error messages
     if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, union_tag_errors, model_type_errors]):
-        error_msg += "\nOther validation errors:"
+        error_msg += "\n\nOther validation errors:"
         for err in exc.errors():
             error_msg += f"\n{'.'.join(map(str, err['loc']))}: {err['type']}: {err['msg']}"
 
-    return error_msg
+    return PydanticValidationErrorAnalysis(
+        error_msg=error_msg,
+        missing_fields=missing_fields,
+        extra_fields=extra_fields,
+        type_errors=type_errors,
+        value_errors=value_errors,
+        enum_errors=enum_errors,
+        union_tag_errors=union_tag_errors,
+        model_type_errors=model_type_errors,
+    )
+
+
+def format_pydantic_validation_error(exc: ValidationError) -> str:
+    """Format a Pydantic ValidationError into a readable string with detailed error information.
+
+    Args:
+        exc: The Pydantic ValidationError exception
+
+    Returns:
+        A formatted string containing categorized validation errors
+
+    """
+    return analyze_pydantic_validation_error(exc).error_msg
 
 
 def convert_strenum_to_str(

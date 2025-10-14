@@ -17,16 +17,16 @@ from pipelex.exceptions import PipelexCLIError
 class TestInitCmd:
     def test_do_init_config_copies_all_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories
-        template_dir = tmp_path / "config_template"
-        template_dir.mkdir()
-        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        kit_configs_dir = tmp_path / "kit" / "configs"
+        kit_configs_dir.mkdir(parents=True)
+        (kit_configs_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
 
-        # Mock config manager
+        # Mock get_configs_dir and config manager
+        mocker.patch("pipelex.cli.commands.init_cmd.get_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_root_dir = str(tmp_path)
         mock_config_manager.pipelex_config_dir = str(target_dir)
 
         mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
@@ -41,18 +41,18 @@ class TestInitCmd:
 
     def test_do_init_config_skips_existing_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories with existing file
-        template_dir = tmp_path / "config_template"
-        template_dir.mkdir()
-        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
-        (template_dir / "new_file.toml").write_text("[new]\nconfig = 'value'")
+        kit_configs_dir = tmp_path / "kit" / "configs"
+        kit_configs_dir.mkdir(parents=True)
+        (kit_configs_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        (kit_configs_dir / "new_file.toml").write_text("[new]\nconfig = 'value'")
 
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
         (target_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '0.9'")
 
-        # Mock config manager
+        # Mock get_configs_dir and config manager
+        mocker.patch("pipelex.cli.commands.init_cmd.get_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_root_dir = str(tmp_path)
         mock_config_manager.pipelex_config_dir = str(target_dir)
 
         mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
@@ -75,17 +75,17 @@ class TestInitCmd:
 
     def test_do_init_config_reset_overwrites_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories with existing file
-        template_dir = tmp_path / "config_template"
-        template_dir.mkdir()
-        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        kit_configs_dir = tmp_path / "kit" / "configs"
+        kit_configs_dir.mkdir(parents=True)
+        (kit_configs_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
         (target_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '0.9'")
 
-        # Mock config manager
+        # Mock get_configs_dir and config manager
+        mocker.patch("pipelex.cli.commands.init_cmd.get_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_root_dir = str(tmp_path)
         mock_config_manager.pipelex_config_dir = str(target_dir)
 
         mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
@@ -105,11 +105,11 @@ class TestInitCmd:
 
     def test_do_init_config_nested_directory_structure(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup complex nested structure
-        template_dir = tmp_path / "config_template"
-        template_dir.mkdir()
-        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        kit_configs_dir = tmp_path / "kit" / "configs"
+        kit_configs_dir.mkdir(parents=True)
+        (kit_configs_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
-        inference_dir = template_dir / "inference"
+        inference_dir = kit_configs_dir / "inference"
         inference_dir.mkdir()
         (inference_dir / "backends.toml").write_text("[backends]\nconfig = 'value'")
 
@@ -120,9 +120,9 @@ class TestInitCmd:
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
 
-        # Mock config manager
+        # Mock get_configs_dir and config manager
+        mocker.patch("pipelex.cli.commands.init_cmd.get_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_root_dir = str(tmp_path)
         mock_config_manager.pipelex_config_dir = str(target_dir)
 
         mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
@@ -144,16 +144,16 @@ class TestInitCmd:
 
     def test_do_init_config_handles_permission_error(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories
-        template_dir = tmp_path / "config_template"
-        template_dir.mkdir()
-        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        kit_configs_dir = tmp_path / "kit" / "configs"
+        kit_configs_dir.mkdir(parents=True)
+        (kit_configs_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
 
-        # Mock config manager
+        # Mock get_configs_dir and config manager
+        mocker.patch("pipelex.cli.commands.init_cmd.get_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_root_dir = str(tmp_path)
         mock_config_manager.pipelex_config_dir = str(target_dir)
 
         mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
@@ -167,15 +167,15 @@ class TestInitCmd:
 
     def test_do_init_config_creates_target_directory(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup template directory only
-        template_dir = tmp_path / "config_template"
-        template_dir.mkdir()
-        (template_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
+        kit_configs_dir = tmp_path / "kit" / "configs"
+        kit_configs_dir.mkdir(parents=True)
+        (kit_configs_dir / "pipelex.toml").write_text("[tool.pipelex]\nversion = '1.0'")
 
         target_dir = tmp_path / ".pipelex"  # Don't create this
 
-        # Mock config manager
+        # Mock get_configs_dir and config manager
+        mocker.patch("pipelex.cli.commands.init_cmd.get_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_root_dir = str(tmp_path)
         mock_config_manager.pipelex_config_dir = str(target_dir)
 
         mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)

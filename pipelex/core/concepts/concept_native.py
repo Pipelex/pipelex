@@ -14,6 +14,7 @@ class NativeConceptCode(StrEnum):
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
     LLM_PROMPT = "LlmPrompt"
+    IMG_GEN_PROMPT = "ImgGenPrompt"
     PAGE = "Page"
     ANYTHING = "Anything"
 
@@ -26,7 +27,7 @@ class NativeConceptCode(StrEnum):
         return f"{self.value}Content"
 
     @classmethod
-    def is_text(cls, concept_code: str) -> bool:
+    def is_text_concept(cls, concept_code: str) -> bool:
         try:
             enum_value = NativeConceptCode(concept_code)
         except ValueError:
@@ -42,6 +43,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.LLM_PROMPT
+                | NativeConceptCode.IMG_GEN_PROMPT
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
             ):

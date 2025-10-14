@@ -42,7 +42,7 @@ Just state what it is in a single sentence.
 type = "PipeLLM"
 description = "Imagine a fantasy scene including products of nature"
 inputs = { product_of_nature = "ProductOfNature" }
-output = "images.ImgGenPrompt"
+output = "ImgGenPrompt"
 prompt = """
 Imagine a fantasy scene including the following products of nature:
 
@@ -54,7 +54,7 @@ Keep it short and concise, just one sentence.
 [pipe.imagine_nature_scene_of_original_power_rangers_colors]
 type = "PipeSequence"
 description = "Imagine nature scenes of Power Rangers colors"
-output = "images.ImgGenPrompt"
+output = "ImgGenPrompt"
 steps = [
     { pipe = "original_power_ranger_colors", result = "color" },
     { pipe = "imagine_nature_product", result = "product_of_nature" },
@@ -64,7 +64,7 @@ steps = [
 [pipe.imagine_nature_scene_of_alltime_power_rangers_colors]
 type = "PipeSequence"
 description = "Imagine nature scenes of Power Rangers colors"
-output = "images.ImgGenPrompt"
+output = "ImgGenPrompt"
 steps = [
     { pipe = "alltime_power_ranger_colors", result = "color", multiple_output = true },
     { pipe = "imagine_nature_product", result = "product_of_nature" },

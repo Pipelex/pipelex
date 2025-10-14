@@ -4,7 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.tools.typing.module_inspector import ModuleFileError, find_classes_in_module, import_module_from_file
+from pipelex.tools.typing.module_inspector import (
+    ModuleFileError,
+    find_class_names_in_file,
+    find_classes_in_module,
+    import_module_from_file,
+    import_module_from_file_if_has_classes,
+)
 
 
 class TestModuleFileError:
@@ -284,3 +290,171 @@ class TestFindClassesInModule:
         assert BaseClass in classes
         assert LocalSubClass in classes
         assert ImportedSubClass in classes
+
+
+class TestFindClassNamesInFile:
+    def test_find_all_class_names(self, tmp_path: Path):
+        """Test finding all class names without filtering."""
+        test_file_path = tmp_path / "test_classes.py"
+        test_file_path.write_text("""
+class ClassA:
+    pass
+
+class ClassB:
+    pass
+
+def some_function():
+    pass
+""")
+        class_names = find_class_names_in_file(str(test_file_path))
+        assert len(class_names) == 2
+        assert "ClassA" in class_names
+        assert "ClassB" in class_names
+
+    def test_find_class_names_with_base_class_filter(self, tmp_path: Path):
+        """Test finding classes that inherit from specific base classes."""
+        test_file_path = tmp_path / "test_inheritance.py"
+        test_file_path.write_text("""
+class BaseContent:
+    pass
+
+class StructuredContent:
+    pass
+
+class MyContent(StructuredContent):
+    pass
+
+class OtherContent(BaseContent):
+    pass
+
+class UnrelatedClass:
+    pass
+""")
+        class_names = find_class_names_in_file(
+            str(test_file_path),
+            base_class_names=["StructuredContent"],
+        )
+        assert len(class_names) == 1
+        assert "MyContent" in class_names
+        assert "OtherContent" not in class_names
+        assert "UnrelatedClass" not in class_names
+
+    def test_find_class_names_with_qualified_base_class(self, tmp_path: Path):
+        """Test finding classes with qualified base class names."""
+        test_file_path = tmp_path / "test_qualified.py"
+        test_file_path.write_text("""
+from pipelex.core.stuffs.structured_content import StructuredContent
+
+class MyContent(StructuredContent):
+    pass
+
+class UnrelatedClass:
+    pass
+""")
+        class_names = find_class_names_in_file(
+            str(test_file_path),
+            base_class_names=["StructuredContent"],
+        )
+        assert len(class_names) == 1
+        assert "MyContent" in class_names
+
+    def test_find_class_names_empty_file(self, tmp_path: Path):
+        """Test with file containing no classes."""
+        test_file_path = tmp_path / "test_empty.py"
+        test_file_path.write_text("""
+def some_function():
+    pass
+
+variable = 42
+""")
+        class_names = find_class_names_in_file(str(test_file_path))
+        assert len(class_names) == 0
+
+    def test_find_class_names_non_python_file_raises_error(self, tmp_path: Path):
+        """Test that non-Python file raises error."""
+        test_file_path = tmp_path / "test.txt"
+        test_file_path.write_text("Not Python")
+        with pytest.raises(ModuleFileError) as excinfo:
+            find_class_names_in_file(str(test_file_path))
+        assert "is not a Python file" in str(excinfo.value)
+
+    def test_find_class_names_nonexistent_file_raises_error(self, tmp_path: Path):
+        """Test that nonexistent file raises error."""
+        nonexistent_file_path = tmp_path / "nonexistent.py"
+        with pytest.raises(ModuleFileError) as excinfo:
+            find_class_names_in_file(str(nonexistent_file_path))
+        assert "does not exist" in str(excinfo.value)
+
+
+class TestImportModuleFromFileIfHasClasses:
+    @pytest.fixture(autouse=True)
+    def cleanup_sys_modules(self):
+        """Clean up sys.modules entries after each test."""
+        yield
+        # Clean up sys.modules entries for test modules
+        modules_to_remove = [name for name in sys.modules if "test_module_" in name or name == "test_module"]
+        for module_name in modules_to_remove:
+            del sys.modules[module_name]
+
+    def test_import_file_with_matching_classes(self, tmp_path: Path):
+        """Test that file with matching classes is imported."""
+        test_file_path = tmp_path / "test_module_with_class.py"
+        test_file_path.write_text("""
+class StructuredContent:
+    pass
+
+class MyContent(StructuredContent):
+    value = "imported"
+""")
+        module = import_module_from_file_if_has_classes(
+            str(test_file_path),
+            base_class_names=["StructuredContent"],
+        )
+        assert module is not None
+        assert hasattr(module, "MyContent")
+        assert module.MyContent.value == "imported"
+
+    def test_skip_file_without_matching_classes(self, tmp_path: Path):
+        """Test that file without matching classes is not imported."""
+        test_file_path = tmp_path / "test_module_no_match.py"
+        # Add code that would execute and cause side effects
+        test_file_path.write_text("""
+print("This should not execute!")
+
+class UnrelatedClass:
+    pass
+
+def some_function():
+    pass
+""")
+        module = import_module_from_file_if_has_classes(
+            str(test_file_path),
+            base_class_names=["StructuredContent"],
+        )
+        assert module is None
+        # Verify the module was NOT loaded into sys.modules
+        assert not any("test_module_no_match" in name for name in sys.modules)
+
+    def test_import_all_files_with_classes_when_no_filter(self, tmp_path: Path):
+        """Test that any file with classes is imported when no filter is provided."""
+        test_file_path = tmp_path / "test_module_any_class.py"
+        test_file_path.write_text("""
+class AnyClass:
+    value = "any_class"
+""")
+        module = import_module_from_file_if_has_classes(str(test_file_path))
+        assert module is not None
+        assert hasattr(module, "AnyClass")
+        assert module.AnyClass.value == "any_class"
+
+    def test_skip_file_with_no_classes_when_no_filter(self, tmp_path: Path):
+        """Test that file with no classes is skipped even without filter."""
+        test_file_path = tmp_path / "test_module_no_classes.py"
+        test_file_path.write_text("""
+def some_function():
+    pass
+
+variable = 42
+""")
+        module = import_module_from_file_if_has_classes(str(test_file_path))
+        assert module is None

@@ -3,12 +3,15 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMPromptFactoryError, LLMPromptTemplateInputsError
+from pipelex.cogt.exceptions import LLMPromptTemplateInputsError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 from pipelex.config import get_config
+from pipelex.hub import get_content_generator
 from pipelex.tools.misc.string_utils import is_none_or_has_text
 
 
@@ -23,10 +26,6 @@ def make_empty_prompt() -> LLMPrompt:
 class LLMPromptTemplate(LLMPromptFactoryAbstract):
     proto_prompt: LLMPrompt = make_empty_prompt()
     base_template_inputs: LLMPromptTemplateInputs = LLMPromptTemplateInputs()
-
-    # fields kept for reference and debugging only (they have no effect)
-    source_system_template_name: str | None = None
-    source_user_template_name: str | None = None
 
     @override
     async def make_llm_prompt_from_args(
@@ -48,7 +47,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
             user_images = [arguments_dict.pop("user_image")]
         is_user_images_append: bool | None = arguments_dict.pop("is_user_images_append", None)
 
-        return self._make_llm_prompt(
+        return await self._make_llm_prompt(
             system_text=system_text,
             user_text=user_text,
             user_images=user_images,
@@ -56,7 +55,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
             template_inputs=LLMPromptTemplateInputs(root=arguments_dict),
         )
 
-    def _make_llm_prompt(
+    async def _make_llm_prompt(
         self,
         system_text: str | None = None,
         user_text: str | None = None,
@@ -91,25 +90,25 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
 
         # input variables can be applied to prompt texts used as templates
         if llm_prompt.system_text:
-            try:
-                # TODO: use jinja2 templating here
-                llm_prompt.system_text = llm_prompt.system_text.format(**all_template_inputs.root)
-            except KeyError as exc:
-                error_msg = f"Could not apply inputs to system_text. KeyError = {exc}. system_text = '{llm_prompt.system_text}'"
-                if template_name := self.source_system_template_name:
-                    error_msg = f"Error using template named '{template_name}': {error_msg}.\n\n Available inputs: {all_template_inputs.list_keys()}"
-                log.error(error_msg)
-                raise LLMPromptFactoryError(message=error_msg) from exc
+            llm_prompt.system_text = await get_content_generator().make_templated_text(
+                context=all_template_inputs.root,
+                template=llm_prompt.system_text,
+                templating_style=TemplatingStyle(
+                    tag_style=TagStyle.XML,
+                    text_format=TextFormat.MARKDOWN,
+                ),
+                template_category=TemplateCategory.LLM_PROMPT,
+            )
         if llm_prompt.user_text:
-            try:
-                # TODO: use jinja2 templating here
-                llm_prompt.user_text = llm_prompt.user_text.format(**all_template_inputs.root)
-            except KeyError as exc:
-                error_msg = f"Could not apply inputs to user_text. KeyError = {exc}. user_text = '{llm_prompt.user_text}'"
-                if template_name := self.source_user_template_name:
-                    error_msg = f"Error using template named '{template_name}': {error_msg}.\n\n Available inputs: {all_template_inputs.list_keys()}"
-                log.error(error_msg)
-                raise LLMPromptFactoryError(message=error_msg) from exc
+            llm_prompt.user_text = await get_content_generator().make_templated_text(
+                context=all_template_inputs.root,
+                template=llm_prompt.user_text,
+                templating_style=TemplatingStyle(
+                    tag_style=TagStyle.XML,
+                    text_format=TextFormat.MARKDOWN,
+                ),
+                template_category=TemplateCategory.LLM_PROMPT,
+            )
 
         return llm_prompt
 

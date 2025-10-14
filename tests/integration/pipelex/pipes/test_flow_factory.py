@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.libraries.pipelines.builder.flow_factory import FlowFactory
+from pipelex.builder.flow_factory import FlowFactory
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -70,8 +70,8 @@ class TestFlowFactory:
             assert len(flow.flow_elements) > 0
 
             # Log some details about what we found
-            controller_count = sum(1 for pipe in flow.flow_elements.values() if pipe.category == "PipeController")
-            operator_count = sum(1 for pipe in flow.flow_elements.values() if pipe.category == "PipeSignature")
+            controller_count = sum(1 for pipe in flow.flow_elements.values() if pipe.pipe_category == "PipeController")
+            operator_count = sum(1 for pipe in flow.flow_elements.values() if pipe.pipe_category == "PipeSignature")
 
             log.info(f"flow contains {len(flow.flow_elements)} pipes: {controller_count} controllers, {operator_count} operators (as signatures)")
 
@@ -111,7 +111,7 @@ class TestFlowFactory:
         # Find an operator pipe (LLM pipe) - converted to signature
         operator_pipe = flow.flow_elements.get("summarize_discord_channel_update_for_new_members")
         assert operator_pipe is not None
-        assert operator_pipe.category == "PipeSignature"
+        assert operator_pipe.pipe_category == "PipeSignature"
         assert operator_pipe.type == "PipeLLM"
 
         # Verify it has the signature properties

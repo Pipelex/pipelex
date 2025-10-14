@@ -5,7 +5,7 @@ import tomlkit
 from pytest_mock import MockerFixture
 
 from pipelex.language.plx_config import PlxConfig, PlxConfigForConcepts, PlxConfigForPipes, PlxConfigInlineTables, PlxConfigStrings
-from pipelex.language.plx_factory import PlxFactory
+from pipelex.language.plx_factory import PIPE_CATEGORY_FIELD_KEY, PlxFactory
 
 
 class TestPlxFactoryUnit:
@@ -206,13 +206,13 @@ class TestPlxFactoryUnit:
         """Test that category field is skipped."""
         _mock_config = mocker.patch.object(PlxFactory, "_plx_config", return_value=mock_plx_config)
 
-        mapping = {"field1": "value1", "category": "should_be_skipped", "field2": "value2"}
+        mapping = {"field1": "value1", PIPE_CATEGORY_FIELD_KEY: "should_be_skipped", "field2": "value2"}
         result = PlxFactory.convert_mapping_to_table(mapping)
 
         assert isinstance(result, tomlkit.items.Table)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
         assert "field1" in result
         assert "field2" in result
-        assert "category" not in result
+        assert PIPE_CATEGORY_FIELD_KEY not in result
 
     def test_add_spaces_to_inline_tables_simple(self):
         """Test adding spaces to simple inline tables."""

@@ -188,7 +188,7 @@ description = "Domain with invalid array syntax"
 [concept]
 TestConcept = ["Unclosed array"
 """,
-    ValidationError,
+    PLXDecodeError,
 )
 INVALID_ARRAY_SYNTAX2 = (
     "invalid_array_syntax",

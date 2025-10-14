@@ -13,15 +13,11 @@ There are two main ways to inject custom implementations:
 ```python
 from pipelex import Pipelex
 
-pipelex = Pipelex(
-    config_dir_path="./pipelex_libraries",
+pipelex = Pipelex.make(
     template_provider=MyTemplateProvider(),
     pipeline_tracker=MyPipelineTracker(),
     activity_manager=MyActivityManager(),
-    reporting_delegate=MyReportingDelegate()
-)
-
-pipelex.setup(
+    reporting_delegate=MyReportingDelegate(),
     secrets_provider=MySecretsProvider(),
     content_generator=MyContentGenerator(),
     pipe_router=MyPipeRouter()

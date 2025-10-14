@@ -19,7 +19,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
 
@@ -203,10 +203,9 @@ class PipeSequence(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        if pipe_run_params.run_mode != PipeRunMode.DRY:
+        if not pipe_run_params.run_mode.is_dry:
             msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
             raise PipeRunParamsError(msg)
-        log.debug(f"PipeSequence._dry_run_controller_pipe() called with {self.code=} {pipe_run_params=}")
         # Verify the output of this pipe is matching the output of the last step.
         concept_string_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output.concept_string
         if self.output.concept_string != concept_string_of_last_step:
