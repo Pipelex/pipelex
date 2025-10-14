@@ -95,11 +95,6 @@ class LibraryManager(LibraryManagerAbstract):
         self.teardown()
         self.setup()
 
-    def _get_pipeline_library_dirs(self) -> list[Path]:
-        # Scan the entire project root for .plx files
-        project_root = Path(config_manager.local_root_dir)
-        return [project_root]
-
     def _find_plx_files_in_dir(self, dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
         """Find PLX files matching a pattern in a directory, excluding problematic directories.
 
@@ -128,7 +123,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         return filtered_files
 
-    def _get_pipelex_plx_files_from_dirs(self, dirs: list[Path]) -> list[Path]:
+    def _get_pipelex_plx_files_from_dirs(self, dirs: set[Path]) -> list[Path]:
         """Get all valid Pipelex PLX files from the given directories."""
         all_plx_paths: list[Path] = []
         seen_files: set[str] = set()  # Track by absolute path to avoid duplicates
@@ -256,7 +251,13 @@ class LibraryManager(LibraryManagerAbstract):
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> None:
-        dirs_to_use = library_dirs or self._get_pipeline_library_dirs()
+        # dirs_to_use = library_dirs or [Path(config_manager.local_root_dir)]
+        dirs_to_use: set[Path] = set()
+        if library_dirs:
+            dirs_to_use.update(library_dirs)
+        else:
+            dirs_to_use.add(Path(config_manager.local_root_dir))
+            dirs_to_use.add(Path(config_manager.pipelex_root_dir))
 
         valid_plx_paths: list[Path]
         if library_file_paths:

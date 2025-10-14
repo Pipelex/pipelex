@@ -49,6 +49,7 @@ def _demote_headings(md_content: str, levels: int) -> str:
     return re.sub(pattern, demote_match, md_content, flags=re.MULTILINE)
 
 
+# TODO: fix bug which makes it not idempotent (because heading 1 gets deleted)
 def build_merged_rules(idx: KitIndex, agent_set: str | None = None) -> str:
     """Build merged agent documentation from ordered files.
 
