@@ -3,13 +3,13 @@ import os
 from configparser import ConfigParser
 from typing import Any
 
-from pipelex.tools.config.config_root import (
+from pipelex.system.configuration.config_root import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
 )
+from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
-from pipelex.tools.runtime_manager import runtime_manager
 
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
@@ -19,7 +19,7 @@ class ConfigError(Exception):
     pass
 
 
-class ConfigManager:
+class ConfigLoader:
     @property
     def is_in_pipelex_config(self) -> bool:
         return os.path.basename(os.getcwd()) == "pipelex"
@@ -222,4 +222,4 @@ class ConfigManager:
         return None
 
 
-config_manager = ConfigManager()
+config_manager = ConfigLoader()

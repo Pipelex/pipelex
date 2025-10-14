@@ -3,7 +3,7 @@ from pathlib import Path
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
-from pipelex.tools.class_registry_utils import ClassRegistryUtils
+from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 
 
 class TestClassRegistryUtilsUnit:
@@ -17,18 +17,18 @@ class TestClassRegistryUtilsUnit:
 
         # Mock the functions at the location where they're imported in ClassRegistryUtils
         mock_import = mocker.patch(
-            "pipelex.tools.class_registry_utils.import_module_from_file",
+            "pipelex.system.registries.class_registry_utils.import_module_from_file",
             return_value=mock_module,
         )
         mock_find = mocker.patch(
-            "pipelex.tools.class_registry_utils.find_classes_in_module",
+            "pipelex.system.registries.class_registry_utils.find_classes_in_module",
             return_value=[str, int],
         )
 
         # Mock the global class registry
         mock_registry = mocker.MagicMock()
         mocker.patch(
-            "pipelex.tools.class_registry_utils.KajsonManager.get_class_registry",
+            "pipelex.system.registries.class_registry_utils.KajsonManager.get_class_registry",
             return_value=mock_registry,
         )
 

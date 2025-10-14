@@ -28,8 +28,8 @@ from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.config.config_root import ConfigRoot
-from pipelex.tools.config.manager import config_manager
+from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 

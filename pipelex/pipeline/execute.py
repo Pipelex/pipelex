@@ -17,7 +17,7 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.environment import get_optional_env
+from pipelex.system.environment import get_optional_env
 
 
 async def execute_pipeline(

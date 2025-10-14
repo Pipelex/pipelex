@@ -2,7 +2,7 @@ from pipelex.cogt.exceptions import LLMConfigError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.plugins.fal.fal_config import FalConfig
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.file_utils import find_files_in_dir
 
 

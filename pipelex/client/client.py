@@ -10,7 +10,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.exceptions import ClientAuthenticationError
 from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
-from pipelex.tools.environment import get_required_env
+from pipelex.system.environment import get_required_env
 
 
 class PipelexClient(PipelexProtocol):

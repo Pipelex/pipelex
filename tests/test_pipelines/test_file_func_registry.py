@@ -3,7 +3,7 @@ from pydantic import Field
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.func_registry import pipe_func
+from pipelex.system.registries.func_registry import pipe_func
 
 
 class FilePath(StructuredContent):

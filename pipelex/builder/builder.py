@@ -42,7 +42,7 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import get_library_manager
 from pipelex.pipe_run.dry_run import dry_run_pipes
-from pipelex.tools.func_registry import pipe_func
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:

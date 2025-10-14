@@ -37,9 +37,9 @@ from pipelex.libraries.library_utils import (
     get_pipelex_package_dir_for_imports,
     get_pipelex_plx_files_from_package,
 )
-from pipelex.tools.class_registry_utils import ClassRegistryUtils
-from pipelex.tools.config.manager import config_manager
-from pipelex.tools.func_registry_utils import FuncRegistryUtils
+from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.types import StrEnum
 
 
@@ -290,7 +290,7 @@ class LibraryManager(LibraryManagerAbstract):
         self._import_pipelex_modules_directly()
 
         # Verify critical functions were registered
-        from pipelex.tools.func_registry import func_registry  # noqa: PLC0415 - intentional local import
+        from pipelex.system.registries.func_registry import func_registry  # noqa: PLC0415 - intentional local import
 
         critical_functions = ["create_concept_spec", "assemble_pipelex_bundle_spec"]
         for func_name in critical_functions:

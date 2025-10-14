@@ -14,9 +14,9 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.config import get_config
+from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path
-from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
 from pipelex.types import Self
 

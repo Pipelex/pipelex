@@ -10,9 +10,9 @@ from pipelex.exceptions import PipelexConfigError, StaticValidationErrorType
 from pipelex.hub import get_required_config
 from pipelex.language.plx_config import PlxConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
+from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
-from pipelex.tools.config.config_model import ConfigModel
-from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.types import StrEnum
 

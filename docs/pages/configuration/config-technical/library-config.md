@@ -169,7 +169,7 @@ Pipelex loads your pipelines in a specific order to ensure dependencies are reso
 For custom functions used in `PipeFunc` operators, add the `@pipe_func()` decorator:
 
 ```python
-from pipelex.tools.func_registry import pipe_func
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
 

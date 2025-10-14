@@ -16,7 +16,7 @@ from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringOrCo
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.func_registry import pipe_func
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
 from pipelex.types import Self, StrEnum
 

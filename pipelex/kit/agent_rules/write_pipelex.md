@@ -713,7 +713,7 @@ The Python function must:
 Functions must be registered in the function registry before use:
 
 ```python
-from pipelex.tools.func_registry import func_registry
+from pipelex.system.registries.func_registry import func_registry
 
 @func_registry.register("my_function_name")
 async def my_custom_function(working_memory: WorkingMemory) -> StuffContent:

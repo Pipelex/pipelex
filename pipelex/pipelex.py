@@ -51,10 +51,10 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
+from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.runtime import runtime_manager
 from pipelex.test_extras.registry_test_models import PipelexTestModels
-from pipelex.tools.config.config_root import ConfigRoot
-from pipelex.tools.func_registry import func_registry
-from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract

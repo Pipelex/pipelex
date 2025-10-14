@@ -3,8 +3,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenPromptError
+from pipelex.system.runtime import ProblemReaction, runtime_manager
 from pipelex.tools.misc.json_utils import json_str
-from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
 
 
 class ImgGenPrompt(BaseModel):

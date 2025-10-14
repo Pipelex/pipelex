@@ -165,7 +165,7 @@ async def my_custom_function(working_memory: WorkingMemory) -> TextContent:
 
 **After:**
 ```python
-from pipelex.tools.func_registry import pipe_func
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
 

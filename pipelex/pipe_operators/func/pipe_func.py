@@ -17,7 +17,7 @@ from pipelex.exceptions import DryRunError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.func_registry import func_registry
+from pipelex.system.registries.func_registry import func_registry
 
 
 class PipeFuncOutput(PipeOutput):

@@ -48,7 +48,7 @@ Here is an example of an eligible function:
 ```python
 # in any Python file in your project (e.g., my_project/custom_functions.py)
 
-from pipelex.tools.func_registry import pipe_func
+from pipelex.system.registries.func_registry import pipe_func
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
 
