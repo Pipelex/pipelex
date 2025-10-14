@@ -194,7 +194,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
     @override
     def generate_context(self) -> dict[str, Any]:
-        # TODO: Add unit tests for this method
         artefact_dict: StuffArtefactDict = {}
         for name, stuff in self.root.items():
             artefact_dict[name] = stuff.make_artefact()
