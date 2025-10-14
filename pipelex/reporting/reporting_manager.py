@@ -7,7 +7,7 @@ from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
 from pipelex.cogt.usage.cost_registry import CostRegistry
-from pipelex.config import ReportingConfig
+from pipelex.config import get_config
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
@@ -27,9 +27,9 @@ class UsageRegistry(RootModel[LLMUsageRegistryRoot]):
 
 
 class ReportingManager(ReportingProtocol):
-    def __init__(self, reporting_config: ReportingConfig):
+    def __init__(self):
+        self._reporting_config = get_config().pipelex.reporting_config
         self._usage_registries: dict[str, UsageRegistry] = {}
-        self._reporting_config = reporting_config
 
     ############################################################
     # Manager lifecycle

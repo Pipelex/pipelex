@@ -115,7 +115,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         self.reporting_delegate: ReportingProtocol
         if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager(reporting_config=get_config().pipelex.reporting_config)
+            self.reporting_delegate = reporting_delegate or ReportingManager()
         else:
             self.reporting_delegate = ReportingNoOp()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
