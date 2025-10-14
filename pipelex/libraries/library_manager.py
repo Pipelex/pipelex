@@ -1,3 +1,5 @@
+import importlib
+import pkgutil
 from importlib.abc import Traversable
 from importlib.resources import files
 from pathlib import Path
@@ -300,6 +302,33 @@ class LibraryManager(LibraryManagerAbstract):
             log.debug(f"Could not convert importlib.resources Traversable to filesystem Path: {exc}")
         return None
 
+    def _import_pipelex_modules_directly(self) -> None:
+        """Import pipelex modules directly to register @pipe_func decorated functions.
+
+        This ensures critical pipelex functions are registered regardless of how pipelex
+        is installed (wheel, source, relative path, etc.).
+
+        Uses pkgutil.walk_packages to auto-discover all pipelex.builder modules.
+        """
+        import pipelex.builder  # noqa: PLC0415 - intentional local import
+
+        try:
+            # Walk all submodules in pipelex.builder to discover @pipe_func decorated functions
+            if hasattr(pipelex.builder, "__path__"):
+                for _importer, modname, _ispkg in pkgutil.walk_packages(
+                    path=pipelex.builder.__path__, prefix="pipelex.builder.", onerror=lambda _: None
+                ):
+                    try:
+                        # Import each module to trigger @pipe_func decorator registration
+                        importlib.import_module(modname)
+                        log.debug(f"Imported {modname} for @pipe_func registration")
+                    except Exception as exc:
+                        log.debug(f"Could not import {modname}: {exc}")
+            else:
+                log.warning("Could not walk pipelex.builder package - no __path__ attribute")
+        except ImportError as exc:
+            log.warning(f"Could not import pipelex.builder package: {exc}")
+
     @override
     def load_libraries(
         self,
@@ -354,9 +383,14 @@ class LibraryManager(LibraryManagerAbstract):
                 require_decorator=True,
             )
 
-        # Import from pipelex package if accessible as filesystem
-        if pipelex_pkg_dir := self._get_pipelex_package_dir_for_imports():
-            log.debug(f"Importing pipelex package modules from: {pipelex_pkg_dir}")
+        # Import from pipelex package
+        # Always directly import critical builder modules first (works in all installation modes)
+        self._import_pipelex_modules_directly()
+
+        # Then try filesystem-based scanning if package is accessible (for completeness)
+        pipelex_pkg_dir = self._get_pipelex_package_dir_for_imports()
+        if pipelex_pkg_dir:
+            log.debug(f"Additionally scanning pipelex package filesystem: {pipelex_pkg_dir}")
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=str(pipelex_pkg_dir),
                 base_class_names=[StructuredContent.__name__],

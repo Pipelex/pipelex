@@ -28,6 +28,7 @@ Other ideas:
 pipelex build pipe "Take a photo as input, and render the opposite of the photo, don't structure anything, use only text content, be super concise"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
+pipelex build pipe "Given an theme, write a Haiku"
 """
 
 
