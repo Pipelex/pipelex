@@ -15,7 +15,7 @@ We tried to group all the renamings we wanted to do which impact our language, s
 
 This is all in the spirit of making Pipelex a declarative language, where you express what you want to do, and the system will figure out how to do it. So our focus inwas to make the Pipelex language easier to understand and use for non-technical users, and at the same time use more consistent and obvious words that developers are used to.
 
-**💡 Pro tip:** To make migration easier, pass the [migration guide](pipelex/kit/migrations/migrate_0.11.0_0.12.0.md) to your favorite SWE agent (Cursor, Claude Code, github copilot, etc.) and let it handle the bulk of the changes!
+**💡 Pro tip:** To make migration easier, pass the [migration guide](https://github.com/PipelexLab/pipelex/blob/main/pipelex/kit/migrations/migrate_0.11.0_0.12.0.md) to your favorite SWE agent (Cursor, Claude Code, github copilot, etc.) and let it handle the bulk of the changes!
 
 - **Removed centralized `pipelex_libraries` folder system**
   - Pipelines are now auto-discovered from anywhere in your project—no special directory required
@@ -23,7 +23,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
   - Custom functions require `@pipe_func()` decorator for auto-discovery
   - Structure classes auto-discovered (must inherit from `StructuredContent`)
   - Configuration stays at repository root in `.pipelex/` directory
-  - See [migration guide](pipelex/kit/migrations/migrate_0.11.0_0.12.0.md) for details on reorganizing your project structure
+  - See [migration guide](https://github.com/PipelexLab/pipelex/blob/main/pipelex/kit/migrations/migrate_0.11.0_0.12.0.md) for details on reorganizing your project structure
 
 - General changes
   - renamed `definition` fields to `description` across all cases

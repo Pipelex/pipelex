@@ -148,6 +148,7 @@ nav:
     - Changelog: changelog.md
     - Tools:
       - CLI: pages/tools/cli.md
+      - Pipe Builder: pages/tools/pipe-builder.md
       - Logging: pages/tools/logging.md
     - Advanced Customizations:
       - Overview: pages/advanced-customization/index.md
