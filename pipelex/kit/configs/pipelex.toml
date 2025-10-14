@@ -47,11 +47,13 @@ default_log_level = "INFO"
 pipelex = "INFO"
 
 [cogt.llm_config]
-is_dump_text_prompts_enabled = true
+# Uncomment any of these to enable dumping the inputs or outputs of text-genration with an LLM
+# is_dump_text_prompts_enabled = true
 # is_dump_response_text_enabled = true
 
 [cogt.llm_config.instructor_config]
-is_dump_kwargs_enabled = true
+# Uncomment any of these to enable dumping the kwargs, response or errors of the instructor
+# is_dump_kwargs_enabled = true
 # is_dump_response_enabled = true
 # is_dump_error_enabled = true
 
