@@ -58,7 +58,8 @@ This document outlines the core coding standards, best practices, and quality co
     - Always catch exceptions at the place where you can add useful context to it.
     - Use try/except blocks with specific exceptions
     - Convert third-party exceptions to our custom ones
-    - Never catch Exception, only catch specific exceptions
+    - NEVER catch the generic Exception, only catch specific exceptions, except at the root of CLI commands
+    - NEVER raise generic exceptions like ValueError or TypeError, create new error classes and raise them instead
     - Always add `from exc` to the exception
    
    ```python

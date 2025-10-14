@@ -53,7 +53,7 @@ This document outlines the core coding standards, best practices, and quality co
     - Use try/except blocks with specific exceptions
     - Convert third-party exceptions to our custom ones
     - NEVER catch the generic Exception, only catch specific exceptions, except at the root of CLI commands
-    - NEVER raise geenric exceptions like ValueError or TypeError, create new error classes and raise them instead
+    - NEVER raise generic exceptions like ValueError or TypeError, create new error classes and raise them instead
     - Always add `from exc` to the exception
    
    ```python

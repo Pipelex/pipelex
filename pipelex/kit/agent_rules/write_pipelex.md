@@ -1,8 +1,8 @@
 # Guide to write or edit pipelines using the Pipelex language in .plx files
 
-- Always first write your "plan" in natural langage, then transcribe it in pipelex.
+- Always first write your "plan" in natural language, then transcribe it in pipelex.
 - You should ALWAYS RUN the terminal command `make validate` when you are writing or editing a `.plx` file. It will ensure the pipe is runnable. If not, iterate.
-- Please use POSIX standard for files. (enmpty lines, no trailing whitespaces, etc.)
+- Please use POSIX standard for files. (empty lines, no trailing whitespaces, etc.)
 
 ## Pipeline File Naming
 - Files must be `.plx` for pipelines (Always add an empty line at the end of the file, and do not add trailing whitespaces to PLX files at all)
@@ -64,7 +64,7 @@ output = "ConceptName"
 ```
 
 The pipes will all have at least this base definition. 
-- `inputs`: Dictionnary of key behing the variable used in the prompts, and the value behing the ConceptName. It should ALSO LIST THE INPUTS OF THE INTERMEDIATE STEPS (if PipeSequence) or of the conditionnal pipes (if PipeCondition).
+- `inputs`: Dictionary of key being the variable used in the prompts, and the value being the ConceptName. It should ALSO LIST THE INPUTS OF THE INTERMEDIATE STEPS (if PipeSequence) or of the conditional pipes (if PipeCondition).
 So If you have this error:
 `StaticValidationError: missing_input_variable • domain='expense_validator' • pipe='validate_expense' • 
 variable='['invoice']'``
@@ -253,7 +253,7 @@ The PipeCondition controller allows you to implement conditional logic in your p
 ```plx
 [pipe.conditional_operation]
 type = "PipeCondition"
-description = "A conditonal pipe to decide wheter..."
+description = "A conditional pipe to decide whether..."
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
@@ -268,7 +268,7 @@ or
 ```plx
 [pipe.conditional_operation]
 type = "PipeCondition"
-description = "A conditonal pipe to decide wheter..."
+description = "A conditional pipe to decide whether..."
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression_template = "{{ input_data.category }}" # Jinja2 code
@@ -408,7 +408,7 @@ Match the expense with its corresponding invoice:
 @invoices
 """
 ```
-In the example above, the expense data and the invoices data are obviously made of several lines each, that's why it makes sense to use the "@" prefix in order to have them delimited inside a block. Note that our preprocessor will automatically include the block's title, so it doens't need to be explictly written in the prompt.
+In the example above, the expense data and the invoices data are obviously made of several lines each, that's why it makes sense to use the "@" prefix in order to have them delimited inside a block. Note that our preprocessor will automatically include the block's title, so it doesn't need to be explicitly written in the prompt.
 
 DO NOT write things like "Here is the expense: @expense".
 DO write simply "@expense" alone in an isolated line.

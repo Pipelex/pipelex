@@ -194,7 +194,7 @@ class PipeOutput(BaseModel):
         ...
 ```
 
-As you can see, you can extarct any variable from the output working memory.
+As you can see, you can extract any variable from the output working memory.
 
 ### Getting the main stuff as a specific type
 

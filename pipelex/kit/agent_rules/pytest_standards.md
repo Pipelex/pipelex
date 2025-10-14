@@ -43,7 +43,7 @@ Always group the tests of a module into a test class:
 @pytest.mark.asyncio(loop_scope="class")
 class TestFooBar:
     @pytest.mark.parametrize(
-        "topic test_case_blueprint",
+        "topic, test_case_blueprint",
         [
             TestCases.CASE_1,
             TestCases.CASE_2,
