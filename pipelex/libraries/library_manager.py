@@ -312,22 +312,29 @@ class LibraryManager(LibraryManagerAbstract):
         """
         import pipelex.builder  # noqa: PLC0415 - intentional local import
 
+        log.info("Starting pipelex.builder module discovery for @pipe_func registration")
+
         try:
             # Walk all submodules in pipelex.builder to discover @pipe_func decorated functions
             if hasattr(pipelex.builder, "__path__"):
+                log.info(f"pipelex.builder has __path__: {pipelex.builder.__path__}")
+                module_count = 0
                 for _importer, modname, _ispkg in pkgutil.walk_packages(
                     path=pipelex.builder.__path__, prefix="pipelex.builder.", onerror=lambda _: None
                 ):
+                    module_count += 1
                     try:
                         # Import each module to trigger @pipe_func decorator registration
                         importlib.import_module(modname)
-                        log.debug(f"Imported {modname} for @pipe_func registration")
+                        log.info(f"Successfully imported {modname} for @pipe_func registration")
                     except Exception as exc:
-                        log.debug(f"Could not import {modname}: {exc}")
+                        log.warning(f"Could not import {modname}: {exc}")
+
+                log.info(f"Discovered and attempted to import {module_count} modules in pipelex.builder")
             else:
-                log.warning("Could not walk pipelex.builder package - no __path__ attribute")
+                log.error("Could not walk pipelex.builder package - no __path__ attribute")
         except ImportError as exc:
-            log.warning(f"Could not import pipelex.builder package: {exc}")
+            log.error(f"Could not import pipelex.builder package: {exc}")
 
     @override
     def load_libraries(
@@ -385,7 +392,18 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Import from pipelex package
         # Always directly import critical builder modules first (works in all installation modes)
+        log.info("About to import pipelex.builder modules for @pipe_func registration")
         self._import_pipelex_modules_directly()
+
+        # Verify critical functions were registered
+        from pipelex.tools.func_registry import func_registry  # noqa: PLC0415 - intentional local import
+
+        critical_functions = ["create_concept_spec", "assemble_pipelex_bundle_spec"]
+        for func_name in critical_functions:
+            if func_registry.has_function(func_name):
+                log.info(f"✓ Function '{func_name}' successfully registered")
+            else:
+                log.error(f"✗ Function '{func_name}' NOT registered - this will cause errors!")
 
         # Then try filesystem-based scanning if package is accessible (for completeness)
         pipelex_pkg_dir = self._get_pipelex_package_dir_for_imports()
