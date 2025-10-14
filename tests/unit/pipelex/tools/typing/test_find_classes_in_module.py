@@ -1,6 +1,15 @@
+import sys
 import types
+from pathlib import Path
 
-from pipelex.tools.typing.module_inspector import find_classes_in_module
+import pytest
+
+from pipelex.tools.typing.module_inspector import (
+    ModuleFileError,
+    find_class_names_in_file,
+    find_classes_in_module,
+    import_module_from_file_if_has_classes,
+)
 
 
 class TestFindClassesInModule:

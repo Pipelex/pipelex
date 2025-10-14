@@ -16,6 +16,7 @@ from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field
 from pipelex.types import StrEnum
 
+
 class Concept(BaseModel):
     model_config = ConfigDict(extra="ignore", strict=True)
 
