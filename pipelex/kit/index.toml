@@ -8,6 +8,7 @@ default_set = "pipelex_language"
 
 [agent_rules.sets]
 coding_standards = [
+    "commands.md",
     "python_standards.md",
     "pytest_standards.md",
     "docs.md",
@@ -15,6 +16,7 @@ coding_standards = [
 ]
 pipelex_language = ["write_pipelex.md", "run_pipelex.md", "llms.md"]
 all = [
+    "commands.md",
     "python_standards.md",
     "write_pipelex.md",
     "run_pipelex.md",
@@ -38,6 +40,10 @@ globs = ["tests/**/*.py"]
 [agent_rules.cursor.files.docs.front_matter]
 description = "Guidelines for writing documentation"
 globs = ["docs/**/*.md"]
+
+[agent_rules.cursor.files.commands.front_matter]
+description = "Guidelines for running commands"
+alwaysApply = true
 
 [agent_rules.cursor.files.tdd.front_matter]
 description = "Guidelines for writing test-driven development code"
