@@ -1,0 +1,143 @@
+---
+alwaysApply: false
+description: Python coding standards and best practices
+globs:
+- '**/*.py'
+---
+# Coding Standards & Best Practices for Python Code
+
+This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
+
+## Type Hints
+
+1. **Always Use Type Hints**
+
+    - Every function parameter must be typed
+    - Every function return must be typed
+    - Use type hints for all variables where type is not obvious
+    - Use dict, list, tuple types with lowercase first letter: dict[], list[], tuple[]
+    - Use type hints for all fields
+    - Use the `|` syntax for union types (e.g `str | int`) and `| None` for optionals (not `Optional[]`)
+    - Use Field(default_factory=...) for mutable defaults
+
+2. **BaseModel / Pydantic Standards**
+
+    - Use `BaseModel` and respect Pydantic v2 standards
+    - Use the modern `ConfigDict` when needed, e.g. `model_config = ConfigDict(extra="forbid", strict=True)`
+    - Keep models focused and single-purpose
+    - For list fields with non-string items in BaseModels, use `empty_list_factory_of()` to avoid linter complaints:
+      ```python
+      from pydantic import BaseModel, Field
+      from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+      
+      class MyModel(BaseModel):
+          names: list[str] = Field(default_factory=list)  # OK for strings
+          numbers: list[int] = Field(default_factory=empty_list_factory_of(int), description="A list of numbers")
+          items: list[MyItem] = Field(default_factory=empty_list_factory_of(MyItem), description="A list of items")
+      ```
+
+3. **StrEnum**
+   - Import from `pipelex.types`:
+   ```python
+   from pipelex.types import StrEnum
+   ```
+
+4. **Self type**
+   - Import from `pipelex.types`:
+   ```python
+   from pipelex.types import Self
+   ```
+
+## Factory Pattern
+
+    - Use Factory Pattern for object creation when dealing with multiple implementations
+    - Our factory methods are named `make_from_...` and such
+
+## Error Handling
+
+    - Always catch exceptions at the place where you can add useful context to it.
+    - Use try/except blocks with specific exceptions
+    - Convert third-party exceptions to our custom ones
+    - Never catch Exception, only catch specific exceptions
+    - Always add `from exc` to the exception
+   
+   ```python
+   try:
+       self.models_manager.setup()
+   except RoutingProfileLibraryNotFoundError as exc:
+       msg = "The routing library could not be found, please call `pipelex init config` to create it"
+       raise PipelexSetupError(msg) from exc
+   ```
+
+   **Note**: Following Ruff rules, we set the error message as a variable before raising it, for cleaner error traces.
+
+## Documentation
+
+1. **Docstring Format**
+   ```python
+   def process_image(image_path: str, size: tuple[int, int]) -> bytes:
+       """Process and resize an image.
+       
+       Args:
+           image_path: Path to the source image
+           size: Tuple of (width, height) for resizing
+           
+       Returns:
+           Processed image as bytes
+       """
+       pass
+   ```
+
+2. **Class Documentation**
+   ```python
+   class ImageProcessor:
+       """Handles image processing operations.
+       
+       Provides methods for resizing, converting, and optimizing images.
+       """
+   ```
+
+## Code Quality Checks
+
+### Linting and Type Checking
+
+Before finalizing a task, run:
+```bash
+make fix-unused-imports
+make check
+```
+
+This runs multiple code quality tools:
+- Pyright: Static type checking
+- Ruff: Fast Python linter  
+- Mypy: Static type checker
+
+Always fix any issues reported by these tools before proceeding.
+
+### Running Tests
+
+1. **Quick Test Run** (no LLM/image generation):
+   ```bash
+   make tp
+   ```
+   Runs tests with markers: `(dry_runnable or not (inference or llm or img_gen or extract)) and not (needs_output or pipelex_api)`
+
+2. **Specific Tests**:
+   ```bash
+   make tp TEST=TestClassName
+   # or
+   make tp TEST=test_function_name
+   ```
+   Note: Matches names starting with the provided string.
+
+**Important**: Never run `make ti`, `make test-inference`, `make te`, `make test-extract`, `make tg`, or `make test-img-gen` - these use costly inference.
+
+## Pipelines
+
+- Always validate pipelines after creation/edit with `make validate`.
+  Iterate if there are errors.
+
+## Project Structure
+
+- **Tests**: `tests/` directory
+- **Documentation**: `docs/` directory
