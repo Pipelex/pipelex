@@ -35,7 +35,7 @@ from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
-class PipelexRegistryModels(RegistryModels):
+class CoreRegistryModels(RegistryModels):
     FIELD_EXTRACTION: ClassVar[list[ModelType]] = []
 
     PIPE_OPERATORS: ClassVar[list[PipeAbstractType]] = [

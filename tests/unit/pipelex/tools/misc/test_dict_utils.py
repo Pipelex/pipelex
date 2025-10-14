@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.tools.exceptions import NestedKeyConflictError
+from pipelex.system.exceptions import NestedKeyConflictError
 from pipelex.tools.misc.dict_utils import apply_to_strings_in_list, apply_to_strings_recursive, insert_before, substitute_nested_in_context
 
 

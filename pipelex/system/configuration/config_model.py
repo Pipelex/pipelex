@@ -2,7 +2,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.tools.exceptions import ConfigModelError
+from pipelex.system.exceptions import ConfigModelError
 from pipelex.types import StrEnum
 
 StrEnumType = TypeVar("StrEnumType", bound=StrEnum)

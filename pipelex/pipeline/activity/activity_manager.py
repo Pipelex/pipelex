@@ -4,7 +4,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
 from pipelex.pipeline.activity.activity_models import ActivityCallback, ActivityReport
-from pipelex.tools.exceptions import RootException
+from pipelex.system.exceptions import RootException
 
 
 class ActivityManagerError(RootException):

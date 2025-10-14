@@ -2,7 +2,7 @@ from pydantic import field_validator
 
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.tools.exceptions import ConfigValidationError
+from pipelex.system.exceptions import ConfigValidationError
 
 
 class FalConfig(ConfigModel):

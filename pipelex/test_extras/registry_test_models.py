@@ -11,5 +11,5 @@ class FictionCharacter(StructuredContent):
     backstory: str
 
 
-class PipelexTestModels(RegistryModels):
+class TestRegistryModels(RegistryModels):
     TEST_MODELS: ClassVar[list[ModelType]] = [FictionCharacter]

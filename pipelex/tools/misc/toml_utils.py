@@ -4,7 +4,7 @@ from typing import Any
 
 import tomli
 
-from pipelex.tools.exceptions import ToolException
+from pipelex.system.exceptions import ToolException
 from pipelex.tools.misc.file_utils import path_exists
 
 

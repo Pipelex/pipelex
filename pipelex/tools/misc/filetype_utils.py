@@ -6,7 +6,7 @@ import filetype
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.tools.exceptions import ToolException
+from pipelex.system.exceptions import ToolException
 
 
 class FileTypeException(ToolException):

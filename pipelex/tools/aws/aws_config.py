@@ -4,7 +4,7 @@ from pipelex import log
 from pipelex.hub import get_secret
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.environment import EnvVarNotFoundError, get_required_env
-from pipelex.tools.exceptions import CredentialsError
+from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.types import StrEnum
 

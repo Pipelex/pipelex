@@ -5,7 +5,7 @@ from typing import Any, Union, cast
 from kajson import kajson
 from pydantic import BaseModel
 
-from pipelex.tools.exceptions import ToolException
+from pipelex.system.exceptions import ToolException
 from pipelex.tools.misc.file_utils import save_text_to_path
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 

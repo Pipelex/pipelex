@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pipelex.tools.exceptions import ToolException
+from pipelex.system.exceptions import ToolException
 
 
 class ContextProviderException(ToolException):

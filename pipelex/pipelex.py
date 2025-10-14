@@ -28,7 +28,7 @@ from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
-from pipelex.core.registry_models import PipelexRegistryModels
+from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
@@ -54,7 +54,7 @@ from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtoco
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.runtime import runtime_manager
-from pipelex.test_extras.registry_test_models import PipelexTestModels
+from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -242,10 +242,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
-        self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
+        self.class_registry.register_classes(CoreRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.debug("Registering test models for unit testing")
-            self.class_registry.register_classes(PipelexTestModels.get_all_models())
+            self.class_registry.register_classes(TestRegistryModels.get_all_models())
         self.activity_manager.setup()
 
         observer_provider = observer_provider or LocalObserver()
