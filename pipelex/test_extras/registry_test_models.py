@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.registry_models import ModelType, RegistryModels
+from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
 class FictionCharacter(StructuredContent):
@@ -11,5 +11,5 @@ class FictionCharacter(StructuredContent):
     backstory: str
 
 
-class PipelexTestModels(RegistryModels):
+class TestRegistryModels(RegistryModels):
     TEST_MODELS: ClassVar[list[ModelType]] = [FictionCharacter]

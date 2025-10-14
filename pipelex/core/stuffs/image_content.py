@@ -6,9 +6,10 @@ from PIL import Image
 from typing_extensions import override
 from yattag import Doc
 
+from pipelex.cogt.exceptions import ImageContentError
 from pipelex.cogt.extract.extract_output import ExtractedImage
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
+from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str, save_base_64_str_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_directory_exists, get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.path_utils import InterpretedPathOrUrl, interpret_path_or_url
@@ -29,7 +30,7 @@ class ImageContent(StuffContent):
 
     @override
     def rendered_plain(self) -> str:
-        return self.url
+        return self.url[:500]
 
     @override
     def rendered_html(self) -> str:
@@ -40,7 +41,7 @@ class ImageContent(StuffContent):
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        return f"![{self.url}]({self.url})"
+        return f"![{self.url[:100]}]({self.url})"
 
     @override
     def rendered_json(self) -> str:
@@ -48,19 +49,25 @@ class ImageContent(StuffContent):
 
     @classmethod
     def make_from_extracted_image(cls, extracted_image: ExtractedImage) -> Self:
-        return cls(
-            url=extracted_image.image_id,
-            base_64=extracted_image.base_64,
-            caption=extracted_image.caption,
-        )
+        if base_64 := extracted_image.base_64:
+            prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
+            return cls(
+                url=prefixed_base64_str,
+                base_64=extracted_image.base_64,
+                caption=extracted_image.caption,
+            )
+        else:
+            msg = f"Base 64 is required for image content: {extracted_image}"
+            raise ImageContentError(msg)
 
     @classmethod
     def make_from_image(cls, image: Image.Image) -> Self:
         buffer = BytesIO()
         image.save(buffer, format="PNG")
         base_64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
         return cls(
-            url=f"data:image/png;base64,{base_64}",
+            url=prefixed_base64_str,
             base_64=base_64,
         )
 
@@ -83,7 +90,7 @@ class ImageContent(StuffContent):
                 extension=extension,
                 avoid_suffix_if_possible=True,
             )
-            save_base64_to_binary_file(b64=base_64, file_path=file_path)
+            save_base_64_str_to_binary_file(base_64_str=base_64, file_path=file_path)
 
         if caption := self.caption:
             caption_file_path = get_incremental_file_path(
@@ -101,29 +108,3 @@ class ImageContent(StuffContent):
                 avoid_suffix_if_possible=True,
             )
             save_text_to_path(text=source_prompt, path=source_prompt_file_path)
-
-
-class PDFContent(StuffContent):
-    url: str
-
-    @property
-    @override
-    def short_desc(self) -> str:
-        url_desc = interpret_path_or_url(path_or_uri=self.url).desc
-        return f"{url_desc} of a PDF document"
-
-    @override
-    def rendered_plain(self) -> str:
-        return self.url
-
-    @override
-    def rendered_html(self) -> str:
-        doc = Doc()
-        doc.stag("a", href=self.url, klass="msg-pdf")
-        doc.text(self.url)
-
-        return doc.getvalue()
-
-    @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        return f"[{self.url}]({self.url})"

@@ -5,7 +5,7 @@ from pydantic import Field, field_validator
 from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
 from rich.logging import RichHandler
 
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.types import StrEnum
 

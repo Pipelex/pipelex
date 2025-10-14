@@ -6,7 +6,12 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
-from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_base64, detect_file_type_from_bytes, detect_file_type_from_path
+from pipelex.tools.misc.filetype_utils import (
+    FileType,
+    detect_file_type_from_base64,
+    detect_file_type_from_bytes,
+    detect_file_type_from_path,
+)
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 

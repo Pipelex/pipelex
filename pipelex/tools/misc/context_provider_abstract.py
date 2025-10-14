@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pipelex.tools.exceptions import ToolException
+from pipelex.system.exceptions import ToolException
 
 
 class ContextProviderException(ToolException):
@@ -20,5 +20,5 @@ class ContextProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def generate_jinja2_context(self) -> dict[str, Any]:
+    def generate_context(self) -> dict[str, Any]:
         pass

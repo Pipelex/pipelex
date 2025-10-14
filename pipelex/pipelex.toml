@@ -4,6 +4,23 @@
 [pipelex.observer_config]
 observer_dir = "results/observer"
 
+[pipelex.scan_config]
+excluded_dirs = [
+    ".venv",
+    "venv",
+    "env",
+    ".env",
+    "virtualenv",
+    ".virtualenv",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    "results",
+]
+
 [pipelex.feature_config]
 # WIP/Experimental feature flags
 is_pipeline_tracking_enabled = false
@@ -107,10 +124,9 @@ You are a data modeling expert specialized in extracting structure from text.
 """
 
 structure_from_preliminary_text_user = """
-Your job is to extract and structure information from a text.
-Here is the text:
+Extract and structure information from this text:
 
-{preliminary_text}
+{{ preliminary_text | tag }}
 
 Now generate the JSON in the required format.
 Do not create information that is not in the text.
@@ -118,17 +134,20 @@ Do not create information that is not in the text.
 
 output_structure_prompt = """
 
+
 ---
 The instance we want to generate will be for the following class:
 {{ class_structure_str }}
 
 Don't bother with JSON formatting, we'll do that as a second step.
 For now, just output markdown with the details of the instance.
-DO NOT create information.
-If some information is not present for an attribute, output the default value or None according to the attribute definition.
+DO NOT create new information.
+If some information is not present for an attribute, output the default value or None according to the field definition.
 """
 
 output_structure_prompt_no_preliminary_text = """
+
+
 ---
 The instance we want to generate will be for the following class:
 {{ class_structure_str }}
@@ -184,17 +203,6 @@ gemini = { tag_style = "xml" }
 [pipelex.structure_config]
 is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
-
-####################################################################################################
-# Pipelex libraries config
-####################################################################################################
-
-[pipelex.library_config]
-
-[pipelex.generic_template_names]
-structure_from_preliminary_text_system = "structure_from_preliminary_text_system"
-structure_from_preliminary_text_user = "structure_from_preliminary_text_user"
-
 ####################################################################################################
 # Static validation config
 ####################################################################################################
@@ -246,11 +254,8 @@ text_gen_truncate_length = 256
 nb_list_items = 3
 nb_extract_pages = 4
 allowed_to_fail_pipes = [
-    "infinite_loop_1",              # Loop but only for testing purposes
-    "fix_failing_pipes_once",       # Loop but its normal
-    "validate_pipelex_bundle_spec", # Loop but its normal
-    "handle_validation_result",     # Complex case of a sub pipe needed a ListContent because its batching on, but the dry_run cannot know.
-    "pipe_builder",                 # because of the 'fix_failing_pipes_once', 'validate_pipelex_bundle_spec', 'handle_validation_result'
+    "infinite_loop_1", # Loop but only for testing purposes
+    "pipe_builder",    # Still not fully proofed
 ]
 image_urls = [
     "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
@@ -276,3 +281,23 @@ structure_field_ordering = ["type", "description", "choices", "required"]
 
 [pipelex.plx_config.pipes]
 field_ordering = ["type", "description", "inputs", "output"]
+
+####################################################################################################
+# Migration config
+####################################################################################################
+
+[migration.migration_maps.config]
+definition = "description"
+ocr_config = "extract_config"
+ocr = "extract"
+img_gen = "model"
+llm_handle = "model"
+llm = "model"
+llm_to_structure = "model_to_structure"
+
+[migration.migration_maps.plx]
+img_gen = "model"
+ocr = "model"
+llm_handle = "model"
+llm = "model"
+llm_to_structure = "model_to_structure"

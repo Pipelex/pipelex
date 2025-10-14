@@ -6,15 +6,17 @@ from pipelex.cogt.exceptions import (
     InferenceBackendCredentialsError,
     InferenceBackendCredentialsErrorType,
     InferenceBackendLibraryError,
+    InferenceBackendLibraryNotFoundError,
+    InferenceBackendLibraryValidationError,
     InferenceModelSpecError,
 )
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.config import get_config
+from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path
-from pipelex.tools.runtime_manager import runtime_manager
 from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
 from pipelex.types import Self
 
@@ -38,9 +40,12 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backends_library_path = get_config().cogt.inference_config.backends_library_path
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
-        except (FileNotFoundError, InferenceBackendLibraryError) as exc:
-            msg = f"Failed to load inference backend library from file '{backends_library_path}': {exc}"
-            raise InferenceBackendLibraryError(msg) from exc
+        except FileNotFoundError as file_not_found_exc:
+            msg = f"Could not find inference backend library at '{backends_library_path}': {file_not_found_exc}"
+            raise InferenceBackendLibraryNotFoundError(msg) from file_not_found_exc
+        except ValidationError as exc:
+            msg = f"Invalid inference backend library configuration in '{backends_library_path}': {exc}"
+            raise InferenceBackendLibraryValidationError(msg) from exc
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
             standard_fields = InferenceBackendBlueprint.model_fields.keys()
@@ -63,7 +68,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 ) from var_fallback_pattern_exc
             except VarNotFoundError as var_not_found_exc:
                 msg = (
-                    f"Variable substitution failed due to a variable not found error in file '{backends_library_path}':"
+                    f"Variable substitution failed due to a 'variable not found' error in file '{backends_library_path}':"
                     f"\n{var_not_found_exc}\nRun mode: '{runtime_manager.run_mode}'"
                 )
                 raise InferenceBackendCredentialsError(

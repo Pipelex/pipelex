@@ -9,11 +9,10 @@ from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.exceptions import PipelexConfigError, StaticValidationErrorType
 from pipelex.hub import get_required_config
 from pipelex.language.plx_config import PlxConfig
-from pipelex.libraries.library_config import LibraryConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
+from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
-from pipelex.tools.config.config_model import ConfigModel
-from pipelex.tools.config.config_root import ConfigRoot
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.types import StrEnum
 
@@ -62,11 +61,6 @@ class DryRunConfig(ConfigModel):
         return value
 
 
-class GenericTemplateNames(ConfigModel):
-    structure_from_preliminary_text_user: str
-    structure_from_preliminary_text_system: str
-
-
 class StructureConfig(ConfigModel):
     is_default_text_then_structure: bool
 
@@ -100,14 +94,23 @@ class ObserverConfig(ConfigModel):
     observer_dir: str
 
 
+class ScanConfig(ConfigModel):
+    excluded_dirs: frozenset[str]
+
+    @field_validator("excluded_dirs", mode="before")
+    @classmethod
+    def validate_excluded_dirs(cls, value: list[str] | frozenset[str]) -> frozenset[str]:
+        if isinstance(value, frozenset):
+            return value
+        return frozenset(value)
+
+
 class Pipelex(ConfigModel):
     feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig
 
-    library_config: LibraryConfig
     static_validation_config: StaticValidationConfig
-    generic_template_names: GenericTemplateNames
     tracker_config: TrackerConfig
     structure_config: StructureConfig
     prompting_config: PromptingConfig
@@ -117,12 +120,30 @@ class Pipelex(ConfigModel):
     pipe_run_config: PipeRunConfig
     reporting_config: ReportingConfig
     observer_config: ObserverConfig
+    scan_config: ScanConfig
+
+
+class MigrationConfig(ConfigModel):
+    migration_maps: dict[str, dict[str, str]]
+
+    def text_in_renaming_keys(self, category: str, text: str) -> list[tuple[str, str]]:
+        renaming_map = self.migration_maps.get(category)
+        if not renaming_map:
+            return []
+        return [(key, value) for key, value in renaming_map.items() if text in key]
+
+    def text_in_renaming_values(self, category: str, text: str) -> list[tuple[str, str]]:
+        renaming_map = self.migration_maps.get(category)
+        if not renaming_map:
+            return []
+        return [(key, value) for key, value in renaming_map.items() if text in value]
 
 
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
     pipelex: Pipelex
+    migration: MigrationConfig
 
 
 def get_config() -> PipelexConfig:

@@ -1,15 +1,12 @@
 from typing import Any
 
-from jinja2 import Template, meta
 from jinja2.exceptions import (
     TemplateAssertionError,
     TemplateSyntaxError,
     UndefinedError,
 )
 
-from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.jinja2.jinja2_errors import (
@@ -18,7 +15,6 @@ from pipelex.tools.jinja2.jinja2_errors import (
     Jinja2TemplateRenderError,
 )
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
-from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 
 
 def _add_to_templating_context(temlating_context: dict[str, Any], jinja2_context_key: Jinja2ContextKey, value: Any) -> None:
@@ -38,23 +34,13 @@ async def render_jinja2(
         template_category=template_category,
     )
 
-    template: Template
     try:
         template = jinja2_env.from_string(template_source)
     except TemplateAssertionError as exc:
         msg = f"Jinja2 render error: '{exc}', template_source:\n{template_source}"
         raise Jinja2TemplateRenderError(msg) from exc
-    template_source = preprocess_template(template_source)
-    check_jinja2_parsing(
-        template_source=template_source,
-        template_category=template_category,
-    )
 
-    parsed_ast = jinja2_env.parse(template_source)
-    if undeclared_variables := meta.find_undeclared_variables(parsed_ast):
-        undeclared_variables.discard("preliminary_text")
-        if undeclared_variables:
-            log.verbose(undeclared_variables, "Jinja2 undeclared_variables")
+    # Create a copy to avoid mutating the caller's original dictionary
     temlating_context = temlating_context.copy()
     if templating_style:
         _add_to_templating_context(

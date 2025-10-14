@@ -1,22 +1,21 @@
 from typing import ClassVar
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-
-from .complex.multi_feature import COMPLEX_TEST_CASES
-from .concepts.refining_concepts import REFINING_CONCEPT_TEST_CASES
-from .concepts.simple_concepts import SIMPLE_CONCEPT_TEST_CASES
-from .concepts.structured_concepts import STRUCTURED_CONCEPT_TEST_CASES
-from .domain.simple_domains import DOMAIN_TEST_CASES
-from .errors.invalid_plx import ERROR_TEST_CASES
-from .pipes.controllers.batch.pipe_batch import PIPE_BATCH_TEST_CASES
-from .pipes.controllers.condition.pipe_condition import PIPE_CONDITION_TEST_CASES
-from .pipes.controllers.parallel.pipe_parallel import PIPE_PARALLEL_TEST_CASES
-from .pipes.controllers.sequence.pipe_sequence import PIPE_SEQUENCE_TEST_CASES
-from .pipes.operators.compose.pipe_compose import PIPE_COMPOSE_TEST_CASES
-from .pipes.operators.extract.pipe_extract import PIPE_EXTRACT_TEST_CASES
-from .pipes.operators.func.pipe_func import PIPE_FUNC_TEST_CASES
-from .pipes.operators.img_gen.pipe_img_gen import PIPE_IMG_GEN_TEST_CASES
-from .pipes.operators.llm.pipe_llm import PIPE_LLM_TEST_CASES
+from tests.unit.pipelex.core.test_data.complex.multi_feature import COMPLEX_TEST_CASES
+from tests.unit.pipelex.core.test_data.concepts.refining_concepts import REFINING_CONCEPT_TEST_CASES
+from tests.unit.pipelex.core.test_data.concepts.simple_concepts import SIMPLE_CONCEPT_TEST_CASES
+from tests.unit.pipelex.core.test_data.concepts.structured_concepts import STRUCTURED_CONCEPT_TEST_CASES
+from tests.unit.pipelex.core.test_data.domain.simple_domains import DOMAIN_TEST_CASES
+from tests.unit.pipelex.core.test_data.errors.invalid_plx import ERROR_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.controllers.batch.pipe_batch import PIPE_BATCH_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.controllers.condition.pipe_condition import PIPE_CONDITION_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.controllers.parallel.pipe_parallel import PIPE_PARALLEL_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.controllers.sequence.pipe_sequence import PIPE_SEQUENCE_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.operators.compose.pipe_compose import PIPE_COMPOSE_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.operators.extract.pipe_extract import PIPE_EXTRACT_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.operators.func.pipe_func import PIPE_FUNC_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.operators.img_gen.pipe_img_gen import PIPE_IMG_GEN_TEST_CASES
+from tests.unit.pipelex.core.test_data.pipes.operators.llm.pipe_llm import PIPE_LLM_TEST_CASES
 
 
 class InterpreterTestCases:

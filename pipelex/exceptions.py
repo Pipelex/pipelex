@@ -1,7 +1,7 @@
 from click import ClickException
 from typing_extensions import override
 
-from pipelex.tools.exceptions import RootException
+from pipelex.system.exceptions import RootException
 from pipelex.tools.misc.context_provider_abstract import ContextProviderException
 from pipelex.types import StrEnum
 

@@ -1,5 +1,3 @@
-import inspect
-import os
 from importlib.metadata import metadata
 from typing import cast
 
@@ -14,7 +12,15 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
-from pipelex.cogt.exceptions import InferenceBackendCredentialsError, RoutingProfileLibraryNotFoundError
+from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendLibraryNotFoundError,
+    InferenceBackendLibraryValidationError,
+    ModelDeckNotFoundError,
+    ModelDeckValidationError,
+    RoutingProfileLibraryNotFoundError,
+    RoutingProfileValidationError,
+)
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
@@ -22,7 +28,8 @@ from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
-from pipelex.core.registry_models import PipelexRegistryModels
+from pipelex.core.registry_models import CoreRegistryModels
+from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
@@ -44,15 +51,15 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
-from pipelex.test_extras.registry_test_models import PipelexTestModels
-from pipelex.tools.config.config_root import ConfigRoot
-from pipelex.tools.func_registry import func_registry
-from pipelex.tools.runtime_manager import runtime_manager
+from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.runtime import runtime_manager
+from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import Self
+from pipelex.urls import URLs
 
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
@@ -61,7 +68,7 @@ PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
-        config_dir_path: str,
+        config_dir_path: str = "./pipelex",
         # Dependency injection
         pipelex_hub: PipelexHub | None = None,
         config_cls: type[ConfigRoot] | None = None,
@@ -80,10 +87,10 @@ class Pipelex(metaclass=MetaSingleton):
         # tools
         try:
             self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig)
-        except ValidationError as exc:
-            formatted_error_msg = format_pydantic_validation_error(exc)
-            msg = f"Could not setup config because of: {formatted_error_msg}"
-            raise PipelexConfigError(msg) from exc
+        except ValidationError as validation_error:
+            validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+            msg = f"Could not setup config because of: {validation_error_msg}"
+            raise PipelexConfigError(msg) from validation_error
 
         log.configure(
             project_name=get_config().project_name or "unknown_project",
@@ -108,7 +115,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         self.reporting_delegate: ReportingProtocol
         if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager(reporting_config=get_config().pipelex.reporting_config)
+            self.reporting_delegate = reporting_delegate or ReportingManager()
         else:
             self.reporting_delegate = ReportingNoOp()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
@@ -125,7 +132,6 @@ class Pipelex(metaclass=MetaSingleton):
             domain_library=domain_library,
             concept_library=concept_library,
             pipe_library=pipe_library,
-            config_dir_path=config_dir_path,
         )
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
@@ -152,6 +158,32 @@ class Pipelex(metaclass=MetaSingleton):
 
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
+    @staticmethod
+    def _get_config_not_found_error_msg(component_name: str) -> str:
+        """Generate error message for missing config files."""
+        return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
+
+    @staticmethod
+    def _get_validation_error_msg(component_name: str, validation_exc: Exception) -> str:
+        """Generate error message for invalid config files."""
+        msg = ""
+        cause_exc = validation_exc.__cause__
+        if cause_exc is None:
+            msg += f"\nUnxpexted cause:{cause_exc}"
+            raise PipelexSetupError(msg) from cause_exc
+        if not isinstance(cause_exc, ValidationError):
+            msg += f"\nUnxpexted cause:{cause_exc}"
+            raise PipelexSetupError(msg) from cause_exc
+        report = report_validation_error(category="config", validation_error=cause_exc)
+        return f"""{msg}
+{report}
+
+Config files are invalid for the {component_name}.
+You can fix them manually, or run `pipelex init config --reset` to regenerate them.
+Note that this command resets all config files to their default values.
+If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
+"""
+
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -167,21 +199,37 @@ class Pipelex(metaclass=MetaSingleton):
         self.plugin_manager.setup()
         try:
             self.models_manager.setup()
-        except RoutingProfileLibraryNotFoundError as routing_profile_library_exc:
-            msg = "The routing library could not be found, please call `pipelex init config` to create it"
-            raise PipelexSetupError(msg) from routing_profile_library_exc
+        except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
+            msg = self._get_config_not_found_error_msg("routing profile library")
+            raise PipelexSetupError(msg) from routing_not_found_exc
+        except InferenceBackendLibraryNotFoundError as backend_not_found_exc:
+            msg = self._get_config_not_found_error_msg("inference backend library")
+            raise PipelexSetupError(msg) from backend_not_found_exc
+        except ModelDeckNotFoundError as deck_not_found_exc:
+            msg = self._get_config_not_found_error_msg("model deck")
+            raise PipelexSetupError(msg) from deck_not_found_exc
+        except RoutingProfileValidationError as routing_validation_exc:
+            msg = self._get_validation_error_msg("routing profile library", routing_validation_exc)
+            raise PipelexSetupError(msg) from routing_validation_exc
+        except InferenceBackendLibraryValidationError as backend_validation_exc:
+            msg = self._get_validation_error_msg("inference backend library", backend_validation_exc)
+            raise PipelexSetupError(msg) from backend_validation_exc
+        except ModelDeckValidationError as deck_validation_exc:
+            msg = self._get_validation_error_msg("model deck", deck_validation_exc)
+            msg += "\n\nIf you added your own config files to the model deck then you'll have to change them manually."
+            raise PipelexSetupError(msg) from deck_validation_exc
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
             error_msg: str
             if secrets_provider:
                 error_msg = (
-                    f"Could not get credentials for inference backend {backend_name}:\n{credentials_exc},"
+                    f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},"
                     f"\ncheck that secret '{var_name}' is available from your secrets provider."
                 )
             else:
                 error_msg = (
-                    f"Could not get credentials for inference backend {backend_name}:\n{credentials_exc},\n"
+                    f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},\n"
                     f"you need to add '{var_name}' to your environment variables or to your .env file."
                 )
             if credentials_exc.backend_name == "pipelex_inference":
@@ -189,15 +237,15 @@ class Pipelex(metaclass=MetaSingleton):
                     "\nYou can check the project's README about getting a Pipelex Inference API key,\n\n"
                     "or you can bring your own 'OPENAI_API_KEY', "
                     "'AZURE_OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'MISTRAL_API_KEY' etc.\n"
-                    "--> choose which inference backends to enable in .pipelex/inference/backends.toml\n"
+                    "--> choose which inference backends to enable in '.pipelex/inference/backends.toml'\n"
                 )
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
-        self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
+        self.class_registry.register_classes(CoreRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.debug("Registering test models for unit testing")
-            self.class_registry.register_classes(PipelexTestModels.get_all_models())
+            self.class_registry.register_classes(TestRegistryModels.get_all_models())
         self.activity_manager.setup()
 
         observer_provider = observer_provider or LocalObserver()
@@ -219,10 +267,10 @@ class Pipelex(metaclass=MetaSingleton):
     def validate_libraries(self):
         try:
             self.library_manager.validate_libraries()
-        except ValidationError as exc:
-            formatted_error_msg = format_pydantic_validation_error(exc)
-            msg = f"Could not validate libraries because of: {formatted_error_msg}"
-            raise PipelexSetupError(msg) from exc
+        except ValidationError as validation_error:
+            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+            msg = f"Could not validate libraries because of: {validation_error_msg}"
+            raise PipelexSetupError(msg) from validation_error
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}")
 
     def teardown(self):
@@ -250,58 +298,21 @@ class Pipelex(metaclass=MetaSingleton):
 
     # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
-    def make(
-        cls,
-        relative_config_folder_path: str | None = None,
-        absolute_config_folder_path: str | None = None,
-        from_file: bool | None = True,
-    ) -> Self:
+    def make(cls) -> Self:
         """Create and initialize a Pipelex instance.
-
-        Args:
-            relative_config_folder_path: Path to config folder relative to either the caller file or current working directory.
-                Cannot be used together with absolute_config_folder_path.
-            absolute_config_folder_path: Absolute path to config folder.
-                Cannot be used together with relative_config_folder_path.
-            from_file: Only used when relative_config_folder_path is provided.
-                If True (default), the relative path is resolved relative to the file where make() was called.
-                If False, the relative path is resolved relative to the current working directory (useful for CLI scenarios).
 
         Returns:
             Initialized Pipelex instance.
 
         Raises:
-            PipelexSetupError: If both relative_config_folder_path and absolute_config_folder_path are provided.
-            Or if frame inspection fails when using relative paths with from_file=True.
-
-        Note:
-            If neither path is provided, defaults to "./pipelex_libraries".
+            if setup fails
 
         """
-        if relative_config_folder_path is not None and absolute_config_folder_path is not None:
-            msg = "Cannot specify both relative_config_folder_path and absolute_config_folder_path"
+        if cls.get_optional_instance() is not None:
+            msg = "Pipelex is already initialized"
             raise PipelexSetupError(msg)
 
-        if relative_config_folder_path is not None:
-            if from_file:
-                current_frame = inspect.currentframe()
-                if current_frame is None:
-                    msg = "Could not find relative config folder path because of: Failed to get current frame"
-                    raise PipelexSetupError(msg)
-                if current_frame.f_back is None:
-                    msg = "Could not find relative config folder path because of: Failed to get caller frame"
-                    raise PipelexSetupError(msg)
-                caller_file = current_frame.f_back.f_code.co_filename
-                caller_dir = os.path.dirname(os.path.abspath(caller_file))
-                config_dir_path = os.path.abspath(os.path.join(caller_dir, relative_config_folder_path))
-            else:
-                config_dir_path = os.path.abspath(os.path.join(os.getcwd(), relative_config_folder_path))
-        elif absolute_config_folder_path is not None:
-            config_dir_path = absolute_config_folder_path
-        else:
-            config_dir_path = "./pipelex_libraries"
-
-        pipelex_instance = cls(config_dir_path=config_dir_path)
+        pipelex_instance = cls()
         pipelex_instance.setup()
         pipelex_instance.setup_libraries()
         return pipelex_instance

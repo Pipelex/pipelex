@@ -7,9 +7,9 @@ from typing_extensions import TYPE_CHECKING, override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMPromptTemplateInputsError
+from pipelex.system.runtime import ProblemReaction, runtime_manager
 from pipelex.tools.misc.json_utils import json_str
 from pipelex.tools.misc.string_utils import can_inject_text
-from pipelex.tools.runtime_manager import ProblemReaction, runtime_manager
 
 if TYPE_CHECKING:
     from collections.abc import ItemsView

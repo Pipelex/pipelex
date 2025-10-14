@@ -1,25 +1,23 @@
-[pipelex]
+[pipelex.log_config]
+default_log_level = "INFO"
+
+[pipelex.log_config.package_log_levels]
+pipelex = "INFO"
+
+[cogt.llm_config]
+# is_dump_text_prompts_enabled = true
+# is_dump_response_text_enabled = true
+
+[cogt.llm_config.instructor_config]
+# is_dump_kwargs_enabled = true
+# is_dump_response_enabled = true
+# is_dump_error_enabled = true
+
 [pipelex.observer_config]
 observer_dir = "results/observer"
 
-[pipelex.aws_config]
-api_key_method = "env"
-# The possible values are "env" and "secret_provider".
-# "env" means means that the env var are stored in your .env file.
-# "secret_provider" means that the env var are stored in your Secret Manager (See the doc for injecting a secret provider).
-
-[cogt]
-
-####################################################################################################
-# OCR config
-####################################################################################################
-
-[cogt.extract_config]
-page_output_text_file_name = "page_text.md"
-
 [pipelex.feature_config]
 # WIP/Experimental feature flags
-is_pipeline_tracking_enabled = false
-is_activity_tracking_enabled = false
+# is_pipeline_tracking_enabled = true
+# is_activity_tracking_enabled = true
 is_reporting_enabled = true
-

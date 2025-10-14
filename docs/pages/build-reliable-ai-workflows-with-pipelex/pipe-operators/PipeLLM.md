@@ -27,7 +27,7 @@ type = "PipeLLM"
 description = "Describe an image"
 inputs = { image = "Image" }
 output = "VisualDescription"
-prompt_template = """
+prompt = """
 Describe the provided image in great detail.
 """
 ```
@@ -42,9 +42,9 @@ You can use any concept that refines `Image` as an input, and choose descriptive
 [pipe.analyze_wedding]
 type = "PipeLLM"
 description = "Analyze wedding photo"
-inputs = { wedding_photo = "images.Photo" }
+inputs = { wedding_photo = "Photo" }
 output = "PhotoAnalysis"
-prompt_template = """
+prompt = """
 Analyze this wedding photo and describe the key moments captured.
 """
 ```
@@ -59,7 +59,7 @@ type = "PipeLLM"
 description = "Analyze the visual layout of a page"
 inputs = { "page_content.page_view" = "Image" }
 output = "LayoutAnalysis"
-prompt_template = """
+prompt = """
 Analyze the visual layout and design elements of this page.
 Focus on typography, spacing, and overall composition.
 """
@@ -83,7 +83,7 @@ inputs = {
     second_image = "Image"
 }
 output = "ImageComparison"
-prompt_template = """
+prompt = """
 Compare these two images and describe their similarities and differences.
 """
 ```
@@ -101,7 +101,7 @@ inputs = {
     document.page_view = "Image"
 }
 output = "DocumentAnalysis"
-prompt_template = """
+prompt = """
 Given this context: $context
 
 Analyze the document page shown in the image and explain how it relates to the provided context.
@@ -167,7 +167,7 @@ type = "PipeLLM"
 description = "Summarize a text"
 inputs = { text = "TextToSummarize" }
 output = "TextSummary"
-prompt_template = """
+prompt = """
 Please provide a concise summary of the following text:
 
 @text
@@ -186,7 +186,7 @@ type = "PipeLLM"
 description = "Extract table data from an image"
 inputs = { image = "TableScreenshot" }
 output = "TableData"
-prompt_template = """
+prompt = """
 Extract the table data from this image and format it as a structured table.
 """
 ```
@@ -204,7 +204,7 @@ type = "PipeLLM"
 description = "Process an expense report"
 inputs = { report = "ExpenseReport" }
 output = "ProcessedExpenseReport"
-prompt_template = """
+prompt = """
 Analyze this expense report and extract the following information:
 - Total amount
 - Date

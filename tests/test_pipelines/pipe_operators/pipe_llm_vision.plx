@@ -5,6 +5,10 @@ description = "Test PipeLLM with vision capabilities"
 VisionAnalysis = "Some analysis based on the image"
 BasicDescription = "Basic description of the image"
 
+[concept.Photo]
+description = "A photo"
+refines = "Image"
+
 [pipe.describe_image]
 type = "PipeLLM"
 description = "Describe what is in the image"
@@ -42,7 +46,7 @@ Completely ignore $imageA.
 [pipe.vision_analysis]
 type = "PipeLLM"
 description = "Provide detailed analysis of the image"
-inputs = { image = "images.Photo" }
+inputs = { image = "Photo" }
 output = "VisionAnalysis"
 model = "llm_to_extract_diagram"
 system_prompt = "You are an expert image analyst. Provide detailed, accurate descriptions."

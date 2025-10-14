@@ -9,8 +9,8 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.exceptions import PipelexUnexpectedError
-from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
+from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field
 
 
 class Concept(BaseModel):
@@ -74,7 +74,7 @@ class Concept(BaseModel):
 
             if strict:
                 # Check if classes are equivalent (same fields, types, descriptions)
-                return ClassRegistryUtils.are_classes_equivalent(concept_1_class, concept_2_class)
+                return are_classes_equivalent(concept_1_class, concept_2_class)
             # Check if concept_1 is a subclass of concept_2
             try:
                 if issubclass(concept_1_class, concept_2_class):
@@ -83,7 +83,7 @@ class Concept(BaseModel):
                 pass
 
             # Check if concept_1 has compatible fields with concept_2
-            return ClassRegistryUtils.has_compatible_field(concept_1_class, concept_2_class)
+            return has_compatible_field(concept_1_class, concept_2_class)
         return False
 
     @classmethod

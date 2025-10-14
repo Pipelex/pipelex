@@ -44,13 +44,13 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     template: str
     templating_style: TemplatingStyle | None = None
-    template_category: TemplateCategory = TemplateCategory.BASIC
+    category: TemplateCategory = TemplateCategory.BASIC
     extra_context: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def validate_template(self) -> Self:
         try:
-            check_jinja2_parsing(template_source=self.template, template_category=self.template_category)
+            check_jinja2_parsing(template_source=self.template, template_category=self.category)
         except Jinja2TemplateSyntaxError as exc:
             msg = f"Could not parse template for PipeCompose '{self.code}: {exc}"
             raise PipeDefinitionError(msg) from exc
@@ -92,7 +92,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     @override
     def required_variables(self) -> set[str]:
         required_variables = detect_jinja2_required_variables(
-            template_category=self.template_category,
+            template_category=self.category,
             template_source=self.template,
         )
         return {
@@ -115,7 +115,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             msg = f"PipeCompose does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             raise PipeRunParamsError(msg)
 
-        context: dict[str, Any] = working_memory.generate_jinja2_context()
+        context: dict[str, Any] = working_memory.generate_context()
         if pipe_run_params:
             context.update(**pipe_run_params.params)
         if self.extra_context:
@@ -125,7 +125,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             context=context,
             template=self.template,
             templating_style=self.templating_style,
-            template_category=self.template_category,
+            template_category=self.category,
         )
         log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
         assert isinstance(jinja2_text, str)

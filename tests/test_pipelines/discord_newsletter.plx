@@ -84,7 +84,7 @@ output = "HtmlNewsletter"
 
 [pipe.format_html_newsletter.template]
 category = "html"
-source = """
+template = """
 <!-- Weekly Summary -->
 <h2>☀️ Weekly Summary</h2>
 <p>

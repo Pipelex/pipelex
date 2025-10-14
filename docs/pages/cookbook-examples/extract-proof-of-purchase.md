@@ -12,14 +12,11 @@ The pipeline `power_extractor_proof_of_purchase` is specifically designed to han
 
 ```python
 async def extract_proof_of_purchase(pdf_url: str) -> ProofOfPurchase:
-    working_memory = WorkingMemoryFactory.make_from_pdf(
-        pdf_url=pdf_url,
-        concept_string="PDF",
-        name="pdf",
-    )
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_proof_of_purchase",
-        working_memory=working_memory,
+        input_memory={
+            "document": PDFContent(url=pdf_url),
+        },
     )
     working_memory = pipe_output.working_memory
     proof_of_purchase: ProofOfPurchase = working_memory.get_list_stuff_first_item_as(name="proof_of_purchase", item_type=ProofOfPurchase)
@@ -58,12 +55,12 @@ The pipeline uses a powerful `PipeLLM` to extract the structured data from the d
 [pipe.write_markdown_from_page_content_proof_of_purchase]
 type = "PipeLLM"
 description = "Write markdown from page content"
-inputs = { "page_content.page_view" = "Page" } # The LLM receives the image of the page
-output = "ProofOfPurchase" # The LLM is forced to output a ProofOfPurchase object
+inputs = { "page_content.page_view" = "Image", page_content = "Page" }
+output = "ProofOfPurchase"
 model = "llm_for_img_to_text"
 structuring_method = "preliminary_text"
 system_prompt = """You are a multimodal LLM, expert at converting images into perfect markdown."""
-prompt_template = """
+prompt = """
 You are given an image of a proof of purchase.
 Your role is to convert the image into perfect markdown.
 

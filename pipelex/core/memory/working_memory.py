@@ -28,6 +28,7 @@ from pipelex.types import Self
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
 PRETTY_PRINT_MAX_LENGTH = 1000
+TEST_DUMMY_NAME = "dummy_result"
 
 StuffDict = dict[str, Stuff]
 StuffArtefactDict = dict[str, StuffArtefact]
@@ -125,12 +126,13 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             raise WorkingMemoryConsistencyError(msg)
         if name in self.root or name in self.aliases:
             existing_stuff = self.get_stuff(name=name)
-            if existing_stuff == stuff:
+            if existing_stuff == stuff and name != TEST_DUMMY_NAME:
                 log.warning(f"Key '{name}' already exists in WorkingMemory with the same stuff")
                 return
-            log.warning(f"Key '{name}' already exists in WorkingMemory and will be replaced by something different")
-            log.verbose(f"Existing stuff: {existing_stuff}")
-            log.verbose(f"New stuff: {stuff}")
+            elif name != TEST_DUMMY_NAME:
+                log.warning(f"Key '{name}' already exists in WorkingMemory and will be replaced by something different")
+                log.verbose(f"Existing stuff: {existing_stuff}")
+                log.verbose(f"New stuff: {stuff}")
 
         # it's a new stuff
         self.set_stuff(name=name, stuff=stuff)
@@ -157,7 +159,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         if target not in self.root:
             msg = f"Cannot create alias to non-existent target '{target}'"
             raise WorkingMemoryConsistencyError(msg)
-        log.debug(f"Setting alias '{alias}' pointing to target '{target}'")
         self.aliases[alias] = target
 
     def add_alias(self, alias: str, target: str) -> None:
@@ -166,7 +167,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             msg = f"Cannot add alias '{alias}' as it already exists"
             raise WorkingMemoryConsistencyError(msg)
         self.set_alias(alias=alias, target=target)
-        log.debug(f"Added alias '{alias}' pointing to target '{target}'")
 
     def remove_alias(self, alias: str) -> None:
         """Remove an alias if it exists."""
@@ -193,19 +193,16 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     ################################################################################################
 
     @override
-    def generate_jinja2_context(self) -> dict[str, Any]:
-        # TODO: Add unit tests for this method
+    def generate_context(self) -> dict[str, Any]:
         artefact_dict: StuffArtefactDict = {}
         for name, stuff in self.root.items():
-            a = stuff.make_artefact()
-            artefact_dict[name] = a
+            artefact_dict[name] = stuff.make_artefact()
         for alias, target in self.aliases.items():
             artefact_dict[alias] = artefact_dict[target]
         return artefact_dict
 
     @override
     def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None) -> Any:
-        # TODO: Add unit tests for this method
         # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot

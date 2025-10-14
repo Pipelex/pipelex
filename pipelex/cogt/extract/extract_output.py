@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from pipelex import log
-from pipelex.tools.misc.base_64_utils import save_base64_to_binary_file
+from pipelex.tools.misc.base_64_utils import save_base_64_str_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_directory_exists, save_text_to_path
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, empty_list_factory_of
 
@@ -17,7 +17,7 @@ class ExtractedImage(CustomBaseModel):
         if base_64 := self.base_64:
             filename = self.image_id
             file_path = f"{directory}/{filename}"
-            save_base64_to_binary_file(b64=base_64, file_path=file_path)
+            save_base_64_str_to_binary_file(base_64_str=base_64, file_path=file_path)
 
 
 class ExtractedImageFromPage(ExtractedImage):

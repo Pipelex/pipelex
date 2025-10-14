@@ -1,0 +1,67 @@
+####################################################################################################
+# Pipelex Configuration File
+####################################################################################################
+#
+# This configuration file is copied to your project's .pipelex/ directory when you run:
+#   pipelex init config
+#
+# Purpose:
+# - This file allows you to override Pipelex's default settings for your specific project
+# - Feel free to modify any settings below to suit your needs
+# - You can add any configuration sections that exist in the main pipelex.toml
+#
+# Finding Available Settings:
+# - See the full default configuration in: pipelex/pipelex.toml (in the Pipelex package)
+# - See the configuration structure classes in: pipelex/config.py and pipelex/cogt/config_cogt.py
+#
+# Common Customizations:
+# - Logging levels and behavior
+# - Excluded directories for scanning
+# - LLM prompt dumping for debugging
+# - Feature flags for tracking and reporting
+# - Observer and reporting output directories
+#
+####################################################################################################
+
+[pipelex.scan_config]
+excluded_dirs = [
+    ".venv",
+    "venv",
+    "env",
+    ".env",
+    "virtualenv",
+    ".virtualenv",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    "results",
+]
+
+[pipelex.log_config]
+default_log_level = "INFO"
+
+[pipelex.log_config.package_log_levels]
+pipelex = "INFO"
+
+[cogt.llm_config]
+# Uncomment any of these to enable dumping the inputs or outputs of text-genration with an LLM
+# is_dump_text_prompts_enabled = true
+# is_dump_response_text_enabled = true
+
+[cogt.llm_config.instructor_config]
+# Uncomment any of these to enable dumping the kwargs, response or errors of the instructor
+# is_dump_kwargs_enabled = true
+# is_dump_response_enabled = true
+# is_dump_error_enabled = true
+
+[pipelex.observer_config]
+observer_dir = "results/observer"
+
+[pipelex.feature_config]
+# WIP/Experimental feature flags
+is_pipeline_tracking_enabled = false
+is_activity_tracking_enabled = false
+is_reporting_enabled = true

@@ -5,7 +5,8 @@ from pathlib import Path
 import filetype
 from pydantic import BaseModel
 
-from pipelex.tools.exceptions import ToolException
+from pipelex import log
+from pipelex.system.exceptions import ToolException
 
 
 class FileTypeException(ToolException):
@@ -76,16 +77,19 @@ def detect_file_type_from_base64(b64: str | bytes) -> FileType:
     """
     # Normalise to bytes holding only the Base-64 alphabet
     if isinstance(b64, bytes):
+        log.debug(f"b64 is already bytes: {b64[:100]!r}")
         b64_bytes = b64
     else:  # str  →  handle optional data-URL header
+        log.debug(f"b64 is a string: {b64[:100]!r}")
         if b64.lstrip().startswith("data:") and "," in b64:
             b64 = b64.split(",", 1)[1]
+        log.debug(f"b64 after split: {b64[:100]!r}")
         b64_bytes = b64.encode("ascii")  # Base-64 is pure ASCII
 
     try:
         raw = base64.b64decode(b64_bytes, validate=True)
     except binascii.Error as exc:  # malformed Base-64
-        msg = f"Could not identify file type of given bytes because input is not valid Base-64: {exc}"
+        msg = f"Could not identify file type of given bytes because input is not valid Base-64: {exc}\n{b64_bytes[:100]!r}"
         raise FileTypeException(msg) from exc
 
     return detect_file_type_from_bytes(buf=raw)

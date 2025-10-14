@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from pipelex.cogt.model_routing.routing_models import BackendMatchForModel, BackendMatchingMethod
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.string_utils import matches_wildcard_pattern
 
 

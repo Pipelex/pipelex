@@ -8,26 +8,20 @@ This example demonstrates how to use Pipelex for creative text generation. It ta
 
 ## The Pipeline Explained
 
-The `generate_screenplay` function takes a pitch as a string, creates a `Stuff` object with the `screenplay.Pitch` concept, and then runs the `generate_screenplay` pipeline.
+The `generate_screenplay` function takes a pitch as a string and executes the `generate_screenplay` pipeline, passing the pitch through the `input_memory` dictionary with the concept specification.
 
 ```python
 async def generate_screenplay(pitch: str):
     """Generate a screenplay from a pitch using the pipeline."""
 
-    # Create Stuff object for the pitch
-    pitch_stuff = StuffFactory.make_from_concept_string(
-        concept_string="screenplay.Pitch",
-        content=TextContent(text=pitch),
-        name="pitch",
-    )
-
-    # Create Working Memory
-    working_memory = WorkingMemoryFactory.make_from_single_stuff(pitch_stuff)
-
-    # Run the pipe
     pipe_output = await execute_pipeline(
         pipe_code="generate_screenplay",
-        working_memory=working_memory,
+        input_memory={
+            "pitch": {
+                "concept": "screenplay.Pitch",
+                "content": pitch,
+            }
+        },
     )
     pretty_print(pipe_output, title="Pipe Output")
 ```

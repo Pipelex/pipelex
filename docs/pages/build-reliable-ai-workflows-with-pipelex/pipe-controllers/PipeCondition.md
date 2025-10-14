@@ -61,7 +61,7 @@ large = "process_large"
 type = "PipeLLM"
 description = "Handle small category"
 output = "native.Text"
-prompt_template = """
+prompt = """
 Output this only: "small"
 """
 
@@ -69,7 +69,7 @@ Output this only: "small"
 type = "PipeLLM"
 description = "Handle medium category"
 output = "native.Text"
-prompt_template = """
+prompt = """
 Output this only: "medium"
 """
 
@@ -77,7 +77,7 @@ Output this only: "medium"
 type = "PipeLLM"
 description = "Handle large category"
 output = "native.Text"
-prompt_template = """
+prompt = """
 Output this only: "large"
 """
 ```
@@ -109,7 +109,7 @@ type = "PipeLLM"
 description = "Process invoice documents"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
-prompt_template = """
+prompt = """
 Process this invoice document...
 """
 
@@ -118,7 +118,7 @@ type = "PipeLLM"
 description = "Process receipt documents" 
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
-prompt_template = """
+prompt = """
 Process this receipt document...
 """
 
@@ -127,7 +127,7 @@ type = "PipeLLM"
 description = "Handle unknown document types"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
-prompt_template = """
+prompt = """
 Process this unknown document type...
 """
 ```

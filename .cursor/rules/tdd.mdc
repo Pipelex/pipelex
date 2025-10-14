@@ -1,7 +1,6 @@
 ---
-description: 
-globs: 
 alwaysApply: false
+description: Guidelines for writing test-driven development code
 ---
 # Test-Driven Development Guide
 
@@ -26,3 +25,4 @@ If the code needs refactoring, with the best practices [coding_standards.mdc](co
 5. **Validate tests**
 
 Remember: The key to TDD is writing the test first and letting it drive your implementation. Always run the full test suite and quality checks before considering a feature complete.
+

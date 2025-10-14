@@ -4,7 +4,7 @@ from mistralai import Mistral
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import OcrCapabilityError, SdkTypeError
+from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -88,7 +88,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
     ) -> ExtractOutput:
         if should_caption_images:
             msg = "Captioning is not implemented for Mistral OCR."
-            raise OcrCapabilityError(msg)
+            raise ExtractCapabilityError(msg)
         if should_include_page_views:
             log.debug("Page views are not implemented for Mistral OCR.")
             # TODO: use a model capability flag to check possibility before asking for it

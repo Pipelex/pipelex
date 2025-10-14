@@ -5,7 +5,7 @@ from pydantic import Field
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.vertexai_factory import VertexAIFactory
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 
 
 class InferenceBackendBlueprint(ConfigModel):

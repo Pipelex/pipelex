@@ -11,7 +11,7 @@ OutcomeMap = dict[str, str]
 
 class PipeConditionBlueprint(PipeBlueprint):
     type: Literal["PipeCondition"] = "PipeCondition"
-    category: Literal["PipeController"] = "PipeController"
+    pipe_category: Literal["PipeController"] = "PipeController"
     expression_template: str | None = None
     expression: str | None = None
     outcomes: OutcomeMap = Field(default_factory=OutcomeMap)

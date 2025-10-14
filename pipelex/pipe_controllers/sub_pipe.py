@@ -30,7 +30,6 @@ class SubPipe(BaseModel):
         sub_pipe_run_params: PipeRunParams,
     ) -> PipeOutput:
         """Run or dry run a single operation self."""
-        log.debug(f"SubPipe {self.pipe_code} to generate {self.output_name}")
         if self.output_multiplicity:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
         sub_pipe_run_params.batch_params = self.batch_params
@@ -110,7 +109,6 @@ class SubPipe(BaseModel):
         else:
             # Case 3: Normal processing
             required_variables = sub_pipe.required_variables()
-            log.debug(required_variables, title=f"Required variables for {self.pipe_code}")
             required_stuff_names = {rv for rv in required_variables if not rv.startswith("_")}
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)

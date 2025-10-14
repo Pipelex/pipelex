@@ -10,7 +10,7 @@ from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
 from pipelex.hub import get_pipe_library, get_required_pipe
 from pipelex.pipelex import Pipelex
-from pipelex.tools.config.manager import config_manager
+from pipelex.system.configuration.config_loader import config_manager
 
 
 def do_show_config() -> None:
@@ -26,9 +26,9 @@ def do_show_config() -> None:
         raise PipelexConfigError(msg) from exc
 
 
-def do_list_pipes(relative_config_folder_path: str = "pipelex_libraries") -> None:
+def do_list_pipes() -> None:
     """List all available pipes."""
-    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    Pipelex.make()
 
     try:
         get_pipe_library().pretty_list_pipes()
@@ -37,9 +37,9 @@ def do_list_pipes(relative_config_folder_path: str = "pipelex_libraries") -> Non
         raise PipelexCLIError(msg) from exc
 
 
-def do_show_pipe(pipe_code: str, relative_config_folder_path: str = "./pipelex_libraries") -> None:
+def do_show_pipe(pipe_code: str) -> None:
     """Show a single pipe definition from the library."""
-    Pipelex.make(relative_config_folder_path=relative_config_folder_path, from_file=False)
+    Pipelex.make()
     pipe = get_required_pipe(pipe_code=pipe_code)
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 
@@ -54,33 +54,20 @@ def show_config_cmd() -> None:
 
 
 @show_app.command("pipes")
-def list_pipes_cmd(
-    relative_config_folder_path: Annotated[
-        str,
-        typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
-    ] = "pipelex_libraries",
-) -> None:
-    do_list_pipes(relative_config_folder_path=relative_config_folder_path)
+def list_pipes_cmd() -> None:
+    do_list_pipes()
 
 
 @show_app.command("pipe")
 def show_pipe_cmd(
     pipe_code: Annotated[str, typer.Argument(help="Pipeline code to show definition for")],
-    relative_config_folder_path: Annotated[
-        str,
-        typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
-    ] = "./pipelex_libraries",
 ) -> None:
-    do_show_pipe(pipe_code=pipe_code, relative_config_folder_path=relative_config_folder_path)
+    do_show_pipe(pipe_code=pipe_code)
 
 
 @show_app.command("models")
 def show_models_cmd(
     backend_name: Annotated[str, typer.Argument(help="Backend name to list models for")],
-    relative_config_folder_path: Annotated[
-        str,
-        typer.Option("--config-folder-path", "-c", help="Relative path to the config folder path"),
-    ] = "./pipelex_libraries",
     flat: Annotated[
         bool,
         typer.Option("--flat", "-f", help="Output in flat CSV format for easy copy-pasting"),
@@ -89,7 +76,6 @@ def show_models_cmd(
     asyncio.run(
         ModelLister.list_models(
             backend_name=backend_name,
-            relative_config_folder_path=relative_config_folder_path,
             flat=flat,
         )
     )

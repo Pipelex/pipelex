@@ -27,11 +27,11 @@ system_prompt = """
 You are an expert at describing page contents.
 """
 prompt = """
-Extract the date and title of the article.
+Extract the date and title.
 
 @page.page_view
-Also, add this as the description of the article:
 
+Also, add this to the description:
 $page.text_and_images.text.text
 """
 

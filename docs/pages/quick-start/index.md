@@ -1,79 +1,139 @@
 # Quick-start
 
-This guide shows the basics of Pipelex for the simplest use-cases: LLM calling and structured outputs.
+Welcome to Pipelex! This guide will get you started building AI workflows in minutes.
 
-You can **find more powerful examples** in the [Cookbook Examples](../cookbook-examples/index.md) section of the docs or dive directly into the [Cookbook repository](https://github.com/Pipelex/pipelex-cookbook). [![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
+## What is Pipelex?
+
+Pipelex is an open-source Python framework for building **repeatable AI workflows**. Instead of cramming everything into one complex prompt, you break tasks into focused steps—each pipe handling one clear transformation. These workflows process information from **extraction** to **analysis** to **decision making**. The result? **Deterministic structure with adaptive intelligence**: the reliability of software with the flexibility of AI.
+
+Each pipe processes information: it takes structured inputs and produces structured outputs. Pipelex uses **Concepts** (typing with meaning) to ensure your pipelines make sense. A "non-compete clause" and a "flower description" are both text, but they represent different concepts. Pipelex validates that pipes connect properly, catching errors before they happen.
+
+The `.plx` language is simple and readable—even for non-technical users. You can generate pipelines with AI or write them yourself.
+
+Learn more about the philosophy in [The Pipelex Paradigm](../pipelex-paradigm-for-repeatable-ai-workflows/index.md).
 
 ---
 
-## Setting up API Keys
+## Installation
 
-Before you can make LLM calls with Pipelex, you need to configure API keys. You have two options:
-
-### Option 1: Use Pipelex Inference (Recommended for Getting Started)
-
-Get **free access** to all well-known commercial and open-source LLMs with a single API key:
-
-1. **Join our Discord community to get your free Pipelex Inference key** (no credit card required, limited time offer)
-   - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join
-   - Request your API key in the appropriate channel once you're in
-
-2. **Set up your environment**:
-   ```bash
-   # Create a .env file in your project root
-   echo "PIPELEX_INFERENCE_API_KEY=your-key-here" > .env
-   ```
-
-With Pipelex Inference, you get instant access to models from OpenAI, Anthropic, Google, Mistral, and more - all through a single API key!
-
-### Option 2: Use Your Own API Keys
-
-If you already have API keys from LLM providers, you can use them directly:
+Install Pipelex with pip:
 
 ```bash
-# Add to your .env file
-# To directly use models on OpenAI, you will need to set the following variable
-OPENAI_API_KEY=your-openai-key
-# To directly use models on Anthropic, you will need to set the following variable
-ANTHROPIC_API_KEY=your-anthropic-key
-# To directly use models on Google, you will need to set the following variable
-GOOGLE_API_KEY=your-google-key
-# To directly use models on Mistral, you will need to set the following variable
-MISTRAL_API_KEY=your-mistral-key
-# To directly use models on FAL, you will need to set the following variable
-FAL_API_KEY=your-fal-key
-# To directly use models on XAI, you will need to set the following variable
-XAI_API_KEY=your-xai-key
-
-# To use models via Ollama, you will need to set the following variables
-OLLAMA_API_KEY=your-ollama-key
-# To use models via BlackboxAI, you will need to set the following variables
-BLACKBOX_API_KEY=your-blackboxai-key
-# To use models via Azure OpenAI, you will need to set the following variables
-AZURE_API_KEY=your-azure-key
-AZURE_API_BASE=your-azure-endpoint
-AZURE_API_VERSION=your-azure-version
-# To use models via AWS Bedrock, you will need to set the following variables
-AWS_ACCESS_KEY_ID=your-aws-key
-AWS_SECRET_ACCESS_KEY=your-aws-secret
-AWS_REGION=your-aws-region
+pip install pipelex
 ```
 
-Adding those env variables is not enough. You also need to configure the inference backend to choose where to route the AI calls.
-See the [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md#inference-backends) documentation.
+That's it! Now let's generate your first pipeline.
 
-For example, if you want to use a gemini model via GOOGLE, enable the google backend in `.pipelex/inference/backends.toml` and set the API key in your env.
 ---
 
-## Your first LLM call with Pipelex
+## Generate Your First Pipeline with AI
 
-Let's start by running your very first LLM call using Pipelex.
-For illustration purposes, let's build **a character generator**. Each example relies on asynchronous execution and typed models for reliable prompts.
+The fastest way to get started is to generate pipelines using natural language. Pipelex can create complete, multi-step workflows for you.
 
-### Write your first pipeline
+### Step 1: Generate with Pipe Builder
 
-First, create a `.plx` library file in the `pipelex_libraries/pipelines` directory to store your pipe definition.
-Run `pipelex init libraries` to create this directory if it doesn't exist. For now, keep all your pipeline definitions inside that folder only.
+The Pipe Builder transforms natural language descriptions into working `.plx` files. Here are some real-world examples:
+
+**Example 1: Expense Report Validation**
+
+```bash
+pipelex build pipe "Given an expense report, apply company rules" -o expense_pipeline.plx
+```
+
+**Example 2: CV/Job Matching**
+
+```bash
+pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match" -o cv_matcher.plx
+```
+
+**Example 3: Compliance Analysis**
+
+```bash
+pipelex build pipe "Given an RFP PDF, build a compliance matrix" -o compliance_pipeline.plx
+```
+
+These commands generate complete `.plx` files containing:
+
+- Domain definitions
+- Concept declarations
+- Multi-step pipe workflows
+
+The Pipe Builder handles complexity automatically, creating pipelines with proper structure and validation.
+
+!!! info "Pipe Builder is in Beta"
+    The Pipe Builder is currently in beta and improving rapidly. Expect frequent enhancements!
+
+### Step 2: Install Agent Rules for Iteration
+
+Once you have a generated pipeline, you can refine it using any AI coding assistant:
+
+```bash
+pipelex kit rules
+```
+
+This command installs Pipelex rules for:
+
+- **Cursor**
+- **Claude Code**
+- **OpenAI Codex**
+- **GitHub Copilot**
+- **Windsurf**
+- **Blackbox AI**
+
+These rules teach your AI assistant Pipelex syntax, concepts, and best practices.
+
+### Step 3: Iterate with Your AI Assistant
+
+With the rules installed, use natural language to refine your pipeline:
+
+- "Add a validation step to check for negative amounts"
+- "Include confidence scores in the match analysis"
+- "Add error handling for missing PDF files"
+- "Create a summary report at the end"
+
+Your AI assistant will understand Pipelex and make the changes correctly.
+
+### Step 4: Test Your Pipeline
+
+Run your pipeline from the command line or Python:
+
+**CLI:**
+
+```bash
+pipelex run <pipe_code> --input-memory-from-json input.json
+```
+
+**Python:**
+
+```python
+import asyncio
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipelex import Pipelex
+
+async def run_pipeline():
+    pipe_output = await execute_pipeline(pipe_code="your_pipe_code")
+    print(pipe_output.main_stuff_as_str)
+
+Pipelex.make()
+asyncio.run(run_pipeline())
+```
+
+!!! tip "Need API Access?"
+    To run these pipelines with LLMs, you'll need API access. We offer **free credits** for testing and developing, or you can bring your own keys, or run local AI. See the [Installation & Configuration](../installation/index.md#api-configuration) guide for all options.
+
+---
+
+## Understanding How It Works
+
+Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.plx` language.
+
+### Your First LLM Call with Pipelex
+
+Let's build a **character generator** to understand the basics.
+
+#### Write Your First Pipeline
+
+Create a `.plx` file anywhere in your project (we recommend a `pipelines` directory):
 
 `character.plx`
 ```plx
@@ -84,13 +144,20 @@ domain = "characters"
 type = "PipeLLM"
 description = "Creates a character."
 output = "Text"
-prompt_template = """You are a book writer. Your task is to create a character.
+prompt = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
-### Run your first Pipelex script
+This pipeline:
 
-Now, create a `.py` python file to run your script. You can save it anywhere in your repository.
+- Declares a `characters` domain
+- Defines a `create_character` pipe of type `PipeLLM`
+- Outputs plain `Text`
+- Uses a simple prompt
+
+#### Run Your First Pipelex Script
+
+Create a Python file to execute the pipeline:
 
 `character.py`
 ```python
@@ -113,7 +180,7 @@ Pipelex.make()
 asyncio.run(create_character())
 ```
 
-### Get your first Pipelex result
+#### Get Your First Pipelex Result
 
 ```bash
 python character.py
@@ -121,9 +188,9 @@ python character.py
 
 ![Example of a generated character sheet](character_sheet.png)
 
-## How to use a specific LLM or LLM provider
+### Using Specific LLMs
 
-### Indicate your LLM selection explicitly using the `llm` attribute
+#### Indicate Your LLM Selection Explicitly
 
 ```plx
 [pipe.create_character]
@@ -131,11 +198,11 @@ type = "PipeLLM"
 description = "Create a character."
 output = "Text"
 model = { model = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
-prompt_template = """You are a book writer. Your task is to create a character.
+prompt = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
-### Or use an LLM preset from the LLM deck
+#### Or Use an LLM Preset from the LLM Deck
 
 ```plx
 [pipe.create_character]
@@ -143,7 +210,7 @@ type = "PipeLLM"
 description = "Create a character."
 output = "Text"
 model = "llm_for_creative_writing"
-prompt_template = """You are a book writer. Your task is to create a character.
+prompt = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 
 # The llm deck above is defined in `.pipelex/inference/deck/base_deck.toml` as:
@@ -151,20 +218,19 @@ Think of it and then output the character description."""
 # it's a base preset that we provide. you can add your own presets, too.
 ```
 
-💡 We have a lot of [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
-Make sure you have credentials for the underlying LLM provider (and added your API key to the `.env`) and select the one you want!
+💡 We have many [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
 
-Learn more about LLM presets, LLM handles and LLM deck in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md)
+Learn more in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md).
 
-### Generate a structured output
+### Generate Structured Outputs
 
-Let's say that we no longer want plain text as output but a rigorously structured Character object.
+Let's create a rigorously structured `Character` object instead of plain text.
 
-### Define the model
+#### Define the Structure
 
-Using the [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax, define your object structure as a Python class, in the `pipelex_libraries/pipelines` directory:
+Using [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax:
 
-`pipelex_libraries/pipelines/characters.py`
+`characters.py`
 ```python
 from pipelex.core.stuffs.structured_content import StructuredContent
 
@@ -177,50 +243,66 @@ class Character(StructuredContent):
     description: str
 ```
 
-### Improve the pipeline
+!!! tip "Keep Structure Files Clean"
+    Keep your `StructuredContent` classes in dedicated files with minimal module-level code. Pipelex imports these modules during auto-discovery, so any module-level code will be executed.
 
-It's time to specify that your output be a `Character` instance. Use the `output` field for that purpose.
+💡 **Alternative: Inline Structure Definition**
 
-💡 Here, the concept name matches the class name (ie. `Character`), the `Character` class will automatically be considered as the structure to output.
+Define structures directly in your `.plx` file:
 
-`pipelex_libraries/pipelines/characters.plx`
+```plx
+[concept.Character]
+description = "A character in a fiction story"
+
+[concept.Character.structure]
+name = "The character's name"
+age = { type = "integer", description = "The character's age", required = true }
+gender = "The character's gender"
+description = "A description of the character"
+```
+
+Learn more in [Structuring Concepts](../build-reliable-ai-workflows-with-pipelex/structuring-concepts.md).
+
+#### Improve the Pipeline
+
+Specify that your output is a `Character` instance:
+
+`characters.plx`
 ```plx
 domain = "characters"
 
 [concept]
-Character = "A character is a fiction story" # <- Define here your output concept so that it is linked to the class name
+Character = "A character in a fiction story" # <- Define your output concept
 
 [pipe]
 [pipe.create_character]
 type = "PipeLLM"
 description = "Create a character. Get a structured result."
 output = "Character"    # <- This is the output concept for your pipe
-prompt_template = """You are a book writer. Your task is to create a character.
+prompt = """You are a book writer. Your task is to create a character.
 Think of it and then output the character description."""
 ```
 
-💡 Defining the `Character` concept as "A character is a fiction story" might seem obvious but… think of it: "character" can also mean a letter or symbol in a text. Defining concepts is the best way to avoid any ambiguity and make sure the LLMs understand what you mean.
+💡 The concept name matches the class name (`Character`), so Pipelex automatically links them.
 
-### Run your pipeline
+💡 Defining concepts removes ambiguity—"character" could mean a letter or symbol, but here it clearly means a fictional person.
 
-As you can see, the output is a `Character` instance.
+#### Run Your Pipeline
+
+The output is now a structured `Character` instance:
 
 ![Example of a generated character sheet with structure in JSON](structured_character_sheet_json.png)
 
+### Using Prompt Templates
 
-## Generate using information in a prompt template
+Pass data into prompts using templates.
 
-What if you want to pass some data into a prompt?
-You can do that using a prompt template.
+Let's process existing characters and extract metadata from their descriptions.
 
-In this example, we no longer want to generate characters. We want to process existing ones, especially their description attributes.
-
-We want to extract structured information from the description field. Thus we have a `Character` input and a `CharacterMetadata` output.
-
-### Define the output structure
+#### Define the Output Structure
 
 ```python
-# pipelex_libraries/pipelines/character_model.py
+# character_model.py
 from pipelex.core.stuffs.structured_content import StructuredContent
 
 # input class
@@ -238,9 +320,9 @@ class CharacterMetadata(StructuredContent):
     height: float
 ```
 
-### **Let's use a template to fill prompts with data**
+#### Use a Template to Fill Prompts with Data
 
-💡 Our template syntax is based on [Jinja2 syntax](https://jinja.palletsprojects.com/en/stable/). You can include a variable using the **classic** `{{ double.curly.braces }}`, and to make it simpler, we've added the possibility to just prefix your variable with the `@` symbol (recommended). Pipes declare their required inputs explicitly with the `inputs` table:
+💡 Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `{{ double.curly.braces }}` or the simpler `@` prefix (recommended).
 
 ```plx
 [concept]
@@ -251,9 +333,9 @@ CharacterMetadata = "Metadata regarding a character."
 [pipe.extract_character_1]
 type = "PipeLLM"
 description = "Get character information from a description."
-inputs = { character = "Character" }  # <- These are the inputs of your pipe, usable in the prompt_template
+inputs = { character = "Character" }  # <- These inputs are usable in the prompt
 output = "CharacterMetadata"
-prompt_template = """
+prompt = """
 You are given a text description of a character.
 Your task is to extract specific data from the following description.
 
@@ -261,11 +343,11 @@ Your task is to extract specific data from the following description.
 """
 ```
 
-💡 `@character.description` is substituted by grabbing the stuff named `character`in the working memory and using its `description`attribute
+💡 `@character.description` grabs the `character` stuff from working memory and uses its `description` attribute.
 
-Learn more about how we use Jinja in the [PipeLLM documentation](../build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md).
+Learn more about Jinja in the [PipeLLM documentation](../build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md).
 
-### **This is how you do it from the code side**
+#### Execute from Python
 
 ```python
 import asyncio
@@ -275,7 +357,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 
-from pipelex.libraries.pipelines.screenplay import Character, CharacterMetadata
+from character_model import Character, CharacterMetadata
 
 
 async def process_existing_character():
@@ -309,7 +391,7 @@ async def process_existing_character():
         working_memory=working_memory,
     )
 
-    # Get the result as a porperly typed instance
+    # Get the result as a properly typed instance
     extracted_metadata = pipe_output.main_stuff_as(content_type=CharacterMetadata) # <- This is the output of your pipe, properly typed
 
     print(extracted_metadata)
@@ -319,6 +401,32 @@ Pipelex.make()
 asyncio.run(process_existing_character())
 ```
 
-### **Get result**
+#### Get Result
 
 ![Example of extracted character metadata](extracted_character_metadata.png)
+
+---
+
+## Next Steps
+
+Now that you understand the basics, explore more:
+
+**Learn More:**
+
+- [Cookbook Examples](../cookbook-examples/index.md) - Real-world examples and patterns
+- [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md) - Deep dive into pipeline design
+- [Pipe Operators](../build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
+- [Pipe Controllers](../build-reliable-ai-workflows-with-pipelex/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
+
+**Explore Tools:**
+
+- [Pipe Builder](../tools/pipe-builder.md) - Generate pipelines from natural language
+- [Kit Commands](../tools/kit.md) - Manage agent rules and migrations
+- [CLI Commands](../tools/cli.md) - Command-line interface reference
+
+**Configure:**
+
+- [LLM Configuration](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md) - Optimize cost and quality
+- [Inference Backend](../configuration/config-technical/inference-backend-config.md) - Configure model providers
+
+[![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)

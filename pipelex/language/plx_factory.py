@@ -22,6 +22,7 @@ class SectionKey(StrEnum):
 
 CONCEPT_STRUCTURE_FIELD_KEY = "structure"
 PIPE_TEMPLATE_FIELD_KEY = "template"
+PIPE_CATEGORY_FIELD_KEY = "pipe_category"
 
 
 class PlxFactory:
@@ -102,7 +103,7 @@ class PlxFactory:
         # If field ordering is provided, add fields in the specified order first
         if field_ordering:
             for field_key in field_ordering:
-                if field_key in mapping and field_key != "category":  # Skip category field (pipe metadata)
+                if field_key in mapping and field_key != PIPE_CATEGORY_FIELD_KEY:  # Skip category field (pipe metadata)
                     field_value = mapping[field_key]
                     if isinstance(field_value, Mapping):
                         # Special handling for template field - create nested table instead of inline
@@ -117,7 +118,7 @@ class PlxFactory:
 
             # Add any remaining fields not in the ordering
             for field_key, field_value in mapping.items():
-                if field_key not in field_ordering and field_key != "category":
+                if field_key not in field_ordering and field_key != PIPE_CATEGORY_FIELD_KEY:
                     if isinstance(field_value, Mapping):
                         # Special handling for template field - create nested table instead of inline
                         if field_key == PIPE_TEMPLATE_FIELD_KEY:
@@ -132,7 +133,7 @@ class PlxFactory:
             # No field ordering provided, use original logic
             for field_key, field_value in mapping.items():
                 # Skip the category field as it's not needed in PLX output (pipe metadata)
-                if field_key == "category":
+                if field_key == PIPE_CATEGORY_FIELD_KEY:
                     continue
 
                 if isinstance(field_value, Mapping):
@@ -331,4 +332,5 @@ class PlxFactory:
     @classmethod
     def make_plx_content(cls, blueprint: PipelexBundleBlueprint) -> str:
         blueprint_dict = blueprint.model_dump(serialize_as_any=True)
+        # blueprint_dict = cls._remove_pipe_category_from_pipes(blueprint_dict)
         return cls.dict_to_plx_styled_toml(data=blueprint_dict)

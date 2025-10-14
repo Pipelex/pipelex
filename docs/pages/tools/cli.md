@@ -6,10 +6,9 @@ The Pipelex CLI provides a command-line interface for managing and interacting w
 
 ### Init group
 
-Initialize project assets.
+Initialize project configuration.
 
 ```bash
-pipelex init libraries [DIRECTORY] [--overwrite/-o]
 pipelex init config [--reset/-r]
 ```
 
@@ -18,8 +17,8 @@ pipelex init config [--reset/-r]
 Validate configuration and pipelines.
 
 ```bash
-pipelex validate all [-c/--config-folder-path PATH]
-pipelex validate pipe PIPE_CODE [-c/--config-folder-path PATH]
+pipelex validate all
+pipelex validate pipe PIPE_CODE
 ```
 
 ### Show group
@@ -28,15 +27,16 @@ Inspect configuration and pipes.
 
 ```bash
 pipelex show config
-pipelex show pipes [-c/--config-folder-path PATH]
-pipelex show pipe PIPE_CODE [-c/--config-folder-path PATH]
+pipelex show pipes
+pipelex show pipe PIPE_CODE
 ```
 
 ## Usage Tips
 
-1. Always run `pipelex validate all -c path/to/your/pipelex/config/folder` after making changes to your configuration or pipelines
+1. Always run `pipelex validate all` after making changes to your configuration or pipelines
 2. Use `pipelex show config` to debug configuration issues
-3. When initializing a new project:
-   - Start with `pipelex init config`
-   - Then run `pipelex init libraries`
-   - Finally, validate your setup with `pipelex validate all -c path/to/your/pipelex/config/folder`
+3. Use `pipelex show pipes` to see all discovered pipelines
+4. When initializing a new project:
+   - Run `pipelex init config` to create configuration files
+   - Create your `.plx` pipeline files anywhere in your project
+   - Validate your setup with `pipelex validate all`

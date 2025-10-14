@@ -16,7 +16,7 @@ class StructuringMethod(StrEnum):
 
 class PipeLLMBlueprint(PipeBlueprint):
     type: Literal["PipeLLM"] = "PipeLLM"
-    category: Literal["PipeOperator"] = "PipeOperator"
+    pipe_category: Literal["PipeOperator"] = "PipeOperator"
 
     model: LLMModelChoice | None = None
     model_to_structure: LLMModelChoice | None = None

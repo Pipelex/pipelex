@@ -1,4 +1,4 @@
-from pipelex.tools.exceptions import ToolException
+from pipelex.system.exceptions import ToolException
 
 
 class SecretNotFoundError(ToolException):

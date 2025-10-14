@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.exceptions import PipeBlueprintError
@@ -55,7 +55,7 @@ class AllowedPipeTypes(StrEnum):
 class PipeBlueprint(BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: str | None = None
-    category: Any
+    pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
     type: Any  # TODO: Find a better way to handle this.
     description: str | None = None
     inputs: dict[str, str | InputRequirementBlueprint] | None = None
@@ -94,7 +94,7 @@ class PipeBlueprint(BaseModel):
             raise PipeBlueprintError(msg)
         return value
 
-    @field_validator("category", mode="after")
+    @field_validator("pipe_category", mode="after")
     @staticmethod
     def validate_pipe_category(value: Any) -> Any:
         """Validate that the pipe category is one of the allowed values."""

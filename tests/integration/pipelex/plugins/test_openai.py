@@ -4,7 +4,7 @@ from pipelex import pretty_print
 from pipelex.hub import get_models_manager
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.environment import all_env_vars_are_set, any_env_var_is_placeholder
+from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
 
 
 # make t VERBOSE=2 TEST=TestOpenAI

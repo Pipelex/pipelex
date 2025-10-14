@@ -10,14 +10,20 @@ from pipelex.cogt.exceptions import (
     LLMHandleNotFoundError,
     LLMSettingsValidationError,
     ModelDeckValidatonError,
+    ModelNotFoundError,
 )
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
-from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
+from pipelex.cogt.llm.llm_setting import (
+    LLMModelChoice,
+    LLMSetting,
+    LLMSettingChoices,
+    LLMSettingChoicesDefaults,
+)
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.tools.config.config_model import ConfigModel
-from pipelex.tools.exceptions import ConfigValidationError
+from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.exceptions import ConfigValidationError
 from pipelex.types import Self
 
 LLM_PRESET_DISABLED = "disabled"
@@ -69,7 +75,11 @@ class ModelDeck(ConfigModel):
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
     img_gen_choice_default: ImgGenModelChoice
 
-    def check_llm_setting(self, llm_setting_or_preset_id: LLMModelChoice, is_disabled_allowed: bool = False):
+    def check_llm_setting(
+        self,
+        llm_setting_or_preset_id: LLMModelChoice,
+        is_disabled_allowed: bool = False,
+    ):
         if isinstance(llm_setting_or_preset_id, LLMSetting):
             return
         preset_id: str = llm_setting_or_preset_id
@@ -114,7 +124,7 @@ class ModelDeck(ConfigModel):
         raise ImgGenChoiceNotFoundError(msg)
 
     @classmethod
-    def final_validate(cls, deck: Self):  # pyright: ignore[reportIncompatibleMethodOverride]
+    def final_validate(cls, deck: Self):
         for llm_preset_id, llm_setting in deck.llm_presets.items():
             inference_model = deck.get_required_inference_model(model_handle=llm_setting.model)
             try:
@@ -191,7 +201,7 @@ class ModelDeck(ConfigModel):
             for alias in alias_list:
                 if inference_model := self.get_optional_inference_model(model_handle=alias):
                     return inference_model
-        log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck")
+        log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck, it could be an external plugin.")
         return None
 
     def is_handle_defined(self, model_handle: str) -> bool:
@@ -201,7 +211,7 @@ class ModelDeck(ConfigModel):
         inference_model = self.get_optional_inference_model(model_handle=model_handle)
         if inference_model is None:
             msg = f"Model handle '{model_handle}' not found in deck"
-            raise LLMHandleNotFoundError(msg)
+            raise ModelNotFoundError(msg)
         if model_handle not in self.inference_models:
             log.dev(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
         return inference_model

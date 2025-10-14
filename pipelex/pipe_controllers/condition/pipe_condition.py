@@ -249,7 +249,7 @@ class PipeCondition(PipeController):
 
         # Evaluate the expression using templating
         evaluated_expression = await content_generator.make_templated_text(
-            context=working_memory.generate_jinja2_context(),
+            context=working_memory.generate_context(),
             template=self.applied_expression_template,
             template_category=TemplateCategory.EXPRESSION,
         )
@@ -311,7 +311,6 @@ class PipeCondition(PipeController):
 
         # Get required variables and validate they exist in working memory
         required_variables = chosen_pipe.required_variables()
-        log.debug(required_variables, title=f"Required variables for PipeCondition '{self.code}'")
         required_stuff_names = {required_variable for required_variable in required_variables if not required_variable.startswith("_")}
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)

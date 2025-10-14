@@ -3,7 +3,7 @@ import os
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.tools.environment import (
+from pipelex.system.environment import (
     EnvVarNotFoundError,
     all_env_vars_are_set,
     any_env_var_is_placeholder,

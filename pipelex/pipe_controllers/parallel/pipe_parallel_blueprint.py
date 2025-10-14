@@ -12,7 +12,7 @@ from pipelex.types import Self
 
 class PipeParallelBlueprint(PipeBlueprint):
     type: Literal["PipeParallel"] = "PipeParallel"
-    category: Literal["PipeController"] = "PipeController"
+    pipe_category: Literal["PipeController"] = "PipeController"
     parallels: list[SubPipeBlueprint]
     add_each_output: bool = False
     combined_output: str | None = None

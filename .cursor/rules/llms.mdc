@@ -1,6 +1,9 @@
 ---
-globs: *.plx,*.toml
 alwaysApply: false
+description: LLM configuration and usage guidelines
+globs:
+- '*.plx'
+- '*.toml'
 ---
 # Rules to choose LLM models used in PipeLLMs.
 
@@ -39,7 +42,7 @@ type = "PipeLLM"
 description = "Write text about Hello World."
 output = "Text"
 model = { model = "gpt-5", temperature = 0.9 }
-prompt_template = """
+prompt = """
 Write a haiku about Hello World.
 """
 ```
@@ -65,7 +68,7 @@ description = "Extract invoice information from an invoice text transcript"
 inputs = { invoice_text = "InvoiceText" }
 output = "Invoice"
 model = "llm_to_extract_invoice"
-prompt_template = """
+prompt = """
 Extract invoice information from this invoice:
 
 The category of this invoice is: $invoice_details.category.
@@ -79,3 +82,4 @@ You must not use an LLM preset in a PipeLLM that does not exist in the deck. If 
 
 
 You can override the predefined llm presets by setting them in `.pipelex/inference/deck/overrides.toml`.
+

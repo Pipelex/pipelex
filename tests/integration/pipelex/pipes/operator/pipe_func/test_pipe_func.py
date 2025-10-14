@@ -12,7 +12,7 @@ from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.tools.func_registry import func_registry
+from pipelex.system.registries.func_registry import func_registry
 from tests.cases.source_code import wrap_lines
 
 

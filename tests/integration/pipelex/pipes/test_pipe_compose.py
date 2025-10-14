@@ -32,7 +32,7 @@ class TestPipeCompose:
         pipe_compose_blueprint = PipeComposeBlueprint(
             description="Jinja2 test for any context",
             template=TemplateBlueprint(
-                source=template_source,
+                template=template_source,
                 templating_style=TemplatingStyle(tag_style=TagStyle.TICKS, text_format=TextFormat.MARKDOWN),
                 category=TemplateCategory.MARKDOWN,
                 extra_context={"place_holder": "[some text from test_pipe_compose_for_any]"},
@@ -63,7 +63,7 @@ class TestPipeCompose:
         pipe_compose_blueprint = PipeComposeBlueprint(
             description="Jinja2 test for stuff context",
             template=TemplateBlueprint(
-                source=template_source,
+                template=template_source,
                 templating_style=TemplatingStyle(tag_style=TagStyle.TICKS, text_format=TextFormat.MARKDOWN),
                 category=TemplateCategory.MARKDOWN,
                 extra_context={"place_holder": "[some text from test_pipe_compose_for_stuff]"},

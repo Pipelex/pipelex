@@ -3,6 +3,9 @@
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
+from pipelex import log
+from pipelex.system.exceptions import NestedKeyConflictError
+
 K = TypeVar("K")
 V = TypeVar("V")
 
@@ -93,3 +96,64 @@ def apply_to_strings_in_list(data: list[Any], transform_func: Callable[[str], st
         else:
             result.append(item)
     return result
+
+
+def substitute_nested_in_context(context: dict[str, Any], extra_params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Substitute nested values in context dict using dotted key notation.
+
+    This function processes keys from extra_params that contain dots (e.g., "foo.bar.blip")
+    and creates nested dictionary structures in the context dict. Keys without dots are
+    added directly to the context.
+
+    Args:
+        context: The context dictionary to mutate
+        extra_params: Dictionary with potentially dotted keys to process
+
+    Returns:
+        The mutated context dictionary
+
+    Raises:
+        NestedKeyConflictError: When attempting to create nested keys under a non-dict value
+
+    Example:
+        >>> context = {}
+        >>> extra_params = {"foo.bar.blip": "hello"}
+        >>> substitute_nested_in_context(context, extra_params)
+        >>> context
+        {'foo': {'bar': {'blip': 'hello'}}}
+
+    """
+    if not extra_params:
+        return context
+
+    original_context = context.copy()
+
+    for key, value in extra_params.items():
+        if "." not in key:
+            # Simple key without dots - add directly to context
+            context[key] = value
+        else:
+            # Dotted key - create nested structure
+            segments = key.split(".")
+            current = context
+
+            # Navigate/create nested dicts for all segments except the last
+            for segment in segments[:-1]:
+                if segment not in current:
+                    # Create new nested dict
+                    current[segment] = {}
+                elif not (hasattr(current[segment], "__getitem__") and hasattr(current[segment], "__setitem__")):
+                    # Conflict: trying to nest under a non-dict-like value
+                    # Must support both __getitem__ and __setitem__ to be dict-like (e.g., dict, StuffArtefact)
+                    error_message = f"Cannot set nested key '{key}': '{segment}' is not a dict-like object"
+                    log.error(original_context, title="original_context")
+                    log.error(extra_params, title="extra_params")
+                    raise NestedKeyConflictError(error_message)
+                # Navigate into the nested dict
+                current = current[segment]
+
+            # Set the final value
+            last_segment = segments[-1]
+            current[last_segment] = value
+
+    return context

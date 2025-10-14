@@ -8,38 +8,26 @@ This example demonstrates how to create a pipeline that takes a draft of a tweet
 
 ## The Pipeline Explained
 
-The `optimize_tweet` function is the core of this example. It takes two strings, `draft_tweet_str` and `writing_style_str`, creates two `Stuff` objects with the concepts `tech_tweet.DraftTweet` and `tech_tweet.WritingStyle`, and then runs the `optimize_tweet_sequence` pipeline.
+The `optimize_tweet` function is the core of this example. It takes two strings, `draft_tweet` and `writing_style`, and executes the `optimize_tweet_sequence` pipeline, passing both inputs through the `input_memory` dictionary with their respective concept specifications.
 
 ```python
-async def optimize_tweet(draft_tweet_str: str, writing_style_str: str) -> OptimizedTweet:
-    # Create the draft tweet stuff
-    draft_tweet = StuffFactory.make_from_concept_string(
-        concept_string="tech_tweet.DraftTweet",
-        content=TextContent(text=draft_tweet_str),
-        name="draft_tweet",
-    )
-    writing_style = StuffFactory.make_from_concept_string(
-        concept_string="tech_tweet.WritingStyle",
-        content=TextContent(text=writing_style_str),
-        name="writing_style",
-    )
-
-    # Create working memory
-    working_memory = WorkingMemoryFactory.make_from_multiple_stuffs(
-        [
-            draft_tweet,
-            writing_style,
-        ]
-    )
-
-    # Run the sequence pipe
+async def optimize_tweet(draft_tweet: str, writing_style: str) -> str:
     pipe_output = await execute_pipeline(
         pipe_code="optimize_tweet_sequence",
-        working_memory=working_memory,
+        input_memory={
+            "draft_tweet": {
+                "concept": "tech_tweet.DraftTweet",
+                "content": draft_tweet,
+            },
+            "writing_style": {
+                "concept": "tech_tweet.WritingStyle",
+                "content": writing_style,
+            },
+        },
     )
 
     # Get the optimized tweet
-    optimized_tweet = pipe_output.main_stuff_as(content_type=OptimizedTweet)
+    optimized_tweet = pipe_output.main_stuff_as_str
     return optimized_tweet
 ```
 
@@ -82,7 +70,7 @@ system_prompt = """
 You are an expert in social media optimization, particularly for tech content on Twitter/X.
 Your role is to analyze tech tweets and check if they display typical startup communication pitfalls.
 """
-prompt_template = """
+prompt = """
 Evaluate the tweet for these key issues:
 
 **Fluffiness** - Overuse of buzzwords without concrete meaning...

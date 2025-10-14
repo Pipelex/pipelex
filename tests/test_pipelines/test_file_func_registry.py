@@ -3,6 +3,7 @@ from pydantic import Field
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.system.registries.func_registry import pipe_func
 
 
 class FilePath(StructuredContent):
@@ -18,6 +19,7 @@ class CodebaseFileContent(StructuredContent):
     file_content: str = Field(description="Content of the codebase file")
 
 
+@pipe_func()
 def read_file_content(working_memory: WorkingMemory) -> ListContent[CodebaseFileContent]:
     """Read the content of related codebase files.
 

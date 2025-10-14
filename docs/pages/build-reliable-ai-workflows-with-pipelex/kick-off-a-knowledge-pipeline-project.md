@@ -2,10 +2,10 @@
 
 ## Creating Your First Pipeline
 
-A pipeline in Pipelex is a collection of related concepts and pipes. Start by creating a PLX file in the `pipelines` directory:
+A pipeline in Pipelex is a collection of related concepts and pipes. Start by creating a PLX file in your project:
 
 ```plx
-# pipelex_libraries/pipelines/tutorial.plx
+# tutorial.plx
 
 domain = "tutorial"
 description = "My first Pipelex library"
@@ -21,7 +21,7 @@ type = "PipeLLM"
 description = "Answer a question"
 inputs = { question = "tutorial.Question" }
 output = "tutorial.Answer"
-prompt_template = """
+prompt = """
 Please answer the following question:
 
 @question
@@ -99,8 +99,10 @@ A domain consists of:
 
 2.  **Organization**
     - One domain per topic/functionality.
-    - Match Python file names with domain names (`finance.plx` -> `finance.py`).
+    - Use `_struct.py` suffix for structure files (`finance.plx` -> `finance_struct.py`).
     - Keep related concepts within the same domain.
+    - Place your `.plx` files anywhere in your project - Pipelex automatically discovers them.
+    - Keep `.pipelex/` configuration directory at repository root.
 
 3.  **Documentation**
     - Always add a description to your domain.
@@ -132,25 +134,63 @@ Consistent naming makes your pipeline code discoverable and maintainable:
 - For multi-word domains, use underscores: domain "customer_service" → `customer_service.plx`
 
 ### Python Model Files
-- It is recommended to match the PLX filename exactly: `legal.plx` → `legal.py`
-- But in any case, Pipelex will load models from all python modules in the `pipelines` directory or its subdirectories.
+- It is recommended to name structure files with a `_struct.py` suffix: `legal.plx` → `legal_struct.py`
+- Pipelex will automatically discover and load structure classes from all Python files in your project (excluding common directories like `.venv`, `.git`, etc.)
 
 ## Project Structure
 
-Every Pipelex project follows a simple directory structure that keeps your knowledge pipelines organized and maintainable:
+**Key principle:** Put `.plx` files where they belong in YOUR codebase. Pipelex automatically finds them.
 
+### Recommended Patterns
+
+**Topic-Based (Best for organized codebases):**
 ```
 your-project/
-├── pipelex_libraries/         # All your pipeline code lives here
-│   ├── pipelines/             # Pipeline definitions and models
-│   │   ├── __init__.py
-│   │   ├── characters.plx     # Domain definitions
-│   │   └── characters.py      # Python models for concepts
-│   ├── templates/             # Reusable prompt templates
-│   ├── llm_integrations/      # LLM provider configurations
-│   └── llm_deck/              # LLM model presets
-├── main.py                    # Your application code
-└── requirements.txt           # Python dependencies
+├── my_project/                # Your Python package
+│   ├── finance/
+│   │   ├── models.py
+│   │   ├── services.py
+│   │   ├── invoices.plx          # Pipeline with finance code
+│   │   └── invoices_struct.py    # Structure classes
+│   └── legal/
+│       ├── models.py
+│       ├── contracts.plx         # Pipeline with legal code
+│       └── contracts_struct.py
+├── .pipelex/                     # Config at repo root
+│   ├── pipelex.toml
+│   └── inference/
+└── requirements.txt
 ```
 
-The `pipelex_libraries/pipelines` directory is where Pipelex looks for your pipeline definitions. This standardized structure means you can share libraries between projects, version control them separately, and maintain clean separation between your pipeline logic and application code.
+**Centralized (If you prefer grouping pipelines):**
+```
+your-project/
+├── my_project/
+│   ├── pipelines/              # All pipelines together
+│   │   ├── finance.plx
+│   │   ├── finance_struct.py
+│   │   ├── legal.plx
+│   │   └── legal_struct.py
+│   └── core/
+│       └── (your code)
+└── .pipelex/
+```
+
+**Flat (Small projects):**
+```
+your-project/
+├── my_project/
+│   ├── invoice_pipeline.plx
+│   ├── invoice_struct.py
+│   └── main.py
+└── .pipelex/
+```
+
+### Key Points
+
+- **Flexible placement**: `.plx` files work anywhere in your project
+- **Automatic discovery**: Pipelex scans and finds them automatically
+- **Configuration location**: `.pipelex/` stays at repository root
+- **Naming convention**: Use `_struct.py` suffix for structure files
+- **Excluded directories**: `.venv`, `.git`, `__pycache__`, `node_modules` are skipped
+- **Best practice**: Keep related pipelines with their related code

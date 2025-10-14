@@ -1,6 +1,6 @@
 from typing_extensions import override
 
-from pipelex.tools.environment import EnvVarNotFoundError, get_optional_env, get_required_env
+from pipelex.system.environment import EnvVarNotFoundError, get_optional_env, get_required_env
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 

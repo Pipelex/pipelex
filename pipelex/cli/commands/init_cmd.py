@@ -6,33 +6,16 @@ from typing import Annotated
 import typer
 
 from pipelex.exceptions import PipelexCLIError
-from pipelex.libraries.library_config import LibraryConfig
-from pipelex.tools.config.manager import config_manager
+from pipelex.kit.paths import get_configs_dir
+from pipelex.system.configuration.config_loader import config_manager
 
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
 
-def do_init_libraries(directory: str = ".", overwrite: bool = False) -> None:
-    try:
-        target_dir = os.path.join(directory, "pipelex_libraries")
-        os.makedirs(directory, exist_ok=True)
-
-        library_config = LibraryConfig(config_dir_path=target_dir)
-        library_config.export_libraries(overwrite=overwrite)
-
-        if overwrite:
-            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (all files overwritten)")
-        else:
-            typer.echo(f"✅ Successfully initialized pipelex libraries at '{target_dir}' (only created non-existing files)")
-    except Exception as exc:
-        msg = f"Failed to initialize libraries at '{directory}': {exc}"
-        raise PipelexCLIError(msg) from exc
-
-
 def do_init_config(reset: bool = False) -> None:
     """Initialize pipelex configuration in the current directory."""
-    config_template_dir = os.path.join(config_manager.pipelex_root_dir, "config_template")
+    config_template_dir = str(get_configs_dir())
     target_config_dir = config_manager.pipelex_config_dir
 
     os.makedirs(target_config_dir, exist_ok=True)
@@ -80,14 +63,6 @@ def do_init_config(reset: bool = False) -> None:
 
 # Typer group for init commands
 init_app = typer.Typer(help="Initialization commands", no_args_is_help=True)
-
-
-@init_app.command("libraries")
-def init_libraries_cmd(
-    directory: Annotated[str, typer.Argument(help="Directory where to create the pipelex_libraries folder")] = ".",
-    overwrite: Annotated[bool, typer.Option("--overwrite", "-o", help="Warning: If set, existing files will be overwritten.")] = False,
-) -> None:
-    do_init_libraries(directory=directory, overwrite=overwrite)
 
 
 @init_app.command("config")

@@ -32,10 +32,10 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
-from pipelex.tools.registry_models import ModelType, RegistryModels
+from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
-class PipelexRegistryModels(RegistryModels):
+class CoreRegistryModels(RegistryModels):
     FIELD_EXTRACTION: ClassVar[list[ModelType]] = []
 
     PIPE_OPERATORS: ClassVar[list[PipeAbstractType]] = [

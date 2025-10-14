@@ -1,7 +1,10 @@
 from typing import Any
 
+import pytest
+
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.tools.misc.dict_utils import apply_to_strings_in_list, apply_to_strings_recursive, insert_before
+from pipelex.system.exceptions import NestedKeyConflictError
+from pipelex.tools.misc.dict_utils import apply_to_strings_in_list, apply_to_strings_recursive, insert_before, substitute_nested_in_context
 
 
 class TestDictUtils:
@@ -243,3 +246,106 @@ class TestDictUtils:
         assert result[2][0] == "list in list list"
         assert result[2][1][0]["very_deep"] == "very deep value very_deep"
         assert result[2][1][1] == "deep list item deep_list"
+
+    def test_substitute_nested_in_context_basic(self) -> None:
+        """Test basic nested substitution with dotted keys."""
+        context: dict[str, Any] = {}
+        extra_params = {"foo.bar": "hello"}
+
+        result = substitute_nested_in_context(context, extra_params)
+
+        assert result is context  # Should mutate original
+        assert context["foo"]["bar"] == "hello"
+
+    def test_substitute_nested_in_context_deep_nesting(self) -> None:
+        """Test deep nesting with multiple levels."""
+        context: dict[str, Any] = {}
+        extra_params = {"a.b.c.d": "deep_value"}
+
+        substitute_nested_in_context(context, extra_params)
+
+        assert context["a"]["b"]["c"]["d"] == "deep_value"
+
+    def test_substitute_nested_in_context_multiple_keys(self) -> None:
+        """Test multiple nested keys, some sharing prefixes."""
+        context: dict[str, Any] = {}
+        extra_params = {
+            "foo.bar.nested": "value3",
+            "foo.baz": "value2",
+            "other.key": "value4",
+        }
+
+        substitute_nested_in_context(context, extra_params)
+
+        assert context["foo"]["bar"]["nested"] == "value3"
+        assert context["foo"]["baz"] == "value2"
+        assert context["other"]["key"] == "value4"
+
+    def test_substitute_nested_in_context_mixed_keys(self) -> None:
+        """Test mixed keys with and without dots."""
+        context: dict[str, Any] = {}
+        extra_params = {
+            "simple": "simple_value",
+            "nested.key": "nested_value",
+            "another": 42,
+        }
+
+        substitute_nested_in_context(context, extra_params)
+
+        assert context["simple"] == "simple_value"
+        assert context["nested"]["key"] == "nested_value"
+        assert context["another"] == 42
+
+    def test_substitute_nested_in_context_existing_nested(self) -> None:
+        """Test extending existing nested structures."""
+        context: dict[str, Any] = {"foo": {"existing": "old_value"}}
+        extra_params = {"foo.bar": "new_value"}
+
+        substitute_nested_in_context(context, extra_params)
+
+        assert context["foo"]["existing"] == "old_value"
+        assert context["foo"]["bar"] == "new_value"
+
+    def test_substitute_nested_in_context_conflict(self) -> None:
+        """Test error when trying to nest under a non-dict-like value."""
+        context: dict[str, Any] = {"foo": "string_value"}
+        extra_params = {"foo.bar": "new_value"}
+
+        with pytest.raises(NestedKeyConflictError) as exc_info:
+            substitute_nested_in_context(context, extra_params)
+
+        assert "foo.bar" in exc_info.value.message
+        assert "foo" in exc_info.value.message
+        assert "dict-like" in exc_info.value.message
+
+    def test_substitute_nested_in_context_none_extra_params(self) -> None:
+        """Test function works when extra_params is None."""
+        context: dict[str, Any] = {"existing": "value"}
+
+        result = substitute_nested_in_context(context, None)
+
+        assert result is context
+        assert context == {"existing": "value"}
+
+    def test_substitute_nested_in_context_empty_extra_params(self) -> None:
+        """Test function works with empty extra_params."""
+        context: dict[str, Any] = {"existing": "value"}
+        extra_params: dict[str, Any] = {}
+
+        result = substitute_nested_in_context(context, extra_params)
+
+        assert result is context
+        assert context == {"existing": "value"}
+
+    def test_substitute_nested_in_context_mutation(self) -> None:
+        """Test that the original context dict is mutated."""
+        context: dict[str, Any] = {"existing": "value"}
+        original_id = id(context)
+        extra_params = {"foo.bar": "hello"}
+
+        result = substitute_nested_in_context(context, extra_params)
+
+        assert id(result) == original_id
+        assert result is context
+        assert context["foo"]["bar"] == "hello"
+        assert context["existing"] == "value"
