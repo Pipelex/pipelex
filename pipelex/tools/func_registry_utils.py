@@ -53,7 +53,6 @@ class FuncRegistryUtils:
                 func_registry.register_function(
                     func=func,
                     name=func_name,
-                    should_raise_if_already_registered=False,
                 )
                 functions_registered += 1
                 log.verbose(f"Registered @pipe_func: {func_name} from {modname}")
@@ -125,7 +124,6 @@ class FuncRegistryUtils:
                 func_registry.register_function(
                     func=func,
                     name=func_name,
-                    should_raise_if_already_registered=False,
                 )
         except ModuleFileError:
             # Expected: file validation issues (directories with .py extension, etc.)
