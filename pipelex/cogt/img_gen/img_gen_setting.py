@@ -4,7 +4,7 @@ from pydantic import Field, model_validator
 
 from pipelex.cogt.exceptions import ImgGenSettingsValidationError
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import Self
 
 

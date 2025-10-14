@@ -28,7 +28,7 @@ from pipelex.config import PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
-from pipelex.core.registry_models import PipelexRegistryModels
+from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
@@ -51,10 +51,10 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
-from pipelex.test_extras.registry_test_models import PipelexTestModels
-from pipelex.tools.config.config_root import ConfigRoot
-from pipelex.tools.func_registry import func_registry
-from pipelex.tools.runtime_manager import runtime_manager
+from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.runtime import runtime_manager
+from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -115,7 +115,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         self.reporting_delegate: ReportingProtocol
         if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager(reporting_config=get_config().pipelex.reporting_config)
+            self.reporting_delegate = reporting_delegate or ReportingManager()
         else:
             self.reporting_delegate = ReportingNoOp()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
@@ -242,10 +242,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
         self.reporting_delegate.setup()
-        self.class_registry.register_classes(PipelexRegistryModels.get_all_models())
+        self.class_registry.register_classes(CoreRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.debug("Registering test models for unit testing")
-            self.class_registry.register_classes(PipelexTestModels.get_all_models())
+            self.class_registry.register_classes(TestRegistryModels.get_all_models())
         self.activity_manager.setup()
 
         observer_provider = observer_provider or LocalObserver()

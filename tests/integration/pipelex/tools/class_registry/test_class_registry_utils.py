@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.hub import get_class_registry
-from pipelex.tools.class_registry_utils import ClassRegistryUtils
+from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from tests.cases import ClassRegistryTestCases
 
 

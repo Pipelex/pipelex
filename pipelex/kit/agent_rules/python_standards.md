@@ -54,7 +54,6 @@ This document outlines the core coding standards, best practices, and quality co
     - Use type hints for all variables where type is not obvious
     - Use dict, list, tuple types with lowercase first letter: dict[], list[], tuple[]
     - Use type hints for all fields
-    - Use the `|` syntax for union types (e.g `str | int`) and `| None` for optionals (not `Optional[]`)
     - Use Field(default_factory=...) for mutable defaults
     - Use `# pyright: ignore[specificError]` or `# type: ignore` only as a last resort. In particular, if you are sure about the type, you often solve issues by using cast() or creating a new typed variable.
 

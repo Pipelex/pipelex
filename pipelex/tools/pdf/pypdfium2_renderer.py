@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pypdfium2 as pdfium
 from pypdfium2.raw import FPDFBitmap_BGRA
 
-from pipelex.tools.exceptions import ToolException
+from pipelex.system.exceptions import ToolException
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 

@@ -1,5 +1,3 @@
-"""Path utilities for the kit system."""
-
 from importlib.abc import Traversable
 from importlib.resources import files
 

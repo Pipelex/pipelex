@@ -7,7 +7,6 @@ NEVER USE unittest.mock or MagicMock. YOU MUST USE pytest-mock instead.
 ### Test file structure
 
 - Name test files with `test_` prefix
-- Use descriptive names that match the functionality being tested
 - Place test files in the appropriate test category directory:
     - `tests/unit/` - for unit tests that test individual functions/classes in isolation
     - `tests/integration/` - for integration tests that test component interactions
@@ -59,6 +58,7 @@ class TestFooBar:
 ```
 
 - Never more than 1 class per test file.
+- When testing one method, if possible, limit the number of test functions, but with different test cases in parameters
 - Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
 
 ### Test Data Organization
@@ -90,11 +90,12 @@ Also note that we provide a topic for the test case, which is purely for conveni
 
 ## Best Practices for Testing
 
+- Whenever possible, use strong asserts to test value, not just type and presence.
 - Use parametrize for multiple test cases
 - Test both success and failure cases
 - Verify working memory state
 - Check output structure and content
 - Use meaningful test case names
-- Include docstrings explaining test purpose
+- Include docstrings explaining test purpose but not on top of the file
 - Log outputs for debugging
 - Generate reports for cost tracking

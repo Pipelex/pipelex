@@ -193,19 +193,16 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     ################################################################################################
 
     @override
-    def generate_jinja2_context(self) -> dict[str, Any]:
-        # TODO: Add unit tests for this method
+    def generate_context(self) -> dict[str, Any]:
         artefact_dict: StuffArtefactDict = {}
         for name, stuff in self.root.items():
-            artefact = stuff.make_artefact()
-            artefact_dict[name] = artefact
+            artefact_dict[name] = stuff.make_artefact()
         for alias, target in self.aliases.items():
             artefact_dict[alias] = artefact_dict[target]
         return artefact_dict
 
     @override
     def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None) -> Any:
-        # TODO: Add unit tests for this method
         # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot

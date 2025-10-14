@@ -10,7 +10,7 @@ from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
 from pipelex.hub import get_pipe_library, get_required_pipe
 from pipelex.pipelex import Pipelex
-from pipelex.tools.config.manager import config_manager
+from pipelex.system.configuration.config_loader import config_manager
 
 
 def do_show_config() -> None:

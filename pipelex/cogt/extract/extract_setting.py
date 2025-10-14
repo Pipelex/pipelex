@@ -2,7 +2,7 @@ from typing import Union
 
 from pydantic import Field
 
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 
 
 class ExtractSetting(ConfigModel):

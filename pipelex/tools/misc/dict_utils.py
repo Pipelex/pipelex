@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
 from pipelex import log
-from pipelex.tools.exceptions import NestedKeyConflictError
+from pipelex.system.exceptions import NestedKeyConflictError
 
 K = TypeVar("K")
 V = TypeVar("V")

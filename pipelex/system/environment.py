@@ -2,7 +2,7 @@ import os
 
 from dotenv import load_dotenv
 
-from pipelex.tools.exceptions import ToolException
+from pipelex.system.exceptions import ToolException
 from pipelex.tools.misc.placeholder import value_is_placeholder
 
 load_dotenv(dotenv_path=".env", override=True)

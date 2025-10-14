@@ -22,8 +22,8 @@ from pipelex.cogt.llm.llm_setting import (
 )
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.tools.config.config_model import ConfigModel
-from pipelex.tools.exceptions import ConfigValidationError
+from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.exceptions import ConfigValidationError
 from pipelex.types import Self
 
 LLM_PRESET_DISABLED = "disabled"

@@ -36,7 +36,7 @@ def import_module_from_file(file_path: str) -> Any:
         raise ModuleFileError(msg)
 
     # Convert file path to module-style path to use as the actual module name
-    module_name = _convert_file_path_to_module_path(file_path)
+    module_name = convert_file_path_to_module_path(file_path)
 
     # Check if module is already loaded to avoid duplicate loading
     if module_name in sys.modules:
@@ -59,7 +59,7 @@ def import_module_from_file(file_path: str) -> Any:
     return module
 
 
-def _convert_file_path_to_module_path(file_path: str) -> str:
+def convert_file_path_to_module_path(file_path: str) -> str:
     """Convert a file path to a valid module identifier.
 
     The module name doesn't need to match the actual package structure since

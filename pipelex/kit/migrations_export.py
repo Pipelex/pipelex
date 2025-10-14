@@ -1,5 +1,3 @@
-"""Export migration documentation from kit to user's .pipelex directory."""
-
 from pathlib import Path
 
 import typer

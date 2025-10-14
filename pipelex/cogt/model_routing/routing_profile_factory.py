@@ -1,7 +1,7 @@
 from pydantic import Field
 
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
-from pipelex.tools.config.config_model import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 
 
 class RoutingProfileBlueprint(ConfigModel):

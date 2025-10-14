@@ -1,5 +1,5 @@
-from pipelex.tools.environment import is_env_var_set
-from pipelex.tools.runtime_manager import RunMode, runtime_manager
+from pipelex.system.environment import is_env_var_set
+from pipelex.system.runtime import RunMode, runtime_manager
 
 
 def test_testing():

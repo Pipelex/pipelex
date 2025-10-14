@@ -1,5 +1,3 @@
-"""Build and update merged agent documentation in target files."""
-
 import difflib
 import re
 from importlib.abc import Traversable

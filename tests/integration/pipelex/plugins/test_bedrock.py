@@ -7,7 +7,7 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from pipelex.tools.environment import all_env_vars_are_set, any_env_var_is_placeholder
+from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
 
 warnings.filterwarnings(
     "ignore",
