@@ -15,6 +15,15 @@ We tried to group all the renamings we wanted to do which impact our language, s
 
 This is all in the spirit of making Pipelex a declarative language, where you express what you want to do, and the system will figure out how to do it. So our focus inwas to make the Pipelex language easier to understand and use for non-technical users, and at the same time use more consistent and obvious words that developers are used to.
 
+**💡 Pro tip:** To make migration easier, pass the [migration guide](pipelex/kit/migrations/migrate_0.11.0_0.12.0.md) to your favorite SWE agent (Cursor, Claude Code, github copilot, etc.) and let it handle the bulk of the changes!
+
+- **Removed centralized `pipelex_libraries` folder system**
+  - Pipelines are now auto-discovered from anywhere in your project—no special directory required
+  - No config path parameters needed in `Pipelex.make()` or CLI commands (just call `Pipelex.make()`)
+  - Custom functions require `@pipe_func()` decorator for auto-discovery
+  - Structure classes auto-discovered (must inherit from `StructuredContent`)
+  - Configuration stays at repository root in `.pipelex/` directory
+  - See [migration guide](pipelex/kit/migrations/migrate_0.11.0_0.12.0.md) for details on reorganizing your project structure
 
 - General changes
   - renamed `definition` fields to `description` across all cases
@@ -91,6 +100,8 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Updated kajson dependency from version `0.3.0` to `0.3.1`
  - Cleanup env example and better explain how to set up keys in README and docs
  - Changed Gemini routing from `google` backend to `pipelex_inference` backend
+ - **BREAKING:** Split `pipelex.core.stuffs.stuff_content` module into individual files per content type (affects imports: `StructuredContent`, `TextContent`, `ImageContent`, `ListContent`, `PDFContent`, `PageContent`, `NumberContent`, `HtmlContent`, `MermaidContent`, `TextAndImagesContent`)
+ - **BREAKING:** Renamed package `pipelex.pipe_works` to `pipelex.pipe_run` and moved `PipeRunParams` classes into it
  - Renamed `ConceptProviderAbstract` to `ConceptLibraryAbstract`
  - Renamed `DomainProviderAbstract` to `DomainLibraryAbstract`
  - Renamed `PipeProviderAbstract` to `PipeLibraryAbstract`
@@ -119,6 +130,8 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Updated README badge URL to point to main branch instead of feature/pipe-builder branch
 
 ### Removed
+ - Removed centralized `pipelex_libraries` folder system and `pipelex init libraries` command
+ - Removed config path parameters from `Pipelex.make()` (`relative_config_folder_path`, `config_folder_path`, `from_file`)
  - Removed Gemini 1.5 series models: `gemini-1.5-pro`, `gemini-1.5-flash`, and `gemini-1.5-flash-8b`
  - Removed `base_templates.toml` file (generic prompts moved to `pipelex.toml`)
  - Removed `gpt-5-mini` from possible models in pipe-builder
