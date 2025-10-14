@@ -85,8 +85,8 @@ markdown_extensions:
 nav:
   - Home:
     - Welcome: index.md
-    - Installation: pages/installation/index.md
     - Quick-start: pages/quick-start/index.md
+    - Installation: pages/installation/index.md
     - Understand Pipelex:
       - The Knowledge Pipeline Manifesto: manifesto.md
       - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
@@ -148,6 +148,7 @@ nav:
     - Changelog: changelog.md
     - Tools:
       - CLI: pages/tools/cli.md
+      - Kit Commands: pages/tools/kit.md
       - Pipe Builder: pages/tools/pipe-builder.md
       - Logging: pages/tools/logging.md
     - Advanced Customizations:
