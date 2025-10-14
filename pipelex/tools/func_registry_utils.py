@@ -81,7 +81,7 @@ class FuncRegistryUtils:
                 func_registry.register_function(
                     func=func,
                     name=func_name,
-                    should_warn_if_already_registered=True,
+                    should_raise_if_already_registered=False,
                 )
         except ModuleFileError:
             # Expected: file validation issues (directories with .py extension, etc.)

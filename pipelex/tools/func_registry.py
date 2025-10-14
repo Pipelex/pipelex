@@ -77,7 +77,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         self,
         func: Callable[..., Any],
         name: str | None = None,
-        should_warn_if_already_registered: bool = True,
+        should_raise_if_already_registered: bool = False,
     ) -> None:
         """Registers a function in the registry with a name if it meets eligibility criteria."""
         if not self.is_eligible_function(func):
@@ -85,11 +85,10 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
 
         key = name or func.__name__
         if key in self.root:
-            if should_warn_if_already_registered:
-                self.log(f"Function '{key}' already exists in registry")
-            else:
+            if should_raise_if_already_registered:
                 msg = f"Function '{key}' already exists in registry"
                 raise FuncRegistryError(msg)
+            self.log(f"Function '{key}' already exists in registry")
         else:
             self.log(f"Registered new single function '{key}' in registry")
         self.root[key] = func
@@ -113,12 +112,12 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def register_functions_dict(self, functions: dict[str, Callable[..., Any]]) -> None:
         """Registers multiple functions in the registry with names if they meet eligibility criteria."""
         for name, func in functions.items():
-            self.register_function(func=func, name=name, should_warn_if_already_registered=False)
+            self.register_function(func=func, name=name, should_raise_if_already_registered=False)
 
     def register_functions(self, functions: list[Callable[..., Any]]) -> None:
         """Registers multiple functions in the registry with names if they meet eligibility criteria."""
         for func in functions:
-            self.register_function(func=func, should_warn_if_already_registered=False)
+            self.register_function(func=func, should_raise_if_already_registered=False)
 
     def get_function(self, name: str) -> Callable[..., Any] | None:
         """Retrieves a function from the registry by its name. Returns None if not found."""
