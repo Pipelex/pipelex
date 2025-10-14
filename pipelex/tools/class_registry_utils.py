@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Union, get_args, get_origin
 
 from kajson.kajson_manager import KajsonManager
 
+from pipelex.tools.misc.common_exclusions import EXCLUDED_SCAN_DIRS
 from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
 
 if TYPE_CHECKING:
@@ -92,14 +93,11 @@ class ClassRegistryUtils:
         # Get all files using the base utility
         all_files = base_find_files_in_dir(dir_path, pattern, is_recursive)
 
-        # Directories to exclude from scanning to avoid import issues
-        exclude_dirs = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
-
         # Filter out files in excluded directories
         filtered_files: list[Path] = []
         for file_path in all_files:
             # Check if any parent directory is in the exclude list
-            should_exclude = any(part in exclude_dirs for part in file_path.parts)
+            should_exclude = any(part in EXCLUDED_SCAN_DIRS for part in file_path.parts)
             if not should_exclude:
                 filtered_files.append(file_path)
 

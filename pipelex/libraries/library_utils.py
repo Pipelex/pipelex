@@ -1,16 +1,12 @@
 """Utility functions for library management."""
 
-import importlib
-import inspect
-import pkgutil
 from importlib.abc import Traversable
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
 
 from pipelex import log
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.tools.func_registry import func_registry
+from pipelex.tools.misc.common_exclusions import EXCLUDED_SCAN_DIRS
 from pipelex.tools.misc.file_utils import find_files_in_dir
 
 
@@ -41,8 +37,7 @@ def get_pipelex_plx_files_from_package() -> list[Path]:
                         log.verbose(f"Found pipelex package PLX file: {plx_path_str}")
                 elif child.is_dir():
                     # Skip excluded directories
-                    excluded = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
-                    if child.name not in excluded:
+                    if child.name not in EXCLUDED_SCAN_DIRS:
                         _find_plx_in_traversable(child, collected)
         except (PermissionError, OSError) as exc:
             log.warning(f"Could not access {traversable}: {exc}")
@@ -83,64 +78,12 @@ def find_plx_files_in_dir(dir_path: str, pattern: str, is_recursive: bool) -> li
     # Get all files using the base utility
     all_files = find_files_in_dir(dir_path, pattern, is_recursive)
 
-    # Directories to exclude from scanning to avoid loading invalid PLX files
-    exclude_dirs = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
-
     # Filter out files in excluded directories
     filtered_files: list[Path] = []
     for file_path in all_files:
         # Check if any parent directory is in the exclude list
-        should_exclude = any(part in exclude_dirs for part in file_path.parts)
+        should_exclude = any(part in EXCLUDED_SCAN_DIRS for part in file_path.parts)
         if not should_exclude:
             filtered_files.append(file_path)
 
     return filtered_files
-
-
-def register_pipe_funcs_from_package(package_name: str, package: Any) -> int:
-    """Register all @pipe_func decorated functions from a package.
-
-    Args:
-        package_name: Full name of the package (e.g. "pipelex.builder")
-        package: The imported package object
-
-    Returns:
-        Number of functions registered
-    """
-    functions_registered = 0
-
-    if not hasattr(package, "__path__"):
-        log.warning(f"Package {package_name} has no __path__ attribute, cannot walk modules")
-        return 0
-
-    log.verbose(f"Walking package {package_name} at {package.__path__}")
-
-    for _importer, modname, _ispkg in pkgutil.walk_packages(path=package.__path__, prefix=f"{package_name}.", onerror=lambda _: None):
-        # Import the module
-        module = importlib.import_module(modname)
-        log.verbose(f"Imported {modname}")
-
-        # Find @pipe_func decorated functions in this module
-        for _name, obj in inspect.getmembers(module, inspect.isfunction):
-            # Skip functions imported from other modules
-            if obj.__module__ != modname:
-                continue
-
-            # Only process functions marked with @pipe_func
-            if not func_registry.is_marked_pipe_func(obj):
-                continue
-
-            # Check for custom name from decorator
-            custom_name = getattr(obj, "_pipe_func_name", None)
-            func_name = custom_name if custom_name is not None else obj.__name__
-
-            # Register the function
-            func_registry.register_function(
-                func=obj,
-                name=func_name,
-                should_raise_if_already_registered=False,
-            )
-            functions_registered += 1
-            log.verbose(f"Registered @pipe_func: {func_name} from {modname}")
-
-    return functions_registered

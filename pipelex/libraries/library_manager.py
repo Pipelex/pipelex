@@ -36,7 +36,6 @@ from pipelex.libraries.library_utils import (
     find_plx_files_in_dir,
     get_pipelex_package_dir_for_imports,
     get_pipelex_plx_files_from_package,
-    register_pipe_funcs_from_package,
 )
 from pipelex.tools.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.config.manager import config_manager
@@ -230,7 +229,7 @@ class LibraryManager(LibraryManagerAbstract):
         import pipelex.builder  # noqa: PLC0415 - intentional local import
 
         log.info("Registering @pipe_func functions from pipelex.builder")
-        functions_count = register_pipe_funcs_from_package("pipelex.builder", pipelex.builder)
+        functions_count = FuncRegistryUtils.register_pipe_funcs_from_package("pipelex.builder", pipelex.builder)
         log.info(f"Registered {functions_count} @pipe_func functions from pipelex.builder")
 
     @override

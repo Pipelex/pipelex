@@ -1,10 +1,13 @@
+import importlib
 import inspect
+import pkgutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from pipelex import log
 from pipelex.tools.func_registry import func_registry, pipe_func
+from pipelex.tools.misc.common_exclusions import EXCLUDED_SCAN_DIRS
 from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
 from pipelex.tools.typing.module_inspector import (
     ModuleFileError,
@@ -13,6 +16,50 @@ from pipelex.tools.typing.module_inspector import (
 
 
 class FuncRegistryUtils:
+    @classmethod
+    def register_pipe_funcs_from_package(cls, package_name: str, package: Any) -> int:
+        """Register all @pipe_func decorated functions from a package.
+
+        Args:
+            package_name: Full name of the package (e.g. "pipelex.builder")
+            package: The imported package object
+
+        Returns:
+            Number of functions registered
+
+        """
+        functions_registered = 0
+
+        if not hasattr(package, "__path__"):
+            log.warning(f"Package {package_name} has no __path__ attribute, cannot walk modules")
+            return 0
+
+        log.verbose(f"Walking package {package_name} at {package.__path__}")
+
+        for _importer, modname, _ispkg in pkgutil.walk_packages(
+            path=package.__path__,
+            prefix=f"{package_name}.",
+            onerror=lambda _: None,
+        ):
+            # Import the module
+            module = importlib.import_module(modname)
+            log.verbose(f"Imported {modname}")
+
+            # Find @pipe_func decorated functions in this module
+            functions_to_register = cls._find_functions_in_module(module)
+
+            for func in functions_to_register:
+                func_name = cls._get_function_registration_name(func)
+                func_registry.register_function(
+                    func=func,
+                    name=func_name,
+                    should_raise_if_already_registered=False,
+                )
+                functions_registered += 1
+                log.verbose(f"Registered @pipe_func: {func_name} from {modname}")
+
+        return functions_registered
+
     @classmethod
     def register_funcs_in_folder(
         cls,
@@ -74,10 +121,7 @@ class FuncRegistryUtils:
             functions_to_register = cls._find_functions_in_module(module)
 
             for func in functions_to_register:
-                # Check for custom name from decorator
-                custom_name = getattr(func, "_pipe_func_name", None)
-                func_name = custom_name if custom_name is not None else func.__name__
-
+                func_name = cls._get_function_registration_name(func)
                 func_registry.register_function(
                     func=func,
                     name=func_name,
@@ -131,6 +175,23 @@ class FuncRegistryUtils:
         return functions
 
     @classmethod
+    def _get_function_registration_name(cls, func: Callable[..., Any]) -> str:
+        """Extract the registration name for a function.
+
+        If the function has a custom name from the @pipe_func decorator, use that.
+        Otherwise, use the function's __name__.
+
+        Args:
+            func: The function to get the registration name for
+
+        Returns:
+            The name to use when registering the function
+
+        """
+        custom_name = getattr(func, "_pipe_func_name", None)
+        return custom_name if custom_name is not None else func.__name__
+
+    @classmethod
     def _find_files_in_dir(cls, dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
         """Find files matching a pattern in a directory, excluding common build/cache directories.
 
@@ -146,14 +207,11 @@ class FuncRegistryUtils:
         # Get all files using the base utility
         all_files = base_find_files_in_dir(dir_path, pattern, is_recursive)
 
-        # Directories to exclude from scanning to avoid import issues
-        exclude_dirs = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
-
         # Filter out files in excluded directories
         filtered_files: list[Path] = []
         for file_path in all_files:
             # Check if any parent directory is in the exclude list
-            should_exclude = any(part in exclude_dirs for part in file_path.parts)
+            should_exclude = any(part in EXCLUDED_SCAN_DIRS for part in file_path.parts)
             if not should_exclude:
                 filtered_files.append(file_path)
 
