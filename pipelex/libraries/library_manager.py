@@ -1,9 +1,10 @@
 import importlib
+import inspect
 import pkgutil
 from importlib.abc import Traversable
 from importlib.resources import files
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from pydantic import ValidationError
 from typing_extensions import override
@@ -311,6 +312,7 @@ class LibraryManager(LibraryManagerAbstract):
         Uses pkgutil.walk_packages to auto-discover all pipelex.builder modules.
         """
         import pipelex.builder  # noqa: PLC0415 - intentional local import
+        from pipelex.tools.func_registry import func_registry  # noqa: PLC0415 - intentional local import
 
         log.info("Starting pipelex.builder module discovery for @pipe_func registration")
 
@@ -319,18 +321,44 @@ class LibraryManager(LibraryManagerAbstract):
             if hasattr(pipelex.builder, "__path__"):
                 log.info(f"pipelex.builder has __path__: {pipelex.builder.__path__}")
                 module_count = 0
+                functions_registered = 0
+
                 for _importer, modname, _ispkg in pkgutil.walk_packages(
                     path=pipelex.builder.__path__, prefix="pipelex.builder.", onerror=lambda _: None
                 ):
                     module_count += 1
                     try:
-                        # Import each module to trigger @pipe_func decorator registration
-                        importlib.import_module(modname)
-                        log.info(f"Successfully imported {modname} for @pipe_func registration")
-                    except Exception as exc:
-                        log.warning(f"Could not import {modname}: {exc}")
+                        # Import the module
+                        module = importlib.import_module(modname)
+                        log.info(f"Successfully imported {modname}")
 
-                log.info(f"Discovered and attempted to import {module_count} modules in pipelex.builder")
+                        # Find @pipe_func decorated functions in this module
+                        for _name, obj in inspect.getmembers(module, inspect.isfunction):
+                            # Skip functions imported from other modules
+                            if obj.__module__ != modname:
+                                continue
+
+                            # Only process functions marked with @pipe_func
+                            if not func_registry.is_marked_pipe_func(obj):
+                                continue
+
+                            # Check for custom name from decorator
+                            custom_name = getattr(obj, "_pipe_func_name", None)
+                            func_name = custom_name if custom_name is not None else obj.__name__
+
+                            # Register the function
+                            func_registry.register_function(
+                                func=obj,
+                                name=func_name,
+                                should_warn_if_already_registered=False,
+                            )
+                            functions_registered += 1
+                            log.info(f"Registered @pipe_func: {func_name} from {modname}")
+
+                    except Exception as exc:
+                        log.warning(f"Could not process {modname}: {exc}")
+
+                log.info(f"Discovered {module_count} modules and registered {functions_registered} @pipe_func functions")
             else:
                 log.error("Could not walk pipelex.builder package - no __path__ attribute")
         except ImportError as exc:
