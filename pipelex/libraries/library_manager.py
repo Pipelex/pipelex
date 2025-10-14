@@ -1,3 +1,5 @@
+from importlib.abc import Traversable
+from importlib.resources import files
 from pathlib import Path
 from typing import ClassVar
 
@@ -245,32 +247,101 @@ class LibraryManager(LibraryManagerAbstract):
                 pipes.append(pipe)
         return pipes
 
+    def _get_pipelex_plx_files_from_package(self) -> list[Path]:
+        """Get all PLX files from the pipelex package using importlib.resources.
+
+        This works reliably whether pipelex is installed as a wheel, from source,
+        or as a relative path import.
+
+        Returns:
+            List of Path objects to PLX files in pipelex package
+        """
+        plx_files: list[Path] = []
+        pipelex_package = files("pipelex")
+
+        def _find_plx_in_traversable(traversable: Traversable, collected: list[Path]) -> None:
+            """Recursively find .plx files in a Traversable."""
+            try:
+                if not traversable.is_dir():
+                    return
+
+                for child in traversable.iterdir():
+                    if child.is_file() and child.name.endswith(".plx"):
+                        # Convert to path string for validation
+                        plx_path_str = str(child)
+                        if PipelexInterpreter.is_pipelex_file(Path(plx_path_str)):
+                            collected.append(Path(plx_path_str))
+                            log.debug(f"Found pipelex package PLX file: {plx_path_str}")
+                    elif child.is_dir():
+                        # Skip excluded directories
+                        excluded = {".venv", ".git", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".env", "results"}
+                        if child.name not in excluded:
+                            _find_plx_in_traversable(child, collected)
+            except (PermissionError, OSError) as exc:
+                log.debug(f"Could not access {traversable}: {exc}")
+
+        _find_plx_in_traversable(pipelex_package, plx_files)
+        log.debug(f"Found {len(plx_files)} PLX files in pipelex package")
+        return plx_files
+
+    def _get_pipelex_package_dir_for_imports(self) -> Path | None:
+        """Get the pipelex package directory as a Path for importing Python modules.
+
+        Returns:
+            Path to the pipelex package directory, or None if not accessible as filesystem
+        """
+        pipelex_package = files("pipelex")
+        try:
+            # Try to convert to Path (works for filesystem paths)
+            pkg_path = Path(str(pipelex_package))
+            if pkg_path.exists() and pkg_path.is_dir():
+                return pkg_path
+        except (TypeError, ValueError, OSError) as exc:
+            log.debug(f"Could not convert importlib.resources Traversable to filesystem Path: {exc}")
+        return None
+
     @override
     def load_libraries(
         self,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> None:
-        # dirs_to_use = library_dirs or [Path(config_manager.local_root_dir)]
-        dirs_to_use: set[Path] = set()
+        # Collect directories to scan (user project directories)
+        user_dirs: set[Path] = set()
         if library_dirs:
-            dirs_to_use.update(library_dirs)
+            user_dirs.update(library_dirs)
         else:
-            dirs_to_use.add(Path(config_manager.local_root_dir))
-            dirs_to_use.add(Path(config_manager.pipelex_root_dir))
+            user_dirs.add(Path(config_manager.local_root_dir))
 
         valid_plx_paths: list[Path]
         if library_file_paths:
             valid_plx_paths = library_file_paths
         else:
-            all_plx_paths: list[Path] = self._get_pipelex_plx_files_from_dirs(dirs_to_use)
-            # Remove failing pipelines from the list
-            # failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
-            # valid_plx_paths = [path for path in all_plx_paths if path not in failing_pipelines_file_paths]
-            valid_plx_paths = all_plx_paths
+            # Get PLX files from user directories
+            user_plx_paths: list[Path] = self._get_pipelex_plx_files_from_dirs(user_dirs)
+
+            # Get PLX files from pipelex package using importlib.resources
+            # This works reliably in all installation modes (wheel, source, relative)
+            pipelex_plx_paths: list[Path] = self._get_pipelex_plx_files_from_package()
+
+            # Combine and deduplicate
+            all_plx_paths = user_plx_paths + pipelex_plx_paths
+            seen_absolute_paths: set[str] = set()
+            valid_plx_paths = []
+            for plx_path in all_plx_paths:
+                try:
+                    absolute_path = str(plx_path.resolve())
+                except (OSError, RuntimeError):
+                    # For paths that can't be resolved (e.g., in zipped packages), use string representation
+                    absolute_path = str(plx_path)
+
+                if absolute_path not in seen_absolute_paths:
+                    valid_plx_paths.append(plx_path)
+                    seen_absolute_paths.add(absolute_path)
 
         # Import modules to load them into sys.modules (but don't register classes yet)
-        for library_dir in dirs_to_use:
+        # Import from user directories
+        for library_dir in user_dirs:
             # Only import files that contain StructuredContent subclasses (uses AST pre-check)
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=str(library_dir),
@@ -279,6 +350,19 @@ class LibraryManager(LibraryManagerAbstract):
             # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
             FuncRegistryUtils.register_funcs_in_folder(
                 folder_path=str(library_dir),
+                decorator_names=[pipe_func.__name__],
+                require_decorator=True,
+            )
+
+        # Import from pipelex package if accessible as filesystem
+        if pipelex_pkg_dir := self._get_pipelex_package_dir_for_imports():
+            log.debug(f"Importing pipelex package modules from: {pipelex_pkg_dir}")
+            ClassRegistryUtils.import_modules_in_folder(
+                folder_path=str(pipelex_pkg_dir),
+                base_class_names=[StructuredContent.__name__],
+            )
+            FuncRegistryUtils.register_funcs_in_folder(
+                folder_path=str(pipelex_pkg_dir),
                 decorator_names=[pipe_func.__name__],
                 require_decorator=True,
             )
