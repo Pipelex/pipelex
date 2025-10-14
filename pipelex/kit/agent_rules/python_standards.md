@@ -2,9 +2,52 @@
 
 This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
 
-## Type Hints
+## Variables, loops and indexes
 
-1. **Always Use Type Hints**
+    - Variable names should have a minimum length of 3 characters. No exceptions: name your `for` loop indexes like `index_foobar`, your exceptions `exc` or more specific like `validation_error` when there are several layers of exceptions, and use `for key, value in ...` for key/value pairs.
+    - When looping on the keys of a dict, use `for key in the_dict` rather than `for key in the_dict.keys()` otherwise you won't pass linting.
+    - Avoid inline for loops, unless it's ultra-simple and holds on oneline.
+
+## Enums and tests
+
+    - When defining enums related to string values, always inherit from `StrEnum`
+    - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
+    - As our match/case constructs over enums are always exhaustive, NEVER add a default `case _: ...`. Otherwise, you won't pass linting.
+
+## Imports
+
+### **Imports at the top of the file**
+
+    - Import all necessary libraries at the top of the file
+    - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
+    - Do not bother with ordering the imports, our Ruff linter will handle it for us. Same goes with removing unused imports.
+
+- **Logging and Pretty Printing**:
+
+    - Both `log()` and `pretty_print()` can be imported from `pipelex` directly:
+    ```python
+    from pipelex import log, pretty_print
+
+    log.info("Hello, world!")
+    ```
+    - Both have a title arg which is handy when logging/printing objects:
+
+    ```python
+    log.debug("Hello, world!", title="Your first Pipelex log")
+    pretty_print(output_object, title="Your first Pipelex output")
+    ```
+    - Both handle formatting json using Rich, pretty_print makes it prettier.
+
+- **StrEnum and Self type**:
+
+    - Both `StrEnum` and `Self` must be imported from `pipelex.types` (handles python retrocompatibility):
+    ```python
+    from pipelex.types import Self, StrEnum
+    ```
+
+## Typing
+
+### **Always Use Type Hints**
 
     - Every function parameter must be typed
     - Every function return must be typed
@@ -13,8 +56,9 @@ This document outlines the core coding standards, best practices, and quality co
     - Use type hints for all fields
     - Use the `|` syntax for union types (e.g `str | int`) and `| None` for optionals (not `Optional[]`)
     - Use Field(default_factory=...) for mutable defaults
+    - Use `# pyright: ignore[specificError]` or `# type: ignore` only as a last resort. In particular, if you are sure about the type, you often solve issues by using cast() or creating a new typed variable.
 
-2. **BaseModel / Pydantic Standards**
+### **BaseModel / Pydantic Standards**
 
     - Use `BaseModel` and respect Pydantic v2 standards
     - Use the modern `ConfigDict` when needed, e.g. `model_config = ConfigDict(extra="forbid", strict=True)`
@@ -29,18 +73,6 @@ This document outlines the core coding standards, best practices, and quality co
           numbers: list[int] = Field(default_factory=empty_list_factory_of(int), description="A list of numbers")
           items: list[MyItem] = Field(default_factory=empty_list_factory_of(MyItem), description="A list of items")
       ```
-
-3. **StrEnum**
-   - Import from `pipelex.types`:
-   ```python
-   from pipelex.types import StrEnum
-   ```
-
-4. **Self type**
-   - Import from `pipelex.types`:
-   ```python
-   from pipelex.types import Self
-   ```
 
 ## Factory Pattern
 

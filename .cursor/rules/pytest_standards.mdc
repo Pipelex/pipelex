@@ -41,7 +41,7 @@ Several markers may be applied. For instance, if the test uses an LLM, then it u
 
 ### Test Class Structure
 
-Always group the tests of a module into a test class:
+- Always group the tests of a module into a test class:
 
 ```python
 @pytest.mark.llm
@@ -64,11 +64,12 @@ class TestFooBar:
         # Test implementation
 ```
 
-Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
+- Never more than 1 class per test file.
+- Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
 
 ### Test Data Organization
 
-- If it's not already there, create a `test_data.py` file in the test directory
+- If it's not already there, create a `test_data.py` file in the proper test directory
 - Define test cases using `StuffBlueprint`:
 
 ```python
