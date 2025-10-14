@@ -74,6 +74,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Added `is_dump_text_prompts_enabled` and `is_dump_response_text_enabled` configuration flags to have the console display everything that goes in and out of the LLMs
  - Added `generic_templates` section in `llm_config` with structure extraction prompts
  - Added useful error messages with migration configuration maps pin-pointing the fields to rename for config and plx files
+ - Added improved error message for `PipeFunc` when function not found in registry, mentioning `@pipe_func()` decorator requirement since v0.12.0
  - Added pytest filterwarnings to ignore deprecated class-based config warnings
  - Added `Flow` class that represents the flow of pipe signatures
  - Added `pipe-builder` command `flow` to generate flow view from pipeline brief
@@ -120,6 +121,8 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
  - Changed exception base class from `PipelexError` to `PipelexException` throughout codebase
  - Updated Makefile pyright target to use `--pythonpath` flag correctly
+ - Updated PipeFunc documentation to reflect `@pipe_func()` decorator requirement and auto-discovery from anywhere in project
+ - Added warnings about module-level code execution during auto-discovery to PipeFunc and StructuredContent documentation
 
 ### Fixed
  - Fixed Makefile target `pyright` to use correct pythonpath flag

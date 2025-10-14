@@ -6,6 +6,7 @@ from typing import Any, TypeVar, cast, get_type_hints
 from pydantic import Field, PrivateAttr, RootModel
 
 from pipelex.tools.exceptions import ToolException
+from pipelex.urls import URLs
 
 FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
 
@@ -127,8 +128,10 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         """Retrieves a function from the registry by its name. Raises an error if not found."""
         if name not in self.root:
             msg = (
-                f"Function '{name}' not found in registry:"
-                "See how to register a function here: https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc"
+                f"Function '{name}' not found in registry. "
+                f"Since v0.12.0, custom functions require the @pipe_func() decorator for auto-discovery. "
+                f"Add @pipe_func() above your function definition. "
+                f"See: {URLs.pipe_func_docs}"
             )
             raise FuncRegistryError(msg)
         return self.root[name]

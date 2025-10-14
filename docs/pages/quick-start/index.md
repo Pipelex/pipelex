@@ -176,6 +176,9 @@ class Character(StructuredContent):
     description: str
 ```
 
+!!! tip "Keep Structure Files Clean"
+    Keep your `StructuredContent` classes in dedicated files with minimal module-level code. Pipelex imports these modules during auto-discovery, so any module-level code will be executed.
+
 💡 **Alternative: Inline Structure Definition**
 
 Instead of creating a separate Python file, you can define structures directly in your `.plx` file using TOML syntax:

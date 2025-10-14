@@ -139,6 +139,11 @@ class Invoice(StructuredContent):
 
 Classes inheriting from `StructuredContent` are automatically discovered and registered by Pipelex.
 
+!!! warning "Module Execution During Auto-Discovery"
+    When Pipelex discovers `StructuredContent` classes, it imports the module containing them. **Any code at the module level (outside functions/classes) will be executed during import.** This can have unintended side effects.
+    
+    **Best practice:** Keep your `StructuredContent` classes in dedicated modules (e.g., `*_struct.py` files) with minimal module-level code, or ensure module-level code is safe to execute during discovery.
+
 ### With Custom Validation
 
 ```python

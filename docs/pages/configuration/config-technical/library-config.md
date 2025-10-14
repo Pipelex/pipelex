@@ -223,6 +223,7 @@ pipelex show pipe YOUR_PIPE_CODE
 - Use `_struct.py` suffix for files containing structure classes (e.g., `finance_struct.py`)
 - Inherit from `StructuredContent` or its subclasses
 - Place structure class files near their corresponding `.plx` files
+- **Keep modules clean**: Avoid module-level code that executes on import (Pipelex imports modules during auto-discovery)
 
 ### 3. Custom Functions
 
@@ -230,6 +231,7 @@ pipelex show pipe YOUR_PIPE_CODE
 - Use descriptive function names
 - Document function parameters and return types
 - Keep functions focused and testable
+- **Keep modules clean**: Avoid module-level code that executes on import (Pipelex imports modules during auto-discovery)
 
 ### 4. Validation
 
