@@ -249,7 +249,7 @@ class PipeCondition(PipeController):
 
         # Evaluate the expression using templating
         evaluated_expression = await content_generator.make_templated_text(
-            context=working_memory.generate_jinja2_context(),
+            context=working_memory.generate_context(),
             template=self.applied_expression_template,
             template_category=TemplateCategory.EXPRESSION,
         )
