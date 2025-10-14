@@ -137,13 +137,23 @@ class Concept(BaseModel):
         # Generate the content based on structure
         content_example = self._generate_content_example_for_class(structure_class, var_name)
 
-        # For simple native concepts (Text, Image, PDF), return just the value
+        # For simple native concepts - return compact format
         if self.structure_class_name == "TextContent":
-            return cast("str", content_example)  # Returns just a string
-        elif self.structure_class_name in {"ImageContent", "PDFContent"}:
-            return cast("str", content_example)  # Returns just a URL string
+            return cast("str", content_example)  # Just a string
+        elif self.structure_class_name == "ImageContent":
+            # Return dict with class instantiation info
+            return {
+                "_class": "ImageContent",
+                "url": cast("str", content_example),
+            }
+        elif self.structure_class_name == "PDFContent":
+            # Return dict with class instantiation info
+            return {
+                "_class": "PDFContent",
+                "url": cast("str", content_example),
+            }
         elif self.structure_class_name == "NumberContent":
-            return cast("int", content_example)  # Returns just a number
+            return cast("int", content_example)  # Just a number
 
         # For complex concepts, wrap with concept_code
         return {

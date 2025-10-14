@@ -18,7 +18,14 @@ def _value_to_python_code(value: Any, indent_level: int = 0) -> str:
     """
     indent = "    " * indent_level
 
-    if isinstance(value, str):
+    if isinstance(value, dict) and "_class" in value:
+        # Special handling for Content class instantiation (e.g., PDFContent, ImageContent)
+        class_name = value["_class"]  # pyright: ignore[reportUnknownVariableType]
+        if class_name in {"PDFContent", "ImageContent"}:
+            url = value.get("url", "your_url")  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportUnknownVariableType]
+            return f'{class_name}(url="{url}")'
+        return str(value)  # pyright: ignore[reportUnknownArgumentType]
+    elif isinstance(value, str):
         # String value - add quotes
         return f'"{value}"'
     elif isinstance(value, bool):
@@ -62,13 +69,31 @@ def generate_runner_code(pipe: PipeAbstract) -> str:
     pipe_code = pipe.code
     inputs = pipe.inputs
 
-    # Build import section - minimal imports since we use compact memory format
-    import_lines = [
-        "import asyncio",
-        "",
-        "from pipelex.pipelex import Pipelex",
-        "from pipelex.pipeline.execute import execute_pipeline",
-    ]
+    # Determine which imports are needed based on input concepts
+    needs_pdf = False
+    needs_image = False
+    for input_req in inputs.root.values():
+        concept = input_req.concept
+        if concept.structure_class_name == "PDFContent":
+            needs_pdf = True
+        elif concept.structure_class_name == "ImageContent":
+            needs_image = True
+
+    # Build import section
+    import_lines = ["import asyncio", ""]
+
+    # Add content class imports if needed
+    if needs_pdf:
+        import_lines.append("from pipelex.core.stuffs.pdf_content import PDFContent")
+    if needs_image:
+        import_lines.append("from pipelex.core.stuffs.image_content import ImageContent")
+
+    import_lines.extend(
+        [
+            "from pipelex.pipelex import Pipelex",
+            "from pipelex.pipeline.execute import execute_pipeline",
+        ]
+    )
 
     # Build input_memory entries
     if inputs.nb_inputs > 0:
@@ -86,7 +111,6 @@ def generate_runner_code(pipe: PipeAbstract) -> str:
         "",
         "",
         f"async def run_{pipe_code}():",
-        '    """Run the pipeline and return the result."""',
         "    return await execute_pipeline(",
         f'        pipe_code="{pipe_code}",',
     ]

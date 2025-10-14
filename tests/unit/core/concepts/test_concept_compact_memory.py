@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
@@ -12,44 +10,35 @@ from pipelex.core.concepts.concept_native import NativeConceptCode
 class TestConceptCompactMemory:
     """Test Concept methods for generating compact memory examples."""
 
-    @pytest.mark.parametrize(
-        ("concept_code", "domain", "structure_class_name", "var_name", "expected_value", "expected_type"),
-        [
-            # Text concept - simple string
-            ("Text", "native", "TextContent", "message", "message_text", str),
-            # Custom text-based concept - simple string
-            ("CustomText", "test_domain", "TextContent", "raw_text", "raw_text_text", str),
-            # Image concept - URL string
-            ("Image", "native", "ImageContent", "photo", "photo_url", str),
-            # PDF concept - URL string
-            ("PDF", "native", "PDFContent", "document", "document_url", str),
-            # Number concept
-            ("Number", "native", "NumberContent", "count", 0, int),
-        ],
-    )
-    def test_get_compact_memory_example_simple_types(
-        self,
-        concept_code: str,
-        domain: str,
-        structure_class_name: str,
-        var_name: str,
-        expected_value: str | int,
-        expected_type: type,
-    ) -> None:
-        """Test that get_compact_memory_example generates correct simple values."""
-        # Create concept using ConceptFactory
-        concept = ConceptFactory.make(
-            concept_code=concept_code,
-            domain=domain,
-            description=f"Test {concept_code}",
-            structure_class_name=structure_class_name,
-            refines=None,
-        )
+    def test_get_compact_memory_example_text(self) -> None:
+        """Test compact memory example for Text concept."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
+        result = concept.get_compact_memory_example("message")
+        assert isinstance(result, str)
+        assert result == "message_text"
 
-        # Test
-        result = concept.get_compact_memory_example(var_name)
-        assert isinstance(result, expected_type)
-        assert result == expected_value
+    def test_get_compact_memory_example_number(self) -> None:
+        """Test compact memory example for Number concept."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.NUMBER)
+        result = concept.get_compact_memory_example("count")
+        assert isinstance(result, int)
+        assert result == 0
+
+    def test_get_compact_memory_example_image(self) -> None:
+        """Test compact memory example for Image concept."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
+        result = concept.get_compact_memory_example("photo")
+        assert isinstance(result, dict)
+        assert result["_class"] == "ImageContent"
+        assert result["url"] == "photo_url"
+
+    def test_get_compact_memory_example_pdf(self) -> None:
+        """Test compact memory example for PDF concept."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+        result = concept.get_compact_memory_example("document")
+        assert isinstance(result, dict)
+        assert result["_class"] == "PDFContent"
+        assert result["url"] == "document_url"
 
     def test_get_compact_memory_example_text_and_images(self) -> None:
         """Test compact memory example for TextAndImages concept."""
