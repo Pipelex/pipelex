@@ -1,5 +1,3 @@
-"""Index loader for kit configuration."""
-
 from pydantic import ValidationError
 
 from pipelex.exceptions import PipelexException

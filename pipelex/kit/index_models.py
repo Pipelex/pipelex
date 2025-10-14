@@ -1,5 +1,3 @@
-"""Pydantic models for kit index configuration."""
-
 from typing import Any
 
 from pydantic import Field

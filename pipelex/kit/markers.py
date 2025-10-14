@@ -1,6 +1,3 @@
-"""Marker utilities for content insertion and replacement."""
-
-
 def find_span(text: str, begin: str, end: str) -> tuple[int, int] | None:
     """Find the span of text between begin and end markers.
 

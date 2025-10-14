@@ -1,5 +1,3 @@
-"""Export agent markdown files to Cursor rules with YAML front-matter."""
-
 from collections.abc import Iterable
 from importlib.abc import Traversable
 from pathlib import Path
