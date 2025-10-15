@@ -25,7 +25,7 @@ is_generate_cost_report_file_enabled = true
 ```
 
 - Controls whether cost report files are generated after the execution of the pipeline
-- When enabled, creates detailed reports in the xlsx format in the directory `reports/` by default.
+- When enabled, creates detailed reports in CSV format in the directory `reports/` by default.
 - Default: `true`
 
 ### Report File Location
@@ -43,13 +43,13 @@ cost_report_dir_path = "reports"
 
 ```toml
 cost_report_base_name = "cost_report"
-cost_report_extension = "xlsx"
+cost_report_extension = "csv"
 ```
 
 - Base name for report files
-- File extension for report files (e.g., "xlsx" for Excel files)
-- Final filename will include an incremental number (e.g., `cost_report_1.xlsx`, `cost_report_2.xlsx`)
-- Default: Base name = `"cost_report"`, Extension = `"xlsx"`
+- File extension for report files (e.g., "csv" for CSV files)
+- Final filename will include an incremental number (e.g., `cost_report_1.csv`, `cost_report_2.csv`)
+- Default: Base name = `"cost_report"`, Extension = `"csv"`
 
 ### Cost Unit Scaling
 
@@ -78,7 +78,7 @@ cost_report_dir_path = "analytics/cost_reports"
 
 # Customize report file naming
 cost_report_base_name = "llm_costs"
-cost_report_extension = "xlsx"
+cost_report_extension = "csv"
 
 # Show costs in thousands
 cost_report_unit_scale = 1000.0
