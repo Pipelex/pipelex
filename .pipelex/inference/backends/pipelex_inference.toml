@@ -102,7 +102,7 @@ outputs = ["text", "structured"]
 costs = { input = 0.10, output = 0.40 }
 
 ["gemini-2.5-pro"]
-model_id = "gemini-2.5-pro"
+model_id = "gemini/gemini-2.5-pro"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
