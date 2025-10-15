@@ -3,7 +3,7 @@ from click import Command, Context
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex.cli.commands import gen_app, init_app, show_app, validate_app
+from pipelex.cli.commands import init_app, run_app, show_app, validate_app
 from pipelex.cli.commands.build_cmd import build_app
 from pipelex.cli.commands.kit_cmd import kit_app
 
@@ -37,4 +37,4 @@ app.add_typer(validate_app, name="validate", help="Validation and dry-run comman
 app.add_typer(show_app, name="show", help="Show and list commands")
 app.add_typer(build_app, name="build", help="Build artifacts like pipeline blueprints")
 app.add_typer(kit_app, name="kit", help="Manage kit assets")
-app.add_typer(gen_app, name="gen", help="Generate Python files from pipe definitions")
+app.add_typer(run_app, name="run", help="Run pipelines and prepare runner files")

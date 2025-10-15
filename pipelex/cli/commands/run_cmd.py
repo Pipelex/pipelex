@@ -1,5 +1,3 @@
-"""Commands for generating Python runner files from pipe definitions."""
-
 import subprocess
 from typing import Annotated
 
@@ -10,7 +8,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.tools.codegen.runner_generator import generate_runner_code
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
 
-gen_app = typer.Typer(help="Generate Python runner files from pipe definitions", no_args_is_help=True)
+run_app = typer.Typer(help="Run pipelines and generate runner files", no_args_is_help=True)
 
 
 def do_generate_runner(pipe_code: str, output_path: str | None, execute: bool, lint: bool) -> None:
@@ -80,9 +78,9 @@ def do_generate_runner(pipe_code: str, output_path: str | None, execute: bool, l
             typer.echo(result.stderr)
 
 
-@gen_app.command("runner")
-def generate_runner_cmd(
-    pipe_code: Annotated[str, typer.Argument(help="The pipe code to generate a runner for")],
+@run_app.command("prepare")
+def prepare_runner_cmd(
+    pipe_code: Annotated[str, typer.Argument(help="The pipe code to prepare a runner for")],
     output: Annotated[
         str | None,
         typer.Option("--output", "-o", help="Path to save the generated Python file"),
@@ -96,7 +94,7 @@ def generate_runner_cmd(
         typer.Option("--lint", "-l", help="Run linter on the generated file"),
     ] = False,
 ) -> None:
-    """Generate a Python runner file for a pipe.
+    """Prepare a Python runner file for a pipe.
 
     The generated file will include:
     - All necessary imports
@@ -105,6 +103,6 @@ def generate_runner_cmd(
     - Code to execute the pipeline
 
     Native concept types (Text, Image, PDF, etc.) will be automatically handled.
-    Custom concept types will include TODO comments for filling in required fields.
+    Custom concept types will have their structure recursively generated.
     """
     do_generate_runner(pipe_code=pipe_code, output_path=output, execute=execute, lint=lint)
