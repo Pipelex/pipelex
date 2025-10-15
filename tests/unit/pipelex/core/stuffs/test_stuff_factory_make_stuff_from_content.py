@@ -32,7 +32,7 @@ class TestData:
     EMPTY_LIST_CONTENT: ClassVar[ListContent[TextContent]] = ListContent(items=[])
 
     # Dictionary test data - native concept
-    NATIVE_TEXT_DICT: ClassVar[dict[str, Any]] = {"concept": NativeConceptCode.TEXT, "content": {"text": "Native text content"}}
+    NATIVE_TEXT_DICT: ClassVar[dict[str, Any]] = {"concept": NativeConceptCode.TEXT.concept_string, "content": {"text": "Native text content"}}
 
     # Dictionary test data - custom concept with concept field
     CUSTOM_CONCEPT_DICT: ClassVar[dict[str, Any]] = {
@@ -203,9 +203,15 @@ class TestMakeStuffFromStuffContentUsingSearchDomains:
 
     def test_dict_with_native_concept(self, mocker: MockerFixture):
         """Test dictionary with native concept."""
+        # Mock ConceptFactory to handle native concept creation
         mock_concept = mocker.Mock()
         mock_concept_factory = mocker.patch("pipelex.core.stuffs.stuff_factory.ConceptFactory")
         mock_concept_factory.make_native_concept.return_value = mock_concept
+
+        # Mock the make_domain_and_concept_code method
+        mock_domain_and_code = mocker.Mock()
+        mock_domain_and_code.concept_code = "Text"
+        mock_concept_factory.make_domain_and_concept_code_from_concept_string_or_code.return_value = mock_domain_and_code
 
         mock_content = mocker.Mock(spec=StuffContent)
         mock_content_factory = mocker.patch("pipelex.core.stuffs.stuff_factory.StuffContentFactory")
