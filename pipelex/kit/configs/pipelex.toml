@@ -65,3 +65,11 @@ observer_dir = "results/observer"
 is_pipeline_tracking_enabled = false
 is_activity_tracking_enabled = false
 is_reporting_enabled = true
+
+[pipelex.reporting_config]
+is_log_costs_to_console = false
+is_generate_cost_report_file_enabled = true
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "csv"
+cost_report_unit_scale = 1.0
