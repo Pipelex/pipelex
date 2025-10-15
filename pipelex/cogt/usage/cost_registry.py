@@ -167,8 +167,15 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         if not records:
             return
 
+        # Collect all unique field names across all records
+        all_fieldnames: set[str] = set()
+        for record in records:
+            all_fieldnames.update(record.keys())
+
+        # Sort fieldnames for consistent column order
+        fieldnames = sorted(all_fieldnames)
+
         with open(file_path, "w", newline="", encoding="utf-8") as csvfile:
-            fieldnames = records[0].keys()
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(records)
