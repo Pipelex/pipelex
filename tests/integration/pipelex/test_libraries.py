@@ -89,13 +89,15 @@ class TestLibraries:
         test_pipelines_dir = [Path(LibraryTestCases.TEST_PIPELINES_DIR_PATH)]
         library_manager.load_libraries(library_dirs=test_pipelines_dir)
         # Verify that libraries were loaded
-        assert len(library_manager.concept_library.root) > 0, "No concepts were loaded"
-        assert len(library_manager.pipe_library.root) > 0, "No pipes were loaded"
+        concept_library = library_manager.get_concept_library()
+        pipe_library = library_manager.get_pipe_library()
+        assert len(concept_library.root) > 0, "No concepts were loaded"
+        assert len(pipe_library.root) > 0, "No pipes were loaded"
 
         # Test individual concepts and pipes
-        assert library_manager.concept_library.get_required_concept(concept_string=known_concept) is not None
+        assert concept_library.get_required_concept(concept_string=known_concept) is not None
         pretty_print(
-            f"Concept: {known_concept} is correctly loaded as {library_manager.concept_library.get_required_concept(concept_string=known_concept)}",
+            f"Concept: {known_concept} is correctly loaded as {concept_library.get_required_concept(concept_string=known_concept)}",
         )
-        assert library_manager.pipe_library.get_optional_pipe(known_pipe) is not None
-        pretty_print(f"Pipe: {known_pipe} is correctly loaded as {library_manager.pipe_library.get_optional_pipe(known_pipe)}")
+        assert pipe_library.get_optional_pipe(known_pipe) is not None
+        pretty_print(f"Pipe: {known_pipe} is correctly loaded as {pipe_library.get_optional_pipe(known_pipe)}")

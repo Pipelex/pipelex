@@ -234,21 +234,27 @@ class PipelexHub:
 
     # pipelex
 
-    def get_required_domain_library(self) -> DomainLibraryAbstract:
+    def get_required_domain_library(self, pipeline_run_id: str | None = None) -> DomainLibraryAbstract:
+        if self._library_manager is not None:
+            return self._library_manager.get_domain_library(pipeline_run_id=pipeline_run_id)
         if self._domain_library is None:
-            msg = "DomainLibrary is not initialized"
+            msg = "DomainLibrary with pipeline_run_id '{pipeline_run_id}' is not initialized"
             raise RuntimeError(msg)
         return self._domain_library
 
-    def get_required_concept_library(self) -> ConceptLibraryAbstract:
+    def get_required_concept_library(self, pipeline_run_id: str | None = None) -> ConceptLibraryAbstract:
+        if self._library_manager is not None:
+            return self._library_manager.get_concept_library(pipeline_run_id=pipeline_run_id)
         if self._concept_library is None:
-            msg = "ConceptLibrary is not initialized"
+            msg = "ConceptLibrary with pipeline_run_id '{pipeline_run_id}' is not initialized"
             raise RuntimeError(msg)
         return self._concept_library
 
-    def get_required_pipe_library(self) -> PipeLibraryAbstract:
+    def get_required_pipe_library(self, pipeline_run_id: str | None = None) -> PipeLibraryAbstract:
+        if self._library_manager is not None:
+            return self._library_manager.get_pipe_library(pipeline_run_id=pipeline_run_id)
         if self._pipe_library is None:
-            msg = "PipeLibrary is not initialized"
+            msg = "PipeLibrary with pipeline_run_id '{pipeline_run_id}' is not initialized"
             raise RuntimeError(msg)
         return self._pipe_library
 
@@ -373,36 +379,36 @@ def get_secret(secret_id: str) -> str:
     return get_secrets_provider().get_secret(secret_id=secret_id)
 
 
-def get_required_domain(domain: str) -> Domain:
-    return get_pipelex_hub().get_required_domain_library().get_required_domain(domain=domain)
+def get_required_domain(domain: str, pipeline_run_id: str | None = None) -> Domain:
+    return get_pipelex_hub().get_required_domain_library(pipeline_run_id=pipeline_run_id).get_required_domain(domain=domain)
 
 
-def get_optional_domain(domain: str) -> Domain | None:
-    return get_pipelex_hub().get_required_domain_library().get_domain(domain=domain)
+def get_optional_domain(domain: str, pipeline_run_id: str | None = None) -> Domain | None:
+    return get_pipelex_hub().get_required_domain_library(pipeline_run_id=pipeline_run_id).get_domain(domain=domain)
 
 
-def get_pipe_library() -> PipeLibraryAbstract:
-    return get_pipelex_hub().get_required_pipe_library()
+def get_pipe_library(pipeline_run_id: str | None = None) -> PipeLibraryAbstract:
+    return get_pipelex_hub().get_required_pipe_library(pipeline_run_id=pipeline_run_id)
 
 
-def get_pipes() -> list[PipeAbstract]:
-    return get_pipelex_hub().get_required_pipe_library().get_pipes()
+def get_pipes(pipeline_run_id: str | None = None) -> list[PipeAbstract]:
+    return get_pipelex_hub().get_required_pipe_library(pipeline_run_id=pipeline_run_id).get_pipes()
 
 
-def get_required_pipe(pipe_code: str) -> PipeAbstract:
-    return get_pipelex_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code)
+def get_required_pipe(pipe_code: str, pipeline_run_id: str | None = None) -> PipeAbstract:
+    return get_pipelex_hub().get_required_pipe_library(pipeline_run_id=pipeline_run_id).get_required_pipe(pipe_code=pipe_code)
 
 
-def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
-    return get_pipelex_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
+def get_optional_pipe(pipe_code: str, pipeline_run_id: str | None = None) -> PipeAbstract | None:
+    return get_pipelex_hub().get_required_pipe_library(pipeline_run_id=pipeline_run_id).get_optional_pipe(pipe_code=pipe_code)
 
 
-def get_concept_library() -> ConceptLibraryAbstract:
-    return get_pipelex_hub().get_required_concept_library()
+def get_concept_library(pipeline_run_id: str | None = None) -> ConceptLibraryAbstract:
+    return get_pipelex_hub().get_required_concept_library(pipeline_run_id=pipeline_run_id)
 
 
-def get_required_concept(concept_string: str) -> Concept:
-    return get_pipelex_hub().get_required_concept_library().get_required_concept(concept_string=concept_string)
+def get_required_concept(concept_string: str, pipeline_run_id: str | None = None) -> Concept:
+    return get_pipelex_hub().get_required_concept_library(pipeline_run_id=pipeline_run_id).get_required_concept(concept_string=concept_string)
 
 
 def get_pipe_router() -> PipeRouterProtocol:
@@ -434,4 +440,4 @@ def get_observer_provider() -> ObserverProtocol:
 
 
 def get_native_concept(native_concept: NativeConceptCode) -> Concept:
-    return get_pipelex_hub().get_required_concept_library().get_native_concept(native_concept=native_concept)
+    return get_pipelex_hub().get_required_concept_library(pipeline_run_id=pipeline_run_id).get_native_concept(native_concept=native_concept)

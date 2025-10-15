@@ -5,7 +5,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 class PipeLibraryAbstract(ABC):
     @abstractmethod
-    def validate_with_libraries(self) -> None:
+    def validate_with_libraries(self, pipeline_run_id: str | None = None) -> None:
         pass
 
     @abstractmethod

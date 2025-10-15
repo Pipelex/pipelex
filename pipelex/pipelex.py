@@ -25,9 +25,6 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import PipelexConfig, get_config
-from pipelex.core.concepts.concept_library import ConceptLibrary
-from pipelex.core.domains.domain_library import DomainLibrary
-from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
@@ -121,18 +118,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
 
         # pipelex libraries
-        domain_library = DomainLibrary.make_empty()
-        concept_library = ConceptLibrary.make_empty()
-        pipe_library = PipeLibrary.make_empty()
-        self.pipelex_hub.set_domain_library(domain_library=domain_library)
-        self.pipelex_hub.set_concept_library(concept_library=concept_library)
-        self.pipelex_hub.set_pipe_library(pipe_library=pipe_library)
-
-        self.library_manager = LibraryManagerFactory.make(
-            domain_library=domain_library,
-            concept_library=concept_library,
-            pipe_library=pipe_library,
-        )
+        self.library_manager = LibraryManagerFactory.make_empty()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         # pipelex pipeline
@@ -262,6 +248,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def setup_libraries(self):
         self.library_manager.setup()
         self.library_manager.load_libraries()
+        # Set the UNTITLED libraries in the hub for backward compatibility
+        self.pipelex_hub.set_domain_library(domain_library=self.library_manager.get_domain_library())
+        self.pipelex_hub.set_concept_library(concept_library=self.library_manager.get_concept_library())
+        self.pipelex_hub.set_pipe_library(pipe_library=self.library_manager.get_pipe_library())
         log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
 
     def validate_libraries(self):

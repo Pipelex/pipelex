@@ -17,10 +17,10 @@ PipeLibraryRoot = dict[str, PipeAbstract]
 
 class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     @override
-    def validate_with_libraries(self):
+    def validate_with_libraries(self, pipeline_run_id: str | None = None):
         concept_library = get_concept_library()
         for pipe in self.root.values():
-            pipe.validate_output()
+            pipe.validate_output(pipeline_run_id=pipeline_run_id)
             try:
                 for concept in pipe.concept_dependencies():
                     try:

@@ -4,6 +4,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.exceptions import PipelineInputError
 from pipelex.hub import (
+    get_library_manager,
     get_pipe_router,
     get_pipeline_manager,
     get_report_delegate,
@@ -88,6 +89,7 @@ async def execute_pipeline(
     pipeline = get_pipeline_manager().add_new_pipeline()
     pipeline_run_id = pipeline.pipeline_run_id
     get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
+    get_library_manager().open_library(pipeline_run_id=pipeline_run_id)
 
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline_run_id,

@@ -83,7 +83,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return self
 
     @override
-    def validate_with_libraries(self):
+    def validate_with_libraries(self, pipeline_run_id: str | None = None):
         llm_config = get_config().cogt.llm_config
         self.validate_inputs()
         self.llm_prompt_spec.validate_with_libraries()
@@ -96,7 +96,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
     @override
-    def validate_output(self):
+    def validate_output(self, pipeline_run_id: str | None = None):
         if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
@@ -195,6 +195,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             else:
                 output_concept = get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code),
+                    pipeline_run_id=job_metadata.pipeline_run_id,
                 )
 
         multiplicity_resolution = output_multiplicity_to_apply(
@@ -289,9 +290,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         llm_prompt_2_factory = None
                     case StructuringMethod.PRELIMINARY_TEXT:
                         log.verbose(f"Creating llm_prompt_2_factory for pipe {self.code} with structuring_method {structuring_method}")
-                        pipe = get_required_pipe(pipe_code=self.code)
+                        pipe = get_required_pipe(pipe_code=self.code, pipeline_run_id=job_metadata.pipeline_run_id)
                         # TODO: run_pipe() could get the domain at the same time as the pip_code
-                        domain = get_required_domain(domain=pipe.domain)
+                        domain = get_required_domain(domain=pipe.domain, pipeline_run_id=job_metadata.pipeline_run_id)
                         prompt_template_to_structure = (
                             self.prompt_template_to_structure
                             or domain.prompt_template_to_structure
@@ -309,7 +310,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 log.debug(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
                 # TODO: run_pipe() should get the domain along with the pip_code
                 if the_pipe := get_optional_pipe(pipe_code=self.code):
-                    domain = get_required_domain(domain=the_pipe.domain)
+                    domain = get_required_domain(domain=the_pipe.domain, pipeline_run_id=job_metadata.pipeline_run_id)
                 else:
                     domain = Domain.make_default()
                 prompt_template_to_structure = (
@@ -334,6 +335,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 output_structure_prompt = await PipeLLM.get_output_structure_prompt(
                     concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
                     is_with_preliminary_text=is_with_preliminary_text,
+                    pipeline_run_id=job_metadata.pipeline_run_id,
                 )
             llm_prompt_1_for_object = await self.llm_prompt_spec.make_llm_prompt(
                 output_concept_string=output_concept.concept_string,
@@ -470,8 +472,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         )
 
     @staticmethod
-    async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
-        concept = get_required_concept(concept_string=concept_string)
+    async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool, pipeline_run_id: str | None = None) -> str | None:
+        concept = get_required_concept(concept_string=concept_string, pipeline_run_id=pipeline_run_id)
         output_class = get_class_registry().get_class(concept.structure_class_name)
         log.debug(f"get_output_structure_prompt for {concept_string} with {is_with_preliminary_text=}")
         log.debug(f"output_class: {output_class}")

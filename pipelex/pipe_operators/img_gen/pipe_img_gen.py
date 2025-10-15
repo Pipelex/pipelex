@@ -97,14 +97,14 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         return self
 
     @override
-    def validate_with_libraries(self):
+    def validate_with_libraries(self, pipeline_run_id: str | None = None):
         self._validate_inputs()
         if self.img_gen:
             check_img_gen_choice_with_deck(img_gen_choice=self.img_gen)
 
     @override
-    def validate_output(self):
-        if not get_concept_library().is_compatible(
+    def validate_output(self, pipeline_run_id: str | None = None):
+        if not get_concept_library(pipeline_run_id=pipeline_run_id).is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
             strict=True,

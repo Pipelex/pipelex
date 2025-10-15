@@ -37,6 +37,7 @@ from pipelex.libraries.library_utils import (
     get_pipelex_package_dir_for_imports,
     get_pipelex_plx_files_from_package,
 )
+from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
@@ -65,38 +66,141 @@ class LibraryManager(LibraryManagerAbstract):
         "prompt_template_to_structure",
     ]
 
-    def __init__(
-        self,
-        domain_library: DomainLibrary,
-        concept_library: ConceptLibrary,
-        pipe_library: PipeLibrary,
-    ):
-        self.domain_library = domain_library
-        self.concept_library = concept_library
-        self.pipe_library = pipe_library
+    def __init__(self):
+        self._domain_libraries: dict[str, DomainLibrary] = {SpecialPipelineId.UNTITLED: DomainLibrary.make_empty()}
+        self._concept_libraries: dict[str, ConceptLibrary] = {SpecialPipelineId.UNTITLED: ConceptLibrary.make_empty()}
+        self._pipe_libraries: dict[str, PipeLibrary] = {SpecialPipelineId.UNTITLED: PipeLibrary.make_empty()}
 
-    @override
-    def validate_libraries(self):
-        log.debug("LibraryManager validating libraries")
-
-        self.concept_library.validate_with_libraries()
-        self.pipe_library.validate_with_libraries()
-        self.domain_library.validate_with_libraries()
+    ############################################################
+    # Manager lifecycle
+    ############################################################
 
     @override
     def setup(self) -> None:
-        self.concept_library.setup()
+        self._domain_libraries.clear()
+        self._concept_libraries.clear()
+        self._pipe_libraries.clear()
+        concept_library = ConceptLibrary.make_empty()
+        concept_library.setup()
+        self._domain_libraries[SpecialPipelineId.UNTITLED] = DomainLibrary.make_empty()
+        self._concept_libraries[SpecialPipelineId.UNTITLED] = concept_library
+        self._pipe_libraries[SpecialPipelineId.UNTITLED] = PipeLibrary.make_empty()
 
     @override
     def teardown(self) -> None:
-        self.pipe_library.teardown()
-        self.concept_library.teardown()
-        self.domain_library.teardown()
+        for pipe_library in self._pipe_libraries.values():
+            pipe_library.teardown()
+        for concept_library in self._concept_libraries.values():
+            concept_library.teardown()
+        for domain_library in self._domain_libraries.values():
+            domain_library.teardown()
+        self._pipe_libraries.clear()
+        self._concept_libraries.clear()
+        self._domain_libraries.clear()
 
     @override
     def reset(self) -> None:
         self.teardown()
         self.setup()
+
+    @override
+    def open_library(self, pipeline_run_id: str) -> None:
+        if pipeline_run_id in self._domain_libraries:
+            msg = f"Library for pipeline '{pipeline_run_id}' already exists"
+            raise LibraryError(msg)
+
+        concept_library = ConceptLibrary.make_empty()
+        concept_library.setup()
+        self._domain_libraries[pipeline_run_id] = DomainLibrary.make_empty()
+        self._concept_libraries[pipeline_run_id] = concept_library
+        self._pipe_libraries[pipeline_run_id] = PipeLibrary.make_empty()
+
+    @override
+    def close_library(self, pipeline_run_id: str) -> None:
+        if pipeline_run_id in self._pipe_libraries:
+            self._pipe_libraries[pipeline_run_id].teardown()
+            self._pipe_libraries.pop(pipeline_run_id)
+        if pipeline_run_id in self._concept_libraries:
+            self._concept_libraries[pipeline_run_id].teardown()
+            self._concept_libraries.pop(pipeline_run_id)
+        if pipeline_run_id in self._domain_libraries:
+            self._domain_libraries[pipeline_run_id].teardown()
+            self._domain_libraries.pop(pipeline_run_id)
+
+    ############################################################
+    # Public library accessors
+    ############################################################
+
+    @override
+    def get_domain_library(self, pipeline_run_id: str | None = None) -> DomainLibrary:
+        if pipeline_run_id is None:
+            pipeline_run_id = SpecialPipelineId.UNTITLED
+        if pipeline_run_id not in self._domain_libraries:
+            msg = f"Domain library for pipeline '{pipeline_run_id}' does not exist"
+            raise LibraryError(msg)
+        return self._domain_libraries[pipeline_run_id]
+
+    @override
+    def get_concept_library(self, pipeline_run_id: str | None = None) -> ConceptLibrary:
+        if pipeline_run_id is None:
+            pipeline_run_id = SpecialPipelineId.UNTITLED
+        if pipeline_run_id not in self._concept_libraries:
+            msg = f"Concept library for pipeline '{pipeline_run_id}' does not exist"
+            raise LibraryError(msg)
+        return self._concept_libraries[pipeline_run_id]
+
+    @override
+    def get_pipe_library(self, pipeline_run_id: str | None = None) -> PipeLibrary:
+        if pipeline_run_id is None:
+            pipeline_run_id = SpecialPipelineId.UNTITLED
+        if pipeline_run_id not in self._pipe_libraries:
+            msg = f"Pipe library for pipeline '{pipeline_run_id}' does not exist"
+            raise LibraryError(msg)
+        return self._pipe_libraries[pipeline_run_id]
+
+    ############################################################
+    # Private methods
+    ############################################################
+
+    def _get_domain_library(self, pipeline_run_id: str) -> DomainLibrary:
+        """Internal helper that requires explicit pipeline_run_id."""
+        if pipeline_run_id not in self._domain_libraries:
+            msg = f"Domain library for pipeline '{pipeline_run_id}' does not exist"
+            raise LibraryError(msg)
+        return self._domain_libraries[pipeline_run_id]
+
+    def _get_concept_library(self, pipeline_run_id: str) -> ConceptLibrary:
+        """Internal helper that requires explicit pipeline_run_id."""
+        if pipeline_run_id not in self._concept_libraries:
+            msg = f"Concept library for pipeline '{pipeline_run_id}' does not exist"
+            raise LibraryError(msg)
+        return self._concept_libraries[pipeline_run_id]
+
+    def _get_pipe_library(self, pipeline_run_id: str) -> PipeLibrary:
+        """Internal helper that requires explicit pipeline_run_id."""
+        if pipeline_run_id not in self._pipe_libraries:
+            msg = f"Pipe library for pipeline '{pipeline_run_id}' does not exist"
+            raise LibraryError(msg)
+        return self._pipe_libraries[pipeline_run_id]
+
+    ############################################################
+    # LibraryManagerAbstract
+    ############################################################
+
+    @override
+    def validate_libraries(self, pipeline_run_id: str | None = None):
+        log.debug("LibraryManager validating libraries")
+
+        if pipeline_run_id is None:
+            pipeline_run_id = SpecialPipelineId.UNTITLED
+
+        concept_library = self._get_concept_library(pipeline_run_id)
+        pipe_library = self._get_pipe_library(pipeline_run_id)
+        domain_library = self._get_domain_library(pipeline_run_id)
+
+        concept_library.validate_with_libraries()
+        pipe_library.validate_with_libraries()
+        domain_library.validate_with_libraries()
 
     def _get_pipelex_plx_files_from_dirs(self, dirs: set[Path]) -> list[Path]:
         """Get all valid Pipelex PLX files from the given directories."""
@@ -133,15 +237,22 @@ class LibraryManager(LibraryManagerAbstract):
         return all_plx_paths
 
     @override
-    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> list[PipeAbstract]:
+    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint, pipeline_run_id: str | None = None) -> list[PipeAbstract]:
         """Load a blueprint."""
+        if pipeline_run_id is None:
+            pipeline_run_id = SpecialPipelineId.UNTITLED
+
+        domain_library = self._get_domain_library(pipeline_run_id)
+        concept_library = self._get_concept_library(pipeline_run_id)
+        pipe_library = self._get_pipe_library(pipeline_run_id)
+
         # Create and load domain
         try:
             domain = self._load_domain_from_blueprint(blueprint)
         except DomainDefinitionError as exc:
             msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
             raise DomainLoadingError(message=msg, domain_code=exc.domain_code, description=exc.description, source=exc.source) from exc
-        self.domain_library.add_domain(domain=domain)
+        domain_library.add_domain(domain=domain)
 
         # Create and load concepts
         try:
@@ -151,7 +262,7 @@ class LibraryManager(LibraryManagerAbstract):
             raise ConceptLoadingError(
                 message=msg, concept_definition_error=exc, concept_code=exc.concept_code, description=exc.description, source=exc.source
             ) from exc
-        self.concept_library.add_concepts(concepts=concepts)
+        concept_library.add_concepts(concepts=concepts)
 
         # Create and load pipes
         try:
@@ -161,14 +272,21 @@ class LibraryManager(LibraryManagerAbstract):
             raise PipeLoadingError(
                 message=msg, pipe_definition_error=exc, pipe_code=exc.pipe_code or "", description=exc.description or "", source=exc.source
             ) from exc
-        self.pipe_library.add_pipes(pipes=pipes)
+        pipe_library.add_pipes(pipes=pipes)
 
         return pipes
 
     @override
-    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint, pipeline_run_id: str | None = None) -> None:
+        if pipeline_run_id is None:
+            pipeline_run_id = SpecialPipelineId.UNTITLED
+
+        domain_library = self._get_domain_library(pipeline_run_id)
+        concept_library = self._get_concept_library(pipeline_run_id)
+        pipe_library = self._get_pipe_library(pipeline_run_id)
+
         if blueprint.pipe is not None:
-            self.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
+            pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
 
         # Remove concepts (they may depend on domain)
         if blueprint.concept is not None:
@@ -176,9 +294,9 @@ class LibraryManager(LibraryManagerAbstract):
                 ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
                 for concept_code in blueprint.concept
             ]
-            self.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
+            concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
 
-        self.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
+        domain_library.remove_domain_by_code(domain_code=blueprint.domain)
 
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
         return DomainFactory.make_from_blueprint(
@@ -235,9 +353,25 @@ class LibraryManager(LibraryManagerAbstract):
     @override
     def load_libraries(
         self,
+        pipeline_run_id: str | None = None,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> None:
+        if pipeline_run_id is None:
+            pipeline_run_id = SpecialPipelineId.UNTITLED
+
+        # Ensure libraries exist for this pipeline_run_id
+        if pipeline_run_id not in self._domain_libraries:
+            if pipeline_run_id == SpecialPipelineId.UNTITLED:
+                # Auto-setup for UNTITLED if not already done
+                self.setup()
+            else:
+                msg = f"Libraries for pipeline '{pipeline_run_id}' do not exist. Call open_library() first."
+                raise LibraryError(msg)
+
+        domain_library = self._get_domain_library(pipeline_run_id)
+        concept_library = self._get_concept_library(pipeline_run_id)
+        pipe_library = self._get_pipe_library(pipeline_run_id)
         # Collect directories to scan (user project directories)
         user_dirs: set[Path] = set()
         if library_dirs:
@@ -346,7 +480,7 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             all_domains.append(domain)
-        self.domain_library.add_domains(domains=all_domains)
+        domain_library.add_domains(domains=all_domains)
 
         # Load all concepts second
         all_concepts: list[Concept] = []
@@ -361,7 +495,7 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             all_concepts.extend(concepts)
-        self.concept_library.add_concepts(concepts=all_concepts)
+        concept_library.add_concepts(concepts=all_concepts)
 
         # Load all pipes third
         all_pipes: list[PipeAbstract] = []
@@ -376,4 +510,4 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             all_pipes.extend(pipes)
-        self.pipe_library.add_pipes(pipes=all_pipes)
+        pipe_library.add_pipes(pipes=all_pipes)
