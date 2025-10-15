@@ -17,10 +17,7 @@ def do_show_config() -> None:
     """Show the pipelex configuration."""
     try:
         final_config = config_manager.load_config()
-        pretty_print(
-            final_config,
-            title=f"Pipelex configuration for project: {config_manager.get_project_name()}",
-        )
+        pretty_print(final_config, title="Pipelex configuration")
     except Exception as exc:
         msg = f"Error loading configuration: {exc}"
         raise PipelexConfigError(msg) from exc

@@ -96,7 +96,6 @@ class PipelexHub:
         #     config (Config): The configuration instance to set.
         """
         config = config_manager.load_config(specific_config_path)
-        config["project_name"] = config_manager.get_project_name()
         self.set_config(config=config_cls.model_validate(config))
 
     def set_config(self, config: ConfigRoot):
