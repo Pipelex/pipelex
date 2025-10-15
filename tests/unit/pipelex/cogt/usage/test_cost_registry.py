@@ -106,6 +106,74 @@ class TestCostRegistry:
         # File should not be created for empty records
         assert not csv_file.exists()
 
+    def test_save_to_csv_with_varying_fields(self, tmp_path: Path):
+        """Test that save_to_csv handles records with different fields correctly.
+
+        This test ensures the bug where different records have different fields
+        (e.g., some with output_audio, output_reasoning tokens) is caught.
+        """
+        # Prepare test data with varying fields across records
+        records: list[dict[str, Any]] = [
+            {
+                LLMTokenCostReportField.LLM_NAME: "model-standard",
+                LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED: 100,
+                LLMTokenCostReportField.COST_INPUT_CACHED: 0.10,
+            },
+            {
+                LLMTokenCostReportField.LLM_NAME: "model-with-audio",
+                LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED: 50,
+                LLMTokenCostReportField.COST_INPUT_CACHED: 0.05,
+                "nb_tokens_output_audio": 200,  # Extra field not in first record
+                "cost_output_audio": 0.20,  # Extra field not in first record
+            },
+            {
+                LLMTokenCostReportField.LLM_NAME: "model-with-reasoning",
+                LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED: 75,
+                LLMTokenCostReportField.COST_INPUT_CACHED: 0.075,
+                "nb_tokens_output_reasoning": 150,  # Extra field not in other records
+                "cost_output_reasoning": 0.15,  # Extra field not in other records
+            },
+        ]
+
+        # Save to CSV - should handle varying fields without errors
+        csv_file = tmp_path / "varying_fields_report.csv"
+        CostRegistry.save_to_csv(records, str(csv_file))
+
+        # Verify file exists
+        assert csv_file.exists()
+
+        # Read and verify all fields are present in headers
+        with open(csv_file, encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            rows = list(reader)
+
+        # Should have 3 rows
+        assert len(rows) == 3
+
+        # Verify all fields are in the CSV (even if some rows have empty values)
+        assert LLMTokenCostReportField.LLM_NAME in rows[0]
+        assert LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED in rows[0]
+        assert "nb_tokens_output_audio" in rows[0]
+        assert "nb_tokens_output_reasoning" in rows[0]
+        assert "cost_output_audio" in rows[0]
+        assert "cost_output_reasoning" in rows[0]
+
+        # Verify first row values (should have empty strings for missing fields)
+        assert rows[0][LLMTokenCostReportField.LLM_NAME] == "model-standard"
+        assert rows[0][LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED] == "100"
+        assert rows[0]["nb_tokens_output_audio"] == ""  # Missing field = empty string
+        assert rows[0]["nb_tokens_output_reasoning"] == ""  # Missing field = empty string
+
+        # Verify second row has its extra field
+        assert rows[1][LLMTokenCostReportField.LLM_NAME] == "model-with-audio"
+        assert rows[1]["nb_tokens_output_audio"] == "200"
+        assert rows[1]["cost_output_audio"] == "0.2"
+
+        # Verify third row has its extra field
+        assert rows[2][LLMTokenCostReportField.LLM_NAME] == "model-with-reasoning"
+        assert rows[2]["nb_tokens_output_reasoning"] == "150"
+        assert rows[2]["cost_output_reasoning"] == "0.15"
+
     def test_generate_report_aggregation(self, mocker: MockerFixture, tmp_path: Path):
         """Test groupby logic and cost calculations are correct."""
         # Mock console output to avoid printing during tests
