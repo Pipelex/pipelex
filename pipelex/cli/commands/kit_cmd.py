@@ -1,5 +1,7 @@
 """CLI commands for kit asset management."""
 
+import os
+import shutil
 from pathlib import Path
 
 import typer
@@ -9,9 +11,62 @@ from pipelex.exceptions import PipelexCLIError
 from pipelex.kit.cursor_export import export_cursor_rules, remove_cursor_rules
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.migrations_export import export_migration_instructions
+from pipelex.kit.paths import get_configs_dir
 from pipelex.kit.targets_update import build_merged_rules, remove_from_targets, update_targets
+from pipelex.system.configuration.config_loader import config_manager
 
 kit_app = typer.Typer(help="Manage kit assets: export Cursor rules and merge agent docs", no_args_is_help=True)
+
+
+@kit_app.command("config")
+def init_config_cmd(
+    reset: Annotated[bool, typer.Option("--reset", "-r", help="Warning: If set, existing files will be overwritten.")] = False,
+) -> None:
+    """Initialize pipelex configuration in the current directory."""
+    config_template_dir = str(get_configs_dir())
+    target_config_dir = config_manager.pipelex_config_dir
+
+    os.makedirs(target_config_dir, exist_ok=True)
+
+    try:
+        copied_files: list[str] = []
+        existing_files: list[str] = []
+
+        def copy_directory_structure(src_dir: str, dst_dir: str, relative_path: str = "") -> None:
+            """Recursively copy directory structure, handling existing files."""
+            for item in os.listdir(src_dir):
+                src_item = os.path.join(src_dir, item)
+                dst_item = os.path.join(dst_dir, item)
+                relative_item = os.path.join(relative_path, item) if relative_path else item
+
+                if os.path.isdir(src_item):
+                    os.makedirs(dst_item, exist_ok=True)
+                    copy_directory_structure(src_item, dst_item, relative_item)
+                elif os.path.exists(dst_item) and not reset:
+                    existing_files.append(relative_item)
+                else:
+                    shutil.copy2(src_item, dst_item)
+                    copied_files.append(relative_item)
+
+        copy_directory_structure(config_template_dir, target_config_dir)
+
+        # Report results
+        if copied_files:
+            typer.echo(f"✅ Copied {len(copied_files)} files to {target_config_dir}:")
+            for file in sorted(copied_files):
+                typer.echo(f"   • {file}")
+
+        if existing_files:
+            typer.echo(f"ℹ️  Skipped {len(existing_files)} existing files (use --reset to overwrite):")
+            for file in sorted(existing_files):
+                typer.echo(f"   • {file}")
+
+        if not copied_files and not existing_files:
+            typer.echo(f"✅ Configuration directory {target_config_dir} is already up to date")
+
+    except Exception as exc:
+        msg = f"Failed to initialize configuration: {exc}"
+        raise PipelexCLIError(msg) from exc
 
 
 @kit_app.command("rules")
