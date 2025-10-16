@@ -41,6 +41,7 @@ class PipeExtractSpec(PipeSpec):
 
     Validation Rules:
         - inputs dict must have exactly one input entry, and the value must be either `Image` or `PDF`.
+        - output must be "Page"
     """
 
     type: SkipJsonSchema[Literal["PipeExtract"]] = "PipeExtract"
@@ -49,6 +50,11 @@ class PipeExtractSpec(PipeSpec):
     page_images: bool | None = Field(default=None, description="Whether to include detected images in the Extract output.")
     page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
+
+    @field_validator("output", mode="before")
+    @classmethod
+    def validate_output(cls, _: str) -> str:
+        return "Page"
 
     @field_validator("extract_skill", mode="before")
     @classmethod

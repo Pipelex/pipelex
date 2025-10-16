@@ -13,6 +13,7 @@ class PipeRouterProtocol(Protocol):
         pipe_job: PipeJob,
     ) -> None:
         payload: PayloadType = {
+            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
             "pipe_job": pipe_job,
         }
         await self.observer_provider.observe_before_run(payload)
@@ -23,6 +24,7 @@ class PipeRouterProtocol(Protocol):
         pipe_output: PipeOutput,
     ) -> None:
         payload: PayloadType = {
+            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
             "pipe_job": pipe_job,
             "pipe_output": pipe_output,
         }
@@ -34,6 +36,7 @@ class PipeRouterProtocol(Protocol):
         error: Exception,
     ) -> None:
         payload: PayloadType = {
+            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
             "pipe_job": pipe_job,
             "error": error,
         }

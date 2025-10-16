@@ -30,7 +30,7 @@ class PipelexClient(PipelexProtocol):
         api_token: str | None = None,
         api_base_url: str | None = None,
     ):
-        self.api_token = api_token or get_required_env("PIPELEX_API_TOKEN")
+        self.api_token = api_token or get_required_env("PIPELEX_API_KEY")
 
         if not self.api_token:
             msg = "API token is required for API execution"
@@ -92,6 +92,7 @@ class PipelexClient(PipelexProtocol):
 
         if input_memory is not None:
             working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
+
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
             working_memory=working_memory,
             output_name=output_name,
