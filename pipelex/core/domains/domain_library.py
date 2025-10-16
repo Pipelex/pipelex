@@ -13,8 +13,16 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
     def validate_with_libraries(self):
         pass
 
-    def reset(self):
+    def setup(self):
+        pass
+
+    @override
+    def teardown(self):
         self.root = {}
+
+    def reset(self):
+        self.teardown()
+        self.setup()
 
     @classmethod
     def make_empty(cls) -> Self:
@@ -37,17 +45,10 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
             del self.root[domain_code]
 
     @override
-    def get_domain(self, domain: str) -> Domain | None:
-        return self.root.get(domain)
-
-    @override
     def get_required_domain(self, domain: str) -> Domain:
+        """Get a domain by code from this library, raising an error if not found."""
         the_domain = self.get_domain(domain=domain)
         if not the_domain:
             msg = f"Domain '{domain}' not found. Check for typos and make sure it is declared in a pipeline library."
             raise DomainLibraryError(msg)
         return the_domain
-
-    @override
-    def teardown(self) -> None:
-        self.root = {}

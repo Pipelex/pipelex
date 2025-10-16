@@ -5,6 +5,19 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 class PipeLibraryAbstract(ABC):
     @abstractmethod
+    def setup(self) -> None:
+        pass
+
+    @abstractmethod
+    def teardown(self) -> None:
+        pass
+
+    @abstractmethod
+    def reset(self) -> None:
+        self.teardown()
+        self.setup()
+
+    @abstractmethod
     def validate_with_libraries(self, pipeline_run_id: str | None = None) -> None:
         pass
 
@@ -25,10 +38,6 @@ class PipeLibraryAbstract(ABC):
         pass
 
     def remove_pipes_by_codes(self, pipe_codes: list[str]) -> None:
-        pass
-
-    @abstractmethod
-    def teardown(self) -> None:
         pass
 
     @abstractmethod

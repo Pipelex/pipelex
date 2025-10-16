@@ -29,21 +29,22 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def setup(self):
-        all_native_concepts = ConceptFactory.make_all_native_concepts()
-        self.add_concepts(concepts=all_native_concepts)
-
-    @override
-    def reset(self):
-        self.root = {}
-        self.setup()
+        pass
 
     @override
     def teardown(self):
         self.root = {}
 
+    @override
+    def reset(self):
+        self.teardown()
+        self.setup()
+
     @classmethod
     def make_empty(cls) -> Self:
-        return cls(root={})
+        library = cls(root={})
+        library.setup()
+        return library
 
     @override
     def list_concepts(self) -> list[Concept]:

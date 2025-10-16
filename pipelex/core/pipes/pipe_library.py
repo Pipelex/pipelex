@@ -35,9 +35,15 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 msg = f"Missing dependency for pipe '{pipe.code}': {not_found_error}"
                 raise PipeLibraryError(msg) from not_found_error
 
+    @override
+    def teardown(self):
+        self.root = {}
+
     @classmethod
     def make_empty(cls) -> Self:
-        return cls(root={})
+        library = cls(root={})
+        library.setup()
+        return library
 
     @override
     def add_new_pipe(self, pipe: PipeAbstract):
@@ -80,9 +86,6 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             if pipe_code in self.root:
                 del self.root[pipe_code]
 
-    @override
-    def teardown(self) -> None:
-        self.root = {}
 
     @override
     def pretty_list_pipes(self) -> None:
