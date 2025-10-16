@@ -15,10 +15,10 @@ from pipelex.core.pipes.pipe_library import PipeLibrary
 
 class Library(BaseModel):
     """A Library bundles together domain, concept, and pipe libraries for a specific context.
-    
+
     This represents a complete set of Pipelex definitions (domains, concepts, pipes)
     that can be loaded and used together, typically for a single pipeline run.
-    
+
     Each Library (except BASE) inherits native concepts and base pipes from the BASE library.
     """
 
@@ -29,14 +29,10 @@ class Library(BaseModel):
     @classmethod
     def make_empty(cls) -> "Library":
         """Create an empty library with initialized concept library (includes native concepts).
-        
+
         This should only be used for the BASE library.
         """
-        return cls(
-            domain_library=DomainLibrary.make_empty(),
-            concept_library=ConceptLibrary.make_empty(),
-            pipe_library=PipeLibrary.make_empty(),
-        )
+        return cls.make_base()
 
     @classmethod
     def make_base(cls) -> "Library":
@@ -48,15 +44,24 @@ class Library(BaseModel):
 
         # 2 - Pipe library, add the builder pipes
         pipe_library = PipeLibrary.make_empty()
-        
+
         # 3 - Domain library, add the domains
         domain_library = DomainLibrary.make_empty()
-        
+
         return cls(
             domain_library=domain_library,
             concept_library=concept_library,
             pipe_library=pipe_library,
         )
+
+    def get_domain_library(self) -> DomainLibrary:
+        return self.domain_library
+
+    def get_concept_library(self) -> ConceptLibrary:
+        return self.concept_library
+
+    def get_pipe_library(self) -> PipeLibrary:
+        return self.pipe_library
 
     def teardown(self) -> None:
         """Teardown all libraries in this bundle."""
@@ -72,35 +77,35 @@ class Library(BaseModel):
 
     def load_from_blueprints(self, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
-        
+
         Args:
             blueprints: List of parsed PLX blueprints to load
-            
+
         Returns:
             List of all pipes that were loaded
         """
         all_pipes: list[PipeAbstract] = []
-        
+
         # Load all domains first
         all_domains: list[Domain] = []
         for blueprint in blueprints:
             domain = self._load_domain_from_blueprint(blueprint)
             all_domains.append(domain)
         self.domain_library.add_domains(domains=all_domains)
-        
+
         # Load all concepts second
         all_concepts: list[Concept] = []
         for blueprint in blueprints:
             concepts = self._load_concepts_from_blueprint(blueprint)
             all_concepts.extend(concepts)
         self.concept_library.add_concepts(concepts=all_concepts)
-        
+
         # Load all pipes third
         for blueprint in blueprints:
             pipes = self._load_pipes_from_blueprint(blueprint)
             all_pipes.extend(pipes)
         self.pipe_library.add_pipes(pipes=all_pipes)
-        
+
         return all_pipes
 
     def _load_domain_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> Domain:
@@ -146,3 +151,21 @@ class Library(BaseModel):
                 pipes.append(pipe)
         return pipes
 
+    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+        if blueprint.pipe is not None:
+            self.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
+
+        # Remove concepts (they may depend on domain)
+        if blueprint.concept is not None:
+            from pipelex.core.concepts.concept_factory import ConceptFactory
+
+            concept_codes_to_remove = [
+                ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
+                for concept_code in blueprint.concept
+            ]
+            self.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
+
+        self.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
+
+    def validate_library(self):
+        self.validate_with_libraries()

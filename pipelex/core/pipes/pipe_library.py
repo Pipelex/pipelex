@@ -86,7 +86,6 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             if pipe_code in self.root:
                 del self.root[pipe_code]
 
-
     @override
     def pretty_list_pipes(self) -> None:
         def _format_concept_code(concept_code: str | None, current_domain: str) -> str:

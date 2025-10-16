@@ -248,7 +248,7 @@ async def validate_bundle_spec(pipelex_bundle_spec: PipelexBundleSpec):
         raise PipelexBundleError(message=pipe_spec_error.message, pipe_failures=pipe_failures) from pipe_spec_error
 
     try:
-        pipes = library_manager.load_from_blueprint(blueprint=pipelex_bundle_blueprint)
+        pipes = library_manager.get_library().load_from_blueprints(blueprints=[pipelex_bundle_blueprint])
         dry_run_result = await dry_run_pipes(pipes=pipes, raise_on_failure=True)
     except StaticValidationError as static_validation_error:
         static_validation_error_data = StaticValidationErrorData(

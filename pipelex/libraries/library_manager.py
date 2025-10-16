@@ -6,26 +6,20 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_library import ConceptLibrary
-from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import (
     ConceptDefinitionError,
     ConceptLibraryError,
-    ConceptLoadingError,
     DomainDefinitionError,
-    DomainLoadingError,
     LibraryError,
     LibraryLoadingError,
     PipeDefinitionError,
     PipeLibraryError,
-    PipeLoadingError,
 )
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -36,6 +30,7 @@ from pipelex.libraries.library_utils import (
 )
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.types import StrEnum
 
@@ -55,11 +50,12 @@ class LibraryComponent(StrEnum):
 
 class SpecialLibraryId(StrEnum):
     """Special library identifiers.
-    
-    BASE: The base/default library containing native concepts and builder pipes.
-          All new libraries inherit (copy) the contents of the BASE library when created.
+
+    UNTITLED: The untitled/default library
     """
-    BASE = "base"
+
+    UNTITLED = "untitled"
+
 
 class LibraryManager(LibraryManagerAbstract):
     allowed_root_attributes: ClassVar[list[str]] = [
@@ -71,8 +67,8 @@ class LibraryManager(LibraryManagerAbstract):
     ]
 
     def __init__(self):
-        # BASE library is the fallback library for all others
-        self._libraries: dict[str, Library] = {SpecialLibraryId.BASE: Library.make_empty()}
+        # UNTITLED library is the fallback library for all others
+        self._libraries: dict[str, Library] = {SpecialLibraryId.UNTITLED: Library.make_empty()}
 
     ############################################################
     # Manager lifecycle
@@ -81,7 +77,7 @@ class LibraryManager(LibraryManagerAbstract):
     @override
     def setup(self) -> None:
         self._libraries.clear()
-        self._libraries[SpecialLibraryId.BASE] = Library.make_empty()
+        self.create_library(library_id=SpecialLibraryId.UNTITLED)
 
     @override
     def teardown(self) -> None:
@@ -95,85 +91,51 @@ class LibraryManager(LibraryManagerAbstract):
         self.setup()
 
     @override
+    def create_library(self, library_id: str):
+        if library_id in self._libraries:
+            msg = f"Library '{library_id}' already exists"
+            raise LibraryError(msg)
+        self._libraries[library_id] = Library.make_empty()
+
+    @override
     def open_library(self, library_id: str) -> None:
         """Open a new library with the given library_id.
-        
+
         The new library will inherit native concepts and base pipes from the BASE library.
         """
         if library_id in self._libraries:
             msg = f"Library '{library_id}' already exists"
             raise LibraryError(msg)
-        
-        # Create a new library that inherits from BASE
-        base_library = Library.make_base_library()
-        self._libraries[library_id] = base_library
 
-    @override
-    def close_library(self, library_id: str) -> None:
-        """Close and cleanup a library with the given library_id."""
-        if library_id not in self._libraries:
-            msg = f"Trying to close a library that does not exist: '{library_id}'"
-            raise LibraryError(msg)
-        self._libraries[library_id].teardown()
-        self._libraries.pop(library_id)
+        # Create a new library that inherits from UNTITLED
+        base_library = Library.make_base()
+        self.create_library(library_id=library_id)
+        self.set_library(library_id=library_id, library=base_library)
 
     ############################################################
     # Public library accessors
     ############################################################
 
     @override
+    def set_library(self, library_id: str, library: Library) -> None:
+        if library_id not in self._libraries:
+            msg = f"Library '{library_id}' does not exist"
+            raise LibraryError(msg)
+        self._libraries[library_id] = library
+
+    @override
     def get_library(self, library_id: str | None = None) -> Library:
         """Get the Library object for a specific library_id."""
         if library_id is None:
-            library_id = SpecialLibraryId.BASE
+            library_id = SpecialLibraryId.UNTITLED
         if library_id not in self._libraries:
             msg = f"Trying to get a library that does not exist: '{library_id}'"
             raise LibraryError(msg)
         return self._libraries[library_id]
 
-    @override
-    def get_domain_library(self, library_id: str | None = None) -> DomainLibrary:
-        """Get the domain library for a specific library_id."""
-        return self.get_library(library_id).domain_library
-
-    @override
-    def get_concept_library(self, library_id: str | None = None) -> ConceptLibrary:
-        """Get the concept library for a specific library_id."""
-        return self.get_library(library_id).concept_library
-
-    @override
-    def get_pipe_library(self, library_id: str | None = None) -> PipeLibrary:
-        """Get the pipe library for a specific library_id."""
-        return self.get_library(library_id).pipe_library
-
-    @override
-    def get_required_domain(self, domain: str, library_id: str | None = None) -> Domain:
-        """Get a required domain from the specified library."""
-        return self.get_library(library_id).domain_library.get_required_domain(domain=domain)
-
-    @override
-    def get_required_concept(self, concept_string: str, library_id: str | None = None) -> Concept:
-        """Get a required concept from the specified library."""
-        return self.get_library(library_id).concept_library.get_required_concept(concept_string=concept_string)
-
-    @override
-    def get_required_pipe(self, pipe_code: str, library_id: str | None = None) -> PipeAbstract:
-        """Get a required pipe from the specified library."""
-        return self.get_library(library_id).pipe_library.get_required_pipe(pipe_code=pipe_code)
-
     ############################################################
     # Private methods
     ############################################################
-
-    ############################################################
-    # LibraryManagerAbstract
-    ############################################################
-
-    @override
-    def validate_libraries(self, library_id: str | None = None):
-        log.debug("LibraryManager validating libraries")
-        library = self.get_library(library_id)
-        library.validate_with_libraries()
 
     def _get_pipelex_plx_files_from_dirs(self, dirs: set[Path]) -> list[Path]:
         """Get all valid Pipelex PLX files from the given directories."""
@@ -209,46 +171,6 @@ class LibraryManager(LibraryManagerAbstract):
 
         return all_plx_paths
 
-    @override
-    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint, library_id: str | None = None) -> list[PipeAbstract]:
-        """Load a single blueprint into the specified library."""
-        library = self.get_library(library_id)
-        
-        try:
-            return library.load_from_blueprints([blueprint])
-        except DomainDefinitionError as exc:
-            msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-            raise DomainLoadingError(message=msg, domain_code=exc.domain_code, description=exc.description, source=exc.source) from exc
-        except ConceptDefinitionError as exc:
-            msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-            raise ConceptLoadingError(
-                message=msg, concept_definition_error=exc, concept_code=exc.concept_code, description=exc.description, source=exc.source
-            ) from exc
-        except PipeDefinitionError as exc:
-            msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-            raise PipeLoadingError(
-                message=msg, pipe_definition_error=exc, pipe_code=exc.pipe_code or "", description=exc.description or "", source=exc.source
-            ) from exc
-
-    @override
-    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint, library_id: str | None = None) -> None:
-        library = self.get_library(library_id)
-
-        if blueprint.pipe is not None:
-            library.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
-
-        # Remove concepts (they may depend on domain)
-        if blueprint.concept is not None:
-            from pipelex.core.concepts.concept_factory import ConceptFactory
-            concept_codes_to_remove = [
-                ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
-                for concept_code in blueprint.concept
-            ]
-            library.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
-
-        library.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
-
-
     def _import_pipelex_modules_directly(self) -> None:
         """Import pipelex modules to register @pipe_func decorated functions.
 
@@ -269,19 +191,13 @@ class LibraryManager(LibraryManagerAbstract):
         library_file_paths: list[Path] | None = None,
     ) -> None:
         if library_id is None:
-            library_id = SpecialLibraryId.BASE
+            library_id = SpecialLibraryId.UNTITLED
 
         # Ensure libraries exist for this library_id
         if library_id not in self._libraries:
-            if library_id == SpecialLibraryId.BASE:
-                # Auto-setup for BASE if not already done
-                self.setup()
-            else:
-                msg = f"Library '{library_id}' does not exist. Call open_library() first."
-                raise LibraryError(msg)
+            msg = f"Trying to load a library that does not exist: '{library_id}'"
+            raise LibraryError(msg)
 
-        library = self.get_library(library_id)
-        
         # Collect directories to scan (user project directories)
         user_dirs: set[Path] = set()
         if library_dirs:
@@ -334,8 +250,6 @@ class LibraryManager(LibraryManagerAbstract):
         self._import_pipelex_modules_directly()
 
         # Verify critical functions were registered
-        from pipelex.system.registries.func_registry import func_registry  # noqa: PLC0415 - intentional local import
-
         critical_functions = ["create_concept_spec", "assemble_pipelex_bundle_spec"]
         for func_name in critical_functions:
             if func_registry.has_function(func_name):
@@ -356,7 +270,9 @@ class LibraryManager(LibraryManagerAbstract):
             )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
-        num_registered = ClassRegistryUtils.auto_register_all_subclasses(base_class=StructuredContent)
+        num_registered = ClassRegistryUtils.auto_register_all_subclasses(
+            base_class=StructuredContent,
+        )
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
         # Parse all blueprints
@@ -379,7 +295,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Load all blueprints into the library
         try:
-            library.load_from_blueprints(blueprints)
+            self.get_library(library_id=library_id).load_from_blueprints(blueprints=blueprints)
         except DomainDefinitionError as domain_def_error:
             msg = f"Could not load domains from blueprints: {domain_def_error}"
             raise LibraryLoadingError(msg) from domain_def_error
