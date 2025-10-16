@@ -7,7 +7,8 @@ import typer
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_loop import BuilderLoop
-from pipelex.hub import get_report_delegate
+from pipelex.builder.runner_code import generate_runner_code
+from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
@@ -181,3 +182,51 @@ def build_partial_cmd(
     typer.echo(typer.style(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN))
 
     get_report_delegate().generate_report()
+
+
+@build_app.command("prepare", help="Prepare a Python runner file for a pipe")
+def prepare_runner_cmd(
+    pipe_code: Annotated[str, typer.Argument(help="The pipe code to prepare a runner for")],
+    output_path: Annotated[
+        str | None,
+        typer.Option("--output", "-o", help="Path to save the generated Python file"),
+    ] = None,
+) -> None:
+    """Prepare a Python runner file for a pipe.
+
+    The generated file will include:
+    - All necessary imports
+    - Example input values based on the pipe's input types
+
+    Native concept types (Text, Image, PDF, etc.) will be automatically handled.
+    Custom concept types will have their structure recursively generated.
+    """
+    # Initialize Pipelex
+    Pipelex.make()
+
+    # Get the pipe
+    try:
+        pipe = get_required_pipe(pipe_code=pipe_code)
+    except Exception as e:
+        typer.echo(typer.style(f"❌ Error: Could not find pipe '{pipe_code}': {e}", fg=typer.colors.RED))
+        raise typer.Exit(1) from e
+
+    # Generate the code
+    try:
+        runner_code = generate_runner_code(pipe)
+    except Exception as e:
+        typer.echo(typer.style(f"❌ Error generating runner code: {e}", fg=typer.colors.RED))
+        raise typer.Exit(1) from e
+
+    # Determine output path
+    if not output_path:
+        output_path = f"run_{pipe_code}.py"
+
+    # Save the file
+    try:
+        ensure_directory_for_file_path(file_path=output_path)
+        save_text_to_path(text=runner_code, path=output_path)
+        typer.echo(typer.style(f"✅ Generated runner file: {output_path}", fg=typer.colors.GREEN))
+    except Exception as e:
+        typer.echo(typer.style(f"❌ Error saving file: {e}", fg=typer.colors.RED))
+        raise typer.Exit(1) from e
