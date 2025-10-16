@@ -100,7 +100,7 @@ class PipelexHub:
 
     def set_config(self, config: ConfigRoot):
         if self._config is not None:
-            log.warning(f"set_config() got called but {self._config.project_name} config has already been set")
+            log.warning("set_config() got called but it has already been set")
             return
         self._config = config
 

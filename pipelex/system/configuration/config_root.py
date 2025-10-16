@@ -18,14 +18,7 @@ class SecretMethod(StrEnum):
 
 
 class ConfigRoot(ConfigModel):
-    """Main configuration class for the project.
-
-    Attributes:
-        project_name (str): Name of the current project.
-
-    """
-
-    project_name: str | None = None
+    """Main configuration class for the project."""
 
     def __init__(self, **kwargs: Any):
         """Initialize the Config instance.

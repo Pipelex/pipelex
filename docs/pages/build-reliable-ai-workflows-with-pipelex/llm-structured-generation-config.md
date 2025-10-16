@@ -72,10 +72,11 @@ The `is_default_text_then_structure` flag determines how LLM pipes generate stru
 The two-step process uses:
 
 1. The pipe's configured prompts for initial text generation
-2. A specialized structure extraction prompt that can be customized:
-   - Through domain configuration (`domain.prompt_template_to_structure`)
-   - Through pipe configuration (`pipe.prompt_template_to_structure`)
-   - Falls back to base template if not specified
+2. A specialized structure extraction prompt that can be customized in the `pipelex.toml` config in the `[cogt.llm_config.generic_templates]` section:
+
+ - `structure_from_preliminary_text_system`: The system prompt for the second LLM call
+ - `structure_from_preliminary_text_user`: The user prompt for the second LLM call
+
 
 ## Example Flow
 

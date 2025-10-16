@@ -81,10 +81,6 @@ class PipelexBundleSpec(StructuredContent):
         description: Natural language description of the pipeline's purpose and functionality.
         system_prompt: Default system prompt applied to all LLM pipes in the bundle
                       unless overridden at the pipe level.
-        system_prompt_to_structure: System prompt specifically for output structuring
-                                   operations across the bundle.
-        prompt_template_to_structure: Template for structuring prompts used in output
-                                     formatting operations.
         concept: Dictionary of concept definitions used in this domain. Keys are concept
                 codes in PascalCase format, values are ConceptBlueprint instances or
                 string references to existing concepts.
@@ -158,9 +154,7 @@ class PipelexBundleSpec(StructuredContent):
         return PipelexBundleBlueprint(
             domain=self.domain,
             description=self.description,
-            prompt_template_to_structure=None,
             system_prompt=self.system_prompt,
-            system_prompt_to_structure=None,
             pipe=pipe,
             concept=concept,
         )

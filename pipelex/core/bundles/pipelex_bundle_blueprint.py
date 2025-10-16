@@ -35,8 +35,6 @@ class PipelexBundleBlueprint(BaseModel):
     domain: str
     description: str | None = None
     system_prompt: str | None = None
-    system_prompt_to_structure: str | None = None
-    prompt_template_to_structure: str | None = None
 
     concept: dict[str, ConceptBlueprint | str] | None = Field(default_factory=dict)
 
