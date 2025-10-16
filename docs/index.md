@@ -101,7 +101,7 @@ Pipelex is an open-source Python framework for building **repeatable AI workflow
 
 Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.plx` files) is simple and human-readable, even for non-technical users.
 
-Each step can be structured and validated in ssoftware, so you benefit from the reliability of software, and the intelligence of AI.
+Each step can be structured and validated, so you benefit from the reliability of software, and the intelligence of AI.
 
 ---
 
