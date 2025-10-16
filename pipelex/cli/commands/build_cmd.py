@@ -7,11 +7,11 @@ import typer
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.runner_code import generate_runner_code
 from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
-from pipelex.tools.codegen.runner_generator import generate_runner_code
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 

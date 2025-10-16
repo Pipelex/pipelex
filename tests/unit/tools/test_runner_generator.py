@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from pipelex.builder.runner_code import generate_compact_memory_entry
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.tools.codegen.runner_generator import generate_compact_memory_entry, value_to_python_code
+from pipelex.tools.codegen.runner_generator import value_to_python_code
 
 
 class TestValueToPythonCode:
