@@ -112,6 +112,7 @@ nav:
       - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
       - Structuring Concepts: pages/build-reliable-ai-workflows-with-pipelex/structuring-concepts.md
       - Design and Run Pipelines: pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md
+      - Executing Pipelines with Inputs: pages/build-reliable-ai-workflows-with-pipelex/executing-pipelines-with-inputs.md
       - Pipeline Creation: pages/build-reliable-ai-workflows-with-pipelex/pipeline-creation.md
       - Pipe Operators:
         - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md
