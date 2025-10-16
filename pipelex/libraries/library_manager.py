@@ -1,31 +1,21 @@
 from pathlib import Path
 from typing import ClassVar
 
-from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.concept_library import ConceptLibrary
-from pipelex.core.domains.domain_library import DomainLibrary
-from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import (
-    ConceptDefinitionError,
     ConceptLibraryError,
-    DomainDefinitionError,
     LibraryError,
-    LibraryLoadingError,
-    PipeDefinitionError,
     PipeLibraryError,
 )
 from pipelex.libraries.library import Library
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
-    find_plx_files_in_dir,
     get_pipelex_package_dir_for_imports,
+    get_pipelex_plx_files_from_dirs,
     get_pipelex_plx_files_from_package,
 )
 from pipelex.system.configuration.config_loader import config_manager
@@ -46,15 +36,6 @@ class LibraryComponent(StrEnum):
                 return ConceptLibraryError
             case LibraryComponent.PIPE:
                 return PipeLibraryError
-
-
-class SpecialLibraryId(StrEnum):
-    """Special library identifiers.
-
-    UNTITLED: The untitled/default library
-    """
-
-    UNTITLED = "untitled"
 
 
 class LibraryManager(LibraryManagerAbstract):
@@ -137,52 +118,6 @@ class LibraryManager(LibraryManagerAbstract):
     # Private methods
     ############################################################
 
-    def _get_pipelex_plx_files_from_dirs(self, dirs: set[Path]) -> list[Path]:
-        """Get all valid Pipelex PLX files from the given directories."""
-        all_plx_paths: list[Path] = []
-        seen_files: set[str] = set()  # Track by absolute path to avoid duplicates
-
-        for dir_path in dirs:
-            if not dir_path.exists():
-                log.debug(f"Directory does not exist, skipping: {dir_path}")
-                continue
-
-            # Find all .plx files in the directory, excluding problematic directories
-            plx_files = find_plx_files_in_dir(
-                dir_path=str(dir_path),
-                pattern="*.plx",
-                is_recursive=True,
-            )
-
-            # Filter to only include valid Pipelex files
-            for plx_file in plx_files:
-                absolute_path = str(plx_file.resolve())
-
-                # Skip if already seen
-                if absolute_path in seen_files:
-                    log.debug(f"Skipping duplicate PLX file: {plx_file}")
-                    continue
-
-                if PipelexInterpreter.is_pipelex_file(plx_file):
-                    all_plx_paths.append(plx_file)
-                    seen_files.add(absolute_path)
-                else:
-                    log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")
-
-        return all_plx_paths
-
-    def _import_pipelex_modules_directly(self) -> None:
-        """Import pipelex modules to register @pipe_func decorated functions.
-
-        This ensures critical pipelex functions are registered regardless of how pipelex
-        is installed (wheel, source, relative path, etc.).
-        """
-        import pipelex.builder  # noqa: PLC0415 - intentional local import
-
-        log.verbose("Registering @pipe_func functions from pipelex.builder")
-        functions_count = FuncRegistryUtils.register_pipe_funcs_from_package("pipelex.builder", pipelex.builder)
-        log.verbose(f"Registered {functions_count} @pipe_func functions from pipelex.builder")
-
     @override
     def load_libraries(
         self,
@@ -205,15 +140,15 @@ class LibraryManager(LibraryManagerAbstract):
         else:
             user_dirs.add(Path(config_manager.local_root_dir))
 
+        # Get PLX file paths
         valid_plx_paths: list[Path]
         if library_file_paths:
             valid_plx_paths = library_file_paths
         else:
             # Get PLX files from user directories
-            user_plx_paths: list[Path] = self._get_pipelex_plx_files_from_dirs(user_dirs)
+            user_plx_paths: list[Path] = get_pipelex_plx_files_from_dirs(user_dirs)
 
-            # Get PLX files from pipelex package using importlib.resources
-            # This works reliably in all installation modes (wheel, source, relative)
+            # Get PLX files from pipelex package
             pipelex_plx_paths: list[Path] = get_pipelex_plx_files_from_package()
 
             # Combine and deduplicate
@@ -231,7 +166,7 @@ class LibraryManager(LibraryManagerAbstract):
                     valid_plx_paths.append(plx_path)
                     seen_absolute_paths.add(absolute_path)
 
-        # Import modules to load them into sys.modules (but don't register classes yet)
+        # Import modules and register in global registries
         # Import from user directories
         for library_dir in user_dirs:
             # Only import files that contain StructuredContent subclasses (uses AST pre-check)
@@ -250,6 +185,7 @@ class LibraryManager(LibraryManagerAbstract):
         self._import_pipelex_modules_directly()
 
         # Verify critical functions were registered
+        # TODO: This should be a Unit test
         critical_functions = ["create_concept_spec", "assemble_pipelex_bundle_spec"]
         for func_name in critical_functions:
             if func_registry.has_function(func_name):
@@ -275,37 +211,21 @@ class LibraryManager(LibraryManagerAbstract):
         )
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
-        # Parse all blueprints
-        blueprints: list[PipelexBundleBlueprint] = []
-        for plx_file_path in valid_plx_paths:
-            try:
-                blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
-            except FileNotFoundError as file_not_found_error:
-                msg = f"Could not find PLX blueprint at '{plx_file_path}'"
-                raise LibraryLoadingError(msg) from file_not_found_error
-            except PipeDefinitionError as pipe_def_error:
-                msg = f"Could not load PLX blueprint from '{plx_file_path}': {pipe_def_error}"
-                raise LibraryLoadingError(msg) from pipe_def_error
-            except ValidationError as validation_error:
-                validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-                msg = f"Could not load PLX blueprint from '{plx_file_path}' because of: {validation_error_msg}"
-                raise LibraryLoadingError(msg) from validation_error
-            blueprint.source = str(plx_file_path)
-            blueprints.append(blueprint)
+        # Delegate to the Library instance to load blueprints
+        self.get_library(library_id=library_id).load_from_plx_files(plx_file_paths=valid_plx_paths)
 
-        # Load all blueprints into the library
-        try:
-            self.get_library(library_id=library_id).load_from_blueprints(blueprints=blueprints)
-        except DomainDefinitionError as domain_def_error:
-            msg = f"Could not load domains from blueprints: {domain_def_error}"
-            raise LibraryLoadingError(msg) from domain_def_error
-        except ConceptDefinitionError as concept_def_error:
-            msg = f"Could not load concepts from blueprints: {concept_def_error}"
-            raise LibraryLoadingError(msg) from concept_def_error
-        except PipeDefinitionError as pipe_def_error:
-            msg = f"Could not load pipes from blueprints: {pipe_def_error}"
-            raise LibraryLoadingError(msg) from pipe_def_error
-        except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-            msg = f"Could not load blueprints because of: {validation_error_msg}"
-            raise LibraryLoadingError(msg) from validation_error
+    ############################################################
+    # Private helper methods
+    ############################################################
+
+    def _import_pipelex_modules_directly(self) -> None:
+        """Import pipelex modules to register @pipe_func decorated functions.
+
+        This ensures critical pipelex functions are registered regardless of how pipelex
+        is installed (wheel, source, relative path, etc.).
+        """
+        import pipelex.builder  # noqa: PLC0415 - intentional local import
+
+        log.verbose("Registering @pipe_func functions from pipelex.builder")
+        functions_count = FuncRegistryUtils.register_pipe_funcs_from_package("pipelex.builder", pipelex.builder)
+        log.verbose(f"Registered {functions_count} @pipe_func functions from pipelex.builder")

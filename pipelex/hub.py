@@ -19,7 +19,7 @@ from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_library_abstract import DomainLibraryAbstract
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
-from pipelex.libraries.library_manager import SpecialLibraryId
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol

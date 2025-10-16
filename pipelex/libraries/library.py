@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from pathlib import Path
+
+from pydantic import BaseModel, Field, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
@@ -8,9 +10,17 @@ from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.domains.domain_library import DomainLibrary
+from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_library import PipeLibrary
+from pipelex.core.validation import report_validation_error
+from pipelex.exceptions import (
+    ConceptDefinitionError,
+    DomainDefinitionError,
+    LibraryLoadingError,
+    PipeDefinitionError,
+)
 
 
 class Library(BaseModel):
@@ -48,11 +58,21 @@ class Library(BaseModel):
         # 3 - Domain library, add the domains
         domain_library = DomainLibrary.make_empty()
 
-        return cls(
+        library = cls(
             domain_library=domain_library,
             concept_library=concept_library,
             pipe_library=pipe_library,
         )
+
+        library.load_from_plx_files(
+            plx_file_paths=[
+                Path("pipelex/builder/builder.plx"),
+                Path("pipelex/builder/pipe/pipe_design.plx"),
+                Path("pipelex/builder/concept/concept.plx"),
+            ]
+        )
+
+        return library
 
     def get_domain_library(self) -> DomainLibrary:
         return self.domain_library
@@ -169,3 +189,54 @@ class Library(BaseModel):
 
     def validate_library(self):
         self.validate_with_libraries()
+
+    ############################################################
+    # Library loading from sources
+    ############################################################
+
+    def load_from_plx_files(self, plx_file_paths: list[Path]) -> None:
+        """Load library from a list of PLX file paths.
+
+        This method:
+        1. Parses blueprints from PLX files
+        2. Loads blueprints into the library
+
+        Note: Module imports and registry loading should be done by the LibraryManager
+        before calling this method.
+
+        Args:
+            plx_file_paths: List of PLX file paths to load.
+        """
+        blueprints: list[PipelexBundleBlueprint] = []
+        for plx_file_path in plx_file_paths:
+            try:
+                blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
+            except FileNotFoundError as file_not_found_error:
+                msg = f"Could not find PLX blueprint at '{plx_file_path}'"
+                raise LibraryLoadingError(msg) from file_not_found_error
+            except PipeDefinitionError as pipe_def_error:
+                msg = f"Could not load PLX blueprint from '{plx_file_path}': {pipe_def_error}"
+                raise LibraryLoadingError(msg) from pipe_def_error
+            except ValidationError as validation_error:
+                validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+                msg = f"Could not load PLX blueprint from '{plx_file_path}' because of: {validation_error_msg}"
+                raise LibraryLoadingError(msg) from validation_error
+            blueprint.source = str(plx_file_path)
+            blueprints.append(blueprint)
+
+        # Load all blueprints into the library
+        try:
+            self.load_from_blueprints(blueprints=blueprints)
+        except DomainDefinitionError as domain_def_error:
+            msg = f"Could not load domains from blueprints: {domain_def_error}"
+            raise LibraryLoadingError(msg) from domain_def_error
+        except ConceptDefinitionError as concept_def_error:
+            msg = f"Could not load concepts from blueprints: {concept_def_error}"
+            raise LibraryLoadingError(msg) from concept_def_error
+        except PipeDefinitionError as pipe_def_error:
+            msg = f"Could not load pipes from blueprints: {pipe_def_error}"
+            raise LibraryLoadingError(msg) from pipe_def_error
+        except ValidationError as validation_error:
+            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+            msg = f"Could not load blueprints because of: {validation_error_msg}"
+            raise LibraryLoadingError(msg) from validation_error
