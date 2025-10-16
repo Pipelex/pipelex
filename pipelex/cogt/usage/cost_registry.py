@@ -1,6 +1,6 @@
+import csv
 from typing import Any
 
-import pandas as pd
 from pydantic import Field, RootModel
 from rich import box
 from rich.console import Console
@@ -20,12 +20,13 @@ CostRegistryRoot = list[LLMTokenCostReport]
 class CostRegistry(RootModel[CostRegistryRoot]):
     root: CostRegistryRoot = Field(default_factory=empty_list_factory_of(LLMTokenCostReport))
 
-    def to_dataframe(self) -> pd.DataFrame:
+    def to_records(self) -> list[dict[str, Any]]:
+        """Convert cost reports to list of flat dictionaries."""
         records: list[dict[str, Any]] = []
         for token_cost_report in self.root:
             record_dict = token_cost_report.as_flat_dictionary()
             records.append(record_dict)
-        return pd.DataFrame(records)
+        return records
 
     @classmethod
     def generate_report(
@@ -46,38 +47,53 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             cost_report = cls.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
             cost_registry.root.append(cost_report)
 
-        cost_registry_df = cost_registry.to_dataframe()
+        records = cost_registry.to_records()
 
         # Calculate total costs overall
-        total_nb_tokens_input_cached = cost_registry_df[LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED].sum()  # pyright: ignore[reportUnknownMemberType]
-        total_nb_tokens_input_non_cached = cost_registry_df[LLMTokenCostReportField.NB_TOKENS_INPUT_NON_CACHED].sum()  # pyright: ignore[reportUnknownMemberType]
-        total_nb_tokens_input_joined = cost_registry_df[LLMTokenCostReportField.NB_TOKENS_INPUT_JOINED].sum()  # pyright: ignore[reportUnknownMemberType]
-        total_nb_tokens_output = cost_registry_df[LLMTokenCostReportField.NB_TOKENS_OUTPUT].sum()  # pyright: ignore[reportUnknownMemberType]
-        total_cost_input_cached = cost_registry_df[LLMTokenCostReportField.COST_INPUT_CACHED].sum()  # pyright: ignore[reportUnknownMemberType]
-        total_cost_input_non_cached = cost_registry_df[LLMTokenCostReportField.COST_INPUT_NON_CACHED].sum()  # pyright: ignore[reportUnknownMemberType]
-        total_cost_input_joined = cost_registry_df[LLMTokenCostReportField.COST_INPUT_JOINED].sum()  # pyright: ignore[reportUnknownMemberType]
-        total_cost_output = cost_registry_df[LLMTokenCostReportField.COST_OUTPUT].sum()  # pyright: ignore[reportUnknownMemberType]
+        total_nb_tokens_input_cached = sum(record[LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED] for record in records)
+        total_nb_tokens_input_non_cached = sum(record[LLMTokenCostReportField.NB_TOKENS_INPUT_NON_CACHED] for record in records)
+        total_nb_tokens_input_joined = sum(record[LLMTokenCostReportField.NB_TOKENS_INPUT_JOINED] for record in records)
+        total_nb_tokens_output = sum(record[LLMTokenCostReportField.NB_TOKENS_OUTPUT] for record in records)
+        total_cost_input_cached = sum(record[LLMTokenCostReportField.COST_INPUT_CACHED] for record in records)
+        total_cost_input_non_cached = sum(record[LLMTokenCostReportField.COST_INPUT_NON_CACHED] for record in records)
+        total_cost_input_joined = sum(record[LLMTokenCostReportField.COST_INPUT_JOINED] for record in records)
+        total_cost_output = sum(record[LLMTokenCostReportField.COST_OUTPUT] for record in records)
         total_cost = cls.compute_total_cost(
             input_non_cached_cost=total_cost_input_non_cached,
             input_cached_cost=total_cost_input_cached,
             output_cost=total_cost_output,
         )
 
-        # Calculate costs per LLM model
-        llm_group = cost_registry_df.groupby(LLMTokenCostReportField.LLM_NAME)  # pyright: ignore[reportUnknownMemberType]
-        agg_by_llm_name = llm_group.agg(  # pyright: ignore[reportUnknownMemberType]
-            {
-                LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED: "sum",
-                LLMTokenCostReportField.NB_TOKENS_INPUT_NON_CACHED: "sum",
-                LLMTokenCostReportField.NB_TOKENS_INPUT_JOINED: "sum",
-                LLMTokenCostReportField.NB_TOKENS_OUTPUT: "sum",
-                LLMTokenCostReportField.COST_INPUT_CACHED: "sum",
-                LLMTokenCostReportField.COST_INPUT_NON_CACHED: "sum",
-                LLMTokenCostReportField.COST_INPUT_JOINED: "sum",
-                LLMTokenCostReportField.COST_OUTPUT: "sum",
-            },
-        ).reset_index()
-        if agg_by_llm_name is None or agg_by_llm_name.empty:  # pyright: ignore[reportUnnecessaryComparison]
+        # Calculate costs per LLM model - group by LLM name
+        grouped_by_llm: dict[str, dict[str, float]] = {}
+        for record in records:
+            llm_name = record[LLMTokenCostReportField.LLM_NAME]
+            if llm_name not in grouped_by_llm:
+                grouped_by_llm[llm_name] = {
+                    LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED: 0,
+                    LLMTokenCostReportField.NB_TOKENS_INPUT_NON_CACHED: 0,
+                    LLMTokenCostReportField.NB_TOKENS_INPUT_JOINED: 0,
+                    LLMTokenCostReportField.NB_TOKENS_OUTPUT: 0,
+                    LLMTokenCostReportField.COST_INPUT_CACHED: 0.0,
+                    LLMTokenCostReportField.COST_INPUT_NON_CACHED: 0.0,
+                    LLMTokenCostReportField.COST_INPUT_JOINED: 0.0,
+                    LLMTokenCostReportField.COST_OUTPUT: 0.0,
+                }
+
+            # Aggregate values
+            for field in [
+                LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED,
+                LLMTokenCostReportField.NB_TOKENS_INPUT_NON_CACHED,
+                LLMTokenCostReportField.NB_TOKENS_INPUT_JOINED,
+                LLMTokenCostReportField.NB_TOKENS_OUTPUT,
+                LLMTokenCostReportField.COST_INPUT_CACHED,
+                LLMTokenCostReportField.COST_INPUT_NON_CACHED,
+                LLMTokenCostReportField.COST_INPUT_JOINED,
+                LLMTokenCostReportField.COST_OUTPUT,
+            ]:
+                grouped_by_llm[llm_name][field] += record[field]
+
+        if not grouped_by_llm:
             msg = "Empty report aggregation by LLM name"
             raise CostRegistryError(msg)
 
@@ -103,24 +119,24 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         table.add_column(f"Output Cost ({scale_str}$)", justify="right", style="yellow")
         table.add_column(f"Total Cost ({scale_str}$)", justify="right", style="bold yellow")
 
-        for _, row in agg_by_llm_name.iterrows():  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            llm_name = row[LLMTokenCostReportField.LLM_NAME]  # pyright: ignore[reportUnknownVariableType]
+        # Add rows for each LLM model
+        for llm_name, aggregated_data in grouped_by_llm.items():
             row_total_cost = cls.compute_total_cost(
-                input_non_cached_cost=row[LLMTokenCostReportField.COST_INPUT_NON_CACHED],  # pyright: ignore[reportUnknownArgumentType]
-                input_cached_cost=row[LLMTokenCostReportField.COST_INPUT_CACHED],  # pyright: ignore[reportUnknownArgumentType]
-                output_cost=row[LLMTokenCostReportField.COST_OUTPUT],  # pyright: ignore[reportUnknownArgumentType]
+                input_non_cached_cost=aggregated_data[LLMTokenCostReportField.COST_INPUT_NON_CACHED],
+                input_cached_cost=aggregated_data[LLMTokenCostReportField.COST_INPUT_CACHED],
+                output_cost=aggregated_data[LLMTokenCostReportField.COST_OUTPUT],
             )
             table.add_row(
-                llm_name,  # pyright: ignore[reportUnknownArgumentType]
-                f"{row[LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED]:,}",  # pyright: ignore[reportUnknownVariableType]
-                f"{row[LLMTokenCostReportField.NB_TOKENS_INPUT_NON_CACHED]:,}",  # pyright: ignore[reportUnknownVariableType]
-                f"{row[LLMTokenCostReportField.NB_TOKENS_INPUT_JOINED]:,}",  # pyright: ignore[reportUnknownVariableType]
-                f"{row[LLMTokenCostReportField.NB_TOKENS_OUTPUT]:,}",  # pyright: ignore[reportUnknownVariableType]
-                f"{row[LLMTokenCostReportField.COST_INPUT_CACHED] / unit_scale:.4f}",  # pyright: ignore[reportUnknownVariableType]
-                f"{row[LLMTokenCostReportField.COST_INPUT_NON_CACHED] / unit_scale:.4f}",  # pyright: ignore[reportUnknownVariableType]
-                f"{row[LLMTokenCostReportField.COST_INPUT_JOINED] / unit_scale:.4f}",  # pyright: ignore[reportUnknownVariableType]
-                f"{row[LLMTokenCostReportField.COST_OUTPUT] / unit_scale:.4f}",  # pyright: ignore[reportUnknownVariableType]
-                f"{row_total_cost / unit_scale:.4f}",  # pyright: ignore[reportUnknownVariableType]
+                llm_name,
+                f"{int(aggregated_data[LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED]):,}",
+                f"{int(aggregated_data[LLMTokenCostReportField.NB_TOKENS_INPUT_NON_CACHED]):,}",
+                f"{int(aggregated_data[LLMTokenCostReportField.NB_TOKENS_INPUT_JOINED]):,}",
+                f"{int(aggregated_data[LLMTokenCostReportField.NB_TOKENS_OUTPUT]):,}",
+                f"{aggregated_data[LLMTokenCostReportField.COST_INPUT_CACHED] / unit_scale:.4f}",
+                f"{aggregated_data[LLMTokenCostReportField.COST_INPUT_NON_CACHED] / unit_scale:.4f}",
+                f"{aggregated_data[LLMTokenCostReportField.COST_INPUT_JOINED] / unit_scale:.4f}",
+                f"{aggregated_data[LLMTokenCostReportField.COST_OUTPUT] / unit_scale:.4f}",
+                f"{row_total_cost / unit_scale:.4f}",
             )
 
         # add total row
@@ -143,10 +159,26 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         console.print(table)
 
         if cost_report_file_path:
-            cost_registry_df.to_excel(  # pyright: ignore[reportUnknownMemberType]
-                cost_report_file_path,
-                index=False,
-            )
+            cls.save_to_csv(records, cost_report_file_path)
+
+    @staticmethod
+    def save_to_csv(records: list[dict[str, Any]], file_path: str) -> None:
+        """Save records to CSV file."""
+        if not records:
+            return
+
+        # Collect all unique field names across all records
+        all_fieldnames: set[str] = set()
+        for record in records:
+            all_fieldnames.update(record.keys())
+
+        # Sort fieldnames for consistent column order
+        fieldnames = sorted(all_fieldnames)
+
+        with open(file_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(records)
 
     @classmethod
     def compute_total_cost(cls, input_non_cached_cost: float, input_cached_cost: float, output_cost: float) -> float:

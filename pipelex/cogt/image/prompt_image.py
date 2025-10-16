@@ -44,14 +44,6 @@ class PromptImagePath(PromptImage):
 class PromptImageUrl(PromptImage):
     url: str
 
-    # @field_validator("url")
-    # @classmethod
-    # def validate_url(cls, value: str) -> str:
-    #     if not (value.startswith(("http", "file", "data:image/"))):
-    #         msg = f"Image url must start with http, file, or data:image/, here it starts with '{value[:100]}'"
-    #         raise PromptImageDefinitionError(msg)
-    #     return value
-
     @override
     def __str__(self) -> str:
         truncated_url = AttributePolisher.get_truncated_value(name="url", value=self.url)
