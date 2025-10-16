@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 
@@ -87,19 +86,42 @@ class TestConceptCompactMemory:
 
     def test_get_compact_memory_example_for_refined_text_concept(self) -> None:
         """Test compact memory example for a concept that refines Text."""
-        # Create a concept that refines Text
-        blueprint = ConceptBlueprint(
+        # Create a concept that refines Text using direct make() to control domain
+        concept = ConceptFactory.make(
+            domain="test_domain",
+            concept_code="Question",
             description="A question",
+            structure_class_name="TextContent",
             refines="native.Text",
         )
 
-        concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
-            concept_code="Question",
-            blueprint=blueprint,
+        # Test - should return full format with concept_code since it's a refined (non-native) concept
+        # Even though it refines Text, it's not the native Text concept itself
+        result = concept.get_compact_memory_example("question")
+        assert isinstance(result, dict)
+        assert "concept_code" in result
+        assert result["concept_code"] == "test_domain.Question"
+        assert "content" in result
+        assert result["content"] == "question_text"  # Content is still the simple text string
+
+    def test_get_compact_memory_example_for_refined_image_concept(self) -> None:
+        """Test compact memory example for a concept that refines Image (non-native)."""
+        # Create a concept that refines Image using direct make() to control domain
+        concept = ConceptFactory.make(
+            domain="tables",
+            concept_code="TableScreenshot",
+            description="A screenshot of a table",
+            structure_class_name="ImageContent",
+            refines="native.Image",
         )
 
-        # Test - should return a simple string since it uses TextContent
-        result = concept.get_compact_memory_example("question")
-        assert isinstance(result, str)
-        assert result == "question_text"
+        # Test - should return full format with concept_code since it's a refined (non-native) concept
+        result = concept.get_compact_memory_example("table_screenshot")
+        assert isinstance(result, dict)
+        assert "concept_code" in result
+        assert result["concept_code"] == "tables.TableScreenshot"
+        assert "content" in result
+        # Content should be wrapped in ImageContent format
+        assert isinstance(result["content"], dict)
+        assert result["content"]["_class"] == "ImageContent"
+        assert result["content"]["url"] == "table_screenshot_url"
