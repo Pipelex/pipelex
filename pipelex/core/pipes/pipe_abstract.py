@@ -31,10 +31,10 @@ class PipeAbstract(ABC, BaseModel):
         return code
 
     @abstractmethod
-    def validate_output(self, pipeline_run_id: str | None = None):
+    def validate_output(self):
         """Validate the output for the pipe."""
 
-    def validate_with_libraries(self, pipeline_run_id: str | None = None):
+    def validate_with_libraries(self):
         """Validate the pipe with the libraries, after the static validation"""
 
     @abstractmethod

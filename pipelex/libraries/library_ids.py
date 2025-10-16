@@ -1,5 +1,3 @@
-"""Library identifiers and enumerations."""
-
 from pipelex.types import StrEnum
 
 

@@ -13,16 +13,14 @@ from pipelex.pipelex import Pipelex
 
 def do_validate_all_libraries_and_dry_run() -> None:
     """Validate libraries and dry-run all pipes."""
-    pipelex_instance = Pipelex.make()
-    pipelex_instance.validate_libraries()
+    Pipelex.make()
     asyncio.run(dry_run_pipes(pipes=get_pipes(), raise_on_failure=True))
     log.info("Setup sequence passed OK, config and pipelines are validated.")
 
 
 def do_dry_run_pipe(pipe_code: str) -> None:
     """Dry run a single pipe."""
-    pipelex_instance = Pipelex.make()
-    pipelex_instance.validate_libraries()
+    Pipelex.make()
 
     asyncio.run(
         dry_run_pipe(

@@ -29,7 +29,7 @@ from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
-from pipelex.libraries.library_manager_factory import LibraryManagerFactory
+from pipelex.libraries.library_manager import LibraryManager
 from pipelex.observer.local_observer import LocalObserver
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
@@ -115,7 +115,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
 
         # pipelex libraries
-        self.library_manager = LibraryManagerFactory.make_empty()
+        self.library_manager = LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         # pipelex pipeline
