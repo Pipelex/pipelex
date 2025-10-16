@@ -16,6 +16,7 @@ from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_pat
 
 
 def run_cmd(
+    ctx: typer.Context,
     target: Annotated[
         str | None,
         typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
@@ -60,8 +61,8 @@ def run_cmd(
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
     if provided_options == 0:
-        typer.secho("Failed to run: must provide a pipe code, bundle file, or target", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
+        typer.echo(ctx.get_help())
+        raise typer.Exit(0)
     if provided_options > 1:
         typer.secho(
             "Failed to run: cannot use multiple options (--pipe, --bundle, or positional target) simultaneously",
