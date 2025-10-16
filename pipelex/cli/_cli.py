@@ -14,6 +14,7 @@ from pipelex.cli.commands.validate_cmd import validate_app
 class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
+        # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
         return ["init", "kit", "build", "validate", "run", "show"]
 
     @override
@@ -39,9 +40,15 @@ app = typer.Typer(
 )
 
 
-app.add_typer(init_app, name="init", help="Initialization commands")
-app.add_typer(kit_app, name="kit", help="Manage kit assets")
-app.add_typer(build_app, name="build", help="Build artifacts like pipeline blueprints")
-app.add_typer(validate_app, name="validate", help="Validation and dry-run commands")
-app.command(name="run", help="Execute a pipeline")(run_cmd)
-app.add_typer(show_app, name="show", help="Show and list commands")
+app.add_typer(init_app, name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")
+app.add_typer(kit_app, name="kit", help="Manage kit assets: agent rules, migration rules")
+app.add_typer(
+    build_app, name="build", help="Generate AI workflows from natural language requirements: pipelines in .plx format and python code to run them"
+)
+app.add_typer(
+    validate_app,
+    name="validate",
+    help="Validate pipes: static validation for syntax and dependencies, dry-run execution for logic and consistency",
+)
+app.command(name="run", help="Run a pipe identified by its pipe code or run the main pipe from a bundle file (.plx) given its path")(run_cmd)
+app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")

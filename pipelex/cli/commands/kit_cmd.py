@@ -15,61 +15,10 @@ from pipelex.kit.paths import get_configs_dir
 from pipelex.kit.targets_update import build_merged_rules, remove_from_targets, update_targets
 from pipelex.system.configuration.config_loader import config_manager
 
-kit_app = typer.Typer(help="Manage kit assets: export Cursor rules and merge agent docs", no_args_is_help=True)
+kit_app = typer.Typer(no_args_is_help=True)
 
 
-@kit_app.command("config")
-def init_config_cmd(
-    reset: Annotated[bool, typer.Option("--reset", "-r", help="Warning: If set, existing files will be overwritten.")] = False,
-) -> None:
-    """Initialize pipelex configuration in the current directory."""
-    config_template_dir = str(get_configs_dir())
-    target_config_dir = config_manager.pipelex_config_dir
-
-    os.makedirs(target_config_dir, exist_ok=True)
-
-    try:
-        copied_files: list[str] = []
-        existing_files: list[str] = []
-
-        def copy_directory_structure(src_dir: str, dst_dir: str, relative_path: str = "") -> None:
-            """Recursively copy directory structure, handling existing files."""
-            for item in os.listdir(src_dir):
-                src_item = os.path.join(src_dir, item)
-                dst_item = os.path.join(dst_dir, item)
-                relative_item = os.path.join(relative_path, item) if relative_path else item
-
-                if os.path.isdir(src_item):
-                    os.makedirs(dst_item, exist_ok=True)
-                    copy_directory_structure(src_item, dst_item, relative_item)
-                elif os.path.exists(dst_item) and not reset:
-                    existing_files.append(relative_item)
-                else:
-                    shutil.copy2(src_item, dst_item)
-                    copied_files.append(relative_item)
-
-        copy_directory_structure(config_template_dir, target_config_dir)
-
-        # Report results
-        if copied_files:
-            typer.echo(f"✅ Copied {len(copied_files)} files to {target_config_dir}:")
-            for file in sorted(copied_files):
-                typer.echo(f"   • {file}")
-
-        if existing_files:
-            typer.echo(f"ℹ️  Skipped {len(existing_files)} existing files (use --reset to overwrite):")
-            for file in sorted(existing_files):
-                typer.echo(f"   • {file}")
-
-        if not copied_files and not existing_files:
-            typer.echo(f"✅ Configuration directory {target_config_dir} is already up to date")
-
-    except Exception as exc:
-        msg = f"Failed to initialize configuration: {exc}"
-        raise PipelexCLIError(msg) from exc
-
-
-@kit_app.command("rules")
+@kit_app.command("rules", help="Export Pipelex Cursor rules and merge Pipelex marked sections into other agent rules files")
 def agent_rules(
     repo_root: Annotated[Path | None, typer.Option("--repo-root", dir_okay=True, writable=True, help="Repository root directory")] = None,
     cursor: Annotated[bool, typer.Option("--cursor/--no-cursor", help="Export Cursor rules to .cursor/rules")] = True,
@@ -78,12 +27,6 @@ def agent_rules(
     diff: Annotated[bool, typer.Option("--diff", help="Show unified diff of changes")] = False,
     backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
 ) -> None:
-    """Sync kit assets: export Cursor rules and merge agent documentation.
-
-    This command:
-    1. Exports agent markdown files to Cursor .mdc files with YAML front-matter
-    2. Builds merged agent documentation and updates target files using markers
-    """
     try:
         if repo_root is None:
             repo_root = Path()
@@ -110,7 +53,9 @@ def agent_rules(
         raise PipelexCLIError(msg) from exc
 
 
-@kit_app.command("remove-rules")
+@kit_app.command(
+    "remove-rules", help="Remove agent rules: delete Pipelex Cursor rules and remove Pipelex marked sections from other agent rules files"
+)
 def remove_rules(
     repo_root: Annotated[Path | None, typer.Option("--repo-root", dir_okay=True, writable=True, help="Repository root directory")] = None,
     cursor: Annotated[bool, typer.Option("--cursor/--no-cursor", help="Remove Cursor rules from .cursor/rules")] = True,
@@ -120,12 +65,6 @@ def remove_rules(
     diff: Annotated[bool, typer.Option("--diff", help="Show unified diff of changes")] = False,
     backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
 ) -> None:
-    """Remove agent rules: delete Cursor rules and remove marked sections from target files.
-
-    This command:
-    1. Deletes agent markdown files from Cursor .mdc files in .cursor/rules
-    2. Removes marked sections from target files (or deletes entire files with --delete-files)
-    """
     try:
         if repo_root is None:
             repo_root = Path()
@@ -160,16 +99,11 @@ def remove_rules(
         raise PipelexCLIError(msg) from exc
 
 
-@kit_app.command("migrations")
+@kit_app.command("migrations", help="Sync Pipelex migration instructions to the `.pipelex/migrations` directory")
 def migration_instructions(
     repo_root: Annotated[Path | None, typer.Option("--repo-root", dir_okay=True, writable=True, help="Repository root directory")] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would be done without making changes")] = False,
 ) -> None:
-    """Sync migration instructions from kit to .pipelex/migrations.
-
-    This command copies migration documentation files from the pipelex.kit
-    package to the user's .pipelex/migrations directory.
-    """
     try:
         if repo_root is None:
             repo_root = Path()

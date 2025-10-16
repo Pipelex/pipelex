@@ -34,16 +34,16 @@ def do_dry_run_pipe(pipe_code: str) -> None:
 
 
 # Typer group for validation commands
-validate_app = typer.Typer(help="Validation and dry-run commands", no_args_is_help=True)
+validate_app = typer.Typer(no_args_is_help=True)
 
 
-@validate_app.command("all")
-def validate_all_cmd() -> None:
-    do_validate_all_libraries_and_dry_run()
-
-
-@validate_app.command("pipe")
+@validate_app.command("pipe", help="Validate and dry run a single pipe")
 def dry_run_pipe_cmd(
     pipe_code: Annotated[str, typer.Argument(help="The pipe code to dry run")],
 ) -> None:
     do_dry_run_pipe(pipe_code=pipe_code)
+
+
+@validate_app.command("all", help="Validate and dry run all pipes")
+def validate_all_cmd() -> None:
+    do_validate_all_libraries_and_dry_run()

@@ -62,10 +62,10 @@ def do_init_config(reset: bool = False) -> None:
 
 
 # Typer group for init commands
-init_app = typer.Typer(help="Initialization commands", no_args_is_help=True)
+init_app = typer.Typer(no_args_is_help=True)
 
 
-@init_app.command("config")
+@init_app.command("config", help="Initialize Pipelex configuration in a `.pipelex` directory")
 def init_config_cmd(
     reset: Annotated[bool, typer.Option("--reset", "-r", help="Warning: If set, existing files will be overwritten.")] = False,
 ) -> None:

@@ -34,7 +34,7 @@ pipelex build pipe "Given an theme, write a Haiku"
 """
 
 
-@build_app.command("pipe", help="Generate a pipeline with one validation/fix loop corecting the deterministic issues")
+@build_app.command("pipe", help="Build a Pipelex bundle with one validation/fix loop correcting deterministic issues")
 def build_pipe_cmd(
     brief: Annotated[
         str,
@@ -82,9 +82,9 @@ def build_pipe_cmd(
     get_report_delegate().generate_report()
 
 
-@build_app.command("runner", help="Prepare a Python runner file for a pipe")
+@build_app.command("runner", help="Build the Python code to run a pipe using its pipe code, including the necessary inputs")
 def prepare_runner_cmd(
-    pipe_code: Annotated[str, typer.Argument(help="The pipe code to prepare a runner for")],
+    pipe_code: Annotated[str, typer.Argument(help="The pipe code to run")],
     output_path: Annotated[
         str | None,
         typer.Option("--output", "-o", help="Path to save the generated Python file"),
@@ -130,7 +130,7 @@ def prepare_runner_cmd(
         raise typer.Exit(1) from e
 
 
-@build_app.command("one-shot-pipe", help="Generate a pipeline in one shot without validation loop (fast but may need manual fixes)")
+@build_app.command("one-shot-pipe", help="Developer utility for contributors: deliver pipeline in one shot, without validation loop")
 def build_one_shot_cmd(
     brief: Annotated[
         str,
@@ -183,7 +183,9 @@ def build_one_shot_cmd(
     get_report_delegate().generate_report()
 
 
-@build_app.command("partial-pipe", help="Generate a partial pipeline specification and save it as JSON (for debugging)")
+@build_app.command(
+    "partial-pipe", help="Developer utility for contributors: deliver a partial pipeline specification (not an actual bundle) and save it as JSON"
+)
 def build_partial_cmd(
     brief: Annotated[
         str,
