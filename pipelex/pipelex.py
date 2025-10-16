@@ -89,10 +89,7 @@ class Pipelex(metaclass=MetaSingleton):
             msg = f"Could not setup config because of: {validation_error_msg}"
             raise PipelexConfigError(msg) from validation_error
 
-        log.configure(
-            project_name=get_config().project_name or "unknown_project",
-            log_config=get_config().pipelex.log_config,
-        )
+        log.configure(log_config=get_config().pipelex.log_config)
         log.debug("Logs are configured")
 
         # tools
@@ -243,7 +240,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done for {get_config().project_name}")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     def setup_libraries(self):
         self.library_manager.setup()
@@ -261,7 +258,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     #         validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
     #         msg = f"Could not validate libraries because of: {validation_error_msg}"
     #         raise PipelexSetupError(msg) from validation_error
-    #     log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done for {get_config().project_name}")
+    #     log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done")
 
     def teardown(self):
         # pipelex
@@ -280,7 +277,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.class_registry.teardown()
         func_registry.teardown()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done for {get_config().project_name} (except config & logs)")
+        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         self.pipelex_hub.reset_config()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:

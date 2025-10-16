@@ -24,7 +24,6 @@ def reset_pipelex_config_fixture():
         config = get_config()
         log.verbose(config, title="Test config")
         assert isinstance(config, pipelex.config.PipelexConfig)
-        assert config.project_name == "pipelex"
     except Exception as exc:
         Console().print(Traceback())
         pytest.exit(f"Critical Pipelex setup error: {exc}")

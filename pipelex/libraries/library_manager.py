@@ -43,8 +43,6 @@ class LibraryManager(LibraryManagerAbstract):
         "domain",
         "description",
         "system_prompt",
-        "system_prompt_jto_structure",
-        "prompt_template_to_structure",
     ]
 
     def __init__(self):

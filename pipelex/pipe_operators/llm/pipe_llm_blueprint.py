@@ -25,8 +25,6 @@ class PipeLLMBlueprint(PipeBlueprint):
     prompt: str | None = None
 
     structuring_method: StructuringMethod | None = None
-    prompt_template_to_structure: str | None = None
-    system_prompt_to_structure: str | None = None
 
     nb_output: int | None = None
     multiple_output: bool | None = None

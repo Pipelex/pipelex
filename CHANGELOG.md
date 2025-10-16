@@ -245,7 +245,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 
 We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
 
-- **Get started in seconds** with [Pipelex Inference](pages/configuration/config-technical/inference-backend-config.md#pipelex-inference): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
+- **Get started in seconds** with [Pipelex Inference](pages/configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
 - **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, AWS Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
 - **Smart model routing**: Automatically route models to the right backend using [routing profiles](pages/configuration/config-technical/inference-backend-config.md#routing-profiles) with pattern matching
 - **User-friendly aliases**: Define shortcuts like `best-claude` → `claude-4.1-opus` with optional fallback chains

@@ -9,7 +9,7 @@ PipelexBundleSpec = "A Pipelex bundle spec."
 ValidationResult = "Status (success or failure) and details of the validation failure if applicable."
 # PipeFailure = "Details of a single pipe failure during dry run."
 # DryRunResult = "A result of a dry run of a pipelex bundle spec."
-DomainInformation = "A domain information object."
+BundleHeaderSpec = "A domain information object."
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Main
@@ -26,24 +26,27 @@ steps = [
     { pipe = "structure_concepts", result = "concept_specs" },
     { pipe = "design_pipe_signatures", result = "pipe_signatures" },
     { pipe = "detail_pipe_spec", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
-    { pipe = "pipe_builder_domain_information", result = "domain_information" },
+    { pipe = "write_bundle_header", result = "bundle_header_spec" },
     { pipe = "assemble_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
 ]
 
-[pipe.pipe_builder_domain_information]
+[pipe.write_bundle_header]
 type = "PipeLLM"
-description = "Turn the brief into a DomainInformation object."
-inputs = { brief = "UserBrief" }
-output = "DomainInformation"
+description = "Write the bundle header."
+inputs = { brief = "UserBrief", pipe_signatures = "PipeSignature" }
+output = "BundleHeaderSpec"
 model = "llm_to_engineer"
 prompt = """
 Name and define the domain of this process:
 @brief
 
+@pipe_signatures
+
 For example, if the brief is about generating and analyzing a compliance matrix out of a RFP,
-the domain would be "rfp_compliance" and the definition would be "Generating and analyzing compliance related to RFPs".
+the domain would be "rfp_compliance" and the description would be "Generating and analyzing compliance related to RFPs".
 The domain name should be not more than 4 words, in snake_case.
-For the definition, be concise.
+For the description, be concise.
+The main pipe is the one that will carry out the main task of the pipeline, it should be pretty obvious to identify.
 """
 
 [pipe.draft_the_plan]
@@ -54,6 +57,7 @@ output = "PlanDraft"
 model = "llm_to_engineer"
 prompt = """
 Return a draft of a plan that narrates the pipeline as pseudo-steps (no code):
+- Be clear which is the main pipe of the pipeline, don't write "main" in its pipe_code, but make it clear in its description.
 - Explicitly indicate when you are running things in sequence,
   or in parallel (several independant steps in parallel),
   or in batch (same operation applied to N elements of a list)
@@ -187,6 +191,7 @@ You can use the native concepts for inputs/outputs as required: Text, Image, PDF
 Define the contracts of the pipes to build:
 - For each pipe: give a unique snake_case pipe_code, a type and description, specify inputs (one or more) and output (one)
 - Add as much details as possible for the description.
+- Be clear which is the main pipe of the pipeline, don't write "main" in its pipe_code, but make it clear in its description.
 
 Available pipe controllers:
 - PipeSequence: A pipe that executes a sequence of pipes: it needs to reference the pipes it will execute.
@@ -216,6 +221,6 @@ Be smart about splitting the workflow into steps (sequence or parallel):
 [pipe.assemble_pipelex_bundle_spec]
 type = "PipeFunc"
 description = "Compile the pipelex bundle spec."
-inputs = { pipe_specs = "PipeSpec", concept_specs = "ConceptSpec", domain_information = "DomainInformation" }
+inputs = { pipe_specs = "PipeSpec", concept_specs = "ConceptSpec", bundle_header_spec = "BundleHeaderSpec" }
 output = "PipelexBundleSpec"
 function_name = "assemble_pipelex_bundle_spec"

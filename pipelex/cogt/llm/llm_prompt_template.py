@@ -113,7 +113,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         return llm_prompt
 
     @classmethod
-    def for_structure_from_preliminary_text(cls) -> "LLMPromptTemplate":
+    def make_for_structuring_from_preliminary_text(cls) -> "LLMPromptTemplate":
         llm_config = get_config().cogt.llm_config
         proto_prompt = LLMPrompt(
             system_text=llm_config.get_template("structure_from_preliminary_text_system"),

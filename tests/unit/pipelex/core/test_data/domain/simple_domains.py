@@ -16,15 +16,11 @@ DOMAIN_WITH_SYSTEM_PROMPTS = (
     """domain = "system_prompt_test"
 description = "A domain with system prompts"
 system_prompt = "You are an expert assistant"
-system_prompt_to_structure = "Generate structured output"
-prompt_template_to_structure = "Structure the following data: ..."
 """,
     PipelexBundleBlueprint(
         domain="system_prompt_test",
         description="A domain with system prompts",
         system_prompt="You are an expert assistant",
-        system_prompt_to_structure="Generate structured output",
-        prompt_template_to_structure="Structure the following data: ...",
     ),
 )
 

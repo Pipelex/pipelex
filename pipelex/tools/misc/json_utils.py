@@ -122,10 +122,10 @@ def load_json_dict_from_path(path: str) -> dict[Any, Any]:
 
     """
     json_content: JsonContent = load_json_from_path(path)
-    if isinstance(json_content, dict):
-        return json_content
-    msg = f"{path} is not a dict"
-    raise JsonTypeError(msg)
+    if not isinstance(json_content, dict):
+        msg = f"{path} is not a dict"
+        raise JsonTypeError(msg)
+    return json_content
 
 
 def load_json_list_from_path(path: str) -> list[Any]:

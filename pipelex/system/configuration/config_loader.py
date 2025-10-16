@@ -1,6 +1,5 @@
 import importlib
 import os
-from configparser import ConfigParser
 from typing import Any
 
 from pipelex.system.configuration.config_root import (
@@ -159,67 +158,6 @@ class ConfigLoader:
                 raise ConfigError(msg)
 
         return pipelex_config
-
-    def get_project_name(self) -> str | None:
-        """Get the project name from configuration files.
-
-        Checks the following files in order:
-        1. pipelex's pyproject.toml
-        2. Local pyproject.toml
-        3. setup.cfg
-        4. setup.py
-
-        Returns:
-            str | None: The project name or None if not found
-
-        """
-        # First check pipelex's pyproject.toml
-        pipelex_pyproject_path = os.path.join(os.path.dirname(os.getcwd()), "pyproject.toml")
-        if pipelex_pyproject := load_toml_from_path_if_exists(path=pipelex_pyproject_path):
-            if (project_name := pipelex_pyproject.get("project", {}).get("name")) and isinstance(project_name, str):
-                return str(project_name)
-
-        # Check local pyproject.toml
-        local_pyproject_path = os.path.join(os.getcwd(), "pyproject.toml")
-        if local_pyproject := load_toml_from_path_if_exists(local_pyproject_path):
-            name_obj: object = local_pyproject.get("project", {}).get("name") or local_pyproject.get("tool", {}).get("poetry", {}).get("name")
-            if isinstance(name_obj, str):
-                return name_obj
-
-        # Check setup.cfg
-        setup_cfg_path = os.path.join(os.getcwd(), "setup.cfg")
-        try:
-            config = ConfigParser()
-            config.read(setup_cfg_path)
-            if (cfg_name := config.get("metadata", "name", fallback=None)) and config.has_section("metadata"):
-                return cfg_name
-        except FileNotFoundError as exc:
-            print(f"setup.cfg not found at {setup_cfg_path}: {exc}")
-        except (ValueError, OSError) as exc:
-            print(f"Failed to parse setup.cfg at {setup_cfg_path}: {exc}")
-
-        # Check setup.py as last resort
-        setup_py_path = os.path.join(os.getcwd(), "setup.py")
-        try:
-            with open(setup_py_path) as f:
-                content = f.read()
-                # Simple string search for name parameter
-                for line in content.splitlines():
-                    if "name=" in line or "name =" in line:
-                        # Extract value between quotes
-                        for quote in ['"', "'"]:
-                            start = line.find(quote)
-                            if start != -1:
-                                end = line.find(quote, start + 1)
-                                if end != -1:
-                                    return line[start + 1 : end]
-        except FileNotFoundError as exc:
-            print(f"setup.py not found at {setup_py_path}: {exc}")
-        except (OSError, UnicodeDecodeError) as exc:
-            print(f"Failed to read setup.py at {setup_py_path}: {exc}")
-
-        print("Could not find project name in any of the configuration files")
-        return None
 
 
 config_manager = ConfigLoader()

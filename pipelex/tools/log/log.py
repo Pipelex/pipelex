@@ -16,7 +16,6 @@ class Log:
 
     def __init__(self):
         """Initialize the Log class with default attributes."""
-        self.project_name: str | None = None
         self._log_config_instance: LogConfig | None = None
         self.rich_handler: logging.Handler | None = None
         self.poor_handler: logging.Handler | None = None
@@ -62,21 +61,15 @@ class Log:
                     handler.close()
 
         logging.shutdown()
-        self.project_name = None
         self._log_config_instance = None
         self.rich_handler = None
         self.poor_handler = None
         self.log_dispatch.reset()
 
-    def configure(
-        self,
-        project_name: str,
-        log_config: LogConfig,
-    ):
+    def configure(self, log_config: LogConfig):
         """Configure the logging system with the given project name and log configuration.
 
         Args:
-            project_name (str): The name of the project.
             log_config (LogConfig): The log configuration to use.
 
         Raises:
@@ -87,14 +80,10 @@ class Log:
             msg = "LogConfig is already set. You can only call log.configure() once."
             raise RuntimeError(msg)
 
-        self.log_dispatch.configure(
-            project_name=project_name,
-            log_config=log_config,
-        )
+        self.log_dispatch.configure(log_config=log_config)
 
         self._log_config_instance = log_config
 
-        self.project_name = project_name
         self.rich_handler = log_config.rich_log_config.make_rich_handler()
         self.rich_handler.setFormatter(EmojiLogFormatter())
 
@@ -114,8 +103,7 @@ class Log:
 
         self.set_levels_for_packages(package_log_levels=log_config.package_log_levels)
 
-        self.verbose("Logs configured")
-        self.verbose(f"Config set for {project_name}")
+        self.verbose("Logs configured and config set")
 
     def set_poor_log_formatter(self, formatter: logging.Formatter):
         """Set the formatter for the poor log handler.

@@ -137,28 +137,45 @@ class Concept(BaseModel):
         # Generate the content based on structure
         content_example = self._generate_content_example_for_class(structure_class, var_name)
 
-        # For simple native concepts - return compact format
-        if self.structure_class_name == "TextContent":
+        # Check if this is actually a native concept (not just using a native structure class)
+        is_native = Concept.is_native_concept(self)
+
+        # For simple native concepts ONLY - return compact format
+        if is_native and self.structure_class_name == "TextContent":
             return cast("str", content_example)  # Just a string
-        elif self.structure_class_name == "ImageContent":
+        elif is_native and self.structure_class_name == "ImageContent":
             # Return dict with class instantiation info
             return {
                 "_class": "ImageContent",
                 "url": cast("str", content_example),
             }
-        elif self.structure_class_name == "PDFContent":
+        elif is_native and self.structure_class_name == "PDFContent":
             # Return dict with class instantiation info
             return {
                 "_class": "PDFContent",
                 "url": cast("str", content_example),
             }
-        elif self.structure_class_name == "NumberContent":
+        elif is_native and self.structure_class_name == "NumberContent":
             return cast("int", content_example)  # Just a number
 
-        # For complex concepts, wrap with concept_code
+        # For refined or complex concepts, wrap with concept_code
+        # For Image/PDF content, wrap in the _class format
+        if self.structure_class_name == "ImageContent":
+            content_wrapped = {
+                "_class": "ImageContent",
+                "url": cast("str", content_example),
+            }
+        elif self.structure_class_name == "PDFContent":
+            content_wrapped = {
+                "_class": "PDFContent",
+                "url": cast("str", content_example),
+            }
+        else:
+            content_wrapped = content_example
+
         return {
             "concept_code": self.concept_string,
-            "content": content_example,
+            "content": content_wrapped,
         }
 
     @classmethod

@@ -10,8 +10,7 @@ class DomainBlueprint(BaseModel):
     code: str
     description: str
     system_prompt: str | None = None
-    system_prompt_to_structure: str | None = None
-    prompt_template_to_structure: str | None = None
+    main_pipe: str | None = None
 
     @staticmethod
     def validate_domain_code(code: str) -> None:

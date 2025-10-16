@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -35,8 +36,7 @@ class PipelexBundleBlueprint(BaseModel):
     domain: str
     description: str | None = None
     system_prompt: str | None = None
-    system_prompt_to_structure: str | None = None
-    prompt_template_to_structure: str | None = None
+    main_pipe: str | None = None
 
     concept: dict[str, ConceptBlueprint | str] | None = Field(default_factory=dict)
 
@@ -47,3 +47,10 @@ class PipelexBundleBlueprint(BaseModel):
     def validate_domain_syntax(cls, domain: str) -> str:
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
+
+    @model_validator(mode="after")
+    def validate_main_pipe(self) -> "PipelexBundleBlueprint":
+        if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
+            msg = f"Main pipe '{self.main_pipe}' could not be found in bundle spec"
+            raise PipelexBundleError(message=msg)
+        return self
