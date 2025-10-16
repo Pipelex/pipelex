@@ -139,6 +139,9 @@ Analyze the document page shown in the image and explain how it relates to the p
 
 3. **Variable Multiple Outputs**: Use `multiple_output = true` when you need a variable-length list where the LLM determines how many outputs to generate based on the content and context.
 
+!!! info "Learn More About Multiplicity"
+    For a comprehensive guide on output multiplicity, input multiplicity, and the philosophy behind how Pipelex handles single items versus collections, see [Understanding Multiplicity](../understanding-multiplicity.md).
+
 ## Examples
 
 ### Simple Text Generation Example

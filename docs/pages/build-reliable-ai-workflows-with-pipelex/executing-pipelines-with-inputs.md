@@ -20,6 +20,9 @@ ImplicitMemory = dict[str, StuffContentOrData]
 
 Pipelex is smart about detecting what you mean and automatically wraps your data in the appropriate content types.
 
+!!! tip "Working with Lists"
+    When providing multiple items as input (lists) or expecting multiple outputs, understanding multiplicity is essential. See [Understanding Multiplicity](understanding-multiplicity.md) for a comprehensive guide on how Pipelex handles single items versus collections.
+
 ## Quick Comparison
 
 Here's when to use each format:

@@ -83,7 +83,12 @@ Please extract the most relevant keywords from the following product description
 
 Focus on features, benefits, and unique selling points.
 """
+```
 
+!!! note "Multiple Outputs"
+    The `multiple_output = true` setting allows the LLM to generate as many keywords as it finds relevant. For a comprehensive guide on controlling how many items pipes produce or accept, see [Understanding Multiplicity](understanding-multiplicity.md).
+
+```plx
 [pipe.generate_tagline_from_keywords]
 type = "PipeLLM"
 description = "Generate a tagline from keywords"
