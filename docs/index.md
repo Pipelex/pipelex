@@ -63,8 +63,20 @@ Now refine your pipeline with natural language:
 **CLI:**
 
 ```bash
-pipelex run <pipe_code> --input-memory-from-json input.json
+# Run a pipe by code
+pipelex run <pipe_code>
+
+# Run with inputs (JSON file containing input_memory dict)
+pipelex run <pipe_code> --inputs input.json
+
+# Run a bundle's main_pipe (auto-detected from .plx extension)
+pipelex run bundle.plx --inputs input.json
+
+# Customize output location
+pipelex run <pipe_code> --output results/output.json
 ```
+
+The `--inputs` file should be a JSON dictionary where keys are input variable names and values are the input data. For native types like Text, use strings directly. For structured types, provide objects matching the expected structure.
 
 **Python:**
 
