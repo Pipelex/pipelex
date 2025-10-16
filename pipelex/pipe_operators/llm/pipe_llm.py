@@ -79,7 +79,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def validate_with_libraries(self, pipeline_run_id: str | None = None):
-        llm_config = get_config().cogt.llm_config
         self.validate_inputs()
         self.llm_prompt_spec.validate_with_libraries()
         if self.llm_choices:
@@ -186,7 +185,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             else:
                 output_concept = get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code),
-                    pipeline_run_id=job_metadata.pipeline_run_id,
                 )
 
         multiplicity_resolution = output_multiplicity_to_apply(
@@ -294,7 +292,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 output_structure_prompt = await PipeLLM.get_output_structure_prompt(
                     concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
                     is_with_preliminary_text=is_with_preliminary_text,
-                    pipeline_run_id=job_metadata.pipeline_run_id,
                 )
             llm_prompt_1_for_object = await self.llm_prompt_spec.make_llm_prompt(
                 output_concept_string=output_concept.concept_string,
@@ -431,8 +428,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         )
 
     @staticmethod
-    async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool, pipeline_run_id: str | None = None) -> str | None:
-        concept = get_required_concept(concept_string=concept_string, pipeline_run_id=pipeline_run_id)
+    async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
+        concept = get_required_concept(concept_string=concept_string)
         output_class = get_class_registry().get_class(concept.structure_class_name)
         log.debug(f"get_output_structure_prompt for {concept_string} with {is_with_preliminary_text=}")
         log.debug(f"output_class: {output_class}")

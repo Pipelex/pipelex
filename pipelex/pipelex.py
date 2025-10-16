@@ -244,21 +244,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     def setup_libraries(self):
         self.library_manager.setup()
+        print("jdqojsoqjio", self.library_manager)
         self.library_manager.load_libraries()
-        # Set the UNTITLED libraries in the hub for backward compatibility
-        self.pipelex_hub.set_domain_library(domain_library=self.library_manager.get_domain_library())
-        self.pipelex_hub.set_concept_library(concept_library=self.library_manager.get_concept_library())
-        self.pipelex_hub.set_pipe_library(pipe_library=self.library_manager.get_pipe_library())
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done for {get_config().project_name}")
-
-    # def validate_libraries(self):
-    #     try:
-    #         self.library_manager.validate_libraries()
-    #     except ValidationError as validation_error:
-    #         validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-    #         msg = f"Could not validate libraries because of: {validation_error_msg}"
-    #         raise PipelexSetupError(msg) from validation_error
-    #     log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done")
 
     def teardown(self):
         # pipelex

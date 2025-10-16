@@ -49,8 +49,6 @@ class Library(BaseModel):
         """Create the BASE library that contains native concepts and builder pipes."""
         # 1 - Concept library, add the native concepts
         concept_library = ConceptLibrary.make_empty()
-        all_native_concepts = ConceptFactory.make_all_native_concepts()
-        concept_library.add_concepts(concepts=all_native_concepts)
 
         # 2 - Pipe library, add the builder pipes
         pipe_library = PipeLibrary.make_empty()
@@ -136,8 +134,6 @@ class Library(BaseModel):
                 code=blueprint.domain,
                 description=blueprint.description or "",
                 system_prompt=blueprint.system_prompt,
-                system_prompt_to_structure=blueprint.system_prompt_to_structure,
-                prompt_template_to_structure=blueprint.prompt_template_to_structure,
             ),
         )
 
@@ -177,8 +173,6 @@ class Library(BaseModel):
 
         # Remove concepts (they may depend on domain)
         if blueprint.concept is not None:
-            from pipelex.core.concepts.concept_factory import ConceptFactory
-
             concept_codes_to_remove = [
                 ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
                 for concept_code in blueprint.concept

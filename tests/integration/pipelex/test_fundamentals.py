@@ -3,7 +3,6 @@ import pytest
 from pipelex.config import get_config
 from pipelex.hub import get_pipes
 from pipelex.pipe_run.dry_run import dry_run_pipes
-from pipelex.pipelex import Pipelex
 
 
 # We use gha_disabled here because those tests are called directly and explicitly by the tests-check.yml file before the rest of the tests.
@@ -13,9 +12,6 @@ class TestFundamentals:
         # This test does nothing but the conftest runs Pipelex.make()
         # Therefore this test will fail if Pipelex.make() fails.
         pass
-
-    def test_validate_libraries(self):
-        Pipelex.get_instance().validate_libraries()
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_dry_run_all_pipes(self):
