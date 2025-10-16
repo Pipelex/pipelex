@@ -1,7 +1,5 @@
-from pipelex import pretty_print
 from pipelex.config import PipelexConfig
 from pipelex.hub import get_pipelex_hub
-from pipelex.system.configuration.config_loader import config_manager
 
 
 class TestLoadConfig:

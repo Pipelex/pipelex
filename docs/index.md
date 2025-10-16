@@ -4,19 +4,91 @@ title: "Open-source AI workflows"
 
 ![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_banner_docs_v2.png)
 
-# Easily build repeatable AI workflows
+# Build reliable AI workflows in minutes
 
-Pipelex is an open-source language specifically designed to build reliable, repeatable workflows. Stop wrestling with fragile workflows and start building AI systems you can trust.
+## Install
 
-## Ready to build something amazing?
+```bash
+pip install pipelex
+pipelex init config
+```
 
-**Just want to see it in action?** Get up and running in minutes with our quick-start guide.
+## Set your API key
 
-[:material-rocket-launch: Install & Quick Start](pages/quick-start/index.md){ .md-button .md-button--primary .equal-width }
+```bash
+# Linux/MacOS
+export PIPELEX_INFERENCE_API_KEY=###
 
-**Want to understand the bigger picture?** Discover why Pipelex changes everything about AI development.
+# Windows PowerShell
+$env:PIPELEX_INFERENCE_API_KEY="###"
 
-[:material-book-open: Read the Manifesto](manifesto.md){ .md-button .equal-width }
-[:material-lightbulb: Explore the Paradigm](pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md){ .md-button .equal-width }
+# Windows CMD
+set PIPELEX_INFERENCE_API_KEY=###
+```
+
+**Where to get an API key:** The `PIPELEX_INFERENCE_API_KEY` key provides access to all the AI models, you can get a free key from [our Discord](https://go.pipelex.com/discord). You can also use another AI routing service like [BlackBox AI](https://docs.blackbox.ai/), or bring your own API keys (OpenAI, Anthropic, Google, etc.), or run local AI (no key needed). See [Configure AI Providers](pages/setup/configure-ai-providers.md) for details. If you are using non-standard APIs, that's OK too, doin't hesitate to join our [Discord](https://go.pipelex.com/discord) for guidance.
+
+## Generate your first pipe
+
+```bash
+pipelex build pipe "Imagine a cute animal mascot for a startup based on its elevator pitch"
+```
+
+**More serious use-cases for business:**
+
+```bash
+pipelex build pipe "Given an expense report, apply company rules"
+pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match"
+```
+
+Each of these commands generates a complete production-ready script in our Pipelex language, saved as `.plx` file including domain definition, concepts, and the multiple _pipe_ steps to take to achieve the goal.
+
+## Easily iterate on your pipe
+
+Now, thanks to our Pipelex language, and its high level of abstraction, you can directly edit the pipeline. It's pretty easy even for non-technical users. Better yet, you can get assisted in making changes with the help of your favorite AI coding assistant. To that end, we have prepared comprehensive guides for the most popular AI coding assistants and you can install them with one call:
+
+```bash
+pipelex kit rules
+```
+
+This installs Pipelex rules for Cursor, Claude Code, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI.
+
+Now refine your pipeline with natural language:
+
+- "Include confidence scores between 0 and 100 in the match analysis"
+- "Write a recap email at the end"
+
+
+---
+
+## What is Pipelex?
+
+Pipelex is an open-source Python framework for building **repeatable AI workflows**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+
+Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.plx` files) is simple and human-readable, even for non-technical users.
+
+Each step can be structured and validated in ssoftware, so you benefit from the reliability of software, and the intelligence of AI.
+
+---
+
+## Next Steps
+
+**Learn More:**
+
+- [Full Tutorial](pages/quick-start/index.md) - Complete guide with examples
+- [Cookbook Examples](pages/cookbook-examples/index.md) - Real-world patterns
+- [Build Reliable AI Workflows](pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md) - Deep dive
+
+**Understand the Philosophy:**
+
+- [:material-book-open: Read the Manifesto](manifesto.md){ .md-button .equal-width }
+- [:material-lightbulb: Explore the Paradigm](pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md){ .md-button .equal-width }
+
+**Configure:**
+
+- [Configure AI Providers](pages/setup/configure-ai-providers.md) - API keys, local AI, model providers
+- [Project Organization](pages/setup/project-organization.md) - Structure your Pipelex projects
+
+[![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
 
 

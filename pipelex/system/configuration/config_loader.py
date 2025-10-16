@@ -1,6 +1,5 @@
 import importlib
 import os
-from configparser import ConfigParser
 from typing import Any
 
 from pipelex.system.configuration.config_root import (

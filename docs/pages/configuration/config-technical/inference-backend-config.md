@@ -15,8 +15,6 @@ Get a single API key that works with all major providers (OpenAI, Anthropic, Goo
 - ✅ Automatic model routing
 - ✅ Free on Discord (limited time offer)
 
-See [Pipelex Inference](#pipelex-inference) section below for setup details.
-
 ### Option B: Bring Your Own Keys
 
 Use your own API keys from individual providers for full control and direct billing. Ideal for production deployments with existing provider relationships.
@@ -511,22 +509,3 @@ Common error types:
    - Keep base configurations unchanged to make upgrades easier
    - Version control your custom configurations
    - Share routing profiles and presets across your team
-
-## Validation
-
-Validate your inference configuration:
-
-```bash
-# Validate all configurations
-pipelex validate all
-
-# Check specific configuration
-pipelex validate inference
-```
-
-The validation checks:
-- Backend connectivity
-- Model availability
-- Routing consistency
-- Preset validity
-- Alias resolution

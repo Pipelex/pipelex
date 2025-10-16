@@ -1,128 +1,5 @@
 # Quick-start
 
-Welcome to Pipelex! This guide will get you started building AI workflows in minutes.
-
-## What is Pipelex?
-
-Pipelex is an open-source Python framework for building **repeatable AI workflows**. Instead of cramming everything into one complex prompt, you break tasks into focused steps—each pipe handling one clear transformation. These workflows process information from **extraction** to **analysis** to **decision making**. The result? **Deterministic structure with adaptive intelligence**: the reliability of software with the flexibility of AI.
-
-Each pipe processes information: it takes structured inputs and produces structured outputs. Pipelex uses **Concepts** (typing with meaning) to ensure your pipelines make sense. A "non-compete clause" and a "flower description" are both text, but they represent different concepts. Pipelex validates that pipes connect properly, catching errors before they happen.
-
-The `.plx` language is simple and readable—even for non-technical users. You can generate pipelines with AI or write them yourself.
-
-Learn more about the philosophy in [The Pipelex Paradigm](../pipelex-paradigm-for-repeatable-ai-workflows/index.md).
-
----
-
-## Installation
-
-Install Pipelex with pip:
-
-```bash
-pip install pipelex
-```
-
-That's it! Now let's generate your first pipeline.
-
----
-
-## Generate Your First Pipeline with AI
-
-The fastest way to get started is to generate pipelines using natural language. Pipelex can create complete, multi-step workflows for you.
-
-### Step 1: Generate with Pipe Builder
-
-The Pipe Builder transforms natural language descriptions into working `.plx` files. Here are some real-world examples:
-
-**Example 1: Expense Report Validation**
-
-```bash
-pipelex build pipe "Given an expense report, apply company rules" -o expense_pipeline.plx
-```
-
-**Example 2: CV/Job Matching**
-
-```bash
-pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match" -o cv_matcher.plx
-```
-
-**Example 3: Compliance Analysis**
-
-```bash
-pipelex build pipe "Given an RFP PDF, build a compliance matrix" -o compliance_pipeline.plx
-```
-
-These commands generate complete `.plx` files containing:
-
-- Domain definitions
-- Concept declarations
-- Multi-step pipe workflows
-
-The Pipe Builder handles complexity automatically, creating pipelines with proper structure and validation.
-
-!!! info "Pipe Builder is in Beta"
-    The Pipe Builder is currently in beta and improving rapidly. Expect frequent enhancements!
-
-### Step 2: Install Agent Rules for Iteration
-
-Once you have a generated pipeline, you can refine it using any AI coding assistant:
-
-```bash
-pipelex kit rules
-```
-
-This command installs Pipelex rules for:
-
-- **Cursor**
-- **Claude Code**
-- **OpenAI Codex**
-- **GitHub Copilot**
-- **Windsurf**
-- **Blackbox AI**
-
-These rules teach your AI assistant Pipelex syntax, concepts, and best practices.
-
-### Step 3: Iterate with Your AI Assistant
-
-With the rules installed, use natural language to refine your pipeline:
-
-- "Add a validation step to check for negative amounts"
-- "Include confidence scores in the match analysis"
-- "Add error handling for missing PDF files"
-- "Create a summary report at the end"
-
-Your AI assistant will understand Pipelex and make the changes correctly.
-
-### Step 4: Test Your Pipeline
-
-Run your pipeline from the command line or Python:
-
-**CLI:**
-
-```bash
-pipelex run <pipe_code> --input-memory-from-json input.json
-```
-
-**Python:**
-
-```python
-import asyncio
-from pipelex.pipeline.execute import execute_pipeline
-from pipelex.pipelex import Pipelex
-
-async def run_pipeline():
-    pipe_output = await execute_pipeline(pipe_code="your_pipe_code")
-    print(pipe_output.main_stuff_as_str)
-
-Pipelex.make()
-asyncio.run(run_pipeline())
-```
-
-!!! tip "Need API Access?"
-    To run these pipelines with LLMs, you'll need API access. We offer **free credits** for testing and developing, or you can bring your own keys, or run local AI. See the [Installation & Configuration](../installation/index.md#api-configuration) guide for all options.
-
----
-
 ## Understanding How It Works
 
 Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.plx` language.
@@ -144,8 +21,10 @@ domain = "characters"
 type = "PipeLLM"
 description = "Creates a character."
 output = "Text"
-prompt = """You are a book writer. Your task is to create a character.
-Think of it and then output the character description."""
+prompt = """
+You are a book writer. Your task is to create a character.
+Think of it and then output the character description.
+"""
 ```
 
 This pipeline:
@@ -198,8 +77,10 @@ type = "PipeLLM"
 description = "Create a character."
 output = "Text"
 model = { model = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
-prompt = """You are a book writer. Your task is to create a character.
-Think of it and then output the character description."""
+prompt = """
+You are a book writer. Your task is to create a character.
+Think of it and then output the character description.
+"""
 ```
 
 #### Or Use an LLM Preset from the LLM Deck
@@ -210,10 +91,12 @@ type = "PipeLLM"
 description = "Create a character."
 output = "Text"
 model = "llm_for_creative_writing"
-prompt = """You are a book writer. Your task is to create a character.
-Think of it and then output the character description."""
+prompt = """
+You are a book writer. Your task is to create a character.
+Think of it and then output the character description.
+"""
 
-# The llm deck above is defined in `.pipelex/inference/deck/base_deck.toml` as:
+# The llm choice above is defined in `.pipelex/inference/deck/base_deck.toml` as:
 # llm_for_creative_writing = { model = "best-claude", temperature = 0.9 }
 # it's a base preset that we provide. you can add your own presets, too.
 ```
@@ -279,8 +162,10 @@ Character = "A character in a fiction story" # <- Define your output concept
 type = "PipeLLM"
 description = "Create a character. Get a structured result."
 output = "Character"    # <- This is the output concept for your pipe
-prompt = """You are a book writer. Your task is to create a character.
-Think of it and then output the character description."""
+prompt = """
+You are a book writer. Your task is to create a character.
+Think of it and then output the character description.
+"""
 ```
 
 💡 The concept name matches the class name (`Character`), so Pipelex automatically links them.

@@ -86,7 +86,9 @@ nav:
   - Home:
     - Welcome: index.md
     - Quick-start: pages/quick-start/index.md
-    - Installation: pages/installation/index.md
+    - Setup:
+      - Configure AI Providers: pages/setup/configure-ai-providers.md
+      - Project Organization: pages/setup/project-organization.md
     - Understand Pipelex:
       - The Knowledge Pipeline Manifesto: manifesto.md
       - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
