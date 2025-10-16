@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import Annotated
 
 import typer
 
-from pipelex import log, pretty_print, pretty_print_md
+from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_pipe_from_bundle
 from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.exceptions import PipeInputError

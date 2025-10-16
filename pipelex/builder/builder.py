@@ -18,7 +18,6 @@ from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.exceptions import PipeInputError
 from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
