@@ -58,6 +58,28 @@ Now refine your pipeline with natural language:
 - "Include confidence scores between 0 and 100 in the match analysis"
 - "Write a recap email at the end"
 
+## Run your pipeline
+
+**CLI:**
+
+```bash
+pipelex run <pipe_code> --input-memory-from-json input.json
+```
+
+**Python:**
+
+```python
+import asyncio
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipelex import Pipelex
+
+async def run_pipeline():
+    pipe_output = await execute_pipeline(pipe_code="your_pipe_code")
+    print(pipe_output.main_stuff_as_str)
+
+Pipelex.make()
+asyncio.run(run_pipeline())
+```
 
 ---
 

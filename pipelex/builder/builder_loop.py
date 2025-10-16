@@ -3,13 +3,13 @@ from pipelex.builder.builder import (
     PipelexBundleSpec,
     PipeSpecUnion,
     reconstruct_bundle_with_pipe_fixes,
-    validate_bundle_spec,
 )
 from pipelex.builder.builder_errors import (
     PipelexBundleError,
     PipelexBundleNoFixForError,
     PipelexBundleUnexpectedError,
 )
+from pipelex.builder.builder_validation import validate_bundle_spec
 from pipelex.client.protocol import ImplicitMemory
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
 from pipelex.exceptions import StaticValidationErrorType
@@ -34,7 +34,7 @@ class BuilderLoop:
         save_text_to_path(text=plx_content, path="results/generated_pipeline_1st_iteration.plx")
 
         try:
-            await validate_bundle_spec(pipelex_bundle_spec=pipelex_bundle_spec)
+            await validate_bundle_spec(bundle_spec=pipelex_bundle_spec)
         except PipelexBundleError as bundle_error:
             pretty_print(bundle_error.as_structured_content(), title="Pipelex Bundle Error")
             pipelex_bundle_spec = self._fix_bundle_error(bundle_error=bundle_error, pipelex_bundle_spec=pipelex_bundle_spec)
