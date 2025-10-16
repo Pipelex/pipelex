@@ -26,7 +26,7 @@ $env:PIPELEX_INFERENCE_API_KEY="###"
 set PIPELEX_INFERENCE_API_KEY=###
 ```
 
-**Where to get an API key:** The `PIPELEX_INFERENCE_API_KEY` key provides access to all the AI models, you can get a free key from [our Discord](https://go.pipelex.com/discord). You can also use another AI routing service like [BlackBox AI](https://docs.blackbox.ai/), or bring your own API keys (OpenAI, Anthropic, Google, etc.), or run local AI (no key needed). See [Configure AI Providers](pages/setup/configure-ai-providers.md) for details. If you are using non-standard APIs, that's OK too, doin't hesitate to join our [Discord](https://go.pipelex.com/discord) for guidance.
+**Where to get an API key:** The `PIPELEX_INFERENCE_API_KEY` key provides access to all the AI models, you can get a free key from [our Discord](https://go.pipelex.com/discord). You can also use another AI routing service like [BlackBox AI](https://docs.blackbox.ai/), or bring your own API keys (OpenAI, Anthropic, Google, etc.), or run local AI (no key needed). See [Configure AI Providers](pages/setup/configure-ai-providers.md) for details. If you are using non-standard APIs, that's OK too, don't hesitate to join our [Discord](https://go.pipelex.com/discord) for guidance.
 
 ## Generate your first pipe
 
