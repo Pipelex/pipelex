@@ -34,7 +34,7 @@ set PIPELEX_INFERENCE_API_KEY=###
 pipelex build pipe "Imagine a cute animal mascot for a startup based on its elevator pitch"
 ```
 
-**More serious use-cases for business:**
+**Other useful use-cases for business:**
 
 ```bash
 pipelex build pipe "Given an expense report, apply company rules"
