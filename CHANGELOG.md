@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.12.0] - 2025-10-15
 
 ### Highlights - Moving fast and breaking things
 
@@ -92,6 +92,12 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Added template preprocessing with `preprocess_template()` function
  - Added better dependency checking for optional SDK packages (anthropic, mistralai, boto3, aioboto3)
  - Added `MissingDependencyError` exception for missing optional dependencies
+ - Added `library_utils.py` module with utility functions for PLX file discovery using `importlib.resources`
+ - Added `class_utils.py` module with `are_classes_equivalent()` and `has_compatible_field()` functions
+ - Added comprehensive unit tests for `CostRegistry`, `WorkingMemory`, and `ModuleInspector`
+ - Added `ScanConfig` class with configurable excluded directories for library scanning
+ - Added CSV export capabilities to `CostRegistry` with `save_to_csv()` and `to_records()` methods
+ - Added default configuration template in `pipelex/kit/configs/pipelex.toml`
 
 ### Changed
  - Replaced package `toml` by `tomli` which is more modern and faster
@@ -99,10 +105,18 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Updated Gemini 2.5 Series comment from '(when available)' to stable release
  - Updated `base-claude` from `claude-4-sonnet` to `claude-4.5-sonnet` across all presets
  - Updated kajson dependency from version `0.3.0` to `0.3.1`
+ - Updated httpx dependency to `>=0.23.0,<1.0.0` for broader compatibility
  - Cleanup env example and better explain how to set up keys in README and docs
  - Changed Gemini routing from `google` backend to `pipelex_inference` backend
+ - **BREAKING:** Major module reorganization - moved `tools/config/`, `tools/exceptions.py`, `tools/environment.py`, `tools/runtime_manager.py` to `system/` package structure (`system/configuration/`, `system/exceptions.py`, `system/environment.py`, `system/runtime.py`)
+ - **BREAKING:** Reorganized registry modules from `tools/` to `system/registries/` (affects `class_registry_utils`, `func_registry`, `func_registry_utils`, `registry_models`)
  - **BREAKING:** Split `pipelex.core.stuffs.stuff_content` module into individual files per content type (affects imports: `StructuredContent`, `TextContent`, `ImageContent`, `ListContent`, `PDFContent`, `PageContent`, `NumberContent`, `HtmlContent`, `MermaidContent`, `TextAndImagesContent`)
  - **BREAKING:** Renamed package `pipelex.pipe_works` to `pipelex.pipe_run` and moved `PipeRunParams` classes into it
+ - **BREAKING:** Cost reporting changed from Excel (xlsx) to CSV format using native Python csv module instead of pandas
+ - Renamed `ConfigManager` to `ConfigLoader`
+ - Renamed `PipelexRegistryModels` to `CoreRegistryModels`
+ - Renamed `PipelexTestModels` to `TestRegistryModels`
+ - Renamed `generate_jinja2_context()` to `generate_context()` in `WorkingMemory` and `ContextProviderAbstract`
  - Renamed `ConceptProviderAbstract` to `ConceptLibraryAbstract`
  - Renamed `DomainProviderAbstract` to `DomainLibraryAbstract`
  - Renamed `PipeProviderAbstract` to `PipeLibraryAbstract`
@@ -121,6 +135,9 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
  - Changed exception base class from `PipelexError` to `PipelexException` throughout codebase
  - Updated Makefile pyright target to use `--pythonpath` flag correctly
+ - Enhanced `LibraryManager` to use `importlib.resources` for reliable PLX file discovery across all installation modes (wheel, source, relative path)
+ - Simplified `FuncRegistryUtils` to exclusively register functions with `@pipe_func` decorator (removed `decorator_names` and `require_decorator` parameters)
+ - Updated `ReportingManager` to get config directly instead of via constructor parameter
  - Updated PipeFunc documentation to reflect `@pipe_func()` decorator requirement and auto-discovery from anywhere in project
  - Added warnings about module-level code execution during auto-discovery to PipeFunc and StructuredContent documentation
 
@@ -144,6 +161,13 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Removed `get_optional_domain_provider()` and `get_optional_concept_provider()` methods from hub
  - Removed unused test fixtures (apple, cherry, blueberry, concept_provider, pretty) from conftest.py
  - Removed some Vision/Image description pipes from the base library, because we doubt they were useful as they were
+ - Removed pandas and openpyxl dependencies (including stubs: pandas-stubs, types-openpyxl)
+ - Removed Excel file generation for cost reports and `to_dataframe()` method from `CostRegistry`
+ - Removed `should_warn_if_already_registered` parameter from `func_registry.register_function()`
+ - Removed `decorator_names` and `require_decorator` parameters from `FuncRegistryUtils` methods
+ - Removed `_find_plx_files_in_dir()` and `_get_pipelex_plx_files_from_dirs()` methods from `LibraryManager` (refactored to `library_utils` module)
+ - Removed hardcoded excluded directories from `ClassRegistryUtils` and `FuncRegistryUtils` (now use `ScanConfig`)
+ - Removed `are_classes_equivalent()` and `has_compatible_field()` methods from `ClassRegistryUtils` (moved to `class_utils` module)
 
 ## [v0.11.0] - 2025-10-01
 
