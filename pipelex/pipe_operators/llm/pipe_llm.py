@@ -15,7 +15,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.domains.domain import Domain, SpecialDomain
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
@@ -35,10 +35,7 @@ from pipelex.hub import (
     get_content_generator,
     get_model_deck,
     get_native_concept,
-    get_optional_pipe,
     get_required_concept,
-    get_required_domain,
-    get_required_pipe,
 )
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
@@ -63,8 +60,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     llm_prompt_spec: LLMPromptBlueprint
     llm_choices: LLMSettingChoices | None = None
     structuring_method: StructuringMethod | None = None
-    prompt_template_to_structure: str | None = None
-    system_prompt_to_structure: str | None = None
     output_multiplicity: PipeOutputMultiplicity | None = None
 
     @model_validator(mode="after")
@@ -84,13 +79,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def validate_with_libraries(self):
-        llm_config = get_config().cogt.llm_config
         self.validate_inputs()
         self.llm_prompt_spec.validate_with_libraries()
-        if self.prompt_template_to_structure:
-            llm_config.get_template(template_name=self.prompt_template_to_structure)
-        if self.system_prompt_to_structure:
-            llm_config.get_template(template_name=self.system_prompt_to_structure)
         if self.llm_choices:
             for llm_choice in self.llm_choices.list_choices():
                 check_llm_choice_with_deck(llm_choice=llm_choice)
@@ -289,42 +279,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         llm_prompt_2_factory = None
                     case StructuringMethod.PRELIMINARY_TEXT:
                         log.verbose(f"Creating llm_prompt_2_factory for pipe {self.code} with structuring_method {structuring_method}")
-                        pipe = get_required_pipe(pipe_code=self.code)
-                        # TODO: run_pipe() could get the domain at the same time as the pip_code
-                        domain = get_required_domain(domain=pipe.domain)
-                        prompt_template_to_structure = (
-                            self.prompt_template_to_structure
-                            or domain.prompt_template_to_structure
-                            or llm_config.get_template(template_name="structure_from_preliminary_text_user")
-                        )
-                        system_prompt = self.system_prompt_to_structure or domain.system_prompt
-                        llm_prompt_2_proto = LLMPrompt(
-                            system_text=system_prompt,
-                            user_text=prompt_template_to_structure,
-                        )
-                        llm_prompt_2_factory = LLMPromptTemplate(
-                            proto_prompt=llm_prompt_2_proto,
-                        )
+                        llm_prompt_2_factory = LLMPromptTemplate.make_for_structuring_from_preliminary_text()
             elif get_config().pipelex.structure_config.is_default_text_then_structure:
                 log.debug(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
-                # TODO: run_pipe() should get the domain along with the pip_code
-                if the_pipe := get_optional_pipe(pipe_code=self.code):
-                    domain = get_required_domain(domain=the_pipe.domain)
-                else:
-                    domain = Domain.make_default()
-                prompt_template_to_structure = (
-                    self.prompt_template_to_structure
-                    or domain.prompt_template_to_structure
-                    or llm_config.get_template(template_name="structure_from_preliminary_text_user")
-                )
-                system_prompt = self.system_prompt_to_structure or domain.system_prompt
-                llm_prompt_2_proto = LLMPrompt(
-                    system_text=system_prompt,
-                    user_text=prompt_template_to_structure,
-                )
-                llm_prompt_2_factory = LLMPromptTemplate(
-                    proto_prompt=llm_prompt_2_proto,
-                )
+                llm_prompt_2_factory = LLMPromptTemplate.make_for_structuring_from_preliminary_text()
                 log.debug(llm_prompt_2_factory, title="llm_prompt_2_factory")
             else:
                 llm_prompt_2_factory = None

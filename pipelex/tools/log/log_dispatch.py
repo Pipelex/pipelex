@@ -17,7 +17,6 @@ class LogDispatch:
     ########################################################
     # TODO: more elegant init for log_dispatch / log
     def __init__(self):
-        self.project_name: str | None = None
         self._log_config_instance: LogConfig | None = None
         self.log_mode: LogMode = LogMode.RICH
 
@@ -26,7 +25,6 @@ class LogDispatch:
 
     def reset(self):
         """Reset the log dispatch."""
-        self.project_name = None
         self._log_config_instance = None
 
     @property
@@ -45,15 +43,10 @@ class LogDispatch:
             raise RuntimeError(msg)
         return self._log_config_instance
 
-    def configure(
-        self,
-        project_name: str,
-        log_config: LogConfig,
-    ):
-        """Configures the LogDispatch with project name and log configuration.
+    def configure(self, log_config: LogConfig):
+        """Configures the LogDispatch with log configuration.
 
         Args:
-            project_name (str): The name of the project.
             log_config (LogConfig): The log configuration to use.
 
         Raises:
@@ -64,7 +57,6 @@ class LogDispatch:
             msg = "LogConfig is already set. You can only call log.configure() once."
             raise RuntimeError(msg)
         self._log_config_instance = log_config
-        self.project_name = project_name
         self.log_mode = log_config.log_mode
 
     ########################################################
@@ -275,10 +267,7 @@ class LogDispatch:
                     if module_file == logging_module_path or module_file.endswith("/log.py"):
                         continue
                     if module.__name__ == "__main__":
-                        if self.project_name is None:
-                            msg = "Project name is not set. You must call initialize Pipelex first."
-                            raise RuntimeError(msg)
-                        log_origin_name = self.project_name
+                        log_origin_name = "Unknown"
                     else:
                         log_origin_name = module.__name__.split(sep=".", maxsplit=1)[0]
                     break

@@ -99,7 +99,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_assignment_factory_to_object = LLMAssignmentFactory(
             job_metadata=job_metadata,
             llm_setting=llm_setting_for_object,
-            llm_prompt_factory=llm_prompt_factory_for_object or LLMPromptTemplate.for_structure_from_preliminary_text(),
+            llm_prompt_factory=llm_prompt_factory_for_object or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
         )
 
         workflow_arg = TextThenObjectAssignment(
@@ -169,7 +169,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         llm_assignment_factory_to_object = LLMAssignmentFactory(
             job_metadata=job_metadata,
             llm_setting=llm_setting_for_object_list,
-            llm_prompt_factory=llm_prompt_factory_for_object_list or LLMPromptTemplate.for_structure_from_preliminary_text(),
+            llm_prompt_factory=llm_prompt_factory_for_object_list or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
         )
         workflow_arg = TextThenObjectAssignment(
             object_class_name=object_class.__name__,

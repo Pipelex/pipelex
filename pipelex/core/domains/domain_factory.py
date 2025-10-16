@@ -14,8 +14,6 @@ class DomainFactory:
                 code=blueprint.code,
                 description=blueprint.description,
                 system_prompt=blueprint.system_prompt,
-                system_prompt_to_structure=blueprint.system_prompt_to_structure,
-                prompt_template_to_structure=blueprint.prompt_template_to_structure,
             )
         except ValidationError as exc:
             validation_error_msg = format_pydantic_validation_error(exc)

@@ -87,13 +87,22 @@ class PipeLLMSpec(PipeSpec):
     temperature: float | None = Field(default=None, ge=0, le=1)
     system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
     prompt: str | None = Field(
-        description=(
-            "A template for the user prompt. Use `$` prefix for inline variables (e.g., `$topic`) and `@` prefix "
-            "to insert content as a block with delimiters (e.g., `@extracted_text` --> extracted_text: ```\n[the extracted_text goes here]\n```). "
-            "**Notes**: • Image variables must be inserted too. They can be simply added with the `$` prefix on a line, e.g. `$image_1`."
-            "Or you can mention them by their number in order in the inputs section, starting from 1. Example: "
-            "`Only analyze the colors from $image_1 and the shapes from $image_2."
-        )
+        description="""A template for the user prompt:
+Use `$` prefix for inline variables (e.g., `$topic`) and `@` prefix to insert content as a block with delimiters
+For example, `@extracted_text` will generate this:
+extracted_text: ```
+[the extracted_text goes here]
+```
+so you don't need to write the delimiters yourself.
+
+**Notes**:
+• Image variables must be inserted too.
+They can be simply added with the `$` prefix on a line, e.g. `$image_1`.
+Or you can mention them by their number in order in the inputs section, starting from 1.
+Example: `Only analyze the colors from $image_1 and the shapes from $image_2.
+• If we are generating a structured concept, DO NOT detail the structure in the prompt: we will add the schema later.
+So, don't have to write a bullet-list of all the attributes definitions yourself.
+"""
     )
 
     nb_output: int | None = Field(

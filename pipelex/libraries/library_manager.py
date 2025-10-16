@@ -61,8 +61,6 @@ class LibraryManager(LibraryManagerAbstract):
         "domain",
         "description",
         "system_prompt",
-        "system_prompt_jto_structure",
-        "prompt_template_to_structure",
     ]
 
     def __init__(
@@ -187,8 +185,7 @@ class LibraryManager(LibraryManagerAbstract):
                 code=blueprint.domain,
                 description=blueprint.description or "",
                 system_prompt=blueprint.system_prompt,
-                system_prompt_to_structure=blueprint.system_prompt_to_structure,
-                prompt_template_to_structure=blueprint.prompt_template_to_structure,
+                main_pipe=blueprint.main_pipe,
             ),
         )
 
