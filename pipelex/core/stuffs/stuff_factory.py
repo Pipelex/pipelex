@@ -221,13 +221,13 @@ class StuffFactory:
         else:
             stuff_content_dict: dict[str, Any] = stuff_content_or_data
             try:
-                concept_code = stuff_content_dict.get("concept") or stuff_content_dict.get("concept_code")
-                if not concept_code:
+                concept_string = stuff_content_dict.get("concept") or stuff_content_dict.get("concept_code")
+                if not concept_string:
                     msg = "Stuff content data dict is badly formed: no concept code"
                     raise StuffFactoryError(msg)
                 content_value = stuff_content_dict["content"]
-                if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_code):
-                    concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(concept_code))
+                if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string):
+                    concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode(concept_string.split(".")[-1]))
                     content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
                         concept=concept,
                         value=content_value,
@@ -243,7 +243,7 @@ class StuffFactory:
                 raise StuffFactoryError(msg) from exc
 
             concept_library = get_concept_library()
-            concept = concept_library.get_required_concept(concept_string=concept_code)
+            concept = concept_library.get_required_concept(concept_string=concept_string)
 
             if isinstance(content_value, StuffContent):
                 return StuffFactory.make_stuff(
