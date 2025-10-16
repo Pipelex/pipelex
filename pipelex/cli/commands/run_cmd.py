@@ -6,44 +6,14 @@ from typing import Annotated
 
 import typer
 
-from pipelex import log, pretty_print
-from pipelex.builder.builder_validation import dry_run_bundle_blueprint, extract_pipe_failures_from_dry_run_result_by_blueprint
-from pipelex.core.interpreter import PipelexInterpreter
+from pipelex import log, pretty_print, pretty_print_md
+from pipelex.builder.builder import load_pipe_from_bundle
+from pipelex.builder.builder_errors import PipelexBundleError
+from pipelex.exceptions import PipeInputError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.tools.misc.file_utils import get_incremental_file_path
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
-
-
-async def _load_pipe_from_bundle(bundle_path: str) -> str:
-    """Load a bundle file and extract its main_pipe.
-
-    Args:
-        bundle_path: Path to the .plx bundle file.
-
-    Returns:
-        The pipe_code from the bundle's main_pipe.
-
-    Raises:
-        typer.Exit: If file not found or no main_pipe declared.
-    """
-    bundle_path_obj = Path(bundle_path)
-    if not bundle_path_obj.exists():
-        typer.echo(typer.style(f"Error: Bundle file not found: {bundle_path}", fg=typer.colors.RED))
-        raise typer.Exit(1)
-
-    interpreter = PipelexInterpreter(file_path=bundle_path_obj)
-    bundle_blueprint = interpreter.make_pipelex_bundle_blueprint()
-
-    if not bundle_blueprint.main_pipe:
-        typer.echo(typer.style(f"Error: Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED))
-        raise typer.Exit(1)
-
-    dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
-    pipe_failures = extract_pipe_failures_from_dry_run_result_by_blueprint(bundle_blueprint=bundle_blueprint, dry_run_result=dry_run_result)
-    if pipe_failures:
-        typer.echo(typer.style(f"Error: Pipes failed during dry run: {pipe_failures}", fg=typer.colors.RED))
-        raise typer.Exit(1)
-    return bundle_blueprint.main_pipe
 
 
 def run_cmd(
@@ -91,43 +61,55 @@ def run_cmd(
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
     if provided_options == 0:
-        typer.echo(typer.style("Error: Must provide a pipe code, bundle file, or target", fg=typer.colors.RED))
+        typer.secho("Failed to run: must provide a pipe code, bundle file, or target", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
     if provided_options > 1:
-        typer.echo(
-            typer.style(
-                "Error: Cannot use multiple options (--pipe, --bundle, or positional target) simultaneously",
-                fg=typer.colors.RED,
-            )
+        typer.secho(
+            "Failed to run: cannot use multiple options (--pipe, --bundle, or positional target) simultaneously",
+            fg=typer.colors.RED,
+            err=True,
         )
         raise typer.Exit(1)
 
     async def run_pipeline():
-        pipe_code: str
-        source_description: str
+        # Initialize to satisfy linter (will be assigned before use)
+        pipe_code: str = ""
+        source_description: str = ""
+        bundle_path: str | None = None
+
+        # Determine source: bundle path or pipe code
+        if bundle:
+            bundle_path = bundle
+        elif pipe:
+            pipe_code = pipe
+            source_description = f"pipe '{pipe_code}'"
+        elif target:
+            if target.endswith(".plx"):
+                bundle_path = target
+            else:
+                pipe_code = target
+                source_description = f"pipe '{pipe_code}'"
+        else:
+            # Should never reach here due to validation above
+            typer.secho("Failed to run: no pipe or bundle specified", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+
+        # Load bundle if needed
+        if bundle_path:
+            try:
+                pipe_code = await load_pipe_from_bundle(bundle_path)
+                source_description = f"bundle '{bundle_path}' • main_pipe: '{pipe_code}'"
+            except FileNotFoundError as exc:
+                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
+            except PipelexBundleError as exc:
+                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
+            except PipeInputError as exc:
+                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
 
         try:
-            if bundle:
-                # Explicit bundle option
-                pipe_code = await _load_pipe_from_bundle(bundle)
-                source_description = f"bundle '{bundle}' (main_pipe: {pipe_code})"
-            elif pipe:
-                # Explicit pipe option
-                pipe_code = pipe
-                source_description = f"pipe '{pipe_code}'"
-            elif target:
-                # Auto-detect: is it a .plx file or a pipe code?
-                if target.endswith(".plx"):
-                    pipe_code = await _load_pipe_from_bundle(target)
-                    source_description = f"bundle '{target}' (main_pipe: {pipe_code})"
-                else:
-                    pipe_code = target
-                    source_description = f"pipe '{pipe_code}'"
-            else:
-                # Should never reach here due to validation above
-                typer.echo(typer.style("Error: No pipe or bundle specified", fg=typer.colors.RED))
-                raise typer.Exit(1)
-
             # Load inputs if provided
             input_memory = None
             if inputs:
@@ -135,16 +117,14 @@ def run_cmd(
                     input_memory = load_json_dict_from_path(inputs)
                     typer.echo(f"Loaded inputs from: {inputs}")
                 except FileNotFoundError as file_not_found_exc:
-                    typer.echo(typer.style(f"Error: Input file not found: {inputs}", fg=typer.colors.RED))
+                    typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
                     raise typer.Exit(1) from file_not_found_exc
                 except JsonTypeError as json_type_error_exc:
-                    typer.echo(typer.style(f"Error: Input file is not a proper JSON dictionary: {inputs}", fg=typer.colors.RED))
+                    typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
                     raise typer.Exit(1) from json_type_error_exc
 
             # Execute pipeline
-            typer.echo("=" * 70)
-            typer.echo(typer.style(f"🚀 Executing {source_description}...", fg=typer.colors.GREEN))
-            typer.echo("")
+            typer.secho(f"\n🚀 Executing {source_description}...\n", fg=typer.colors.GREEN, bold=True)
 
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
@@ -154,13 +134,16 @@ def run_cmd(
             # Pretty print main_stuff unless disabled
             if not no_pretty_print:
                 typer.echo("")
-                typer.echo("=" * 70)
-                pretty_print(pipe_output.main_stuff, title="Pipeline Output")
+                pretty_print_md(content=pipe_output.main_stuff.content.rendered_markdown(), title=f"Main output of '{pipe_code}'")
                 typer.echo("")
 
             # Save working memory to JSON unless disabled
             if not no_output:
-                output_path = output or f"{pipe_code}.json"
+                output_path = output or get_incremental_file_path(
+                    base_path="results",
+                    base_name=f"run_{pipe_code}",
+                    extension="json",
+                )
                 working_memory_dict = pipe_output.working_memory.model_dump()
                 save_as_json_to_path(object_to_save=working_memory_dict, path=output_path)
                 typer.echo(typer.style(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN))
@@ -169,7 +152,7 @@ def run_cmd(
 
         except Exception as exc:
             log.error(f"Error executing pipeline: {exc}")
-            typer.echo(typer.style(f"Error: {exc}", fg=typer.colors.RED))
+            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
     asyncio.run(run_pipeline())

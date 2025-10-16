@@ -1,19 +1,24 @@
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from pydantic import ValidationError
 
 from pipelex.builder.builder_errors import (
     PipeBuilderError,
+    PipelexBundleError,
     PipelexBundleUnexpectedError,
 )
+from pipelex.builder.builder_validation import document_pipe_failures_from_dry_run_blueprint, dry_run_bundle_blueprint
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.builder.pipe.pipe_signature import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
+from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.exceptions import PipeInputError
 from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -119,3 +124,38 @@ async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> Pi
             pipelex_bundle_spec.concept[concept_code] = fixed_concept_blueprint
 
     return pipelex_bundle_spec
+
+
+async def load_pipe_from_bundle(bundle_path: str) -> str:
+    """Load a bundle file and extract its main_pipe.
+
+    Args:
+        bundle_path: Path to the .plx bundle file.
+
+    Returns:
+        The pipe_code from the bundle's main_pipe.
+
+    Raises:
+        FileNotFoundError: If the bundle file does not exist.
+        PipelexBundleError: If no main_pipe is declared or if pipes fail during dry run.
+        PipeInputError: If there are input errors during dry run validation.
+    """
+    bundle_path_obj = Path(bundle_path)
+    if not bundle_path_obj.exists():
+        msg = f"Bundle file not found: {bundle_path}"
+        raise FileNotFoundError(msg)
+
+    interpreter = PipelexInterpreter(file_path=bundle_path_obj)
+    bundle_blueprint = interpreter.make_pipelex_bundle_blueprint()
+
+    if not bundle_blueprint.main_pipe:
+        msg = f"Bundle '{bundle_path}' does not declare a main_pipe"
+        raise PipelexBundleError(message=msg)
+
+    dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
+    pipe_failures = document_pipe_failures_from_dry_run_blueprint(bundle_blueprint=bundle_blueprint, dry_run_result=dry_run_result)
+    if pipe_failures:
+        msg = f"Pipes failed during dry run in bundle '{bundle_path}'"
+        raise PipelexBundleError(message=msg, pipe_failures=pipe_failures)
+
+    return bundle_blueprint.main_pipe

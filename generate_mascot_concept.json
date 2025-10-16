@@ -1,7 +1,7 @@
 {
     "root": {
         "elevator_pitch": {
-            "stuff_code": "46QWf",
+            "stuff_code": "HkBMY",
             "stuff_name": "elevator_pitch",
             "concept": {
                 "code": "Text",
@@ -13,7 +13,7 @@
             "content": {}
         },
         "mascot_characteristics": {
-            "stuff_code": "mRzkr",
+            "stuff_code": "gUStr",
             "stuff_name": "mascot_characteristics",
             "concept": {
                 "code": "MascotCharacteristics",
@@ -25,7 +25,7 @@
             "content": {}
         },
         "image_prompt": {
-            "stuff_code": "LPLEp",
+            "stuff_code": "BZoCP",
             "stuff_name": "image_prompt",
             "concept": {
                 "code": "ImagePrompt",
@@ -37,7 +37,7 @@
             "content": {}
         },
         "mascot_image": {
-            "stuff_code": "gyCNV",
+            "stuff_code": "Pe9HX",
             "stuff_name": "mascot_image",
             "concept": {
                 "code": "MascotImage",

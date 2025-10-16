@@ -73,7 +73,7 @@ def extract_pipe_failures_from_dry_run_result(bundle_spec: PipelexBundleSpec, dr
     return dry_run_pipe_failures
 
 
-def extract_pipe_failures_from_dry_run_result_by_blueprint(
+def document_pipe_failures_from_dry_run_blueprint(
     bundle_blueprint: PipelexBundleBlueprint, dry_run_result: dict[str, DryRunOutput]
 ) -> list[PipeFailure]:
     dry_run_pipe_failures: list[PipeFailure] = []
