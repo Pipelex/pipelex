@@ -185,6 +185,7 @@ class LibraryManager(LibraryManagerAbstract):
                 code=blueprint.domain,
                 description=blueprint.description or "",
                 system_prompt=blueprint.system_prompt,
+                main_pipe=blueprint.main_pipe,
             ),
         )
 

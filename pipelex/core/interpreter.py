@@ -28,6 +28,7 @@ class PipelexInterpreter(BaseModel):
             raise PipelexConfigurationError(msg)
         return self
 
+    # TODO: rethink this method
     @staticmethod
     def is_pipelex_file(file_path: Path) -> bool:
         """Check if a file is a valid Pipelex PLX file.
