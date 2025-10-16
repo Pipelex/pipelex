@@ -43,21 +43,6 @@ pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if th
 
 Each of these commands generates a complete production-ready script in our Pipelex language, saved as `.plx` file including domain definition, concepts, and the multiple _pipe_ steps to take to achieve the goal.
 
-## Easily iterate on your pipe
-
-Now, thanks to our Pipelex language, and its high level of abstraction, you can directly edit the pipeline. It's pretty easy even for non-technical users. Better yet, you can get assisted in making changes with the help of your favorite AI coding assistant. To that end, we have prepared comprehensive guides for the most popular AI coding assistants and you can install them with one call:
-
-```bash
-pipelex kit rules
-```
-
-This installs Pipelex rules for Cursor, Claude Code, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI.
-
-Now refine your pipeline with natural language:
-
-- "Include confidence scores between 0 and 100 in the match analysis"
-- "Write a recap email at the end"
-
 ## Run your pipeline
 
 **CLI:**
@@ -92,6 +77,21 @@ async def run_pipeline():
 Pipelex.make()
 asyncio.run(run_pipeline())
 ```
+
+## Easily iterate on your pipe
+
+Now, thanks to our Pipelex language, and its high level of abstraction, you can directly edit the pipeline. It's pretty easy even for non-technical users. Better yet, you can get assisted in making changes with the help of your favorite AI coding assistant. To that end, we have prepared comprehensive guides for the most popular AI coding assistants and you can install them with one call:
+
+```bash
+pipelex kit rules
+```
+
+This installs Pipelex rules for Cursor, Claude Code, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI.
+
+Now refine your pipeline with natural language:
+
+- "Include confidence scores between 0 and 100 in the match analysis"
+- "Write a recap email at the end"
 
 ---
 
