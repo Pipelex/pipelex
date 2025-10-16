@@ -15,9 +15,9 @@ from pipelex.builder.builder_errors import (
     StaticValidationErrorData,
     ValidateDryRunError,
 )
+from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.domain_spec import DomainSpec
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -89,7 +89,7 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
     )
 
     pipe_specs: list[PipeSpecUnion] = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="pipe_specs").content).items
-    domain_information = working_memory.get_stuff_as(name="domain_information", content_type=DomainSpec)
+    bundle_header_spec = working_memory.get_stuff_as(name="bundle_header_spec", content_type=BundleHeaderSpec)
 
     # Properly validate and reconstruct concept specs to ensure proper Pydantic validation
     validated_concepts: dict[str, ConceptSpec | str] = {}
@@ -104,10 +104,10 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
             raise PipeBuilderError(msg) from exc
 
     return PipelexBundleSpec(
-        domain=domain_information.domain,
-        description=domain_information.description,
-        system_prompt=domain_information.system_prompt,
-        main_pipe=domain_information.main_pipe,
+        domain=bundle_header_spec.domain,
+        description=bundle_header_spec.description,
+        system_prompt=bundle_header_spec.system_prompt,
+        main_pipe=bundle_header_spec.main_pipe,
         concept=validated_concepts,
         pipe={pipe_spec.pipe_code: _convert_pipe_spec(pipe_spec) for pipe_spec in pipe_specs},
     )

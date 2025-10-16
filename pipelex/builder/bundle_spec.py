@@ -1,11 +1,11 @@
-
-from pydantic import ConfigDict, Field, ValidationError, field_validator
+from pydantic import ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from pipelex.builder.builder_errors import (
     ConceptFailure,
     ConceptSpecError,
     PipeBuilderError,
     PipeFailure,
+    PipelexBundleError,
     PipeSpecError,
 )
 from pipelex.builder.concept.concept_spec import ConceptSpec
@@ -53,7 +53,7 @@ class PipelexBundleSpec(StructuredContent):
     domain: str
     description: str | None = None
     system_prompt: str | None = None
-    main_pipe: str | None = None
+    main_pipe: str
 
     concept: dict[str, ConceptSpec | str] | None = Field(default_factory=dict)
 
@@ -64,6 +64,13 @@ class PipelexBundleSpec(StructuredContent):
     def validate_domain_syntax(cls, domain: str) -> str:
         DomainBlueprint.validate_domain_code(code=domain)
         return domain
+
+    @model_validator(mode="after")
+    def validate_main_pipe(self) -> "PipelexBundleSpec":
+        if not self.pipe or (self.main_pipe not in self.pipe):
+            msg = f"Main pipe '{self.main_pipe}' could not be found in bundle spec"
+            raise PipelexBundleError(message=msg)
+        return self
 
     def to_blueprint(self) -> PipelexBundleBlueprint:
         concept: dict[str, ConceptBlueprint | str] | None = None
