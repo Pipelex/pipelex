@@ -59,7 +59,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
-            msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in a library listed in the config."
+            msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in plx file in an imported package."
             raise PipeLibraryPipeNotFoundError(msg)
         return the_pipe
 

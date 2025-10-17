@@ -50,5 +50,5 @@ app.add_typer(
     name="validate",
     help="Validate pipes: static validation for syntax and dependencies, dry-run execution for logic and consistency",
 )
-app.command(name="run", help="Run a pipe identified by its pipe code or run the main pipe from a bundle file (.plx) given its path")(run_cmd)
+app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.plx)")(run_cmd)
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")

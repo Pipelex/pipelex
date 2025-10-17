@@ -1,7 +1,5 @@
 """CLI commands for kit asset management."""
 
-import os
-import shutil
 from pathlib import Path
 
 import typer
@@ -11,9 +9,7 @@ from pipelex.exceptions import PipelexCLIError
 from pipelex.kit.cursor_export import export_cursor_rules, remove_cursor_rules
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.migrations_export import export_migration_instructions
-from pipelex.kit.paths import get_configs_dir
 from pipelex.kit.targets_update import build_merged_rules, remove_from_targets, update_targets
-from pipelex.system.configuration.config_loader import config_manager
 
 kit_app = typer.Typer(no_args_is_help=True)
 

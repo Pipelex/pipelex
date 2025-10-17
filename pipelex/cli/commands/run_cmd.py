@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Annotated
 
+import click
 import typer
 
 from pipelex import log, pretty_print_md
@@ -16,18 +17,18 @@ from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_pat
 
 
 def run_cmd(
-    ctx: typer.Context,
+    # ctx: typer.Context,
     target: Annotated[
         str | None,
         typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
     ] = None,
     pipe: Annotated[
         str | None,
-        typer.Option("--pipe", help="Explicitly specify pipe code to run"),
+        typer.Option("--pipe", help="Pipe code to run, can be omitted if you specify a bundle (.plx) that declares a main pipe"),
     ] = None,
     bundle: Annotated[
         str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx) - runs its main_pipe"),
+        typer.Option("--bundle", help="Bundle file path (.plx) - runs its main_pipe unless you specify a pipe code"),
     ] = None,
     inputs: Annotated[
         str | None,
@@ -46,59 +47,74 @@ def run_cmd(
         typer.Option("--no-pretty-print", help="Skip pretty printing the main_stuff"),
     ] = False,
 ) -> None:
-    """Execute a pipeline by pipe code or bundle file.
+    """Execute a pipeline from a specific bundle file (or not), specifying its pipe code or not.
+    If the bundle is provided, it will run its main pipe unless you specify a pipe code.
+    If the pipe code is provided, you don't need to provide a bundle file if it's already part of the imported packages.
 
     Examples:
         pipelex run my_pipe
-        pipelex run --pipe my_pipe --inputs data.json
         pipelex run --bundle my_bundle.plx
+        pipelex run --bundle my_bundle.plx --pipe my_pipe
+        pipelex run --pipe my_pipe --inputs data.json
         pipelex run my_bundle.plx --inputs data.json
         pipelex run my_pipe --output results.json --no-pretty-print
     """
-    # Initialize Pipelex
-    Pipelex.make()
-
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
     if provided_options == 0:
+        ctx: click.Context = click.get_current_context()
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
-    if provided_options > 1:
-        typer.secho(
-            "Failed to run: cannot use multiple options (--pipe, --bundle, or positional target) simultaneously",
-            fg=typer.colors.RED,
-            err=True,
-        )
+
+    # Let's analyze the options and determine what pipe code to use and if we need to load a bundle
+    pipe_code: str | None = None
+    bundle_path: str | None = None
+
+    # Determine source:
+    if target:
+        if target.endswith(".plx"):
+            bundle_path = target
+            if bundle:
+                typer.secho(
+                    "Failed to run: cannot use option --bundle if you're already passing a bundle file (.plx) as positional argument",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+        else:
+            pipe_code = target
+            if pipe:
+                typer.secho(
+                    "Failed to run: cannot use option --pipe if you're already passing a pipe code as positional argument",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+
+    if bundle:
+        assert not bundle_path, "bundle_path should be None at this stage if --bundle is provided"
+        bundle_path = bundle
+
+    if pipe:
+        assert not pipe_code, "pipe_code should be None at this stage if --pipe is provided"
+        pipe_code = pipe
+
+    if not pipe_code and not bundle_path:
+        typer.secho("Failed to run: no pipe code or bundle file specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
-    async def run_pipeline():
-        # Initialize to satisfy linter (will be assigned before use)
-        pipe_code: str = ""
-        source_description: str = ""
-        bundle_path: str | None = None
-
-        # Determine source: bundle path or pipe code
-        if bundle:
-            bundle_path = bundle
-        elif pipe:
-            pipe_code = pipe
-            source_description = f"pipe '{pipe_code}'"
-        elif target:
-            if target.endswith(".plx"):
-                bundle_path = target
-            else:
-                pipe_code = target
-                source_description = f"pipe '{pipe_code}'"
-        else:
-            # Should never reach here due to validation above
-            typer.secho("Failed to run: no pipe or bundle specified", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1)
-
-        # Load bundle if needed
+    async def run_pipeline(pipe_code: str | None = None, bundle_path: str | None = None):
+        # Initialize Pipelex
+        Pipelex.make()
+        source_description: str
         if bundle_path:
             try:
-                pipe_code = await load_pipe_from_bundle(bundle_path)
-                source_description = f"bundle '{bundle_path}' • main_pipe: '{pipe_code}'"
+                main_pipe_code = await load_pipe_from_bundle(bundle_path)
+                if not pipe_code:
+                    pipe_code = main_pipe_code
+                    source_description = f"bundle '{bundle_path}' • main pipe: '{pipe_code}'"
+                else:
+                    source_description = f"bundle '{bundle_path}' • pipe: '{pipe_code}'"
             except FileNotFoundError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
@@ -108,6 +124,11 @@ def run_cmd(
             except PipeInputError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
+        elif pipe_code:
+            source_description = f"pipe '{pipe_code}'"
+        else:
+            typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
 
         try:
             # Load inputs if provided
@@ -155,4 +176,4 @@ def run_cmd(
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
-    asyncio.run(run_pipeline())
+    asyncio.run(run_pipeline(pipe_code=pipe_code, bundle_path=bundle_path))
