@@ -1,8 +1,19 @@
+import re
+from typing import TYPE_CHECKING
+
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements import InputRequirement, InputRequirements
+from pipelex.exceptions import PipelexException
 from pipelex.hub import get_required_concept
+
+if TYPE_CHECKING:
+    from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+
+
+class InputRequirementsFactorySyntaxError(PipelexException):
+    pass
 
 
 class InputRequirementsFactory:
@@ -35,3 +46,46 @@ class InputRequirementsFactory:
                 multiplicity=input_requirement_blueprint.multiplicity,
             )
         return InputRequirements(root=input_requirements_dict)
+
+    @classmethod
+    def make_from_string(cls, requirement_str: str) -> InputRequirement:
+        """Parse an input requirement string and return an InputRequirement.
+
+        Interprets multiplicity from a string in the form:
+        - "domain.ConceptCode[5]" -> multiplicity = 5 (int)
+        - "domain.ConceptCode[]" -> multiplicity = True
+        - "domain.ConceptCode" -> multiplicity = None (single item, default)
+
+        Args:
+            requirement_str: String in the format "domain.ConceptCode" with optional "[multiplicity]"
+
+        Returns:
+            InputRequirement with the parsed concept and multiplicity
+
+        Raises:
+            InputRequirementsFactorySyntaxError: If the requirement string format is invalid
+        """
+        # Pattern to match concept string and optional multiplicity brackets
+        # Group 1: concept string (everything before brackets)
+        # Group 2: content inside brackets (empty string for [], digits for [5])
+        pattern = r"^(.+?)(?:\[(\d*)\])?$"
+        match = re.match(pattern, requirement_str)
+
+        if not match:
+            msg = f"Invalid input requirement string: {requirement_str}"
+            raise InputRequirementsFactorySyntaxError(msg)
+
+        concept_string = match.group(1)
+        multiplicity_str = match.group(2)
+
+        # Determine multiplicity
+        multiplicity: VariableMultiplicity | None = None
+        if multiplicity_str is not None:  # Brackets were present
+            if multiplicity_str == "":  # Empty brackets []
+                multiplicity = True
+            else:  # Number in brackets [5]
+                multiplicity = int(multiplicity_str)
+        # else: No brackets, multiplicity stays None
+
+        concept = get_required_concept(concept_string=concept_string)
+        return InputRequirement(concept=concept, multiplicity=multiplicity)
