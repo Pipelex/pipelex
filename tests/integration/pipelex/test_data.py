@@ -2,6 +2,7 @@ from typing import ClassVar
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.pdf_content import PDFContent
@@ -10,7 +11,6 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeStackOverflowError
-from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
 from tests.cases import ImageTestCases, PDFTestCases
 
 
@@ -127,7 +127,7 @@ class PipeTestCases:
             "test_no_input_that_could_be_long",
         ),
     ]
-    NO_INPUT_PARALLEL1: ClassVar[list[tuple[str, str, PipeOutputMultiplicity | None]]] = [  # topic, pipe, multiplicity
+    NO_INPUT_PARALLEL1: ClassVar[list[tuple[str, str, VariableMultiplicity | None]]] = [  # topic, pipe, multiplicity
         (
             "Nature colors painting",
             "choose_colors",

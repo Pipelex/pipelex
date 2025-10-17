@@ -1,12 +1,12 @@
 from pydantic import BaseModel, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
 
 class InputRequirementBlueprint(BaseModel):
     concept: str
-    multiplicity: PipeOutputMultiplicity | None = None
+    multiplicity: VariableMultiplicity | None = None
 
     @field_validator("concept", mode="before")
     @classmethod

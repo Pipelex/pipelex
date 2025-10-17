@@ -7,7 +7,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.exceptions import StartPipelineError
 from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunMode, VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -17,7 +17,7 @@ async def start_pipeline(
     working_memory: WorkingMemory | None = None,
     input_memory: CompactMemory | None = None,
     output_name: str | None = None,
-    output_multiplicity: PipeOutputMultiplicity | None = None,
+    output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
 ) -> asyncio.Task[PipeOutput]:

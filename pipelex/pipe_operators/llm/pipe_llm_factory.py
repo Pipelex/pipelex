@@ -9,12 +9,12 @@ from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_run.pipe_run_params import make_output_multiplicity
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 
 
@@ -103,9 +103,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
 
         # output_multiplicity defaults to False for PipeLLM so unless it's run with explicit demand for multiple outputs,
         # we'll generate only one output
-        output_multiplicity = make_output_multiplicity(
-            nb_output=blueprint.nb_output,
-            multiple_output=blueprint.multiple_output,
+        output_multiplicity = make_variable_multiplicity(
+            nb_items=blueprint.nb_output,
+            multiple_items=blueprint.multiple_output,
         )
 
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(

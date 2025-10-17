@@ -4,14 +4,14 @@ from pydantic import BaseModel, Field, RootModel, field_validator
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.exceptions import PipeInputNotFoundError
-from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
 
 
 class InputRequirement(BaseModel):
     concept: Concept
-    multiplicity: PipeOutputMultiplicity | None = None
+    multiplicity: VariableMultiplicity | None = None
 
 
 class NamedInputRequirement(InputRequirement):
@@ -77,7 +77,7 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
             raise PipeInputNotFoundError(msg)
         return requirement
 
-    def add_requirement(self, variable_name: str, concept: Concept, multiplicity: PipeOutputMultiplicity | None = None):
+    def add_requirement(self, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
         self.root[variable_name] = InputRequirement(concept=concept, multiplicity=multiplicity)
 
     @property

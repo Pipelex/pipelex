@@ -17,6 +17,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -31,7 +32,7 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity, PipeRunMode, PipeRunParams, output_multiplicity_to_apply
+from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
@@ -81,7 +82,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
     output_format: OutputFormat | None = Field(default=None, strict=False)
-    output_multiplicity: PipeOutputMultiplicity
+    output_multiplicity: VariableMultiplicity
 
     @field_validator("img_gen_prompt_var_name")
     @classmethod

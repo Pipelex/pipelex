@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from typing_extensions import runtime_checkable
 
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
 from pipelex.types import StrEnum
 
 StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
@@ -54,7 +54,7 @@ class PipelineRequest(BaseModel):
 
     input_memory: CompactMemory | None = None
     output_name: str | None = None
-    output_multiplicity: PipeOutputMultiplicity | None = None
+    output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_code: str | None = None
 
 
@@ -128,7 +128,7 @@ class PipelexProtocol(Protocol):
         working_memory: WorkingMemory | None = None,
         input_memory: CompactMemory | None = None,
         output_name: str | None = None,
-        output_multiplicity: PipeOutputMultiplicity | None = None,
+        output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
         """Execute a pipeline synchronously and wait for its completion.
@@ -157,7 +157,7 @@ class PipelexProtocol(Protocol):
         working_memory: WorkingMemory | None = None,
         input_memory: CompactMemory | None = None,
         output_name: str | None = None,
-        output_multiplicity: PipeOutputMultiplicity | None = None,
+        output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
         """Start a pipeline execution asynchronously without waiting for completion.
