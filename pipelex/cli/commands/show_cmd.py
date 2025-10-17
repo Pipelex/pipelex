@@ -42,34 +42,56 @@ def do_show_pipe(pipe_code: str) -> None:
 
 
 # Typer group for show commands
-show_app = typer.Typer(help="Show and list commands", no_args_is_help=True)
+show_app = typer.Typer(
+    no_args_is_help=True,
+)
 
 
-@show_app.command("config")
+@show_app.command("config", help="Display the main Pipelex configuration (not including inference backends)")
 def show_config_cmd() -> None:
     do_show_config()
 
 
-@show_app.command("pipes")
+@show_app.command("pipes", help="List all available pipes in the current project")
 def list_pipes_cmd() -> None:
+    """List all pipes that have been loaded into the pipe library.
+
+    This includes pipes from your project's .plx files and any
+    pipes from imported packages.
+    """
     do_list_pipes()
 
 
-@show_app.command("pipe")
+@show_app.command("pipe", help="Display the detailed definition of a specific pipe")
 def show_pipe_cmd(
-    pipe_code: Annotated[str, typer.Argument(help="Pipeline code to show definition for")],
+    pipe_code: Annotated[str, typer.Argument(help="Pipeline code to show definition for (e.g., 'my_domain.my_pipe')")],
 ) -> None:
+    """Show the complete definition of a pipe including its inputs, outputs,
+    prompt, and all configuration settings.
+
+    Example:
+        pipelex show pipe hello_world
+    """
     do_show_pipe(pipe_code=pipe_code)
 
 
-@show_app.command("models")
+@show_app.command("models", help="List available AI models from a specific backend provider")
 def show_models_cmd(
-    backend_name: Annotated[str, typer.Argument(help="Backend name to list models for")],
+    backend_name: Annotated[str, typer.Argument(help="Backend name to list models for (e.g., 'openai', 'anthropic', 'google')")],
     flat: Annotated[
         bool,
-        typer.Option("--flat", "-f", help="Output in flat CSV format for easy copy-pasting"),
+        typer.Option("--flat", "-f", help="Output in flat CSV format for easy copy-pasting into configuration files"),
     ] = False,
 ) -> None:
+    """List all available models from a configured backend provider.
+
+    This queries the backend's API to retrieve the current list of available models.
+    Use --flat for a simplified output that's easy to copy into config files.
+
+    Examples:
+        pipelex show models openai
+        pipelex show models anthropic --flat
+    """
     asyncio.run(
         ModelLister.list_models(
             backend_name=backend_name,
