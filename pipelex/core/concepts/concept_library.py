@@ -1,5 +1,4 @@
 from pydantic import Field, RootModel, model_validator
-from pipelex.types import Self
 from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
@@ -8,9 +7,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
-from pipelex.hub import get_class_registry
+from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
 
@@ -103,21 +101,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     def get_native_concepts(self) -> list[Concept]:
         """Create all native concepts from the hardcoded data"""
         return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptCode.values_list()]
-
-    @override
-    def is_image_concept(self, concept: Concept) -> bool:
-        """Check if the concept is an image concept.
-        It is an image concept if its structure class is a subclass of ImageContent
-        or if it refines the native Image concept.
-        """
-        pydantic_model = get_class_registry().get_class(concept.structure_class_name)
-        is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
-        refines_image = self.is_compatible(
-            tested_concept=concept,
-            wanted_concept=self.get_native_concept(native_concept=NativeConceptCode.IMAGE),
-            strict=True,
-        )
-        return is_image_class or refines_image
 
     @override
     def search_for_concept_in_domains(self, concept_code: str, search_domains: list[str]) -> Concept | None:

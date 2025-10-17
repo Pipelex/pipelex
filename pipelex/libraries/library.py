@@ -3,6 +3,12 @@ from pydantic import BaseModel
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
+from pipelex.exceptions import (
+    ConceptError,
+    ConceptLibraryConceptNotFoundError,
+    PipeLibraryError,
+    PipeLibraryPipeNotFoundError,
+)
 
 
 class Library(BaseModel):
@@ -33,6 +39,25 @@ class Library(BaseModel):
         self.domain_library.teardown()
 
     def validate_library(self) -> None:
-        self.concept_library.validate_with_libraries()
-        self.pipe_library.validate_with_libraries()
-        self.domain_library.validate_with_libraries()
+        self.validate_pipe_library_with_libraries()
+
+    def validate_pipe_library_with_libraries(self) -> None:
+        for pipe in self.pipe_library.root.values():
+            try:
+                # Validate concept dependencies exit
+                for concept in pipe.concept_dependencies():
+                    try:
+                        self.concept_library.get_required_concept(concept_string=concept.concept_string)
+                    except ConceptError as concept_error:
+                        msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
+                        raise PipeLibraryError(msg) from concept_error
+
+                # Validate pipe dependencies exit
+                for pipe_code in pipe.pipe_dependencies():
+                    self.pipe_library.get_required_pipe(pipe_code=pipe_code)
+
+            except (ConceptLibraryConceptNotFoundError, PipeLibraryPipeNotFoundError) as not_found_error:
+                msg = f"Missing dependency for pipe '{pipe.code}': {not_found_error}"
+                raise PipeLibraryError(msg) from not_found_error
+        for pipe in self.pipe_library.root.values():
+            pipe.validate_with_libraries()

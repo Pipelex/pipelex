@@ -46,10 +46,6 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def is_image_concept(self, concept: Concept) -> bool:
-        pass
-
-    @abstractmethod
     def search_for_concept_in_domains(self, concept_code: str, search_domains: list[str]) -> Concept | None:
         pass
 

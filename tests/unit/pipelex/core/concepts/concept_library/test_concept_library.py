@@ -1,12 +1,12 @@
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.hub import get_concept_library
+from pipelex.hub import get_native_concept
 
 
 class TestConceptLibrary:
     def test_is_image_concept(self):
-        concept_library = get_concept_library()
         native_image_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE)
 
         concept_1 = ConceptFactory.make_from_blueprint(
@@ -62,10 +62,33 @@ class TestConceptLibrary:
             ),
         )
 
-        assert concept_library.is_image_concept(concept=native_image_concept) is True
-        assert concept_library.is_image_concept(concept=concept_1) is True
-        assert concept_library.is_image_concept(concept=concept_2) is True
-        assert concept_library.is_image_concept(concept=concept_3) is True
-        assert concept_library.is_image_concept(concept=concept_4) is True
-        assert concept_library.is_image_concept(concept=concept_5) is False
-        assert concept_library.is_image_concept(concept=concept_6) is False
+        assert (
+            Concept.are_concept_compatible(
+                concept_1=native_image_concept, concept_2=get_native_concept(native_concept=NativeConceptCode.IMAGE), strict=True
+            )
+            is True
+        )
+        assert (
+            Concept.are_concept_compatible(concept_1=concept_1, concept_2=get_native_concept(native_concept=NativeConceptCode.IMAGE), strict=True)
+            is True
+        )
+        assert (
+            Concept.are_concept_compatible(concept_1=concept_2, concept_2=get_native_concept(native_concept=NativeConceptCode.IMAGE), strict=True)
+            is True
+        )
+        assert (
+            Concept.are_concept_compatible(concept_1=concept_3, concept_2=get_native_concept(native_concept=NativeConceptCode.IMAGE), strict=True)
+            is True
+        )
+        assert (
+            Concept.are_concept_compatible(concept_1=concept_4, concept_2=get_native_concept(native_concept=NativeConceptCode.IMAGE), strict=True)
+            is True
+        )
+        assert (
+            Concept.are_concept_compatible(concept_1=concept_5, concept_2=get_native_concept(native_concept=NativeConceptCode.IMAGE), strict=True)
+            is False
+        )
+        assert (
+            Concept.are_concept_compatible(concept_1=concept_6, concept_2=get_native_concept(native_concept=NativeConceptCode.IMAGE), strict=True)
+            is False
+        )

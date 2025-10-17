@@ -8,33 +8,13 @@ from typing_extensions import override
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
-from pipelex.exceptions import ConceptError, ConceptLibraryConceptNotFoundError, PipeLibraryError, PipeLibraryPipeNotFoundError
-from pipelex.hub import get_concept_library
+from pipelex.exceptions import PipeLibraryError, PipeLibraryPipeNotFoundError
 from pipelex.types import Self
 
 PipeLibraryRoot = dict[str, PipeAbstract]
 
 
 class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
-    @override
-    def validate_with_libraries(self, pipeline_run_id: str | None = None):
-        concept_library = get_concept_library()
-        for pipe in self.root.values():
-            pipe.validate_output()
-            try:
-                for concept in pipe.concept_dependencies():
-                    try:
-                        concept_library.get_required_concept(concept_string=concept.concept_string)
-                    except ConceptError as concept_error:
-                        msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
-                        raise PipeLibraryError(msg) from concept_error
-                for pipe_code in pipe.pipe_dependencies():
-                    self.get_required_pipe(pipe_code=pipe_code)
-                pipe.validate_with_libraries()
-            except (ConceptLibraryConceptNotFoundError, PipeLibraryPipeNotFoundError) as not_found_error:
-                msg = f"Missing dependency for pipe '{pipe.code}': {not_found_error}"
-                raise PipeLibraryError(msg) from not_found_error
-
     @override
     def teardown(self):
         self.root = {}

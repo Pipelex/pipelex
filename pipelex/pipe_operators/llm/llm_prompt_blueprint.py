@@ -25,9 +25,6 @@ class LLMPromptBlueprint(BaseModel):
     prompt_blueprint: TemplateBlueprint | None = None
     user_images: list[str] | None = None
 
-    def validate_with_libraries(self):
-        pass
-
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
         if self.user_images:

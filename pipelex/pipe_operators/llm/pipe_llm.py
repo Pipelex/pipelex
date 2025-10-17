@@ -13,6 +13,7 @@ from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingC
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -78,9 +79,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return self
 
     @override
-    def validate_with_libraries(self, pipeline_run_id: str | None = None):
+    def validate_with_libraries(self):
         self.validate_inputs()
-        self.llm_prompt_spec.validate_with_libraries()
         if self.llm_choices:
             for llm_choice in self.llm_choices.list_choices():
                 check_llm_choice_with_deck(llm_choice=llm_choice)
@@ -139,7 +139,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         for input_name, requirement in self.needed_inputs().items:
             if input_name not in required_variables:
                 explanation: str | None = None
-                if get_concept_library().is_image_concept(concept=requirement.concept):
+                if Concept.are_concept_compatible(
+                    concept_1=requirement.concept, concept_2=get_native_concept(native_concept=NativeConceptCode.IMAGE), strict=True
+                ):
                     # We have an exraneous image input, the user probably forgot to add it into the prompt template
                     explanation = (
                         f"You have provided an image input named '{input_name}', but it is not referenced in the prompt template. "
