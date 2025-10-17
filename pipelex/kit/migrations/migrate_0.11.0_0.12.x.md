@@ -18,6 +18,7 @@ This release introduces several breaking changes to make the Pipelex language mo
 - [ ] Move .plx files to appropriate locations in your project
 - [ ] Update Pipelex.make() calls (remove config path parameters)
 - [ ] Add @pipe_func() decorators to custom functions used in PipeFunc operators
+- [ ] **Update input multiplicity syntax to use bracket notation**
 - [ ] Update PipeCompose (formerly PipeJinja2)
 - [ ] Update PipeExtract (formerly PipeOCR)
 - [ ] Update PipeLLM prompts and fields
@@ -270,7 +271,31 @@ Solution:
 2. Ensure function is `async` and accepts `working_memory`
 3. Verify function is in a discoverable location
 
-## 2. General Changes
+## 2. Input Multiplicity Syntax Simplification
+
+Input multiplicity now uses concise bracket notation instead of verbose dictionary syntax.
+
+### Migration Patterns
+
+- `{ concept = "ConceptName" }` → `"ConceptName"`
+- `{ concept = "ConceptName", multiplicity = true }` → `"ConceptName[]"`
+- `{ concept = "ConceptName", multiplicity = N }` → `"ConceptName[N]"`
+
+### Examples
+
+**Variable list:**
+
+Before: `inputs = { documents = { concept = "Document", multiplicity = true } }`
+
+After: `inputs = { documents = "Document[]" }`
+
+**Fixed count:**
+
+Before: `inputs = { images = { concept = "Image", multiplicity = 2 } }`
+
+After: `inputs = { images = "Image[2]" }`
+
+## 3. General Changes
 
 ### Rename `definition` to `description`
 
@@ -1092,6 +1117,10 @@ The following replacements can be done with find/replace tools:
 
 **In `.plx` files:**
 - `definition = "` → `description = "`
+- `{ concept = "ConceptName", multiplicity = false }` → `"ConceptName"`
+- `{ concept = "ConceptName", multiplicity = true }` → `"ConceptName[]"`
+- `{ concept = "ConceptName", multiplicity = N }` → `"ConceptName[N]"`
+- `{ concept = "ConceptName" }` → `"ConceptName"`
 - `type = "PipeJinja2"` → `type = "PipeCompose"`
 - `type = "PipeOCR"` → `type = "PipeExtract"`
 - `prompt_template = ` → `prompt = `
@@ -1101,6 +1130,10 @@ The following replacements can be done with find/replace tools:
 - `default_pipe_code = ` → `default_outcome = `
 
 **In `.py` files:**
+- Remove `from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint`
+- `InputRequirementBlueprint(concept="ConceptName", multiplicity=True)` → `"ConceptName[]"`
+- `InputRequirementBlueprint(concept="ConceptName", multiplicity=N)` → `"ConceptName[N]"`
+- `InputRequirementBlueprint(concept="ConceptName")` → `"ConceptName"`
 - `ocr_page_contents_from_pdf` → `extract_page_contents_from_pdf`
 - Remove `relative_config_folder_path` parameters from `Pipelex.make()`
 - Remove `config_folder_path` parameters from `Pipelex.make()`
