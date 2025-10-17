@@ -17,7 +17,6 @@ from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_pat
 
 
 def run_cmd(
-    # ctx: typer.Context,
     target: Annotated[
         str | None,
         typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
@@ -36,7 +35,7 @@ def run_cmd(
     ] = None,
     output: Annotated[
         str | None,
-        typer.Option("--output", "-o", help="Path to save output JSON (default: {pipe_code}.json)"),
+        typer.Option("--output", "-o", help="Path to save output JSON, default to '{pipe_code}.json'"),
     ] = None,
     no_output: Annotated[
         bool,

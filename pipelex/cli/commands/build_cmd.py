@@ -2,17 +2,20 @@ import asyncio
 import time
 from typing import Annotated
 
+import click
 import typer
 
 from pipelex import pretty_print
-from pipelex.builder.builder import PipelexBundleSpec
+from pipelex.builder.builder import PipelexBundleSpec, load_pipe_from_bundle
+from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
+from pipelex.exceptions import PipeInputError
 from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
-from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
+from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 
 build_app = typer.Typer(help="Build working pipelines from natural language requirements", no_args_is_help=True)
@@ -82,12 +85,23 @@ def build_pipe_cmd(
     get_report_delegate().generate_report()
 
 
-@build_app.command("runner", help="Build the Python code to run a pipe using its pipe code, including the necessary inputs")
+@build_app.command("runner", help="Build the Python code to run a pipe with the necessary inputs")
 def prepare_runner_cmd(
-    pipe_code: Annotated[str, typer.Argument(help="The pipe code to run")],
+    target: Annotated[
+        str | None,
+        typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
+    ] = None,
+    pipe: Annotated[
+        str | None,
+        typer.Option("--pipe", help="Pipe code to use, can be omitted if you specify a bundle (.plx) that declares a main pipe"),
+    ] = None,
+    bundle: Annotated[
+        str | None,
+        typer.Option("--bundle", help="Bundle file path (.plx) - uses its main_pipe unless you specify a pipe code"),
+    ] = None,
     output_path: Annotated[
         str | None,
-        typer.Option("--output", "-o", help="Path to save the generated Python file"),
+        typer.Option("--output", "-o", help="Path to save the generated Python file, defaults to 'results/run_{pipe_code}.py'"),
     ] = None,
 ) -> None:
     """Prepare a Python runner file for a pipe.
@@ -98,36 +112,114 @@ def prepare_runner_cmd(
 
     Native concept types (Text, Image, PDF, etc.) will be automatically handled.
     Custom concept types will have their structure recursively generated.
+
+    Examples:
+        pipelex build runner my_pipe
+        pipelex build runner --bundle my_bundle.plx
+        pipelex build runner --bundle my_bundle.plx --pipe my_pipe
+        pipelex build runner my_bundle.plx
+        pipelex build runner my_pipe --output runner.py
     """
-    # Initialize Pipelex
-    Pipelex.make()
+    # Validate mutual exclusivity
+    provided_options = sum([target is not None, pipe is not None, bundle is not None])
+    if provided_options == 0:
+        ctx: click.Context = click.get_current_context()
+        typer.echo(ctx.get_help())
+        raise typer.Exit(0)
 
-    # Get the pipe
-    try:
-        pipe = get_required_pipe(pipe_code=pipe_code)
-    except Exception as e:
-        typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
+    # Let's analyze the options and determine what pipe code to use and if we need to load a bundle
+    pipe_code: str | None = None
+    bundle_path: str | None = None
 
-    # Generate the code
-    try:
-        runner_code = generate_runner_code(pipe)
-    except Exception as e:
-        typer.secho(f"❌ Error generating runner code: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
+    # Determine source:
+    if target:
+        if target.endswith(".plx"):
+            bundle_path = target
+            if bundle:
+                typer.secho(
+                    "Failed to run: cannot use option --bundle if you're already passing a bundle file (.plx) as positional argument",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+        else:
+            pipe_code = target
+            if pipe:
+                typer.secho(
+                    "Failed to run: cannot use option --pipe if you're already passing a pipe code as positional argument",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
 
-    # Determine output path
-    if not output_path:
-        output_path = f"run_{pipe_code}.py"
+    if bundle:
+        assert not bundle_path, "bundle_path should be None at this stage if --bundle is provided"
+        bundle_path = bundle
 
-    # Save the file
-    try:
-        ensure_directory_for_file_path(file_path=output_path)
-        save_text_to_path(text=runner_code, path=output_path)
-        typer.secho(f"✅ Generated runner file: {output_path}", fg=typer.colors.GREEN)
-    except Exception as e:
-        typer.secho(f"❌ Error saving file: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
+    if pipe:
+        assert not pipe_code, "pipe_code should be None at this stage if --pipe is provided"
+        pipe_code = pipe
+
+    if not pipe_code and not bundle_path:
+        typer.secho("Failed to run: no pipe code or bundle file specified", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    async def prepare_runner(pipe_code: str | None = None, bundle_path: str | None = None):
+        # Initialize Pipelex
+        Pipelex.make()
+
+        if bundle_path:
+            try:
+                main_pipe_code = await load_pipe_from_bundle(bundle_path)
+                if not pipe_code:
+                    pipe_code = main_pipe_code
+                    typer.echo(f"Using main pipe '{pipe_code}' from bundle '{bundle_path}'")
+                else:
+                    typer.echo(f"Using pipe '{pipe_code}' from bundle '{bundle_path}'")
+            except FileNotFoundError as exc:
+                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
+            except PipelexBundleError as exc:
+                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
+            except PipeInputError as exc:
+                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
+        elif not pipe_code:
+            typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+
+        # Get the pipe
+        try:
+            pipe = get_required_pipe(pipe_code=pipe_code)
+        except Exception as exc:
+            typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
+            raise typer.Exit(1) from exc
+
+        # Generate the code
+        try:
+            runner_code = generate_runner_code(pipe)
+        except Exception as exc:
+            typer.secho(f"❌ Error generating runner code: {exc}", fg=typer.colors.RED)
+            raise typer.Exit(1) from exc
+
+        # Determine output path
+        final_output_path = output_path or get_incremental_file_path(
+            base_path="results",
+            base_name=f"run_{pipe_code}",
+            extension="py",
+        )
+
+        # Save the file
+        try:
+            ensure_directory_for_file_path(file_path=final_output_path)
+            save_text_to_path(text=runner_code, path=final_output_path)
+            typer.secho(f"✅ Generated runner file: {final_output_path}", fg=typer.colors.GREEN)
+        except Exception as exc:
+            typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
+            raise typer.Exit(1) from exc
+
+    asyncio.run(prepare_runner(pipe_code=pipe_code, bundle_path=bundle_path))
 
 
 @build_app.command("one-shot-pipe", help="Developer utility for contributors: deliver pipeline in one shot, without validation loop")
