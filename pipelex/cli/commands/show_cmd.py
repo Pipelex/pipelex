@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
+from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
 from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe
@@ -53,7 +54,14 @@ def do_show_backends(show_all: bool = False) -> None:
 
     try:
         models_manager = cast("ModelManager", get_models_manager())
-        backend_library = models_manager.inference_backend_library
+
+        # Load backends with or without disabled ones based on show_all flag
+        if show_all:
+            backend_library = InferenceBackendLibrary()
+            backend_library.load(include_disabled=True)
+        else:
+            backend_library = models_manager.inference_backend_library
+
         routing_profile_library = models_manager.routing_profile_library
     except Exception as exc:
         msg = f"Error accessing backend or routing configuration: {exc}"
@@ -68,27 +76,31 @@ def do_show_backends(show_all: bool = False) -> None:
         return
 
     # Filter backends based on show_all flag
-    backends_to_display = all_backends if show_all else [b for b in all_backends if b.extra_config.get("enabled", True)]
+    backends_to_display = all_backends if show_all else [b for b in all_backends if b.enabled]
 
     # Display backends table
+    table_title = "All Configured Backends" if show_all else "Enabled Backends"
     backends_table = Table(
-        title="Configured Backends",
+        title=table_title,
         show_header=True,
         header_style="bold cyan",
         box=box.SQUARE_DOUBLE_HEAD,
     )
     backends_table.add_column("Backend Name", style="green")
-    backends_table.add_column("Status", style="yellow")
+    if show_all:
+        backends_table.add_column("Status", style="yellow")
     backends_table.add_column("Endpoint", style="blue")
     backends_table.add_column("Models", style="cyan", justify="right")
 
     for backend in sorted(backends_to_display, key=lambda b: b.name):
-        enabled = backend.extra_config.get("enabled", True)
-        status = "[green]Enabled[/green]" if enabled else "[red]Disabled[/red]"
         endpoint = backend.endpoint if backend.endpoint else "[dim]N/A[/dim]"
         model_count = str(len(backend.model_specs))
 
-        backends_table.add_row(backend.name, status, endpoint, model_count)
+        if show_all:
+            status = "[green]Enabled[/green]" if backend.enabled else "[red]Disabled[/red]"
+            backends_table.add_row(backend.name, status, endpoint, model_count)
+        else:
+            backends_table.add_row(backend.name, endpoint, model_count)
 
     console.print("\n")
     console.print(backends_table)
@@ -132,7 +144,7 @@ def do_show_backends(show_all: bool = False) -> None:
 
     # Display helper messages
     if not show_all:
-        enabled_count = len([b for b in all_backends if b.extra_config.get("enabled", True)])
+        enabled_count = len([b for b in all_backends if b.enabled])
         disabled_count = len(all_backends) - enabled_count
         if disabled_count > 0:
             console.print(f"[dim]💡 Showing {enabled_count} enabled backend(s). {disabled_count} disabled backend(s) hidden.[/dim]")

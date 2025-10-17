@@ -10,11 +10,11 @@ api_key = "${AZURE_API_KEY}"
 api_version = "${AZURE_API_VERSION}"
 
 [bedrock]
-enabled = true
+enabled = false
 aws_region = "${AWS_REGION}"
 
 [google]
-enabled = true
+enabled = false
 api_key = "${GOOGLE_API_KEY}"
 
 [vertexai]

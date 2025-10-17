@@ -39,9 +39,9 @@ pipelex build pipe "Given an theme, write a Haiku"
 
 @build_app.command("pipe", help="Build a Pipelex bundle with one validation/fix loop correcting deterministic issues")
 def build_pipe_cmd(
-    brief: Annotated[
+    prompt: Annotated[
         str,
-        typer.Argument(help="Brief description of what the pipeline should do"),
+        typer.Argument(help="Prompt describing what the pipeline should do"),
     ],
     output_path: Annotated[
         str,
@@ -72,7 +72,7 @@ def build_pipe_cmd(
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
             return
 
-        pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code="pipe_builder", input_memory={"brief": brief})
+        pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code="pipe_builder", input_memory={"brief": prompt})
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
         save_text_to_path(text=plx_content, path=output_path)
         typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
