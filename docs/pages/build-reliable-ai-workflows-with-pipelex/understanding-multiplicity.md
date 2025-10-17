@@ -1,6 +1,6 @@
 # Understanding Multiplicity
 
-Multiplicity in Pipelex defines how many items a pipe can accept as input or produce as output. This concept is fundamental to building flexible AI workflows that can handle both single items and collections.
+Multiplicity in Pipelex defines how many items a particular stuff can comprise in a particular context. This applies to any of the pipe input variables and also to the output of the pipe. This idea is fundamental to building flexible AI workflows that can handle both single items and collections.
 
 This guide explains the philosophy behind multiplicity in Pipelex and how to use it effectively in your pipelines.
 

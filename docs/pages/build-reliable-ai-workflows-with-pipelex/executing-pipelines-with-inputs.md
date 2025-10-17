@@ -42,9 +42,15 @@ The simplest way to provide text input is with a plain string. Pipelex automatic
 
 ```python
 pipe_output = await execute_pipeline(
-    pipe_code="summarize_text",
+    pipe_code="summarize_story",
     input_memory={
-        "text": "This is the content I want to summarize.",
+        "story": """
+        Once upon a time there was a brave knight who saved the kingdom from a dragon.
+        [...]
+        # Imagine this is a long text for the purpose of this example
+        [...]
+        and they lived happily ever after.
+        """,
     },
 )
 ```

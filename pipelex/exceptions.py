@@ -266,6 +266,7 @@ class PipeStackOverflowError(PipeExecutionError):
     pass
 
 
+# TODO: create variants of DryRunError for each type of Pipe
 class DryRunError(PipeExecutionError):
     """Raised when a dry run fails due to missing inputs or other validation issues."""
 

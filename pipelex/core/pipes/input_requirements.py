@@ -109,7 +109,6 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
         the_requirements: list[NamedInputRequirement] = []
         for requirement_expression, requirement in self.root.items():
             required_variable_name = requirement_expression.split(".", 1)[0]
-            # TODO: refactor this with a proper class like InputRequirement
             the_requirements.append(
                 NamedInputRequirement(
                     variable_name=required_variable_name,
