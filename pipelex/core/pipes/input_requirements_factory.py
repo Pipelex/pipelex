@@ -29,22 +29,29 @@ class InputRequirementsFactory:
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> InputRequirements:
         input_requirements_dict: dict[str, InputRequirement] = {}
-        for var_name, input_requirement_blueprint in blueprint.items():
-            if isinstance(input_requirement_blueprint, str):
-                input_requirement_blueprint = InputRequirementBlueprint(concept=input_requirement_blueprint)
+        for var_name, input_requirement_blueprint_or_str in blueprint.items():
+            if isinstance(input_requirement_blueprint_or_str, str):
+                input_requirement = InputRequirementsFactory.make_from_string(
+                    domain=domain,
+                    requirement_str=input_requirement_blueprint_or_str,
+                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+                )
+            else:
+                input_requirement_blueprint = input_requirement_blueprint_or_str
 
-            concept_string_or_code = input_requirement_blueprint.concept
-            ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
-            concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
-                domain=domain,
-                concept_sring_or_code=concept_string_or_code,
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-            )
+                concept_string_or_code = input_requirement_blueprint.concept
+                ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+                concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
+                    domain=domain,
+                    concept_sring_or_code=concept_string_or_code,
+                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+                )
 
-            input_requirements_dict[var_name] = InputRequirement(
-                concept=get_required_concept(concept_string=concept_string_with_domain),
-                multiplicity=input_requirement_blueprint.multiplicity,
-            )
+                input_requirement = InputRequirement(
+                    concept=get_required_concept(concept_string=concept_string_with_domain),
+                    multiplicity=input_requirement_blueprint_or_str.multiplicity,
+                )
+            input_requirements_dict[var_name] = input_requirement
         return InputRequirements(root=input_requirements_dict)
 
     @classmethod
