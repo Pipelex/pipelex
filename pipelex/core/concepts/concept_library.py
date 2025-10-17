@@ -1,6 +1,5 @@
-from typing import Any
-
-from pydantic import Field, RootModel
+from pydantic import Field, RootModel, model_validator
+from pipelex.types import Self
 from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
@@ -12,7 +11,6 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
-from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
 
@@ -20,8 +18,8 @@ ConceptLibraryRoot = dict[str, Concept]
 class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     root: ConceptLibraryRoot = Field(default_factory=dict)
 
-    def validate_with_libraries(self):
-        """Validates that the each refine concept code in the refines array of each concept in the library exists in the library"""
+    @model_validator(mode="before")
+    def validation_static(self):
         for concept in self.root.values():
             if concept.refines and concept.refines not in self.root:
                 msg = f"Concept '{concept.code}' refines '{concept.refines}' but no concept with the code '{concept.refines}' exists"
@@ -107,16 +105,12 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptCode.values_list()]
 
     @override
-    def get_class(self, concept_code: str) -> type[Any] | None:
-        return get_class_registry().get_class(concept_code)
-
-    @override
     def is_image_concept(self, concept: Concept) -> bool:
         """Check if the concept is an image concept.
         It is an image concept if its structure class is a subclass of ImageContent
         or if it refines the native Image concept.
         """
-        pydantic_model = self.get_class(concept_code=concept.structure_class_name)
+        pydantic_model = get_class_registry().get_class(concept.structure_class_name)
         is_image_class = bool(pydantic_model and issubclass(pydantic_model, ImageContent))
         refines_image = self.is_compatible(
             tested_concept=concept,

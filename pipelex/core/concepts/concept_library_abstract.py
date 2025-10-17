@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_native import NativeConceptCode
@@ -52,10 +51,6 @@ class ConceptLibraryAbstract(ABC):
 
     @abstractmethod
     def search_for_concept_in_domains(self, concept_code: str, search_domains: list[str]) -> Concept | None:
-        pass
-
-    @abstractmethod
-    def get_class(self, concept_code: str) -> type[Any] | None:
         pass
 
     @abstractmethod
