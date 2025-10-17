@@ -91,23 +91,23 @@ inputs = {
 
 ### Input Multiplicity
 
-By default, inputs expect a single item. Use expanded syntax to specify multiple items:
+By default, inputs expect a single item. Use bracket notation to specify multiple items:
 
 ```plx
-# Single item (default) - use standard syntax
+# Single item (default)
 inputs = { document = "Text" }
 
 # Variable list - indeterminate number of items
-inputs = { documents = { concept = "Text", multiplicity = true } }
+inputs = { documents = "Text[]" }
 
 # Fixed count - exactly N items
-inputs = { comparison_items = { concept = "Image", multiplicity = 2 } }
+inputs = { comparison_items = "Image[2]" }
 ```
 
 **Key points:**
-- Don't use `multiplicity = false` - it's unnecessary (default behavior)
-- Use `multiplicity = true` for lists of unknown length
-- Use `multiplicity = N` (integer > 1) when operation requires exact count (e.g., comparing 2 items)
+- No brackets = single item (default behavior)
+- Use `[]` for lists of unknown length
+- Use `[N]` (where N is an integer) when operation requires exact count (e.g., comparing 2 items)
 
 ## Structuring Models
 
