@@ -48,16 +48,24 @@ class InputRequirementsFactory:
         return InputRequirements(root=input_requirements_dict)
 
     @classmethod
-    def make_from_string(cls, requirement_str: str) -> InputRequirement:
+    def make_from_string(
+        cls,
+        domain: str,
+        requirement_str: str,
+        concept_codes_from_the_same_domain: list[str] | None = None,
+    ) -> InputRequirement:
         """Parse an input requirement string and return an InputRequirement.
 
         Interprets multiplicity from a string in the form:
         - "domain.ConceptCode[5]" -> multiplicity = 5 (int)
         - "domain.ConceptCode[]" -> multiplicity = True
         - "domain.ConceptCode" -> multiplicity = None (single item, default)
+        - "ConceptCode[5]" -> multiplicity = 5 (resolved with domain)
 
         Args:
-            requirement_str: String in the format "domain.ConceptCode" with optional "[multiplicity]"
+            domain: The domain to use for resolving concept codes without domain prefix
+            requirement_str: String in the format "domain.ConceptCode" or "ConceptCode" with optional "[multiplicity]"
+            concept_codes_from_the_same_domain: List of concept codes from the same domain for resolution
 
         Returns:
             InputRequirement with the parsed concept and multiplicity
@@ -75,8 +83,16 @@ class InputRequirementsFactory:
             msg = f"Invalid input requirement string: {requirement_str}"
             raise InputRequirementsFactorySyntaxError(msg)
 
-        concept_string = match.group(1)
+        concept_string_or_code = match.group(1)
         multiplicity_str = match.group(2)
+
+        # Validate and resolve concept string with domain
+        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+        concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
+            domain=domain,
+            concept_sring_or_code=concept_string_or_code,
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+        )
 
         # Determine multiplicity
         multiplicity: VariableMultiplicity | None = None
@@ -87,5 +103,5 @@ class InputRequirementsFactory:
                 multiplicity = int(multiplicity_str)
         # else: No brackets, multiplicity stays None
 
-        concept = get_required_concept(concept_string=concept_string)
+        concept = get_required_concept(concept_string=concept_string_with_domain)
         return InputRequirement(concept=concept, multiplicity=multiplicity)
