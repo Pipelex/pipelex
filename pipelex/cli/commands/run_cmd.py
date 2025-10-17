@@ -167,9 +167,9 @@ def run_cmd(
                 )
                 working_memory_dict = pipe_output.working_memory.model_dump()
                 save_as_json_to_path(object_to_save=working_memory_dict, path=output_path)
-                typer.echo(typer.style(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN))
+                typer.secho(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN)
 
-            typer.echo(typer.style("✅ Pipeline execution completed successfully", fg=typer.colors.GREEN))
+            typer.secho("✅ Pipeline execution completed successfully", fg=typer.colors.GREEN)
 
         except Exception as exc:
             log.error(f"Error executing pipeline: {exc}")

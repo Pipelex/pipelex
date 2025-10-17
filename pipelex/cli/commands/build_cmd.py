@@ -51,14 +51,14 @@ def build_pipe_cmd(
 ) -> None:
     Pipelex.make()
     typer.echo("=" * 70)
-    typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
+    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
     typer.echo("")
 
     async def run_pipeline():
         if no_output:
-            typer.echo(typer.style("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
         elif not output_path:
-            typer.echo(typer.style("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED))
+            typer.secho("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED)
             raise typer.Exit(1)
         else:
             ensure_directory_for_file_path(file_path=output_path)
@@ -66,18 +66,18 @@ def build_pipe_cmd(
         builder_loop = BuilderLoop()
         # Save to file unless explicitly disabled with --no-output
         if no_output:
-            typer.echo(typer.style("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
             return
 
         pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code="pipe_builder", input_memory={"brief": brief})
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
         save_text_to_path(text=plx_content, path=output_path)
-        typer.echo(typer.style(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN))
+        typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
     start_time = time.time()
     asyncio.run(run_pipeline())
     end_time = time.time()
-    typer.echo(typer.style(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN))
+    typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
     get_report_delegate().generate_report()
 
@@ -106,14 +106,14 @@ def prepare_runner_cmd(
     try:
         pipe = get_required_pipe(pipe_code=pipe_code)
     except Exception as e:
-        typer.echo(typer.style(f"❌ Error: Could not find pipe '{pipe_code}': {e}", fg=typer.colors.RED))
+        typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
 
     # Generate the code
     try:
         runner_code = generate_runner_code(pipe)
     except Exception as e:
-        typer.echo(typer.style(f"❌ Error generating runner code: {e}", fg=typer.colors.RED))
+        typer.secho(f"❌ Error generating runner code: {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
 
     # Determine output path
@@ -124,9 +124,9 @@ def prepare_runner_cmd(
     try:
         ensure_directory_for_file_path(file_path=output_path)
         save_text_to_path(text=runner_code, path=output_path)
-        typer.echo(typer.style(f"✅ Generated runner file: {output_path}", fg=typer.colors.GREEN))
+        typer.secho(f"✅ Generated runner file: {output_path}", fg=typer.colors.GREEN)
     except Exception as e:
-        typer.echo(typer.style(f"❌ Error saving file: {e}", fg=typer.colors.RED))
+        typer.secho(f"❌ Error saving file: {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
 
 
@@ -147,14 +147,14 @@ def build_one_shot_cmd(
 ) -> None:
     Pipelex.make()
     typer.echo("=" * 70)
-    typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
+    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
     typer.echo("")
 
     async def run_pipeline():
         if no_output:
-            typer.echo(typer.style("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
         elif not output_path:
-            typer.echo(typer.style("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED))
+            typer.secho("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED)
             raise typer.Exit(1)
         else:
             ensure_directory_for_file_path(file_path=output_path)
@@ -167,18 +167,18 @@ def build_one_shot_cmd(
 
         # Save to file unless explicitly disabled with --no-output
         if no_output:
-            typer.echo(typer.style("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
             return
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
         save_text_to_path(text=plx_content, path=output_path)
-        typer.echo(typer.style(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN))
+        typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
     start_time = time.time()
     asyncio.run(run_pipeline())
     end_time = time.time()
-    typer.echo(typer.style(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN))
+    typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
     get_report_delegate().generate_report()
 
@@ -202,14 +202,14 @@ def build_partial_cmd(
 ) -> None:
     Pipelex.make()
     typer.echo("=" * 70)
-    typer.echo(typer.style("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN))
+    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
     typer.echo("")
 
     async def run_pipeline():
         if no_output:
-            typer.echo(typer.style("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
         elif not output_path:
-            typer.echo(typer.style("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED))
+            typer.secho("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED)
             raise typer.Exit(1)
         else:
             ensure_directory_for_file_path(file_path=output_path)
@@ -220,15 +220,15 @@ def build_partial_cmd(
         )
         # Save to file unless explicitly disabled with --no-output
         if no_output:
-            typer.echo(typer.style("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW))
+            typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
             return
         json_output = pipe_output.main_stuff.content.smart_dump()
         save_as_json_to_path(object_to_save=json_output, path=output_path)
-        typer.echo(typer.style(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN))
+        typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
     start_time = time.time()
     asyncio.run(run_pipeline())
     end_time = time.time()
-    typer.echo(typer.style(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN))
+    typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
     get_report_delegate().generate_report()
