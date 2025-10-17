@@ -141,20 +141,17 @@ Input multiplicity specifies whether a pipe expects a single item or multiple it
 
 ### Syntax for Input Multiplicity
 
-Input multiplicity is specified using an expanded syntax in the `inputs` dictionary:
+Input multiplicity is specified using bracket notation in the `inputs` dictionary:
 
 ```plx
 # Standard syntax (single item, the default)
 inputs = { document = "Text" }
 
-# Equivalent with explicit multiplicity = false (not needed, but shown for clarity)
-inputs = { document = { concept = "Text", multiplicity = false } }
-
-# Variable list (indeterminate number)
-inputs = { documents = { concept = "Text", multiplicity = true } }
+# Variable list (indeterminate number of items)
+inputs = { documents = "Text[]" }
 
 # Fixed count (exactly N items)
-inputs = { comparison_items = { concept = "Text", multiplicity = 2 } }
+inputs = { comparison_items = "Text[2]" }
 ```
 
 ### The Three Input Multiplicity Modes
@@ -179,12 +176,12 @@ Analyze this report in detail:
 """
 ```
 
-!!! note "No Need for `multiplicity = false`"
-    You don't need to specify `multiplicity = false` explicitly, it's the default. Only use the expanded syntax when you need `multiplicity = true` or a fixed integer count.
+!!! note "Default Single Item Behavior"
+    When no brackets are used, the input expects a single item. Only use brackets when you need multiple items (`[]`) or a specific count (`[N]`).
 
-**2. Variable list (`multiplicity = true`)**
+**2. Variable list (bracket notation `[]`)**
 
-When you set `multiplicity = true`, the pipe expects a list with an indeterminate number of items:
+Use empty brackets `[]` to specify that the pipe expects a list with an indeterminate number of items:
 
 ```plx
 [concept]
@@ -194,7 +191,7 @@ Summary = "A concise overview of multiple documents"
 [pipe.summarize_all_documents]
 type = "PipeLLM"
 description = "Create a unified summary of multiple documents"
-inputs = { documents = { concept = "Document", multiplicity = true } }
+inputs = { documents = "Document[]" }
 output = "Summary"
 prompt = """
 Analyze all of these documents:
@@ -205,9 +202,17 @@ Create a single unified summary that captures the key points across all document
 """
 ```
 
-**3. Fixed count (`multiplicity = N`)**
+!!! info "When You Actually Need `[]` Notation"
+    The `[]` notation is only required for **advanced use cases**:
+    
+    1. **Batching over items**: When using `batch_over` in a `PipeSequence` to process each item separately
+    2. **Looping in templates**: When you need to iterate over items using Jinja2 syntax (`{% for item in items %}`) in `PipeLLM`, `PipeCompose`, or `PipeCondition` prompts
+    
+    For most cases where you simply pass multiple items to a pipe that processes them all together, you don't need to declare the input with `[]`. The pipe will receive the list and process it as a whole.
 
-When you set `multiplicity` to a specific integer, the pipe expects exactly that many items:
+**3. Fixed count (bracket notation `[N]`)**
+
+Use a number in brackets `[N]` to specify that the pipe expects exactly that many items:
 
 ```plx
 [concept]
@@ -217,7 +222,7 @@ Comparison = "A detailed comparison analysis"
 [pipe.compare_two_images]
 type = "PipeLLM"
 description = "Compare exactly two images side by side"
-inputs = { images = { concept = "Image", multiplicity = 2 } }
+inputs = { images = "Image[2]" }
 output = "Comparison"
 prompt = """
 Compare these two images in detail:
@@ -253,7 +258,7 @@ Extract all fields from this invoice:
 [pipe.process_invoice_batch]
 type = "PipeSequence"
 description = "Process multiple invoices"
-inputs = { invoice_images = { concept = "InvoiceImage", multiplicity = true } }
+inputs = { invoice_images = "InvoiceImage[]" }
 output = "InvoiceData"
 steps = [
     { pipe = "extract_single_invoice", batch_over = "invoice_images", batch_as = "invoice_image", result = "all_invoice_data" }
@@ -296,7 +301,7 @@ Comparison = "A comparative analysis of products"
 [pipe.compare_products]
 type = "PipeLLM"
 description = "Compare two products"
-inputs = { products = { concept = "ProductDescription", multiplicity = 2 } }
+inputs = { products = "ProductDescription[2]" }
 output = "Comparison"
 prompt = """
 Compare these two products:
@@ -352,7 +357,7 @@ Use fixed output multiplicity when:
 - External requirements dictate a fixed count
 - You want consistent batch sizes for processing
 
-### When to Use Variable Input (`multiplicity = true`)
+### When to Use Variable Input (Empty Brackets `[]`)
 
 Use variable input multiplicity when:
 
@@ -361,7 +366,7 @@ Use variable input multiplicity when:
 - The workflow involves collecting items before processing
 - You want maximum flexibility in how the pipe is called
 
-### When to Use Fixed Input (`multiplicity = N`)
+### When to Use Fixed Input (Brackets with Number `[N]`)
 
 Use fixed input multiplicity when:
 
