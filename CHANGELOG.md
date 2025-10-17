@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Added
+ - **New `pipelex run` Command**: A top-level command to execute pipelines directly from the CLI. It can run a pipe existing in the package or a pipe from any `.plx` bundle file, with options to provide inputs from a JSON file and save the output.
+ - **New `pipelex build runner` Command**: A new command that generates a Python script to run a specified pipe. The script includes all necessary imports and placeholder inputs, significantly speeding up the integration of pipes into Python applications.
+ - **New `pipelex show backends` Command**: A new command to display all configured inference backends, their status (enabled/disabled), and the active model routing profile and its rules.
+ - **Revamped Documentation**: The documentation has been overhauled with a new "Getting Started" guide on the main page, making it easier for new users to install Pipelex, configure API keys, and run their first pipeline. New sections on executing pipelines and input/output multiplicity have also been added.
+
+### Changed
+ - **Bundle `main_pipe` Attribute**: Pipelex bundles (`.plx` files) now support a `main_pipe` attribute to designate the primary entry point of the bundle. This is used by the new `pipelex run` and `build build runner` commands to simplify execution.
+ - **CLI Reorganization**: The main command-line interface has been restructured for better usability, with improved help texts and a more logical command order.
+ - **`PipeExtract` Operator**: The `PipeExtract` operator's output is now consistently validated to be the `Page` concept, simplifying its usage for document processing.
+ - **Python Coding Standards**: Updated internal coding standards to recommend declaring variables with a type but no default value to better leverage linters for bug detection.
+
+### Removed
+ - Removed seldom used `prompt_template_to_structure` and `system_prompt_to_structure` configurations at the pipe and domain level.
+ - Removed **Project Name** discovery from Configuration.
+ - Removed temporary design document for the new inference backend system, as the feature is now fully implemented and documented.
+
 ## [v0.12.0] - 2025-10-15
 
 ### Highlights - Moving fast and breaking things
