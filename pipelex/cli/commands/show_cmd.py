@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
+from rich import box
+from rich.console import Console
+from rich.table import Table
 
 from pipelex import pretty_print
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_pipe_library, get_required_pipe
+from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
+
+if TYPE_CHECKING:
+    from pipelex.cogt.models.model_manager import ModelManager
 
 
 def do_show_config() -> None:
@@ -39,6 +45,101 @@ def do_show_pipe(pipe_code: str) -> None:
     Pipelex.make()
     pipe = get_required_pipe(pipe_code=pipe_code)
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
+
+
+def do_show_backends(show_all: bool = False) -> None:
+    """Display all backends and the active routing profile."""
+    Pipelex.make()
+
+    try:
+        models_manager = cast("ModelManager", get_models_manager())
+        backend_library = models_manager.inference_backend_library
+        routing_profile_library = models_manager.routing_profile_library
+    except Exception as exc:
+        msg = f"Error accessing backend or routing configuration: {exc}"
+        raise PipelexCLIError(msg) from exc
+
+    console = Console()
+
+    # Get all backends
+    all_backends = list(backend_library.root.values())
+    if not all_backends:
+        console.print("[yellow]No backends configured.[/yellow]")
+        return
+
+    # Filter backends based on show_all flag
+    backends_to_display = all_backends if show_all else [b for b in all_backends if b.extra_config.get("enabled", True)]
+
+    # Display backends table
+    backends_table = Table(
+        title="Configured Backends",
+        show_header=True,
+        header_style="bold cyan",
+        box=box.SQUARE_DOUBLE_HEAD,
+    )
+    backends_table.add_column("Backend Name", style="green")
+    backends_table.add_column("Status", style="yellow")
+    backends_table.add_column("Endpoint", style="blue")
+    backends_table.add_column("Models", style="cyan", justify="right")
+
+    for backend in sorted(backends_to_display, key=lambda b: b.name):
+        enabled = backend.extra_config.get("enabled", True)
+        status = "[green]Enabled[/green]" if enabled else "[red]Disabled[/red]"
+        endpoint = backend.endpoint if backend.endpoint else "[dim]N/A[/dim]"
+        model_count = str(len(backend.model_specs))
+
+        backends_table.add_row(backend.name, status, endpoint, model_count)
+
+    console.print("\n")
+    console.print(backends_table)
+    console.print("\n")
+
+    # Display routing profile information
+    try:
+        active_profile = routing_profile_library.active_profile
+
+        console.print(f"[bold cyan]Active Routing Profile:[/bold cyan] [green]{active_profile.name}[/green]")
+        if active_profile.description:
+            console.print(f"[dim]{active_profile.description}[/dim]")
+
+        if active_profile.default:
+            console.print(f"[bold]Default Backend:[/bold] [cyan]{active_profile.default}[/cyan]")
+
+        # Display routing rules
+        if active_profile.routes:
+            console.print("\n[bold]Routing Rules:[/bold]")
+            routes_table = Table(
+                show_header=True,
+                header_style="bold cyan",
+                box=box.SIMPLE,
+                show_edge=False,
+            )
+            routes_table.add_column("Pattern", style="green")
+            routes_table.add_column("→", style="dim", justify="center")
+            routes_table.add_column("Target Backend", style="cyan")
+
+            for pattern, target_backend in sorted(active_profile.routes.items()):
+                routes_table.add_row(pattern, "→", target_backend)
+
+            console.print(routes_table)
+        else:
+            console.print("[dim]No specific routing rules defined.[/dim]")
+
+    except Exception as exc:
+        console.print(f"[yellow]Warning: Could not load routing profile information: {exc}[/yellow]")
+
+    console.print("\n")
+
+    # Display helper messages
+    if not show_all:
+        enabled_count = len([b for b in all_backends if b.extra_config.get("enabled", True)])
+        disabled_count = len(all_backends) - enabled_count
+        if disabled_count > 0:
+            console.print(f"[dim]💡 Showing {enabled_count} enabled backend(s). {disabled_count} disabled backend(s) hidden.[/dim]")
+            console.print("[dim]   To see all backends: [bold]pipelex show backends --all[/bold][/dim]\n")
+
+    console.print("[dim]💡 To enable more backends, edit: [bold].pipelex/inference/backends.toml[/bold][/dim]")
+    console.print("[dim]💡 To list available models for a backend: [bold]pipelex show models <backend_name>[/bold][/dim]\n")
 
 
 # Typer group for show commands
@@ -98,3 +199,18 @@ def show_models_cmd(
             flat=flat,
         )
     )
+
+
+@show_app.command("backends", help="Display backend configurations and active routing profile")
+def show_backends_cmd(
+    show_all_backends: Annotated[bool, typer.Option("--all", "-a", help="Show all backends including disabled ones")] = False,
+) -> None:
+    """Display all configured backends and the active routing profile with its routing rules.
+
+    By default, shows only enabled backends. Use --all to include disabled backends.
+
+    Examples:
+        pipelex show backends
+        pipelex show backends --all
+    """
+    do_show_backends(show_all=show_all_backends)
