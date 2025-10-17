@@ -2,7 +2,6 @@ from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 
@@ -21,7 +20,7 @@ class PipeLLMTestCases:
             source=None,
             type="PipeLLM",
             description="Generate text",
-            inputs={"topic": InputRequirementBlueprint(concept="Text")},
+            inputs={"topic": "Text"},
             output="Text",
             prompt="Write about $topic",
             model="claude-4.1-opus",
@@ -62,7 +61,7 @@ class PipeLLMTestCases:
             source=None,
             type="PipeLLM",
             description="Analyze image",
-            inputs={"image": InputRequirementBlueprint(concept="Image")},
+            inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
             model="gemini-2.5-flash-lite",
@@ -129,7 +128,7 @@ class PipeLLMTestCases:
             source=None,
             type="PipeLLM",
             description="Generate with system prompt",
-            inputs={"data": InputRequirementBlueprint(concept="Data")},
+            inputs={"data": "Data"},
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
             output="Analysis",

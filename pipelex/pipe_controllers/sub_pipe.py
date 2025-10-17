@@ -2,7 +2,6 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -56,9 +55,7 @@ class SubPipe(BaseModel):
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
-                    batch_params.input_item_stuff_name: InputRequirementBlueprint(
-                        concept=item_stuff_requirement.concept.concept_string,
-                    ),
+                    batch_params.input_item_stuff_name: item_stuff_requirement.concept.concept_string,
                 },
             )
 

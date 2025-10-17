@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 
 
@@ -17,7 +16,7 @@ class PipeFuncTestCases:
         ),
         PipeFuncBlueprint(
             description="Execute a function",
-            inputs={"data": InputRequirementBlueprint(concept="Data")},
+            inputs={"data": "Data"},
             output="ProcessedData",
             type="PipeFunc",
             pipe_category="PipeOperator",

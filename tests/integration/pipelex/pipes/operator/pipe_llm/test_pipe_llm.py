@@ -3,7 +3,6 @@ import pytest
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.hub import get_class_registry, get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
@@ -145,7 +144,7 @@ class TestPipeLLM:
             working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
             pipe_llm_blueprint = PipeLLMBlueprint(
                 description="LLM test for image processing with attributes",
-                inputs={stuff_name: InputRequirementBlueprint(concept=stuff.concept.concept_string)},
+                inputs={stuff_name: stuff.concept.concept_string},
                 output=NativeConceptCode.TEXT,
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
                 prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,

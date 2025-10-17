@@ -2,7 +2,6 @@ from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
@@ -24,7 +23,7 @@ class PipeParallelTestCases:
         ),
         PipeParallelBlueprint(
             description="Run pipes in parallel",
-            inputs={"data": InputRequirementBlueprint(concept="Data")},
+            inputs={"data": "Data"},
             output="Results",
             type="PipeParallel",
             pipe_category="PipeController",
@@ -55,7 +54,7 @@ class PipeParallelTestCases:
         ),
         PipeParallelBlueprint(
             description="Parallel with combined output",
-            inputs={"input": InputRequirementBlueprint(concept="Input")},
+            inputs={"input": "Input"},
             output="CombinedResult",
             type="PipeParallel",
             pipe_category="PipeController",
@@ -85,7 +84,7 @@ class PipeParallelTestCases:
         ),
         PipeParallelBlueprint(
             description="Parallel with combined output",
-            inputs={"input": InputRequirementBlueprint(concept="Input")},
+            inputs={"input": "Input"},
             output="CombinedResult",
             type="PipeParallel",
             pipe_category="PipeController",

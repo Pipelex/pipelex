@@ -4,7 +4,6 @@ from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 
 
@@ -21,7 +20,7 @@ class PipeComposeTestCases:
         ),
         PipeComposeBlueprint(
             description="Render a template",
-            inputs={"data": InputRequirementBlueprint(concept="Data")},
+            inputs={"data": "Data"},
             output="RenderedText",
             type="PipeCompose",
             pipe_category="PipeOperator",

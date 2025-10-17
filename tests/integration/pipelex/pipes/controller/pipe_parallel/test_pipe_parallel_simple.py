@@ -7,7 +7,6 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -27,7 +26,7 @@ class TestPipeParallelSimple:
         # Create PipeParallel instance - pipes are loaded from PLX files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline",
-            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}")},
+            inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             parallels=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
@@ -143,7 +142,7 @@ class TestPipeParallelSimple:
         # Create PipeParallel instance
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline for short text",
-            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}")},
+            inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             parallels=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),

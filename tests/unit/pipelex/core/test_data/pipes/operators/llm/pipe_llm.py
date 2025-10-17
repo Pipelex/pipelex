@@ -1,7 +1,6 @@
 # ruff: noqa: E501
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 # Basic PipeLLM with prompt_template
@@ -157,7 +156,7 @@ description = "Domain with pipe definitions"
 [pipe.brainstorm_solutions]
 type = "PipeLLM"
 description = "Brainstorm multiple solutions"
-inputs = { problem = { concept = "Text" } }
+inputs = { problem = "Text" }
 output = "Text"
 prompt = "Brainstorm solutions for this problem: $problem"
 multiple_output = true
@@ -169,7 +168,7 @@ multiple_output = true
             "brainstorm_solutions": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Brainstorm multiple solutions",
-                inputs={"problem": InputRequirementBlueprint(concept="Text")},
+                inputs={"problem": "Text"},
                 output=NativeConceptCode.TEXT,
                 multiple_output=True,
                 prompt="Brainstorm solutions for this problem: $problem",
@@ -274,7 +273,7 @@ PersonInfo = "Information about a person"
 [pipe.extract_person_info]
 type = "PipeLLM"
 description = "Extract structured person information"
-inputs = { text = { concept = "Text", multiplicity = 1 } }
+inputs = { text = "Text[1]" }
 output = "PersonInfo"
 prompt = "Extract person information from this text: @text"
 """,
@@ -286,7 +285,7 @@ prompt = "Extract person information from this text: @text"
             "extract_person_info": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Extract structured person information",
-                inputs={"text": InputRequirementBlueprint(concept="Text", multiplicity=1)},
+                inputs={"text": "Text[1]"},
                 output="PersonInfo",
                 prompt="Extract person information from this text: @text",
             ),
@@ -306,7 +305,7 @@ DocumentSummary = "Summary of a document"
 [pipe.analyze_documents]
 type = "PipeLLM"
 description = "Analyze multiple documents and single query"
-inputs = { documents = { concept = "Text", multiplicity = true }, query = { concept = "Text", multiplicity = false } }
+inputs = { documents = "Text[]", query = "Text" }
 output = "DocumentSummary"
 prompt = """
 Analyze these documents based on the query: $query
@@ -323,8 +322,8 @@ Documents: @documents
                 type="PipeLLM",
                 description="Analyze multiple documents and single query",
                 inputs={
-                    "documents": InputRequirementBlueprint(concept="Text", multiplicity=True),
-                    "query": InputRequirementBlueprint(concept="Text", multiplicity=False),
+                    "documents": "Text[]",
+                    "query": "Text",
                 },
                 output="DocumentSummary",
                 prompt="""Analyze these documents based on the query: $query

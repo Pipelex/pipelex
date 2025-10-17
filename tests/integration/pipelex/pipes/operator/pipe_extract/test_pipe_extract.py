@@ -5,7 +5,6 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_concept_library, get_pipe_router
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
@@ -46,7 +45,7 @@ class TestPipeExtract:
     ):
         pipe_extract_blueprint = PipeExtractBlueprint(
             description="OCR test for image processing",
-            inputs={"page_scan": InputRequirementBlueprint(concept=NativeConceptCode.IMAGE)},
+            inputs={"page_scan": NativeConceptCode.IMAGE},
             output=NativeConceptCode.TEXT_AND_IMAGES,
             page_images=True,
             page_image_captions=False,
@@ -84,7 +83,7 @@ class TestPipeExtract:
         input_name = "arbitrary_name"
         blueprint = PipeExtractBlueprint(
             description="OCR test for PDF processing",
-            inputs={input_name: InputRequirementBlueprint(concept=NativeConceptCode.PDF)},
+            inputs={input_name: NativeConceptCode.PDF},
             output=NativeConceptCode.TEXT_AND_IMAGES,
             model=extract_choice_for_pdf,
             page_images=True,

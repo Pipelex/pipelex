@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 
 
@@ -23,7 +22,7 @@ class PipeConditionTestCases:
         ),
         PipeConditionBlueprint(
             description="Conditional with template",
-            inputs={"item": InputRequirementBlueprint(concept="Item")},
+            inputs={"item": "Item"},
             output="ProcessedItem",
             type="PipeCondition",
             pipe_category="PipeController",

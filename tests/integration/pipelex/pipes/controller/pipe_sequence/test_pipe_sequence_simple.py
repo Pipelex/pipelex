@@ -10,7 +10,6 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_concept_library, get_native_concept
@@ -44,7 +43,7 @@ class TestPipeSequenceSimple:
         # Create PipeSequence instance - pipes are loaded from PLX files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Simple sequence for text processing",
-            inputs={"input_text": InputRequirementBlueprint(concept=concept_1.concept_string)},
+            inputs={"input_text": concept_1.concept_string},
             output=concept_2.concept_string,
             steps=[
                 SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),

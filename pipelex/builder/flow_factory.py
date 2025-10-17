@@ -77,21 +77,12 @@ class FlowFactory:
         Returns:
             PipeSignature containing the contract information.
         """
-        # Extract inputs as strings from InputRequirementBlueprint
-        inputs: dict[str, str] = {}
-        if pipe_blueprint.inputs:
-            for input_name, input_requirement in pipe_blueprint.inputs.items():
-                if hasattr(input_requirement, "concept"):
-                    inputs[input_name] = input_requirement.concept
-                else:
-                    inputs[input_name] = str(input_requirement)
-
         return PipeSignature(
             code=pipe_code,
             pipe_category="PipeSignature",
             type=pipe_blueprint.type,
             description=pipe_blueprint.description or "",
-            inputs=inputs,
+            inputs=pipe_blueprint.inputs,
             result=pipe_code,
             output=pipe_blueprint.output,
             pipe_dependencies=[],

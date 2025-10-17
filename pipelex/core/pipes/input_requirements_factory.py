@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements import InputRequirement, InputRequirements
 from pipelex.exceptions import PipelexException
 from pipelex.hub import get_required_concept
@@ -25,32 +24,16 @@ class InputRequirementsFactory:
     def make_from_blueprint(
         cls,
         domain: str,
-        blueprint: dict[str, str | InputRequirementBlueprint],
+        blueprint: dict[str, str],
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> InputRequirements:
         input_requirements_dict: dict[str, InputRequirement] = {}
-        for var_name, input_requirement_blueprint_or_str in blueprint.items():
-            if isinstance(input_requirement_blueprint_or_str, str):
-                input_requirement = InputRequirementsFactory.make_from_string(
-                    domain=domain,
-                    requirement_str=input_requirement_blueprint_or_str,
-                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-                )
-            else:
-                input_requirement_blueprint = input_requirement_blueprint_or_str
-
-                concept_string_or_code = input_requirement_blueprint.concept
-                ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
-                concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
-                    domain=domain,
-                    concept_sring_or_code=concept_string_or_code,
-                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-                )
-
-                input_requirement = InputRequirement(
-                    concept=get_required_concept(concept_string=concept_string_with_domain),
-                    multiplicity=input_requirement_blueprint_or_str.multiplicity,
-                )
+        for var_name, requirement_str in blueprint.items():
+            input_requirement = InputRequirementsFactory.make_from_string(
+                domain=domain,
+                requirement_str=requirement_str,
+                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+            )
             input_requirements_dict[var_name] = input_requirement
         return InputRequirements(root=input_requirements_dict)
 

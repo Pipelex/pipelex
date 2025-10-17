@@ -6,7 +6,6 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity
@@ -61,17 +60,10 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
 
         user_images: list[str] = []
         if blueprint.inputs:
-            for stuff_name, requirement in blueprint.inputs.items():
-                if isinstance(requirement, str):
-                    # if it's just a concept string, it's a concept, we make a basic input requirement from it
-                    input_requirement_blueprint = InputRequirementBlueprint(concept=requirement)
-                else:
-                    input_requirement_blueprint = requirement
-
-                concept_string = input_requirement_blueprint.concept
+            for stuff_name, requirement_str in blueprint.inputs.items():
                 domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                     domain=domain,
-                    concept_string_or_code=concept_string,
+                    concept_string_or_code=requirement_str,
                     concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
                 concept = get_required_concept(

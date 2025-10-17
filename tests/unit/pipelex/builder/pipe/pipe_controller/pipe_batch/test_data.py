@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 
 
@@ -17,7 +16,7 @@ class PipeBatchTestCases:
         ),
         PipeBatchBlueprint(
             description="Process items in batch",
-            inputs={"items": InputRequirementBlueprint(concept="ItemList")},
+            inputs={"items": "ItemList"},
             output="ProcessedItems",
             type="PipeBatch",
             pipe_category="PipeController",
@@ -40,7 +39,7 @@ class PipeBatchTestCases:
         ),
         PipeBatchBlueprint(
             description="Batch with custom names",
-            inputs={"data": InputRequirementBlueprint(concept="DataList")},
+            inputs={"data": "DataList"},
             output="Results",
             type="PipeBatch",
             pipe_category="PipeController",

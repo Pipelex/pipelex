@@ -5,7 +5,6 @@ from pydantic import Field, field_validator
 from pipelex import log
 from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.core.pipes.exceptions import PipeBlueprintError
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
@@ -93,17 +92,9 @@ class PipeSpec(StructuredContent):
         return normalized_pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:
-        converted_inputs: dict[str, str | InputRequirementBlueprint] | None
-        if not self.inputs:
-            converted_inputs = None
-        else:
-            converted_inputs = {}
-            for input_name, concept_code in self.inputs.items():
-                converted_inputs[input_name] = InputRequirementBlueprint(concept=concept_code)
-
         return PipeBlueprint(
             description=self.description,
-            inputs=converted_inputs,
+            inputs=self.inputs if self.inputs else None,
             output=self.output,
             type=self.type,
             pipe_category=self.pipe_category,

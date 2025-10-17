@@ -1,34 +1,32 @@
 from typing import ClassVar
 
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
-
 
 class InputRequirementTestCases:
     SIMPLE_TEXT_INPUT = (
         "simple_text_input",
         "Text",
-        InputRequirementBlueprint(concept="Text"),
+        "Text",
     )
 
     IMAGE_INPUT = (
         "image_input",
         "Image",
-        InputRequirementBlueprint(concept="Image"),
+        "Image",
     )
 
     CUSTOM_CONCEPT_INPUT = (
         "custom_concept_input",
         "CustomConcept",
-        InputRequirementBlueprint(concept="CustomConcept"),
+        "CustomConcept",
     )
 
     DOMAIN_CONCEPT_INPUT = (
         "domain_concept_input",
         "domain.ConceptName",
-        InputRequirementBlueprint(concept="domain.ConceptName"),
+        "domain.ConceptName",
     )
 
-    TEST_CASES: ClassVar[list[tuple[str, str, InputRequirementBlueprint]]] = [
+    TEST_CASES: ClassVar[list[tuple[str, str, str]]] = [
         SIMPLE_TEXT_INPUT,
         IMAGE_INPUT,
         CUSTOM_CONCEPT_INPUT,
