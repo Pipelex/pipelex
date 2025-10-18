@@ -26,7 +26,7 @@ def do_validate_all_libraries_and_dry_run() -> None:
 def validate_cmd(
     target: Annotated[
         str | None,
-        typer.Argument(help="Pipe code, bundle file path (auto-detected), or 'all' to validate all pipes"),
+        typer.Argument(help="Pipe code, bundle file path (auto-detected based on .plx extension), or 'all' to validate all pipes"),
     ] = None,
     pipe: Annotated[
         str | None,
@@ -37,7 +37,7 @@ def validate_cmd(
         typer.Option("--bundle", help="Bundle file path (.plx) - validates all pipes in the bundle"),
     ] = None,
 ) -> None:
-    """Validate and dry run a pipe or all pipes.
+    """Validate and dry run a pipe or a bundle or all pipes.
 
     Examples:
         pipelex validate my_pipe
