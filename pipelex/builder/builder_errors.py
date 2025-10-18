@@ -1,5 +1,3 @@
-"""Error classes and their structured content representations for the builder domain."""
-
 from pydantic import Field
 
 from pipelex.builder.concept.concept_spec import ConceptSpec
@@ -12,6 +10,7 @@ from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.builder.validation_errors import SyntaxErrorData
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.exceptions import (
     PipelexException,
@@ -59,6 +58,7 @@ class ConceptDefinitionErrorData(StructuredContent):
     concept_code: str = Field(description="The concept code")
     description: str = Field(description="Description of the concept")
     structure_class_python_code: str | None = Field(None, description="Python code for the structure class if available")
+    structure_class_syntax_error_data: SyntaxErrorData | None = Field(None, description="Syntax error data for the structure class if available")
     source: str | None = Field(None, description="Source of the error")
 
 

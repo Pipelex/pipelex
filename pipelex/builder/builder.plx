@@ -65,6 +65,7 @@ Return a draft of a plan that narrates the pipeline as pseudo-steps (no code):
 - For each pipe: state the pipe's description, inputs (by name using snake_case), and the output (by name using snake_case),
 DO NOT indicate the inputs or output type. Just name them.
 - Be aware of the steps where you will want structured outputs or inputs. Make sense of it but be concise.
+- Do not bother with planning a final step that gathers all the elements unless it's clear from the brief that the user wants the pipe to do that.
 
 Available pipe controllers:
 - PipeSequence: A pipe that executes a sequence of pipes: it needs to reference the pipes it will execute.
@@ -83,9 +84,8 @@ Available pipe operators:
   - Then set output = "Article[]" to get a variable list, or output = "Article[5]" for exactly 5 items
   - Examples: output = "Text[]" (multiple texts), output = "Image[3]" (exactly 3 images), output = "Employee[]" (list of employees)
 - PipeImgGen: A pipe that uses an AI model to generate images.
-  - Use bracket notation for multiple images: output = "Image[3]" generates exactly 3 images
-  VERY IMPORTANT: IF YOU DECIDE TO CREATE A PipeImgGen, YOU ALSO HAVE TO CREATE A PIPELLM THAT WILL WRITE THE PROMPT, AND THAT NEEDS TO PRECEED THE PIPEIMGEN, based on the necessary elements.
-  That means that in the MAIN pipeline, the prompt MUST NOT be considered as an input. It should be the output of a step that generates the prompt.
+  - VERY IMPORTANT: IF YOU DECIDE TO CREATE A PipeImgGen to generate an image, YOU ALSO HAVE TO CREATE A PIPELLM THAT WILL WRITE THE PROMPT
+  AND THAT NEEDS TO PRECEED THE PIPEIMGEN, based on the necessary elements, unless it's clear from the brief that the prompt should be part of the main pipe's original inputs.
 - PipeExtract: A pipe that uses OCR technology to extract text from an image or a pdf.
   - Always outputs a list of pages: output = "Page[]"
   VERY IMPORTANT: THE INPUT OF THE PIPEEXTRACT MUST BE either an image or a pdf or a concept which refines one of them.
@@ -203,6 +203,7 @@ Define the contracts of the pipes to build:
 - For each pipe: give a unique snake_case pipe_code, a type and description, specify inputs (one or more) and output (one)
 - Add as much details as possible for the description.
 - Be clear which is the main pipe of the pipeline, don't write "main" in its pipe_code, but make it clear in its description.
+- Do not bother with planning a final step that gathers all the elements unless it's clear from the brief that the user wants the pipe to do that.
 
 Available pipe controllers:
 - PipeSequence: A pipe that executes a sequence of pipes: it needs to reference the pipes it will execute.

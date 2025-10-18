@@ -1,6 +1,4 @@
 <!-- BEGIN_PIPELEX_RULES -->
-# Pipelex Rules
-
 ## Guide to write or edit pipelines using the Pipelex language in .plx files
 
 - Always first write your "plan" in natural language, then transcribe it in pipelex.

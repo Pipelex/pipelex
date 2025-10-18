@@ -5,6 +5,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import Field
 
+from pipelex import log
+from pipelex.builder.validation_errors import SyntaxErrorData
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.exceptions import ConceptStructureGeneratorError, PipelexException
@@ -54,8 +56,14 @@ class StructureGenerator:
             the_class = self.validate_generated_code(
                 python_code=generated_code, expected_class_name=class_name, required_base_class=StructuredContent
             )
-        except (ConceptStructureValidationError, SyntaxError, ValueError, ImportError, Exception) as exc:
-            msg = f"Error validating generated code: {exc}"
+        except SyntaxError as syntax_error:
+            msg = f"Error validating generated code: {syntax_error}"
+            syntax_error_data = SyntaxErrorData.from_syntax_error(syntax_error)
+            raise ConceptStructureGeneratorError(
+                msg, structure_class_python_code=generated_code, syntax_error_data=syntax_error_data
+            ) from syntax_error
+        except (ConceptStructureValidationError, ValueError, ImportError, Exception) as exc:
+            msg = f"Error validating generated code: {exc}\nGenerated code:\n```python\n{generated_code}\n```"
             raise ConceptStructureGeneratorError(msg, structure_class_python_code=generated_code) from exc
 
         return generated_code, the_class

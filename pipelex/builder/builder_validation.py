@@ -132,6 +132,7 @@ async def dry_run_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> 
             concept_code=concept_def_error.concept_code,
             description=concept_def_error.description,
             structure_class_python_code=concept_def_error.structure_class_python_code,
+            structure_class_syntax_error_data=concept_def_error.structure_class_syntax_error_data,
             source=concept_def_error.source,
         )
         raise PipelexBundleError(

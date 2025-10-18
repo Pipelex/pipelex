@@ -46,6 +46,10 @@ def build_pipe_cmd(
         str,
         typer.Argument(help="Prompt describing what the pipeline should do"),
     ],
+    builder_pipe: Annotated[
+        str,
+        typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
+    ] = "pipe_builder",
     output_path: Annotated[
         str,
         typer.Option("--output", "-o", help="Path to save the generated PLX file"),
@@ -75,7 +79,7 @@ def build_pipe_cmd(
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
             return
 
-        pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code="pipe_builder", input_memory={"brief": prompt})
+        pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code=builder_pipe, input_memory={"brief": prompt})
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
         save_text_to_path(text=plx_content, path=output_path)
         typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
@@ -235,6 +239,10 @@ def build_one_shot_cmd(
         str,
         typer.Argument(help="Brief description of what the pipeline should do"),
     ],
+    builder_pipe: Annotated[
+        str,
+        typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
+    ] = "pipe_builder",
     output_path: Annotated[
         str,
         typer.Option("--output", "-o", help="Path to save the generated PLX file"),
@@ -259,7 +267,7 @@ def build_one_shot_cmd(
             ensure_directory_for_file_path(file_path=output_path)
 
         pipe_output = await execute_pipeline(
-            pipe_code="pipe_builder",
+            pipe_code=builder_pipe,
             input_memory={"brief": brief},
         )
         pretty_print(pipe_output, title="Pipe Output")
@@ -290,6 +298,10 @@ def build_partial_cmd(
         str,
         typer.Argument(help="Brief description of what the pipeline should do"),
     ],
+    builder_pipe: Annotated[
+        str,
+        typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
+    ] = "pipe_builder",
     output_path: Annotated[
         str,
         typer.Option("--output", "-o", help="Path to save the generated PLX file"),
@@ -314,7 +326,7 @@ def build_partial_cmd(
             ensure_directory_for_file_path(file_path=output_path)
 
         pipe_output = await execute_pipeline(
-            pipe_code="pipe_builder",
+            pipe_code=builder_pipe,
             input_memory={"brief": brief},
         )
         # Save to file unless explicitly disabled with --no-output

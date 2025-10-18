@@ -1,6 +1,7 @@
 from click import ClickException
 from typing_extensions import override
 
+from pipelex.builder.validation_errors import SyntaxErrorData
 from pipelex.system.exceptions import RootException
 from pipelex.tools.misc.context_provider_abstract import ContextProviderException
 from pipelex.types import StrEnum
@@ -160,19 +161,22 @@ class ConceptDefinitionError(PipelexException):
         concept_code: str,
         description: str,
         structure_class_python_code: str | None = None,
+        structure_class_syntax_error_data: SyntaxErrorData | None = None,
         source: str | None = None,
     ):
         self.domain_code = domain_code
         self.concept_code = concept_code
         self.description = description
         self.structure_class_python_code = structure_class_python_code
+        self.structure_class_syntax_error_data = structure_class_syntax_error_data
         self.source = source
         super().__init__(message)
 
 
 class ConceptStructureGeneratorError(PipelexException):
-    def __init__(self, message: str, structure_class_python_code: str | None = None):
+    def __init__(self, message: str, structure_class_python_code: str | None = None, syntax_error_data: SyntaxErrorData | None = None):
         self.structure_class_python_code = structure_class_python_code
+        self.syntax_error_data = syntax_error_data
         super().__init__(message)
 
 

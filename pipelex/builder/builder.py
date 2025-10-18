@@ -2,14 +2,13 @@ from typing import TYPE_CHECKING, cast
 
 from pydantic import ValidationError
 
+from pipelex import pretty_print
 from pipelex.builder.builder_errors import (
     PipeBuilderError,
     PipelexBundleError,
     PipelexBundleUnexpectedError,
 )
-from pipelex.builder.builder_validation import (
-    validate_dry_run_bundle_blueprint,
-)
+from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
@@ -178,6 +177,7 @@ async def load_and_validate_bundle(bundle_path: str) -> PipelexBundleBlueprint:
         await validate_dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
     except PipelexBundleError as exc:
         msg = f"Bundle at '{bundle_path}' failed to validate"
+        pretty_print(exc, title="Validation Error Details")
         raise PipelexBundleError(message=msg, pipe_failures=exc.pipe_failures) from exc
 
     return bundle_blueprint
