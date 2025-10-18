@@ -213,5 +213,5 @@ class ModelDeck(ConfigModel):
             msg = f"Model handle '{model_handle}' not found in deck"
             raise ModelNotFoundError(msg)
         if model_handle not in self.inference_models:
-            log.dev(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
+            log.verbose(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
         return inference_model

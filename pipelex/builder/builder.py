@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from pydantic import ValidationError
@@ -8,7 +7,9 @@ from pipelex.builder.builder_errors import (
     PipelexBundleError,
     PipelexBundleUnexpectedError,
 )
-from pipelex.builder.builder_validation import document_pipe_failures_from_dry_run_blueprint, dry_run_bundle_blueprint
+from pipelex.builder.builder_validation import (
+    validate_dry_run_bundle_blueprint,
+)
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
@@ -24,6 +25,7 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
@@ -158,36 +160,24 @@ async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> Pi
     return pipelex_bundle_spec
 
 
-async def load_pipe_from_bundle(bundle_path: str) -> str:
+async def load_and_validate_bundle(bundle_path: str) -> PipelexBundleBlueprint:
     """Load a bundle file and extract its main_pipe.
 
     Args:
         bundle_path: Path to the .plx bundle file.
 
     Returns:
-        The pipe_code from the bundle's main_pipe.
+        PipelexBundleBlueprint: The blueprint of the bundle.
 
     Raises:
-        FileNotFoundError: If the bundle file does not exist.
-        PipelexBundleError: If no main_pipe is declared or if pipes fail during dry run.
-        PipeInputError: If there are input errors during dry run validation.
+        PipelexBundleError: If any pipe failed during dry run.
     """
-    bundle_path_obj = Path(bundle_path)
-    if not bundle_path_obj.exists():
-        msg = f"Bundle file not found: {bundle_path}"
-        raise FileNotFoundError(msg)
+    bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
 
-    interpreter = PipelexInterpreter(file_path=bundle_path_obj)
-    bundle_blueprint = interpreter.make_pipelex_bundle_blueprint()
+    try:
+        await validate_dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
+    except PipelexBundleError as exc:
+        msg = f"Bundle at '{bundle_path}' failed to validate"
+        raise PipelexBundleError(message=msg, pipe_failures=exc.pipe_failures) from exc
 
-    if not bundle_blueprint.main_pipe:
-        msg = f"Bundle '{bundle_path}' does not declare a main_pipe"
-        raise PipelexBundleError(message=msg)
-
-    dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
-    pipe_failures = document_pipe_failures_from_dry_run_blueprint(bundle_blueprint=bundle_blueprint, dry_run_result=dry_run_result)
-    if pipe_failures:
-        msg = f"Pipes failed during dry run in bundle '{bundle_path}'"
-        raise PipelexBundleError(message=msg, pipe_failures=pipe_failures)
-
-    return bundle_blueprint.main_pipe
+    return bundle_blueprint

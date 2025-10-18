@@ -93,7 +93,7 @@ class Pipelex(metaclass=MetaSingleton):
             raise PipelexConfigError(msg) from validation_error
 
         log.configure(log_config=get_config().pipelex.log_config)
-        log.debug("Logs are configured")
+        log.verbose("Logs are configured")
 
         # tools
         self.class_registry = class_registry or ClassRegistry()
@@ -153,7 +153,7 @@ class Pipelex(metaclass=MetaSingleton):
             self.activity_manager = ActivityManagerNoOp()
         self.pipelex_hub.set_activity_manager(activity_manager=self.activity_manager)
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
     @staticmethod
     def _get_config_not_found_error_msg(component_name: str) -> str:
@@ -241,7 +241,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.reporting_delegate.setup()
         self.class_registry.register_classes(CoreRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
-            log.debug("Registering test models for unit testing")
+            log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
         self.activity_manager.setup()
 
@@ -254,12 +254,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     def setup_libraries(self):
         self.library_manager.setup()
         self.library_manager.load_libraries()
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done")
 
     def validate_libraries(self):
         try:
@@ -268,7 +268,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
             msg = f"Could not validate libraries because of: {validation_error_msg}"
             raise PipelexSetupError(msg) from validation_error
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done")
 
     def teardown(self):
         # pipelex
@@ -287,7 +287,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.class_registry.teardown()
         func_registry.teardown()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         self.pipelex_hub.reset_config()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:
@@ -312,6 +312,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipelex_instance = cls()
         pipelex_instance.setup()
         pipelex_instance.setup_libraries()
+        log.info(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 
     @classmethod

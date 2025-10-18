@@ -8,7 +8,7 @@ from pipelex.cli.commands.init_cmd import init_app
 from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
-from pipelex.cli.commands.validate_cmd import validate_app
+from pipelex.cli.commands.validate_cmd import validate_cmd
 
 
 class PipelexCLI(TyperGroup):
@@ -45,10 +45,8 @@ app.add_typer(kit_app, name="kit", help="Manage kit assets: agent rules, migrati
 app.add_typer(
     build_app, name="build", help="Generate AI workflows from natural language requirements: pipelines in .plx format and python code to run them"
 )
-app.add_typer(
-    validate_app,
-    name="validate",
-    help="Validate pipes: static validation for syntax and dependencies, dry-run execution for logic and consistency",
+app.command(name="validate", help="Validate pipes: static validation for syntax and dependencies, dry-run execution for logic and consistency")(
+    validate_cmd
 )
 app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.plx)")(run_cmd)
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")

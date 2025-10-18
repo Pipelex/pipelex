@@ -5,7 +5,6 @@ import shortuuid
 from pydantic import model_validator
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
@@ -88,12 +87,6 @@ class PipeBatch(PipeController):
         """Common logic for running or dry-running a pipe in batch mode."""
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_item_stuff_name = batch_params.input_item_stuff_name
-        log.debug(
-            f"PipeBatch._run_batch_pipe() START: pipe_code='{self.code}', "
-            f"input_list_stuff_name='{batch_params.input_list_stuff_name}', "
-            f"input_item_stuff_name='{input_item_stuff_name}', "
-            f"branch_pipe_code='{self.branch_pipe_code}'"
-        )
         try:
             input_item_concept_code = self.inputs.get_required_input_requirement(input_item_stuff_name)
         except PipeInputNotFoundError as exc:
@@ -102,7 +95,6 @@ class PipeBatch(PipeController):
 
         if pipe_run_params.final_stuff_code:
             method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "_run_controller_pipe"
-            log.debug(f"PipeBatch.{method_name}() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
         pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
@@ -116,13 +108,6 @@ class PipeBatch(PipeController):
 
         input_stuff_code = input_stuff.stuff_code
         input_content = input_stuff.content
-        log.debug(
-            f"PipeBatch._run_batch_pipe() INPUT LIST: "
-            f"variable_name='{batch_params.input_list_stuff_name}', "
-            f"concept={input_stuff.concept.code if input_stuff.concept else 'None'}, "
-            f"content_type={type(input_content).__name__}"
-        )
-
         if not isinstance(input_content, ListContent):
             msg = f"Input of PipeBatch must be ListContent, got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}"
             raise PipeInputError(message=msg, pipe_code=self.code, variable_name=batch_params.input_list_stuff_name, concept_code=None)
@@ -150,12 +135,6 @@ class PipeBatch(PipeController):
                 name=input_item_stuff_name,
             )
             item_stuffs.append(item_input_stuff)
-            log.debug(
-                f"PipeBatch._run_batch_pipe() BATCH ITEM [{branch_index}]: "
-                f"variable_name='{input_item_stuff_name}', "
-                f"concept={item_input_stuff.concept.code if item_input_stuff.concept else 'None'}, "
-                f"content_type={type(item).__name__}"
-            )
             branch_memory = working_memory.make_deep_copy()
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
@@ -163,11 +142,6 @@ class PipeBatch(PipeController):
             required_stuffs = branch_memory.get_existing_stuffs(names=required_variables)
             required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff_code]
             required_stuff_lists.append(required_stuffs)
-            log.debug(
-                f"PipeBatch._run_batch_pipe() BRANCH MEMORY [{branch_index}]: "
-                f"required_variables={required_variables}, "
-                f"available_stuffs={[f'{s.stuff_name}:{type(s.content).__name__}' for s in required_stuffs]}"
-            )
             branch_pipe_run_params = pipe_run_params.deep_copy_with_final_stuff_code(final_stuff_code=branch_output_item_code)
 
             task: Coroutine[Any, Any, PipeOutput]
@@ -204,13 +178,6 @@ class PipeBatch(PipeController):
             concept=self.output,
             content=list_content,
             name=output_name,
-        )
-        log.debug(
-            f"PipeBatch._run_batch_pipe() OUTPUT LIST: "
-            f"variable_name='{output_name}', "
-            f"concept={self.output.code}, "
-            f"content_type={type(list_content).__name__}, "
-            f"num_items={len(output_items)}"
         )
 
         method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "run_pipe"

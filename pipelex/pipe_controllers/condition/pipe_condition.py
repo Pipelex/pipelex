@@ -278,7 +278,7 @@ class PipeCondition(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        log.dev(f"{self.class_name} generating a '{self.output.code}'")
+        log.verbose(f"{self.class_name} generating a '{self.output.code}'")
 
         # TODO: restore pipe_layer feature
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)

@@ -66,7 +66,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
 
         error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
         return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
-    log.info(f"Pipe '{pipe.code}' dry run completed successfully")
+    log.info(f"✅ Pipe '{pipe.code}' dry run completed successfully")
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
@@ -123,8 +123,8 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
     unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
 
     log.info(
-        f"Dry run completed: '{len(successful_pipes)}' successful, '{len(failed_pipes)}' failed, "
-        f"'{len(allowed_to_fail_pipes)}' allowed to fail, in '{time.time() - start_time:.2f}' seconds",
+        f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, "
+        f"{len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
     )
     if unexpected_failures:
         unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
@@ -168,7 +168,7 @@ def _convert_to_working_memory_format(needed_inputs_spec: InputRequirements) -> 
                 needed_inputs_for_factory.append(typed_named_input_requirement)
             else:
                 # Fallback to TextContent if we can't get the proper class
-                log.warning(
+                log.verbose(
                     f"Could not get structure class '{structure_class_name}' for "
                     f"concept '{named_input_requirement.concept.code}', falling back to TextContent",
                 )

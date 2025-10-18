@@ -156,3 +156,11 @@ async def dry_run_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> 
         )
         raise PipelexBundleError(message=pipe_input_error.message, pipe_input_errors=[pipe_input_error_data]) from pipe_input_error
     return dry_run_result
+
+
+async def validate_dry_run_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint):
+    dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
+    pipe_failures = document_pipe_failures_from_dry_run_blueprint(bundle_blueprint=bundle_blueprint, dry_run_result=dry_run_result)
+    if pipe_failures:
+        msg = "Dry run failed for bundle"
+        raise PipelexBundleError(message=msg, pipe_failures=pipe_failures)

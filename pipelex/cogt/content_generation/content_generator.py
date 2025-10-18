@@ -179,7 +179,7 @@ class ContentGenerator(ContentGeneratorProtocol):
 
         preliminary_text = await llm_gen_text(llm_assignment=llm_assignment_for_text)
 
-        log.dev(f"preliminary_text: {preliminary_text}")
+        log.verbose(f"preliminary_text: {preliminary_text}")
 
         fup_llm_assignment = await workflow_arg.llm_assignment_factory_to_object.make_llm_assignment(
             preliminary_text=preliminary_text,
@@ -214,7 +214,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             nb_images=1,
         )
         generated_image = await img_gen_single_image(img_gen_assignment=img_gen_assignment)
-        log.dev(f"{self.__class__.__name__} generated image: {generated_image}")
+        log.verbose(f"{self.__class__.__name__} generated image: {generated_image}")
         return generated_image
 
     @override
@@ -238,7 +238,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             nb_images=nb_images,
         )
         generated_image_list = await img_gen_image_list(img_gen_assignment=img_gen_assignment)
-        log.dev(f"{self.__class__.__name__} generated image list: {generated_image_list}")
+        log.verbose(f"{self.__class__.__name__} generated image list: {generated_image_list}")
         return generated_image_list
 
     @override

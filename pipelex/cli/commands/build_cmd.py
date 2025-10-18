@@ -6,7 +6,7 @@ import click
 import typer
 
 from pipelex import pretty_print
-from pipelex.builder.builder import PipelexBundleSpec, load_pipe_from_bundle
+from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
 from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
@@ -173,8 +173,12 @@ def prepare_runner_cmd(
 
         if bundle_path:
             try:
-                main_pipe_code = await load_pipe_from_bundle(bundle_path)
+                bundle_blueprint = await load_and_validate_bundle(bundle_path)
                 if not pipe_code:
+                    main_pipe_code = bundle_blueprint.main_pipe
+                    if not main_pipe_code:
+                        typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
+                        raise typer.Exit(1)
                     pipe_code = main_pipe_code
                     typer.echo(f"Using main pipe '{pipe_code}' from bundle '{bundle_path}'")
                 else:
