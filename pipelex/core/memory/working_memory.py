@@ -334,3 +334,11 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     def main_stuff_as_mermaid(self) -> MermaidContent:
         """Get main stuff content as MermaidContent if applicable."""
         return self.get_stuff_as_mermaid(name=MAIN_STUFF_NAME)
+
+    ################################################################################################
+    # Serialization
+    ################################################################################################
+
+    def smart_dump(self) -> dict[str, Any]:
+        """Serialize the working memory as a dictionary."""
+        return self.model_dump(serialize_as_any=True)

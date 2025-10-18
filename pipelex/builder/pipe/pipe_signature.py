@@ -6,8 +6,8 @@ from pydantic import Field, field_validator
 from pipelex import log
 from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.core.pipes.exceptions import PipeBlueprintError
-from pipelex.core.pipes.multiplicity_utils import parse_concept_with_multiplicity
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
 

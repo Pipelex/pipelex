@@ -2,8 +2,8 @@ from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
-from pipelex.core.pipes.multiplicity_utils import parse_concept_with_multiplicity
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint

@@ -7,9 +7,8 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
-from pipelex.core.pipes.multiplicity_utils import parse_concept_with_multiplicity
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity
+from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
@@ -62,9 +61,12 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         user_images: list[str] = []
         if blueprint.inputs:
             for stuff_name, requirement_str in blueprint.inputs.items():
+                # Parse to strip multiplicity brackets
+                input_parse_result = parse_concept_with_multiplicity(requirement_str)
+
                 domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                     domain=domain,
-                    concept_string_or_code=requirement_str,
+                    concept_string_or_code=input_parse_result.concept,
                     concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
                 concept = get_required_concept(

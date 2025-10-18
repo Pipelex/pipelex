@@ -164,7 +164,7 @@ def run_cmd(
                     base_name=f"run_{pipe_code}",
                     extension="json",
                 )
-                working_memory_dict = pipe_output.working_memory.model_dump()
+                working_memory_dict = pipe_output.working_memory.smart_dump()
                 save_as_json_to_path(object_to_save=working_memory_dict, path=output_path)
                 typer.secho(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN)
 

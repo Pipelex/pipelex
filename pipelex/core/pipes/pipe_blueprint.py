@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.exceptions import PipeBlueprintError
-from pipelex.core.pipes.multiplicity_utils import parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import StrEnum
 
