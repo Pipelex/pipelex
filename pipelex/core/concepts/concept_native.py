@@ -54,6 +54,29 @@ class NativeConceptCode(StrEnum):
                 return False
 
     @classmethod
+    def is_dynamic_concept(cls, concept_code: str) -> bool:
+        try:
+            enum_value = NativeConceptCode(concept_code)
+        except ValueError:
+            return False
+
+        match enum_value:
+            case (
+                NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.PDF
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.LLM_PROMPT
+                | NativeConceptCode.IMG_GEN_PROMPT
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.ANYTHING
+            ):
+                return False
+            case NativeConceptCode.DYNAMIC:
+                return True
+
+    @classmethod
     def values_list(cls) -> list["NativeConceptCode"]:
         return list(cls)
 

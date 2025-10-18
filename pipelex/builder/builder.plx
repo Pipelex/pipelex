@@ -101,6 +101,10 @@ Be smart about splitting the workflow into steps (sequence or parallel):
 Apply the DRY principle: don't repeat yourself. if you have a task to apply several times, make it a dedicated pipe.
 If you're in a sequence and you are to apply that pipe to a previous output which is multiple, plan to batch over it.
 
+You must never include nore than one batch step in the same pipe sequence.
+Instead, you must create a pipe sequence specifically for the process to apply to each batched element
+and that sub pipe will have the second batch step.
+
 Keep your style concise, no need to write tags such as "Description:", just write what you need to write.
 Do not write any intro or outro, just write the plan.
 
@@ -232,6 +236,11 @@ Be smart about splitting the workflow into steps (sequence or parallel):
 - But don't ask the LLM for many things which are unrelated, it would lose reliability.
 - Apply the DRY principle: don't repeat yourself. if you have a task to apply several times, make it a dedicated pipe.
 - If you're in a sequence and you are to apply that pipe to a previous output which is multiple, use batch_over/batch_as attributes in that step.
+
+
+You must never include nore than one batch step in the same pipe sequence.
+Instead, you must create a pipe sequence specifically for the process to apply to each batched element
+and that sub pipe will have the second batch step.
 """
 
 [pipe.assemble_pipelex_bundle_spec]

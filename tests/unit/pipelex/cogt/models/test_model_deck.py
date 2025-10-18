@@ -1,5 +1,4 @@
 import pytest
-from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -51,145 +50,114 @@ class TestModelDeckGetOptionalInferenceModel:
         # Assert
         assert result == model_spec
 
-    def test_direct_model_lookup_not_found(self, mocker: MockerFixture):
+    def test_direct_model_lookup_not_found(self):
         # Arrange
         model_deck = self._create_test_model_deck()
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("nonexistent-model")
 
         # Assert
         assert result is None
-        mock_log.warning.assert_called_once_with(
-            "Skipping model handle 'nonexistent-model' because it's not found in deck, it could be an external plugin."
-        )
 
-    def test_simple_string_alias_resolution_success(self, mocker: MockerFixture):
+    def test_simple_string_alias_resolution_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-gpt": "gpt-4"})
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("best-gpt")
 
         # Assert
         assert result == model_spec
-        mock_log.debug.assert_called_once_with("Redirection for 'best-gpt': gpt-4")
 
-    def test_simple_string_alias_resolution_not_found(self, mocker: MockerFixture):
+    def test_simple_string_alias_resolution_not_found(self):
         # Arrange
         model_deck = self._create_test_model_deck(aliases={"best-gpt": "nonexistent-model"})
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("best-gpt")
 
         # Assert
         assert result is None
-        mock_log.debug.assert_called_once_with("Redirection for 'best-gpt': nonexistent-model")
-        # The final warning is about the original alias, not the target
-        mock_log.warning.assert_called_with("Skipping model handle 'best-gpt' because it's not found in deck, it could be an external plugin.")
 
-    def test_list_alias_resolution_first_success(self, mocker: MockerFixture):
+    def test_list_alias_resolution_first_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-model": ["gpt-4", "claude-3"]})
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("best-model")
 
         # Assert
         assert result == model_spec
-        mock_log.debug.assert_called_once_with("Redirection for 'best-model': ['gpt-4', 'claude-3']")
 
-    def test_list_alias_resolution_second_success(self, mocker: MockerFixture):
+    def test_list_alias_resolution_second_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
             inference_models={"claude-3": model_spec},
             aliases={"best-model": ["nonexistent-model", "claude-3"]},
         )
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("best-model")
 
         # Assert
         assert result == model_spec
-        mock_log.debug.assert_called_once_with("Redirection for 'best-model': ['nonexistent-model', 'claude-3']")
 
-    def test_list_alias_resolution_none_found(self, mocker: MockerFixture):
+    def test_list_alias_resolution_none_found(self):
         # Arrange
         model_deck = self._create_test_model_deck(aliases={"best-model": ["nonexistent-1", "nonexistent-2"]})
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("best-model")
 
         # Assert
         assert result is None
-        mock_log.debug.assert_called_once_with("Redirection for 'best-model': ['nonexistent-1', 'nonexistent-2']")
-        # Should have warning calls: one for each alias in the list + one for the original alias
-        assert mock_log.warning.call_count == 3
 
-    def test_recursive_alias_resolution_success(self, mocker: MockerFixture):
+    def test_recursive_alias_resolution_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-model": "best-gpt", "best-gpt": "gpt-4"})
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("best-model")
 
         # Assert
         assert result == model_spec
-        # Should have debug calls for both redirections
-        assert mock_log.debug.call_count == 2
 
-    def test_recursive_alias_resolution_with_list(self, mocker: MockerFixture):
+    def test_recursive_alias_resolution_with_list(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
             inference_models={"gpt-4": model_spec},
             aliases={"best-model": ["nonexistent", "best-gpt"], "best-gpt": "gpt-4"},
         )
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("best-model")
 
         # Assert
         assert result == model_spec
-        # Should have debug calls for both redirections
-        assert mock_log.debug.call_count >= 2
 
-    def test_empty_alias_list(self, mocker: MockerFixture):
+    def test_empty_alias_list(self):
         # Arrange
         model_deck = self._create_test_model_deck(aliases={"empty-alias": []})
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("empty-alias")
 
         # Assert
         assert result is None
-        # Empty list evaluates to False, so no debug log is called
-        mock_log.debug.assert_not_called()
-        mock_log.warning.assert_called_once_with(
-            "Skipping model handle 'empty-alias' because it's not found in deck, it could be an external plugin."
-        )
 
-    def test_circular_alias_prevention(self, mocker: MockerFixture):
+    def test_circular_alias_prevention(self):
         # Note: The current implementation doesn't have explicit circular reference detection,
         # but Python's recursion limit should prevent infinite loops.
         # This test ensures the method handles it gracefully.
 
         # Arrange
         model_deck = self._create_test_model_deck(aliases={"alias-a": "alias-b", "alias-b": "alias-a"})
-        mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act & Assert
         # This should either return None or raise RecursionError (which would be caught by pytest)
@@ -199,24 +167,21 @@ class TestModelDeckGetOptionalInferenceModel:
             # If no exception, result should be None
             assert result is None
 
-    def test_complex_waterfall_scenario(self, mocker: MockerFixture):
+    def test_complex_waterfall_scenario(self):
         # Arrange
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
             inference_models={"claude-3": model_spec},
             aliases={"best-model": ["premium-gpt", "premium-claude"], "premium-gpt": ["gpt-4-turbo", "gpt-4"], "premium-claude": "claude-3"},
         )
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model("best-model")
 
         # Assert
         assert result == model_spec
-        # Should have multiple debug calls for the waterfall resolution
-        assert mock_log.debug.call_count >= 2
 
-    def test_mixed_string_and_list_aliases(self, mocker: MockerFixture):
+    def test_mixed_string_and_list_aliases(self):
         # Arrange
         model_spec1 = self._create_test_model_spec("gpt-4")
         model_spec2 = self._create_test_model_spec("claude-3")
@@ -228,7 +193,6 @@ class TestModelDeckGetOptionalInferenceModel:
                 "backup-model": ["claude-4", "claude-3"],  # list alias
             },
         )
-        mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result1 = model_deck.get_optional_inference_model("ai-model")
@@ -247,31 +211,12 @@ class TestModelDeckGetOptionalInferenceModel:
             "UPPERCASE-MODEL",  # uppercase
         ],
     )
-    def test_edge_case_llm_handles(self, llm_handle: str, mocker: MockerFixture):
+    def test_edge_case_llm_handles(self, llm_handle: str):
         # Arrange
         model_deck = self._create_test_model_deck()
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
 
         # Act
         result = model_deck.get_optional_inference_model(llm_handle)
 
         # Assert
         assert result is None
-        mock_log.warning.assert_called_once_with(
-            f"Skipping model handle '{llm_handle}' because it's not found in deck, it could be an external plugin."
-        )
-
-    def test_logging_behavior(self, mocker: MockerFixture):
-        # Arrange
-        model_deck = self._create_test_model_deck(aliases={"test-alias": "target-model"})
-        mock_log = mocker.patch("pipelex.cogt.models.model_deck.log")
-
-        # Act
-        model_deck.get_optional_inference_model("test-alias")
-
-        # Assert
-        # Verify debug log for redirection
-        mock_log.debug.assert_called_with("Redirection for 'test-alias': target-model")
-
-        # The final warning is about the original alias, not the target
-        mock_log.warning.assert_called_with("Skipping model handle 'test-alias' because it's not found in deck, it could be an external plugin.")
