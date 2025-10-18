@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.exceptions import PipeBlueprintError
+from pipelex.core.pipes.multiplicity_utils import parse_concept_with_multiplicity
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import StrEnum
 
@@ -104,9 +105,11 @@ class PipeBlueprint(BaseModel):
 
     @field_validator("output", mode="before")
     @classmethod
-    def validate_concept_string_or_code(cls, output: str) -> str:
-        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output)
-        return output
+    def validate_output(cls, output: str) -> str:
+        # Strip multiplicity brackets before validating
+        output_parse_result = parse_concept_with_multiplicity(output)
+        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
+        return output  # Return with brackets intact
 
     @classmethod
     def validate_pipe_code_syntax(cls, pipe_code: str) -> str:

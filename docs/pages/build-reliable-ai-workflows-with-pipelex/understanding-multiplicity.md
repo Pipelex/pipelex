@@ -33,89 +33,13 @@ By keeping concepts singular and using multiplicity to express quantity, Pipelex
 
 ## Output Multiplicity
 
-Output multiplicity controls how many items a pipe produces. This is most commonly used with `PipeLLM` to generate multiple outputs from a single execution.
+Output multiplicity controls how many items a pipe produces. You can specify this using bracket notation in the `output` field.
 
-### The Two Modes of Output Multiplicity
+### The Three Output Multiplicity Modes
 
-Pipelex supports two ways to specify output multiplicity:
+**1. Single output (default)**
 
-1. **Fixed multiplicity** (`nb_output`): Generate an exact number of items
-2. **Variable multiplicity** (`multiple_output`): Let the LLM decide how many items to generate
-
-### Fixed Output Multiplicity
-
-Use `nb_output` when you need a specific, predetermined number of outputs:
-
-```plx
-[concept]
-Headline = "A catchy title for content"
-
-[pipe.generate_headline_options]
-type = "PipeLLM"
-description = "Generate headline alternatives"
-inputs = { article_text = "Text" }
-output = "Headline"
-nb_output = 5
-prompt = """
-Read this article:
-
-@article_text
-
-Generate $_nb_output different headline options for this article.
-Make each one unique and compelling.
-"""
-```
-
-In this example, the pipe will always produce exactly 5 headlines. The variable `$_nb_output` is automatically available in your prompt, making it easy to communicate the requirement to the LLM.
-
-**Common use cases for fixed multiplicity:**
-
-- Generate N alternative versions for A/B testing
-- Create a fixed set of options for user selection
-- Produce a specific number of variations for comparison
-- Match external requirements (e.g., "always provide 3 recommendations")
-
-### Variable Output Multiplicity
-
-Use `multiple_output = true` when the number of outputs should depend on the content:
-
-```plx
-[concept]
-LineItem = "A single line item from an invoice"
-
-[concept.LineItem.structure]
-description = "Description of the item or service"
-quantity = { type = "number", description = "Quantity purchased" }
-unit_price = { type = "number", description = "Price per unit" }
-total = { type = "number", description = "Total price for this line" }
-
-[pipe.extract_line_items]
-type = "PipeLLM"
-description = "Extract all line items from an invoice"
-inputs = { invoice_text = "Text" }
-output = "LineItem"
-multiple_output = true
-prompt = """
-Extract all line items from this invoice:
-
-@invoice_text
-
-For each line item, extract the description, quantity, unit price, and total amount.
-"""
-```
-
-Here, the pipe will extract however many line items appear in the invoice. A simple invoice might have 2 line items, while a detailed purchase order might have 50.
-
-**Common use cases for variable multiplicity:**
-
-- Extract entities from text (unknown count in advance)
-- Generate as many alternatives as needed
-- List all items that match criteria
-- Identify all occurrences of a pattern
-
-### Single Output (Default)
-
-When you don't specify `nb_output` or `multiple_output`, a pipe produces a single output:
+When no brackets are used in the output, the pipe produces a single item:
 
 ```plx
 [concept]
@@ -134,6 +58,78 @@ Summarize this document concisely:
 ```
 
 This is the default behavior and represents the most common case.
+
+**2. Variable output (bracket notation `[]`)**
+
+Use empty brackets in the output to let the LLM decide how many items to generate:
+
+```plx
+[concept]
+LineItem = "A single line item from an invoice"
+
+[concept.LineItem.structure]
+description = "Description of the item or service"
+quantity = { type = "number", description = "Quantity purchased" }
+unit_price = { type = "number", description = "Price per unit" }
+total = { type = "number", description = "Total price for this line" }
+
+[pipe.extract_line_items]
+type = "PipeLLM"
+description = "Extract all line items from an invoice"
+inputs = { invoice_text = "Text" }
+output = "LineItem[]"
+prompt = """
+Extract all line items from this invoice:
+
+@invoice_text
+
+For each line item, extract the description, quantity, unit price, and total amount.
+"""
+```
+
+The pipe will extract however many line items appear in the invoice. A simple invoice might have 2 line items, while a detailed purchase order might have 50.
+
+**Common use cases for variable output:**
+
+- Extract entities from text (unknown count in advance)
+- Generate as many alternatives as needed
+- List all items that match criteria
+- Identify all occurrences of a pattern
+
+**3. Fixed output (bracket notation `[N]`)**
+
+Use a number in brackets to generate an exact number of items:
+
+```plx
+[concept]
+Headline = "A catchy title for content"
+
+[pipe.generate_headline_options]
+type = "PipeLLM"
+description = "Generate headline alternatives"
+inputs = { article_text = "Text" }
+output = "Headline[5]"
+prompt = """
+Read this article:
+
+@article_text
+
+Generate 5 different headline options for this article.
+Make each one unique and compelling.
+"""
+```
+
+The pipe will always produce exactly 5 headlines.
+
+**Common use cases for fixed output:**
+
+- Generate N alternative versions for A/B testing
+- Create a fixed set of options for user selection
+- Produce a specific number of variations for comparison
+- Match external requirements (e.g., "always provide 3 recommendations")
+
+!!! note "Alternative Syntax"
+    For compatibility, you can also use the explicit `nb_output` and `multiple_output` fields, which override any brackets in the output field. However, bracket notation is the recommended approach for clarity.
 
 ## Input Multiplicity
 

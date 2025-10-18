@@ -128,9 +128,8 @@ description = "Domain with pipe definitions"
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate multiple ideas"
-output = "Text"
+output = "Text[3]"
 prompt = "Generate creative ideas for a mobile app"
-nb_output = 3
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -139,8 +138,7 @@ nb_output = 3
             "generate_ideas": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Generate multiple ideas",
-                output=NativeConceptCode.TEXT,
-                nb_output=3,
+                output="Text[3]",
                 prompt="Generate creative ideas for a mobile app",
             ),
         },
@@ -157,9 +155,8 @@ description = "Domain with pipe definitions"
 type = "PipeLLM"
 description = "Brainstorm multiple solutions"
 inputs = { problem = "Text" }
-output = "Text"
+output = "Text[]"
 prompt = "Brainstorm solutions for this problem: $problem"
-multiple_output = true
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -169,8 +166,7 @@ multiple_output = true
                 type="PipeLLM",
                 description="Brainstorm multiple solutions",
                 inputs={"problem": "Text"},
-                output=NativeConceptCode.TEXT,
-                multiple_output=True,
+                output="Text[]",
                 prompt="Brainstorm solutions for this problem: $problem",
             ),
         },

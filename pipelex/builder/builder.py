@@ -12,17 +12,28 @@ from pipelex.builder.builder_validation import document_pipe_failures_from_dry_r
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
+from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
+from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.builder.pipe.pipe_extract_spec import PipeExtractSpec
+from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
+from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
+from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
+from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
+from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_signature import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.list_content import ListContent
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 # # TODO: Put this in a factory. Investigate why it is necessary.
@@ -55,7 +66,29 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         item_type=ConceptSpec,
     )
 
-    pipe_specs: list[PipeSpecUnion] = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="pipe_specs").content).items
+    # pipe_specs: list[PipeSpecUnion] = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="pipe_specs").content).items
+    pipe_specs_list: ListContent[StuffContent] = working_memory.get_stuff_as_list(name="pipe_specs", item_type=StructuredContent)
+    pipe_specs_list_items: list[StuffContent] = pipe_specs_list.items
+    pipe_specs: list[PipeSpecUnion] = []
+    for pipe_spec_item in pipe_specs_list_items:
+        if not isinstance(
+            pipe_spec_item,
+            (
+                PipeFuncSpec,
+                PipeImgGenSpec,
+                PipeComposeSpec,
+                PipeLLMSpec,
+                PipeExtractSpec,
+                PipeBatchSpec,
+                PipeConditionSpec,
+                PipeParallelSpec,
+                PipeSequenceSpec,
+            ),
+        ):
+            msg = f"Pipe spec item '{pipe_spec_item}' is not any type of PipeSpecUnion, it's a {type(pipe_spec_item)}"
+            raise PipeBuilderError(msg)
+        pipe_specs.append(pipe_spec_item)
+
     bundle_header_spec = working_memory.get_stuff_as(name="bundle_header_spec", content_type=BundleHeaderSpec)
 
     # Properly validate and reconstruct concept specs to ensure proper Pydantic validation
@@ -64,7 +97,7 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         try:
             # Re-create the ConceptSpec to ensure proper Pydantic validation
             # This handles any serialization/deserialization issues from working memory
-            validated_concept = ConceptSpec(**concept_spec.model_dump(serialize_as_any=True))
+            validated_concept = ConceptSpec.model_validate(concept_spec.model_dump(serialize_as_any=True))
             validated_concepts[validated_concept.the_concept_code] = validated_concept
         except ValidationError as exc:
             msg = f"Failed to validate concept spec {concept_spec.the_concept_code}: {format_pydantic_validation_error(exc)}"

@@ -1,3 +1,4 @@
+import re
 from typing import Any, Literal
 
 from pydantic import Field, field_validator
@@ -5,6 +6,7 @@ from pydantic import Field, field_validator
 from pipelex import log
 from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.core.pipes.exceptions import PipeBlueprintError
+from pipelex.core.pipes.multiplicity_utils import parse_concept_with_multiplicity
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
@@ -21,7 +23,10 @@ class PipeSignature(StructuredContent):
     pipe_category: Literal["PipeSignature"] = "PipeSignature"
     description: str = Field(description="What the pipe does")
     inputs: dict[str, str] = Field(
-        description="Pipe inputs: keys are the input variable_names in snake_case, values are the ConceptCodes in PascalCase."
+        description=(
+            "Pipe inputs: keys are input variable_names in snake_case, "
+            "values are ConceptCodes in PascalCase with optional multiplicity brackets (e.g., 'Text', 'Text[]', 'Text[2]')."
+        )
     )
     result: str = Field(
         description="variable_name for the result of the pipe. Must be snake_case. It could be referenced as input in a following pipe."
@@ -43,7 +48,11 @@ class PipeSpec(StructuredContent):
     )
     description: str | None = Field(description="Natural language description of what the pipe does.")
     inputs: dict[str, str] = Field(
-        description=("Input concept specifications. The keys are input names in snake_case. Each value must be a ConceptCode in PascalCase"),
+        description=(
+            "Input concept specifications. Keys are input names in snake_case. "
+            "Values are ConceptCodes in PascalCase with optional multiplicity: "
+            "'ConceptName' (single), 'ConceptName[]' (variable list), or 'ConceptName[N]' (fixed count)."
+        )
     )
     output: str = Field(description="Output concept code in PascalCase format!! Very important")
 
@@ -62,20 +71,39 @@ class PipeSpec(StructuredContent):
 
     @field_validator("output", mode="after")
     @classmethod
-    def validate_concept_string_or_code(cls, output: str) -> str:
-        ConceptSpec.validate_concept_string_or_code(concept_string_or_code=output)
-        return output
+    def validate_output(cls, output: str) -> str:
+        # Extract concept without multiplicity for validation
+        parse_result = parse_concept_with_multiplicity(output)
+        ConceptSpec.validate_concept_string_or_code(concept_string_or_code=parse_result.concept)
+        return output  # Return original with brackets intact
 
     @field_validator("inputs", mode="after")
     @classmethod
     def validate_inputs(cls, inputs: dict[str, str] | None) -> dict[str, str] | None:
         if inputs is None:
             return None
-        for input_name, concept_code in inputs.items():
+
+        # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
+        multiplicity_pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+
+        for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
                 raise PipeBlueprintError(msg)
-            ConceptSpec.validate_concept_string_or_code(concept_string_or_code=concept_code)
+
+            # Validate the concept spec format with optional multiplicity brackets
+            match = re.match(multiplicity_pattern, concept_spec)
+            if not match:
+                msg = (
+                    f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
+                    f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
+                )
+                raise PipeBlueprintError(msg)
+
+            # Extract the concept part (without multiplicity) and validate it
+            concept_string_or_code = match.group(1)
+            ConceptSpec.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+
         return inputs
 
     @classmethod

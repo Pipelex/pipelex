@@ -33,7 +33,6 @@ class TestPipeImgGen:
             description="Image generation test",
             img_gen_prompt=image_desc,
             output=NativeConceptCode.IMAGE,
-            nb_output=1,
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(

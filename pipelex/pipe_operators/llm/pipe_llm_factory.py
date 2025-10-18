@@ -7,6 +7,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.multiplicity_utils import parse_concept_with_multiplicity
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity
 from pipelex.exceptions import PipeDefinitionError
@@ -93,16 +94,19 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             for_object=blueprint.model_to_structure,
         )
 
-        # output_multiplicity defaults to False for PipeLLM so unless it's run with explicit demand for multiple outputs,
-        # we'll generate only one output
+        # Parse output for multiplicity (may have brackets like "Text[]" or "Text[3]")
+        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
+
+        # Convert bracket notation to output_multiplicity
         output_multiplicity = make_variable_multiplicity(
-            nb_items=blueprint.nb_output,
-            multiple_items=blueprint.multiple_output,
+            nb_items=output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, int) else None,
+            multiple_items=output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, bool) else None,
         )
 
+        # Use concept without brackets for output concept resolution
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
-            concept_string_or_code=blueprint.output,
+            concept_string_or_code=output_parse_result.concept,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         output_concept_domain, output_concept_code = output_domain_and_code.domain, output_domain_and_code.concept_code

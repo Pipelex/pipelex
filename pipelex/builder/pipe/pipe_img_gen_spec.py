@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_signature import PipeSpec
@@ -36,12 +36,16 @@ class PipeImgGenSpec(PipeSpec):
     PipeImgGen enables AI-powered image generation using various models like DALL-E or
     diffusion models. Supports static and dynamic prompts with configurable generation
     parameters.
+
+    Output Multiplicity:
+        Specify using bracket notation in output field:
+        - output = "Image" - single image (default)
+        - output = "Image[3]" - exactly 3 images
     """
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     img_gen_skill: ImgGenSkill | None = None
-    nb_output: int | None = Field(default=None, ge=1)
 
     @field_validator("img_gen_skill", mode="before")
     @classmethod
@@ -55,6 +59,7 @@ class PipeImgGenSpec(PipeSpec):
     def to_blueprint(self) -> PipeImgGenBlueprint:
         """Convert this PipeImgGenBlueprint to the core PipeImgGenBlueprint."""
         base_blueprint = super().to_blueprint()
+
         return PipeImgGenBlueprint(
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
@@ -69,5 +74,4 @@ class PipeImgGenSpec(PipeSpec):
             output_format=None,
             is_raw=None,
             seed=None,
-            nb_output=self.nb_output,
         )

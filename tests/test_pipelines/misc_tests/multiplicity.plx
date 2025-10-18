@@ -11,12 +11,11 @@ FantasyScene = "A fantasy scene"
 [pipe.original_power_ranger_colors]
 type = "PipeLLM"
 description = "Recall the colors of the original power rangers"
-output = "Color"
+output = "Color[5]"
 prompt = """
-Remind me of the colors of the {{ _nb_output }} original power rangers.
+Remind me of the colors of the 5 original power rangers.
 """
 model = "llm_for_creative_writing"
-nb_output = 5
 
 [pipe.alltime_power_ranger_colors]
 type = "PipeLLM"
@@ -66,7 +65,7 @@ type = "PipeSequence"
 description = "Imagine nature scenes of Power Rangers colors"
 output = "ImgGenPrompt"
 steps = [
-    { pipe = "alltime_power_ranger_colors", result = "color", multiple_output = true },
+    { pipe = "alltime_power_ranger_colors", result = "color" },
     { pipe = "imagine_nature_product", result = "product_of_nature" },
     { pipe = "imagine_fantasy_scene_including_products_of_nature" },
 ]

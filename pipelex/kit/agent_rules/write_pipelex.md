@@ -368,22 +368,22 @@ prompt = "Analyze this data"
 
 ### Multiple Outputs
 
-Generate multiple outputs (fixed number):
+Generate multiple outputs (fixed number) - use bracket notation:
 ```plx
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate ideas"
-output = "Idea"
-nb_output = 3  # Generate exactly 3 ideas
+output = "Idea[3]"  # Generate exactly 3 ideas
+prompt = "Generate 3 ideas"
 ```
 
-Generate multiple outputs (variable number):
+Generate multiple outputs (variable number) - use bracket notation:
 ```plx
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate ideas"
-output = "Idea"
-multiple_output = true  # Let the LLM decide how many to generate
+output = "Idea[]"  # Let the LLM decide how many to generate
+prompt = "Generate ideas"
 ```
 
 ### Vision

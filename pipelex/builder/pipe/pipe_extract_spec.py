@@ -51,9 +51,10 @@ class PipeExtractSpec(PipeSpec):
     page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
 
+    @override
     @field_validator("output", mode="before")
     @classmethod
-    def validate_output(cls, _: str) -> str:
+    def validate_output(cls, output: str) -> str:
         return "Page"
 
     @field_validator("extract_skill", mode="before")

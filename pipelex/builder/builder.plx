@@ -147,8 +147,7 @@ List the concept drafts in Markdown format with a heading 3 for each, e.g. `### 
 type = "PipeLLM"
 description = "Structure the concept definitions."
 inputs = { concept_drafts = "ConceptDrafts", brief = "UserBrief" }
-output = "concept.ConceptSpec"
-multiple_output = true
+output = "concept.ConceptSpec[]"
 model = "llm_to_engineer"
 system_prompt = """
 You are an expert at data extraction and json formatting.
@@ -166,8 +165,7 @@ Your task here is to extract a list of ConceptSpec from these concept drafts:
 type = "PipeLLM"
 description = "Write the pipe signatures for the plan."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "concept.ConceptSpec" }
-output = "pipe_design.PipeSignature"
-multiple_output = true
+output = "pipe_design.PipeSignature[]"
 model = "llm_to_engineer"
 system_prompt = """
 You are a Senior engineer, very well versed in creating pipelines.
