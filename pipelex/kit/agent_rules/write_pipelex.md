@@ -634,8 +634,7 @@ Multiple Image Generation:
 type = "PipeImgGen"
 description = "Generate multiple image variations"
 inputs = { prompt = "ImgGenPrompt" }
-output = "Image"
-nb_output = 3
+output = "Image[3]"
 seed = "auto"
 ```
 
@@ -662,7 +661,6 @@ safety_tolerance = 3
 - `quality`: Image quality ("standard", "hd")
 
 **Output Configuration:**
-- `nb_output`: Number of images to generate
 - `aspect_ratio`: Image dimensions ("1:1", "16:9", "9:16", etc.)
 - `output_format`: File format ("png", "jpeg", "webp")
 - `background`: Background type ("default", "transparent")

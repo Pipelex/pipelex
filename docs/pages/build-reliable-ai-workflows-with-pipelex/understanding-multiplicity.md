@@ -128,9 +128,6 @@ The pipe will always produce exactly 5 headlines.
 - Produce a specific number of variations for comparison
 - Match external requirements (e.g., "always provide 3 recommendations")
 
-!!! note "Alternative Syntax"
-    For compatibility, you can also use the explicit `nb_output` and `multiple_output` fields, which override any brackets in the output field. However, bracket notation is the recommended approach for clarity.
-
 ## Input Multiplicity
 
 Input multiplicity specifies whether a pipe expects a single item or multiple items as input. This allows you to design pipes that explicitly require lists or explicitly require single items.
@@ -321,8 +318,7 @@ CompanyName = "The name of a company or organization"
 type = "PipeLLM"
 description = "Extract all company names from an article"
 inputs = { article = "Article" }
-output = "CompanyName"
-multiple_output = true
+output = "CompanyName[]"
 prompt = """
 Read this article:
 
@@ -335,7 +331,7 @@ Only include entities that are explicitly named.
 
 ## Best Practices
 
-### When to Use Variable Output (`multiple_output = true`)
+### When to Use Variable Output (`[]`)
 
 Use variable output multiplicity when:
 
@@ -344,7 +340,7 @@ Use variable output multiplicity when:
 - The count isn't known until after processing
 - You want the LLM to use its judgment about completeness
 
-### When to Use Fixed Output (`nb_output = N`)
+### When to Use Fixed Output (`[N]`)
 
 Use fixed output multiplicity when:
 
@@ -415,10 +411,10 @@ pipe_output = await execute_pipeline(
 Multiplicity in Pipelex gives you precise control over how many items flow through your pipelines:
 
 - **Concepts stay singular** to maintain clean semantics
-- **Output multiplicity** (`nb_output`, `multiple_output`) controls generation
-- **Input multiplicity** (in the `inputs` definition) enforces expectations
-- **Variable multiplicity** (`true`) for unknown counts
-- **Fixed multiplicity** (integer) for exact requirements
+- **Output multiplicity** (bracket notation in `output` field) controls generation
+- **Input multiplicity** (bracket notation in `inputs` definition) enforces expectations
+- **Variable multiplicity** (`[]`) for unknown counts
+- **Fixed multiplicity** (`[N]`) for exact requirements
 
 By understanding and using multiplicity effectively, you can build pipelines that handle both single items and collections with clarity and type safety.
 

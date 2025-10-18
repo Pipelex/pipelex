@@ -126,18 +126,27 @@ Analyze the document page shown in the image and explain how it relates to the p
 | `prompt_template`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). **Note**: Do not use `@` or `$` for image variables.                 | No       |
 | `images`                    | list of strings     | **Deprecated**: Use the `inputs` section to declare image inputs instead.                                                                                               | No       |
 | `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
-| `nb_output`                 | integer             | Specifies exactly how many outputs to generate (e.g., `nb_output = 3` for exactly 3 outputs). Use when you need a fixed number of results. Mutually exclusive with `multiple_output`.  | No       |
-| `multiple_output`           | boolean             | Controls output generation mode. Default is `false` (single output). Set to `true` for variable-length list generation when you need an indeterminate number of outputs. Mutually exclusive with `nb_output`. | No       |
 
-### Output Generation Modes
+### Output Multiplicity
 
-`PipeLLM` supports three different output generation modes:
+Specify output multiplicity using bracket notation in the `output` field:
 
-1. **Single Output** (default): Don't specify `nb_output` or `multiple_output`, or set `multiple_output = false`. The LLM generates exactly one result.
+- **Single output** (default): `output = "Text"` - generates exactly one item
+- **Variable output**: `output = "Text[]"` - lets the LLM decide how many items to generate
+- **Fixed output**: `output = "Text[5]"` - generates exactly 5 items
 
-2. **Fixed Multiple Outputs**: Use `nb_output = N` (where N is a positive integer) when you need exactly N outputs. For example, `nb_output = 3` will try to generate 3 results. The parameter `_nb_output` will be available in the prompt template, e.g. "Give me the names of $_nb_output flowers".
+Examples:
 
-3. **Variable Multiple Outputs**: Use `multiple_output = true` when you need a variable-length list where the LLM determines how many outputs to generate based on the content and context.
+```plx
+# Single output (default)
+output = "Summary"
+
+# Variable - extract all keywords found
+output = "Keyword[]"
+
+# Fixed - generate exactly 3 alternatives
+output = "Headline[3]"
+```
 
 !!! info "Learn More About Multiplicity"
     For a comprehensive guide on output multiplicity, input multiplicity, and the philosophy behind how Pipelex handles single items versus collections, see [Understanding Multiplicity](../understanding-multiplicity.md).

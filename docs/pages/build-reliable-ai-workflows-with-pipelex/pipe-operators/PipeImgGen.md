@@ -39,9 +39,8 @@ Image generation presets are defined in your model deck configuration and can in
 | `type`                  | string          | The type of the pipe: `PipeImgGen`                                                                          | Yes      |
 | `description`           | string          | A description of the image generation operation.                                                                           | Yes      |
 | `inputs`                | dictionary      | The input concept(s) for the image generation operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
-| `output`                | string          | The output concept produced by the image generation operation.                                                | Yes      |
+| `output`                | string          | The output concept produced by the image generation operation. Use bracket notation for multiple images: `"Image[3]"` generates exactly 3 images.                                                | Yes      |
 | `img_gen_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
-| `nb_output`             | integer         | The number of images to generate. If omitted, a single image is generated.                                                    | No       |
 | `img_gen`           | string          | The choice of image generation model handle preset or setting to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
 | `aspect_ratio`          | string          | The desired aspect ratio of the image (e.g., `"16:9"`, `"1:1"`).                                                              | No       |
 | `quality`               | string          | The quality of the generated image (e.g., `"standard"`, `"hd"`).                                                              | No       |
@@ -67,7 +66,7 @@ quality = "hd"
 
 ### Example: Generating multiple images from a dynamic prompt
 
-This pipe takes a text prompt as input and generates three variations of the image.
+This pipe takes a text prompt as input and generates three variations of the image using bracket notation.
 
 ```plx
 [concept]
@@ -77,8 +76,7 @@ ImagePrompt = "A text prompt for generating an image"
 type = "PipeImgGen"
 description = "Generate three logo variations from a prompt"
 inputs = { prompt = "ImgGenPrompt" }
-output = "Image"
-nb_output = 3
+output = "Image[3]"
 model = "base_img_gen"
 aspect_ratio = "1:1"
 ```

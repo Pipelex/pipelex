@@ -1,4 +1,6 @@
 <!-- BEGIN_PIPELEX_RULES -->
+# Pipelex Rules
+
 ## Guide to write or edit pipelines using the Pipelex language in .plx files
 
 - Always first write your "plan" in natural language, then transcribe it in pipelex.
@@ -369,22 +371,22 @@ prompt = "Analyze this data"
 
 #### Multiple Outputs
 
-Generate multiple outputs (fixed number):
+Generate multiple outputs (fixed number) - use bracket notation:
 ```plx
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate ideas"
-output = "Idea"
-nb_output = 3  # Generate exactly 3 ideas
+output = "Idea[3]"  # Generate exactly 3 ideas
+prompt = "Generate 3 ideas"
 ```
 
-Generate multiple outputs (variable number):
+Generate multiple outputs (variable number) - use bracket notation:
 ```plx
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate ideas"
-output = "Idea"
-multiple_output = true  # Let the LLM decide how many to generate
+output = "Idea[]"  # Let the LLM decide how many to generate
+prompt = "Generate ideas"
 ```
 
 #### Vision
@@ -635,8 +637,7 @@ Multiple Image Generation:
 type = "PipeImgGen"
 description = "Generate multiple image variations"
 inputs = { prompt = "ImgGenPrompt" }
-output = "Image"
-nb_output = 3
+output = "Image[3]"
 seed = "auto"
 ```
 
@@ -663,7 +664,6 @@ safety_tolerance = 3
 - `quality`: Image quality ("standard", "hd")
 
 **Output Configuration:**
-- `nb_output`: Number of images to generate
 - `aspect_ratio`: Image dimensions ("1:1", "16:9", "9:16", etc.)
 - `output_format`: File format ("png", "jpeg", "webp")
 - `background`: Background type ("default", "transparent")
