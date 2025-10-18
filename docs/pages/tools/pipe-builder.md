@@ -39,7 +39,7 @@ This command:
 
 The build command supports the following options:
 
-- `--output`, `-o`: Path to save the generated file (default: `./results/generated_pipeline.plx`)
+- `--output`, `-o`: Path to save the generated file
 - `--no-output`: Skip saving the file (useful for testing)
 
 ## How It Works
