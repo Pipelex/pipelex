@@ -4,7 +4,7 @@ from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.types import StrEnum
@@ -55,7 +55,7 @@ class PipeExtractSpec(PipeSpec):
     @field_validator("output", mode="before")
     @classmethod
     def validate_output(cls, output: str) -> str:
-        return "Page"
+        return "Page[]"
 
     @field_validator("extract_skill", mode="before")
     @classmethod

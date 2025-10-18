@@ -135,7 +135,7 @@ class PipeSequence(PipeController):
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
-                log.debug(f"the_needed_inputs.required_names: {the_needed_inputs.required_names}")
+                log.verbose(f"the_needed_inputs.required_names: {the_needed_inputs.required_names}")
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
                     domain=self.domain,

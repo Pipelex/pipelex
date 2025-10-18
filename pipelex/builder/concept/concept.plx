@@ -26,10 +26,9 @@ prompt = """
 Create a ConceptStructureSpec from the ConceptSpecDraft.
 Please focus only on the structure.
 
-The field "definition" IS NOT a structure. It is a general definition of the concept.
+The field "description" IS NOT a structure. It is a general description of the concept.
 If the field "structure" is empty, return an empty list.
 
-ConceptSpecDraft:
 @concept_spec_draft
 """
 

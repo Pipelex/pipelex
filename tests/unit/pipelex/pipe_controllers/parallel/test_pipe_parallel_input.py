@@ -19,7 +19,7 @@ class TestPipeParallelValidateInputs:
         test_id: str,
         blueprint: PipeParallelBlueprint,
     ):
-        log.debug(f"Testing valid case: {test_id}")
+        log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
         pipe_parallel = PipeParallelFactory.make_from_blueprint(
@@ -42,7 +42,7 @@ class TestPipeParallelValidateInputs:
         blueprint_dict: dict[str, Any],
         expected_error_message_fragment: str,
     ):
-        log.debug(f"Testing error case: {test_id}")
+        log.verbose(f"Testing error case: {test_id}")
 
         with pytest.raises((StaticValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
             # Construct blueprint from dict at test time to trigger validation

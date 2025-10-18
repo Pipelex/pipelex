@@ -82,7 +82,7 @@ log.info("Quick update", inline="Status")
 
 # Logging structured data
 data = {"key": "value", "nested": {"data": True}}
-log.debug(data, title="Configuration")
+log.verbose(data, title="Configuration")
 
 # Warning with problem ID
 log.warning("API rate limit approaching", problem_id="rate_limit_warning")

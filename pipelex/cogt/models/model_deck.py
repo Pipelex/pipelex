@@ -193,7 +193,7 @@ class ModelDeck(ConfigModel):
         if inference_model := self.inference_models.get(model_handle):
             return inference_model
         if redirection := self.aliases.get(model_handle):
-            log.debug(f"Redirection for '{model_handle}': {redirection}")
+            log.verbose(f"Redirection for '{model_handle}': {redirection}")
             if isinstance(redirection, str):
                 alias_list = [redirection]
             else:

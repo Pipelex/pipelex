@@ -81,7 +81,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         self.anthropic_async_client = sdk_instance
         if structure_method:
             instructor_mode = structure_method.as_instructor_mode()
-            log.debug(f"Anthropic structure mode: {structure_method} --> {instructor_mode}")
+            log.verbose(f"Anthropic structure mode: {structure_method} --> {instructor_mode}")
             self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance, mode=instructor_mode)
         else:
             self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance)

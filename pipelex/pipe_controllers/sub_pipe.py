@@ -45,7 +45,9 @@ class SubPipe(BaseModel):
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 )
-                raise PipeInputError(msg) from exc
+                raise PipeInputError(
+                    message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_list_stuff_name, concept_code=None
+                ) from exc
 
             item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
             pipe_batch_blueprint = PipeBatchBlueprint(
@@ -115,7 +117,7 @@ class SubPipe(BaseModel):
                 sub_pipe_path_str = ".".join(sub_pipe_path)
                 error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
                 msg = f"Some required stuff(s) not found: {error_details}"
-                raise PipeInputError(msg) from exc
+                raise PipeInputError(message=msg, pipe_code=self.pipe_code, variable_name=exc.variable_name, concept_code=None) from exc
             log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             # This is the only line that changes between run and dry_run
 

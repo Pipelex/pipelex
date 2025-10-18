@@ -45,7 +45,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
         if structure_method:
             instructor_mode = structure_method.as_instructor_mode()
-            log.debug(f"OpenAI structure mode: {structure_method} --> {instructor_mode}")
+            log.verbose(f"OpenAI structure mode: {structure_method} --> {instructor_mode}")
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance, mode=instructor_mode)
         else:
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance)

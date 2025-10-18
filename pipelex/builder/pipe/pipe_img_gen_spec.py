@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import field_validator
 from typing_extensions import override
 
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.types import StrEnum
 

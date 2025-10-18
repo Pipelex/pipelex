@@ -55,9 +55,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
-        func_name = "make_object_direct"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-
         class ObjectFactory(ModelFactory[object_class]):  # type: ignore[valid-type]
             __model__ = object_class
             __check_model__ = True

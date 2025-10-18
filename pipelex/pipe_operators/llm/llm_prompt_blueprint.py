@@ -73,7 +73,7 @@ class LLMPromptBlueprint(BaseModel):
         prompt_user_images: dict[str, PromptImage] = {}
         if self.user_images:
             for user_image_name in self.user_images:
-                log.debug(f"Getting user image '{user_image_name}' from context")
+                log.verbose(f"Getting user image '{user_image_name}' from context")
                 # Try to get as a single ImageContent first
                 try:
                     prompt_image_content = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)

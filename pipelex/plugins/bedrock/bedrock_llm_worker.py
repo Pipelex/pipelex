@@ -51,7 +51,7 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
     ) -> str:
         message = BedrockFactory.make_simple_message(llm_job=llm_job)
 
-        log.debug(self.inference_model.model_id)
+        log.verbose(self.inference_model.model_id)
 
         bedrock_response_text, nb_tokens_by_category = await self.bedrock_client_for_text.chat(
             messages=message.to_dict_list(),

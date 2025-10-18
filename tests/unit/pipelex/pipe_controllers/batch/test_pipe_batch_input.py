@@ -16,7 +16,7 @@ class TestPipeBatchValidateInputs:
         test_id: str,
         blueprint: PipeBatchBlueprint,
     ):
-        log.debug(f"Testing valid case: {test_id}")
+        log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
         pipe_batch = PipeBatchFactory.make_from_blueprint(

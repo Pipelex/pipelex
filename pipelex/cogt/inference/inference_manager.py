@@ -40,18 +40,18 @@ class InferenceManager(InferenceManagerProtocol):
         log.verbose("InferenceManager teardown done")
 
     def print_workers(self):
-        log.debug("LLM Workers:")
+        log.verbose("LLM Workers:")
         for handle, llm_worker in self.llm_workers.items():
-            log.debug(f"  {handle}:")
-            log.debug(llm_worker.desc)
-        log.debug("Image Workers:")
+            log.verbose(f"  {handle}:")
+            log.verbose(llm_worker.desc)
+        log.verbose("Image Workers:")
         for handle, img_gen_worker_async in self.img_gen_workers.items():
-            log.debug(f"  {handle}:")
-            log.debug(img_gen_worker_async.desc)
-        log.debug("OCR Workers:")
+            log.verbose(f"  {handle}:")
+            log.verbose(img_gen_worker_async.desc)
+        log.verbose("OCR Workers:")
         for handle, extract_worker_async in self.extract_workers.items():
-            log.debug(f"  {handle}:")
-            log.debug(extract_worker_async.desc)
+            log.verbose(f"  {handle}:")
+            log.verbose(extract_worker_async.desc)
 
     ####################################################################################################
     # Setup LLM Workers

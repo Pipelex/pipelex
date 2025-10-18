@@ -21,7 +21,7 @@ from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.interpreter import PipelexInterpreter

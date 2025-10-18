@@ -84,7 +84,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
                     continue
                 new_fal_logs = event.logs[log_index:]
                 for fal_log in new_fal_logs:
-                    log.debug(fal_log["message"], title="FAL Log")
+                    log.verbose(fal_log["message"], title="FAL Log")
                 log_index = len(event.logs)
 
         fal_result = await handler.get()

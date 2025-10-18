@@ -4,6 +4,7 @@ from pipelex.builder.builder_errors import (
     DomainFailure,
     PipeDefinitionErrorData,
     PipeFailure,
+    PipeInputErrorData,
     PipelexBundleError,
     PipelexBundleUnexpectedError,
     PipeSpecError,
@@ -17,6 +18,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.exceptions import (
     ConceptLoadingError,
     DomainLoadingError,
+    PipeInputError,
     PipeLoadingError,
     StaticValidationError,
 )
@@ -145,5 +147,12 @@ async def dry_run_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> 
             source=pipe_def_error.source,
         )
         raise PipelexBundleError(message=pipe_loading_error.message, pipe_definition_errors=[pipe_definition_error_data]) from pipe_loading_error
-
+    except PipeInputError as pipe_input_error:
+        pipe_input_error_data = PipeInputErrorData(
+            message=str(pipe_input_error),
+            pipe_code=pipe_input_error.pipe_code,
+            variable_name=pipe_input_error.variable_name,
+            concept_code=pipe_input_error.concept_code,
+        )
+        raise PipelexBundleError(message=pipe_input_error.message, pipe_input_errors=[pipe_input_error_data]) from pipe_input_error
     return dry_run_result

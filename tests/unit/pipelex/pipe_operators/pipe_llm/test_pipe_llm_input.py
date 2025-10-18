@@ -17,7 +17,7 @@ class TestPipeLLMValidateInputs:
         test_id: str,
         blueprint: PipeLLMBlueprint,
     ):
-        log.debug(f"Testing valid case: {test_id}")
+        log.verbose(f"Testing valid case: {test_id}")
 
         pipe_llm = PipeLLMFactory.make_from_blueprint(
             domain="test_domain",
@@ -37,7 +37,7 @@ class TestPipeLLMValidateInputs:
         blueprint: PipeLLMBlueprint,
         expected_error_message_fragment: str,
     ):
-        log.debug(f"Testing error case: {test_id}")
+        log.verbose(f"Testing error case: {test_id}")
 
         with pytest.raises(StaticValidationError) as exc_info:
             PipeLLMFactory.make_from_blueprint(

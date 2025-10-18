@@ -22,7 +22,7 @@ class ActivityManager(ActivityManagerProtocol):
     @override
     def teardown(self) -> None:
         self._reset()
-        log.debug("ActivityManager teardown done")
+        log.verbose("ActivityManager teardown done")
 
     def _reset(self):
         self.activity_callbacks = {}

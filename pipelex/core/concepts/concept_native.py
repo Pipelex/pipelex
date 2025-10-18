@@ -19,6 +19,10 @@ class NativeConceptCode(StrEnum):
     ANYTHING = "Anything"
 
     @property
+    def as_output_multiple_indeterminate(self) -> str:
+        return f"{self.value}[]"
+
+    @property
     def concept_string(self) -> str:
         return f"{SpecialDomain.NATIVE}.{self.value}"
 
