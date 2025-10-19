@@ -36,7 +36,14 @@ Other ideas:
 pipelex build pipe "Take a photo as input, and render the opposite of the photo, don't structure anything, use only text content, be super concise"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
-pipelex build pipe "Given an theme, write a Haiku"
+pipelex build pipe "Given a theme, write a Haiku"
+
+Testing:
+pipelex build pipe --builder-pipe pipe_builder_2 "Given a theme, write a Haiku"
+pipelex build partial-pipe --builder-pipe pipe_builder_2 "Given a theme, write a Haiku"
+pipelex build partial-pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
+    and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
+        at the end we want the rendered image"
 """
 
 
@@ -302,10 +309,18 @@ def build_partial_cmd(
         str,
         typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
     ] = "pipe_builder",
-    output_path: Annotated[
+    output_dir_path: Annotated[
         str,
         typer.Option("--output", "-o", help="Path to save the generated PLX file"),
-    ] = "./results/generated_pipeline.plx",
+    ] = "./results",
+    output_base_name: Annotated[
+        str,
+        typer.Option("--output-file-name", "-b", help="Name of the generated JSON file"),
+    ] = "partial_pipe",
+    extension: Annotated[
+        str,
+        typer.Option("--extension", "-e", help="Extension of the generated file"),
+    ] = "json",
     no_output: Annotated[
         bool,
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
@@ -317,12 +332,15 @@ def build_partial_cmd(
     typer.echo("")
 
     async def run_pipeline():
+        output_path: str | None = None
         if no_output:
             typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
-        elif not output_path:
-            typer.secho("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED)
-            raise typer.Exit(1)
         else:
+            output_path = get_incremental_file_path(
+                base_path=output_dir_path,
+                base_name=output_base_name,
+                extension=extension,
+            )
             ensure_directory_for_file_path(file_path=output_path)
 
         pipe_output = await execute_pipeline(
@@ -330,12 +348,12 @@ def build_partial_cmd(
             input_memory={"brief": brief},
         )
         # Save to file unless explicitly disabled with --no-output
-        if no_output:
+        if output_path:
+            json_output = pipe_output.main_stuff.content.smart_dump()
+            save_as_json_to_path(object_to_save=json_output, path=output_path)
+            typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
+        else:
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
-            return
-        json_output = pipe_output.main_stuff.content.smart_dump()
-        save_as_json_to_path(object_to_save=json_output, path=output_path)
-        typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
     start_time = time.time()
     asyncio.run(run_pipeline())
