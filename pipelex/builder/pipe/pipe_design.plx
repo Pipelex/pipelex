@@ -58,6 +58,7 @@ Here are the concepts you can use for inputs/outputs:
 @concept_specs
 
 - If you are to apply a pipe step to a previous output which is multiple, use batch_over/batch_as attributes in that step.
+- The output concept of a pipe sequence must always be the same as the output concept of the last pipe in the sequence.
 """
 
 [pipe.detail_pipe_parallel]

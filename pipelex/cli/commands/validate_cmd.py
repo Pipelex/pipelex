@@ -122,44 +122,15 @@ def validate_cmd(
                     typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}' (including '{pipe_code}')", fg=typer.colors.GREEN)
             except FileNotFoundError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+                console.print(exc)
                 raise typer.Exit(1) from exc
             except PipelexBundleError as bundle_error:
                 typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
                 present_validation_error(details_provider=bundle_error)
-                # if concept_definition_errors := bundle_error.get_concept_definition_errors():
-                #     for concept_definition_error in concept_definition_errors:
-                #         if syntax_error_data := concept_definition_error.structure_class_syntax_error_data:
-                #             message = concept_definition_error.message
-                #             code = concept_definition_error.structure_class_python_code or ""
-                #             highlight_lines: set[int] | None = None
-                #             if syntax_error_data.lineno:
-                #                 highlight_lines = {syntax_error_data.lineno}
-                #             syntax = Syntax(
-                #                 code=code,
-                #                 lexer="python",
-                #                 line_numbers=True,
-                #                 word_wrap=False,
-                #                 # theme="monokai",  # pick any theme rich knows; omit to use default
-                #                 theme="ansi_dark",  # pick any theme rich knows; omit to use default
-                #                 line_range=None,
-                #                 highlight_lines=highlight_lines,
-                #             )
-                #             pretty_range = ""
-                #             if syntax_error_data.lineno and syntax_error_data.end_lineno:
-                #                 pretty_range = f"lines {syntax_error_data.lineno} to {syntax_error_data.end_lineno}"
-                #             elif syntax_error_data.lineno:
-                #                 pretty_range = f"line {syntax_error_data.lineno}"
-                #             if syntax_error_data.offset and syntax_error_data.end_offset:
-                #                 pretty_range += f", column {syntax_error_data.offset} to {syntax_error_data.end_offset}"
-                #             elif syntax_error_data.offset:
-                #                 pretty_range += f", column {syntax_error_data.offset}"
-                #             console.print(message)
-                #             if pretty_range:
-                #                 pretty_print(f"Generated code error at {pretty_range}")
-                #             console.print(syntax)
                 raise typer.Exit(1) from bundle_error
             except PipeInputError as exc:
                 typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+                console.print(exc)
                 raise typer.Exit(1) from exc
         elif pipe_code:
             # Validate a single pipe by code
@@ -178,6 +149,7 @@ def validate_cmd(
 
 
 def present_validation_error(details_provider: ValidationErrorDetailsProtocol):
+    console.print(details_provider)
     concept_definition_errors = details_provider.get_concept_definition_errors()
     if not concept_definition_errors:
         return

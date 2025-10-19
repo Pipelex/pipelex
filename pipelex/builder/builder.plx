@@ -237,7 +237,7 @@ Be smart about splitting the workflow into steps (sequence or parallel):
 - But don't ask the LLM for many things which are unrelated, it would lose reliability.
 - Apply the DRY principle: don't repeat yourself. if you have a task to apply several times, make it a dedicated pipe.
 - If you're in a sequence and you are to apply that pipe to a previous output which is multiple, use batch_over/batch_as attributes in that step.
-
+- The output concept of a pipe sequence must always be the same as the output concept of the last pipe in the sequence.
 
 You must never include nore than one batch step in the same pipe sequence.
 Instead, you must create a pipe sequence specifically for the process to apply to each batched element
