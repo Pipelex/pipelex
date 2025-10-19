@@ -5,8 +5,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import Field
 
-from pipelex import log
-from pipelex.builder.validation_errors import SyntaxErrorData
+from pipelex.builder.validation_error_data import SyntaxErrorData
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.exceptions import ConceptStructureGeneratorError, PipelexException

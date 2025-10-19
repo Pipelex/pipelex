@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.builder.validation_error_data import PipeDefinitionErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -14,6 +15,7 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_library import PipeLibrary
@@ -27,7 +29,6 @@ from pipelex.exceptions import (
     DomainLoadingError,
     LibraryError,
     LibraryLoadingError,
-    PipeDefinitionError,
     PipeLibraryError,
     PipeLoadingError,
 )
@@ -136,29 +137,45 @@ class LibraryManager(LibraryManagerAbstract):
         # Create and load domain
         try:
             domain = self._load_domain_from_blueprint(blueprint)
-        except DomainDefinitionError as exc:
-            msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
-            raise DomainLoadingError(message=msg, domain_code=exc.domain_code, description=exc.description, source=exc.source) from exc
+        except DomainDefinitionError as pipe_def_error:
+            msg = f"Could not load domain from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {pipe_def_error}"
+            raise DomainLoadingError(
+                message=msg, domain_code=pipe_def_error.domain_code, description=pipe_def_error.description, source=pipe_def_error.source
+            ) from pipe_def_error
         self.domain_library.add_domain(domain=domain)
 
         # Create and load concepts
         try:
             concepts = self._load_concepts_from_blueprint(blueprint)
-        except ConceptDefinitionError as exc:
-            msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
+        except ConceptDefinitionError as pipe_def_error:
+            msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {pipe_def_error}"
             raise ConceptLoadingError(
-                message=msg, concept_definition_error=exc, concept_code=exc.concept_code, description=exc.description, source=exc.source
-            ) from exc
+                message=msg,
+                concept_definition_error=pipe_def_error,
+                concept_code=pipe_def_error.concept_code,
+                description=pipe_def_error.description,
+                source=pipe_def_error.source,
+            ) from pipe_def_error
         self.concept_library.add_concepts(concepts=concepts)
 
         # Create and load pipes
         try:
             pipes = self._load_pipes_from_blueprint(blueprint)
-        except PipeDefinitionError as exc:
-            msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {exc}"
+        except PipeDefinitionError as pipe_def_error:
+            msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {pipe_def_error}"
             raise PipeLoadingError(
-                message=msg, pipe_definition_error=exc, pipe_code=exc.pipe_code or "", description=exc.description or "", source=exc.source
-            ) from exc
+                message=msg,
+                pipe_definition_error=PipeDefinitionErrorData(
+                    message=pipe_def_error.message,
+                    domain_code=pipe_def_error.domain_code,
+                    pipe_code=pipe_def_error.pipe_code,
+                    description=pipe_def_error.description,
+                    source=pipe_def_error.source,
+                ),
+                pipe_code=pipe_def_error.pipe_code or "",
+                description=pipe_def_error.description or "",
+                source=pipe_def_error.source,
+            ) from pipe_def_error
         self.pipe_library.add_pipes(pipes=pipes)
 
         return pipes
@@ -352,7 +369,10 @@ class LibraryManager(LibraryManagerAbstract):
                 concepts = self._load_concepts_from_blueprint(blueprint)
             except ConceptDefinitionError as concept_def_error:
                 msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {concept_def_error}"
-                raise LibraryLoadingError(msg) from concept_def_error
+                raise LibraryLoadingError(
+                    msg,
+                    concept_definition_errors=[concept_def_error.as_structured_content()],
+                ) from concept_def_error
             except ValidationError as validation_error:
                 validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
                 msg = f"Could not load concepts from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {validation_error_msg}"
@@ -367,7 +387,18 @@ class LibraryManager(LibraryManagerAbstract):
                 pipes = self._load_pipes_from_blueprint(blueprint)
             except PipeDefinitionError as pipe_def_error:
                 msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {pipe_def_error}"
-                raise LibraryLoadingError(msg) from pipe_def_error
+                raise LibraryLoadingError(
+                    msg,
+                    pipe_definition_errors=[
+                        PipeDefinitionErrorData(
+                            message=pipe_def_error.message,
+                            domain_code=pipe_def_error.domain_code,
+                            pipe_code=pipe_def_error.pipe_code,
+                            description=pipe_def_error.description,
+                            source=pipe_def_error.source,
+                        )
+                    ],
+                ) from pipe_def_error
             except ValidationError as validation_error:
                 validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
                 msg = f"Could not load pipes from PLX blueprint at '{blueprint.source}', domain code: '{blueprint.domain}': {validation_error_msg}"

@@ -14,6 +14,7 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipe_errors import PipeDefinitionError, UnexpectedPipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -22,13 +23,11 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
-    PipeDefinitionError,
     PipeInputError,
     PipeRunParamsError,
     StaticValidationError,
     StaticValidationErrorType,
     StuffContentTypeError,
-    UnexpectedPipeDefinitionError,
     WorkingMemoryStuffNotFoundError,
 )
 from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept

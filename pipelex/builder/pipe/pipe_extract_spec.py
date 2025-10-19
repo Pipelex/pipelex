@@ -5,7 +5,7 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.exceptions import PipeDefinitionError
+from pipelex.builder.pipe.pipe_spec_exceptions import PipeExtractSpecError
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.types import StrEnum
 
@@ -67,10 +67,10 @@ class PipeExtractSpec(PipeSpec):
     def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
             msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
-            raise PipeDefinitionError(msg)
+            raise PipeExtractSpecError(msg)
         if len(inputs_value) != 1:
             msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
-            raise PipeDefinitionError(msg)
+            raise PipeExtractSpecError(msg)
         return inputs_value
 
     @override

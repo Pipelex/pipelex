@@ -6,10 +6,10 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
-from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM

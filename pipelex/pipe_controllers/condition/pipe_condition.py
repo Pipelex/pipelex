@@ -10,13 +10,13 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.exceptions import (
     DryRunError,
     PipeConditionError,
-    PipeDefinitionError,
     PipeExecutionError,
     PipeInputError,
     StaticValidationError,

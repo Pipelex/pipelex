@@ -1,7 +1,7 @@
 from pydantic import ConfigDict, model_validator
 
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.types import Self
 

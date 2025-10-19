@@ -1,10 +1,18 @@
+from __future__ import annotations
+
 from click import ClickException
 from typing_extensions import override
 
-from pipelex.builder.validation_errors import SyntaxErrorData
+from pipelex.builder.validation_error_data import (
+    ConceptDefinitionErrorData,
+    LibraryLoadingErrorData,
+    PipeDefinitionErrorData,
+    StaticValidationErrorType,
+    SyntaxErrorData,
+)
+from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
 from pipelex.system.exceptions import RootException
 from pipelex.tools.misc.context_provider_abstract import ContextProviderException
-from pipelex.types import StrEnum
 
 
 class PipelexException(RootException):
@@ -13,13 +21,6 @@ class PipelexException(RootException):
 
 class PipelexUnexpectedError(PipelexException):
     pass
-
-
-class StaticValidationErrorType(StrEnum):
-    MISSING_INPUT_VARIABLE = "missing_input_variable"
-    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
-    INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
-    TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
 
 
 class StaticValidationError(Exception):
@@ -117,8 +118,29 @@ class LibraryError(PipelexException):
     pass
 
 
-class LibraryLoadingError(LibraryError):
-    pass
+class LibraryLoadingError(LibraryError, ValidationErrorDetailsProtocol):
+    """Error raised when loading library components fails."""
+
+    def __init__(
+        self,
+        message: str,
+        concept_definition_errors: list[ConceptDefinitionErrorData] | None = None,
+        pipe_definition_errors: list[PipeDefinitionErrorData] | None = None,
+    ):
+        self.concept_definition_errors = concept_definition_errors
+        self.pipe_definition_errors = pipe_definition_errors
+        super().__init__(message)
+
+    @override
+    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
+        return self.concept_definition_errors or []
+
+    def as_structured_content(self) -> LibraryLoadingErrorData:
+        return LibraryLoadingErrorData(
+            message=str(self),
+            concept_definition_errors=self.concept_definition_errors,
+            pipe_definition_errors=self.pipe_definition_errors,
+        )
 
 
 class DomainLibraryError(LibraryError):
@@ -172,44 +194,23 @@ class ConceptDefinitionError(PipelexException):
         self.source = source
         super().__init__(message)
 
+    def as_structured_content(self) -> ConceptDefinitionErrorData:
+        return ConceptDefinitionErrorData(
+            message=str(self),
+            domain_code=self.domain_code,
+            concept_code=self.concept_code,
+            description=self.description,
+            structure_class_python_code=self.structure_class_python_code,
+            structure_class_syntax_error_data=self.structure_class_syntax_error_data,
+            source=self.source,
+        )
+
 
 class ConceptStructureGeneratorError(PipelexException):
     def __init__(self, message: str, structure_class_python_code: str | None = None, syntax_error_data: SyntaxErrorData | None = None):
         self.structure_class_python_code = structure_class_python_code
         self.syntax_error_data = syntax_error_data
         super().__init__(message)
-
-
-# TODO: add details from all cases raising this error
-class PipeDefinitionError(PipelexException):
-    def __init__(
-        self,
-        message: str,
-        domain_code: str | None = None,
-        pipe_code: str | None = None,
-        description: str | None = None,
-        source: str | None = None,
-    ):
-        self.domain_code = domain_code
-        self.pipe_code = pipe_code
-        self.description = description
-        self.source = source
-        message = message + " • " + self.pipe_details()
-        super().__init__(message)
-
-    def pipe_details(self) -> str:
-        if not self.domain_code and not self.pipe_code and not self.description and not self.source:
-            return "No pipe details provided"
-        details = "Pipe details:"
-        if self.domain_code:
-            details += f" • domain='{self.domain_code}'"
-        if self.pipe_code:
-            details += f" • pipe='{self.pipe_code}'"
-        if self.description:
-            details += f" • description='{self.description}'"
-        if self.source:
-            details += f" • source='{self.source}'"
-        return details
 
 
 class PipeInputError(PipelexException):
@@ -240,16 +241,12 @@ class ConceptLoadingError(LibraryLoadingError):
 
 
 class PipeLoadingError(LibraryLoadingError):
-    def __init__(self, message: str, pipe_definition_error: PipeDefinitionError, pipe_code: str, description: str, source: str | None = None):
+    def __init__(self, message: str, pipe_definition_error: PipeDefinitionErrorData, pipe_code: str, description: str, source: str | None = None):
         self.pipe_definition_error = pipe_definition_error
         self.pipe_code = pipe_code
         self.description = description
         self.source = source
         super().__init__(message)
-
-
-class UnexpectedPipeDefinitionError(PipeDefinitionError):
-    pass
 
 
 class StuffError(PipelexException):

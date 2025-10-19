@@ -8,11 +8,12 @@ from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.exceptions import DryRunError, PipeDefinitionError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
+from pipelex.exceptions import DryRunError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe

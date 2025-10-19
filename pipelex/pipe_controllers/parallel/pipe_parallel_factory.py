@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_required_concept
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint

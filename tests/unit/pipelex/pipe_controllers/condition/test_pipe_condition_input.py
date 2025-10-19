@@ -3,7 +3,8 @@ from typing import Any
 import pytest
 
 from pipelex import log
-from pipelex.exceptions import PipeDefinitionError, StaticValidationError
+from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.exceptions import StaticValidationError
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from tests.unit.pipelex.pipe_controllers.condition.data import PipeConditionInputTestCases

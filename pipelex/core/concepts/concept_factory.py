@@ -1,7 +1,6 @@
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
-from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
