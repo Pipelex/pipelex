@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import click
 import typer
@@ -16,7 +16,10 @@ from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, get_incremental_file_path, save_text_to_path
-from pipelex.tools.misc.json_utils import save_as_json_to_path
+from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
+
+if TYPE_CHECKING:
+    from pipelex.client.protocol import ImplicitMemory
 
 build_app = typer.Typer(help="Build working pipelines from natural language requirements", no_args_is_help=True)
 
@@ -44,6 +47,13 @@ pipelex build partial-pipe --builder-pipe pipe_builder_2 "Given a theme, write a
 pipelex build partial-pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
     and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
         at the end we want the rendered image"
+
+pipelex build partial-pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
+    and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
+        at the end we want the rendered image" -o ./workshop -b plan -e md
+
+pipelex build partial-pipe --builder-pipe pipe_builder_2 "./workshop/partial_A.json" -o ./workshop -b plan -e md
+pipelex build partial-pipe --builder-pipe pipe_builder_2 "./workshop/partial_B.json" -o ./workshop -b structures -e json
 """
 
 
@@ -301,9 +311,9 @@ def build_one_shot_cmd(
     "partial-pipe", help="Developer utility for contributors: deliver a partial pipeline specification (not an actual bundle) and save it as JSON"
 )
 def build_partial_cmd(
-    brief: Annotated[
+    inputs: Annotated[
         str,
-        typer.Argument(help="Brief description of what the pipeline should do"),
+        typer.Argument(help="Inline brief or path to JSON file with input_memory"),
     ],
     builder_pipe: Annotated[
         str,
@@ -343,14 +353,33 @@ def build_partial_cmd(
             )
             ensure_directory_for_file_path(file_path=output_path)
 
+        input_memory: ImplicitMemory | None = None
+        if inputs.endswith(".json"):
+            input_memory = load_json_dict_from_path(inputs)
+        else:
+            input_memory = {"brief": inputs}
         pipe_output = await execute_pipeline(
             pipe_code=builder_pipe,
-            input_memory={"brief": brief},
+            input_memory=input_memory,
         )
         # Save to file unless explicitly disabled with --no-output
         if output_path:
-            json_output = pipe_output.main_stuff.content.smart_dump()
-            save_as_json_to_path(object_to_save=json_output, path=output_path)
+            match extension:
+                case "md":
+                    markdown_output = pipe_output.main_stuff.content.rendered_markdown()
+                    save_text_to_path(text=markdown_output, path=output_path)
+                case "txt":
+                    text_output = pipe_output.main_stuff.content.rendered_plain()
+                    save_text_to_path(text=text_output, path=output_path)
+                case "html":
+                    html_output = pipe_output.main_stuff.content.rendered_html()
+                    save_text_to_path(text=html_output, path=output_path)
+                case "json":
+                    json_output = pipe_output.main_stuff.content.smart_dump()
+                    save_as_json_to_path(object_to_save=json_output, path=output_path)
+                case _:
+                    json_output = pipe_output.main_stuff.content.smart_dump()
+                    save_as_json_to_path(object_to_save=json_output, path=output_path)
             typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
         else:
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)

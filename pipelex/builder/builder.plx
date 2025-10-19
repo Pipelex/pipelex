@@ -135,7 +135,7 @@ For instance:
 - Concepts are always expressed as singular nouns, even if we're to use them as a list:
   for instance, define the concept as "Article" not "Articles", "Employee" not "Employees".
   If we need multiple items, we'll indicate it elsewhere so you don't bother with it here.
-- Provide a short description concise description for each concept
+- Provide a concise description for each concept
 
 If the concept can be expressed as a text, image, pdf, number, or page:
 - Name the concept, define it and just write "refines: Text", "refines: PDF", or "refines: Image" etc.
