@@ -66,7 +66,7 @@ docs = [
 
 dev = [
     "boto3-stubs>=1.35.24",
-    "cocode @ git+https://github.com/Pipelex/cocode.git@release/v0.3.0",
+    "cocode==v0.3.0",
     "mypy>=1.11.2",
     "pyright>=1.1.405",
     "pylint>=3.3.8",
@@ -83,9 +83,6 @@ dev = [
     "types-networkx>=3.3.0.20241020",
     "types-PyYAML>=6.0.12.20250326",
 ]
-
-[tool.uv.sources]
-cocode = { path = "../cocode", editable = true }
 
 [project.scripts]
 pipelex = "pipelex.cli._cli:app"

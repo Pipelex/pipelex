@@ -20,6 +20,7 @@ build_app = typer.Typer(help="Build working pipelines from natural language requ
 Today's example:
 pipelex build pipe "Given an expense report, apply company rules"
 pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match"
+pipelex build pipe "Take a CV in a PDF file and a Job offer text, analyze if they match and generate 5 questions for the interview"
 
 pipelex build partial "Given an expense report, apply company rules" -o results/generated.json
 pipelex build flow "Given an expense report, apply company rules" -o results/flow.json

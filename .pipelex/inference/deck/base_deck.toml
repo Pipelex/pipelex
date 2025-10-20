@@ -67,15 +67,18 @@ llm_cheap = { model = "base-gemini", temperature = 0.1 }
 # Generation skills
 llm_for_factual_writing = { model = "base-gpt", temperature = 0.1 }
 llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
+llm_to_write_questions = { model = "gpt-4o-mini", temperature = 0.3 }
 
 # Reasoning skills
 llm_to_reason_short = { model = "base-claude", temperature = 0.5, max_tokens = 500 }
 llm_to_reason = { model = "base-claude", temperature = 1 }
 llm_to_reason_on_diagram = { model = "base-claude", temperature = 0.5 }
+llm_to_analyze_data = { model = "base-claude", temperature = 0.5 }
 
 # Search and answer skills
-llm_to_answer = { model = "base-claude", temperature = 0.1 }
-llm_to_retrieve = { model = "base-gemini", temperature = 0.1 }
+llm_to_answer_easy_questions = { model = "gpt-4o-mini", temperature = 0.3 }
+llm_to_answer_hard_questions = { model = "base-claude", temperature = 0.3 }
+llm_to_retrieve = { model = "base-claude", temperature = 0.1 }
 llm_for_enrichment = { model = "gpt-4o", temperature = 0.1 }
 llm_to_enrich = { model = "base-claude", temperature = 0.1 }
 llm_for_question_and_excerpt_reformulation = { model = "gpt-4o", temperature = 0.9 }
@@ -84,10 +87,15 @@ llm_for_question_and_excerpt_reformulation = { model = "gpt-4o", temperature = 0
 llm_to_engineer = { model = "smart_llm", temperature = 0.2 }
 llm_to_write = { model = "base-gemini", temperature = 0.2 }
 llm_to_pipelex = { model = "base-claude", temperature = 0.2 }
+llm_to_code = { model = "base-claude", temperature = 0.1 }
+llm_to_analyze_large_codebase = { model = "base-claude", temperature = 0.1 }
 
 # Image skills
+llm_for_basic_vision = { model = "gpt-4o-mini", temperature = 0.1 }
 llm_to_write_img_gen_prompt = { model = "base-claude", temperature = 0.2 }
 llm_to_describe_img = { model = "base-claude", temperature = 0.5 }
+llm_for_visual_analysis = { model = "base-claude", temperature = 0.5 }
+llm_for_visual_design = { model = "base-claude", temperature = 0.5 }
 llm_to_design_fashion = { model = "base-claude", temperature = 0.7 }
 llm_for_img_to_text = { model = "base-claude", temperature = 0.1 }
 
