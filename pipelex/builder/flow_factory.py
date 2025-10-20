@@ -88,7 +88,7 @@ class FlowFactory:
 
         return PipeSignature(
             code=pipe_code,
-            pipe_category="PipeSignature",
+            pipe_category=pipe_blueprint.pipe_category,
             type=pipe_blueprint.type,
             description=pipe_blueprint.description or "",
             inputs=inputs,

@@ -1,6 +1,7 @@
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import Field, field_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from pipelex import log
 from pipelex.builder.concept.concept_spec import ConceptSpec
@@ -19,7 +20,7 @@ class PipeSignature(StructuredContent):
 
     code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.")
     type: AllowedPipeTypes = Field(description="Pipe type.")
-    pipe_category: Literal["PipeSignature"] = "PipeSignature"
+    pipe_category: SkipJsonSchema[AllowedPipeCategories] = Field(description="Pipe category set according to its type.")
     description: str = Field(description="What the pipe does")
     inputs: dict[str, str] = Field(
         description="Pipe inputs: keys are the input variable_names in snake_case, values are the ConceptCodes in PascalCase."
