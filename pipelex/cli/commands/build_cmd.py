@@ -7,7 +7,7 @@ import typer
 
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
-from pipelex.builder.builder_errors import PipelexBundleError
+from pipelex.builder.builder_errors import PipeBuilderError, PipelexBundleError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.exceptions import PipeInputError
@@ -43,14 +43,18 @@ pipelex build pipe "Given a theme, write a Haiku"
 
 Testing:
 pipelex build pipe --builder-pipe pipe_builder_2 "Given a theme, write a Haiku"
+pipelex build pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
+    and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
+        at the end we want the rendered image"
 pipelex build partial-pipe --builder-pipe pipe_builder_2 "Given a theme, write a Haiku"
+
 pipelex build partial-pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
     and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
         at the end we want the rendered image"
 
 pipelex build partial-pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
     and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
-        at the end we want the rendered image" -o ./workshop -b plan -e md
+        at the end we want the rendered image" -o ./workshop -b signatures -e json
 
 pipelex build partial-pipe --builder-pipe pipe_builder_2 "./workshop/partial_A.json" -o ./workshop -b plan -e md
 pipelex build partial-pipe --builder-pipe pipe_builder_2 "./workshop/partial_B.json" -o ./workshop -b structures -e json
@@ -96,7 +100,23 @@ def build_pipe_cmd(
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
             return
 
-        pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code=builder_pipe, input_memory={"brief": prompt})
+        try:
+            pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code=builder_pipe, input_memory={"brief": prompt})
+        except PipeBuilderError as exc:
+            msg = f"Builder loop: Failed to execute pipeline: {exc}."
+            if exc.working_memory:
+                failure_memory_path = get_incremental_file_path(
+                    base_path="results",
+                    base_name="failure_memory",
+                    extension="json",
+                )
+                save_as_json_to_path(object_to_save=exc.working_memory.smart_dump(), path=failure_memory_path)
+                typer.secho(f"❌ {msg}", fg=typer.colors.RED)
+                typer.secho(f"❌ Failure memory saved to: {failure_memory_path}", fg=typer.colors.RED)
+            else:
+                typer.secho(f"❌ {msg}", fg=typer.colors.RED)
+                typer.secho("❌ No failure memory available", fg=typer.colors.RED)
+            raise typer.Exit(1) from exc
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
         save_text_to_path(text=plx_content, path=output_path)
         typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)

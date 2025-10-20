@@ -19,6 +19,7 @@ from pipelex.builder.validation_error_data import (
     PipelexBundleErrorData,
     StaticValidationErrorData,
 )
+from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
 from pipelex.exceptions import PipelexException
 from pipelex.types import Self
@@ -38,7 +39,9 @@ PipeSpecUnion = (
 
 
 class PipeBuilderError(Exception):
-    """Base exception for pipe builder errors."""
+    def __init__(self: Self, message: str, working_memory: WorkingMemory | None = None) -> None:
+        self.working_memory = working_memory
+        super().__init__(message)
 
 
 class ConceptSpecError(PipelexException):

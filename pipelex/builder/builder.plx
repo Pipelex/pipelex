@@ -7,8 +7,6 @@ PlanDraft = "Natural-language pipeline plan text describing sequences, inputs, o
 ConceptDrafts = "Textual draft of the concepts to create."
 PipelexBundleSpec = "A Pipelex bundle spec."
 ValidationResult = "Status (success or failure) and details of the validation failure if applicable."
-# PipeFailure = "Details of a single pipe failure during dry run."
-# DryRunResult = "A result of a dry run of a pipelex bundle spec."
 BundleHeaderSpec = "A domain information object."
 
 # ────────────────────────────────────────────────────────────────────────────────

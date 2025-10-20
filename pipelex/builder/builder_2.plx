@@ -11,12 +11,12 @@ description = "This pipe is going to be the entry point for the builder. It will
 inputs = { brief = "UserBrief" }
 output = "PipelexBundleSpec"
 steps = [
-    # { pipe = "draft_the_plan_2", result = "plan_draft" },
-    # { pipe = "draft_the_concepts_2", result = "concept_drafts" },
+    { pipe = "draft_the_plan_2", result = "plan_draft" },
+    { pipe = "draft_the_concepts_2", result = "concept_drafts" },
     { pipe = "structure_concepts_2", result = "concept_specs" },
     { pipe = "design_pipe_signatures_2", result = "pipe_signatures" },
-    # { pipe = "detail_pipe_spec", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
     # { pipe = "write_bundle_header", result = "bundle_header_spec" },
+    # { pipe = "detail_pipe_spec_2", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
     # { pipe = "assemble_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
 ]
 

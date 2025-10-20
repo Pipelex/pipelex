@@ -29,6 +29,7 @@ from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.exceptions import StuffContentTypeError
 from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -62,13 +63,21 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
     """
     # The working memory actually contains ConceptSpec objects (not ConceptSpecDraft)
     # but they may have been deserialized incorrectly
-    concept_specs = working_memory.get_stuff_as_list(
-        name="concept_specs",
-        item_type=ConceptSpec,
-    )
-
+    try:
+        concept_specs = working_memory.get_stuff_as_list(
+            name="concept_specs",
+            item_type=ConceptSpec,
+        )
+    except StuffContentTypeError as exc:
+        msg = f"assemble_pipelex_bundle_spec: Failed to get concept specs: {exc}."
+        raise PipeBuilderError(message=msg, working_memory=working_memory) from exc
     # pipe_specs: list[PipeSpecUnion] = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="pipe_specs").content).items
-    pipe_specs_list: ListContent[StuffContent] = working_memory.get_stuff_as_list(name="pipe_specs", item_type=StructuredContent)
+    try:
+        pipe_specs_list: ListContent[StuffContent] = working_memory.get_stuff_as_list(name="pipe_specs", item_type=StructuredContent)
+    except StuffContentTypeError as exc:
+        msg = f"assemble_pipelex_bundle_spec: Failed to get pipe specs: {exc}."
+        raise PipeBuilderError(message=msg, working_memory=working_memory) from exc
+
     pipe_specs_list_items: list[StuffContent] = pipe_specs_list.items
     pipe_specs: list[PipeSpecUnion] = []
     for pipe_spec_item in pipe_specs_list_items:
@@ -114,10 +123,10 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
     )
 
 
-async def reconstruct_bundle_with_pipe_fixes_from_memory(working_memory: WorkingMemory) -> PipelexBundleSpec:
-    pipelex_bundle_spec = working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
-    fixed_pipes_list = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="fixed_pipes").content)
-    return reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes_list.items)
+# async def reconstruct_bundle_with_pipe_fixes_from_memory(working_memory: WorkingMemory) -> PipelexBundleSpec:
+#     pipelex_bundle_spec = working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+#     fixed_pipes_list = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="fixed_pipes").content)
+#     return reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes_list.items)
 
 
 def reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec: PipelexBundleSpec, fixed_pipes: list[PipeSpecUnion]) -> PipelexBundleSpec:

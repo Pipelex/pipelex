@@ -5,6 +5,7 @@ from pipelex.builder.builder import (
     reconstruct_bundle_with_pipe_fixes,
 )
 from pipelex.builder.builder_errors import (
+    PipeBuilderError,
     PipelexBundleError,
     PipelexBundleNoFixForError,
     PipelexBundleUnexpectedError,
@@ -12,7 +13,7 @@ from pipelex.builder.builder_errors import (
 from pipelex.builder.builder_validation import validate_bundle_spec
 from pipelex.client.protocol import ImplicitMemory
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.exceptions import StaticValidationErrorType
+from pipelex.exceptions import StaticValidationErrorType, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.execute import execute_pipeline
@@ -34,7 +35,11 @@ class BuilderLoop:
         )
         pretty_print(pipe_output, title="Pipe Output")
 
-        pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+        try:
+            pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+        except WorkingMemoryStuffNotFoundError as exc:
+            msg = f"Builder loop: Failed to get pipelex bundle spec: {exc}."
+            raise PipeBuilderError(message=msg, working_memory=pipe_output.working_memory) from exc
         pretty_print(pipelex_bundle_spec, title="Pipelex Bundle Spec • 1st iteration")
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
 
