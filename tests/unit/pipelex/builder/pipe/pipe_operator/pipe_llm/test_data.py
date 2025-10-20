@@ -24,7 +24,7 @@ class PipeLLMTestCases:
             inputs={"topic": InputRequirementBlueprint(concept="Text")},
             output="Text",
             prompt="Write about $topic",
-            model="claude-4.1-opus",
+            model="llm_for_creative_writing",
         ),
     )
 
@@ -44,7 +44,7 @@ class PipeLLMTestCases:
             description="Generate without inputs",
             output="Text",
             prompt="Generate something interesting",
-            model="claude-4.1-opus",
+            model="llm_for_creative_writing",
         ),
     )
 
@@ -56,7 +56,7 @@ class PipeLLMTestCases:
             inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
-            llm="llm_cheap_for_vision",
+            llm="llm_for_basic_vision",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -65,7 +65,7 @@ class PipeLLMTestCases:
             inputs={"image": InputRequirementBlueprint(concept="Image")},
             output="Text",
             prompt="Analyze the image: $image",
-            model="gemini-2.5-flash-lite",
+            model="llm_for_basic_vision",
         ),
     )
 
@@ -83,7 +83,7 @@ class PipeLLMTestCases:
             source=None,
             type="PipeLLM",
             description="Generate with preset",
-            model="claude-4.5-sonnet",
+            model="llm_to_reason",
             output="Text",
             prompt="Generate text",
         ),
@@ -97,7 +97,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm="llm_cheap_for_easy_questions",
+            llm="llm_to_answer_easy_questions",
             temperature=0.7,
         ),
         PipeLLMBlueprint(
@@ -105,7 +105,7 @@ class PipeLLMTestCases:
             type="PipeLLM",
             description="Generate with settings",
             model=LLMSetting(
-                model="claude-4.5-sonnet",
+                model="llm_to_answer_easy_questions",
                 temperature=0.7,
                 max_tokens=None,  # "auto" is handled at conversion to core
             ),
@@ -133,7 +133,7 @@ class PipeLLMTestCases:
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
             output="Analysis",
-            model="claude-4.5-sonnet",
+            model="llm_to_analyze_data",
         ),
     )
 
@@ -146,7 +146,7 @@ class PipeLLMTestCases:
             output="Item",
             prompt="Generate items",
             multiple_output=True,
-            llm="llm_cheap_for_easy_questions",
+            llm="llm_to_answer_easy_questions",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -156,7 +156,7 @@ class PipeLLMTestCases:
             nb_output=None,
             output="Item",
             prompt="Generate items",
-            model="claude-4.5-sonnet",
+            model="llm_to_answer_easy_questions",
         ),
     )
 
@@ -169,7 +169,7 @@ class PipeLLMTestCases:
             output="Item",
             prompt="Generate items",
             nb_output=5,
-            llm="llm_cheap_for_easy_questions",
+            llm="llm_to_answer_easy_questions",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -179,7 +179,7 @@ class PipeLLMTestCases:
             multiple_output=None,
             output="Item",
             prompt="Generate items",
-            model="claude-4.5-sonnet",
+            model="llm_to_answer_easy_questions",
         ),
     )
 
