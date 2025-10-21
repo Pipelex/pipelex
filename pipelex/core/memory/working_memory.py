@@ -202,7 +202,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         return artefact_dict
 
     @override
-    def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None) -> Any:
+    def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
         # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot
@@ -210,7 +210,43 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
             attr_path_str = parts[1]  # Keep the rest as a dot-separated string
 
             base_stuff = self.get_stuff(base_name)
-
+            if isinstance(base_stuff.content, ListContent):
+                if not accept_list:
+                    raise WorkingMemoryTypeError(
+                        variable_name=name,
+                        message=f"Content of '{base_name}' is ListContent, but accept_list is False",
+                    )
+                the_items: list[Any] = []
+                list_content: ListContent[Any] = base_stuff.content  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+                for item in list_content.items:
+                    item_content = attrgetter(attr_path_str)(item)
+                    # check type
+                    if isinstance(item_content, list):
+                        for item_content_item in item_content:  # pyright: ignore[reportUnknownVariableType]
+                            if item_content_item is None:
+                                continue
+                            if wanted_type and not isinstance(item_content_item, wanted_type):
+                                raise WorkingMemoryTypeError(
+                                    variable_name=name,
+                                    message=(
+                                        f"Item of '{base_name}' is of type '{type(item_content_item).__name__}', "  # pyright: ignore[reportUnknownArgumentType]
+                                        f"it should be '{wanted_type.__name__}'"
+                                    ),
+                                )
+                            the_items.append(item_content_item)
+                    else:
+                        if item_content is None:
+                            continue
+                        if wanted_type and not isinstance(item_content, wanted_type):
+                            raise WorkingMemoryTypeError(
+                                variable_name=name,
+                                message=(
+                                    f"Item of item_content from '{base_name} [item] {attr_path_str}' is of type '{type(item_content).__name__}', "
+                                    f"it should be '{wanted_type.__name__}'"
+                                ),
+                            )
+                        the_items.append(item_content)
+                return the_items
             try:
                 stuff_content = attrgetter(attr_path_str)(base_stuff.content)
             except AttributeError as exc:

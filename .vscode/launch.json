@@ -16,7 +16,7 @@
             "justMyCode": false
         },
         {
-            "name": "Debug test boot without inference",
+            "name": "Debug test without inference",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",

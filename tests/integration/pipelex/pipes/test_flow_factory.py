@@ -5,6 +5,8 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.builder.flow_factory import FlowFactory
+from pipelex.builder.pipe.pipe_signature import PipeSignature
+from pipelex.core.pipes.pipe_blueprint import AllowedPipeTypes
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -70,8 +72,8 @@ class TestFlowFactory:
             assert len(flow.flow_elements) > 0
 
             # Log some details about what we found
-            controller_count = sum(1 for pipe in flow.flow_elements.values() if pipe.pipe_category == "PipeController")
-            operator_count = sum(1 for pipe in flow.flow_elements.values() if pipe.pipe_category == "PipeSignature")
+            controller_count = sum(1 for element in flow.flow_elements.values() if element.controller_blueprint is not None)
+            operator_count = sum(1 for element in flow.flow_elements.values() if element.operator_signature is not None)
 
             log.info(f"flow contains {len(flow.flow_elements)} pipes: {controller_count} controllers, {operator_count} operators (as signatures)")
 
@@ -87,18 +89,19 @@ class TestFlowFactory:
         flow = FlowFactory.make_from_plx_file(plx_file_path)
 
         # Find the sequence pipe
-        sequence_pipe = flow.flow_elements.get("write_discord_newsletter")
-        assert sequence_pipe is not None
-        assert sequence_pipe.type == "PipeSequence"
+        sequence_element = flow.flow_elements.get("write_discord_newsletter")
+        assert sequence_element is not None
+        assert sequence_element.controller_blueprint is not None
+        assert sequence_element.controller_blueprint.type == "PipeSequence"
 
         # Type narrow to PipeSequenceBlueprint for type safety
-        assert isinstance(sequence_pipe, PipeSequenceBlueprint)
+        assert isinstance(sequence_element.controller_blueprint, PipeSequenceBlueprint)
 
         # Verify steps are preserved
-        assert len(sequence_pipe.steps) > 0
+        assert len(sequence_element.controller_blueprint.steps) > 0
 
-        log.info(f"Sequence pipe has {len(sequence_pipe.steps)} steps:")
-        for step in sequence_pipe.steps:
+        log.info(f"Sequence pipe has {len(sequence_element.controller_blueprint.steps)} steps:")
+        for step in sequence_element.controller_blueprint.steps:
             log.info(f"  - {step.pipe} -> {step.result}")
 
     async def test_flow_converts_operators_to_signatures(self):
@@ -109,20 +112,21 @@ class TestFlowFactory:
         flow = FlowFactory.make_from_plx_file(plx_file_path)
 
         # Find an operator pipe (LLM pipe) - converted to signature
-        operator_pipe = flow.flow_elements.get("summarize_discord_channel_update_for_new_members")
-        assert operator_pipe is not None
-        assert operator_pipe.pipe_category == "PipeSignature"
-        assert operator_pipe.type == "PipeLLM"
+        operator_element = flow.flow_elements.get("summarize_discord_channel_update_for_new_members")
+        assert operator_element is not None
+        assert operator_element.operator_signature is not None
+        assert isinstance(operator_element.operator_signature, PipeSignature)
+        assert operator_element.operator_signature.type == AllowedPipeTypes.PIPE_LLM
 
         # Verify it has the signature properties
-        assert hasattr(operator_pipe, "code")
-        assert hasattr(operator_pipe, "inputs")
-        assert hasattr(operator_pipe, "output")
-        assert hasattr(operator_pipe, "description")
+        assert hasattr(operator_element.operator_signature, "code")
+        assert hasattr(operator_element.operator_signature, "inputs")
+        assert hasattr(operator_element.operator_signature, "output")
+        assert hasattr(operator_element.operator_signature, "description")
 
-        # Verify it doesn't have implementation details (like prompt_template)
-        assert not hasattr(operator_pipe, "prompt_template")
+        # Verify it doesn't have implementation details (like prompt)
+        assert not hasattr(operator_element, "prompt")
 
-        log.info(f"Operator pipe '{operator_pipe.code}' converted to signature:")
-        log.info(f"  Inputs: {operator_pipe.inputs}")
-        log.info(f"  Output: {operator_pipe.output}")
+        log.info(f"Operator pipe '{operator_element.operator_signature.code}' converted to signature:")
+        log.info(f"  Inputs: {operator_element.operator_signature.inputs}")
+        log.info(f"  Output: {operator_element.operator_signature.output}")
