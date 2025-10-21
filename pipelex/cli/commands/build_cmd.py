@@ -324,4 +324,3 @@ def build_partial_cmd(
     typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
     get_report_delegate().generate_report()
-
