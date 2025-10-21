@@ -123,12 +123,6 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
     )
 
 
-# async def reconstruct_bundle_with_pipe_fixes_from_memory(working_memory: WorkingMemory) -> PipelexBundleSpec:
-#     pipelex_bundle_spec = working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
-#     fixed_pipes_list = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="fixed_pipes").content)
-#     return reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes_list.items)
-
-
 def reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec: PipelexBundleSpec, fixed_pipes: list[PipeSpecUnion]) -> PipelexBundleSpec:
     if not pipelex_bundle_spec.pipe:
         msg = "No pipes section found in bundle spec"

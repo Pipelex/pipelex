@@ -41,24 +41,6 @@ pipelex build pipe "Take a photo as input, and render the opposite of the photo,
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
 pipelex build pipe "Given a theme, write a Haiku"
-
-Testing:
-pipelex build pipe --builder-pipe pipe_builder_2 "Given a theme, write a Haiku"
-pipelex build pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
-    and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
-        at the end we want the rendered image"
-pipelex build partial-pipe --builder-pipe pipe_builder_2 "Given a theme, write a Haiku"
-
-pipelex build partial-pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
-    and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
-        at the end we want the rendered image"
-
-pipelex build partial-pipe --builder-pipe pipe_builder_2 "Imagine a cute animal mascot for a startup based on its elevator pitch \
-    and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
-        at the end we want the rendered image" -o ./workshop -b signatures -e json
-
-pipelex build partial-pipe --builder-pipe pipe_builder_2 "./workshop/partial_A.json" -o ./workshop -b plan -e md
-pipelex build partial-pipe --builder-pipe pipe_builder_2 "./workshop/partial_B.json" -o ./workshop -b structures -e json
 """
 
 
