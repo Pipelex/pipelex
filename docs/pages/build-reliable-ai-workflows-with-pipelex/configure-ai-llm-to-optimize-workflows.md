@@ -44,7 +44,7 @@ An LLM Preset is simply a name for a LLM Settings that you have predefined in or
 ```toml
 [llm_presets]
 
-llm_to_reason = { 
+llm_for_complex_reasoning = { 
     llm_handle = "gpt-4-turbo", 
     temperature = 0.7, 
     max_tokens = "auto" 

@@ -70,8 +70,7 @@ llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
 llm_to_write_questions = { model = "gpt-4o-mini", temperature = 0.3 }
 
 # Reasoning skills
-llm_to_reason_short = { model = "base-claude", temperature = 0.5, max_tokens = 500 }
-llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
 llm_to_reason_on_diagram = { model = "base-claude", temperature = 0.5 }
 llm_to_analyze_data = { model = "base-claude", temperature = 0.5 }
 
