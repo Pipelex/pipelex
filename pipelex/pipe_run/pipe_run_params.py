@@ -162,6 +162,10 @@ class PipeRunParams(BaseModel):
     pipe_stack: list[str] = Field(default_factory=list)
     pipe_layers: list[str] = Field(default_factory=list)
 
+    @property
+    def pipe_stack_str(self) -> str:
+        return ".".join(self.pipe_stack)
+
     @field_validator("params")
     @classmethod
     def validate_param_keys(cls, value: dict[str, Any]) -> dict[str, Any]:
