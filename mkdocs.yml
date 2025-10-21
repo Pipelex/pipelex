@@ -112,6 +112,8 @@ nav:
       - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
       - Structuring Concepts: pages/build-reliable-ai-workflows-with-pipelex/structuring-concepts.md
       - Design and Run Pipelines: pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md
+      - Executing Pipelines with Inputs: pages/build-reliable-ai-workflows-with-pipelex/executing-pipelines-with-inputs.md
+      - Understanding Multiplicity: pages/build-reliable-ai-workflows-with-pipelex/understanding-multiplicity.md
       - Pipeline Creation: pages/build-reliable-ai-workflows-with-pipelex/pipeline-creation.md
       - Pipe Operators:
         - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md
@@ -130,6 +132,8 @@ nav:
       - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
       - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
       - LLM Providers & Models: pages/configuration/config-technical/inference-backend-config.md
+  - API Reference:
+    - API Guide: pages/api/index.md
   - Configuration:
     - Overview: pages/configuration/index.md
     - Pipeline Validation Configuration:

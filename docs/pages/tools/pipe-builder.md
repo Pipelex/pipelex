@@ -52,6 +52,79 @@ The Pipe Builder follows this process:
 4. **Validation**: Validates the generated pipeline structure
 5. **Automatic Fixes**: Fixes common errors like missing inputs or incorrect pipe connections
 
+## Generate Runner Code
+
+After creating a pipeline, you can generate Python code to run it with the `build runner` command. This creates a ready-to-use Python script with all necessary imports and example input values.
+
+### Usage
+
+```bash
+pipelex build runner [TARGET] [OPTIONS]
+```
+
+**Arguments:**
+
+- `TARGET` - Either a pipe code or a bundle file path, auto-detected according to presence of the .plx file extension
+
+**Options:**
+
+- `--pipe` - Pipe code to use (alternative to positional argument)
+- `--bundle` - Bundle file path (alternative to positional argument)
+- `--output`, `-o` - Path to save the generated Python file (defaults to `results/run_{pipe_code}.py`)
+
+### Examples
+
+**Generate runner for a pipe:**
+
+```bash
+pipelex build runner my_pipe
+```
+
+**Generate runner from a bundle file:**
+
+```bash
+pipelex build runner my_bundle.plx
+```
+
+**Specify a pipe from a bundle:**
+
+```bash
+pipelex build runner --bundle my_bundle.plx --pipe my_pipe
+```
+
+**Custom output path:**
+
+```bash
+pipelex build runner my_pipe --output custom_runner.py
+```
+
+### What Gets Generated
+
+The generated Python file includes:
+
+1. **All necessary imports** - Imports for Pipelex execution, content types, and any custom structures
+2. **Input memory setup** - Example input values based on the pipe's input types
+3. **Pipeline execution** - Async function that executes the pipeline
+4. **Output handling** - Code to extract and display the results
+5. **Main execution block** - Pipelex initialization and asyncio setup
+
+### Input Type Handling
+
+- **Native concepts** (Text, Image, PDF, etc.) - Automatically generates appropriate content objects
+- **Custom concepts** - Recursively generates the structure with example values
+- **Structured content** - Creates example data matching the concept's fields
+
+### Next Steps
+
+After generating the runner file:
+
+1. Open the generated Python file
+2. Review and customize the example input values
+3. Run the script: `python results/run_{pipe_code}.py`
+4. Iterate and adjust as needed
+
+For the complete CLI reference, see [CLI Commands](cli.md).
+
 ## Example Use Cases
 
 **Document Processing:**

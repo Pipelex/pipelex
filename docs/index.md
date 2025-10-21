@@ -24,9 +24,15 @@ $env:PIPELEX_INFERENCE_API_KEY="###"
 
 # Windows CMD
 set PIPELEX_INFERENCE_API_KEY=###
+
+# Note: of course, Pipelex automatically loads environment variables from `.env` files, that works too.
 ```
 
-**Where to get an API key:** The `PIPELEX_INFERENCE_API_KEY` key provides access to all the AI models, you can get a free key from [our Discord](https://go.pipelex.com/discord). You can also use another AI routing service like [BlackBox AI](https://docs.blackbox.ai/), or bring your own API keys (OpenAI, Anthropic, Google, etc.), or run local AI (no key needed). See [Configure AI Providers](pages/setup/configure-ai-providers.md) for details. If you are using non-standard APIs, that's OK too, don't hesitate to join our [Discord](https://go.pipelex.com/discord) for guidance.
+**Where to get an API key:**
+
+- The `PIPELEX_INFERENCE_API_KEY` key provides access to all the AI models. To get your key, join our Discord community: [https://go.pipelex.com/discord](https://go.pipelex.com/discord), then request your **free API key** (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
+- You can also use other AI routing services like [BlackBox AI](https://docs.blackbox.ai/), or you can bring your own API keys (OpenAI, Anthropic, Google, Mistral,etc.), or run local AI (no key needed).
+See [Configure AI Providers](pages/setup/configure-ai-providers.md) for details. If you are using non-standard APIs, that's OK too, don't hesitate to join our [Discord](https://go.pipelex.com/discord) for guidance.
 
 ## Generate your first pipe
 
@@ -61,7 +67,9 @@ pipelex run bundle.plx --inputs input.json
 pipelex run <pipe_code> --output results/output.json
 ```
 
-The `--inputs` file should be a JSON dictionary where keys are input variable names and values are the input data. For native types like Text, use strings directly. For structured types, provide objects matching the expected structure.
+The `--inputs` file should be a JSON dictionary where keys are input variable names and values are the input data. For native concepts like Text, you can use strings directly. For structured types, provide objects matching the expected structure.
+
+Learn more: [Executing Pipelines with Inputs](pages/build-reliable-ai-workflows-with-pipelex/executing-pipelines-with-inputs.md)
 
 **Python:**
 
@@ -80,7 +88,7 @@ asyncio.run(run_pipeline())
 
 ## Easily iterate on your pipe
 
-Now, thanks to our Pipelex language, and its high level of abstraction, you can directly edit the pipeline. It's pretty easy even for non-technical users. Better yet, you can get assisted in making changes with the help of your favorite AI coding assistant. To that end, we have prepared comprehensive guides for the most popular AI coding assistants and you can install them with one call:
+Now, thanks to our Pipelex language, you can easily edit the pipeline, even if you're not a coder. Better yet, you can get assisted in making changes with the help of your favorite AI coding assistant. To that end, we have prepared comprehensive guides for the most popular AI coding assistants and you can install them with one call:
 
 ```bash
 pipelex kit rules
@@ -92,6 +100,16 @@ Now refine your pipeline with natural language:
 
 - "Include confidence scores between 0 and 100 in the match analysis"
 - "Write a recap email at the end"
+
+## IDE Support
+
+By the way, we **highly** recommend installing our own extension for PLX files into your IDE of choice. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to the VS Code marketplace too and if you are using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
+
+## Examples
+
+Visit the 
+[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/): you can clone it, fork it, play with it 
+
 
 ---
 
@@ -124,5 +142,4 @@ Each step can be structured and validated, so you benefit from the reliability o
 - [Project Organization](pages/setup/project-organization.md) - Structure your Pipelex projects
 
 [![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
-
 

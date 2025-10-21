@@ -5,7 +5,7 @@ from typing_extensions import override
 
 from pipelex.client.pipeline_request_factory import PipelineRequestFactory
 from pipelex.client.pipeline_response_factory import PipelineResponseFactory
-from pipelex.client.protocol import CompactMemory, PipelexProtocol, PipelineResponse
+from pipelex.client.protocol import PipelexProtocol, PipelineInputs, PipelineResponse
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.exceptions import ClientAuthenticationError
@@ -54,14 +54,14 @@ class PipelexClient(PipelexProtocol):
             await self.client.aclose()
             self.client = None
 
-    async def _make_api_call(self, endpoint: str, request: str | None = None) -> Any:
+    async def _make_api_call(self, endpoint: str, request: str | None = None) -> dict[str, Any]:
         """Make an API call to the Pipelex server.
 
         Args:
             endpoint: The API endpoint to call, relative to the base URL
             request: A JSON-formatted string to send as the request body, or None if no body is needed
         Returns:
-            Any: The JSON-decoded response from the server
+            dict[str, Any]: The JSON-decoded response from the server
         Raises:
             httpx.HTTPError: If the request fails or returns a non-200 status code
 
@@ -74,24 +74,25 @@ class PipelexClient(PipelexProtocol):
         content = request.encode("utf-8") if request is not None else None
         response = await self.client.post(f"/{endpoint}", content=content, headers={"Content-Type": "application/json"}, timeout=1200)
         response.raise_for_status()
-        return response.json()
+        response_data: dict[str, Any] = response.json()
+        return response_data
 
     @override
     async def execute_pipeline(
         self,
         pipe_code: str,
         working_memory: WorkingMemory | None = None,
-        input_memory: CompactMemory | None = None,
+        inputs: PipelineInputs | None = None,
         output_name: str | None = None,
         output_multiplicity: PipeOutputMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
-        if working_memory and input_memory:
-            msg = f"working_memory and input_memory cannot be provided together to the API execute_pipeline {pipe_code=}"
+        if working_memory and inputs:
+            msg = f"'working_memory' and 'inputs' cannot be provided together to the API execute_pipeline {pipe_code=}."
             raise ValueError(msg)
 
-        if input_memory is not None:
-            working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
+        if inputs is not None:
+            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
             working_memory=working_memory,
@@ -99,6 +100,7 @@ class PipelexClient(PipelexProtocol):
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
+
         response = await self._make_api_call(f"v1/pipeline/{pipe_code}/execute", request=pipeline_request.model_dump_json())
         return PipelineResponseFactory.make_from_api_response(response)
 
@@ -107,17 +109,17 @@ class PipelexClient(PipelexProtocol):
         self,
         pipe_code: str,
         working_memory: WorkingMemory | None = None,
-        input_memory: CompactMemory | None = None,
+        inputs: PipelineInputs | None = None,
         output_name: str | None = None,
         output_multiplicity: PipeOutputMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
-        if working_memory and input_memory:
-            msg = f"working_memory and input_memory cannot be provided together to the API start_pipeline {pipe_code=}"
+        if working_memory and inputs:
+            msg = f"'working_memory' and 'inputs' cannot be provided together to the API start_pipeline {pipe_code=}."
             raise ValueError(msg)
 
-        if input_memory is not None:
-            working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
+        if inputs is not None:
+            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
             working_memory=working_memory,

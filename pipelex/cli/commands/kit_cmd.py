@@ -11,10 +11,10 @@ from pipelex.kit.index_loader import load_index
 from pipelex.kit.migrations_export import export_migration_instructions
 from pipelex.kit.targets_update import build_merged_rules, remove_from_targets, update_targets
 
-kit_app = typer.Typer(help="Manage kit assets: export Cursor rules and merge agent docs", no_args_is_help=True)
+kit_app = typer.Typer(no_args_is_help=True)
 
 
-@kit_app.command("rules")
+@kit_app.command("rules", help="Export Pipelex Cursor rules and merge Pipelex marked sections into other agent rules files")
 def agent_rules(
     repo_root: Annotated[Path | None, typer.Option("--repo-root", dir_okay=True, writable=True, help="Repository root directory")] = None,
     cursor: Annotated[bool, typer.Option("--cursor/--no-cursor", help="Export Cursor rules to .cursor/rules")] = True,
@@ -23,12 +23,6 @@ def agent_rules(
     diff: Annotated[bool, typer.Option("--diff", help="Show unified diff of changes")] = False,
     backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
 ) -> None:
-    """Sync kit assets: export Cursor rules and merge agent documentation.
-
-    This command:
-    1. Exports agent markdown files to Cursor .mdc files with YAML front-matter
-    2. Builds merged agent documentation and updates target files using markers
-    """
     try:
         if repo_root is None:
             repo_root = Path()
@@ -55,7 +49,9 @@ def agent_rules(
         raise PipelexCLIError(msg) from exc
 
 
-@kit_app.command("remove-rules")
+@kit_app.command(
+    "remove-rules", help="Remove agent rules: delete Pipelex Cursor rules and remove Pipelex marked sections from other agent rules files"
+)
 def remove_rules(
     repo_root: Annotated[Path | None, typer.Option("--repo-root", dir_okay=True, writable=True, help="Repository root directory")] = None,
     cursor: Annotated[bool, typer.Option("--cursor/--no-cursor", help="Remove Cursor rules from .cursor/rules")] = True,
@@ -65,12 +61,6 @@ def remove_rules(
     diff: Annotated[bool, typer.Option("--diff", help="Show unified diff of changes")] = False,
     backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
 ) -> None:
-    """Remove agent rules: delete Cursor rules and remove marked sections from target files.
-
-    This command:
-    1. Deletes agent markdown files from Cursor .mdc files in .cursor/rules
-    2. Removes marked sections from target files (or deletes entire files with --delete-files)
-    """
     try:
         if repo_root is None:
             repo_root = Path()
@@ -105,16 +95,11 @@ def remove_rules(
         raise PipelexCLIError(msg) from exc
 
 
-@kit_app.command("migrations")
+@kit_app.command("migrations", help="Sync Pipelex migration instructions to the `.pipelex/migrations` directory")
 def migration_instructions(
     repo_root: Annotated[Path | None, typer.Option("--repo-root", dir_okay=True, writable=True, help="Repository root directory")] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would be done without making changes")] = False,
 ) -> None:
-    """Sync migration instructions from kit to .pipelex/migrations.
-
-    This command copies migration documentation files from the pipelex.kit
-    package to the user's .pipelex/migrations directory.
-    """
     try:
         if repo_root is None:
             repo_root = Path()

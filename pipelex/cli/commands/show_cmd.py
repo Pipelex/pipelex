@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
+from rich import box
+from rich.console import Console
+from rich.table import Table
 
 from pipelex import pretty_print
+from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_pipe_library, get_required_pipe
+from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
+
+if TYPE_CHECKING:
+    from pipelex.cogt.models.model_manager import ModelManager
 
 
 def do_show_config() -> None:
@@ -41,38 +48,181 @@ def do_show_pipe(pipe_code: str) -> None:
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 
 
+def do_show_backends(show_all: bool = False) -> None:
+    """Display all backends and the active routing profile."""
+    Pipelex.make()
+
+    try:
+        models_manager = cast("ModelManager", get_models_manager())
+
+        # Load backends with or without disabled ones based on show_all flag
+        if show_all:
+            backend_library = InferenceBackendLibrary()
+            backend_library.load(include_disabled=True)
+        else:
+            backend_library = models_manager.inference_backend_library
+
+        routing_profile_library = models_manager.routing_profile_library
+    except Exception as exc:
+        msg = f"Error accessing backend or routing configuration: {exc}"
+        raise PipelexCLIError(msg) from exc
+
+    console = Console()
+
+    # Get all backends
+    all_backends = list(backend_library.root.values())
+    if not all_backends:
+        console.print("[yellow]No backends configured.[/yellow]")
+        return
+
+    # Filter backends based on show_all flag
+    backends_to_display = all_backends if show_all else [b for b in all_backends if b.enabled]
+
+    # Display backends table
+    table_title = "All Configured Backends" if show_all else "Enabled Backends"
+    backends_table = Table(
+        title=table_title,
+        show_header=True,
+        header_style="bold cyan",
+        box=box.SQUARE_DOUBLE_HEAD,
+    )
+    backends_table.add_column("Backend Name", style="green")
+    if show_all:
+        backends_table.add_column("Status", style="yellow")
+    backends_table.add_column("Endpoint", style="blue")
+    backends_table.add_column("Models", style="cyan", justify="right")
+
+    for backend in sorted(backends_to_display, key=lambda b: b.name):
+        endpoint = backend.endpoint if backend.endpoint else "[dim]N/A[/dim]"
+        model_count = str(len(backend.model_specs))
+
+        if show_all:
+            status = "[green]Enabled[/green]" if backend.enabled else "[red]Disabled[/red]"
+            backends_table.add_row(backend.name, status, endpoint, model_count)
+        else:
+            backends_table.add_row(backend.name, endpoint, model_count)
+
+    console.print("\n")
+    console.print(backends_table)
+    console.print("\n")
+
+    # Display routing profile information
+    try:
+        active_profile = routing_profile_library.active_profile
+
+        console.print(f"[bold cyan]Active Routing Profile:[/bold cyan] [green]{active_profile.name}[/green]")
+        if active_profile.description:
+            console.print(f"[dim]{active_profile.description}[/dim]")
+
+        if active_profile.default:
+            console.print(f"[bold]Default Backend:[/bold] [cyan]{active_profile.default}[/cyan]")
+
+        # Display routing rules
+        if active_profile.routes:
+            console.print("\n[bold]Routing Rules:[/bold]")
+            routes_table = Table(
+                show_header=True,
+                header_style="bold cyan",
+                box=box.SIMPLE,
+                show_edge=False,
+            )
+            routes_table.add_column("Pattern", style="green")
+            routes_table.add_column("→", style="dim", justify="center")
+            routes_table.add_column("Target Backend", style="cyan")
+
+            for pattern, target_backend in sorted(active_profile.routes.items()):
+                routes_table.add_row(pattern, "→", target_backend)
+
+            console.print(routes_table)
+        else:
+            console.print("[dim]No specific routing rules defined.[/dim]")
+
+    except Exception as exc:
+        console.print(f"[yellow]Warning: Could not load routing profile information: {exc}[/yellow]")
+
+    console.print("\n")
+
+    # Display helper messages
+    if not show_all:
+        enabled_count = len([b for b in all_backends if b.enabled])
+        disabled_count = len(all_backends) - enabled_count
+        if disabled_count > 0:
+            console.print(f"[dim]💡 Showing {enabled_count} enabled backend(s). {disabled_count} disabled backend(s) hidden.[/dim]")
+            console.print("[dim]   To see all backends: [bold]pipelex show backends --all[/bold][/dim]\n")
+
+    console.print("[dim]💡 To enable more backends, edit: [bold].pipelex/inference/backends.toml[/bold][/dim]")
+    console.print("[dim]💡 To list available models for a backend: [bold]pipelex show models <backend_name>[/bold][/dim]\n")
+
+
 # Typer group for show commands
-show_app = typer.Typer(help="Show and list commands", no_args_is_help=True)
+show_app = typer.Typer(
+    no_args_is_help=True,
+)
 
 
-@show_app.command("config")
+@show_app.command("config", help="Display the main Pipelex configuration (not including inference backends)")
 def show_config_cmd() -> None:
     do_show_config()
 
 
-@show_app.command("pipes")
+@show_app.command("pipes", help="List all available pipes in the current project")
 def list_pipes_cmd() -> None:
+    """List all pipes that have been loaded into the pipe library.
+
+    This includes pipes from your project's .plx files and any
+    pipes from imported packages.
+    """
     do_list_pipes()
 
 
-@show_app.command("pipe")
+@show_app.command("pipe", help="Display the detailed definition of a specific pipe")
 def show_pipe_cmd(
-    pipe_code: Annotated[str, typer.Argument(help="Pipeline code to show definition for")],
+    pipe_code: Annotated[str, typer.Argument(help="Pipeline code to show definition for (e.g., 'my_domain.my_pipe')")],
 ) -> None:
+    """Show the complete definition of a pipe including its inputs, outputs,
+    prompt, and all configuration settings.
+
+    Example:
+        pipelex show pipe hello_world
+    """
     do_show_pipe(pipe_code=pipe_code)
 
 
-@show_app.command("models")
+@show_app.command("models", help="List available AI models from a specific backend provider")
 def show_models_cmd(
-    backend_name: Annotated[str, typer.Argument(help="Backend name to list models for")],
+    backend_name: Annotated[str, typer.Argument(help="Backend name to list models for (e.g., 'openai', 'anthropic', 'google')")],
     flat: Annotated[
         bool,
-        typer.Option("--flat", "-f", help="Output in flat CSV format for easy copy-pasting"),
+        typer.Option("--flat", "-f", help="Output in flat CSV format for easy copy-pasting into configuration files"),
     ] = False,
 ) -> None:
+    """List all available models from a configured backend provider.
+
+    This queries the backend's API to retrieve the current list of available models.
+    Use --flat for a simplified output that's easy to copy into config files.
+
+    Examples:
+        pipelex show models openai
+        pipelex show models anthropic --flat
+    """
     asyncio.run(
         ModelLister.list_models(
             backend_name=backend_name,
             flat=flat,
         )
     )
+
+
+@show_app.command("backends", help="Display backend configurations and active routing profile")
+def show_backends_cmd(
+    show_all_backends: Annotated[bool, typer.Option("--all", "-a", help="Show all backends including disabled ones")] = False,
+) -> None:
+    """Display all configured backends and the active routing profile with its routing rules.
+
+    By default, shows only enabled backends. Use --all to include disabled backends.
+
+    Examples:
+        pipelex show backends
+        pipelex show backends --all
+    """
+    do_show_backends(show_all=show_all_backends)

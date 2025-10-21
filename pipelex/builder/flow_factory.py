@@ -1,16 +1,22 @@
 from pathlib import Path
 from typing import Any
 
+from pipelex import log
 from pipelex.builder.builder import PipelexBundleSpec
-from pipelex.builder.flow import Flow, FlowElementUnion
+from pipelex.builder.flow import Flow, FlowElement
 from pipelex.builder.pipe.pipe_signature import PipeSignature
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
+from pipelex.exceptions import PipelexException
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+
+
+class FlowFactoryError(PipelexException):
+    """Exception raised by FlowFactory."""
 
 
 class FlowFactory:
@@ -44,7 +50,7 @@ class FlowFactory:
         Returns:
             Flow with controllers preserved and operators as signatures.
         """
-        flow_elements: dict[str, FlowElementUnion] = {}
+        flow_elements: dict[str, FlowElement] = {}
 
         if bundle_blueprint.pipe:
             for pipe_code, pipe_blueprint in bundle_blueprint.pipe.items():
@@ -55,11 +61,21 @@ class FlowFactory:
                         pipe_blueprint,
                         PipeBatchBlueprint | PipeConditionBlueprint | PipeParallelBlueprint | PipeSequenceBlueprint,
                     ):  # pyright: ignore[reportUnnecessaryIsInstance]
-                        flow_elements[pipe_code] = pipe_blueprint
+                        flow_elements[pipe_code] = FlowElement(controller_blueprint=pipe_blueprint)
+                        log.debug(
+                            f"Adding controller {pipe_code} to flow: category is '{pipe_blueprint.pipe_category}' and type is '{pipe_blueprint.type}'"
+                        )
+                    else:
+                        msg = f"Pipe {pipe_code} is not a controller"
+                        raise FlowFactoryError(message=msg)
                 else:
                     # Convert operators to signatures
-                    flow_elements[pipe_code] = FlowFactory._convert_blueprint_to_signature(pipe_code, pipe_blueprint)
-
+                    signature_from_blueprint = FlowFactory._convert_blueprint_to_signature(pipe_code=pipe_code, pipe_blueprint=pipe_blueprint)
+                    flow_elements[pipe_code] = FlowElement(operator_signature=signature_from_blueprint)
+                    log.debug(
+                        f"Adding operator {pipe_code} to flow: category is '{pipe_blueprint.pipe_category}' and type is '{pipe_blueprint.type}'"
+                    )
+                    log.debug(signature_from_blueprint, title="Signature from blueprint")
         return Flow(
             domain=bundle_blueprint.domain,
             description=bundle_blueprint.description,
@@ -77,21 +93,12 @@ class FlowFactory:
         Returns:
             PipeSignature containing the contract information.
         """
-        # Extract inputs as strings from InputRequirementBlueprint
-        inputs: dict[str, str] = {}
-        if pipe_blueprint.inputs:
-            for input_name, input_requirement in pipe_blueprint.inputs.items():
-                if hasattr(input_requirement, "concept"):
-                    inputs[input_name] = input_requirement.concept
-                else:
-                    inputs[input_name] = str(input_requirement)
-
         return PipeSignature(
             code=pipe_code,
-            pipe_category="PipeSignature",
+            pipe_category=pipe_blueprint.pipe_category,
             type=pipe_blueprint.type,
             description=pipe_blueprint.description or "",
-            inputs=inputs,
+            inputs=pipe_blueprint.inputs,
             result=pipe_code,
             output=pipe_blueprint.output,
             pipe_dependencies=[],

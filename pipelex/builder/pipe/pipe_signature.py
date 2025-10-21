@@ -1,6 +1,7 @@
-from typing import Any, Literal
+from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 from pipelex import log
 from pipelex.builder.concept.concept_spec import ConceptSpec
@@ -19,7 +20,7 @@ class PipeSignature(StructuredContent):
 
     code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.")
     type: AllowedPipeTypes = Field(description="Pipe type.")
-    pipe_category: Literal["PipeSignature"] = "PipeSignature"
+    pipe_category: SkipJsonSchema[AllowedPipeCategories] = Field(description="Pipe category set according to its type.")
     description: str = Field(description="What the pipe does")
     inputs: dict[str, str] = Field(
         description="Pipe inputs: keys are the input variable_names in snake_case, values are the ConceptCodes in PascalCase."
@@ -29,6 +30,19 @@ class PipeSignature(StructuredContent):
     )
     output: str = Field(description="Just the output ConceptCode in PascalCase")
     pipe_dependencies: list[str] = Field(description="List of pipe codes that this pipe depends on. This is for the PipeControllers")
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_pipe_category(cls, values: dict[str, Any]) -> dict[str, Any]:
+        try:
+            type_str = values["type"]
+        except TypeError as exc:
+            msg = f"Invalid type for '{values}': could not get subscript, required for 'type'"
+            raise PipeBlueprintError(msg) from exc
+        # we need to convert the type string to the AllowedPipeTypes enum because it arrives as a str implictly converted to enum but not yet
+        the_type = AllowedPipeTypes(type_str)
+        values["pipe_category"] = the_type.category
+        return values
 
 
 class PipeSpec(StructuredContent):

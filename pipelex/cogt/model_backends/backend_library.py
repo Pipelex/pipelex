@@ -36,7 +36,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def make_empty(cls) -> Self:
         return cls(root={})
 
-    def load(self):
+    def load(self, include_disabled: bool = False):
         backends_library_path = get_config().cogt.inference_config.backends_library_path
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
@@ -51,7 +51,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             standard_fields = InferenceBackendBlueprint.model_fields.keys()
             extra_config: dict[str, Any] = {}
             inference_backend_blueprint_dict_raw = backend_dict.copy()
-            if not inference_backend_blueprint_dict_raw.get("enabled", True):
+            enabled = inference_backend_blueprint_dict_raw.get("enabled", True)
+            if not enabled and not include_disabled:
                 continue
             if runtime_manager.is_ci_testing and backend_name == "vertexai":
                 continue

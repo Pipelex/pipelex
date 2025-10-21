@@ -10,7 +10,7 @@ from pipelex.builder.builder_errors import (
     PipelexBundleUnexpectedError,
 )
 from pipelex.builder.builder_validation import validate_bundle_spec
-from pipelex.client.protocol import ImplicitMemory
+from pipelex.client.protocol import PipelineInputs
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
 from pipelex.exceptions import StaticValidationErrorType
 from pipelex.hub import get_required_pipe
@@ -20,11 +20,11 @@ from pipelex.tools.misc.file_utils import save_text_to_path
 
 
 class BuilderLoop:
-    async def build_and_fix(self, pipe_code: str, input_memory: ImplicitMemory | None = None) -> PipelexBundleSpec:
+    async def build_and_fix(self, pipe_code: str, input_memory: PipelineInputs | None = None) -> PipelexBundleSpec:
         pretty_print(f"Building and fixing with {pipe_code}")
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
-            input_memory=input_memory,
+            inputs=input_memory,
         )
         pretty_print(pipe_output, title="Pipe Output")
 

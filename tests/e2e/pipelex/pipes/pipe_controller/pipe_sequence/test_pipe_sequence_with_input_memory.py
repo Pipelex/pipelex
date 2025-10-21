@@ -94,7 +94,7 @@ class TestPipeSequenceWithInputMemory:
         # Execute the pipeline using input_memory
         pipe_output = await execute_pipeline(
             pipe_code="optimize_tweet_sequence",
-            input_memory={
+            inputs={
                 "draft_tweet": {
                     "concept": "tech_tweet.DraftTweet",
                     "content": SAMPLE_DRAFT_TWEET,

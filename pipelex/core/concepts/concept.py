@@ -18,7 +18,7 @@ from pipelex.types import StrEnum
 
 
 class Concept(BaseModel):
-    model_config = ConfigDict(extra="ignore", strict=True)
+    model_config = ConfigDict(extra="forbid", strict=True)
 
     code: str
     domain: str
@@ -69,6 +69,11 @@ class Concept(BaseModel):
             return True
         if concept_1.structure_class_name == concept_2.structure_class_name:
             return True
+
+        # If concept_1 refines concept_2, they are strictly compatible
+        if concept_1.refines is not None and concept_1.refines == concept_2.concept_string:
+            return True
+
         if concept_1.refines is None and concept_2.refines is None:
             concept_1_class = KajsonManager.get_class_registry().get_class(name=concept_1.structure_class_name)
             concept_2_class = KajsonManager.get_class_registry().get_class(name=concept_2.structure_class_name)
@@ -92,6 +97,8 @@ class Concept(BaseModel):
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:
+        # TODO: DO NOT use the KajsonManager here. Pipelex needs to be instantiated to use the get_class_registry.
+        # And when we go through KajsonManager, no error raises if pipelex is not instantiated.
         # We get_class_registry directly from KajsonManager instead of pipelex hub to avoid circular import
         if KajsonManager.get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
             return True

@@ -10,7 +10,6 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -283,14 +282,6 @@ class PipeCondition(PipeController):
 
         # TODO: restore pipe_layer feature
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
-
-        # Convert PipeInput to blueprint format
-        inputs_blueprint: dict[str, str | InputRequirementBlueprint] = {}
-        for var_name, requirement in self.inputs.root.items():
-            inputs_blueprint[var_name] = InputRequirementBlueprint(
-                concept=requirement.concept.concept_string,
-                multiplicity=requirement.multiplicity,
-            )
 
         evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
 

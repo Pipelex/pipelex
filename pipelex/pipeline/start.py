@@ -1,10 +1,9 @@
 import asyncio
 
-from pipelex.client.protocol import CompactMemory
+from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import StartPipelineError
 from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
@@ -14,13 +13,12 @@ from pipelex.pipeline.job_metadata import JobMetadata
 
 async def start_pipeline(
     pipe_code: str,
-    working_memory: WorkingMemory | None = None,
-    input_memory: CompactMemory | None = None,
+    inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
     output_multiplicity: PipeOutputMultiplicity | None = None,
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
-) -> asyncio.Task[PipeOutput]:
+) -> tuple[str, asyncio.Task[PipeOutput]]:
     """Start a pipeline in the background.
 
     This function mirrors *execute_pipeline* but returns immediately with the
@@ -32,10 +30,8 @@ async def start_pipeline(
     ----------
     pipe_code:
         The code of the pipe to execute.
-    working_memory:
-        Optional ``WorkingMemory`` instance passed to the pipe.
-    input_memory:
-        Optional compact memory to pass to the pipe.
+    inputs:
+        Optional pipeline inputs or working memory to pass to the pipe.
     output_name:
         Name of the output slot to write to.
     output_multiplicity:
@@ -52,12 +48,13 @@ async def start_pipeline(
         can be awaited to get the pipe output.
 
     """
-    if working_memory and input_memory:
-        msg = f"Cannot pass both working_memory and input_memory to `start_pipeline` {pipe_code=}"
-        raise StartPipelineError(msg)
+    working_memory: WorkingMemory | None = None
 
-    if input_memory:
-        working_memory = WorkingMemoryFactory.make_from_compact_memory(input_memory)
+    if inputs:
+        if isinstance(inputs, WorkingMemory):
+            working_memory = inputs
+        else:
+            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
 
     pipeline = get_pipeline_manager().add_new_pipeline()
     pipeline_run_id = pipeline.pipeline_run_id
@@ -88,4 +85,4 @@ async def start_pipeline(
     # Launch execution without awaiting the result.
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))
 
-    return task
+    return pipeline_run_id, task

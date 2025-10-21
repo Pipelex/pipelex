@@ -83,6 +83,26 @@ inputs = {
 
 - `output`: The name of the concept to output. The `ConceptName` should have the same name as the python class if you want structured output:
 
+#### Input Multiplicity
+
+By default, inputs expect a single item. Use expanded syntax to specify multiple items:
+
+```plx
+## Single item (default) - use standard syntax
+inputs = { document = "Text" }
+
+## Variable list - indeterminate number of items
+inputs = { documents = { concept = "Text", multiplicity = true } }
+
+## Fixed count - exactly N items
+inputs = { comparison_items = { concept = "Image", multiplicity = 2 } }
+```
+
+**Key points:**
+- Don't use `multiplicity = false` - it's unnecessary (default behavior)
+- Use `multiplicity = true` for lists of unknown length
+- Use `multiplicity = N` (integer > 1) when operation requires exact count (e.g., comparing 2 items)
+
 ### Structuring Models
 
 Once you've defined your concepts semantically (see "Concept Definitions" above), you need to specify their structure if they have fields.
@@ -907,7 +927,7 @@ pretty_print(gantt_chart, title="Gantt Chart")
 The input memory is a dictionary, where the key is the name of the input variable and the value provides details to make it a stuff object. The relevant definitions are:
 ```python
 StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
-ImplicitMemory = dict[str, StuffContentOrData]
+PipelineInputs = dict[str, StuffContentOrData]
 ```
 As you can seen, we made it so different ways can be used to define that stuff using structured content or data.
 

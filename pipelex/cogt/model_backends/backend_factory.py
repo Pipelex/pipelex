@@ -34,6 +34,7 @@ class InferenceBackendFactory:
                 pass
         return InferenceBackend(
             name=name,
+            enabled=blueprint.enabled,
             endpoint=endpoint,
             api_key=api_key,
             extra_config=extra_config,

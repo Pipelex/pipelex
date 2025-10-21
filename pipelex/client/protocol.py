@@ -1,18 +1,41 @@
 from abc import abstractmethod
-from typing import Any, Protocol
+from typing import Any, Protocol, Sequence
 
 from pydantic import BaseModel
-from typing_extensions import runtime_checkable
+from pydantic.functional_validators import SkipValidation
+from typing_extensions import Annotated, runtime_checkable
 
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_output import DictPipeOutput
+from pipelex.core.stuffs.stuff import DictStuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity
 from pipelex.types import StrEnum
 
-StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
-ImplicitMemory = dict[str, StuffContentOrData]
-CompactMemory = dict[str, dict[str, Any]]
-COMPACT_MEMORY_KEY = "compact_memory"
+# StuffContentOrData represents all possible formats for pipeline inputs input:
+# Case 1: Direct content (no 'concept' key)
+#   - 1.1: str (simple string)
+#   - 1.2: Sequence[str] (list of strings)
+#   - 1.3: StuffContent (a StuffContent object)
+#   - 1.4: Sequence[StuffContent] (list of StuffContent objects, covariant)
+#   - 1.5: ListContent[StuffContent] (a ListContent object containing StuffContent items)
+# Case 2: Dict with 'concept' AND 'content' keys
+#   - 2.1: {"concept": str, "content": str}
+#   - 2.2: {"concept": str, "content": Sequence[str]}
+#   - 2.3: {"concept": str, "content": StuffContent}
+#   - 2.4: {"concept": str, "content": Sequence[StuffContent]}
+#   - 2.5: {"concept": str, "content": dict[str, Any]}
+#   - 2.6: {"concept": str, "content": Sequence[dict[str, Any]}
+#   Note: Case 2 formats can be provided as plain dict or DictStuff instance
+StuffContentOrData = (
+    str  # Case 1.1
+    | Sequence[str]  # Case 1.2
+    | StuffContent  # Case 1.3 (also covers Case 1.5 as ListContent is a StuffContent)
+    | Sequence[StuffContent]  # Case 1.4 (covariant - accepts list[TextContent], etc.)
+    | dict[str, Any]  # Case 2.1-2.7 - plain dicts with {"concept": str, "content": Any} structure
+    | DictStuff  # Case 2.7 - DictStuff instances (same structure as dict but as Pydantic model)
+)
+PipelineInputs = dict[str, StuffContentOrData]  # Can include both dict and StuffContent
 
 
 class PipelineState(StrEnum):
@@ -30,13 +53,13 @@ class ApiResponse(BaseModel):
     """Base response class for Pipelex API calls.
 
     Attributes:
-        status (str | None): Status of the API call ("success", "error", etc.)
+        status (str): Application-level status ("success", "error")
         message (str | None): Optional message providing additional information
         error (str | None): Optional error message when status is not "success"
 
     """
 
-    status: str | None = None
+    status: str | None
     message: str | None = None
     error: str | None = None
 
@@ -45,17 +68,20 @@ class PipelineRequest(BaseModel):
     """Request for executing a pipeline.
 
     Attributes:
-        input_memory (CompactMemory | None): In the format of WorkingMemory.to_compact_memory()
+        inputs (PipelineInputs | None): Inputs in PipelineInputs format - Pydantic validation is skipped
+            to preserve the flexible format (dicts, strings, StuffContent objects, etc.)
         output_name (str | None): Name of the output slot to write to
         output_multiplicity (PipeOutputMultiplicity | None): Output multiplicity setting
         dynamic_output_concept_code (str | None): Override for the dynamic output concept code
+        plx_content (str | None): Content of the pipeline bundle to execute
 
     """
 
-    input_memory: CompactMemory | None = None
+    inputs: Annotated[PipelineInputs | None, SkipValidation] = None
     output_name: str | None = None
     output_multiplicity: PipeOutputMultiplicity | None = None
     dynamic_output_concept_code: str | None = None
+    plx_content: str | None = None
 
 
 class PipelineResponse(ApiResponse):
@@ -66,35 +92,9 @@ class PipelineResponse(ApiResponse):
         created_at (str): Timestamp when the pipeline was created
         pipeline_state (PipelineState): Current state of the pipeline
         finished_at (str | None): Timestamp when the pipeline finished, if completed
-        pipe_output (CompactMemory | None): Output data from the pipeline execution as raw dict, if available
-
-        Example of pipe_output:
-        "pipe_output": {
-            "input_memory": {
-                "text": {
-                    "concept_code": "native.Text",
-                    "content": "Some text........"
-                },
-                "question": {
-                    "concept_code": "answer.Question",
-                    "content": {
-                        "text": "What are aerodynamic features?"
-                    }
-                },
-                "main_stuff": {
-                    "concept_code": "retrieve.RetrievedExcerpt",
-                    "content": {
-                        "items": [
-                            {
-                                "text": "What we're seeing isn't just an incremental...",
-                                "justification": "This excerpt directly mentions the 'aerodynamic profile' of ...."
-                            },
-                            ...
-                        ]
-                    }
-                }
-            }
-        }
+        pipe_output (DictPipeOutput | None): Output data from the pipeline execution (working_memory dict + pipeline_run_id)
+        main_stuff_name (str | None): Name of the main stuff in the pipeline output
+        pipe_structures (dict[str, Any] | None): Structure of the pipeline to execute
 
     """
 
@@ -102,7 +102,9 @@ class PipelineResponse(ApiResponse):
     created_at: str
     pipeline_state: PipelineState
     finished_at: str | None = None
-    pipe_output: CompactMemory | None = None
+    pipe_output: DictPipeOutput | None = None
+    main_stuff_name: str | None = None
+    pipe_structures: dict[str, Any] | None = None
 
 
 @runtime_checkable
@@ -126,7 +128,7 @@ class PipelexProtocol(Protocol):
         self,
         pipe_code: str,
         working_memory: WorkingMemory | None = None,
-        input_memory: CompactMemory | None = None,
+        inputs: PipelineInputs | None = None,
         output_name: str | None = None,
         output_multiplicity: PipeOutputMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
@@ -136,7 +138,7 @@ class PipelexProtocol(Protocol):
         Args:
             pipe_code (str): The code identifying the pipeline to execute
             working_memory (WorkingMemory | None): Memory context passed to the pipeline
-            input_memory (CompactMemory | None): Input memory passed to the pipeline
+            inputs (PipelineInputs | None): Inputs passed to the pipeline
             output_name (str | None): Target output slot name
             output_multiplicity (PipeOutputMultiplicity | None): Output multiplicity setting
             dynamic_output_concept_code (str | None): Override for dynamic output concept
@@ -155,7 +157,7 @@ class PipelexProtocol(Protocol):
         self,
         pipe_code: str,
         working_memory: WorkingMemory | None = None,
-        input_memory: CompactMemory | None = None,
+        inputs: PipelineInputs | None = None,
         output_name: str | None = None,
         output_multiplicity: PipeOutputMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
@@ -165,7 +167,7 @@ class PipelexProtocol(Protocol):
         Args:
             pipe_code (str): The code identifying the pipeline to execute
             working_memory (WorkingMemory | None): Memory context passed to the pipeline
-            input_memory (CompactMemory | None): Input memory passed to the pipeline
+            inputs (PipelineInputs | None): Inputs passed to the pipeline
             output_name (str | None): Target output slot name
             output_multiplicity (PipeOutputMultiplicity | None): Output multiplicity setting
             dynamic_output_concept_code (str | None): Override for dynamic output concept
