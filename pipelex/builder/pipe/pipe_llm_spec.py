@@ -21,7 +21,6 @@ class LLMSkill(StrEnum):
     LLM_FOR_VISUAL_ANALYSIS = "llm_for_visual_analysis"
     LLM_FOR_VISUAL_DESIGN = "llm_for_visual_design"
     LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
-    LLM_FOR_COMPLEX_REASONING = "llm_for_complex_reasoning"
     LLM_TO_REASON_ON_DIAGRAM = "llm_to_reason_on_diagram"
     LLM_TO_ANALYZE_DATA = "llm_to_analyze_data"
     LLM_TO_CODE = "llm_to_code"

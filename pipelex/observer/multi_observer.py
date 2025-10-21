@@ -1,4 +1,3 @@
-
 from typing_extensions import override
 
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
