@@ -34,7 +34,7 @@ class TestPipeSequenceMultiplicity:
         # Execute the pipeline
         pipe_output = await execute_pipeline(
             pipe_code="creative_ideation_sequence",
-            working_memory=working_memory,
+            inputs=working_memory,
             pipe_run_mode=pipe_run_mode,
         )
 

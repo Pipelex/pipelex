@@ -344,3 +344,21 @@ class TestConcept:
         # Test same refines
         assert Concept.are_concept_compatible(concept_5, concept_6, strict=False) is True
         assert Concept.are_concept_compatible(concept_5, concept_6, strict=True) is False
+
+    def test_concept_refining_text_is_strictly_compatible(self):
+        """Test that a concept created with .make() that refines native.Text is strictly compatible with Text."""
+        # Create a concept that refines native.Text using ConceptFactory.make()
+        concept_not_native_text = ConceptFactory.make(
+            domain="test_domain",
+            concept_code="MyConceptNotNativeText",
+            description="Test concept for unit tests",
+            structure_class_name="TextContent",
+            refines="native.Text",
+        )
+
+        # Get the native Text concept
+        text_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
+
+        # A concept that refines Text should be strictly compatible with Text
+        assert Concept.are_concept_compatible(concept_not_native_text, text_concept, strict=True) is True
+        assert Concept.are_concept_compatible(concept_not_native_text, text_concept, strict=False) is True

@@ -174,7 +174,7 @@ class LibraryManager(LibraryManagerAbstract):
                 ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
                 for concept_code in blueprint.concept
             ]
-            self.concept_library.remove_concepts_by_codes(concept_codes=concept_codes_to_remove)
+            self.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)
 
         self.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
 

@@ -152,7 +152,7 @@ def run_cmd(
 
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
-                input_memory=input_memory,
+                inputs=input_memory,
             )
 
             # Pretty print main_stuff unless disabled

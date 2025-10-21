@@ -62,7 +62,7 @@ class FlowFactory:
                         PipeBatchBlueprint | PipeConditionBlueprint | PipeParallelBlueprint | PipeSequenceBlueprint,
                     ):  # pyright: ignore[reportUnnecessaryIsInstance]
                         flow_elements[pipe_code] = FlowElement(controller_blueprint=pipe_blueprint)
-                        log.debug(
+                        log.verbose(
                             f"Adding controller {pipe_code} to flow: category is '{pipe_blueprint.pipe_category}' and type is '{pipe_blueprint.type}'"
                         )
                     else:
@@ -72,10 +72,10 @@ class FlowFactory:
                     # Convert operators to signatures
                     signature_from_blueprint = FlowFactory._convert_blueprint_to_signature(pipe_code=pipe_code, pipe_blueprint=pipe_blueprint)
                     flow_elements[pipe_code] = FlowElement(operator_signature=signature_from_blueprint)
-                    log.debug(
+                    log.verbose(
                         f"Adding operator {pipe_code} to flow: category is '{pipe_blueprint.pipe_category}' and type is '{pipe_blueprint.type}'"
                     )
-                    log.debug(signature_from_blueprint, title="Signature from blueprint")
+                    log.verbose(signature_from_blueprint, title="Signature from blueprint")
         return Flow(
             domain=bundle_blueprint.domain,
             description=bundle_blueprint.description,

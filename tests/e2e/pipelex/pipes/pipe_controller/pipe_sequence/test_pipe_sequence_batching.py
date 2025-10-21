@@ -65,7 +65,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
         # Execute the pipeline
         pipe_output = await execute_pipeline(
             pipe_code="analyze_reviews_sequence",
-            working_memory=working_memory,
+            inputs=working_memory,
         )
 
     # Basic output validation

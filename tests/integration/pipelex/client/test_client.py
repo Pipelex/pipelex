@@ -3,10 +3,9 @@ from pydantic import BaseModel
 
 from pipelex import pretty_print
 from pipelex.client.client import PipelexClient
-from pipelex.client.protocol import COMPACT_MEMORY_KEY, PipelineState
+from pipelex.client.protocol import PipelineState
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -112,35 +111,22 @@ class TestPipelexApiClient:
 
             pretty_print(pipeline_reponse, title="PIPELINE RESPONSE")
             # Verify result
-            assert pipeline_reponse.pipeline_run_id is not None
+            assert pipeline_reponse.pipe_output
+            assert pipeline_reponse.pipe_output.pipeline_run_id is not None
             assert pipeline_reponse.pipeline_state == PipelineState.COMPLETED
             assert pipeline_reponse.pipe_output is not None
 
-            working_memory = pipeline_reponse.pipe_output[COMPACT_MEMORY_KEY]
+            working_memory = pipeline_reponse.pipe_output.working_memory
+            pretty_print(working_memory, title="WORKING MEMORY")
 
             # Verify question structure
-            assert working_memory["question"] == {
-                "concept_code": "answer.Question",
-                "content": {"text": "Aerodynamic features?"},
-            }
+            assert working_memory.root["question"].content["text"] == "Aerodynamic features?"
 
             # Verify main_stuff structure
-            assert working_memory["main_stuff"] is not None
-            assert working_memory["main_stuff"]["concept_code"] == "retrieve.RetrievedExcerpt"
-            assert "content" in working_memory["main_stuff"]
-            assert "items" in working_memory["main_stuff"]["content"]
-            assert isinstance(working_memory["main_stuff"]["content"]["items"], list)
-            assert len(working_memory["main_stuff"]["content"]["items"]) > 0
-
-            # Verify each item has required fields
-            for item in working_memory["main_stuff"]["content"]["items"]:
-                assert "text" in item
-                assert "justification" in item
-                assert isinstance(item["text"], str)
-                assert isinstance(item["justification"], str)
+            assert working_memory.root["main_stuff"] is not None
+            assert working_memory.root["main_stuff"].concept == "retrieve.RetrievedExcerpt"
+            assert working_memory.root["main_stuff"].content is not None
+            assert len(working_memory.root["main_stuff"].content) > 0
 
             # Verify text structure
-            assert working_memory["text"]["concept_code"] == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
-            assert "content" in working_memory["text"]
-            assert isinstance(working_memory["text"]["content"], str)
-            assert "The Dawn of Ultra-Rapid Transit" in working_memory["text"]["content"]
+            assert "The Dawn of Ultra-Rapid Transit" in working_memory.root["text"].content["text"]

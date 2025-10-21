@@ -11,7 +11,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.pdf_content import PDFContent
-from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -32,6 +32,11 @@ TEST_DUMMY_NAME = "dummy_result"
 
 StuffDict = dict[str, Stuff]
 StuffArtefactDict = dict[str, StuffArtefact]
+
+
+class DictWorkingMemory(BaseModel):
+    root: dict[str, DictStuff]
+    aliases: dict[str, str]
 
 
 class WorkingMemory(BaseModel, ContextProviderAbstract):

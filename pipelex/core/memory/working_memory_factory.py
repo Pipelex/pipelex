@@ -1,11 +1,11 @@
-from typing import Any, cast
+from typing import Any
 
 import shortuuid
 from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.client.protocol import CompactMemory, ImplicitMemory
+from pipelex.client.protocol import PipelineInputs
 from pipelex.core.concepts.concept import ConceptBlueprint, SpecialDomain
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
@@ -123,28 +123,16 @@ class WorkingMemoryFactory(BaseModel):
         return WorkingMemory(root={})
 
     @classmethod
-    def make_from_compact_memory(
+    def make_from_pipeline_inputs(
         cls,
-        compact_memory: CompactMemory,
+        pipeline_inputs: PipelineInputs,
         search_domains: list[str] | None = None,
     ) -> WorkingMemory:
-        implicit_memory = cast("ImplicitMemory", compact_memory)
-        return cls.make_from_implicit_memory(
-            implicit_memory=implicit_memory,
-            search_domains=search_domains,
-        )
-
-    @classmethod
-    def make_from_implicit_memory(
-        cls,
-        implicit_memory: ImplicitMemory,
-        search_domains: list[str] | None = None,
-    ) -> WorkingMemory:
-        """Create a WorkingMemory from a implicit memory dictionary.
+        """Create a WorkingMemory from a pipeline inputs dictionary.
 
         Args:
-            implicit_memory: Dictionary in the format from API serialization
-            search_domains: List of search domains to use when making stuff
+            pipeline_inputs: Dictionary in the format from API serialization
+            search_domains: List of domains to search for concepts
 
         Returns:
             WorkingMemory object reconstructed from the implicit format
@@ -152,15 +140,13 @@ class WorkingMemoryFactory(BaseModel):
         """
         working_memory = cls.make_empty()
 
-        for stuff_key, stuff_content_or_data in implicit_memory.items():
-            stuff = StuffFactory.make_stuff_from_stuff_content_using_search_domains(
+        for stuff_key, stuff_content_or_data in pipeline_inputs.items():
+            stuff = StuffFactory.make_stuff_from_stuff_content_or_data(
                 name=stuff_key,
                 stuff_content_or_data=stuff_content_or_data,
-                search_domains=search_domains or [],
+                search_domains=search_domains,
             )
-
             working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
-
         return working_memory
 
     @classmethod

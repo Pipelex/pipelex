@@ -2,15 +2,9 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
-from pipelex.client.protocol import CompactMemory
-from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_output import PipeOutput
-
-if TYPE_CHECKING:
-    from pipelex.core.stuffs.text_content import TextContent
 
 
 class ApiSerializer:
@@ -21,52 +15,32 @@ class ApiSerializer:
     FIELDS_TO_SKIP = ("__class__", "__module__")
 
     @classmethod
-    def serialize_working_memory_for_api(cls, working_memory: WorkingMemory | None = None) -> CompactMemory:
+    def serialize_working_memory_for_api(cls, working_memory: WorkingMemory | None = None) -> dict[str, dict[str, Any]]:
         """Convert WorkingMemory to API-ready format using kajson with proper datetime handling.
 
         Args:
             working_memory: The WorkingMemory to serialize
 
         Returns:
-            Dict ready for API transmission with datetime strings and no __class__/__module__
+            PipelineInputs ready for API transmission with datetime strings and no __class__/__module__.
+            Returns plain dicts with {"concept": str, "content": dict | list} structure for JSON serialization.
 
         """
-        compact_memory: CompactMemory = {}
+        pipeline_inputs: dict[str, dict[str, Any]] = {}
         if working_memory is None:
-            return compact_memory
+            return pipeline_inputs
 
         for stuff_name, stuff in working_memory.root.items():
-            if NativeConceptCode.is_text_concept(concept_code=stuff.concept.code):
-                stuff_content = cast("TextContent", stuff.content)
-                item_dict: dict[str, Any] = {
-                    "concept_code": stuff.concept.code,
-                    "content": stuff_content.text,
-                }
-            else:
-                content_dict = stuff.content.model_dump(serialize_as_any=True)
-                clean_content = cls._clean_and_format_content(content_dict)
+            content_dict = stuff.content.model_dump(serialize_as_any=True)
+            clean_content = cls._clean_and_format_content(content_dict)
 
-                item_dict = {
-                    "concept_code": stuff.concept.code,
-                    "content": clean_content,
-                }
+            # Create plain dict instead of DictStuff instance for JSON serialization
+            pipeline_inputs[stuff_name] = {
+                "concept": stuff.concept.code,
+                "content": clean_content,
+            }
 
-            compact_memory[stuff_name] = item_dict
-
-        return compact_memory
-
-    @classmethod
-    def serialize_pipe_output_for_api(cls, pipe_output: PipeOutput) -> CompactMemory:
-        """Convert PipeOutput to API-ready format.
-
-        Args:
-            pipe_output: The PipeOutput to serialize
-
-        Returns:
-            Dict ready for API transmission
-
-        """
-        return {"compact_memory": cls.serialize_working_memory_for_api(pipe_output.working_memory)}
+        return pipeline_inputs
 
     @classmethod
     def _clean_and_format_content(cls, content: Any) -> Any:

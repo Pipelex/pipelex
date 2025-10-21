@@ -8,19 +8,19 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 
 if TYPE_CHECKING:
-    from pipelex.client.protocol import CompactMemory
+    from pipelex.client.protocol import PipelineInputs
 
 
 class TestWorkingMemoryFactory:
     def test_make_from_compact_memory_with_text_content(self):
-        compact_memory: CompactMemory = {
+        pipeline_inputs: PipelineInputs = {
             "text_item": {
-                "concept_code": NativeConceptCode.TEXT,
+                "concept": NativeConceptCode.TEXT,
                 "content": "Hello, world!",
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs)
 
         assert working_memory is not None
         assert "text_item" in working_memory.root
@@ -32,9 +32,9 @@ class TestWorkingMemoryFactory:
 
     def test_make_from_compact_memory_with_complex_nested_content(self):
         """Test deserialization of compact memory with complex nested structured content."""
-        compact_memory: CompactMemory = {
+        pipeline_inputs: PipelineInputs = {
             "complex_page": {
-                "concept_code": NativeConceptCode.PAGE,
+                "concept": NativeConceptCode.PAGE,
                 "content": {
                     "text_and_images": {
                         "text": {
@@ -60,7 +60,7 @@ class TestWorkingMemoryFactory:
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs)
 
         assert working_memory is not None
         assert "complex_page" in working_memory.root
@@ -113,27 +113,27 @@ class TestWorkingMemoryFactory:
 
     def test_make_from_compact_memory_empty(self):
         """Test deserialization of empty compact memory."""
-        compact_memory: CompactMemory = {}
+        pipeline_inputs: PipelineInputs = {}
 
-        working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs)
 
         assert working_memory is not None
         assert len(working_memory.root) == 0
 
     def test_make_from_compact_memory_multiple_items(self):
         """Test deserialization of compact memory with multiple items."""
-        compact_memory: CompactMemory = {
+        pipeline_inputs: PipelineInputs = {
             "text1": {
-                "concept_code": NativeConceptCode.TEXT,
+                "concept": NativeConceptCode.TEXT,
                 "content": "First text",
             },
             "text2": {
-                "concept_code": NativeConceptCode.TEXT,
+                "concept": NativeConceptCode.TEXT,
                 "content": "Second text",
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_compact_memory(compact_memory)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs)
 
         assert working_memory is not None
         assert len(working_memory.root) == 2

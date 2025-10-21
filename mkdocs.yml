@@ -132,6 +132,8 @@ nav:
       - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
       - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
       - LLM Providers & Models: pages/configuration/config-technical/inference-backend-config.md
+  - API Reference:
+    - API Guide: pages/api/index.md
   - Configuration:
     - Overview: pages/configuration/index.md
     - Pipeline Validation Configuration:

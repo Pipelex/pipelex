@@ -188,27 +188,24 @@ class StructureGenerator:
                 # Recursively handle item types if they're FieldType enums
                 try:
                     item_type_enum = ConceptStructureBlueprintFieldType(item_type)
-                    # Create a temporary blueprint for the item type
-                    temp_blueprint = ConceptStructureBlueprint(description="temp", type=item_type_enum)
-                    item_type = self._get_python_type_from_blueprint(temp_blueprint)
+                    if item_type_enum == ConceptStructureBlueprintFieldType.DICT:
+                        item_blueprint = ConceptStructureBlueprint(description="lorem ipsum", type=item_type_enum, key_type="str", value_type="Any")
+                        item_type = self._get_python_type_from_blueprint(item_blueprint)
+                    else:
+                        # Create a temporary blueprint for the item type
+                        item_blueprint = ConceptStructureBlueprint(description="lorem ipsum", type=item_type_enum)
+                        item_type = self._get_python_type_from_blueprint(item_blueprint)
                 except ValueError:
                     # Keep as string if not a known FieldType
                     pass
                 return f"List[{item_type}]"
             case ConceptStructureBlueprintFieldType.DICT:
-                key_type = field_blueprint.key_type or "str"
+                key_type = "str"
                 value_type = field_blueprint.value_type or "Any"
-                # Recursively handle key and value types
-                try:
-                    key_type_enum = ConceptStructureBlueprintFieldType(key_type)
-                    temp_blueprint = ConceptStructureBlueprint(description="temp", type=key_type_enum)
-                    key_type = self._get_python_type_from_blueprint(temp_blueprint)
-                except ValueError:
-                    pass
                 try:
                     value_type_enum = ConceptStructureBlueprintFieldType(value_type)
-                    temp_blueprint = ConceptStructureBlueprint(description="temp", type=value_type_enum)
-                    value_type = self._get_python_type_from_blueprint(temp_blueprint)
+                    item_blueprint = ConceptStructureBlueprint(description="lorem ipsum", type=value_type_enum)
+                    value_type = self._get_python_type_from_blueprint(item_blueprint)
                 except ValueError:
                     pass
                 return f"Dict[{key_type}, {value_type}]"

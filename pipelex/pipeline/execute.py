@@ -1,8 +1,7 @@
-from pipelex.client.protocol import ImplicitMemory
+from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import PipelineInputError
 from pipelex.hub import (
     get_pipe_router,
     get_pipeline_manager,
@@ -22,8 +21,7 @@ from pipelex.system.environment import get_optional_env
 
 async def execute_pipeline(
     pipe_code: str,
-    working_memory: WorkingMemory | None = None,
-    input_memory: ImplicitMemory | None = None,
+    inputs: PipelineInputs | WorkingMemory | None = None,
     search_domains: list[str] | None = None,
     output_name: str | None = None,
     output_multiplicity: VariableMultiplicity | None = None,
@@ -40,10 +38,8 @@ async def execute_pipeline(
     ----------
     pipe_code:
         The code of the pipe to execute.
-    working_memory:
-        Optional ``WorkingMemory`` instance passed to the pipe.
-    input_memory:
-        Optional compact memory to pass to the pipe.
+    inputs:
+        Optional pipeline inputs or working memory to pass to the pipe.
     output_name:
         Name of the output slot to write to.
     output_multiplicity:
@@ -69,15 +65,16 @@ async def execute_pipeline(
     if pipe.domain not in search_domains:
         search_domains.insert(0, pipe.domain)
 
-    # Can be either working_memory or compact_memory or neither, but not both
-    if working_memory and input_memory:
-        msg = f"Cannot pass both working_memory and input_memory to `execute_pipeline` {pipe_code=}"
-        raise PipelineInputError(msg)
-    if input_memory:
-        working_memory = WorkingMemoryFactory.make_from_implicit_memory(
-            implicit_memory=input_memory,
-            search_domains=search_domains,
-        )
+    working_memory: WorkingMemory | None = None
+
+    if inputs:
+        if isinstance(inputs, WorkingMemory):
+            working_memory = inputs
+        else:
+            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+                pipeline_inputs=inputs,
+                search_domains=search_domains,
+            )
 
     if pipe_run_mode is None:
         if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
