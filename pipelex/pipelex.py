@@ -1,5 +1,5 @@
 from importlib.metadata import metadata
-from typing import cast
+from typing import Any, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -150,7 +150,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
+        **kwargs: Any,
     ):
+        if kwargs:
+            msg = f"The base setup method does not support any additional arguments: {kwargs}"
+            raise PipelexSetupError(msg)
         # tools
         self.class_registry = class_registry or ClassRegistry()
         self.pipelex_hub.set_class_registry(self.class_registry)
@@ -286,16 +290,47 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if self.__class__ in MetaSingleton.instances:
             del MetaSingleton.instances[self.__class__]
 
-    # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
-    def make(cls) -> Self:
-        """Create and initialize a Pipelex instance.
+    def make(
+        cls,
+        class_registry: ClassRegistryAbstract | None = None,
+        secrets_provider: SecretsProviderAbstract | None = None,
+        storage_provider: StorageProviderAbstract | None = None,
+        models_manager: ModelManagerAbstract | None = None,
+        inference_manager: InferenceManager | None = None,
+        content_generator: ContentGeneratorProtocol | None = None,
+        pipeline_manager: PipelineManager | None = None,
+        pipeline_tracker: PipelineTracker | None = None,
+        pipe_router: PipeRouterProtocol | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
+        observers: dict[str, ObserverProtocol] | None = None,
+        **kwargs: Any,
+    ) -> Self:
+        """Create and initialize a Pipelex singleton instance.
+
+        All parameters are optional dependency injections. If None, default implementations
+        are used during setup. This enables customization of core components like secrets
+        management, storage, model routing, and pipeline execution.
+
+        Args:
+            class_registry: Custom class registry for dynamic loading
+            secrets_provider: Custom secrets/credentials provider
+            storage_provider: Custom storage backend
+            models_manager: Custom model configuration manager
+            inference_manager: Custom inference routing manager
+            content_generator: Custom content generation implementation
+            pipeline_manager: Custom pipeline management
+            pipeline_tracker: Custom pipeline tracking/logging
+            pipe_router: Custom pipe routing logic
+            reporting_delegate: Custom reporting handler
+            observers: Custom observers for pipeline events
+            **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
 
         Returns:
             Initialized Pipelex instance.
 
         Raises:
-            if setup fails
+            PipelexSetupError: If Pipelex is already initialized or setup fails
 
         """
         if cls.get_optional_instance() is not None:
@@ -303,7 +338,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(msg)
 
         pipelex_instance = cls()
-        pipelex_instance.setup()
+        pipelex_instance.setup(
+            class_registry=class_registry,
+            secrets_provider=secrets_provider,
+            storage_provider=storage_provider,
+            models_manager=models_manager,
+            inference_manager=inference_manager,
+            content_generator=content_generator,
+            pipeline_manager=pipeline_manager,
+            pipeline_tracker=pipeline_tracker,
+            pipe_router=pipe_router,
+            reporting_delegate=reporting_delegate,
+            observers=observers,
+            **kwargs,
+        )
         pipelex_instance.setup_libraries()
         log.info(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
