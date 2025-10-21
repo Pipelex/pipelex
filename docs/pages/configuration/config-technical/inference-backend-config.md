@@ -385,7 +385,7 @@ cheap_llm_for_object = { model = "cheap_llm_for_object", temperature = 0.5 }
 # Task-specific presets
 llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
 llm_to_extract_invoice = { model = "claude-4.5-sonnet", temperature = 0.1 }
-llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
 
 ### OCR Presets
 

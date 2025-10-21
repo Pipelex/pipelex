@@ -21,7 +21,7 @@ class LLMSkill(StrEnum):
     LLM_FOR_VISUAL_ANALYSIS = "llm_for_visual_analysis"
     LLM_FOR_VISUAL_DESIGN = "llm_for_visual_design"
     LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
-    LLM_TO_REASON = "llm_to_reason"
+    LLM_FOR_COMPLEX_REASONING = "llm_for_complex_reasoning"
     LLM_TO_REASON_ON_DIAGRAM = "llm_to_reason_on_diagram"
     LLM_TO_ANALYZE_DATA = "llm_to_analyze_data"
     LLM_TO_CODE = "llm_to_code"
@@ -44,7 +44,7 @@ class PipeLLMSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeLLM"]] = "PipeLLM"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    llm_skill: LLMSkill | str = Field(description="Select the most adequate LLM skill according to the task to be performed.")
+    llm_skill: LLMSkill | str = Field(description="Select the simplest LLM skill corresponding to the task to be performed.")
     system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
     prompt: str | None = Field(
         description="""A template for the user prompt:
