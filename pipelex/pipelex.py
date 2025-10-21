@@ -37,11 +37,6 @@ from pipelex.observer.local_observer import LocalObserver
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
-from pipelex.pipeline.activity.activity_manager import ActivityManager
-from pipelex.pipeline.activity.activity_manager_protocol import (
-    ActivityManagerNoOp,
-    ActivityManagerProtocol,
-)
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.track.pipeline_tracker import PipelineTracker
 from pipelex.pipeline.track.pipeline_tracker_protocol import (
@@ -77,7 +72,6 @@ class Pipelex(metaclass=MetaSingleton):
         inference_manager: InferenceManager | None = None,
         pipeline_manager: PipelineManager | None = None,
         pipeline_tracker: PipelineTracker | None = None,
-        activity_manager: ActivityManagerProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> None:
         self.config_dir_path = config_dir_path
@@ -143,15 +137,6 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
         self.pipeline_manager = pipeline_manager or PipelineManager()
         self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
-
-        self.activity_manager: ActivityManagerProtocol
-        if activity_manager:
-            self.activity_manager = activity_manager
-        elif get_config().pipelex.feature_config.is_activity_tracking_enabled:
-            self.activity_manager = ActivityManager()
-        else:
-            self.activity_manager = ActivityManagerNoOp()
-        self.pipelex_hub.set_activity_manager(activity_manager=self.activity_manager)
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
@@ -243,7 +228,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if runtime_manager.is_unit_testing:
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
-        self.activity_manager.setup()
 
         observer_provider = observer_provider or LocalObserver()
         self.pipelex_hub.set_observer_provider(observer_provider=observer_provider)
@@ -275,7 +259,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipeline_manager.teardown()
         self.pipeline_tracker.teardown()
         self.library_manager.teardown()
-        self.activity_manager.teardown()
 
         # cogt
         self.inference_manager.teardown()
