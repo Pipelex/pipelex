@@ -13,20 +13,12 @@ if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_setting import LLMModelChoice
 
 
-class AvailableLLM(StrEnum):
-    CLAUDE_4_SONNET = "claude-4.5-sonnet"
-    CLAUDE_4_1_OPUS = "claude-4.1-opus"
-    GPT_5 = "gpt-5"
-    GEMINI_2_5_PRO = "gemini-2.5-pro"
-    GEMINI_2_5_FLASH = "gemini-2.5-flash"
-    GEMINI_2_5_FLASH_LITE = "gemini-2.5-flash-lite"
-
-
 class LLMSkill(StrEnum):
     LLM_TO_RETRIEVE = "llm_to_retrieve"
-    LLM_CHEAP_FOR_EASY_QUESTIONS = "llm_cheap_for_easy_questions"
+    LLM_TO_ANSWER_EASY_QUESTIONS = "llm_to_answer_easy_questions"
     LLM_TO_ANSWER_HARD_QUESTIONS = "llm_to_answer_hard_questions"
-    LLM_CHEAP_FOR_VISION = "llm_cheap_for_vision"
+    LLM_TO_WRITE_QUESTIONS = "llm_to_write_questions"
+    LLM_FOR_BASIC_VISION = "llm_for_basic_vision"
     LLM_FOR_VISUAL_ANALYSIS = "llm_for_visual_analysis"
     LLM_FOR_VISUAL_DESIGN = "llm_for_visual_design"
     LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
@@ -35,34 +27,6 @@ class LLMSkill(StrEnum):
     LLM_TO_ANALYZE_DATA = "llm_to_analyze_data"
     LLM_TO_CODE = "llm_to_code"
     LLM_TO_ANALYZE_LARGE_CODEBASE = "llm_to_analyze_large_codebase"
-
-    @property
-    def llm_recommendation(self) -> AvailableLLM:
-        match self:
-            case LLMSkill.LLM_TO_RETRIEVE:
-                return AvailableLLM.GEMINI_2_5_FLASH
-            case LLMSkill.LLM_CHEAP_FOR_EASY_QUESTIONS:
-                return AvailableLLM.CLAUDE_4_SONNET
-            case LLMSkill.LLM_TO_ANSWER_HARD_QUESTIONS:
-                return AvailableLLM.GPT_5
-            case LLMSkill.LLM_CHEAP_FOR_VISION:
-                return AvailableLLM.GEMINI_2_5_FLASH_LITE
-            case LLMSkill.LLM_FOR_VISUAL_ANALYSIS:
-                return AvailableLLM.GEMINI_2_5_FLASH
-            case LLMSkill.LLM_FOR_VISUAL_DESIGN:
-                return AvailableLLM.GEMINI_2_5_FLASH
-            case LLMSkill.LLM_FOR_CREATIVE_WRITING:
-                return AvailableLLM.CLAUDE_4_1_OPUS
-            case LLMSkill.LLM_TO_REASON:
-                return AvailableLLM.CLAUDE_4_SONNET
-            case LLMSkill.LLM_TO_REASON_ON_DIAGRAM:
-                return AvailableLLM.GPT_5
-            case LLMSkill.LLM_TO_ANALYZE_DATA:
-                return AvailableLLM.CLAUDE_4_SONNET
-            case LLMSkill.LLM_TO_CODE:
-                return AvailableLLM.CLAUDE_4_SONNET
-            case LLMSkill.LLM_TO_ANALYZE_LARGE_CODEBASE:
-                return AvailableLLM.GEMINI_2_5_PRO
 
 
 class PipeLLMSpec(PipeSpec):
@@ -114,10 +78,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 
         # create llm choice as a str
         llm_choice: LLMModelChoice
-        if isinstance(self.llm, LLMSkill):
-            llm_choice = self.llm.llm_recommendation.value
-        else:
-            llm_choice = LLMSkill(self.llm).llm_recommendation.value
+        llm_choice = self.llm
 
         # Make it a LLMSetting if temperature is provided
         if self.temperature:
