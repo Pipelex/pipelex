@@ -33,89 +33,13 @@ By keeping concepts singular and using multiplicity to express quantity, Pipelex
 
 ## Output Multiplicity
 
-Output multiplicity controls how many items a pipe produces. This is most commonly used with `PipeLLM` to generate multiple outputs from a single execution.
+Output multiplicity controls how many items a pipe produces. You can specify this using bracket notation in the `output` field.
 
-### The Two Modes of Output Multiplicity
+### The Three Output Multiplicity Modes
 
-Pipelex supports two ways to specify output multiplicity:
+**1. Single output (default)**
 
-1. **Fixed multiplicity** (`nb_output`): Generate an exact number of items
-2. **Variable multiplicity** (`multiple_output`): Let the LLM decide how many items to generate
-
-### Fixed Output Multiplicity
-
-Use `nb_output` when you need a specific, predetermined number of outputs:
-
-```plx
-[concept]
-Headline = "A catchy title for content"
-
-[pipe.generate_headline_options]
-type = "PipeLLM"
-description = "Generate headline alternatives"
-inputs = { article_text = "Text" }
-output = "Headline"
-nb_output = 5
-prompt = """
-Read this article:
-
-@article_text
-
-Generate $_nb_output different headline options for this article.
-Make each one unique and compelling.
-"""
-```
-
-In this example, the pipe will always produce exactly 5 headlines. The variable `$_nb_output` is automatically available in your prompt, making it easy to communicate the requirement to the LLM.
-
-**Common use cases for fixed multiplicity:**
-
-- Generate N alternative versions for A/B testing
-- Create a fixed set of options for user selection
-- Produce a specific number of variations for comparison
-- Match external requirements (e.g., "always provide 3 recommendations")
-
-### Variable Output Multiplicity
-
-Use `multiple_output = true` when the number of outputs should depend on the content:
-
-```plx
-[concept]
-LineItem = "A single line item from an invoice"
-
-[concept.LineItem.structure]
-description = "Description of the item or service"
-quantity = { type = "number", description = "Quantity purchased" }
-unit_price = { type = "number", description = "Price per unit" }
-total = { type = "number", description = "Total price for this line" }
-
-[pipe.extract_line_items]
-type = "PipeLLM"
-description = "Extract all line items from an invoice"
-inputs = { invoice_text = "Text" }
-output = "LineItem"
-multiple_output = true
-prompt = """
-Extract all line items from this invoice:
-
-@invoice_text
-
-For each line item, extract the description, quantity, unit price, and total amount.
-"""
-```
-
-Here, the pipe will extract however many line items appear in the invoice. A simple invoice might have 2 line items, while a detailed purchase order might have 50.
-
-**Common use cases for variable multiplicity:**
-
-- Extract entities from text (unknown count in advance)
-- Generate as many alternatives as needed
-- List all items that match criteria
-- Identify all occurrences of a pattern
-
-### Single Output (Default)
-
-When you don't specify `nb_output` or `multiple_output`, a pipe produces a single output:
+When no brackets are used in the output, the pipe produces a single item:
 
 ```plx
 [concept]
@@ -135,26 +59,92 @@ Summarize this document concisely:
 
 This is the default behavior and represents the most common case.
 
+**2. Variable output (bracket notation `[]`)**
+
+Use empty brackets in the output to let the LLM decide how many items to generate:
+
+```plx
+[concept]
+LineItem = "A single line item from an invoice"
+
+[concept.LineItem.structure]
+description = "Description of the item or service"
+quantity = { type = "number", description = "Quantity purchased" }
+unit_price = { type = "number", description = "Price per unit" }
+total = { type = "number", description = "Total price for this line" }
+
+[pipe.extract_line_items]
+type = "PipeLLM"
+description = "Extract all line items from an invoice"
+inputs = { invoice_text = "Text" }
+output = "LineItem[]"
+prompt = """
+Extract all line items from this invoice:
+
+@invoice_text
+
+For each line item, extract the description, quantity, unit price, and total amount.
+"""
+```
+
+The pipe will extract however many line items appear in the invoice. A simple invoice might have 2 line items, while a detailed purchase order might have 50.
+
+**Common use cases for variable output:**
+
+- Extract entities from text (unknown count in advance)
+- Generate as many alternatives as needed
+- List all items that match criteria
+- Identify all occurrences of a pattern
+
+**3. Fixed output (bracket notation `[N]`)**
+
+Use a number in brackets to generate an exact number of items:
+
+```plx
+[concept]
+Headline = "A catchy title for content"
+
+[pipe.generate_headline_options]
+type = "PipeLLM"
+description = "Generate headline alternatives"
+inputs = { article_text = "Text" }
+output = "Headline[5]"
+prompt = """
+Read this article:
+
+@article_text
+
+Generate 5 different headline options for this article.
+Make each one unique and compelling.
+"""
+```
+
+The pipe will always produce exactly 5 headlines.
+
+**Common use cases for fixed output:**
+
+- Generate N alternative versions for A/B testing
+- Create a fixed set of options for user selection
+- Produce a specific number of variations for comparison
+- Match external requirements (e.g., "always provide 3 recommendations")
+
 ## Input Multiplicity
 
 Input multiplicity specifies whether a pipe expects a single item or multiple items as input. This allows you to design pipes that explicitly require lists or explicitly require single items.
 
 ### Syntax for Input Multiplicity
 
-Input multiplicity is specified using an expanded syntax in the `inputs` dictionary:
+Input multiplicity is specified using bracket notation in the `inputs` dictionary:
 
 ```plx
 # Standard syntax (single item, the default)
 inputs = { document = "Text" }
 
-# Equivalent with explicit multiplicity = false (not needed, but shown for clarity)
-inputs = { document = { concept = "Text", multiplicity = false } }
-
-# Variable list (indeterminate number)
-inputs = { documents = { concept = "Text", multiplicity = true } }
+# Variable list (indeterminate number of items)
+inputs = { documents = "Text[]" }
 
 # Fixed count (exactly N items)
-inputs = { comparison_items = { concept = "Text", multiplicity = 2 } }
+inputs = { comparison_items = "Text[2]" }
 ```
 
 ### The Three Input Multiplicity Modes
@@ -179,12 +169,12 @@ Analyze this report in detail:
 """
 ```
 
-!!! note "No Need for `multiplicity = false`"
-    You don't need to specify `multiplicity = false` explicitly, it's the default. Only use the expanded syntax when you need `multiplicity = true` or a fixed integer count.
+!!! note "Default Single Item Behavior"
+    When no brackets are used, the input expects a single item. Only use brackets when you need multiple items (`[]`) or a specific count (`[N]`).
 
-**2. Variable list (`multiplicity = true`)**
+**2. Variable list (bracket notation `[]`)**
 
-When you set `multiplicity = true`, the pipe expects a list with an indeterminate number of items:
+Use empty brackets `[]` to specify that the pipe expects a list with an indeterminate number of items:
 
 ```plx
 [concept]
@@ -194,7 +184,7 @@ Summary = "A concise overview of multiple documents"
 [pipe.summarize_all_documents]
 type = "PipeLLM"
 description = "Create a unified summary of multiple documents"
-inputs = { documents = { concept = "Document", multiplicity = true } }
+inputs = { documents = "Document[]" }
 output = "Summary"
 prompt = """
 Analyze all of these documents:
@@ -205,9 +195,17 @@ Create a single unified summary that captures the key points across all document
 """
 ```
 
-**3. Fixed count (`multiplicity = N`)**
+!!! info "When You Actually Need `[]` Notation"
+    The `[]` notation is only required for **advanced use cases**:
+    
+    1. **Batching over items**: When using `batch_over` in a `PipeSequence` to process each item separately
+    2. **Looping in templates**: When you need to iterate over items using Jinja2 syntax (`{% for item in items %}`) in `PipeLLM`, `PipeCompose`, or `PipeCondition` prompts
+    
+    For most cases where you simply pass multiple items to a pipe that processes them all together, you don't need to declare the input with `[]`. The pipe will receive the list and process it as a whole.
 
-When you set `multiplicity` to a specific integer, the pipe expects exactly that many items:
+**3. Fixed count (bracket notation `[N]`)**
+
+Use a number in brackets `[N]` to specify that the pipe expects exactly that many items:
 
 ```plx
 [concept]
@@ -217,7 +215,7 @@ Comparison = "A detailed comparison analysis"
 [pipe.compare_two_images]
 type = "PipeLLM"
 description = "Compare exactly two images side by side"
-inputs = { images = { concept = "Image", multiplicity = 2 } }
+inputs = { images = "Image[2]" }
 output = "Comparison"
 prompt = """
 Compare these two images in detail:
@@ -253,7 +251,7 @@ Extract all fields from this invoice:
 [pipe.process_invoice_batch]
 type = "PipeSequence"
 description = "Process multiple invoices"
-inputs = { invoice_images = { concept = "InvoiceImage", multiplicity = true } }
+inputs = { invoice_images = "InvoiceImage[]" }
 output = "InvoiceData"
 steps = [
     { pipe = "extract_single_invoice", batch_over = "invoice_images", batch_as = "invoice_image", result = "all_invoice_data" }
@@ -296,7 +294,7 @@ Comparison = "A comparative analysis of products"
 [pipe.compare_products]
 type = "PipeLLM"
 description = "Compare two products"
-inputs = { products = { concept = "ProductDescription", multiplicity = 2 } }
+inputs = { products = "ProductDescription[2]" }
 output = "Comparison"
 prompt = """
 Compare these two products:
@@ -320,8 +318,7 @@ CompanyName = "The name of a company or organization"
 type = "PipeLLM"
 description = "Extract all company names from an article"
 inputs = { article = "Article" }
-output = "CompanyName"
-multiple_output = true
+output = "CompanyName[]"
 prompt = """
 Read this article:
 
@@ -334,7 +331,7 @@ Only include entities that are explicitly named.
 
 ## Best Practices
 
-### When to Use Variable Output (`multiple_output = true`)
+### When to Use Variable Output (`[]`)
 
 Use variable output multiplicity when:
 
@@ -343,7 +340,7 @@ Use variable output multiplicity when:
 - The count isn't known until after processing
 - You want the LLM to use its judgment about completeness
 
-### When to Use Fixed Output (`nb_output = N`)
+### When to Use Fixed Output (`[N]`)
 
 Use fixed output multiplicity when:
 
@@ -352,7 +349,7 @@ Use fixed output multiplicity when:
 - External requirements dictate a fixed count
 - You want consistent batch sizes for processing
 
-### When to Use Variable Input (`multiplicity = true`)
+### When to Use Variable Input (Empty Brackets `[]`)
 
 Use variable input multiplicity when:
 
@@ -361,7 +358,7 @@ Use variable input multiplicity when:
 - The workflow involves collecting items before processing
 - You want maximum flexibility in how the pipe is called
 
-### When to Use Fixed Input (`multiplicity = N`)
+### When to Use Fixed Input (Brackets with Number `[N]`)
 
 Use fixed input multiplicity when:
 
@@ -414,10 +411,10 @@ pipe_output = await execute_pipeline(
 Multiplicity in Pipelex gives you precise control over how many items flow through your pipelines:
 
 - **Concepts stay singular** to maintain clean semantics
-- **Output multiplicity** (`nb_output`, `multiple_output`) controls generation
-- **Input multiplicity** (in the `inputs` definition) enforces expectations
-- **Variable multiplicity** (`true`) for unknown counts
-- **Fixed multiplicity** (integer) for exact requirements
+- **Output multiplicity** (bracket notation in `output` field) controls generation
+- **Input multiplicity** (bracket notation in `inputs` definition) enforces expectations
+- **Variable multiplicity** (`[]`) for unknown counts
+- **Fixed multiplicity** (`[N]`) for exact requirements
 
 By understanding and using multiplicity effectively, you can build pipelines that handle both single items and collections with clarity and type safety.
 

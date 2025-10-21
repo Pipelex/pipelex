@@ -258,10 +258,10 @@ class PipeCondition(PipeController):
             error_msg = f"Conditional expression returned no result in pipe {self.code}:"
             error_msg += f"\n\nExpression: {self.applied_expression_template}"
             raise PipeConditionError(error_msg)
-        log.debug(f"evaluated_expression: '{evaluated_expression}'")
+        log.verbose(f"evaluated_expression: '{evaluated_expression}'")
 
         # Add alias if configured
-        log.debug(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
+        log.verbose(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
         if self.add_alias_from_expression_to:
             working_memory.add_alias(
                 alias=evaluated_expression,
@@ -278,7 +278,7 @@ class PipeCondition(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        log.dev(f"{self.class_name} generating a '{self.output.code}'")
+        log.verbose(f"{self.class_name} generating a '{self.output.code}'")
 
         # TODO: restore pipe_layer feature
         # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
@@ -310,7 +310,7 @@ class PipeCondition(PipeController):
             pipe_condition_path_str = ".".join(pipe_condition_path)
             error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
             msg = f"Some required stuff(s) not found: {error_details}"
-            raise PipeInputError(msg) from exc
+            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=exc.variable_name, concept_code=None) from exc
 
         # Track condition steps
         for required_stuff in required_stuffs:
@@ -323,7 +323,7 @@ class PipeCondition(PipeController):
             )
 
         # Execute the chosen pipe
-        log.debug(f"Chosen pipe: {chosen_pipe.code}")
+        log.verbose(f"Chosen pipe: {chosen_pipe.code}")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=chosen_pipe,
@@ -354,7 +354,7 @@ class PipeCondition(PipeController):
         """Dry run implementation for PipeCondition.
         Validates that all required inputs are present, expression is valid, and target pipes exist.
         """
-        log.debug(f"PipeCondition: dry run controller pipe: {self.code}")
+        log.verbose(f"PipeCondition: dry run controller pipe: {self.code}")
 
         # 1. Validate that all required inputs are present in the working memory
         needed_inputs = self.needed_inputs()
@@ -378,7 +378,7 @@ class PipeCondition(PipeController):
                 template_category=TemplateCategory.EXPRESSION,
                 template_source=self.applied_expression_template,
             )
-            log.debug(f"Expression template is valid, requires variables: {required_variables}")
+            log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Exception as exc:
             log.error(f"Dry run failed: invalid expression template: {exc}")
             error_msg = (

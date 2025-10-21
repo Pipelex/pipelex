@@ -19,6 +19,10 @@ class NativeConceptCode(StrEnum):
     ANYTHING = "Anything"
 
     @property
+    def as_output_multiple_indeterminate(self) -> str:
+        return f"{self.value}[]"
+
+    @property
     def concept_string(self) -> str:
         return f"{SpecialDomain.NATIVE}.{self.value}"
 
@@ -48,6 +52,29 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.ANYTHING
             ):
                 return False
+
+    @classmethod
+    def is_dynamic_concept(cls, concept_code: str) -> bool:
+        try:
+            enum_value = NativeConceptCode(concept_code)
+        except ValueError:
+            return False
+
+        match enum_value:
+            case (
+                NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.PDF
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.LLM_PROMPT
+                | NativeConceptCode.IMG_GEN_PROMPT
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.ANYTHING
+            ):
+                return False
+            case NativeConceptCode.DYNAMIC:
+                return True
 
     @classmethod
     def values_list(cls) -> list["NativeConceptCode"]:

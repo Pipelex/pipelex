@@ -77,7 +77,7 @@ class PipelineTracker(PipelineTrackerProtocol):
         as_item_index: int | None = None,
     ) -> str:
         concept_display = Concept.sentence_from_concept(concept=stuff.concept)
-        log.debug(f"Concept display: {stuff.concept.code} -> {concept_display}")
+        log.verbose(f"Concept display: {stuff.concept.code} -> {concept_display}")
         if stuff.is_list:
             concept_display = f"List of [{concept_display}]"
         if as_item_index is not None:
@@ -328,7 +328,7 @@ class PipelineTracker(PipelineTrackerProtocol):
 
     def _print_mermaid_flowchart_code_and_url(self, title: str | None = None, subtitle: str | None = None):
         if not self.nx_graph.nodes:
-            log.debug("No nodes in the pipeline tracker")
+            log.verbose("No nodes in the pipeline tracker")
             return
         if self.start_node is None:
             msg = "Start node is not set"
@@ -343,7 +343,7 @@ class PipelineTracker(PipelineTrackerProtocol):
 
     def _print_mermaid_flowchart_url(self, title: str | None = None, subtitle: str | None = None) -> str | None:
         if not self.nx_graph.nodes:
-            log.debug("No nodes in the pipeline tracker")
+            log.verbose("No nodes in the pipeline tracker")
             return None
         if self.start_node is None:
             msg = "Start node is not set"

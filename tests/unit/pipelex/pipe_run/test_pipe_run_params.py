@@ -1,109 +1,10 @@
 import pytest
 
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
 from pipelex.pipe_run.pipe_run_params import (
-    OutputMultiplicityResolution,
-    PipeOutputMultiplicity,
-    make_output_multiplicity,
     output_multiplicity_to_apply,
 )
-from tests.unit.pipelex.pipe_run.data import MAKE_OUTPUT_MULTIPLICITY_TEST_CASES, OUTPUT_MULTIPLICITY_TO_APPLY_TEST_CASES
-
-
-class TestMakeOutputMultiplicity:
-    @pytest.mark.parametrize(
-        ("nb_output", "multiple_output", "expected_result", "description"),
-        MAKE_OUTPUT_MULTIPLICITY_TEST_CASES,
-        ids=[case[3] for case in MAKE_OUTPUT_MULTIPLICITY_TEST_CASES],
-    )
-    def test_make_output_multiplicity_all_cases(
-        self,
-        nb_output: int | None,
-        multiple_output: bool | None,
-        expected_result: PipeOutputMultiplicity | None,
-        description: str,
-    ):
-        """Test make_output_multiplicity with all parameter combinations."""
-        result = make_output_multiplicity(nb_output=nb_output, multiple_output=multiple_output)
-        assert result == expected_result, f"Failed case: {description}"
-
-    def test_nb_output_precedence_over_multiple_output(self):
-        """Test that nb_output takes precedence when both parameters are provided."""
-        # When both are provided and nb_output is truthy, it should take precedence
-        result = make_output_multiplicity(nb_output=3, multiple_output=True)
-        assert result == 3
-
-        result = make_output_multiplicity(nb_output=1, multiple_output=False)
-        assert result == 1
-
-        # When nb_output is falsy (0), multiple_output should be used
-        result = make_output_multiplicity(nb_output=0, multiple_output=True)
-        assert result is True
-
-    def test_return_types(self):
-        """Test that the function returns the correct types."""
-        # Should return int when nb_output is provided
-        result = make_output_multiplicity(nb_output=5, multiple_output=None)
-        assert isinstance(result, int)
-        assert result == 5
-
-        # Should return bool when multiple_output=True and nb_output is falsy/None
-        result = make_output_multiplicity(nb_output=None, multiple_output=True)
-        assert isinstance(result, bool)
-        assert result is True
-
-        # Should return None when both are falsy/None
-        result = make_output_multiplicity(nb_output=None, multiple_output=None)
-        assert result is None
-
-        result = make_output_multiplicity(nb_output=0, multiple_output=False)
-        assert result is None
-
-    def test_edge_cases(self):
-        """Test edge cases and boundary conditions."""
-        # Negative numbers should still be truthy
-        result = make_output_multiplicity(nb_output=-1, multiple_output=True)
-        assert result == -1
-
-        # Large numbers
-        result = make_output_multiplicity(nb_output=999999, multiple_output=None)
-        assert result == 999999
-
-        # Zero is falsy, so multiple_output should be used
-        result = make_output_multiplicity(nb_output=0, multiple_output=True)
-        assert result is True
-
-        # Both falsy should return None
-        result = make_output_multiplicity(nb_output=0, multiple_output=False)
-        assert result is None
-
-    def test_mutually_exclusive_logic(self):
-        """Test the mutually exclusive behavior of the parameters."""
-        # nb_output takes precedence when truthy
-        assert make_output_multiplicity(nb_output=2, multiple_output=True) == 2
-        assert make_output_multiplicity(nb_output=2, multiple_output=False) == 2
-
-        # multiple_output is used when nb_output is falsy
-        assert make_output_multiplicity(nb_output=0, multiple_output=True) is True
-        assert make_output_multiplicity(nb_output=None, multiple_output=True) is True
-
-        # Default case when both are falsy/None
-        assert make_output_multiplicity(nb_output=0, multiple_output=False) is None
-        assert make_output_multiplicity(nb_output=None, multiple_output=False) is None
-        assert make_output_multiplicity(nb_output=None, multiple_output=None) is None
-
-    def test_function_signature_and_return_annotation(self):
-        """Test that the function can be called with the expected signature."""
-        # Test with keyword arguments
-        result = make_output_multiplicity(nb_output=3, multiple_output=None)
-        assert result == 3
-
-        # Test with positional arguments
-        result = make_output_multiplicity(5, False)
-        assert result == 5
-
-        # Test with mixed arguments
-        result = make_output_multiplicity(nb_output=2, multiple_output=True)
-        assert result == 2
+from tests.unit.pipelex.pipe_run.data import OUTPUT_MULTIPLICITY_TO_APPLY_TEST_CASES
 
 
 class TestOutputMultiplicityToApply:
@@ -116,9 +17,9 @@ class TestOutputMultiplicityToApply:
     )
     def test_output_multiplicity_to_apply_all_cases(
         self,
-        base: PipeOutputMultiplicity | None,
-        override: PipeOutputMultiplicity | None,
-        expected_result: OutputMultiplicityResolution,
+        base: VariableMultiplicity | None,
+        override: VariableMultiplicity | None,
+        expected_result: VariableMultiplicityResolution,
         description: str,
     ):
         """Test output_multiplicity_to_apply with all parameter combinations."""
@@ -207,7 +108,7 @@ class TestOutputMultiplicityToApply:
     def test_return_basemodel_structure(self):
         """Test that the function always returns an OutputMultiplicityResolution with correct types."""
         result = output_multiplicity_to_apply(base_multiplicity=None, override_multiplicity=None)
-        assert isinstance(result, OutputMultiplicityResolution)
+        assert isinstance(result, VariableMultiplicityResolution)
 
         # Test field types
         assert result.resolved_multiplicity is None or isinstance(result.resolved_multiplicity, (bool, int))

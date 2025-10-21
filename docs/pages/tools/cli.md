@@ -80,24 +80,87 @@ pipelex validate all
 ### Validate Single Pipe
 
 ```bash
-pipelex validate pipe PIPE_CODE
+pipelex validate PIPE_CODE
+pipelex validate --pipe PIPE_CODE
 ```
 
-Validates and dry-runs a specific pipe, useful for iterative development.
+Validates and dry-runs a specific pipe from your imported packages, useful for iterative development.
 
 **Arguments:**
 
-- `PIPE_CODE` - The pipe code to validate (e.g., `analyze_cv_matching` or `write_weekly_report`)
+- `PIPE_CODE` - The pipe code to validate as a positional argument, or use `--pipe` option
+
+**Options:**
+
+- `--pipe PIPE_CODE` - Explicitly specify the pipe code to validate (alternative to positional argument)
 
 **Examples:**
 
 ```bash
-# Validate a specific pipe
-pipelex validate pipe analyze_cv_matching
-pipelex validate pipe write_weekly_report
+# Validate a specific pipe (positional argument)
+pipelex validate analyze_cv_matching
+pipelex validate write_weekly_report
+
+# Validate a specific pipe (explicit option)
+pipelex validate --pipe analyze_cv_matching
 ```
 
-**What validation checks:**
+### Validate Bundle
+
+```bash
+pipelex validate BUNDLE_FILE.plx
+pipelex validate --bundle BUNDLE_FILE.plx
+```
+
+Validates all pipes defined in a bundle file. The command automatically detects `.plx` files as bundles.
+
+**Arguments:**
+
+- `BUNDLE_FILE.plx` - Path to the bundle file (auto-detected by `.plx` extension)
+
+**Options:**
+
+- `--bundle BUNDLE_FILE.plx` - Explicitly specify the bundle file path
+
+**Examples:**
+
+```bash
+# Validate a bundle (auto-detected)
+pipelex validate my_pipeline.plx
+pipelex validate pipelines/invoice_processor.plx
+
+# Validate a bundle (explicit option)
+pipelex validate --bundle my_pipeline.plx
+```
+
+**Note:** When validating a bundle, ALL pipes in that bundle are validated, not just the main pipe.
+
+### Validate Specific Pipe in Bundle
+
+```bash
+pipelex validate --bundle BUNDLE_FILE.plx --pipe PIPE_CODE
+```
+
+Validates all pipes in a bundle, while ensuring a specific pipe exists in that bundle. The entire bundle is validated, not just the specified pipe.
+
+**Options:**
+
+- `--bundle BUNDLE_FILE.plx` - Path to the bundle file
+- `--pipe PIPE_CODE` - Pipe code that must exist in the bundle
+
+**Examples:**
+
+```bash
+# Validate bundle and ensure specific pipe exists in it
+pipelex validate --bundle my_pipeline.plx --pipe extract_invoice
+pipelex validate --bundle invoice_processor.plx --pipe validate_amounts
+```
+
+**Important:** The specified pipe must be defined in the bundle. This is useful when you want to validate a bundle and confirm a specific pipe is present and valid within it. However, the entire bundle will be validated regardless.
+
+### What Validation Checks
+
+All validation commands check:
 
 - Syntax correctness of `.plx` files
 - Concept and pipe definitions are valid
@@ -374,8 +437,8 @@ For complete documentation including all options and examples, see [Kit Commands
 
 2. **Development Workflow**
    - Write or generate pipelines in `.plx` files
-   - Validate with `pipelex validate pipe your_pipe_code` during development
-   - Run `pipelex validate all` before committing changes, or pass a pipe code for faster iteration on a specific pipe
+   - Validate with `pipelex validate your_pipe_code` or `pipelex validate your_bundle.plx` during development
+   - Run `pipelex validate all` before committing changes
 
 3. **Running Pipelines**
    - Use `pipelex show pipes` to see available pipes

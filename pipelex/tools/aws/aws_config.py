@@ -32,7 +32,7 @@ class AwsConfig(ConfigModel):
     def get_aws_access_keys_with_method(self, api_key_method: AwsKeyMethod) -> tuple[str, str, str]:
         match api_key_method:
             case AwsKeyMethod.ENV:
-                log.debug("Getting AWS access keys from environment (key id and secret access key).")
+                log.verbose("Getting AWS access keys from environment (key id and secret access key).")
                 try:
                     aws_access_key_id = get_required_env(AWS_ACCESS_KEY_ID_VAR_NAME)
                     aws_secret_access_key = get_required_env(AWS_SECRET_ACCESS_KEY_VAR_NAME)
@@ -40,10 +40,10 @@ class AwsConfig(ConfigModel):
                 except EnvVarNotFoundError as exc:
                     msg = f"Error getting AWS access keys from environment: {exc}"
                     raise AwsCredentialsError(msg) from exc
-                log.debug("Getting AWS region from environment (priority override) or from aws_config.")
+                log.verbose("Getting AWS region from environment (priority override) or from aws_config.")
 
             case AwsKeyMethod.SECRET_PROVIDER:
-                log.debug("Getting AWS secret access key from secrets provider (key id and secret access key).")
+                log.verbose("Getting AWS secret access key from secrets provider (key id and secret access key).")
                 try:
                     aws_access_key_id = get_secret(AWS_ACCESS_KEY_ID_VAR_NAME)
                     aws_secret_access_key = get_secret(AWS_SECRET_ACCESS_KEY_VAR_NAME)
@@ -51,6 +51,6 @@ class AwsConfig(ConfigModel):
                 except SecretNotFoundError as exc:
                     msg = "Error getting AWS access keys from secrets provider."
                     raise AwsCredentialsError(msg) from exc
-                log.debug("Getting AWS region from environment (priority override) or from aws_config.")
+                log.verbose("Getting AWS region from environment (priority override) or from aws_config.")
 
         return aws_access_key_id, aws_secret_access_key, aws_region

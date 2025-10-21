@@ -81,7 +81,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             ensure_path(folder_path)
             img_path = f"{folder_path}/{image_id}_{image_index}.png"
             save_base_64_str_to_binary_file(base_64_str=image_base64, file_path=img_path)
-            log.debug(f"Saved image to {img_path}")
+            log.verbose(f"Saved image to {img_path}")
             generated_image_list.append(
                 GeneratedImage(
                     url=img_path,

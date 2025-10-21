@@ -1,7 +1,6 @@
 from typing import ClassVar
 
-from pipelex.builder.pipe.pipe_signature import PipeSpec
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 
@@ -20,7 +19,7 @@ class PipeBlueprintTestCases:
             type="PipeLLM",
             pipe_category="PipeOperator",
             description="A simple pipe",
-            inputs={"input": InputRequirementBlueprint(concept="Text")},
+            inputs={"input": "Text"},
             output="ProcessedText",
         ),
     )
@@ -43,8 +42,8 @@ class PipeBlueprintTestCases:
             pipe_category="PipeOperator",
             description="Pipe with input requirements",
             inputs={
-                "data": InputRequirementBlueprint(concept="Data"),
-                "config": InputRequirementBlueprint(concept="Config"),
+                "data": "Data",
+                "config": "Config",
             },
             output="Result",
         ),

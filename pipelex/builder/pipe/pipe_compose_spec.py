@@ -4,7 +4,7 @@ from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat

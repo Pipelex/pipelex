@@ -20,6 +20,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -41,7 +42,6 @@ from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import (
-    PipeOutputMultiplicity,
     PipeRunParamKey,
     PipeRunParams,
     output_multiplicity_to_apply,
@@ -60,7 +60,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     llm_prompt_spec: LLMPromptBlueprint
     llm_choices: LLMSettingChoices | None = None
     structuring_method: StructuringMethod | None = None
-    output_multiplicity: PipeOutputMultiplicity | None = None
+    output_multiplicity: VariableMultiplicity | None = None
 
     @model_validator(mode="after")
     def _validate_inputs(self) -> Self:
@@ -173,7 +173,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         llm_config = get_config().cogt.llm_config
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
-        log.debug(f"PipeLLM pipe_code = {self.code}")
         output_concept = self.output
         if self.output.code == SpecialDomain.NATIVE + "." + NativeConceptCode.DYNAMIC:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
@@ -264,16 +263,16 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             )
         else:
             if is_multiple_output:
-                log.debug(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
+                log.verbose(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
             else:
-                log.debug(f"PipeLLM generating a single object output, class name: '{output_concept.structure_class_name}'")
+                log.verbose(f"PipeLLM generating a single object output, class name: '{output_concept.structure_class_name}'")
 
             # TODO: we need a better solution for structuring_method (text then object), meanwhile,
             # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
             llm_prompt_2_factory: LLMPromptFactoryAbstract | None
             if self.structuring_method:
                 structuring_method = cast("StructuringMethod", self.structuring_method)
-                log.debug(f"PipeLLM pipe_code is '{self.code}' and structuring_method is '{structuring_method}'")
+                log.verbose(f"PipeLLM pipe_code is '{self.code}' and structuring_method is '{structuring_method}'")
                 match structuring_method:
                     case StructuringMethod.DIRECT:
                         llm_prompt_2_factory = None
@@ -281,9 +280,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         log.verbose(f"Creating llm_prompt_2_factory for pipe {self.code} with structuring_method {structuring_method}")
                         llm_prompt_2_factory = LLMPromptTemplate.make_for_structuring_from_preliminary_text()
             elif get_config().pipelex.structure_config.is_default_text_then_structure:
-                log.debug(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
+                log.verbose(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
                 llm_prompt_2_factory = LLMPromptTemplate.make_for_structuring_from_preliminary_text()
-                log.debug(llm_prompt_2_factory, title="llm_prompt_2_factory")
+                log.verbose(llm_prompt_2_factory, title="llm_prompt_2_factory")
             else:
                 llm_prompt_2_factory = None
 
@@ -349,12 +348,12 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 task_desc = f"{self.__class__.__name__}_gen_{fixed_nb_output}x{content_class.__class__.__name__}"
             else:
                 task_desc = f"{self.__class__.__name__}_gen_list_{content_class.__class__.__name__}"
-            log.dev(task_desc)
+            log.verbose(task_desc)
             generated_objects: list[StuffContent]
             if llm_prompt_2_factory is not None:
                 # We're generating a list of objects using preliminary text
                 method_desc = "text_then_object"
-                log.dev(f"{task_desc} by {method_desc}")
+                log.verbose(f"{task_desc} by {method_desc}")
                 log.verbose(f"llm_prompt_2_factory: {llm_prompt_2_factory}")
 
                 generated_objects = await content_generator.make_text_then_object_list(
@@ -369,7 +368,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             else:
                 # We're generating a list of objects directly
                 method_desc = "object_direct"
-                log.dev(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
+                log.verbose(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
                 generated_objects = await content_generator.make_object_list_direct(
                     job_metadata=job_metadata,
                     object_class=content_class,
@@ -431,8 +430,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
         concept = get_required_concept(concept_string=concept_string)
         output_class = get_class_registry().get_class(concept.structure_class_name)
-        log.debug(f"get_output_structure_prompt for {concept_string} with {is_with_preliminary_text=}")
-        log.debug(f"output_class: {output_class}")
         if not output_class:
             return None
 

@@ -15,7 +15,7 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import StuffContentValidationError, StuffError
+from pipelex.exceptions import StuffArtefactReservedFieldError, StuffContentTypeError, StuffContentValidationError
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
 
@@ -39,7 +39,7 @@ class Stuff(CustomBaseModel):
                 msg = f"""Cannot create stuff artefact for stuff '{stuff_name}' of concept '{self.concept.code}' because reserved field '{key}'
 in the structured output '{self.content.__class__.__name__}' already exists in the stuff content.
 Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code', 'content'."""
-                raise StuffError(msg)
+                raise StuffArtefactReservedFieldError(message=msg)
             artefact_dict[key] = value
 
         set_artefact_field("stuff_name", self.stuff_name)
@@ -114,7 +114,7 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
             if type(content).__name__ == content_type.__name__:
                 content_dict = content.smart_dump()
                 validated_content = content_type.model_validate(content_dict)
-                log.debug(f"Model validation passed: converted {type(content).__name__} to {content_type.__name__}")
+                log.verbose(f"Model validation passed: converted {type(content).__name__} to {content_type.__name__}")
                 return validated_content
         except ValidationError as exc:
             formatted_error = format_pydantic_validation_error(exc)
@@ -124,8 +124,9 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
                 validation_error=formatted_error,
             ) from exc
 
-        msg = f"Content is of type '{type(content)}', instead of the expected '{content_type}'"
-        raise TypeError(msg)
+        actual_type = type(content)
+        msg = f"Content is of type '{actual_type}', instead of the expected '{content_type}'"
+        raise StuffContentTypeError(message=msg, expected_type=content_type.__name__, actual_type=actual_type.__name__)
 
     def as_list_content(self) -> ListContent:  # pyright: ignore[reportMissingTypeArgument, reportUnknownParameterType]
         """Get content as ListContent with items of any type."""
@@ -155,7 +156,7 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
     @property
     def as_text(self) -> TextContent:
         """Get content as TextContent if applicable."""
-        return self.content_as(TextContent)
+        return self.content_as(content_type=TextContent)
 
     @property
     def as_str(self) -> str:
@@ -165,29 +166,29 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
     @property
     def as_image(self) -> ImageContent:
         """Get content as ImageContent if applicable."""
-        return self.content_as(ImageContent)
+        return self.content_as(content_type=ImageContent)
 
     @property
     def as_pdf(self) -> PDFContent:
         """Get content as PDFContent if applicable."""
-        return self.content_as(PDFContent)
+        return self.content_as(content_type=PDFContent)
 
     @property
     def as_text_and_image(self) -> TextAndImagesContent:
         """Get content as TextAndImageContent if applicable."""
-        return self.content_as(TextAndImagesContent)
+        return self.content_as(content_type=TextAndImagesContent)
 
     @property
     def as_number(self) -> NumberContent:
         """Get content as NumberContent if applicable."""
-        return self.content_as(NumberContent)
+        return self.content_as(content_type=NumberContent)
 
     @property
     def as_html(self) -> HtmlContent:
         """Get content as HtmlContent if applicable."""
-        return self.content_as(HtmlContent)
+        return self.content_as(content_type=HtmlContent)
 
     @property
     def as_mermaid(self) -> MermaidContent:
         """Get content as MermaidContent if applicable."""
-        return self.content_as(MermaidContent)
+        return self.content_as(content_type=MermaidContent)

@@ -48,7 +48,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        log.debug(f"Applying function '{self.function_name}'")
+        log.verbose(f"Applying function '{self.function_name}'")
 
         function = func_registry.get_required_function(self.function_name)
 
@@ -93,7 +93,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        log.debug(f"Dry run for PipeFunc '{self.function_name}'")
+        log.verbose(f"Dry run for PipeFunc '{self.function_name}'")
 
         function = func_registry.get_required_function(self.function_name)
 

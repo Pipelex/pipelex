@@ -18,6 +18,8 @@ This release introduces several breaking changes to make the Pipelex language mo
 - [ ] Move .plx files to appropriate locations in your project
 - [ ] Update Pipelex.make() calls (remove config path parameters)
 - [ ] Add @pipe_func() decorators to custom functions used in PipeFunc operators
+- [ ] **Update input multiplicity syntax to use bracket notation**
+- [ ] **Update output multiplicity to use bracket notation (remove nb_output/multiple_output)**
 - [ ] Update PipeCompose (formerly PipeJinja2)
 - [ ] Update PipeExtract (formerly PipeOCR)
 - [ ] Update PipeLLM prompts and fields
@@ -270,7 +272,108 @@ Solution:
 2. Ensure function is `async` and accepts `working_memory`
 3. Verify function is in a discoverable location
 
-## 2. General Changes
+## 2. Input Multiplicity Syntax Simplification
+
+Input multiplicity now uses concise bracket notation instead of verbose dictionary syntax.
+
+### Migration Patterns
+
+- `{ concept = "ConceptName" }` → `"ConceptName"`
+- `{ concept = "ConceptName", multiplicity = true }` → `"ConceptName[]"`
+- `{ concept = "ConceptName", multiplicity = N }` → `"ConceptName[N]"`
+
+### Examples
+
+**Variable list:**
+
+Before: `inputs = { documents = { concept = "Document", multiplicity = true } }`
+
+After: `inputs = { documents = "Document[]" }`
+
+**Fixed count:**
+
+Before: `inputs = { images = { concept = "Image", multiplicity = 2 } }`
+
+After: `inputs = { images = "Image[2]" }`
+
+## 3. Output Multiplicity - Bracket Notation
+
+Output multiplicity now uses bracket notation in the output field instead of separate parameters.
+
+### Migration Patterns
+
+**Variable output:**
+- Before: `output = "Concept"` + `multiple_output = true`
+- After: `output = "Concept[]"`
+
+**Fixed output:**
+- Before: `output = "Concept"` + `nb_output = 5`
+- After: `output = "Concept[5]"`
+
+### Examples
+
+**PipeLLM variable output:**
+
+Before:
+```plx
+[pipe.extract_companies]
+type = "PipeLLM"
+inputs = { article = "Article" }
+output = "CompanyName"
+multiple_output = true
+```
+
+After:
+```plx
+[pipe.extract_companies]
+type = "PipeLLM"
+inputs = { article = "Article" }
+output = "CompanyName[]"
+```
+
+**PipeLLM fixed output:**
+
+Before:
+```plx
+[pipe.generate_ideas]
+type = "PipeLLM"
+output = "Idea"
+nb_output = 3
+```
+
+After:
+```plx
+[pipe.generate_ideas]
+type = "PipeLLM"
+output = "Idea[3]"
+```
+
+**PipeImgGen fixed output:**
+
+Before:
+```plx
+[pipe.generate_logos]
+type = "PipeImgGen"
+inputs = { prompt = "ImgGenPrompt" }
+output = "Image"
+nb_output = 3
+```
+
+After:
+```plx
+[pipe.generate_logos]
+type = "PipeImgGen"
+inputs = { prompt = "ImgGenPrompt" }
+output = "Image[3]"
+```
+
+### Find and Replace
+
+In `.plx` files, remove these fields when updating to bracket notation:
+- Remove `multiple_output = true` → Add `[]` to output
+- Remove `nb_output = N` → Add `[N]` to output
+
+## 4. General Changes
 
 ### Rename `definition` to `description`
 
@@ -293,7 +396,7 @@ type = "PipeLLM"
 description = "Process data"
 ```
 
-## 3. PipeCompose (formerly PipeJinja2)
+## 5. PipeCompose (formerly PipeJinja2)
 
 ### Rename pipe type
 
@@ -355,7 +458,7 @@ category = "html"
 templating_style = { tag_style = "square_brackets", text_format = "html" }
 ```
 
-## 4. PipeExtract (formerly PipeOCR)
+## 6. PipeExtract (formerly PipeOCR)
 
 ### Rename pipe type
 
@@ -401,7 +504,7 @@ If you're using these functions in Python code:
 **Find:** `ocr_page_contents_and_views_from_pdf`
 **Replace with:** `extract_page_contents_and_views_from_pdf`
 
-## 5. PipeLLM Changes
+## 7. PipeLLM Changes
 
 ### Rename prompt field
 
@@ -479,7 +582,7 @@ Extract person information from this text:
 """
 ```
 
-## 6. PipeImgGen Changes
+## 8. PipeImgGen Changes
 
 ### Rename model field
 
@@ -519,7 +622,7 @@ Or use a preset:
 model = "img_gen_preset_name"
 ```
 
-## 7. PipeCondition Changes
+## 9. PipeCondition Changes
 
 ### Rename outcome fields
 
@@ -569,7 +672,7 @@ To fail when no match:
 default_outcome = "fail"
 ```
 
-## 8. Configuration Files (.pipelex/ directory)
+## 10. Configuration Files (.pipelex/ directory)
 
 ### LLM presets in deck files
 
@@ -656,7 +759,7 @@ is_auto_setup_preset_extract = true
 nb_extract_pages = 10
 ```
 
-## 9. Test Markers
+## 11. Test Markers
 
 ### Update pytest markers
 
@@ -691,7 +794,7 @@ class TestExtractPipeline:
 **Find:** `make test-ocr` or `make to`
 **Replace with:** `make test-extract` or `make te`
 
-## 10. Validation
+## 12. Validation
 
 After making changes, thoroughly test your migration:
 
@@ -735,7 +838,7 @@ source .venv/bin/activate  # Unix/macOS
    - Verify structure classes are discovered
    - Confirm custom functions are registered
 
-## 11. Python API Changes for Client Projects
+## 13. Python API Changes for Client Projects
 
 These changes affect Python code that imports from or uses pipelex.
 
@@ -979,7 +1082,7 @@ get_inference_manager().set_llm_worker_from_external_plugin(
 )
 ```
 
-## 12. File Cleanup
+## 14. File Cleanup
 
 ### Remove Deprecated Files
 
@@ -1004,7 +1107,7 @@ If your project has `AGENTS.md` or `CLAUDE.md` files with Pipelex examples:
    - `llm = ` → `model = `
    - `prompt_template = ` → `prompt = `
 
-## 13. Common Issues
+## 15. Common Issues
 
 ### Issue: Pipeline validation fails with "unknown field"
 
@@ -1070,7 +1173,7 @@ from pipelex.core.stuffs.text_content import TextContent
 - `pipelex.pipe_operators.ocr` → `pipelex.pipe_operators.extract`
 - All class names: `Ocr*` → `Extract*`
 
-## 14. Automation Tools
+## 16. Automation Tools
 
 You can automate many of these text replacements using standard tools available on your platform:
 
@@ -1092,6 +1195,12 @@ The following replacements can be done with find/replace tools:
 
 **In `.plx` files:**
 - `definition = "` → `description = "`
+- `{ concept = "ConceptName", multiplicity = false }` → `"ConceptName"`
+- `{ concept = "ConceptName", multiplicity = true }` → `"ConceptName[]"`
+- `{ concept = "ConceptName", multiplicity = N }` → `"ConceptName[N]"`
+- `{ concept = "ConceptName" }` → `"ConceptName"`
+- Remove `multiple_output = true` lines and add `[]` to output field
+- Remove `nb_output = N` lines and add `[N]` to output field
 - `type = "PipeJinja2"` → `type = "PipeCompose"`
 - `type = "PipeOCR"` → `type = "PipeExtract"`
 - `prompt_template = ` → `prompt = `
@@ -1101,6 +1210,10 @@ The following replacements can be done with find/replace tools:
 - `default_pipe_code = ` → `default_outcome = `
 
 **In `.py` files:**
+- Remove `from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint`
+- `InputRequirementBlueprint(concept="ConceptName", multiplicity=True)` → `"ConceptName[]"`
+- `InputRequirementBlueprint(concept="ConceptName", multiplicity=N)` → `"ConceptName[N]"`
+- `InputRequirementBlueprint(concept="ConceptName")` → `"ConceptName"`
 - `ocr_page_contents_from_pdf` → `extract_page_contents_from_pdf`
 - Remove `relative_config_folder_path` parameters from `Pipelex.make()`
 - Remove `config_folder_path` parameters from `Pipelex.make()`
@@ -1145,7 +1258,7 @@ These require manual intervention:
 3. **Activate your virtual environment** before running Pipelex commands
 4. **Validate after each change** (see Validation section)
 
-## 15. Additional Resources
+## 17. Additional Resources
 
 - See AGENTS.md for complete documentation of the current syntax
 - Run `make validate` frequently to catch issues early

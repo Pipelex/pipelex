@@ -1,7 +1,8 @@
 from typing import Any
 
 from pipelex.config import get_config
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 
 
 class PipeRunParamsFactory:
@@ -10,7 +11,7 @@ class PipeRunParamsFactory:
         cls,
         pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
         pipe_stack_limit: int | None = None,
-        output_multiplicity: PipeOutputMultiplicity | None = None,
+        output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
         batch_params: BatchParams | None = None,
         params: dict[str, Any] | None = None,

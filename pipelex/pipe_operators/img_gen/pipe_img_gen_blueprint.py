@@ -19,6 +19,5 @@ class PipeImgGenBlueprint(PipeBlueprint):
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
-    nb_output: int | None = Field(default=None, ge=1)
     background: Background | None = Field(default=None, strict=False)
     output_format: OutputFormat | None = Field(default=None, strict=False)

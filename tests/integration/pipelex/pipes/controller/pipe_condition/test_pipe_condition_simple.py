@@ -10,7 +10,6 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import DryRunError
@@ -33,7 +32,7 @@ class TestPipeConditionSimple:
         """Test PipeCondition with long text that should trigger capitalize_long_text pipe."""
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Text length condition for testing",
-            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}")},
+            inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             outcomes={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
@@ -103,7 +102,7 @@ class TestPipeConditionSimple:
         # Create PipeCondition instance - pipes are loaded from PLX files
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Text length condition for short text testing",
-            inputs={"input_text": InputRequirementBlueprint(concept=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}")},
+            inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             outcomes={"long": "capitalize_long_text", "short": "add_prefix_short_text"},

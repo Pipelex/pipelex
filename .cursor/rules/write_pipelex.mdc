@@ -91,23 +91,23 @@ inputs = {
 
 ### Input Multiplicity
 
-By default, inputs expect a single item. Use expanded syntax to specify multiple items:
+By default, inputs expect a single item. Use bracket notation to specify multiple items:
 
 ```plx
-# Single item (default) - use standard syntax
+# Single item (default)
 inputs = { document = "Text" }
 
 # Variable list - indeterminate number of items
-inputs = { documents = { concept = "Text", multiplicity = true } }
+inputs = { documents = "Text[]" }
 
 # Fixed count - exactly N items
-inputs = { comparison_items = { concept = "Image", multiplicity = 2 } }
+inputs = { comparison_items = "Image[2]" }
 ```
 
 **Key points:**
-- Don't use `multiplicity = false` - it's unnecessary (default behavior)
-- Use `multiplicity = true` for lists of unknown length
-- Use `multiplicity = N` (integer > 1) when operation requires exact count (e.g., comparing 2 items)
+- No brackets = single item (default behavior)
+- Use `[]` for lists of unknown length
+- Use `[N]` (where N is an integer) when operation requires exact count (e.g., comparing 2 items)
 
 ## Structuring Models
 
@@ -375,22 +375,22 @@ prompt = "Analyze this data"
 
 ### Multiple Outputs
 
-Generate multiple outputs (fixed number):
+Generate multiple outputs (fixed number) - use bracket notation:
 ```plx
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate ideas"
-output = "Idea"
-nb_output = 3  # Generate exactly 3 ideas
+output = "Idea[3]"  # Generate exactly 3 ideas
+prompt = "Generate 3 ideas"
 ```
 
-Generate multiple outputs (variable number):
+Generate multiple outputs (variable number) - use bracket notation:
 ```plx
 [pipe.generate_ideas]
 type = "PipeLLM"
 description = "Generate ideas"
-output = "Idea"
-multiple_output = true  # Let the LLM decide how many to generate
+output = "Idea[]"  # Let the LLM decide how many to generate
+prompt = "Generate ideas"
 ```
 
 ### Vision
@@ -641,8 +641,7 @@ Multiple Image Generation:
 type = "PipeImgGen"
 description = "Generate multiple image variations"
 inputs = { prompt = "ImgGenPrompt" }
-output = "Image"
-nb_output = 3
+output = "Image[3]"
 seed = "auto"
 ```
 
@@ -669,7 +668,6 @@ safety_tolerance = 3
 - `quality`: Image quality ("standard", "hd")
 
 **Output Configuration:**
-- `nb_output`: Number of images to generate
 - `aspect_ratio`: Image dimensions ("1:1", "16:9", "9:16", etc.)
 - `output_format`: File format ("png", "jpeg", "webp")
 - `background`: Background type ("default", "transparent")

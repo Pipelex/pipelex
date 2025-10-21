@@ -16,11 +16,17 @@ from pipelex.exceptions import StaticValidationErrorType
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.execute import execute_pipeline
-from pipelex.tools.misc.file_utils import save_text_to_path
+from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
 
 
 class BuilderLoop:
-    async def build_and_fix(self, pipe_code: str, input_memory: ImplicitMemory | None = None) -> PipelexBundleSpec:
+    async def build_and_fix(
+        self,
+        pipe_code: str,
+        input_memory: ImplicitMemory | None = None,
+        is_save_first_iteration_enabled: bool = True,
+        is_save_second_iteration_enabled: bool = False,
+    ) -> PipelexBundleSpec:
         pretty_print(f"Building and fixing with {pipe_code}")
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
@@ -31,17 +37,33 @@ class BuilderLoop:
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
         pretty_print(pipelex_bundle_spec, title="Pipelex Bundle Spec • 1st iteration")
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-        save_text_to_path(text=plx_content, path="results/generated_pipeline_1st_iteration.plx")
+
+        if is_save_first_iteration_enabled:
+            first_iteration_path = get_incremental_file_path(
+                base_path="results",
+                base_name="generated_pipeline_1st_iteration",
+                extension="plx",
+            )
+            save_text_to_path(text=plx_content, path=first_iteration_path)
 
         try:
             await validate_bundle_spec(bundle_spec=pipelex_bundle_spec)
         except PipelexBundleError as bundle_error:
             pretty_print(bundle_error.as_structured_content(), title="Pipelex Bundle Error")
-            pipelex_bundle_spec = self._fix_bundle_error(bundle_error=bundle_error, pipelex_bundle_spec=pipelex_bundle_spec)
+            pipelex_bundle_spec = self._fix_bundle_error(
+                bundle_error=bundle_error,
+                pipelex_bundle_spec=pipelex_bundle_spec,
+                is_save_second_iteration_enabled=is_save_second_iteration_enabled,
+            )
 
         return pipelex_bundle_spec
 
-    def _fix_bundle_error(self, bundle_error: PipelexBundleError, pipelex_bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
+    def _fix_bundle_error(
+        self,
+        bundle_error: PipelexBundleError,
+        pipelex_bundle_spec: PipelexBundleSpec,
+        is_save_second_iteration_enabled: bool,
+    ) -> PipelexBundleSpec:
         fixed_pipes: list[PipeSpecUnion] = []
 
         # Fix static validation errors for PipeController inputs
@@ -84,10 +106,15 @@ class BuilderLoop:
                     msg = "Static validation error had too many candidate inputs. We don't support fixing this error yet."
                     raise PipelexBundleNoFixForError(message=msg) from bundle_error
 
-        if fixed_pipes:
+        if fixed_pipes and is_save_second_iteration_enabled:
             pipelex_bundle_spec = reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes)
             pretty_print(pipelex_bundle_spec, title="Pipelex Bundle Spec • 2nd iteration")
             plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-            save_text_to_path(text=plx_content, path="results/generated_pipeline_2nd_iteration.plx")
+            second_iteration_path = get_incremental_file_path(
+                base_path="results",
+                base_name="generated_pipeline_2nd_iteration",
+                extension="plx",
+            )
+            save_text_to_path(text=plx_content, path=second_iteration_path)
 
         return pipelex_bundle_spec

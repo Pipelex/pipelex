@@ -17,7 +17,7 @@ class TestPipeImgGenValidateInputs:
         test_id: str,
         blueprint: PipeImgGenBlueprint,
     ):
-        log.debug(f"Testing valid case: {test_id}")
+        log.verbose(f"Testing valid case: {test_id}")
 
         pipe_img_gen = PipeImgGenFactory.make_from_blueprint(
             domain="test_domain",
@@ -39,7 +39,7 @@ class TestPipeImgGenValidateInputs:
         blueprint: PipeImgGenBlueprint,
         expected_error_message_fragment: str,
     ):
-        log.debug(f"Testing error case: {test_id}")
+        log.verbose(f"Testing error case: {test_id}")
 
         with pytest.raises((StaticValidationError, PipeDefinitionError)) as exc_info:
             PipeImgGenFactory.make_from_blueprint(

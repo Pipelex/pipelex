@@ -13,7 +13,7 @@ class ExtractedImage(CustomBaseModel):
 
     def save_to_directory(self, directory: str):
         ensure_directory_exists(directory)
-        log.debug(f"Saving image to directory: {directory}")
+        log.verbose(f"Saving image to directory: {directory}")
         if base_64 := self.base_64:
             filename = self.image_id
             file_path = f"{directory}/{filename}"
@@ -34,7 +34,7 @@ class Page(CustomBaseModel):
 
     def save_to_directory(self, directory: str, page_text_file_name: str):
         ensure_directory_exists(directory)
-        log.debug(f"Saving page to directory: {directory}")
+        log.verbose(f"Saving page to directory: {directory}")
         if text := self.text:
             filename = page_text_file_name
             save_text_to_path(text=text, path=f"{directory}/{filename}")

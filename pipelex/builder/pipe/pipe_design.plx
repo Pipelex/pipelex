@@ -56,6 +56,8 @@ You will specifically generate the PipeSequence related to this signature:
 
 Here are the concepts you can use for inputs/outputs:
 @concept_specs
+
+- If you are to apply a pipe step to a previous output which is multiple, use batch_over/batch_as attributes in that step.
 """
 
 [pipe.detail_pipe_parallel]

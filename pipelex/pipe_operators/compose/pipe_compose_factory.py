@@ -6,6 +6,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
@@ -28,9 +29,12 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             template_category=blueprint.template_category,
         )
 
+        # Parse output to strip multiplicity brackets
+        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
+
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
-            concept_string_or_code=blueprint.output,
+            concept_string_or_code=output_parse_result.concept,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeCompose(

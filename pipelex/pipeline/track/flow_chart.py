@@ -52,7 +52,7 @@ class PipelineFlowChart:
         if nb_nodes == 0:
             msg = "Graph has no nodes"
             raise JobHistoryError(msg)
-        log.debug(f"Generating mermaid flowchart for the whole graph which holds {nb_nodes} nodes")
+        log.verbose(f"Generating mermaid flowchart for the whole graph which holds {nb_nodes} nodes")
         mermaid_settings: dict[str, Any] = {}
         if title:
             mermaid_settings["title"] = title
@@ -158,7 +158,7 @@ class PipelineFlowChart:
         for cycle, (subgraph_name, nodes) in enumerate(graph_tree.nodes_by_subgraph.items()):
             node_lines: list[str] = []
             for node in nodes:
-                # log.debug(f"generate_subgraph_lines for node '{node}'")
+                # log.verbose(f"generate_subgraph_lines for node '{node}'")
                 node_attributes = self.nx_graph.nodes[node]
                 if not node_attributes:
                     msg = f"Node attributes are empty for node '{node}'"

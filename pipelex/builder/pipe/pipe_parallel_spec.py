@@ -4,7 +4,7 @@ from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
 
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint

@@ -5,7 +5,6 @@ import shortuuid
 from pydantic import model_validator
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
@@ -59,7 +58,7 @@ class PipeBatch(PipeController):
         for variable_name in required_variables:
             if variable_name not in self.inputs.root:
                 msg = f"Input '{variable_name}' of pipe '{self.code}' is not in the inputs of the pipe '{self.branch_pipe_code}'"
-                raise PipeInputError(msg)
+                raise PipeInputError(message=msg, pipe_code=self.code, variable_name=variable_name, concept_code=None)
         return self
 
     @override
@@ -92,11 +91,10 @@ class PipeBatch(PipeController):
             input_item_concept_code = self.inputs.get_required_input_requirement(input_item_stuff_name)
         except PipeInputNotFoundError as exc:
             msg = f"Batch input item stuff named '{input_item_stuff_name}' is not in this PipeBatch '{self.code}' input spec: {self.inputs}"
-            raise PipeInputError(msg) from exc
+            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=input_item_stuff_name, concept_code=None) from exc
 
         if pipe_run_params.final_stuff_code:
             method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "_run_controller_pipe"
-            log.debug(f"PipeBatch.{method_name}() final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
         pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
@@ -106,14 +104,13 @@ class PipeBatch(PipeController):
             msg = (
                 f"Input list stuff '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory: {exc}"
             )
-            raise PipeInputError(msg) from exc
+            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=batch_params.input_list_stuff_name, concept_code=None) from exc
 
         input_stuff_code = input_stuff.stuff_code
         input_content = input_stuff.content
-
         if not isinstance(input_content, ListContent):
             msg = f"Input of PipeBatch must be ListContent, got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}"
-            raise PipeInputError(msg)
+            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=batch_params.input_list_stuff_name, concept_code=None)
         input_content = cast("ListContent[StuffContent]", input_content)
 
         # TODO: Make commented code work when inputing images named "a.b.c"

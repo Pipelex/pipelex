@@ -1,15 +1,13 @@
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.cogt.llm.llm_setting import LLMSetting
-from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.tools.typing.validation_utils import has_more_than_one_among_attributes_from_list
-from pipelex.types import Self, StrEnum
+from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_setting import LLMModelChoice
@@ -73,11 +71,11 @@ class PipeLLMSpec(PipeSpec):
     PipeLLM enables Large Language Model processing to generate text or structured output.
     Supports text, structured data, and image inputs.
 
-    Validation Rules:
-        nb_output: Fixed number of outputs to generate (e.g., 3 for exactly 3 outputs).
-                  Must be > 1. Mutually exclusive with multiple_output.
-        multiple_output: Enables variable-length list generation. Default is false (single output).
-                        Set to true for indeterminate number of outputs. Mutually exclusive with nb_output.
+    Output Multiplicity:
+        Specify using bracket notation in output field:
+        - output = "Text" - single item (default)
+        - output = "Text[]" - variable list
+        - output = "Text[3]" - exactly 3 items
 
     """
 
@@ -105,35 +103,10 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 """
     )
 
-    nb_output: int | None = Field(
-        default=None,
-        description=(
-            "Specifies exactly how many outputs to generate (e.g., `nb_output = 3` for exactly 3 outputs). "
-            "Set it if we need a fixed number of results."
-        ),
-        gt=1,
-    )
-    multiple_output: bool | None = Field(
-        default=None,
-        description=(
-            "Controls output generation mode. Set to `true` for variable-length list generation when we need an indeterminate number of outputs."
-        ),
-    )
-
     @field_validator("llm", mode="before")
     @classmethod
     def validate_llm(cls, llm_value: str) -> LLMSkill:
         return LLMSkill(llm_value)
-
-    @model_validator(mode="after")
-    def validate_multiple_output(self) -> Self:
-        if excess_attributes_list := has_more_than_one_among_attributes_from_list(
-            self,
-            attributes_list=["nb_output", "multiple_output"],
-        ):
-            msg = f"PipeLLMSpec must have no more than one of {excess_attributes_list}"
-            raise PipeDefinitionError(msg)
-        return self
 
     @override
     def to_blueprint(self) -> PipeLLMBlueprint:
@@ -159,6 +132,4 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
             system_prompt=self.system_prompt,
             prompt=self.prompt,
             model=llm_choice,
-            nb_output=self.nb_output,
-            multiple_output=self.multiple_output,
         )

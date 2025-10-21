@@ -1,5 +1,4 @@
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_concept_library
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
@@ -29,7 +28,7 @@ class TestPipeConditionValidation:
 
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Test condition for validation",
-            inputs={"input_var": InputRequirementBlueprint(concept=concept_1.concept_string)},
+            inputs={"input_var": concept_1.concept_string},
             output=concept_2.concept_string,
             expression="input_var",
             outcomes={"value1": "pipe_a", "value2": "pipe_b"},
@@ -71,7 +70,7 @@ class TestPipeConditionValidation:
 
         pipe_condition_template_blueprint = PipeConditionBlueprint(
             description="Test condition with expression template",
-            inputs={"var": InputRequirementBlueprint(concept=concept_1.concept_string)},
+            inputs={"var": concept_1.concept_string},
             output=concept_2.concept_string,
             expression_template="{{ var }}",
             outcomes={"value": "target_pipe"},
@@ -87,7 +86,7 @@ class TestPipeConditionValidation:
         # Test with expression
         pipe_condition_expr_blueprint = PipeConditionBlueprint(
             description="Test condition with expression",
-            inputs={"var": InputRequirementBlueprint(concept=concept_1.concept_string)},
+            inputs={"var": concept_1.concept_string},
             output=concept_2.concept_string,
             expression="var",
             outcomes={"value": "target_pipe"},

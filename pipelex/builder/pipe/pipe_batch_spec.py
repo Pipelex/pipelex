@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 
 

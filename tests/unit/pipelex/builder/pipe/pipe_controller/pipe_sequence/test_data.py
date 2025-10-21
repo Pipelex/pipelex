@@ -2,7 +2,6 @@ from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
@@ -23,7 +22,7 @@ class PipeSequenceTestCases:
         ),
         PipeSequenceBlueprint(
             description="A sequence of operations",
-            inputs={"input_data": InputRequirementBlueprint(concept="Text")},
+            inputs={"input_data": "Text"},
             output="ProcessedData",
             type="PipeSequence",
             pipe_category="PipeController",
@@ -54,7 +53,7 @@ class PipeSequenceTestCases:
         ),
         PipeSequenceBlueprint(
             description="Sequence with batch",
-            inputs={"items": InputRequirementBlueprint(concept="ItemList")},
+            inputs={"items": "ItemList"},
             output="ProcessedItems",
             type="PipeSequence",
             pipe_category="PipeController",

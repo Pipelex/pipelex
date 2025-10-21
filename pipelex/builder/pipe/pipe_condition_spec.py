@@ -4,7 +4,7 @@ from pydantic import Field
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 

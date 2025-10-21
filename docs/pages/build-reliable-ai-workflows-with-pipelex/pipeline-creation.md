@@ -27,7 +27,7 @@ pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 
 **Options:**
 
-- `--output, -o`: Output path for generated PLX file (default: `./results/generated_pipeline.plx`)
+- `--output, -o`: Output path for generated PLX file
 - `--no-output`: Skip saving the pipeline to file
 
 ### Build One-Shot (Fast)
@@ -80,7 +80,7 @@ This will:
 2. Generate a complete pipeline with appropriate concepts and pipes
 3. Validate the pipeline for correctness
 4. Fix any deterministic issues automatically
-5. Save the working pipeline to `./results/generated_pipeline.plx`
+5. Save the working pipeline
 
 ## Best Practices
 

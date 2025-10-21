@@ -22,7 +22,7 @@ class ActivityManager(ActivityManagerProtocol):
     @override
     def teardown(self) -> None:
         self._reset()
-        log.debug("ActivityManager teardown done")
+        log.verbose("ActivityManager teardown done")
 
     def _reset(self):
         self.activity_callbacks = {}
@@ -40,5 +40,5 @@ class ActivityManager(ActivityManagerProtocol):
     @override
     def dispatch_activity(self, activity_report: ActivityReport):
         for key, callback in self.activity_callbacks.items():
-            log.dev(f"Dispatching activity to callback '{key}'")
+            log.verbose(f"Dispatching activity to callback '{key}'")
             callback(activity_report)

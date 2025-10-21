@@ -12,8 +12,8 @@ from pipelex.hub import (
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
-    PipeOutputMultiplicity,
     PipeRunMode,
+    VariableMultiplicity,
 )
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -26,7 +26,7 @@ async def execute_pipeline(
     input_memory: ImplicitMemory | None = None,
     search_domains: list[str] | None = None,
     output_name: str | None = None,
-    output_multiplicity: PipeOutputMultiplicity | None = None,
+    output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
 ) -> PipeOutput:

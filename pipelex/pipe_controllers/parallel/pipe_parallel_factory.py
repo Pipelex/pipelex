@@ -5,6 +5,7 @@ from typing_extensions import override
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_required_concept
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
@@ -43,10 +44,13 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
                 message=msg, domain_code=domain, pipe_code=pipe_code, description=blueprint.description, source=blueprint.source
             )
 
+        # Parse output to strip multiplicity brackets
+        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
+
         if blueprint.combined_output:
             combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                 domain=domain,
-                concept_string_or_code=blueprint.output,
+                concept_string_or_code=output_parse_result.concept,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
             combined_output = get_required_concept(
@@ -60,7 +64,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
 
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
-            concept_string_or_code=blueprint.output,
+            concept_string_or_code=output_parse_result.concept,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeParallel(

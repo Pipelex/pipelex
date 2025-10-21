@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Union
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex import log
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
 from pipelex.exceptions import BatchParamsError
 from pipelex.types import Self, StrEnum
 
@@ -30,58 +31,11 @@ class PipeRunMode(StrEnum):
 
 FORCE_DRY_RUN_MODE_ENV_KEY = "PIPELEX_FORCE_DRY_RUN_MODE"
 
-PipeOutputMultiplicity = Union[bool, int]
-
-
-class OutputMultiplicityResolution(BaseModel):
-    """Result of resolving output multiplicity settings between base and override values.
-
-    This model provides a clear, structured representation of how output multiplicity
-    should be applied, replacing the previous tuple-based return format.
-    """
-
-    resolved_multiplicity: PipeOutputMultiplicity | None = Field(description="The final multiplicity value to use after resolution")
-
-    is_multiple_outputs_enabled: bool = Field(description="Whether multiple outputs should be generated")
-
-    specific_output_count: int | None = Field(default=None, description="Exact number of outputs to generate, if specified")
-
-
-def make_output_multiplicity(nb_output: int | None, multiple_output: bool | None) -> PipeOutputMultiplicity | None:
-    """This function takes two mutually exclusive parameters that control how many outputs
-    a pipe should generate and converts them into a single PipeOutputMultiplicity type.
-
-    Args:
-        nb_output: Specific number of outputs to generate. If provided and truthy,
-                  takes precedence over multiple_output.
-        multiple_output: Boolean flag indicating whether to generate multiple outputs.
-                        If True, lets the LLM decide how many outputs to generate.
-
-    Examples:
-        >>> make_output_multiplicity(nb_output=3, multiple_output=None)
-        3
-        >>> make_output_multiplicity(nb_output=None, multiple_output=True)
-        True
-        >>> make_output_multiplicity(nb_output=None, multiple_output=False)
-        None
-        >>> make_output_multiplicity(nb_output=0, multiple_output=True)
-        True
-
-    """
-    output_multiplicity: PipeOutputMultiplicity | None
-    if nb_output:
-        output_multiplicity = nb_output
-    elif multiple_output:
-        output_multiplicity = True
-    else:
-        output_multiplicity = None
-    return output_multiplicity
-
 
 def output_multiplicity_to_apply(
-    base_multiplicity: PipeOutputMultiplicity | None,
-    override_multiplicity: PipeOutputMultiplicity | None,
-) -> OutputMultiplicityResolution:
+    base_multiplicity: VariableMultiplicity | None,
+    override_multiplicity: VariableMultiplicity | None,
+) -> VariableMultiplicityResolution:
     """Resolve output multiplicity settings by combining base configuration with override.
 
     This function implements a priority system where override values take precedence over
@@ -126,19 +80,19 @@ def output_multiplicity_to_apply(
     # Case 1: No override provided - use base value as-is
     if override_multiplicity is None:
         if isinstance(base_multiplicity, bool):
-            return OutputMultiplicityResolution(
+            return VariableMultiplicityResolution(
                 resolved_multiplicity=base_multiplicity,
                 is_multiple_outputs_enabled=base_multiplicity,
                 specific_output_count=None,
             )
         elif isinstance(base_multiplicity, int):
-            return OutputMultiplicityResolution(
+            return VariableMultiplicityResolution(
                 resolved_multiplicity=base_multiplicity,
                 is_multiple_outputs_enabled=True,
                 specific_output_count=base_multiplicity,
             )
         else:
-            return OutputMultiplicityResolution(
+            return VariableMultiplicityResolution(
                 resolved_multiplicity=base_multiplicity, is_multiple_outputs_enabled=False, specific_output_count=None
             )
 
@@ -146,19 +100,19 @@ def output_multiplicity_to_apply(
     elif isinstance(override_multiplicity, bool):
         if override_multiplicity:
             if isinstance(base_multiplicity, bool):
-                return OutputMultiplicityResolution(resolved_multiplicity=True, is_multiple_outputs_enabled=True, specific_output_count=None)
+                return VariableMultiplicityResolution(resolved_multiplicity=True, is_multiple_outputs_enabled=True, specific_output_count=None)
             else:
-                return OutputMultiplicityResolution(
+                return VariableMultiplicityResolution(
                     resolved_multiplicity=base_multiplicity,
                     is_multiple_outputs_enabled=True,
                     specific_output_count=base_multiplicity if isinstance(base_multiplicity, int) else None,
                 )
         else:
-            return OutputMultiplicityResolution(resolved_multiplicity=False, is_multiple_outputs_enabled=False, specific_output_count=None)
+            return VariableMultiplicityResolution(resolved_multiplicity=False, is_multiple_outputs_enabled=False, specific_output_count=None)
 
     else:
         # Case 3: Override is an integer
-        return OutputMultiplicityResolution(
+        return VariableMultiplicityResolution(
             resolved_multiplicity=override_multiplicity,
             is_multiple_outputs_enabled=True,
             specific_output_count=override_multiplicity,
@@ -199,7 +153,7 @@ class PipeRunParams(BaseModel):
     run_mode: PipeRunMode = PipeRunMode.LIVE
     final_stuff_code: str | None = None
     is_with_preliminary_text: bool | None = None
-    output_multiplicity: PipeOutputMultiplicity | None = None
+    output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_code: str | None = None
     batch_params: BatchParams | None = None
     params: dict[str, Any] = Field(default_factory=dict)
@@ -230,7 +184,7 @@ class PipeRunParams(BaseModel):
     def copy_by_injecting_multiplicity(
         cls,
         pipe_run_params: Self,
-        applied_output_multiplicity: PipeOutputMultiplicity | None,
+        applied_output_multiplicity: VariableMultiplicity | None,
         is_with_preliminary_text: bool | None = None,
     ) -> Self:
         """Copy the run params the nb_output into the params, and remove the attribute.

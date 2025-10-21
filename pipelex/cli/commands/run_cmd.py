@@ -7,7 +7,7 @@ import click
 import typer
 
 from pipelex import log, pretty_print_md
-from pipelex.builder.builder import load_pipe_from_bundle
+from pipelex.builder.builder import load_and_validate_bundle
 from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.exceptions import PipeInputError
 from pipelex.pipelex import Pipelex
@@ -108,8 +108,12 @@ def run_cmd(
         source_description: str
         if bundle_path:
             try:
-                main_pipe_code = await load_pipe_from_bundle(bundle_path)
+                bundle_blueprint = await load_and_validate_bundle(bundle_path)
                 if not pipe_code:
+                    main_pipe_code = bundle_blueprint.main_pipe
+                    if not main_pipe_code:
+                        typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
+                        raise typer.Exit(1)
                     pipe_code = main_pipe_code
                     source_description = f"bundle '{bundle_path}' • main pipe: '{pipe_code}'"
                 else:
@@ -164,7 +168,7 @@ def run_cmd(
                     base_name=f"run_{pipe_code}",
                     extension="json",
                 )
-                working_memory_dict = pipe_output.working_memory.model_dump()
+                working_memory_dict = pipe_output.working_memory.smart_dump()
                 save_as_json_to_path(object_to_save=working_memory_dict, path=output_path)
                 typer.secho(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN)
 

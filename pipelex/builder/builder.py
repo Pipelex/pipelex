@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from pydantic import ValidationError
@@ -8,21 +7,35 @@ from pipelex.builder.builder_errors import (
     PipelexBundleError,
     PipelexBundleUnexpectedError,
 )
-from pipelex.builder.builder_validation import document_pipe_failures_from_dry_run_blueprint, dry_run_bundle_blueprint
+from pipelex.builder.builder_validation import (
+    validate_dry_run_bundle_blueprint,
+)
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
+from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
+from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.builder.pipe.pipe_extract_spec import PipeExtractSpec
+from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
+from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
+from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
+from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
+from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.list_content import ListContent
+    from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 # # TODO: Put this in a factory. Investigate why it is necessary.
@@ -55,7 +68,29 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         item_type=ConceptSpec,
     )
 
-    pipe_specs: list[PipeSpecUnion] = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="pipe_specs").content).items
+    # pipe_specs: list[PipeSpecUnion] = cast("ListContent[PipeSpecUnion]", working_memory.get_stuff(name="pipe_specs").content).items
+    pipe_specs_list: ListContent[StuffContent] = working_memory.get_stuff_as_list(name="pipe_specs", item_type=StructuredContent)
+    pipe_specs_list_items: list[StuffContent] = pipe_specs_list.items
+    pipe_specs: list[PipeSpecUnion] = []
+    for pipe_spec_item in pipe_specs_list_items:
+        if not isinstance(
+            pipe_spec_item,
+            (
+                PipeFuncSpec,
+                PipeImgGenSpec,
+                PipeComposeSpec,
+                PipeLLMSpec,
+                PipeExtractSpec,
+                PipeBatchSpec,
+                PipeConditionSpec,
+                PipeParallelSpec,
+                PipeSequenceSpec,
+            ),
+        ):
+            msg = f"Pipe spec item '{pipe_spec_item}' is not any type of PipeSpecUnion, it's a {type(pipe_spec_item)}"
+            raise PipeBuilderError(msg)
+        pipe_specs.append(pipe_spec_item)
+
     bundle_header_spec = working_memory.get_stuff_as(name="bundle_header_spec", content_type=BundleHeaderSpec)
 
     # Properly validate and reconstruct concept specs to ensure proper Pydantic validation
@@ -64,7 +99,7 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         try:
             # Re-create the ConceptSpec to ensure proper Pydantic validation
             # This handles any serialization/deserialization issues from working memory
-            validated_concept = ConceptSpec(**concept_spec.model_dump(serialize_as_any=True))
+            validated_concept = ConceptSpec.model_validate(concept_spec.model_dump(serialize_as_any=True))
             validated_concepts[validated_concept.the_concept_code] = validated_concept
         except ValidationError as exc:
             msg = f"Failed to validate concept spec {concept_spec.the_concept_code}: {format_pydantic_validation_error(exc)}"
@@ -125,36 +160,24 @@ async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> Pi
     return pipelex_bundle_spec
 
 
-async def load_pipe_from_bundle(bundle_path: str) -> str:
+async def load_and_validate_bundle(bundle_path: str) -> PipelexBundleBlueprint:
     """Load a bundle file and extract its main_pipe.
 
     Args:
         bundle_path: Path to the .plx bundle file.
 
     Returns:
-        The pipe_code from the bundle's main_pipe.
+        PipelexBundleBlueprint: The blueprint of the bundle.
 
     Raises:
-        FileNotFoundError: If the bundle file does not exist.
-        PipelexBundleError: If no main_pipe is declared or if pipes fail during dry run.
-        PipeInputError: If there are input errors during dry run validation.
+        PipelexBundleError: If any pipe failed during dry run.
     """
-    bundle_path_obj = Path(bundle_path)
-    if not bundle_path_obj.exists():
-        msg = f"Bundle file not found: {bundle_path}"
-        raise FileNotFoundError(msg)
+    bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
 
-    interpreter = PipelexInterpreter(file_path=bundle_path_obj)
-    bundle_blueprint = interpreter.make_pipelex_bundle_blueprint()
+    try:
+        await validate_dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
+    except PipelexBundleError as exc:
+        msg = f"Bundle at '{bundle_path}' failed to validate"
+        raise PipelexBundleError(message=msg, pipe_failures=exc.pipe_failures) from exc
 
-    if not bundle_blueprint.main_pipe:
-        msg = f"Bundle '{bundle_path}' does not declare a main_pipe"
-        raise PipelexBundleError(message=msg)
-
-    dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
-    pipe_failures = document_pipe_failures_from_dry_run_blueprint(bundle_blueprint=bundle_blueprint, dry_run_result=dry_run_result)
-    if pipe_failures:
-        msg = f"Pipes failed during dry run in bundle '{bundle_path}'"
-        raise PipelexBundleError(message=msg, pipe_failures=pipe_failures)
-
-    return bundle_blueprint.main_pipe
+    return bundle_blueprint

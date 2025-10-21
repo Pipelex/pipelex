@@ -16,7 +16,7 @@ class TestPipeComposeValidateInputs:
         test_id: str,
         blueprint: PipeComposeBlueprint,
     ):
-        log.debug(f"Testing valid case: {test_id}")
+        log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
         pipe_compose = PipeComposeFactory.make_from_blueprint(
@@ -40,7 +40,7 @@ class TestPipeComposeValidateInputs:
         expected_error_type: type[Exception],
         expected_error_message_fragment: str,
     ):
-        log.debug(f"Testing error case: {test_id}")
+        log.verbose(f"Testing error case: {test_id}")
 
         with pytest.raises(expected_error_type) as exc_info:
             PipeComposeFactory.make_from_blueprint(

@@ -73,13 +73,30 @@ class LLMPromptBlueprint(BaseModel):
         prompt_user_images: dict[str, PromptImage] = {}
         if self.user_images:
             for user_image_name in self.user_images:
-                log.debug(f"Getting user image '{user_image_name}' from context")
+                log.verbose(f"Getting user image '{user_image_name}' from context")
                 # Try to get as a single ImageContent first
                 try:
-                    prompt_image_content = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=ImageContent)
+                    prompt_image_content = context_provider.get_typed_object_or_attribute(
+                        name=user_image_name,
+                        wanted_type=ImageContent,
+                        accept_list=True,
+                    )
                     if isinstance(prompt_image_content, ImageContent):
                         user_image = PromptImageFactory.make_prompt_image(url=prompt_image_content.url, base_64_str=prompt_image_content.base_64)
                         prompt_user_images[user_image_name] = user_image
+                    elif isinstance(prompt_image_content, list):
+                        for image_item in prompt_image_content:  # pyright: ignore[reportUnknownVariableType]
+                            if not isinstance(image_item, ImageContent):
+                                msg = f"Item of '{user_image_name}' is of type '{type(image_item).__name__}', it should be ImageContent"  # pyright: ignore[reportUnknownArgumentType]
+                                raise LLMPromptSpecError(msg)
+                            user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
+                            prompt_user_images[user_image_name] = user_image
+                    else:
+                        msg = (
+                            f"User image '{user_image_name}' is of type '{type(prompt_image_content).__name__}', "
+                            "it should be ImageContent or list of ImageContent"
+                        )
+                        raise LLMPromptSpecError(msg)
                 except ContextProviderException:
                     # If single image failed, try to get as a collection (list or tuple)
                     try:

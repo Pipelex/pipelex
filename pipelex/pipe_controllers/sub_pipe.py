@@ -2,8 +2,8 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
@@ -11,14 +11,14 @@ from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBluepri
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class SubPipe(BaseModel):
     pipe_code: str
     output_name: str | None = None
-    output_multiplicity: PipeOutputMultiplicity | None = None
+    output_multiplicity: VariableMultiplicity | None = None
     batch_params: BatchParams | None = None
     concept_codes_from_the_same_domain: list[str] | None = None
 
@@ -45,7 +45,9 @@ class SubPipe(BaseModel):
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 )
-                raise PipeInputError(msg) from exc
+                raise PipeInputError(
+                    message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_list_stuff_name, concept_code=None
+                ) from exc
 
             item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
             pipe_batch_blueprint = PipeBatchBlueprint(
@@ -55,9 +57,7 @@ class SubPipe(BaseModel):
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
-                    batch_params.input_item_stuff_name: InputRequirementBlueprint(
-                        concept=item_stuff_requirement.concept.concept_string,
-                    ),
+                    batch_params.input_item_stuff_name: item_stuff_requirement.concept.concept_string,
                 },
             )
 
@@ -117,7 +117,7 @@ class SubPipe(BaseModel):
                 sub_pipe_path_str = ".".join(sub_pipe_path)
                 error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
                 msg = f"Some required stuff(s) not found: {error_details}"
-                raise PipeInputError(msg) from exc
+                raise PipeInputError(message=msg, pipe_code=self.pipe_code, variable_name=exc.variable_name, concept_code=None) from exc
             log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             # This is the only line that changes between run and dry_run
 

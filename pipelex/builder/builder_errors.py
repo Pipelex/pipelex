@@ -72,6 +72,15 @@ class PipeDefinitionErrorData(StructuredContent):
     source: str | None = Field(None, description="Source of the error")
 
 
+class PipeInputErrorData(StructuredContent):
+    """Structured data for PipeInputError."""
+
+    message: str = Field(description="The error message")
+    pipe_code: str | None = Field(None, description="The pipe code")
+    variable_name: str | None = Field(None, description="The variable name")
+    concept_code: str | None = Field(None, description="The concept code")
+
+
 class DomainFailure(StructuredContent):
     """Details of a single domain failure during dry run."""
 
@@ -109,6 +118,7 @@ class PipelexBundleErrorData(StructuredContent):
     message: str = Field(description="The main error message")
     static_validation_error: StaticValidationErrorData | None = Field(None, description="Static validation error if present")
     domain_failures: list[DomainFailure] | None = Field(None, description="List of domain failures")
+    pipe_input_errors: list[PipeInputErrorData] | None = Field(None, description="List of pipe input errors")
     pipe_failures: list[PipeFailure] | None = Field(None, description="List of pipe failures")
     concept_failures: list[ConceptFailure] | None = Field(None, description="List of concept failures")
     concept_definition_errors: list[ConceptDefinitionErrorData] | None = Field(None, description="List of concept definition errors")
@@ -164,9 +174,11 @@ class PipelexBundleError(PipelexException):
         concept_failures: list[ConceptFailure] | None = None,
         concept_definition_errors: list[ConceptDefinitionErrorData] | None = None,
         pipe_definition_errors: list[PipeDefinitionErrorData] | None = None,
+        pipe_input_errors: list[PipeInputErrorData] | None = None,
     ) -> None:
         self.static_validation_error = static_validation_error
         self.domain_failures = domain_failures
+        self.pipe_input_errors = pipe_input_errors
         self.pipe_failures = pipe_failures
         self.concept_failures = concept_failures
         self.concept_definition_errors = concept_definition_errors
@@ -179,6 +191,7 @@ class PipelexBundleError(PipelexException):
             message=str(self),
             static_validation_error=self.static_validation_error,
             domain_failures=self.domain_failures,
+            pipe_input_errors=self.pipe_input_errors,
             pipe_failures=self.pipe_failures,
             concept_failures=self.concept_failures,
             concept_definition_errors=self.concept_definition_errors,

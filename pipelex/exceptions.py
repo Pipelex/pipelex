@@ -208,6 +208,14 @@ class PipeDefinitionError(PipelexException):
         return details
 
 
+class PipeInputError(PipelexException):
+    def __init__(self, message: str, pipe_code: str, variable_name: str, concept_code: str | None = None):
+        self.pipe_code = pipe_code
+        self.variable_name = variable_name
+        self.concept_code = concept_code
+        super().__init__(message)
+
+
 class DomainLoadingError(LibraryLoadingError):
     def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
         self.domain_code = domain_code
@@ -242,6 +250,13 @@ class UnexpectedPipeDefinitionError(PipeDefinitionError):
 
 class StuffError(PipelexException):
     pass
+
+
+class StuffContentTypeError(StuffError):
+    def __init__(self, message: str, expected_type: str, actual_type: str):
+        self.expected_type = expected_type
+        self.actual_type = actual_type
+        super().__init__(message)
 
 
 class StuffContentValidationError(StuffError):
@@ -288,6 +303,17 @@ class StructureClassError(PipelexException):
     pass
 
 
+class PipeControllerError(PipelexException):
+    pass
+
+
+class PipeControllerOutputConceptMismatchError(PipeControllerError):
+    def __init__(self, message: str, tested_concept: str, wanted_concept: str):
+        self.tested_concept = tested_concept
+        self.wanted_concept = wanted_concept
+        super().__init__(message)
+
+
 class PipeRunParamsError(PipelexException):
     pass
 
@@ -316,11 +342,11 @@ class JobHistoryError(PipelexException):
     pass
 
 
-class PipeInputError(PipelexException):
+class StuffArtefactError(PipelexException):
     pass
 
 
-class StuffArtefactError(PipelexException):
+class StuffArtefactReservedFieldError(StuffArtefactError):
     pass
 
 

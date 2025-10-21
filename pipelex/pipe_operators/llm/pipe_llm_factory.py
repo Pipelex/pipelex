@@ -6,15 +6,14 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_run.pipe_run_params import make_output_multiplicity
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 
 
@@ -61,17 +60,13 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
 
         user_images: list[str] = []
         if blueprint.inputs:
-            for stuff_name, requirement in blueprint.inputs.items():
-                if isinstance(requirement, str):
-                    # if it's just a concept string, it's a concept, we make a basic input requirement from it
-                    input_requirement_blueprint = InputRequirementBlueprint(concept=requirement)
-                else:
-                    input_requirement_blueprint = requirement
+            for stuff_name, requirement_str in blueprint.inputs.items():
+                # Parse to strip multiplicity brackets
+                input_parse_result = parse_concept_with_multiplicity(requirement_str)
 
-                concept_string = input_requirement_blueprint.concept
                 domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                     domain=domain,
-                    concept_string_or_code=concept_string,
+                    concept_string_or_code=input_parse_result.concept,
                     concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
                 concept = get_required_concept(
@@ -101,16 +96,19 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             for_object=blueprint.model_to_structure,
         )
 
-        # output_multiplicity defaults to False for PipeLLM so unless it's run with explicit demand for multiple outputs,
-        # we'll generate only one output
-        output_multiplicity = make_output_multiplicity(
-            nb_output=blueprint.nb_output,
-            multiple_output=blueprint.multiple_output,
+        # Parse output for multiplicity (may have brackets like "Text[]" or "Text[3]")
+        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
+
+        # Convert bracket notation to output_multiplicity
+        output_multiplicity = make_variable_multiplicity(
+            nb_items=output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, int) else None,
+            multiple_items=output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, bool) else None,
         )
 
+        # Use concept without brackets for output concept resolution
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
-            concept_string_or_code=blueprint.output,
+            concept_string_or_code=output_parse_result.concept,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         output_concept_domain, output_concept_code = output_domain_and_code.domain, output_domain_and_code.concept_code

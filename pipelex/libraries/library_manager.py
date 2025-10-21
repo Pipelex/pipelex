@@ -75,7 +75,7 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def validate_libraries(self):
-        log.debug("LibraryManager validating libraries")
+        log.verbose("LibraryManager validating libraries")
 
         self.concept_library.validate_with_libraries()
         self.pipe_library.validate_with_libraries()
@@ -103,7 +103,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         for dir_path in dirs:
             if not dir_path.exists():
-                log.debug(f"Directory does not exist, skipping: {dir_path}")
+                log.verbose(f"Directory does not exist, skipping: {dir_path}")
                 continue
 
             # Find all .plx files in the directory, excluding problematic directories
@@ -119,14 +119,14 @@ class LibraryManager(LibraryManagerAbstract):
 
                 # Skip if already seen
                 if absolute_path in seen_files:
-                    log.debug(f"Skipping duplicate PLX file: {plx_file}")
+                    log.verbose(f"Skipping duplicate PLX file: {plx_file}")
                     continue
 
                 if PipelexInterpreter.is_pipelex_file(plx_file):
                     all_plx_paths.append(plx_file)
                     seen_files.add(absolute_path)
                 else:
-                    log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")
+                    log.verbose(f"Skipping non-Pipelex PLX file: {plx_file}")
 
         return all_plx_paths
 
@@ -299,7 +299,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Then try filesystem-based scanning if package is accessible (for completeness)
         pipelex_pkg_dir = get_pipelex_package_dir_for_imports()
         if pipelex_pkg_dir:
-            log.debug(f"Additionally scanning pipelex package filesystem: {pipelex_pkg_dir}")
+            log.verbose(f"Additionally scanning pipelex package filesystem: {pipelex_pkg_dir}")
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=str(pipelex_pkg_dir),
                 base_class_names=[StructuredContent.__name__],
@@ -310,7 +310,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Auto-discover and register all StructuredContent classes from sys.modules
         num_registered = ClassRegistryUtils.auto_register_all_subclasses(base_class=StructuredContent)
-        log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
+        log.verbose(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
         # Parse all blueprints first
         blueprints: list[PipelexBundleBlueprint] = []

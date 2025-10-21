@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from typing import Any
 
@@ -223,21 +224,31 @@ class ConceptSpec(StructuredContent):
 
     @classmethod
     def validate_concept_string_or_code(cls, concept_string_or_code: str) -> None:
-        if concept_string_or_code.count(".") > 1:
+        # Strip multiplicity brackets if present (e.g., 'Text[]' or 'Text[2]' -> 'Text')
+
+        multiplicity_pattern = r"^(.+?)(?:\[\d*\])?$"
+        match = re.match(multiplicity_pattern, concept_string_or_code)
+        if not match:
+            msg = f"Invalid concept string format: '{concept_string_or_code}'"
+            raise ConceptStringOrConceptCodeError(msg)
+
+        concept_without_multiplicity = match.group(1)
+
+        if concept_without_multiplicity.count(".") > 1:
             msg = (
-                f"concept_string_or_code '{concept_string_or_code}' is invalid. "
+                f"concept_string_or_code '{concept_without_multiplicity}' is invalid. "
                 "It should either contain a domain in snake_case and a concept code in PascalCase separated by one dot, "
                 "or be a concept code in PascalCase."
             )
             raise ConceptStringOrConceptCodeError(msg)
 
-        if concept_string_or_code.count(".") == 1:
-            domain, concept_code = concept_string_or_code.split(".")
+        if concept_without_multiplicity.count(".") == 1:
+            domain, concept_code = concept_without_multiplicity.split(".")
             # Validate domain code
             DomainBlueprint.validate_domain_code(code=domain)
             cls._post_validate_concept_code(concept_code=concept_code)
         else:
-            cls._post_validate_concept_code(concept_code=concept_string_or_code)
+            cls._post_validate_concept_code(concept_code=concept_without_multiplicity)
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""

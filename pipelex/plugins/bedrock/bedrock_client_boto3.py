@@ -12,7 +12,7 @@ from pipelex.plugins.bedrock.bedrock_message import BedrockMessageDictList
 
 class BedrockClientBoto3(BedrockClientProtocol):
     def __init__(self, aws_region: str):
-        log.debug(f"Initializing BedrockClientBoto3 with region '{aws_region}'")
+        log.verbose(f"Initializing BedrockClientBoto3 with region '{aws_region}'")
         self.boto3_client = boto3.client(service_name="bedrock-runtime", region_name=aws_region)  # pyright: ignore[reportUnknownMemberType]
 
     @override

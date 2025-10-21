@@ -17,7 +17,7 @@ class TestPipeExtractValidateInputs:
         test_id: str,
         blueprint: PipeExtractBlueprint,
     ):
-        log.debug(f"Testing valid case: {test_id}")
+        log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
         pipe_extract = PipeExtractFactory.make_from_blueprint(
@@ -40,7 +40,7 @@ class TestPipeExtractValidateInputs:
         blueprint: PipeExtractBlueprint,
         expected_error_message_fragment: str,
     ):
-        log.debug(f"Testing error case: {test_id}")
+        log.verbose(f"Testing error case: {test_id}")
 
         with pytest.raises(StaticValidationError) as exc_info:
             PipeExtractFactory.make_from_blueprint(

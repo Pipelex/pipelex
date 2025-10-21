@@ -3,6 +3,7 @@ from typing_extensions import override
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -19,9 +20,12 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
         blueprint: PipeBatchBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeBatch:
+        # Parse output to strip multiplicity brackets
+        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
+
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
-            concept_string_or_code=blueprint.output,
+            concept_string_or_code=output_parse_result.concept,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeBatch(

@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_img_gen_spec import ImgGenSkill, PipeImgGenSpec
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
 
@@ -26,7 +25,6 @@ class PipeImgGenTestCases:
             aspect_ratio=None,
             background=None,
             output_format=None,
-            nb_output=None,
             is_raw=None,
             seed=None,
         ),
@@ -38,14 +36,13 @@ class PipeImgGenTestCases:
             pipe_code="advanced_img_gen",
             description="Generate image with options",
             inputs={"description": "Text"},
-            output="Image",
+            output="Image[3]",
             img_gen_skill=ImgGenSkill.GEN_IMAGE,
-            nb_output=3,
         ),
         PipeImgGenBlueprint(
             description="Generate image with options",
-            inputs={"description": InputRequirementBlueprint(concept="Text")},
-            output="Image",
+            inputs={"description": "Text"},
+            output="Image[3]",
             type="PipeImgGen",
             pipe_category="PipeOperator",
             img_gen_prompt=None,
@@ -55,7 +52,6 @@ class PipeImgGenTestCases:
             output_format=None,
             is_raw=None,
             seed=None,
-            nb_output=3,
             img_gen_prompt_var_name=None,
         ),
     )

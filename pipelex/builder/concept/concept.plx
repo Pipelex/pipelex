@@ -20,17 +20,15 @@ steps = [
 type = "PipeLLM"
 description = "Convert the ConceptSpec (with its structure draft) into a proper ConceptStructureSpec."
 inputs = { concept_spec_draft = "ConceptSpecDraft" }
-output = "ConceptStructureSpec"
-multiple_output = true
+output = "ConceptStructureSpec[]"
 model = "llm_to_engineer"
 prompt = """
 Create a ConceptStructureSpec from the ConceptSpecDraft.
 Please focus only on the structure.
 
-The field "definition" IS NOT a structure. It is a general definition of the concept.
+The field "description" IS NOT a structure. It is a general description of the concept.
 If the field "structure" is empty, return an empty list.
 
-ConceptSpecDraft:
 @concept_spec_draft
 """
 

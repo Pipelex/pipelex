@@ -42,8 +42,7 @@ class PipeImgGenInputTestCases:
         PipeImgGenBlueprint(
             description="Test case: valid_with_nb_output",
             inputs={"prompt": "native.Text"},
-            output="native.Image",
-            nb_output=3,
+            output="native.Image[3]",
         ),
     )
 

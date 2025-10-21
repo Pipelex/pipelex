@@ -16,7 +16,7 @@ class TestPipeFuncValidateInputs:
         test_id: str,
         blueprint: PipeFuncBlueprint,
     ):
-        log.debug(f"Testing valid case: {test_id}")
+        log.verbose(f"Testing valid case: {test_id}")
 
         pipe_func = PipeFuncFactory.make_from_blueprint(
             domain="test_domain",

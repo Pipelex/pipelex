@@ -4,7 +4,7 @@ from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
-from pipelex.builder.pipe.pipe_signature import PipeSpec
+from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.exceptions import PipeDefinitionError
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.types import StrEnum
@@ -51,10 +51,11 @@ class PipeExtractSpec(PipeSpec):
     page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
 
+    @override
     @field_validator("output", mode="before")
     @classmethod
-    def validate_output(cls, _: str) -> str:
-        return "Page"
+    def validate_output(cls, output: str) -> str:
+        return "Page[]"
 
     @field_validator("extract_skill", mode="before")
     @classmethod
@@ -65,10 +66,10 @@ class PipeExtractSpec(PipeSpec):
     @classmethod
     def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
-            msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
             raise PipeDefinitionError(msg)
         if len(inputs_value) != 1:
-            msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
             raise PipeDefinitionError(msg)
         return inputs_value
 
@@ -79,9 +80,9 @@ class PipeExtractSpec(PipeSpec):
         # create extract choice as a str
         extract_model_choice: ExtractModelChoice
         if isinstance(self.extract_skill, ExtractSkill):
-            extract_model_choice = self.extract_skill.model_recommendation.value
+            extract_model_choice = self.extract_skill.model_recommendation
         else:
-            extract_model_choice = ExtractSkill(self.extract_skill).model_recommendation.value
+            extract_model_choice = ExtractSkill(self.extract_skill).model_recommendation
 
         return PipeExtractBlueprint(
             source=None,

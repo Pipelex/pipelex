@@ -40,7 +40,7 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         self,
         extract_job: ExtractJob,
     ) -> ExtractOutput:
-        log.debug(f"Extract Worker extract_pages:\n{self.inference_model.desc}")
+        log.verbose(f"Extract Worker extract_pages:\n{self.inference_model.desc}")
 
         # Verify that the job is valid
         extract_job.validate_before_execution()

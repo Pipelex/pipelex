@@ -68,8 +68,8 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
             )
         self._active_config = catalog_blueprint.active
 
-        log.debug(f"Loaded routing profile library with active profile: '{self._active_config}'")
-        log.debug(f"Available profiles: {list(self.root.keys())}")
+        log.verbose(f"Loaded routing profile library with active profile: '{self._active_config}'")
+        log.verbose(f"Available profiles: {list(self.root.keys())}")
 
     def get_backend_match_for_model_from_active_routing_profile(self, model_name: str) -> BackendMatchForModel | None:
         """Get the backend name for a given model.
