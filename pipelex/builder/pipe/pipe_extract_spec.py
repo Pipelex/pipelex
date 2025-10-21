@@ -80,9 +80,9 @@ class PipeExtractSpec(PipeSpec):
         # create extract choice as a str
         extract_model_choice: ExtractModelChoice
         if isinstance(self.extract_skill, ExtractSkill):
-            extract_model_choice = self.extract_skill.model_recommendation.value
+            extract_model_choice = self.extract_skill.model_recommendation
         else:
-            extract_model_choice = ExtractSkill(self.extract_skill).model_recommendation.value
+            extract_model_choice = ExtractSkill(self.extract_skill).model_recommendation
 
         return PipeExtractBlueprint(
             source=None,
