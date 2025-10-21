@@ -1,33 +1,20 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.types import StrEnum
 
-
-class AvailableImgGen(StrEnum):
-    BASE_IMG_GEN = "base_img_gen"
-    FAST_IMG_GEN = "fast_img_gen"
-    HIGH_QUALITY_IMG_GEN = "high_quality_img_gen"
+if TYPE_CHECKING:
+    from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 
 
 class ImgGenSkill(StrEnum):
-    GEN_IMAGE = "gen_image"
+    GEN_IMAGE_BASIC = "gen_image_basic"
     GEN_IMAGE_FAST = "gen_image_fast"
     GEN_IMAGE_HIGH_QUALITY = "gen_image_high_quality"
-
-    @property
-    def model_recommendation(self) -> AvailableImgGen:
-        match self:
-            case ImgGenSkill.GEN_IMAGE:
-                return AvailableImgGen.BASE_IMG_GEN
-            case ImgGenSkill.GEN_IMAGE_FAST:
-                return AvailableImgGen.FAST_IMG_GEN
-            case ImgGenSkill.GEN_IMAGE_HIGH_QUALITY:
-                return AvailableImgGen.HIGH_QUALITY_IMG_GEN
 
 
 class PipeImgGenSpec(PipeSpec):
@@ -45,7 +32,7 @@ class PipeImgGenSpec(PipeSpec):
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
-    img_gen_skill: ImgGenSkill | None = None
+    img_gen_skill: ImgGenSkill | str = Field(description="Select the most adequate image generation skill according to the task to be performed.")
 
     @field_validator("img_gen_skill", mode="before")
     @classmethod
@@ -60,6 +47,8 @@ class PipeImgGenSpec(PipeSpec):
         """Convert this PipeImgGenBlueprint to the core PipeImgGenBlueprint."""
         base_blueprint = super().to_blueprint()
 
+        img_gen_choice: ImgGenModelChoice = self.img_gen_skill
+
         return PipeImgGenBlueprint(
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
@@ -68,7 +57,7 @@ class PipeImgGenSpec(PipeSpec):
             pipe_category=self.pipe_category,
             img_gen_prompt=None,
             img_gen_prompt_var_name=None,
-            model=self.img_gen_skill.model_recommendation if self.img_gen_skill else None,
+            model=img_gen_choice,
             aspect_ratio=None,
             background=None,
             output_format=None,

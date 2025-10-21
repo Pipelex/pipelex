@@ -717,15 +717,15 @@ fast_gen = { model = "fast-img-gen", quality = "standard" }
 **Replace with:** `[presets.extract]`
 
 **Find:** `base_ocr_pypdfium2`
-**Replace with:** `base_extract_pypdfium2`
+**Replace with:** `extract_text_from_pdf`
 
-**Find:** `base_ocr_mistral`
+**Find:** `extract_text_from_visuals`
 **Replace with:** `base_extract_mistral`
 
 **Before:**
 ```toml
 [presets.ocr]
-base_ocr_mistral = { ocr_handle = "mistral-ocr" }
+extract_text_from_visuals = { ocr_handle = "mistral-ocr" }
 ```
 
 **After:**

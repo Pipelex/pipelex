@@ -34,9 +34,9 @@ class TestModelDeckGetOptionalInferenceModel:
                 for_object=LLMSetting(model="default_object", temperature=0.1, max_tokens=1000),
             ),
             extract_presets={},
-            extract_choice_default="base_ocr_mistral",
+            extract_choice_default="extract_text_from_visuals",
             img_gen_presets={},
-            img_gen_choice_default="base_img_gen",
+            img_gen_choice_default="gen_image_basic",
         )
 
     def test_direct_model_lookup_success(self):

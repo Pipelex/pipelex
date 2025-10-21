@@ -227,7 +227,7 @@ def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "base_ocr_mistral",
+        "extract_text_from_visuals",
     ],
 )
 def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
@@ -237,7 +237,7 @@ def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "base_ocr_mistral",
+        "extract_text_from_visuals",
     ],
 )
 def extract_choice_for_image(request: pytest.FixtureRequest) -> str:

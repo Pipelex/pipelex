@@ -48,7 +48,7 @@ OCR presets are defined in your model deck configuration and can include paramet
 | `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
 | `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
 | `page_image_captions`       | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
-| `ocr`                       | string  | The OCR model handle, preset, or setting to use (e.g., `"mistral-ocr"`, `"base_ocr_mistral"`). Defaults to the model specified in the global config. | No       |
+| `model`                       | string  | The Extract model choice by name, setting, or preset to use (e.g., `"mistral-ocr"`, `"extract_text_from_visuals"`). Defaults to the model specified in the global config. | No       |
 
 ### Example: Processing a PDF
 
