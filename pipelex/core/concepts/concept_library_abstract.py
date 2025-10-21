@@ -15,7 +15,7 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def remove_concepts_by_codes(self, concept_codes: list[str]) -> None:
+    def remove_concepts_by_concept_strings(self, concept_strings: list[str]) -> None:
         pass
 
     @abstractmethod
@@ -60,4 +60,8 @@ class ConceptLibraryAbstract(ABC):
 
     @abstractmethod
     def get_native_concept(self, native_concept: NativeConceptCode) -> Concept:
+        pass
+
+    @abstractmethod
+    def get_required_concept_from_concept_string_or_code(self, concept_string_or_code: str, search_domains: list[str] | None = None) -> Concept:
         pass

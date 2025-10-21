@@ -67,15 +67,17 @@ llm_cheap = { model = "base-gemini", temperature = 0.1 }
 # Generation skills
 llm_for_factual_writing = { model = "base-gpt", temperature = 0.1 }
 llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
+llm_to_write_questions = { model = "gpt-4o-mini", temperature = 0.3 }
 
 # Reasoning skills
-llm_to_reason_short = { model = "base-claude", temperature = 0.5, max_tokens = 500 }
-llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
 llm_to_reason_on_diagram = { model = "base-claude", temperature = 0.5 }
+llm_to_analyze_data = { model = "base-claude", temperature = 0.5 }
 
 # Search and answer skills
-llm_to_answer = { model = "base-claude", temperature = 0.1 }
-llm_to_retrieve = { model = "base-gemini", temperature = 0.1 }
+llm_to_answer_easy_questions = { model = "gpt-4o-mini", temperature = 0.3 }
+llm_to_answer_hard_questions = { model = "base-claude", temperature = 0.3 }
+llm_to_retrieve = { model = "base-claude", temperature = 0.1 }
 llm_for_enrichment = { model = "gpt-4o", temperature = 0.1 }
 llm_to_enrich = { model = "base-claude", temperature = 0.1 }
 llm_for_question_and_excerpt_reformulation = { model = "gpt-4o", temperature = 0.9 }
@@ -84,10 +86,15 @@ llm_for_question_and_excerpt_reformulation = { model = "gpt-4o", temperature = 0
 llm_to_engineer = { model = "smart_llm", temperature = 0.2 }
 llm_to_write = { model = "base-gemini", temperature = 0.2 }
 llm_to_pipelex = { model = "base-claude", temperature = 0.2 }
+llm_to_code = { model = "base-claude", temperature = 0.1 }
+llm_to_analyze_large_codebase = { model = "base-claude", temperature = 0.1 }
 
 # Image skills
+llm_for_basic_vision = { model = "gpt-4o-mini", temperature = 0.1 }
 llm_to_write_img_gen_prompt = { model = "base-claude", temperature = 0.2 }
 llm_to_describe_img = { model = "base-claude", temperature = 0.5 }
+llm_for_visual_analysis = { model = "base-claude", temperature = 0.5 }
+llm_for_visual_design = { model = "base-claude", temperature = 0.5 }
 llm_to_design_fashion = { model = "base-claude", temperature = 0.7 }
 llm_for_img_to_text = { model = "base-claude", temperature = 0.1 }
 
@@ -107,28 +114,30 @@ for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
 
 ####################################################################################################
-# OCR Presets
+# Extract Presets
 ####################################################################################################
 
 [extract]
-choice_default = "base_ocr_mistral"
+choice_default = "extract_text_from_visuals"
 
 [extract.presets]
-base_ocr_mistral = { model = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-base_extract_pypdfium2 = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+extract_text_from_visuals = { model = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+extract_text_from_pdf = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 
 ####################################################################################################
 # Image Generation Presets
 ####################################################################################################
 
 [img_gen]
-choice_default = "base_img_gen"
+choice_default = "gen_image_basic"
 
 [img_gen.presets]
+
+
 # General purpose
-base_img_gen = { model = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
-fast_img_gen = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
-high_quality_img_gen = { model = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
+gen_image_basic = { model = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
+gen_image_fast = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
+gen_image_high_quality = { model = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
 
 # Specific skills
 img_gen_for_art = { model = "best-img-gen", quality = "high", guidance_scale = 9.0, is_moderated = false, safety_tolerance = 5 }

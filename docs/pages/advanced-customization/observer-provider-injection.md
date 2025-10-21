@@ -107,7 +107,7 @@ my_observer = MyCustomObserver(config_param="production")
 
 # Inject it into the hub
 hub = get_pipelex_hub()
-hub.set_observer_provider(my_observer)
+hub.set_observer(my_observer)
 ```
 
 ### Step 3: Ensure Proper Integration
@@ -132,7 +132,7 @@ local_observer = LocalObserver()
 local_observer = LocalObserver(storage_dir="/path/to/custom/dir")
 
 # Inject the observer
-get_pipelex_hub().set_observer_provider(local_observer)
+get_pipelex_hub().set_observer(local_observer)
 ```
 
 The LocalObserver creates separate JSONL files for each event type:
@@ -209,7 +209,7 @@ def setup_pipelex():
 
     # Setup custom observer
     observer = MyCustomObserver()
-    get_pipelex_hub().set_observer_provider(observer)
+    get_pipelex_hub().set_observer(observer)
 
     return pipelex_instance
 ```

@@ -499,7 +499,7 @@ Simplified input memory:
 
 ### Changed
 - Refactored `PipeInput` to use `InputRequirement` and `TypedNamedInputRequirement` classes instead of plain strings for input specifications.
-- Updated `WorkingMemoryFactory` to handle `ImplicitMemory` instead of `CompactMemory`.
+- Updated `WorkingMemoryFactory` to handle `PipelineInputs` instead of `CompactMemory`.
 - Replaced `ExecutePipelineException` with `PipelineInputError` in `execute_pipeline` function.
 - Updated `PipeBatch`, `PipeCondition`, `PipeParallel`, `PipeSequence`, `PipeFunc`, `PipeImgGen`, `PipeCompose`, `PipeLLM`, and `PipeExtract` classes to use `InputRequirement` for input handling.
 - Updated `PipeInput` creation in various test files to use `make_from_dict` method.

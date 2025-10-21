@@ -19,7 +19,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code="describe_image",
-            input_memory={
+            inputs={
                 "image": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
             },
         )
@@ -52,7 +52,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
-            input_memory={
+            inputs={
                 "imageA": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
                 "imageB": ImageContent(url=LLMVisionTestCases.PATH_IMG_JPEG_3),
             },
@@ -66,7 +66,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with a complex image
         pipe_output = await execute_pipeline(
             pipe_code="vision_analysis",
-            input_memory={
+            inputs={
                 "image": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
             },
         )

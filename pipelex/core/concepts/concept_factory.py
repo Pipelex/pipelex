@@ -161,7 +161,6 @@ class ConceptFactory:
             return DomainAndConceptCode(domain=parts[0], concept_code=parts[1])
         if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code):
             return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_code)
-
         if (
             concept_codes_from_the_same_domain and concept_string_or_code in concept_codes_from_the_same_domain
         ):  # Is a concept code from the same domain

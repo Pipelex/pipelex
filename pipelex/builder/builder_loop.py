@@ -11,7 +11,7 @@ from pipelex.builder.builder_errors import (
     PipelexBundleUnexpectedError,
 )
 from pipelex.builder.builder_validation import validate_bundle_spec
-from pipelex.client.protocol import ImplicitMemory
+from pipelex.client.protocol import PipelineInputs
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
 from pipelex.exceptions import StaticValidationErrorType, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_required_pipe
@@ -24,14 +24,14 @@ class BuilderLoop:
     async def build_and_fix(
         self,
         pipe_code: str,
-        input_memory: ImplicitMemory | None = None,
+        input_memory: PipelineInputs | None = None,
         is_save_first_iteration_enabled: bool = True,
-        is_save_second_iteration_enabled: bool = False,
+        is_save_second_iteration_enabled: bool = True,
     ) -> PipelexBundleSpec:
         pretty_print(f"Building and fixing with {pipe_code}")
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
-            input_memory=input_memory,
+            inputs=input_memory,
         )
         pretty_print(pipe_output, title="Pipe Output")
 

@@ -8,9 +8,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_activity_manager
 from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
-from pipelex.pipeline.activity.activity_models import ActivityReport
 from pipelex.pipeline.job_metadata import JobMetadata
 
 PipeOperatorOutputType = TypeVar("PipeOperatorOutputType", bound=PipeOutput)
@@ -70,12 +68,6 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                     pipe_run_params=pipe_run_params,
                     output_name=output_name,
                 )
-        get_activity_manager().dispatch_activity(
-            activity_report=ActivityReport(
-                job_metadata=job_metadata,
-                content=pipe_output.main_stuff,
-            ),
-        )
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 

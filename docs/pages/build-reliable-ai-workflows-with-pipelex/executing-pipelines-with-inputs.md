@@ -15,7 +15,7 @@ Under the hood, `input_memory` uses this type definition:
 
 ```python
 StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
-ImplicitMemory = dict[str, StuffContentOrData]
+PipelineInputs = dict[str, StuffContentOrData]
 ```
 
 Pipelex is smart about detecting what you mean and automatically wraps your data in the appropriate content types.

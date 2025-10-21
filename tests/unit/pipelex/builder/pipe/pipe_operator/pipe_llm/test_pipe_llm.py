@@ -21,5 +21,4 @@ class TestPipeLLMBlueprintConversion:
             pipe_code=f"test_pipe_{test_name}",
             blueprint=blueprint,
         )
-
         pretty_print(pipe_llm_from_blueprint, title="PipeLLM from blueprint")

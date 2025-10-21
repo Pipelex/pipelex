@@ -682,13 +682,13 @@ default_outcome = "fail"
 **Before (.pipelex/inference/deck/base_deck.toml):**
 ```toml
 [presets.llm]
-llm_to_reason = { llm_handle = "claude-3-5-sonnet", temperature = 1 }
+llm_for_complex_reasoning = { llm_handle = "claude-3-5-sonnet", temperature = 1 }
 ```
 
 **After:**
 ```toml
 [presets.llm]
-llm_to_reason = { model = "claude-3-5-sonnet", temperature = 1 }
+llm_for_complex_reasoning = { model = "claude-3-5-sonnet", temperature = 1 }
 ```
 
 ### Image generation presets
@@ -717,15 +717,15 @@ fast_gen = { model = "fast-img-gen", quality = "standard" }
 **Replace with:** `[presets.extract]`
 
 **Find:** `base_ocr_pypdfium2`
-**Replace with:** `base_extract_pypdfium2`
+**Replace with:** `extract_text_from_pdf`
 
-**Find:** `base_ocr_mistral`
+**Find:** `extract_text_from_visuals`
 **Replace with:** `base_extract_mistral`
 
 **Before:**
 ```toml
 [presets.ocr]
-base_ocr_mistral = { ocr_handle = "mistral-ocr" }
+extract_text_from_visuals = { ocr_handle = "mistral-ocr" }
 ```
 
 **After:**

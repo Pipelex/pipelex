@@ -19,7 +19,7 @@ from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, get_in
 from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 
 if TYPE_CHECKING:
-    from pipelex.client.protocol import ImplicitMemory
+    from pipelex.client.protocol import PipelineInputs
 
 build_app = typer.Typer(help="Build working pipelines from natural language requirements", no_args_is_help=True)
 
@@ -31,6 +31,7 @@ pipelex build pipe "Imagine a cute animal mascot for a startup based on its elev
     include 3 variants of the ideas and 2 variants of each prompt"
 pipelex build pipe "Given an expense report, apply company rules"
 pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match"
+pipelex build pipe "Take a CV in a PDF file and a Job offer text, analyze if they match and generate 5 questions for the interview"
 
 pipelex build partial "Given an expense report, apply company rules" -o results/generated.json
 pipelex build flow "Given an expense report, apply company rules" -o results/flow.json
@@ -305,7 +306,7 @@ def build_one_shot_cmd(
 
         pipe_output = await execute_pipeline(
             pipe_code=builder_pipe,
-            input_memory={"brief": brief},
+            inputs={"brief": brief},
         )
         pretty_print(pipe_output, title="Pipe Output")
 
@@ -373,14 +374,14 @@ def build_partial_cmd(
             )
             ensure_directory_for_file_path(file_path=output_path)
 
-        input_memory: ImplicitMemory | None = None
+        input_memory: PipelineInputs | None = None
         if inputs.endswith(".json"):
             input_memory = load_json_dict_from_path(inputs)
         else:
             input_memory = {"brief": inputs}
         pipe_output = await execute_pipeline(
             pipe_code=builder_pipe,
-            input_memory=input_memory,
+            inputs=input_memory,
         )
         # Save to file unless explicitly disabled with --no-output
         if output_path:

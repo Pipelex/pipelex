@@ -385,7 +385,7 @@ cheap_llm_for_object = { model = "cheap_llm_for_object", temperature = 0.5 }
 # Task-specific presets
 llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
 llm_to_extract_invoice = { model = "claude-4.5-sonnet", temperature = 0.1 }
-llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
 
 ### OCR Presets
 
@@ -394,8 +394,8 @@ OCR presets combine OCR model selection with optimized parameters:
 ```toml
 [extract.presets]
 # General purpose OCR
-base_ocr_mistral = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-base_extract_pypdfium2 = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+extract_text_from_visuals = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+extract_text_from_pdf = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 ```
 
 ### Image Generation Presets
@@ -405,9 +405,9 @@ Image generation presets combine model selection with generation parameters:
 ```toml
 [img_gen.presets]
 # General purpose image generation
-base_img_gen = { model = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
-fast_img_gen = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
-high_quality_img_gen = { model = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
+gen_image_basic = { model = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
+gen_image_fast = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
+gen_image_high_quality = { model = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
 ```
 
 ### Default Choices
@@ -420,10 +420,10 @@ for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
 
 [extract]
-choice_default = "base_ocr_mistral"
+choice_default = "extract_text_from_visuals"
 
 [img_gen]
-choice_default = "base_img_gen"
+choice_default = "gen_image_basic"
 ```
 
 ## Customization

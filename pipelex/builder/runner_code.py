@@ -64,7 +64,7 @@ def value_to_python_code(value: Any, indent_level: int = 0) -> str:
 
 
 def generate_compact_memory_entry(var_name: str, concept: Concept) -> str:
-    """Generate the compact_memory dictionary entry for a given input."""
+    """Generate the pipeline_inputs dictionary entry for a given input."""
     example_value = concept.get_compact_memory_example(var_name)
 
     # Convert the example value to a Python code string

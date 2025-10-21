@@ -40,7 +40,7 @@ class AllowedPipeTypes(StrEnum):
     PIPE_IMG_GEN = "PipeImgGen"
     PIPE_COMPOSE = "PipeCompose"
     PIPE_LLM = "PipeLLM"
-    PIPE_OCR = "PipeExtract"
+    PIPE_EXTRACT = "PipeExtract"
     # Pipe Controller
     PIPE_BATCH = "PipeBatch"
     PIPE_CONDITION = "PipeCondition"
@@ -50,6 +50,28 @@ class AllowedPipeTypes(StrEnum):
     @classmethod
     def value_list(cls) -> list[str]:
         return list(cls)
+
+    @property
+    def category(self) -> AllowedPipeCategories:
+        match self:
+            case AllowedPipeTypes.PIPE_FUNC:
+                return AllowedPipeCategories.PIPE_OPERATOR
+            case AllowedPipeTypes.PIPE_IMG_GEN:
+                return AllowedPipeCategories.PIPE_OPERATOR
+            case AllowedPipeTypes.PIPE_COMPOSE:
+                return AllowedPipeCategories.PIPE_OPERATOR
+            case AllowedPipeTypes.PIPE_LLM:
+                return AllowedPipeCategories.PIPE_OPERATOR
+            case AllowedPipeTypes.PIPE_EXTRACT:
+                return AllowedPipeCategories.PIPE_OPERATOR
+            case AllowedPipeTypes.PIPE_BATCH:
+                return AllowedPipeCategories.PIPE_CONTROLLER
+            case AllowedPipeTypes.PIPE_CONDITION:
+                return AllowedPipeCategories.PIPE_CONTROLLER
+            case AllowedPipeTypes.PIPE_PARALLEL:
+                return AllowedPipeCategories.PIPE_CONTROLLER
+            case AllowedPipeTypes.PIPE_SEQUENCE:
+                return AllowedPipeCategories.PIPE_CONTROLLER
 
 
 class PipeBlueprint(BaseModel):

@@ -13,23 +13,9 @@ if TYPE_CHECKING:
     from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 
 
-class AvailableExtractModel(StrEnum):
-    BASE_OCR_MISTRAL = "base_ocr_mistral"
-    # BASE_EXTRACT_PYPDFIUM2 = "base_extract_pypdfium2"
-
-
 class ExtractSkill(StrEnum):
     EXTRACT_TEXT_FROM_VISUALS = "extract_text_from_visuals"
-    EXTARCT_TEXT_FROM_PDF = "extract_text_from_pdf"
-
-    @property
-    def model_recommendation(self) -> AvailableExtractModel:
-        match self:
-            case ExtractSkill.EXTRACT_TEXT_FROM_VISUALS:
-                return AvailableExtractModel.BASE_OCR_MISTRAL
-            case ExtractSkill.EXTARCT_TEXT_FROM_PDF:
-                # TODO: Debug the BaseOcrPypdfium2
-                return AvailableExtractModel.BASE_OCR_MISTRAL
+    EXTRACT_TEXT_FROM_PDF = "extract_text_from_pdf"
 
 
 class PipeExtractSpec(PipeSpec):
@@ -66,10 +52,10 @@ class PipeExtractSpec(PipeSpec):
     @classmethod
     def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
-            msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
             raise PipeExtractSpecError(msg)
         if len(inputs_value) != 1:
-            msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
             raise PipeExtractSpecError(msg)
         return inputs_value
 
@@ -78,11 +64,7 @@ class PipeExtractSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
 
         # create extract choice as a str
-        extract_model_choice: ExtractModelChoice
-        if isinstance(self.extract_skill, ExtractSkill):
-            extract_model_choice = self.extract_skill.model_recommendation.value
-        else:
-            extract_model_choice = ExtractSkill(self.extract_skill).model_recommendation.value
+        extract_model_choice: ExtractModelChoice = self.extract_skill
 
         return PipeExtractBlueprint(
             source=None,

@@ -815,7 +815,7 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
 llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 
@@ -925,7 +925,7 @@ pretty_print(gantt_chart, title="Gantt Chart")
 The input memory is a dictionary, where the key is the name of the input variable and the value provides details to make it a stuff object. The relevant definitions are:
 ```python
 StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
-ImplicitMemory = dict[str, StuffContentOrData]
+PipelineInputs = dict[str, StuffContentOrData]
 ```
 As you can seen, we made it so different ways can be used to define that stuff using structured content or data.
 
@@ -1123,7 +1123,7 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_to_reason = { model = "base-claude", temperature = 1 }
+llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
 llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 

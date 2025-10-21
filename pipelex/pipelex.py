@@ -34,14 +34,10 @@ from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from pipelex.observer.local_observer import LocalObserver
+from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
-from pipelex.pipeline.activity.activity_manager import ActivityManager
-from pipelex.pipeline.activity.activity_manager_protocol import (
-    ActivityManagerNoOp,
-    ActivityManagerProtocol,
-)
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.track.pipeline_tracker import PipelineTracker
 from pipelex.pipeline.track.pipeline_tracker_protocol import (
@@ -69,19 +65,10 @@ class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
         config_dir_path: str = "./pipelex",
-        # Dependency injection
-        pipelex_hub: PipelexHub | None = None,
         config_cls: type[ConfigRoot] | None = None,
-        class_registry: ClassRegistryAbstract | None = None,
-        models_manager: ModelManagerAbstract | None = None,
-        inference_manager: InferenceManager | None = None,
-        pipeline_manager: PipelineManager | None = None,
-        pipeline_tracker: PipelineTracker | None = None,
-        activity_manager: ActivityManagerProtocol | None = None,
-        reporting_delegate: ReportingProtocol | None = None,
     ) -> None:
         self.config_dir_path = config_dir_path
-        self.pipelex_hub = pipelex_hub or PipelexHub()
+        self.pipelex_hub = PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
 
         # tools
@@ -96,26 +83,11 @@ class Pipelex(metaclass=MetaSingleton):
         log.verbose("Logs are configured")
 
         # tools
-        self.class_registry = class_registry or ClassRegistry()
-        self.pipelex_hub.set_class_registry(self.class_registry)
-        self.kajson_manager = KajsonManager(class_registry=self.class_registry)
+        self.class_registry: ClassRegistryAbstract | None = None
 
         # cogt
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
-
-        self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
-        self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
-
-        self.inference_manager = inference_manager or InferenceManager()
-        self.pipelex_hub.set_inference_manager(self.inference_manager)
-
-        self.reporting_delegate: ReportingProtocol
-        if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager()
-        else:
-            self.reporting_delegate = ReportingNoOp()
-        self.pipelex_hub.set_report_delegate(self.reporting_delegate)
 
         # pipelex libraries
         domain_library = DomainLibrary.make_empty()
@@ -132,26 +104,10 @@ class Pipelex(metaclass=MetaSingleton):
         )
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
-        # pipelex pipeline
-        self.pipeline_tracker: PipelineTrackerProtocol
-        if pipeline_tracker:
-            self.pipeline_tracker = pipeline_tracker
-        elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
-            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
-        else:
-            self.pipeline_tracker = PipelineTrackerNoOp()
-        self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
-        self.pipeline_manager = pipeline_manager or PipelineManager()
-        self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
+        self.reporting_delegate: ReportingProtocol | None = None
 
-        self.activity_manager: ActivityManagerProtocol
-        if activity_manager:
-            self.activity_manager = activity_manager
-        elif get_config().pipelex.feature_config.is_activity_tracking_enabled:
-            self.activity_manager = ActivityManager()
-        else:
-            self.activity_manager = ActivityManagerNoOp()
-        self.pipelex_hub.set_activity_manager(activity_manager=self.activity_manager)
+        # pipeline
+        self.pipeline_tracker: PipelineTrackerProtocol | None = None
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
@@ -183,17 +139,31 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     def setup(
         self,
+        class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
-        pipe_router: PipeRouterProtocol | None = None,
         storage_provider: StorageProviderAbstract | None = None,
-        observer_provider: ObserverProtocol | None = None,
+        models_manager: ModelManagerAbstract | None = None,
+        inference_manager: InferenceManager | None = None,
+        content_generator: ContentGeneratorProtocol | None = None,
+        pipeline_manager: PipelineManager | None = None,
+        pipeline_tracker: PipelineTracker | None = None,
+        pipe_router: PipeRouterProtocol | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
+        observers: dict[str, ObserverProtocol] | None = None,
     ):
         # tools
+        self.class_registry = class_registry or ClassRegistry()
+        self.pipelex_hub.set_class_registry(self.class_registry)
+        self.kajson_manager = KajsonManager(class_registry=self.class_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
+
         # cogt
         self.plugin_manager.setup()
+
+        self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
+        self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
+
         try:
             self.models_manager.setup()
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
@@ -238,17 +208,38 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 )
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
+
+        self.inference_manager = inference_manager or InferenceManager()
+        self.pipelex_hub.set_inference_manager(self.inference_manager)
+
+        # reporting
+        if get_config().pipelex.feature_config.is_reporting_enabled:
+            self.reporting_delegate = reporting_delegate or ReportingManager()
+        else:
+            self.reporting_delegate = ReportingNoOp()
+        self.pipelex_hub.set_report_delegate(self.reporting_delegate)
         self.reporting_delegate.setup()
+
+        # pipeline
+        if pipeline_tracker:
+            self.pipeline_tracker = pipeline_tracker
+        elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
+            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
+        else:
+            self.pipeline_tracker = PipelineTrackerNoOp()
+        self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
+        self.pipeline_manager = pipeline_manager or PipelineManager()
+        self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
+
         self.class_registry.register_classes(CoreRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
-        self.activity_manager.setup()
 
-        observer_provider = observer_provider or LocalObserver()
-        self.pipelex_hub.set_observer_provider(observer_provider=observer_provider)
-
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer_provider=observer_provider))
+        observers = observers or {"local": LocalObserver()}
+        multi_observer = MultiObserver(observers=observers)
+        self.pipelex_hub.set_observer(observer=multi_observer)
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
 
         # pipeline
         self.pipeline_tracker.setup()
@@ -273,18 +264,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def teardown(self):
         # pipelex
         self.pipeline_manager.teardown()
-        self.pipeline_tracker.teardown()
+        if self.pipeline_tracker:
+            self.pipeline_tracker.teardown()
         self.library_manager.teardown()
-        self.activity_manager.teardown()
 
         # cogt
         self.inference_manager.teardown()
-        self.reporting_delegate.teardown()
+        if self.reporting_delegate:
+            self.reporting_delegate.teardown()
         self.plugin_manager.teardown()
 
         # tools
         self.kajson_manager.teardown()
-        self.class_registry.teardown()
+        if self.class_registry:
+            self.class_registry.teardown()
         func_registry.teardown()
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")

@@ -66,10 +66,10 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             self.add_new_concept(concept=concept)
 
     @override
-    def remove_concepts_by_codes(self, concept_codes: list[str]) -> None:
-        for concept_code in concept_codes:
-            if concept_code in self.root:
-                del self.root[concept_code]
+    def remove_concepts_by_concept_strings(self, concept_strings: list[str]) -> None:
+        for concept_string in concept_strings:
+            if concept_string in self.root:
+                del self.root[concept_string]
 
     @override
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
@@ -122,6 +122,39 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             strict=True,
         )
         return is_image_class or refines_image
+
+    @override
+    def get_required_concept_from_concept_string_or_code(self, concept_string_or_code: str, search_domains: list[str] | None = None) -> Concept:
+        if "." in concept_string_or_code:
+            return self.get_required_concept(concept_string=concept_string_or_code)
+        elif NativeConceptCode.is_native_concept(concept_code=concept_string_or_code):
+            return self.get_native_concept(native_concept=NativeConceptCode(concept_string_or_code))
+        else:
+            found_concepts: list[Concept] = []
+            if search_domains is None:
+                for concept in self.root.values():
+                    if concept_string_or_code == concept.code:
+                        found_concepts.append(concept)
+                if len(found_concepts) == 0:
+                    msg = f"Concept '{concept_string_or_code}' not found in the library and no search domains were provided"
+                    raise ConceptLibraryConceptNotFoundError(msg)
+                if len(found_concepts) > 1:
+                    msg = f"Multiple concepts found for '{concept_string_or_code}': {found_concepts}. Please specify the domain."
+                    raise ConceptLibraryConceptNotFoundError(msg)
+                return found_concepts[0]
+            else:
+                for domain in search_domains:
+                    if found_concept := self.get_required_concept(
+                        concept_string=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_string_or_code),
+                    ):
+                        found_concepts.append(found_concept)
+                if len(found_concepts) == 0:
+                    msg = f"Concept '{concept_string_or_code}' not found in the library and no search domains were provided"
+                    raise ConceptLibraryConceptNotFoundError(msg)
+                if len(found_concepts) > 1:
+                    msg = f"Multiple concepts found for '{concept_string_or_code}': {found_concepts}. Please specify the domain."
+                    raise ConceptLibraryConceptNotFoundError(msg)
+                return found_concepts[0]
 
     @override
     def search_for_concept_in_domains(self, concept_code: str, search_domains: list[str]) -> Concept | None:

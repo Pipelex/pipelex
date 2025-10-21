@@ -119,12 +119,11 @@ Analyze the document page shown in the image and explain how it relates to the p
 | `type`                      | string              | The type of the pipe: `PipeLLM`                                                                          | Yes      |
 | `description`               | string              | A description of the LLM operation.                                                                           | Yes      |
 | `inputs`                    | dictionary          | The input concept(s) for the LLM operation, as a dictionary mapping input names to concept codes. For images within structured content, use dot notation (e.g., `"page.image_argurment"`)
-| `output`                    | string              | The output concept produced by the LLM operation.                                                | Yes      |
-| `llm`                       | string or table     | Specifies the LLM preset(s) to use. Can be a single preset or a table mapping different presets for different generation modes (e.g., `main`, `object_direct`).              | No       |
+| `output`                    | string              | The output concept produced by the LLM operation with multiplicity notation using brackets (e.g., `"Text"`, `"Text[]"`, `"Text[3]"`).                                                | Yes      |
+| `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
+| `model_to_structure`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use for structuring after preliminary text generation.              | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Can be inline text or a reference to a template file (`"file:path/to/prompt.md"`).  | No       |
-| `prompt`                    | string              | A simple, static user prompt. Use this when you don't need to inject any variables.                                                                                          | No       |
 | `prompt_template`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). **Note**: Do not use `@` or `$` for image variables.                 | No       |
-| `images`                    | list of strings     | **Deprecated**: Use the `inputs` section to declare image inputs instead.                                                                                               | No       |
 | `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
 
 ### Output Multiplicity

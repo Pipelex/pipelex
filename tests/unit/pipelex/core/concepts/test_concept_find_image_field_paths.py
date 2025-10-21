@@ -75,7 +75,7 @@ def register_test_concepts():
 
     # Cleanup: Remove test concepts from library
     concept_strings = [concept.concept_string for concept in concepts_to_register]
-    concept_library.remove_concepts_by_codes(concept_strings)
+    concept_library.remove_concepts_by_concept_strings(concept_strings)
 
 
 class TestConceptFindImageFieldPaths:

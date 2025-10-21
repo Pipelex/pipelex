@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any, TypeVar
 
 from kajson import kajson
@@ -38,13 +38,13 @@ class StuffContent(ABC, CustomBaseModel):
     def rendered_plain(self) -> str:
         return self.rendered_markdown()
 
-    @abstractmethod
     def rendered_html(self) -> str:
-        pass
+        """Default HTML rendering - subclasses can override for custom rendering."""
+        return f"<pre>{self.rendered_json()}</pre>"
 
-    @abstractmethod
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        pass
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
+        """Default Markdown rendering - subclasses can override for custom rendering."""
+        return f"```json\n{self.rendered_json()}\n```"
 
     def render_spreadsheet(self) -> str:
         return self.rendered_plain()
