@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
-from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 
@@ -13,7 +12,7 @@ class PipeLLMTestCases:
             description="Generate text",
             inputs={"topic": "Text"},
             output="Text",
-            llm="llm_for_creative_writing",
+            llm_skill="llm_for_creative_writing",
             prompt="Write about $topic",
         ),
         PipeLLMBlueprint(
@@ -34,7 +33,7 @@ class PipeLLMTestCases:
             description="Generate without inputs",
             inputs={},
             output="Text",
-            llm="llm_for_creative_writing",
+            llm_skill="llm_for_creative_writing",
             prompt="Generate something interesting",
         ),
         PipeLLMBlueprint(
@@ -55,7 +54,7 @@ class PipeLLMTestCases:
             inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
-            llm="llm_for_basic_vision",
+            llm_skill="llm_for_basic_vision",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -76,7 +75,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm="llm_to_reason",
+            llm_skill="llm_to_reason",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -96,18 +95,13 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm="llm_to_answer_easy_questions",
-            temperature=0.7,
+            llm_skill="llm_to_answer_easy_questions",
         ),
         PipeLLMBlueprint(
             source=None,
             type="PipeLLM",
             description="Generate with settings",
-            model=LLMSetting(
-                model="llm_to_answer_easy_questions",
-                temperature=0.7,
-                max_tokens=None,  # "auto" is handled at conversion to core
-            ),
+            model="llm_to_answer_easy_questions",
             output="Text",
             prompt="Generate text",
         ),
@@ -122,7 +116,7 @@ class PipeLLMTestCases:
             output="Analysis",
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
-            llm="llm_to_analyze_data",
+            llm_skill="llm_to_analyze_data",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -144,7 +138,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[]",
             prompt="Generate items",
-            llm="llm_to_answer_easy_questions",
+            llm_skill="llm_to_answer_easy_questions",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -164,7 +158,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[5]",
             prompt="Generate items",
-            llm="llm_to_answer_easy_questions",
+            llm_skill="llm_to_answer_easy_questions",
         ),
         PipeLLMBlueprint(
             source=None,

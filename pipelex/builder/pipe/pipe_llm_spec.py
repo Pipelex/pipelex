@@ -5,7 +5,6 @@ from pydantic.json_schema import SkipJsonSchema
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.types import StrEnum
 
@@ -45,8 +44,7 @@ class PipeLLMSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeLLM"]] = "PipeLLM"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    llm: LLMSkill | str = Field(description="Select the most adequate LLM model skill according to the task to be performed.")
-    temperature: float | None = Field(default=None, ge=0, le=1)
+    llm_skill: LLMSkill | str = Field(description="Select the most adequate LLM model skill according to the task to be performed.")
     system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
     prompt: str | None = Field(
         description="""A template for the user prompt:
@@ -67,7 +65,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 """
     )
 
-    @field_validator("llm", mode="before")
+    @field_validator("llm_skill", mode="before")
     @classmethod
     def validate_llm(cls, llm_value: str) -> LLMSkill:
         return LLMSkill(llm_value)
@@ -77,12 +75,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
         base_blueprint = super().to_blueprint()
 
         # create llm choice as a str
-        llm_choice: LLMModelChoice
-        llm_choice = self.llm
-
-        # Make it a LLMSetting if temperature is provided
-        if self.temperature:
-            llm_choice = LLMSetting(model=llm_choice, temperature=self.temperature)
+        llm_choice: LLMModelChoice = self.llm_skill
 
         return PipeLLMBlueprint(
             type="PipeLLM",
