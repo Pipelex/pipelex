@@ -64,7 +64,7 @@ class PipelexHub:
         # pipeline
         self._pipeline_tracker: PipelineTrackerProtocol | None = None
         self._pipeline_manager: PipelineManagerAbstract | None = None
-        self._observer_provider: ObserverProtocol | None = None
+        self._observer: ObserverProtocol | None = None
 
     ############################################################
     # Class methods for singleton management
@@ -156,8 +156,8 @@ class PipelexHub:
     def set_library_manager(self, library_manager: LibraryManagerAbstract):
         self._library_manager = library_manager
 
-    def set_observer_provider(self, observer_provider: ObserverProtocol):
-        self._observer_provider = observer_provider
+    def set_observer(self, observer: ObserverProtocol):
+        self._observer = observer
 
     ############################################################
     # Getters
@@ -270,11 +270,11 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._library_manager
 
-    def get_observer_provider(self) -> ObserverProtocol:
-        if self._observer_provider is None:
+    def get_observer(self) -> ObserverProtocol:
+        if self._observer is None:
             msg = "Observer is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
-        return self._observer_provider
+        return self._observer
 
 
 # Shorthand functions for accessing the singleton
@@ -413,8 +413,8 @@ def get_library_manager() -> LibraryManagerAbstract:
     return get_pipelex_hub().get_required_library_manager()
 
 
-def get_observer_provider() -> ObserverProtocol:
-    return get_pipelex_hub().get_observer_provider()
+def get_observer() -> ObserverProtocol:
+    return get_pipelex_hub().get_observer()
 
 
 def get_native_concept(native_concept: NativeConceptCode) -> Concept:

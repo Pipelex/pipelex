@@ -6,7 +6,7 @@ from pipelex.pipe_run.pipe_job import PipeJob
 
 
 class PipeRouterProtocol(Protocol):
-    observer_provider: ObserverProtocol
+    observer: ObserverProtocol
 
     async def _before_run(
         self,
@@ -16,7 +16,7 @@ class PipeRouterProtocol(Protocol):
             "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
             "pipe_job": pipe_job,
         }
-        await self.observer_provider.observe_before_run(payload)
+        await self.observer.observe_before_run(payload)
 
     async def _after_successful_run(
         self,
@@ -28,7 +28,7 @@ class PipeRouterProtocol(Protocol):
             "pipe_job": pipe_job,
             "pipe_output": pipe_output,
         }
-        await self.observer_provider.observe_after_successful_run(payload)
+        await self.observer.observe_after_successful_run(payload)
 
     async def _after_failing_run(
         self,
@@ -40,7 +40,7 @@ class PipeRouterProtocol(Protocol):
             "pipe_job": pipe_job,
             "error": error,
         }
-        await self.observer_provider.observe_after_failing_run(payload)
+        await self.observer.observe_after_failing_run(payload)
 
     async def run(
         self,

@@ -34,6 +34,7 @@ from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from pipelex.observer.local_observer import LocalObserver
+from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
@@ -147,8 +148,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipeline_manager: PipelineManager | None = None,
         pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
-        observer_provider: ObserverProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
+        observers: dict[str, ObserverProtocol] | None = None,
     ):
         # tools
         self.class_registry = class_registry or ClassRegistry()
@@ -235,10 +236,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
-        observer_provider = observer_provider or LocalObserver()
-        self.pipelex_hub.set_observer_provider(observer_provider=observer_provider)
-
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer_provider=observer_provider))
+        observers = observers or {"local": LocalObserver()}
+        multi_observer = MultiObserver(observers=observers)
+        self.pipelex_hub.set_observer(observer=multi_observer)
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
 
         # pipeline
         self.pipeline_tracker.setup()
