@@ -66,10 +66,10 @@ class PipeExtractSpec(PipeSpec):
     @classmethod
     def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
-            msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
             raise PipeDefinitionError(msg)
         if len(inputs_value) != 1:
-            msg = "PipeExtract must have exactly one input which must be either`Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
             raise PipeDefinitionError(msg)
         return inputs_value
 
