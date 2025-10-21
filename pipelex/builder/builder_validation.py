@@ -21,6 +21,7 @@ from pipelex.exceptions import (
     StaticValidationError,
 )
 from pipelex.hub import get_library_manager
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 
 
@@ -41,7 +42,7 @@ async def validate_bundle_spec(bundle_spec: PipelexBundleSpec):
 
     library_manager = get_library_manager()
     dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
-    library_manager.remove_from_blueprint(blueprint=bundle_blueprint)
+    library_manager.remove_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[bundle_blueprint])
 
     dry_run_pipe_failures = extract_pipe_failures_from_dry_run_result(bundle_spec=bundle_spec, dry_run_result=dry_run_result)
     if dry_run_pipe_failures:
@@ -103,7 +104,7 @@ def document_pipe_failures_from_dry_run_blueprint(
 async def dry_run_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> dict[str, DryRunOutput]:
     library_manager = get_library_manager()
     try:
-        pipes = library_manager.load_from_blueprint(blueprint=bundle_blueprint)
+        pipes = library_manager.load_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[bundle_blueprint])
         dry_run_result = await dry_run_pipes(pipes=pipes, raise_on_failure=True)
     except StaticValidationError as static_validation_error:
         static_validation_error_data = StaticValidationErrorData(

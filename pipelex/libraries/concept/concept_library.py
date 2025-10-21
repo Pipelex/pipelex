@@ -4,10 +4,10 @@ from typing_extensions import override
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
+from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]

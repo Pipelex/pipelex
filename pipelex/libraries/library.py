@@ -1,14 +1,14 @@
 from pydantic import BaseModel
 
-from pipelex.core.concepts.concept_library import ConceptLibrary
-from pipelex.core.domains.domain_library import DomainLibrary
-from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.exceptions import (
     ConceptError,
     ConceptLibraryConceptNotFoundError,
     PipeLibraryError,
     PipeLibraryPipeNotFoundError,
 )
+from pipelex.libraries.concept.concept_library import ConceptLibrary
+from pipelex.libraries.domain.domain_library import DomainLibrary
+from pipelex.libraries.pipe.pipe_library import PipeLibrary
 
 
 class Library(BaseModel):

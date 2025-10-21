@@ -3,8 +3,8 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from pipelex.core.concepts.concept_library import ConceptLibrary
-from pipelex.core.pipes.pipe_library import PipeLibrary
+from pipelex.libraries.concept.concept_library import ConceptLibrary
+from pipelex.libraries.pipe.pipe_library import PipeLibrary
 
 
 def pretty_print_all_pipes(

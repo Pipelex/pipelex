@@ -7,8 +7,8 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.exceptions import PipeLibraryError, PipeLibraryPipeNotFoundError
+from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.types import Self
 
 PipeLibraryRoot = dict[str, PipeAbstract]

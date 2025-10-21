@@ -239,6 +239,7 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
+    @override
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
@@ -372,7 +373,7 @@ class LibraryManager(LibraryManagerAbstract):
                 pipes.append(pipe)
         return pipes
 
-    def remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+    def _remove_pipes_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_library(library_id=library_id)
         if blueprint.pipe is not None:
             library.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
@@ -385,4 +386,7 @@ class LibraryManager(LibraryManagerAbstract):
             ]
             library.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)
 
-        library.domain_library.remove_domain_by_code(domain_code=blueprint.domain)
+    @override
+    def remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
+        for blueprint in blueprints:
+            self._remove_pipes_from_blueprint(library_id=library_id, blueprint=blueprint)

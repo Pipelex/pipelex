@@ -2,8 +2,8 @@ from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex.core.domains.domain import Domain
-from pipelex.core.domains.domain_library_abstract import DomainLibraryAbstract
 from pipelex.exceptions import DomainLibraryError
+from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
 from pipelex.types import Self
 
 DomainLibraryRoot = dict[str, Domain]
