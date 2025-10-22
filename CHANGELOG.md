@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.13.1] - 2025-10-22
+
+### Changed
+
+- Changed the `pydantic`dependency from `>=2.10.6` to `>=2.10.6,<3.0.0` to avoid compatibility issues.
+
 ## [v0.13.0] - 2025-10-21
 
 ### Highlights - Simplifying pipeline execution and improving developer experience
