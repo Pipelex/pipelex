@@ -106,6 +106,9 @@ async def execute_pipeline(
         output_name=output_name,
     )
 
-    get_telemetry_manager().track_event(event_name=TelemetryEventName.PIPELINE_EXECUTE, event_data={})
+    event_data = {
+        "pipeline_run_id": job_metadata.pipeline_run_id,
+    }
+    get_telemetry_manager().track_event(event_name=TelemetryEventName.PIPELINE_EXECUTE, event_data=event_data)
 
     return await get_pipe_router().run(pipe_job)

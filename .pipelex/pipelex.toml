@@ -34,7 +34,7 @@ redact = [
     "file_path",
     "url",
 ] # allowlist elsewhere
-debug = true # if true, log events locally instead of sending
+debug = false # if true, log events locally instead of sending
 # Optional, populated only if user opts in:
 user_id = "" # user-provided, not inferred
 org_id = ""  # optional, user-provided
