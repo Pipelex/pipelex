@@ -7,7 +7,8 @@ from pipelex import log
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
 

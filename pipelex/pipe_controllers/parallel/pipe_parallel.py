@@ -1,7 +1,7 @@
 import asyncio
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log
@@ -13,11 +13,12 @@ from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.exceptions import DryRunError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
+from pipelex.exceptions import DryRunMissingInputsError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
 
@@ -34,6 +35,23 @@ class PipeParallel(PipeController):
     parallel_sub_pipes: list[SubPipe]
     add_each_output: bool
     combined_output: Concept | None
+
+    @field_validator("parallel_sub_pipes", mode="before")
+    @classmethod
+    def validate_parallel_sub_pipes(cls, parallel_sub_pipes: list[SubPipe]) -> list[SubPipe]:
+        seen_output_names: set[str] = set()
+        for sub_pipe in parallel_sub_pipes:
+            if not sub_pipe.output_name:
+                msg = f"PipeParallel '{cls.code}' sub-pipe '{sub_pipe.pipe_code}' output name not specified"
+                raise PipeDefinitionError(msg)
+            if sub_pipe.output_name in seen_output_names:
+                msg = (
+                    f"PipeParallel '{cls.code}' sub-pipe '{sub_pipe.pipe_code}' output name '{sub_pipe.output_name}' "
+                    "is already used by another sub-pipe"
+                )
+                raise PipeDefinitionError(msg)
+            seen_output_names.add(sub_pipe.output_name)
+        return parallel_sub_pipes
 
     @override
     def required_variables(self) -> set[str]:
@@ -234,7 +252,6 @@ class PipeParallel(PipeController):
         # 1. Validate that all required inputs are present in the working memory
         needed_inputs = self.needed_inputs()
         missing_input_names: list[str] = []
-
         for named_input_requirement in needed_inputs.named_input_requirements:
             if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
                 missing_input_names.append(named_input_requirement.variable_name)
@@ -242,10 +259,11 @@ class PipeParallel(PipeController):
         if missing_input_names:
             msg = f"Dry run failed: missing required inputs: {missing_input_names}"
             log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
-            raise DryRunError(
+            raise DryRunMissingInputsError(
                 message=msg,
-                missing_inputs=missing_input_names,
+                pipe_type=self.__class__.__name__,
                 pipe_code=self.code,
+                missing_inputs=missing_input_names,
             )
 
         # 2. Validate that all sub-pipes exist
@@ -269,16 +287,7 @@ class PipeParallel(PipeController):
                 ),
             )
 
-        try:
-            pipe_outputs = await asyncio.gather(*tasks)
-        except Exception as exc:
-            msg = f"Dry run failed: parallel sub-pipe execution failed: {exc}"
-            log.error(msg)
-            raise DryRunError(
-                message=msg,
-                missing_inputs=[],
-                pipe_code=self.code,
-            ) from exc
+        pipe_outputs = await asyncio.gather(*tasks)
 
         # 4. Process outputs as in the regular run
         output_stuffs: dict[str, Stuff] = {}
@@ -288,23 +297,19 @@ class PipeParallel(PipeController):
             output_stuff = pipe_output.main_stuff
             sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
             if not sub_pipe_output_name:
-                msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe output name not specified"
-                raise DryRunError(
-                    message=msg,
-                    missing_inputs=[],
-                    pipe_code=self.code,
-                )
+                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
+                msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe_code}' output name not specified"
+                raise PipeDefinitionError(msg)
 
             if self.add_each_output:
                 working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
 
             if sub_pipe_output_name in output_stuffs:
-                msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): duplicate output name '{sub_pipe_output_name}'"
-                raise DryRunError(
-                    message=msg,
-                    missing_inputs=[],
-                    pipe_code=self.code,
+                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
+                msg = (
+                    f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
                 )
+                raise PipeDefinitionError(msg)
 
             output_stuffs[sub_pipe_output_name] = output_stuff
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content

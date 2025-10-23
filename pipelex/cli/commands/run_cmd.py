@@ -9,7 +9,7 @@ import typer
 from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_and_validate_bundle
 from pipelex.builder.builder_errors import PipelexBundleError
-from pipelex.exceptions import PipeInputError
+from pipelex.exceptions import PipeInputError, PipelineExecutionError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_file_path
@@ -150,10 +150,14 @@ def run_cmd(
             # Execute pipeline
             typer.secho(f"\n🚀 Executing {source_description}...\n", fg=typer.colors.GREEN, bold=True)
 
-            pipe_output = await execute_pipeline(
-                pipe_code=pipe_code,
-                inputs=input_memory,
-            )
+            try:
+                pipe_output = await execute_pipeline(
+                    pipe_code=pipe_code,
+                    inputs=input_memory,
+                )
+            except PipelineExecutionError as exc:
+                typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from exc
 
             # Pretty print main_stuff unless disabled
             if not no_pretty_print:

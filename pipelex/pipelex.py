@@ -50,6 +50,9 @@ from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtoco
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.runtime import runtime_manager
+from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
+from pipelex.system.telemetry.telemetry_manager import TelemetryManager
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -149,6 +152,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
+        telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         **kwargs: Any,
     ):
@@ -240,7 +244,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
-        observers = observers or {"local": LocalObserver()}
+        telemetry_manager = telemetry_manager or TelemetryManager()
+        self.pipelex_hub.set_telemetry_manager(telemetry_manager=telemetry_manager)
+        if not observers:
+            local_observer = LocalObserver()
+            observer_telemetry = ObserverTelemetry(telemetry_manager=telemetry_manager)
+            observers = {"local": local_observer, "telemetry": observer_telemetry}
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
         self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
@@ -303,6 +312,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
+        telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         **kwargs: Any,
     ) -> Self:
@@ -323,6 +333,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipeline_tracker: Custom pipeline tracking/logging
             pipe_router: Custom pipe routing logic
             reporting_delegate: Custom reporting handler
+            telemetry_manager: Custom telemetry manager
             observers: Custom observers for pipeline events
             **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
 
@@ -349,6 +360,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipeline_tracker=pipeline_tracker,
             pipe_router=pipe_router,
             reporting_delegate=reporting_delegate,
+            telemetry_manager=telemetry_manager,
             observers=observers,
             **kwargs,
         )

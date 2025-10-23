@@ -5,6 +5,13 @@ from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
+from pipelex.types import StrEnum
+
+
+class LocalObserverEventType(StrEnum):
+    BEFORE_RUN = "before_run"
+    AFTER_SUCCESSFUL_RUN = "after_successful_run"
+    AFTER_FAILING_RUN = "after_failing_run"
 
 
 class LocalObserver(ObserverProtocol):
@@ -24,12 +31,12 @@ class LocalObserver(ObserverProtocol):
 
     @override
     async def observe_before_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl("before_run", payload)
+        self._write_to_jsonl(LocalObserverEventType.BEFORE_RUN, payload)
 
     @override
     async def observe_after_successful_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl("successful_run", payload)
+        self._write_to_jsonl(LocalObserverEventType.AFTER_SUCCESSFUL_RUN, payload)
 
     @override
     async def observe_after_failing_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl("failing_run", payload)
+        self._write_to_jsonl(LocalObserverEventType.AFTER_FAILING_RUN, payload)

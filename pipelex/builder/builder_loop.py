@@ -13,7 +13,7 @@ from pipelex.builder.builder_errors import (
 from pipelex.builder.builder_validation import validate_bundle_spec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.exceptions import StaticValidationErrorType, WorkingMemoryStuffNotFoundError
+from pipelex.exceptions import PipelineExecutionError, StaticValidationErrorType, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.execute import execute_pipeline
@@ -29,10 +29,14 @@ class BuilderLoop:
         is_save_second_iteration_enabled: bool = True,
     ) -> PipelexBundleSpec:
         pretty_print(f"Building and fixing with {pipe_code}")
-        pipe_output = await execute_pipeline(
-            pipe_code=pipe_code,
-            inputs=input_memory,
-        )
+        try:
+            pipe_output = await execute_pipeline(
+                pipe_code=pipe_code,
+                inputs=input_memory,
+            )
+        except PipelineExecutionError as exc:
+            msg = f"Builder loop: Failed to execute pipeline: {exc}."
+            raise PipeBuilderError(message=msg) from exc
         pretty_print(pipe_output, title="Pipe Output")
 
         try:

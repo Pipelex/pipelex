@@ -163,6 +163,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         """
         return hasattr(func, PIPE_FUNC_MARKER) and getattr(func, PIPE_FUNC_MARKER) is True
 
+    # TODO: refactor this into a subclass of FuncRegistry dedicated to pipe funcs, avoid the circular import issue, avoid the code-smell
     def is_eligible_function(self, func: Any, require_decorator: bool = False) -> bool:
         """Checks if a function matches the criteria for PipeFunc registration:
         - Must be callable
@@ -187,59 +188,54 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
 
         the_function = cast("Callable[..., Any]", func)
 
+        # Import here to avoid circular imports
+        # TODO: code-smell
+        from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        # Get function signature
+        sig = inspect.signature(the_function)
+        params = list(sig.parameters.values())
+
+        # Check parameter count and name
+        if len(params) != 1:
+            return False
+
+        param = params[0]
+        if param.name != "working_memory":
+            return False
+
+        # Get type hints
+        type_hints = get_type_hints(the_function)
+
+        # Check parameter type
+        if "working_memory" not in type_hints:
+            return False
+
+        param_type = type_hints["working_memory"]
+        if param_type != WorkingMemory:
+            return False
+
+        # Check return type
+        if "return" not in type_hints:
+            return False
+
+        return_type = type_hints["return"]
+
+        # Check if return type is a subclass of StuffContent
         try:
-            # Import here to avoid circular imports
-            # TODO: code-smell
-            from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
-            from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
-
-            # Get function signature
-            sig = inspect.signature(the_function)
-            params = list(sig.parameters.values())
-
-            # Check parameter count and name
-            if len(params) != 1:
-                return False
-
-            param = params[0]
-            if param.name != "working_memory":
-                return False
-
-            # Get type hints
-            type_hints = get_type_hints(the_function)
-
-            # Check parameter type
-            if "working_memory" not in type_hints:
-                return False
-
-            param_type = type_hints["working_memory"]
-            if param_type != WorkingMemory:
-                return False
-
-            # Check return type
-            if "return" not in type_hints:
-                return False
-
-            return_type = type_hints["return"]
-
-            # Check if return type is a subclass of StuffContent
-            try:
-                if inspect.isclass(return_type) and issubclass(return_type, StuffContent):
+            if inspect.isclass(return_type) and issubclass(return_type, StuffContent):
+                return True
+            # Handle generic types like ListContent[SomeType]
+            if hasattr(return_type, "__origin__"):
+                origin = return_type.__origin__
+                if inspect.isclass(origin) and issubclass(origin, StuffContent):
                     return True
-                # Handle generic types like ListContent[SomeType]
-                if hasattr(return_type, "__origin__"):
-                    origin = return_type.__origin__
-                    if inspect.isclass(origin) and issubclass(origin, StuffContent):
-                        return True
-            except TypeError:
-                # Handle cases where issubclass fails on generic types
-                pass
+        except TypeError:
+            # Handle cases where issubclass fails on generic types
+            pass
 
-            return False
-
-        except Exception:
-            # If we can't analyze the function, skip it
-            return False
+        return False
 
 
 func_registry = FuncRegistry()

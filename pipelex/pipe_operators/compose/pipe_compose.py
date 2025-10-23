@@ -22,7 +22,8 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeRunParamsError
 from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from click import ClickException
 from typing_extensions import override
 
@@ -13,6 +15,10 @@ from pipelex.builder.validation_error_data import (
 from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
 from pipelex.system.exceptions import RootException
 from pipelex.tools.misc.context_provider_abstract import ContextProviderException
+
+if TYPE_CHECKING:
+    from pipelex.cogt.templating.template_category import TemplateCategory
+    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
 class PipelexException(RootException):
@@ -270,25 +276,82 @@ class StuffContentValidationError(StuffError):
         super().__init__(f"Failed to validate content from {original_type} to {target_type}: {validation_error}")
 
 
-class PipeExecutionError(PipelexException):
+class PipeRunError(PipelexException):
     pass
 
 
-class PipeRunError(PipeExecutionError):
-    pass
-
-
-class PipeStackOverflowError(PipeExecutionError):
-    pass
-
-
-# TODO: create variants of DryRunError for each type of Pipe
-class DryRunError(PipeExecutionError):
+class DryRunError(PipeRunError):
     """Raised when a dry run fails due to missing inputs or other validation issues."""
 
-    def __init__(self, message: str, missing_inputs: list[str] | None = None, pipe_code: str | None = None):
-        self.missing_inputs = missing_inputs or []
+    def __init__(self, message: str, pipe_type: str, pipe_code: str | None = None):
+        self.pipe_type = pipe_type
         self.pipe_code = pipe_code
+        super().__init__(message)
+
+
+class DryRunMissingInputsError(DryRunError):
+    """Raised when a dry run fails due to missing inputs or other validation issues."""
+
+    def __init__(self, message: str, pipe_type: str, pipe_code: str, missing_inputs: list[str] | None = None):
+        self.missing_inputs = missing_inputs or []
+        super().__init__(message, pipe_type, pipe_code)
+
+
+class DryRunMissingPipesError(DryRunError):
+    """Raised when a dry run fails due to missing pipes or other validation issues."""
+
+    def __init__(self, message: str, pipe_type: str, pipe_code: str, missing_pipes: list[str] | None = None):
+        self.missing_pipes = missing_pipes or []
+        super().__init__(message, pipe_type, pipe_code)
+
+
+class DryRunTemplatingError(DryRunError):
+    """Raised when a dry run fails due to templating issues."""
+
+    def __init__(self, message: str, pipe_type: str, pipe_code: str, template_category: TemplateCategory, template: str):
+        self.template_category = template_category
+        self.template = template
+        super().__init__(message, pipe_type, pipe_code)
+
+
+class PipeStackOverflowError(PipeRunError):
+    def __init__(self, message: str, limit: int, pipe_stack: list[str]):
+        self.limit = limit
+        self.pipe_stack = pipe_stack
+        super().__init__(message)
+
+
+class PipeRouterError(PipelexException):
+    def __init__(
+        self,
+        message: str,
+        run_mode: PipeRunMode,
+        pipe_code: str,
+        output_name: str | None,
+        pipe_stack: list[str],
+        missing_inputs: list[str] | None = None,
+    ):
+        self.run_mode = run_mode
+        self.pipe_code = pipe_code
+        self.output_name = output_name
+        self.pipe_stack = pipe_stack
+        self.missing_inputs = missing_inputs
+        super().__init__(message)
+
+
+class PipelineExecutionError(PipelexException):
+    def __init__(
+        self,
+        message: str,
+        run_mode: PipeRunMode,
+        pipe_code: str,
+        output_name: str | None,
+        pipe_stack: list[str],
+    ):
+        self.run_mode = run_mode
+        self.pipe_code = pipe_code
+        self.output_name = output_name
+        self.pipe_stack = pipe_stack
         super().__init__(message)
 
 

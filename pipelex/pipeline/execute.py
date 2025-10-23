@@ -4,28 +4,32 @@ from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import PipeExecutionError
+from pipelex.exceptions import PipelineExecutionError, PipeRouterError
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
+    get_telemetry_manager,
 )
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
-    PipeRunMode,
     VariableMultiplicity,
 )
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.validate_plx import validate_plx
 from pipelex.system.environment import get_optional_env
+from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 
+from pipelex.exceptions import PipeExecutionError
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
+
 
 
 async def execute_pipeline(
@@ -137,7 +141,27 @@ async def execute_pipeline(
         output_name=output_name,
     )
 
-    pipe_output = await get_pipe_router().run(pipe_job)
-    if plx_content and blueprint is not None:
-        get_library_manager().remove_from_blueprint(blueprint=blueprint)
+    properties = {
+        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+    }
+    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
+
+    try:
+        pipe_output = await get_pipe_router().run(pipe_job)
+    except PipeRouterError as exc:
+        raise PipelineExecutionError(
+            message=exc.message,
+            run_mode=pipe_job.pipe_run_params.run_mode,
+            pipe_code=pipe_job.pipe.code,
+            output_name=pipe_job.output_name,
+            pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+        ) from exc
+    finally:
+        if plx_content and blueprint is not None:
+            get_library_manager().remove_from_blueprint(blueprint=blueprint)
+    properties = {
+        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+        EventProperty.PIPELINE_EXECUTE_OUTCOME: Outcome.SUCCESS,
+    }
+    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
     return pipe_output

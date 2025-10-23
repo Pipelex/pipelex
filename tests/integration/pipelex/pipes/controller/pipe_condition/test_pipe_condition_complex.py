@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import DryRunError
+from pipelex.exceptions import PipeRouterError
 from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -264,7 +264,7 @@ class TestPipeConditionComplex:
         assert pipe_output.working_memory is not None
 
     async def test_complex_pipeline_dry_run_missing_inputs(self, request: FixtureRequest):
-        """Test complex pipeline dry run with missing inputs - should fail."""
+        """Test complex pipeline dry run with missing inputs - should fail with PipeRouterError."""
         doc_request = DocumentRequest(document_type="technical", priority="urgent", language="english", complexity="high")
 
         doc_stuff = StuffFactory.make_stuff(
@@ -280,7 +280,7 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_single_stuff(doc_stuff)
 
-        with pytest.raises(DryRunError) as exc_info:
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="complex_document_processor"),
@@ -292,6 +292,7 @@ class TestPipeConditionComplex:
 
         error = exc_info.value
         assert error.pipe_code == "complex_document_processor"
+        assert error.missing_inputs is not None
         assert "user_profile" in error.missing_inputs
         assert "missing required inputs" in str(error)
 

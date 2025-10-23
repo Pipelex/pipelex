@@ -1,0 +1,8 @@
+settings_customized = false
+telemetry_mode = "off"                                               # Values: "off" | "anonymous" | "identified"
+host = "https://eu.i.posthog.com"
+project_api_key = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
+respect_dnt = true
+redact = ["prompt", "system_prompt", "response", "file_path", "url"]
+debug = false
+user_id = ""
