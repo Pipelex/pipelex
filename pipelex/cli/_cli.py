@@ -2,6 +2,7 @@ import os
 
 import typer
 from click import Command, Context
+from rich.console import Console
 from typer.core import TyperGroup
 from typing_extensions import override
 
@@ -117,7 +118,23 @@ app = typer.Typer(
 
 @app.callback(invoke_without_command=True)
 def app_callback(ctx: typer.Context) -> None:
-    """Run pre-command checks like telemetry consent."""
+    """Run pre-command checks like printing the logo and checking telemetry consent."""
+    console = Console()
+    console.print(
+        """
+
+░█████████  ░[bold green4]██[/bold green4]                      ░██
+░██     ░██                          ░██
+░██     ░██ ░██░████████   ░███████  ░██  ░███████  ░██    ░[bold green4]██[/bold green4]
+░█████████  ░██░██    ░██ ░██    ░██ ░██ ░██    ░██  ░██  ░██
+░██         ░██░██    ░██ ░█████████ ░██ ░█████████   ░█████
+░██         ░██░███   ░██ ░██        ░██ ░██         ░██  ░██
+░██         ░██░██░█████   ░███████  ░██  ░███████  ░██    ░██
+               ░██
+               ░██
+
+"""
+    )
     # Skip checks if no command is being run (e.g., just --help) or if running init command
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand == "init":
         return
