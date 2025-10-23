@@ -29,6 +29,7 @@ from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.telemetry.telemetry_config import TelemetryConfig
 from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -323,6 +324,10 @@ def get_class_registry() -> ClassRegistryAbstract:
 
 def get_telemetry_manager() -> TelemetryManagerAbstract:
     return get_pipelex_hub().get_telemetry_manager()
+
+
+def get_telemetry_config() -> TelemetryConfig:
+    return get_telemetry_manager().get_telemetry_config()
 
 
 # cogt

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import tomli
+import tomlkit
 
 from pipelex.system.exceptions import ToolException
 from pipelex.tools.misc.file_utils import path_exists
@@ -55,3 +56,29 @@ def load_toml_from_path_if_exists(path: str) -> dict[str, Any] | None:
     if not path_exists(path):
         return None
     return load_toml_from_path(path)
+
+
+def load_toml_with_tomlkit(path: str) -> tomlkit.TOMLDocument:
+    """Load TOML using tomlkit to preserve formatting and comments.
+
+    Args:
+        path: Path to the TOML file
+
+    Returns:
+        TOMLDocument that preserves formatting and comments
+
+    """
+    with open(path, encoding="utf-8") as f:
+        return tomlkit.load(f)
+
+
+def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str) -> None:
+    """Save dictionary as TOML to path, preserving formatting and comments.
+
+    Args:
+        data: Dictionary or TOMLDocument to save as TOML
+        path: Path where the TOML file should be saved
+
+    """
+    with open(path, "w", encoding="utf-8") as f:
+        tomlkit.dump(data, f)  # type: ignore[arg-type]

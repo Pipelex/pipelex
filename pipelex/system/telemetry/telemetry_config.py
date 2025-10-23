@@ -11,6 +11,7 @@ class TelemetryMode(StrEnum):
 
 
 class TelemetryConfig(ConfigModel):
+    settings_customized: bool
     telemetry_mode: TelemetryMode = Field(strict=False)
     host: str
     project_api_key: str

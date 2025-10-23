@@ -30,6 +30,10 @@ class TelemetryManager(TelemetryManagerAbstract):
             self.posthog = Posthog(project_api_key=self.telemetry_config.project_api_key, host=self.telemetry_config.host)
 
     @override
+    def get_telemetry_config(self) -> TelemetryConfig:
+        return self.telemetry_config
+
+    @override
     def setup(self):
         pass
 
