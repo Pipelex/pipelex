@@ -340,7 +340,14 @@ class PipeRouterError(PipelexException):
 
 
 class PipelineExecutionError(PipelexException):
-    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str, output_name: str | None, pipe_stack: list[str]):
+    def __init__(
+        self,
+        message: str,
+        run_mode: PipeRunMode,
+        pipe_code: str,
+        output_name: str | None,
+        pipe_stack: list[str],
+    ):
         self.run_mode = run_mode
         self.pipe_code = pipe_code
         self.output_name = output_name

@@ -10,7 +10,7 @@ from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
 from pipelex.builder.builder_errors import PipeBuilderError, PipelexBundleError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
-from pipelex.exceptions import PipeInputError
+from pipelex.exceptions import PipeInputError, PipelineExecutionError
 from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import Pipelex
@@ -286,10 +286,14 @@ def build_one_shot_cmd(
         else:
             ensure_directory_for_file_path(file_path=output_path)
 
-        pipe_output = await execute_pipeline(
-            pipe_code=builder_pipe,
-            inputs={"brief": brief},
-        )
+        try:
+            pipe_output = await execute_pipeline(
+                pipe_code=builder_pipe,
+                inputs={"brief": brief},
+            )
+        except PipelineExecutionError as exc:
+            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
         pretty_print(pipe_output, title="Pipe Output")
 
         # Save to file unless explicitly disabled with --no-output
@@ -361,10 +365,14 @@ def build_partial_cmd(
             input_memory = load_json_dict_from_path(inputs)
         else:
             input_memory = {"brief": inputs}
-        pipe_output = await execute_pipeline(
-            pipe_code=builder_pipe,
-            inputs=input_memory,
-        )
+        try:
+            pipe_output = await execute_pipeline(
+                pipe_code=builder_pipe,
+                inputs=input_memory,
+            )
+        except PipelineExecutionError as exc:
+            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
         # Save to file unless explicitly disabled with --no-output
         if output_path:
             match extension:

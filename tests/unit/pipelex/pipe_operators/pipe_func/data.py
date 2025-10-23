@@ -8,7 +8,7 @@ from pipelex.system.registries.func_registry import pipe_func
 
 # Register test functions for validation tests
 @pipe_func(name="my_function")
-async def my_function(working_memory: WorkingMemory) -> TextContent:
+async def my_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
     """Test function with no inputs."""
     return TextContent(text="test output")
 
@@ -46,12 +46,12 @@ async def process_all(working_memory: WorkingMemory) -> TextContent:
 
 # Error test functions - these have validation issues
 # NOT registered automatically - must be registered in test fixtures
-async def no_return_type_func(working_memory: WorkingMemory):
+async def no_return_type_func(working_memory: WorkingMemory):  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
     """Test function with no return type annotation."""
     return TextContent(text="no return type")
 
 
-async def wrong_return_type_func(working_memory: WorkingMemory) -> str:
+async def wrong_return_type_func(working_memory: WorkingMemory) -> str:  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
     """Test function with wrong return type (not StuffContent)."""
     return "wrong type"
 
