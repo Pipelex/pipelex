@@ -244,7 +244,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
-        telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=get_config().telemetry)
+        telemetry_manager = telemetry_manager or TelemetryManager()
         self.pipelex_hub.set_telemetry_manager(telemetry_manager=telemetry_manager)
         if not observers:
             local_observer = LocalObserver()

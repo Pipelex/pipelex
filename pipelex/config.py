@@ -12,7 +12,6 @@ from pipelex.language.plx_config import PlxConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.system.telemetry.telemetry_config import TelemetryConfig
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.types import StrEnum
@@ -145,7 +144,6 @@ class PipelexConfig(ConfigRoot):
     cogt: Cogt
     pipelex: Pipelex
     migration: MigrationConfig
-    telemetry: TelemetryConfig
 
 
 def get_config() -> PipelexConfig:
