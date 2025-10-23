@@ -113,6 +113,8 @@ class PipelexClient(PipelexProtocol):
                 working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
+            pipe_code=pipe_code,
+            plx_content=plx_content,
             working_memory=working_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
@@ -156,6 +158,8 @@ class PipelexClient(PipelexProtocol):
                 working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
+            pipe_code=pipe_code,
+            plx_content=plx_content,
             working_memory=working_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,

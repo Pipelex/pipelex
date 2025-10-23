@@ -11,8 +11,8 @@ class PipelineRequestFactory:
 
     @staticmethod
     def make_from_working_memory(
-        pipe_code: str | None = None,
-        plx_content: str | None = None,
+        pipe_code: str | None,
+        plx_content: str | None,
         working_memory: WorkingMemory | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
