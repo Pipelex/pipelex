@@ -91,7 +91,7 @@ class PipeAbstract(ABC, BaseModel):
         limit = pipe_run_params.pipe_stack_limit
         if len(pipe_stack) > limit:
             msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}"
-            raise PipeStackOverflowError(msg)
+            raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=pipe_stack)
 
 
 PipeAbstractType = type[PipeAbstract]

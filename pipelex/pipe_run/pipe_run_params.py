@@ -8,25 +8,13 @@ from pipelex import log
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
 from pipelex.exceptions import BatchParamsError
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.types import Self, StrEnum
 
 
 class PipeRunParamKey(StrEnum):
     DYNAMIC_OUTPUT_CONCEPT = "_dynamic_output_concept"
     NB_OUTPUT = "_nb_output"
-
-
-class PipeRunMode(StrEnum):
-    LIVE = "live"
-    DRY = "dry"
-
-    @property
-    def is_dry(self) -> bool:
-        match self:
-            case PipeRunMode.DRY:
-                return True
-            case PipeRunMode.LIVE:
-                return False
 
 
 FORCE_DRY_RUN_MODE_ENV_KEY = "PIPELEX_FORCE_DRY_RUN_MODE"

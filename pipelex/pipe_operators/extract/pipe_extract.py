@@ -33,7 +33,8 @@ from pipelex.hub import (
     get_native_concept,
 )
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.types import Self

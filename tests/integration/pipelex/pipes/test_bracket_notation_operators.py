@@ -1,6 +1,9 @@
 """Integration tests for bracket notation in operator pipe factories."""
 
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
@@ -11,6 +14,18 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlue
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
+from pipelex.system.registries.func_registry import pipe_func
+
+
+# Test function for PipeFunc bracket notation test
+@pipe_func(name="process_function")
+async def process_function(working_memory: WorkingMemory) -> ListContent[TextContent]:
+    """Test function that processes items and returns a list."""
+    items = working_memory.get_stuff_as_list(name="two_texts", item_type=TextContent).items
+    # Process items and return as list
+    # result_items = [TextContent(text=f"processed: {item.text}") for item in items.content.items]
+    processed_items = [TextContent(text=f"processed: {item.text}") for item in items]
+    return ListContent(items=processed_items)
 
 
 class TestBracketNotationInOperators:
@@ -93,7 +108,7 @@ class TestBracketNotationInOperators:
         """Test PipeFunc factory with bracket notation."""
         blueprint = PipeFuncBlueprint(
             description="Process items",
-            inputs={"items": f"{NativeConceptCode.TEXT}[2]"},
+            inputs={"two_texts": f"{NativeConceptCode.TEXT}[2]"},
             output=f"{NativeConceptCode.TEXT}[]",
             function_name="process_function",
         )
@@ -104,7 +119,7 @@ class TestBracketNotationInOperators:
             blueprint=blueprint,
         )
 
-        assert pipe.inputs.root["items"].multiplicity == 2
+        assert pipe.inputs.root["two_texts"].multiplicity == 2
         assert pipe.output.code == "Text"
 
     def test_pipe_compose_with_bracket_notation(self):

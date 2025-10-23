@@ -12,7 +12,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import DryRunError
+from pipelex.exceptions import PipeRouterError
 from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
@@ -214,12 +214,12 @@ class TestPipeConditionSimple:
             assert original_input.content.category == "small"
 
     async def test_condition_dry_run_missing_inputs_failure(self, request: FixtureRequest):
-        """Test PipeCondition dry run with missing inputs using real pipe - should fail with DryRunError."""
+        """Test PipeCondition dry run with missing inputs using real pipe - should fail with PipeRouterError."""
         # Create empty working memory - missing required input
         empty_working_memory = WorkingMemoryFactory.make_empty()
 
-        # Run dry run using the real pipe - this should fail with DryRunError
-        with pytest.raises(DryRunError) as exc_info:
+        # Run dry run using the real pipe - this should fail with PipeRouterError
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
@@ -232,6 +232,7 @@ class TestPipeConditionSimple:
         # Verify the error details
         error = exc_info.value
         assert error.pipe_code == "basic_condition_by_category_2"
+        assert error.missing_inputs is not None
         assert "input_data" in error.missing_inputs
         assert "missing required inputs" in str(error)
         assert "input_data" in str(error)

@@ -32,7 +32,8 @@ from pipelex.exceptions import (
 )
 from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams, output_multiplicity_to_apply
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self

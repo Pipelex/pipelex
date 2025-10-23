@@ -28,7 +28,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import (
-    PipeExecutionError,
+    PipeRunError,
     StaticValidationError,
     StaticValidationErrorType,
 )
@@ -263,7 +263,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 msg = f"Error generating text with LLM {location}: {exc}"
-                raise PipeExecutionError(msg) from exc
+                raise PipeRunError(msg) from exc
 
             the_content = TextContent(
                 text=generated_text,
@@ -377,7 +377,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     msg = f"Error generating list of objects with text then object {location}: {exc}"
-                    raise PipeExecutionError(msg) from exc
+                    raise PipeRunError(msg) from exc
             else:
                 # We're generating a list of objects directly
                 method_desc = "object_direct"
@@ -393,7 +393,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     msg = f"Error generating list of objects with direct method {location}: {exc}"
-                    raise PipeExecutionError(msg) from exc
+                    raise PipeRunError(msg) from exc
 
             the_content = ListContent(items=generated_objects)
         else:
@@ -417,7 +417,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     msg = f"Error generating single object with text then object {location}: {exc}"
-                    raise PipeExecutionError(msg) from exc
+                    raise PipeRunError(msg) from exc
             else:
                 # We're generating a single object directly
                 method_desc = "object_direct"
@@ -432,7 +432,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     msg = f"Error generating single object with direct method {location}: {exc}"
-                    raise PipeExecutionError(msg) from exc
+                    raise PipeRunError(msg) from exc
             the_content = generated_object
 
         return the_content
