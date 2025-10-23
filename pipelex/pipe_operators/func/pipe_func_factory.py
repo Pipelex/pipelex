@@ -27,6 +27,7 @@ class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
             concept_string_or_code=output_parse_result.concept,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
+        # TODO: make function_name into a callable in PipeFunc
         return PipeFunc(
             domain=domain,
             code=pipe_code,
