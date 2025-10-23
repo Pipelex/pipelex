@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Updated the `PipelexClient` and changed the route of the API calls to `v1/pipeline/execute` and `v1/pipeline/start`.
+
 ## [v0.13.1] - 2025-10-22
 
 ### Changed
