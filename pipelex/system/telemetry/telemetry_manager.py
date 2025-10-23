@@ -3,13 +3,21 @@ from typing import Any
 from posthog import Posthog
 from typing_extensions import override
 
+from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
 
+DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
+
 
 class TelemetryManager(TelemetryManagerAbstract):
     def __init__(self, telemetry_config: TelemetryConfig):
+        self.do_not_track: bool
+        if (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
+            self.do_not_track = True
+        else:
+            self.do_not_track = False
         self.telemetry_config = telemetry_config
         self.posthog = Posthog(project_api_key=self.telemetry_config.project_api_key, host=self.telemetry_config.host)
 
@@ -23,6 +31,8 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def track_event(self, event_name: str, event_data: dict[str, Any] | None = None):
+        if self.do_not_track:
+            return
         # We copy the event data to avoid modifying the original dictionary
         if event_data:
             properties = event_data.copy()
