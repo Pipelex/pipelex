@@ -29,6 +29,7 @@ from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -47,6 +48,8 @@ class PipelexHub:
         self._secrets_provider: SecretsProviderAbstract | None = None
         self._class_registry: ClassRegistryAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
+        self._telemetry_manager: TelemetryManagerAbstract | None = None
+
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
         self._plugin_manager: PluginManager | None = None
@@ -115,6 +118,9 @@ class PipelexHub:
 
     def set_class_registry(self, class_registry: ClassRegistryAbstract):
         self._class_registry = class_registry
+
+    def set_telemetry_manager(self, telemetry_manager: TelemetryManagerAbstract):
+        self._telemetry_manager = telemetry_manager
 
     # cogt
 
@@ -199,6 +205,12 @@ class PipelexHub:
             msg = "StorageProvider is not initialized"
             raise RuntimeError(msg)
         return self._storage_provider
+
+    def get_telemetry_manager(self) -> TelemetryManagerAbstract:
+        if self._telemetry_manager is None:
+            msg = "TelemetryManager is not initialized"
+            raise RuntimeError(msg)
+        return self._telemetry_manager
 
     # cogt
 
@@ -307,6 +319,10 @@ def get_storage_provider() -> StorageProviderAbstract:
 
 def get_class_registry() -> ClassRegistryAbstract:
     return get_pipelex_hub().get_required_class_registry()
+
+
+def get_telemetry_manager() -> TelemetryManagerAbstract:
+    return get_pipelex_hub().get_telemetry_manager()
 
 
 # cogt

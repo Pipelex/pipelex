@@ -21,3 +21,20 @@ observer_dir = "results/observer"
 # is_pipeline_tracking_enabled = true
 # is_activity_tracking_enabled = true
 is_reporting_enabled = true
+
+[telemetry]
+telemetry_mode = "off" # Values: "off" | "anonymous" | "identified"
+host = "https://eu.i.posthog.com"
+project_api_key = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
+respect_dnt = true
+redact = [
+    "prompt",
+    "system_prompt",
+    "response",
+    "file_path",
+    "url",
+] # allowlist elsewhere
+debug = true # if true, log events locally instead of sending
+# Optional, populated only if user opts in:
+user_id = "" # user-provided, not inferred
+org_id = ""  # optional, user-provided

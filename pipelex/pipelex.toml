@@ -301,3 +301,23 @@ ocr = "model"
 llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
+
+####################################################################################################
+# Telemetry config
+####################################################################################################
+
+[telemetry]
+telemetry_mode = "off" # Values: "off" | "anonymous" | "identified"
+host = "https://eu.i.posthog.com"
+project_api_key = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
+respect_dnt = true
+redact = [
+    "prompt",
+    "system_prompt",
+    "response",
+    "file_path",
+    "url",
+] # allowlist elsewhere
+debug = false # if true, log events locally instead of sending
+user_id = "" # user-provided, not inferred
+org_id = "" # optional, user-provided

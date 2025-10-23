@@ -7,6 +7,7 @@ from pipelex.hub import (
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
+    get_telemetry_manager,
 )
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import (
@@ -17,6 +18,7 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.environment import get_optional_env
+from pipelex.system.telemetry.events import TelemetryEventName
 
 
 async def execute_pipeline(
@@ -103,5 +105,7 @@ async def execute_pipeline(
         working_memory=working_memory,
         output_name=output_name,
     )
+
+    get_telemetry_manager().track_event(event_name=TelemetryEventName.PIPELINE_EXECUTE, event_data={})
 
     return await get_pipe_router().run(pipe_job)
