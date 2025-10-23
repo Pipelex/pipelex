@@ -97,7 +97,7 @@ class PipelineRequest(BaseModel):
             msg = (
                 "pipe_code and plx_content cannot be None together. Its either: Both of them, or if there is no plx_content, "
                 "then pipe_code must be provided and must reference a pipe already registered in the library."
-                "plx_content is provided but no pipe_code, plx_content must have a main_pipe property."
+                "If plx_content is provided but no pipe_code, plx_content must have a main_pipe property."
             )
             raise PipelineRequestError(msg)
         return values
