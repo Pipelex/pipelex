@@ -452,3 +452,7 @@ class StartPipelineError(Exception):
 
 class PipelineInputError(Exception):
     pass
+
+
+class PipeExecutionError(PipelexException):
+    pass

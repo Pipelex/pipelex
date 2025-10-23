@@ -4,7 +4,7 @@ from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import PipelineExecutionError, PipeRouterError
+from pipelex.exceptions import PipeExecutionError, PipelineExecutionError, PipeRouterError
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,
@@ -25,11 +25,9 @@ from pipelex.pipeline.validate_plx import validate_plx
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 
-from pipelex.exceptions import PipeExecutionError
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
-
 
 
 async def execute_pipeline(
