@@ -1,7 +1,7 @@
 from typing_extensions import override
 
-from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
-from pipelex.system.telemetry.events import TelemetryEventName
+from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
+from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 
@@ -11,29 +11,26 @@ class ObserverTelemetry(ObserverProtocol):
 
     @override
     async def observe_before_run(self, payload: PayloadType) -> None:
-        pipeline_run_id = payload["pipeline_run_id"]
-        event_data = {
-            "pipeline_run_id": pipeline_run_id,
+        properties = {
+            EventProperty.PIPELINE_RUN_ID: payload[PayloadKey.PIPELINE_RUN_ID],
         }
-        self.telemetry_manager.track_event(event_name=TelemetryEventName.PIPE_RUN, event_data=event_data)
+        self.telemetry_manager.track_event(event_name=EventName.PIPE_RUN, properties=properties)
 
     @override
     async def observe_after_successful_run(self, payload: PayloadType) -> None:
-        pipeline_run_id = payload["pipeline_run_id"]
-        event_data = {
-            "pipeline_run_id": pipeline_run_id,
-            "pipe_run_outcome": "success",
+        properties = {
+            EventProperty.PIPELINE_RUN_ID: payload[PayloadKey.PIPELINE_RUN_ID],
+            EventProperty.PIPE_RUN_OUTCOME: Outcome.SUCCESS,
         }
-        self.telemetry_manager.track_event(event_name=TelemetryEventName.PIPE_COMPLETE, event_data=event_data)
+        self.telemetry_manager.track_event(event_name=EventName.PIPE_COMPLETE, properties=properties)
 
     @override
     async def observe_after_failing_run(
         self,
         payload: PayloadType,
     ) -> None:
-        pipeline_run_id = payload["pipeline_run_id"]
-        event_data = {
-            "pipeline_run_id": pipeline_run_id,
-            "pipe_run_outcome": "failure",
+        properties = {
+            EventProperty.PIPELINE_RUN_ID: payload[PayloadKey.PIPELINE_RUN_ID],
+            EventProperty.PIPE_RUN_OUTCOME: Outcome.FAILURE,
         }
-        self.telemetry_manager.track_event(event_name=TelemetryEventName.PIPE_COMPLETE, event_data=event_data)
+        self.telemetry_manager.track_event(event_name=EventName.PIPE_COMPLETE, properties=properties)

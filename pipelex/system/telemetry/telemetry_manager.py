@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import get_optional_env
+from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
@@ -42,26 +43,26 @@ class TelemetryManager(TelemetryManagerAbstract):
         pass
 
     @override
-    def track_event(self, event_name: str, event_data: dict[str, Any] | None = None):
+    def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):
         if self.do_not_track:
             return
-        # We copy the event data to avoid modifying the original dictionary
-        if event_data:
-            properties = event_data.copy()
+        # We copy the incoming properties to avoid modifying the original dictionary
+        # and to convert the keys to str
+        # and to remove the properties that are in the redact list
+        tracked_properties: dict[str, Any]
+        if properties:
+            tracked_properties = {key: value for key, value in properties.items() if key not in self.telemetry_config.redact}
         else:
-            properties = {}
-        for key in self.telemetry_config.redact:
-            if key in self.telemetry_config.redact:
-                properties.pop(key, None)
+            tracked_properties = {}
         match self.telemetry_config.telemetry_mode:
             case TelemetryMode.ANONYMOUS:
-                self._track_anonymous_event(event_name=event_name, properties=properties)
+                self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
             case TelemetryMode.IDENTIFIED:
                 if not self.telemetry_config.user_id:
                     log.error(f"Could not track event '{event_name}' as identified because user_id is not set, tracking as anonymous")
-                    self._track_anonymous_event(event_name=event_name, properties=properties)
+                    self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
                 else:
-                    self._track_identified_event(event_name=event_name, properties=properties, user_id=self.telemetry_config.user_id)
+                    self._track_identified_event(event_name=event_name, properties=tracked_properties, user_id=self.telemetry_config.user_id)
             case TelemetryMode.OFF:
                 log.dev(f"Telemetry is off, skipping event '{event_name}'")
 
@@ -70,7 +71,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             return
         if self.telemetry_config.debug:
             if properties:
-                log.debug(properties, title=f"Tracking anonymous event '{event_name}'. properties")
+                log.debug(properties, title=f"Tracking anonymous event '{event_name}'. Properties")
             else:
                 log.debug(f"Tracking anonymous event '{event_name}'. No properties.")
         else:
@@ -83,7 +84,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             return
         if self.telemetry_config.debug:
             if properties:
-                log.debug(properties, title=f"Tracking identified event '{event_name}'. properties")
+                log.debug(properties, title=f"Tracking identified event '{event_name}'. Properties")
             else:
                 log.debug(f"Tracking identified event '{event_name}'. No properties.")
         else:

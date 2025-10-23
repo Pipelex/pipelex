@@ -18,7 +18,7 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.environment import get_optional_env
-from pipelex.system.telemetry.events import TelemetryEventName
+from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 
 
 async def execute_pipeline(
@@ -106,9 +106,15 @@ async def execute_pipeline(
         output_name=output_name,
     )
 
-    event_data = {
-        "pipeline_run_id": job_metadata.pipeline_run_id,
+    properties = {
+        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
     }
-    get_telemetry_manager().track_event(event_name=TelemetryEventName.PIPELINE_EXECUTE, event_data=event_data)
+    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
 
-    return await get_pipe_router().run(pipe_job)
+    pipe_output = await get_pipe_router().run(pipe_job)
+    properties = {
+        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+        EventProperty.PIPELINE_EXECUTE_OUTCOME: Outcome.SUCCESS,
+    }
+    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
+    return pipe_output

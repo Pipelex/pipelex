@@ -1,7 +1,7 @@
 from typing import Protocol
 
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
+from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
 from pipelex.pipe_run.pipe_job import PipeJob
 
 
@@ -13,8 +13,8 @@ class PipeRouterProtocol(Protocol):
         pipe_job: PipeJob,
     ) -> None:
         payload: PayloadType = {
-            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
-            "pipe_job": pipe_job,
+            PayloadKey.PIPELINE_RUN_ID: pipe_job.job_metadata.pipeline_run_id,
+            PayloadKey.PIPE_JOB: pipe_job,
         }
         await self.observer.observe_before_run(payload)
 
@@ -24,9 +24,9 @@ class PipeRouterProtocol(Protocol):
         pipe_output: PipeOutput,
     ) -> None:
         payload: PayloadType = {
-            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
-            "pipe_job": pipe_job,
-            "pipe_output": pipe_output,
+            PayloadKey.PIPELINE_RUN_ID: pipe_job.job_metadata.pipeline_run_id,
+            PayloadKey.PIPE_JOB: pipe_job,
+            PayloadKey.PIPE_OUTPUT: pipe_output,
         }
         await self.observer.observe_after_successful_run(payload)
 
@@ -36,9 +36,9 @@ class PipeRouterProtocol(Protocol):
         error: Exception,
     ) -> None:
         payload: PayloadType = {
-            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
-            "pipe_job": pipe_job,
-            "error": error,
+            PayloadKey.PIPELINE_RUN_ID: pipe_job.job_metadata.pipeline_run_id,
+            PayloadKey.PIPE_JOB: pipe_job,
+            PayloadKey.ERROR: error,
         }
         await self.observer.observe_after_failing_run(payload)
 

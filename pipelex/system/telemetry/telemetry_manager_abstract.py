@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig
 
 
@@ -18,5 +19,5 @@ class TelemetryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def track_event(self, event_name: str, event_data: dict[str, Any] | None = None):
+    def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):
         pass
