@@ -13,6 +13,7 @@ from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.telemetry.telemetry_config import TelemetryMode
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
@@ -56,35 +57,48 @@ def check_telemetry_consent() -> None:
         if toml_doc["settings_customized"]:
             return
 
+        # Map choice to telemetry mode using enum
+        mode_map = {
+            1: TelemetryMode.OFF,
+            2: TelemetryMode.ANONYMOUS,
+            3: TelemetryMode.IDENTIFIED,
+        }
+
         # Prompt user for telemetry preference
         typer.echo("\n" + "=" * 70)
         typer.echo("Telemetry Configuration")
         typer.echo("=" * 70)
         typer.echo("\nPipelex can collect anonymous usage data to help improve the product.")
         typer.echo("\nPlease choose your telemetry preference:")
-        typer.echo("  [1] off        - No telemetry data collected")
-        typer.echo("  [2] anonymous  - Anonymous usage data only (default)")
-        typer.echo("  [3] identified - Usage data with user identification")
+        typer.echo(f"  [1] {mode_map[1]:11} - No telemetry data collected")
+        typer.echo(f"  [2] {mode_map[2]:11} - Anonymous usage data only (default)")
+        typer.echo(f"  [3] {mode_map[3]:11} - Usage data with user identification")
+        typer.echo(f"  [q] {'quit':11} - Exit without configuring")
         typer.echo()
 
-        choice = typer.prompt(
+        choice_str = typer.prompt(
             "Enter your choice",
-            type=int,
-            default=2,
+            type=str,
+            default="2",
             show_default=True,
         )
 
-        # Validate choice
-        if choice not in [1, 2, 3]:
+        # Handle quit option
+        if choice_str.lower() == "q":
+            typer.echo("\nExiting without configuring telemetry.")
+            raise typer.Exit(code=0)
+
+        # Parse and validate choice
+        try:
+            choice = int(choice_str)
+        except ValueError:
+            typer.echo(f"Invalid choice: {choice_str}. Defaulting to anonymous.")
+            choice = 2
+
+        if choice not in mode_map:
             typer.echo(f"Invalid choice: {choice}. Defaulting to anonymous.")
             choice = 2
 
-        # Map choice to telemetry mode
-        mode_map = {
-            1: "off",
-            2: "anonymous",
-            3: "identified",
-        }
         telemetry_mode = mode_map[choice]
 
         # Update the settings
@@ -97,6 +111,9 @@ def check_telemetry_consent() -> None:
         typer.echo(f"\n✓ Telemetry mode set to: {telemetry_mode}")
         typer.echo("=" * 70 + "\n")
 
+    except typer.Exit:
+        # Re-raise Exit exceptions (e.g., when user quits)
+        raise
     except Exception as e:
         # Silently fail if there's any issue - don't block CLI usage
         typer.echo(f"Warning: Could not save telemetry preference: {e}", err=True)

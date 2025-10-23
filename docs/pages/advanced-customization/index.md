@@ -60,7 +60,6 @@ Some components are controlled by feature flags in the configuration:
 
 - `is_reporting_enabled`: Controls Reporting system
 - `is_pipeline_tracking_enabled`: Controls Pipeline Tracking
-- `is_activity_tracking_enabled`: Controls Activity Tracking
 
 When a feature is disabled, the corresponding NoOp implementation is used automatically.
 
