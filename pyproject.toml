@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.13.0"
+version = "0.13.1"
 description = "Pipelex is an open-source dev tool based on a simple declarative language that lets you define replicable, structured, composable LLM pipelines."
 authors = [{ name = "Evotis S.A.S.", email = "evotis@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -31,9 +31,9 @@ dependencies = [
     "openai>=1.60.1",
     "pillow>=11.2.1",
     "polyfactory>=2.21.0",
-    "posthog>=6.7.8",
+    "posthog>=6.7.0",
     "pypdfium2>=4.30.0,!=4.30.1",
-    "pydantic==2.10.6",
+    "pydantic>=2.10.6,<3.0.0",
     "python-dotenv>=1.0.1",
     "PyYAML>=6.0.2",
     "rich>=13.8.1",

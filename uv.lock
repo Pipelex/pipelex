@@ -1900,7 +1900,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.13.0"
+version = "0.13.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -2006,8 +2006,8 @@ requires-dist = [
     { name = "openai", specifier = ">=1.60.1" },
     { name = "pillow", specifier = ">=11.2.1" },
     { name = "polyfactory", specifier = ">=2.21.0" },
-    { name = "posthog", specifier = ">=6.7.8" },
-    { name = "pydantic", specifier = "==2.10.6" },
+    { name = "posthog", specifier = ">=6.7.0" },
+    { name = "pydantic", specifier = ">=2.10.6,<3.0.0" },
     { name = "pylint", marker = "extra == 'dev'", specifier = ">=3.3.8" },
     { name = "pypdfium2", specifier = ">=4.30.0,!=4.30.1" },
     { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.405" },
@@ -2068,7 +2068,7 @@ wheels = [
 
 [[package]]
 name = "posthog"
-version = "6.7.8"
+version = "6.7.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -2078,9 +2078,9 @@ dependencies = [
     { name = "six" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/40/b1/a23c9d092de37e9ce39e27166f38f81b0bd7704022fe23f90734eb4b7ad4/posthog-6.7.8.tar.gz", hash = "sha256:999e65134571827061332f1f311df9b24730b386c6eabe0057bf768e514d87a8", size = 119085, upload-time = "2025-10-16T14:46:53.126Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/88/f8/9118197ff1113b957fa3b5d206c0e41d8885afdbb9c590bc5274602e5e62/posthog-6.7.9.tar.gz", hash = "sha256:506fd31a6a4a1a6ca207df5a05ec9bef10b64bbe148d983d8d6956bffad195c3", size = 120171, upload-time = "2025-10-22T20:53:40.099Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/ce/5e5ede2f0b24db113544f9f7ce08d395a4107cbc66d77b8d05d9eaeaeada/posthog-6.7.8-py3-none-any.whl", hash = "sha256:842ccb518f925425f714bae29e4ac36a059a8948c45f6ed155543ca7386d554b", size = 137299, upload-time = "2025-10-16T14:46:51.547Z" },
+    { url = "https://files.pythonhosted.org/packages/07/9c/72705369b4b8bbefebe60d5bc00ad04a76a91b1a437e8ef758cd17d12acb/posthog-6.7.9-py3-none-any.whl", hash = "sha256:1415c20fed34f4be2ed4fb910516637a28a18bdfa461ee6a41588baa2f4fa64a", size = 138472, upload-time = "2025-10-22T20:53:38.749Z" },
 ]
 
 [[package]]
