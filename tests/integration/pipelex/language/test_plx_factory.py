@@ -3,7 +3,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.language.plx_factory import PlxFactory
-from tests.unit.pipelex.core.test_data import InterpreterTestCases
+from tests.unit.core.test_data import InterpreterTestCases
 
 
 class TestPlxFactoryIntegration:
