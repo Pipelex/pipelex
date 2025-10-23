@@ -13,13 +13,15 @@ DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
 
 class TelemetryManager(TelemetryManagerAbstract):
     def __init__(self, telemetry_config: TelemetryConfig):
+        self.telemetry_config = telemetry_config
         self.do_not_track: bool
-        if (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
+        self.posthog: Posthog | None
+        if self.telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
             self.do_not_track = True
+            self.posthog = None
         else:
             self.do_not_track = False
-        self.telemetry_config = telemetry_config
-        self.posthog = Posthog(project_api_key=self.telemetry_config.project_api_key, host=self.telemetry_config.host)
+            self.posthog = Posthog(project_api_key=self.telemetry_config.project_api_key, host=self.telemetry_config.host)
 
     @override
     def setup(self):
@@ -54,6 +56,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                 log.dev(f"Telemetry is off, skipping event '{event_name}'")
 
     def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
+        if not self.posthog:
+            return
         if self.telemetry_config.debug:
             if properties:
                 log.debug(properties, title=f"Tracking anonymous event '{event_name}'. properties")
@@ -64,6 +68,8 @@ class TelemetryManager(TelemetryManagerAbstract):
             self.posthog.capture(event_name, properties=properties)
 
     def _track_identified_event(self, event_name: str, properties: dict[str, Any], user_id: str):
+        if not self.posthog:
+            return
         if self.telemetry_config.debug:
             if properties:
                 log.debug(properties, title=f"Tracking identified event '{event_name}'. properties")

@@ -320,4 +320,3 @@ redact = [
 ] # allowlist elsewhere
 debug = false # if true, log events locally instead of sending
 user_id = "" # user-provided, not inferred
-org_id = "" # optional, user-provided

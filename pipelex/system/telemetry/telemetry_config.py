@@ -18,4 +18,3 @@ class TelemetryConfig(ConfigModel):
     redact: list[str]
     debug: bool
     user_id: str
-    org_id: str
