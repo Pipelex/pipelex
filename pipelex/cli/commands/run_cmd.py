@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Annotated
 
 import click
@@ -137,15 +138,18 @@ def run_cmd(
             # Load inputs if provided
             input_memory = None
             if inputs:
-                try:
-                    input_memory = load_json_dict_from_path(inputs)
-                    typer.echo(f"Loaded inputs from: {inputs}")
-                except FileNotFoundError as file_not_found_exc:
-                    typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
-                    raise typer.Exit(1) from file_not_found_exc
-                except JsonTypeError as json_type_error_exc:
-                    typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
-                    raise typer.Exit(1) from json_type_error_exc
+                if inputs.startswith("{"):
+                    input_memory = json.loads(inputs)
+                else:
+                    try:
+                        input_memory = load_json_dict_from_path(inputs)
+                        typer.echo(f"Loaded inputs from: {inputs}")
+                    except FileNotFoundError as file_not_found_exc:
+                        typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
+                        raise typer.Exit(1) from file_not_found_exc
+                    except JsonTypeError as json_type_error_exc:
+                        typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
+                        raise typer.Exit(1) from json_type_error_exc
 
             # Execute pipeline
             typer.secho(f"\n🚀 Executing {source_description}...\n", fg=typer.colors.GREEN, bold=True)
