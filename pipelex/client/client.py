@@ -5,7 +5,7 @@ from typing_extensions import override
 
 from pipelex.client.pipeline_request_factory import PipelineRequestFactory
 from pipelex.client.pipeline_response_factory import PipelineResponseFactory
-from pipelex.client.protocol import PipelexProtocol, PipelineInputs, PipelineResponse
+from pipelex.client.protocol import PipelexProtocol, PipelineInputs, PipelineRequest, PipelineRequestError, PipelineResponse
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
@@ -80,52 +80,90 @@ class PipelexClient(PipelexProtocol):
     @override
     async def execute_pipeline(
         self,
-        pipe_code: str,
-        working_memory: WorkingMemory | None = None,
-        inputs: PipelineInputs | None = None,
+        pipe_code: str | None = None,
+        plx_content: str | None = None,
+        inputs: PipelineInputs | WorkingMemory | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
-        if working_memory and inputs:
-            msg = f"'working_memory' and 'inputs' cannot be provided together to the API execute_pipeline {pipe_code=}."
-            raise ValueError(msg)
+        """Execute a pipeline synchronously and wait for its completion.
 
+        Args:
+            pipe_code: The code identifying the pipeline to execute
+            plx_content: Content of the pipeline bundle to execute
+            inputs: Inputs passed to the pipeline
+            output_name: Name of the output slot to write to
+            output_multiplicity: Output multiplicity setting
+            dynamic_output_concept_code: Override for the dynamic output concept code
+        Returns:
+            PipelineResponse: Complete execution results including pipeline state and output
+
+        """
+        if not pipe_code and not plx_content:
+            msg = "Either pipe_code or plx_content must be provided to the API execute_pipeline."
+            raise PipelineRequestError(message=msg)
+
+        working_memory: WorkingMemory | None = None
+        pipeline_request: PipelineRequest | None = None
         if inputs is not None:
-            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
+            if isinstance(inputs, WorkingMemory):
+                working_memory = inputs
+            else:
+                working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
+            pipe_code=pipe_code,
+            plx_content=plx_content,
             working_memory=working_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
-
-        response = await self._make_api_call(f"v1/pipeline/{pipe_code}/execute", request=pipeline_request.model_dump_json())
+        response = await self._make_api_call("v1/pipeline/execute", request=pipeline_request.model_dump_json())
         return PipelineResponseFactory.make_from_api_response(response)
 
     @override
     async def start_pipeline(
         self,
-        pipe_code: str,
-        working_memory: WorkingMemory | None = None,
-        inputs: PipelineInputs | None = None,
+        pipe_code: str | None = None,
+        plx_content: str | None = None,
+        inputs: PipelineInputs | WorkingMemory | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
     ) -> PipelineResponse:
-        if working_memory and inputs:
-            msg = f"'working_memory' and 'inputs' cannot be provided together to the API start_pipeline {pipe_code=}."
-            raise ValueError(msg)
+        """Start a pipeline execution asynchronously without waiting for completion.
 
+        Args:
+            pipe_code: The code identifying the pipeline to execute
+            plx_content: Content of the pipeline bundle to execute
+            inputs: Inputs passed to the pipeline
+            output_name: Name of the output slot to write to
+            output_multiplicity: Output multiplicity setting
+            dynamic_output_concept_code: Override for the dynamic output concept code
+        Returns:
+            PipelineResponse: Initial response with pipeline_run_id and created_at timestamp
+        """
+        if not pipe_code and not plx_content:
+            msg = "Either pipe_code or plx_content must be provided to the API start_pipeline."
+            raise PipelineRequestError(message=msg)
+
+        working_memory: WorkingMemory | None = None
+        pipeline_request: PipelineRequest | None = None
         if inputs is not None:
-            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
+            if isinstance(inputs, WorkingMemory):
+                working_memory = inputs
+            else:
+                working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
+            pipe_code=pipe_code,
+            plx_content=plx_content,
             working_memory=working_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
         )
-        response = await self._make_api_call(f"v1/pipeline/{pipe_code}/start", request=pipeline_request.model_dump_json())
+        response = await self._make_api_call("v1/pipeline/start", request=pipeline_request.model_dump_json())
         return PipelineResponseFactory.make_from_api_response(response)

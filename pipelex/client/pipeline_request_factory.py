@@ -11,15 +11,18 @@ class PipelineRequestFactory:
 
     @staticmethod
     def make_from_working_memory(
+        pipe_code: str | None,
+        plx_content: str | None,
         working_memory: WorkingMemory | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
-        plx_content: str | None = None,
     ) -> PipelineRequest:
         """Create a PipelineRequest from a WorkingMemory object.
 
         Args:
+            pipe_code: The code identifying the pipeline to execute
+            plx_content: Content of the pipeline bundle to execute
             working_memory: The WorkingMemory to convert
             output_name: Name of the output slot to write to
             output_multiplicity: Output multiplicity setting
@@ -30,12 +33,13 @@ class PipelineRequestFactory:
 
         """
         return PipelineRequest(
+            pipe_code=pipe_code,
+            plx_content=plx_content,
             # `ApiSerializer.serialize_working_memory_for_api` returns a dict[str, dict[str, Any]] (plain dicts), which is a valid PipelineInputs
             inputs=cast("PipelineInputs", ApiSerializer.serialize_working_memory_for_api(working_memory=working_memory)),
             output_name=output_name,
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_code=dynamic_output_concept_code,
-            plx_content=plx_content,
         )
 
     @staticmethod
@@ -50,9 +54,10 @@ class PipelineRequestFactory:
 
         """
         return PipelineRequest(
+            pipe_code=request_body.get("pipe_code"),
+            plx_content=request_body.get("plx_content"),
             inputs=request_body.get("inputs", {}),
             output_name=request_body.get("output_name"),
             output_multiplicity=request_body.get("output_multiplicity"),
             dynamic_output_concept_code=request_body.get("dynamic_output_concept_code"),
-            plx_content=request_body.get("plx_content"),
         )

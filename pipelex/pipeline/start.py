@@ -4,7 +4,12 @@ from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_pipe_router, get_pipeline_manager, get_report_delegate, get_required_pipe
+from pipelex.hub import (
+    get_pipe_router,
+    get_pipeline_manager,
+    get_report_delegate,
+    get_required_pipe,
+)
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
@@ -19,6 +24,7 @@ async def start_pipeline(
     output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode = PipeRunMode.LIVE,
+    search_domains: list[str] | None = None,
 ) -> tuple[str, asyncio.Task[PipeOutput]]:
     """Start a pipeline in the background.
 
@@ -30,7 +36,7 @@ async def start_pipeline(
     Parameters
     ----------
     pipe_code:
-        The code of the pipe to execute.
+        The code identifying the pipeline to execute.
     inputs:
         Optional pipeline inputs or working memory to pass to the pipe.
     output_name:
@@ -41,6 +47,8 @@ async def start_pipeline(
         Override the dynamic output concept code.
     pipe_run_mode:
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``.
+    search_domains:
+        List of domains to search for pipes.
 
     Returns:
     -------
@@ -49,21 +57,28 @@ async def start_pipeline(
         can be awaited to get the pipe output.
 
     """
+    pipe = get_required_pipe(pipe_code=pipe_code)
+
+    search_domains = search_domains or []
+    if pipe.domain not in search_domains:
+        search_domains.insert(0, pipe.domain)
+
     working_memory: WorkingMemory | None = None
 
     if inputs:
         if isinstance(inputs, WorkingMemory):
             working_memory = inputs
         else:
-            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=inputs)
+            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+                pipeline_inputs=inputs,
+                search_domains=search_domains,
+            )
 
     pipeline = get_pipeline_manager().add_new_pipeline()
-    pipeline_run_id = pipeline.pipeline_run_id
-    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-    pipe = get_required_pipe(pipe_code=pipe_code)
+    get_report_delegate().open_registry(pipeline_run_id=pipeline.pipeline_run_id)
 
     job_metadata = JobMetadata(
-        pipeline_run_id=pipeline_run_id,
+        pipeline_run_id=pipeline.pipeline_run_id,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(
@@ -86,4 +101,4 @@ async def start_pipeline(
     # Launch execution without awaiting the result.
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))
 
-    return pipeline_run_id, task
+    return pipeline.pipeline_run_id, task
