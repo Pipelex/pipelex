@@ -1,17 +1,17 @@
 # Executing Pipelines with Inputs
 
-When you run a Pipelex pipeline from Python, you often need to provide input data. The `input_memory` parameter gives you a flexible and intuitive way to pass data to your pipelines.
+When you run a Pipelex pipeline from Python, you often need to provide input data. The `inputs` parameter gives you a flexible and intuitive way to pass data to your pipelines.
 
 This guide explains the different formats you can use and when to use each one.
 
-## Understanding input_memory
+## Understanding inputs
 
-The `input_memory` parameter accepts a dictionary where:
+The `inputs` parameter accepts a dictionary where:
 
 - **Keys** are the input variable names (matching the `inputs` defined in your pipeline)
 - **Values** can be provided in multiple formats for convenience
 
-Under the hood, `input_memory` uses this type definition:
+Under the hood, `inputs` uses this type definition:
 
 ```python
 StuffContentOrData = dict[str, Any] | StuffContent | list[Any] | str
@@ -43,7 +43,7 @@ The simplest way to provide text input is with a plain string. Pipelex automatic
 ```python
 pipe_output = await execute_pipeline(
     pipe_code="summarize_story",
-    input_memory={
+    inputs={
         "story": """
         Once upon a time there was a brave knight who saved the kingdom from a dragon.
         [...]
@@ -72,7 +72,7 @@ from pipelex.core.stuffs.pdf_content import PDFContent
 
 pipe_output = await execute_pipeline(
     pipe_code="process_invoice",
-    input_memory={
+    inputs={
         "document": PDFContent(url="invoice.pdf"),
     },
 )
@@ -85,7 +85,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 
 pipe_output = await execute_pipeline(
     pipe_code="analyze_photo",
-    input_memory={
+    inputs={
         "photo": ImageContent(url="photo.jpg"),
     },
 )
@@ -112,7 +112,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 
 pipe_output = await execute_pipeline(
     pipe_code="extract_gantt",
-    input_memory={
+    inputs={
         "gantt_chart_image": {
             "concept": "gantt.GanttChartImage",  # Custom concept that refines Image
             "content": ImageContent(url="gantt.png"),
@@ -126,7 +126,7 @@ pipe_output = await execute_pipeline(
 ```python
 pipe_output = await execute_pipeline(
     pipe_code="answer_question",
-    input_memory={
+    inputs={
         "question": {
             "concept": "qa.Question",
             "content": "What is the capital of France?",
@@ -146,7 +146,7 @@ pipe_output = await execute_pipeline(
 
 ## Format 4: Multiple Inputs with Mixed Formats
 
-You can mix and match formats freely in the same `input_memory` dictionary.
+You can mix and match formats freely in the same `inputs` dictionary.
 
 ### Complex Example
 
@@ -155,7 +155,7 @@ from pipelex.core.stuffs.text_content import load_text_from_path
 
 pipe_output = await execute_pipeline(
     pipe_code="analyze_contract",
-    input_memory={
+    inputs={
         # Format 1: Simple string
         "client_instructions": "Focus on payment terms",
         
@@ -208,7 +208,7 @@ Follow these simple rules:
 # Most document processing pipelines expect a PDF input
 pipe_output = await execute_pipeline(
     pipe_code="extract_data",
-    input_memory={
+    inputs={
         "document": PDFContent(url="document.pdf"),
     },
 )
@@ -220,7 +220,7 @@ pipe_output = await execute_pipeline(
 # Image processing with native Image concept
 pipe_output = await execute_pipeline(
     pipe_code="describe_image",
-    input_memory={
+    inputs={
         "image": ImageContent(url="photo.jpg"),
     },
 )
@@ -232,7 +232,7 @@ pipe_output = await execute_pipeline(
 # Simple text input for generation tasks
 pipe_output = await execute_pipeline(
     pipe_code="write_story",
-    input_memory={
+    inputs={
         "topic": "A robot learning to love",
     },
 )
@@ -244,7 +244,7 @@ pipe_output = await execute_pipeline(
 # Custom concept that needs explicit specification
 pipe_output = await execute_pipeline(
     pipe_code="process_tweet",
-    input_memory={
+    inputs={
         "draft_tweet": {
             "concept": "social.DraftTweet",
             "content": "Check out this amazing framework!",
@@ -272,7 +272,7 @@ character = Character(
 # Pass it to the pipeline
 pipe_output = await execute_pipeline(
     pipe_code="analyze_character",
-    input_memory={
+    inputs={
         "character": {
             "concept": "story.Character",
             "content": character,
@@ -283,7 +283,7 @@ pipe_output = await execute_pipeline(
 
 ## Alternative: Using working_memory Directly
 
-For advanced use cases, you can construct the working memory explicitly instead of using `input_memory`:
+For advanced use cases, you can construct the working memory explicitly instead of using `inputs`:
 
 ```python
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -314,7 +314,7 @@ pipe_output = await execute_pipeline(
 - You're building complex multi-stuff scenarios
 - You're working with intermediate pipeline states
 
-**For most cases, `input_memory` is simpler and recommended.**
+**For most cases, `inputs` is simpler and recommended.**
 
 ## Troubleshooting
 
@@ -324,10 +324,10 @@ If you see an error about a concept not being found, you may need to use the exp
 
 ```python
 # ❌ Won't work if MyType is a custom concept
-input_memory={"data": my_value}
+inputs={"data": my_value}
 
 # ✅ Use explicit format
-input_memory={
+inputs={
     "data": {
         "concept": "domain.MyType",
         "content": my_value,
@@ -341,7 +341,7 @@ Make sure the content type matches what your concept expects:
 
 ```python
 # ❌ Wrong: passing a string when concept expects structured data
-input_memory={
+inputs={
     "character": {
         "concept": "story.Character",
         "content": "Alice",  # Should be a Character instance
@@ -349,7 +349,7 @@ input_memory={
 }
 
 # ✅ Correct: pass the right type
-input_memory={
+inputs={
     "character": {
         "concept": "story.Character",
         "content": Character(name="Alice", age=30, ...),

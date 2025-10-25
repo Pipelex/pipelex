@@ -14,7 +14,7 @@ The pipeline `power_extractor_dpe` is designed to recognize and extract the key 
 async def extract_dpe(pdf_url: str) -> Dpe:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_dpe",
-        input_memory={
+        inputs={
             "document": PDFContent(url=pdf_url),
         },
     )

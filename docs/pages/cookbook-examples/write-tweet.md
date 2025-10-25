@@ -8,13 +8,13 @@ This example demonstrates how to create a pipeline that takes a draft of a tweet
 
 ## The Pipeline Explained
 
-The `optimize_tweet` function is the core of this example. It takes two strings, `draft_tweet` and `writing_style`, and executes the `optimize_tweet_sequence` pipeline, passing both inputs through the `input_memory` dictionary with their respective concept specifications.
+The `optimize_tweet` function is the core of this example. It takes two strings, `draft_tweet` and `writing_style`, and executes the `optimize_tweet_sequence` pipeline, passing both inputs through the `inputs` dictionary with their respective concept specifications.
 
 ```python
 async def optimize_tweet(draft_tweet: str, writing_style: str) -> str:
     pipe_output = await execute_pipeline(
         pipe_code="optimize_tweet_sequence",
-        input_memory={
+        inputs={
             "draft_tweet": {
                 "concept": "tech_tweet.DraftTweet",
                 "content": draft_tweet,

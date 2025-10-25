@@ -90,8 +90,8 @@ class TestPipeSequenceWithInputMemory:
     """Test pipe sequence functionality with input memory."""
 
     async def test_optimize_tweet_sequence_with_input_memory(self):
-        """Test the optimize_tweet_sequence pipeline using input_memory parameter."""
-        # Execute the pipeline using input_memory
+        """Test the optimize_tweet_sequence pipeline using inputs parameter."""
+        # Execute the pipeline using inputs
         pipe_output = await execute_pipeline(
             pipe_code="optimize_tweet_sequence",
             inputs={

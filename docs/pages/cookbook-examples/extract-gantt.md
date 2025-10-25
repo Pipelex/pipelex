@@ -15,7 +15,7 @@ async def extract_gantt(image_url: str) -> GanttChart:
     # Run the pipe
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
-        input_memory={
+        inputs={
             "gantt_chart_image": {
                 "concept": "gantt.GanttChartImage",
                 "content": ImageContent(url=image_url),

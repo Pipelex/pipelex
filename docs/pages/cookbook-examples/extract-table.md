@@ -14,7 +14,7 @@ The pipeline `extract_html_table_and_review` takes an image of a table, processe
 async def extract_table(table_screenshot: str) -> HtmlTable:
     pipe_output = await execute_pipeline(
         pipe_code="extract_html_table_and_review",
-        input_memory={
+        inputs={
             "table_screenshot": {
                 "concept": "tables.TableScreenshot",
                 "content": ImageContent(url=table_screenshot),

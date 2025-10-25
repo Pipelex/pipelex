@@ -57,7 +57,7 @@ Each of these commands generates a complete production-ready script in our Pipel
 # Run a pipe by code
 pipelex run <pipe_code>
 
-# Run with inputs (JSON file containing input_memory dict)
+# Run with inputs (JSON file containing inputs dict)
 pipelex run <pipe_code> --inputs input.json
 
 # Run a bundle's main_pipe (auto-detected from .plx extension)

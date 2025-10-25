@@ -899,7 +899,7 @@ async def extract_gantt(image_url: str) -> GanttChart:
     # Run the pipe
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
-        input_memory={
+        inputs={
             "gantt_chart_image": {
                 "concept": "gantt.GanttImage",
                 "content": ImageContent(url=image_url),
@@ -938,7 +938,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 ## If you assign a string, by default it will be considered as a TextContent.
     pipe_output = await execute_pipeline(
         pipe_code="master_advisory_orchestrator",
-        input_memory={
+        inputs={
             "user_input": problem_description,
         },
     )
@@ -948,7 +948,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 ## the system knows what content it corresponds to:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_dpe",
-        input_memory={
+        inputs={
             "document": PDFContent(url=pdf_url),
         },
     )
@@ -957,7 +957,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 ## Because ImageContent is a native concept, we can use it directly as a value:
     pipe_output = await execute_pipeline(
         pipe_code="fashion_variation_pipeline",
-        input_memory={
+        inputs={
             "fashion_photo": ImageContent(url=image_url),
         },
     )
@@ -967,7 +967,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 ## so we must provide it using a dict with the concept and the content:
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
-        input_memory={
+        inputs={
             "gantt_chart_image": {
                 "concept": "gantt.GanttImage",
                 "content": ImageContent(url=image_url),
@@ -979,7 +979,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
     pipe_output = await execute_pipeline(
         pipe_code="retrieve_then_answer",
         dynamic_output_concept_code="contracts.Fees",
-        input_memory={
+        inputs={
             "text": load_text_from_path(path=text_path),
             "question": {
                 "concept": "answer.Question",

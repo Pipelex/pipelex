@@ -144,7 +144,7 @@ async def main():
     # Execute the pipeline and wait for the result
     pipe_output = await execute_pipeline(
         pipe_code="description_to_tagline",
-        input_memory={
+        inputs={
             "description": {
                 "concept": "ProductDescription",
                 "content": "EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",

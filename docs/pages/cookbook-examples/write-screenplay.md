@@ -8,7 +8,7 @@ This example demonstrates how to use Pipelex for creative text generation. It ta
 
 ## The Pipeline Explained
 
-The `generate_screenplay` function takes a pitch as a string and executes the `generate_screenplay` pipeline, passing the pitch through the `input_memory` dictionary with the concept specification.
+The `generate_screenplay` function takes a pitch as a string and executes the `generate_screenplay` pipeline, passing the pitch through the `inputs` dictionary with the concept specification.
 
 ```python
 async def generate_screenplay(pitch: str):
@@ -16,7 +16,7 @@ async def generate_screenplay(pitch: str):
 
     pipe_output = await execute_pipeline(
         pipe_code="generate_screenplay",
-        input_memory={
+        inputs={
             "pitch": {
                 "concept": "screenplay.Pitch",
                 "content": pitch,

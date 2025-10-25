@@ -84,7 +84,7 @@ def build_pipe_cmd(
             return
 
         try:
-            pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code=builder_pipe, input_memory={"brief": prompt})
+            pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code=builder_pipe, inputs={"brief": prompt})
         except PipeBuilderError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."
             if exc.working_memory:
@@ -320,7 +320,7 @@ def build_one_shot_cmd(
 def build_partial_cmd(
     inputs: Annotated[
         str,
-        typer.Argument(help="Inline brief or path to JSON file with input_memory"),
+        typer.Argument(help="Inline brief or path to JSON file with inputs"),
     ],
     builder_pipe: Annotated[
         str,
@@ -360,15 +360,15 @@ def build_partial_cmd(
             )
             ensure_directory_for_file_path(file_path=output_path)
 
-        input_memory: PipelineInputs | None = None
+        inputs: PipelineInputs | None = None
         if inputs.endswith(".json"):
-            input_memory = load_json_dict_from_path(inputs)
+            inputs = load_json_dict_from_path(inputs)
         else:
-            input_memory = {"brief": inputs}
+            inputs = {"brief": inputs}
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=builder_pipe,
-                inputs=input_memory,
+                inputs=inputs,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)

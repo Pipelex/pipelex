@@ -323,7 +323,7 @@ Executes a pipeline, either from a standalone bundle (.plx) file or from your pr
 
 - `--pipe` - Pipe code to run (alternative to positional argument)
 - `--bundle` - Bundle file path (alternative to positional argument)
-- `--inputs`, `-i` - Path to JSON file containing input_memory
+- `--inputs`, `-i` - Path to JSON file containing inputs
 - `--output`, `-o` - Path to save output JSON (defaults to `results/run_{pipe_code}.json`)
 - `--no-output` - Skip saving output to file
 - `--no-pretty-print` - Skip pretty printing the main output

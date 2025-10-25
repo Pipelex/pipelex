@@ -104,7 +104,7 @@ def generate_runner_code(pipe: PipeAbstract) -> str:
         ]
     )
 
-    # Build input_memory entries
+    # Build inputs entries
     if inputs.nb_inputs > 0:
         input_memory_entries: list[str] = []
         for var_name, input_req in inputs.root.items():
@@ -127,7 +127,7 @@ def generate_runner_code(pipe: PipeAbstract) -> str:
     if inputs.nb_inputs > 0:
         function_lines.extend(
             [
-                "        input_memory={",
+                "        inputs={",
                 input_memory_block,
                 "        },",
             ]

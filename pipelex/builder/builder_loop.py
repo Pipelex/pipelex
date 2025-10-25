@@ -24,7 +24,7 @@ class BuilderLoop:
     async def build_and_fix(
         self,
         pipe_code: str,
-        input_memory: PipelineInputs | None = None,
+        inputs: PipelineInputs | None = None,
         is_save_first_iteration_enabled: bool = True,
         is_save_second_iteration_enabled: bool = True,
     ) -> PipelexBundleSpec:
@@ -32,7 +32,7 @@ class BuilderLoop:
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
-                inputs=input_memory,
+                inputs=inputs,
             )
         except PipelineExecutionError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."

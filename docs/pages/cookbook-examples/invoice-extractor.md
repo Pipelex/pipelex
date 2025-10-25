@@ -14,7 +14,7 @@ The `process_invoice` pipeline is a complete workflow for invoice processing.
 async def process_invoice(pdf_url: str) -> ListContent[Invoice]:
     pipe_output = await execute_pipeline(
         pipe_code="process_invoice",
-        input_memory={
+        inputs={
             "document": PDFContent(url=pdf_url),
         },
     )

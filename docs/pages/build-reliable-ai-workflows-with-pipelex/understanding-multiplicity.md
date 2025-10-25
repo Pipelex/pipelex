@@ -377,7 +377,7 @@ from pipelex.pipeline.execute import execute_pipeline
 # Execute a pipe with multiple outputs
 pipe_output = await execute_pipeline(
     pipe_code="extract_line_items",
-    input_memory={"invoice_text": "Your invoice text here..."}
+    inputs={"invoice_text": "Your invoice text here..."}
 )
 
 # Get the list of line items
@@ -396,7 +396,7 @@ from pipelex.core.stuffs.text_content import TextContent
 
 pipe_output = await execute_pipeline(
     pipe_code="summarize_all_documents",
-    input_memory={
+    inputs={
         "documents": [
             TextContent(text="Document 1 content..."),
             TextContent(text="Document 2 content..."),

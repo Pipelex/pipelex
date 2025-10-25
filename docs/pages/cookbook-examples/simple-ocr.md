@@ -16,7 +16,7 @@ The core of this example is a simple function that executes a pre-defined pipeli
 async def simple_ocr(pdf_url: str) -> ListContent[PageContent]:
     pipe_output = await execute_pipeline(
         pipe_code="extract_page_contents_from_pdf",
-        input_memory={
+        inputs={
             "document": PDFContent(url=pdf_url),
         },
     )
@@ -24,4 +24,4 @@ async def simple_ocr(pdf_url: str) -> ListContent[PageContent]:
     return page_content_list
 ```
 
-This showcases how easy it is to kick off a complex process with just a few lines of code. The `input_memory` dictionary simply maps the input name to the PDF content, and the pipeline handles the rest. 
+This showcases how easy it is to kick off a complex process with just a few lines of code. The `inputs` dictionary simply maps the input name to the PDF content, and the pipeline handles the rest. 

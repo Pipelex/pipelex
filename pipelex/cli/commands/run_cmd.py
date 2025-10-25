@@ -32,7 +32,7 @@ def run_cmd(
     ] = None,
     inputs: Annotated[
         str | None,
-        typer.Option("--inputs", "-i", help="Path to JSON file with input_memory"),
+        typer.Option("--inputs", "-i", help="Path to JSON file with inputs"),
     ] = None,
     output: Annotated[
         str | None,
@@ -136,13 +136,13 @@ def run_cmd(
 
         try:
             # Load inputs if provided
-            input_memory = None
+            inputs = None
             if inputs:
                 if inputs.startswith("{"):
-                    input_memory = json.loads(inputs)
+                    inputs = json.loads(inputs)
                 else:
                     try:
-                        input_memory = load_json_dict_from_path(inputs)
+                        inputs = load_json_dict_from_path(inputs)
                         typer.echo(f"Loaded inputs from: {inputs}")
                     except FileNotFoundError as file_not_found_exc:
                         typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
@@ -157,7 +157,7 @@ def run_cmd(
             try:
                 pipe_output = await execute_pipeline(
                     pipe_code=pipe_code,
-                    inputs=input_memory,
+                    inputs=inputs,
                 )
             except PipelineExecutionError as exc:
                 typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
