@@ -54,3 +54,11 @@ class PipelexBundleBlueprint(BaseModel):
             msg = f"Main pipe '{self.main_pipe}' could not be found in bundle spec"
             raise PipelexBundleError(message=msg)
         return self
+
+    @property
+    def nb_pipes(self) -> int:
+        return len(self.pipe) if self.pipe else 0
+
+    @property
+    def nb_concepts(self) -> int:
+        return len(self.concept) if self.concept else 0

@@ -89,7 +89,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         self.root = {}
 
     @override
-    def pretty_list_pipes(self) -> None:
+    def pretty_list_pipes(self) -> int:
         def _format_concept_code(concept_code: str | None, current_domain: str) -> str:
             """Format concept code by removing domain prefix if it matches current domain."""
             if not concept_code:
@@ -145,3 +145,4 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 }
 
             pretty_print(table)
+        return len(pipes)

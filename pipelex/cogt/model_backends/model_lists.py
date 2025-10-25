@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.exceptions import PipelexCLIError
 from pipelex.hub import get_models_manager
-from pipelex.pipelex import Pipelex
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.aws.aws_config import AwsCredentialsError
@@ -39,8 +38,6 @@ class ModelLister:
             backend_name: Name of the backend to list models for
             flat: Whether to output in flat CSV format
         """
-        Pipelex.make()
-
         try:
             backend = get_models_manager().get_required_inference_backend(backend_name)
         except Exception as exc:

@@ -1,9 +1,12 @@
 from importlib.metadata import metadata
-from typing import Any
+from typing import Any, Callable
 
+import posthog
 from posthog import Posthog, new_context, tag
-from typing_extensions import override
+from posthog.args import ExceptionArg, OptionalCaptureArgs
+from typing_extensions import Unpack, override
 
+from pipelex.system.exceptions import RootException
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryIntegration, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -15,14 +18,72 @@ PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
 
 class TelemetryManager(TelemetryManagerAbstract):
+    PRIVACY_NOTICE = "[Privacy: exception message redacted]"
+
     def __init__(self, telemetry_config: TelemetryConfig):
         self.telemetry_config = telemetry_config
+
+        # Create PostHog client
         self.posthog = Posthog(
             project_api_key=self.telemetry_config.project_api_key,
             host=self.telemetry_config.host,
             disable_geoip=not self.telemetry_config.geoip_enabled,
             debug=self.telemetry_config.verbose_enabled,
+            on_error=self._handle_transmission_error,
         )
+
+        # Store original capture_exception method
+        self._original_capture_exception: Callable[..., Any] = self.posthog.capture_exception
+
+        # Wrap capture_exception to sanitize before sending
+        self._wrap_capture_exception()
+
+        posthog.privacy_mode = True
+        posthog.default_client = self.posthog
+
+    def _handle_transmission_error(self, error: Exception | None, _items: list[dict[str, Any]]) -> None:
+        """Handle errors that occur during telemetry transmission.
+
+        Args:
+            error: The transmission error that occurred
+            _items: List of telemetry items that failed to send
+        """
+        if error:
+            log.error(f"Telemetry transmission error: {error}")
+
+    def _wrap_capture_exception(self) -> None:
+        """Wrap the PostHog capture_exception method to sanitize exception messages."""
+
+        def sanitized_capture_exception(
+            exception: ExceptionArg | None = None,
+            **kwargs: Unpack[OptionalCaptureArgs],
+        ) -> Any:
+            """Capture exception with message sanitization for RootException subclasses."""
+            if exception and isinstance(exception, RootException):
+                # Create a new exception with sanitized message while preserving the class type
+                # Use __new__ to create an instance without calling __init__, which may require extra args
+                # This creates a "shell" instance with NO custom attributes (e.g., no tested_concept, wanted_concept, etc.)
+                exception_type = type(exception)
+                sanitized_exception = exception_type.__new__(exception_type)
+
+                # Set the exception args to our privacy notice
+                # This is what str(exception) will return
+                sanitized_exception.args = (self.PRIVACY_NOTICE,)
+
+                # Preserve the traceback so we still get stack trace information
+                if hasattr(exception, "__traceback__"):
+                    sanitized_exception.__traceback__ = exception.__traceback__
+
+                # Note: No custom attributes (tested_concept, wanted_concept, etc.) are present
+                # because we used __new__() without calling __init__(). The __dict__ is already empty.
+
+                return self._original_capture_exception(sanitized_exception, **kwargs)
+            else:
+                # For non-RootException, capture as-is (or auto-detect current exception)
+                return self._original_capture_exception(exception, **kwargs)
+
+        # Replace the method
+        self.posthog.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
     @override
     def setup(self):
