@@ -17,8 +17,8 @@ from pipelex.exceptions import LibraryLoadingError, PipeInputError
 from pipelex.hub import get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
+from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.telemetry_config import TelemetryIntegration
 from pipelex.system.telemetry.telemetry_manager import PACKAGE_VERSION
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ def do_validate_all_libraries_and_dry_run() -> None:
     """Validate libraries and dry-run all pipes."""
     pipelex_instance = Pipelex.make()
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
 
@@ -166,7 +166,7 @@ def validate_cmd(
         raise typer.Exit(1) from library_loading_error
 
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         if bundle_path:
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} bundle")

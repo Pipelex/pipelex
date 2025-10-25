@@ -20,19 +20,8 @@ class TelemetryMode(StrEnum):
                 return True
 
 
-class TelemetryIntegration(StrEnum):
-    CLI = "cli"
-    FASTAPI = "fastapi"
-    DOCKER = "docker"
-    MCP = "mcp"
-    N8N = "n8n"
-    PYTHON = "python"
-    PYTEST = "pytest"
-
-
 class TelemetryConfig(ConfigModel):
     settings_customized: bool
-    integration: TelemetryIntegration | None = Field(default=None, strict=False)
     telemetry_mode: TelemetryMode = Field(strict=False)
     host: str
     project_api_key: str

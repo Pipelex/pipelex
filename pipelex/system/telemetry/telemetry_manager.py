@@ -7,8 +7,9 @@ from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 
 from pipelex.system.exceptions import RootException
+from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
-from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryIntegration, TelemetryMode
+from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
 
@@ -86,10 +87,10 @@ class TelemetryManager(TelemetryManagerAbstract):
         self.posthog.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
     @override
-    def setup(self):
+    def setup(self, integration_mode: IntegrationMode):
         if telemetry_mode := TelemetryManagerAbstract.telemetry_was_just_enabled():
             with new_context():
-                tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+                tag(name=EventProperty.INTEGRATION, value=integration_mode)
                 tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
                 tag(name=EventProperty.SETTING, value=Setting.TELEMETRY_MODE)
             self.posthog.capture(

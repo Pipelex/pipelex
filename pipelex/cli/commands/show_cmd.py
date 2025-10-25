@@ -16,8 +16,8 @@ from pipelex.exceptions import PipelexCLIError, PipelexConfigError
 from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.telemetry_config import TelemetryIntegration
 from pipelex.system.telemetry.telemetry_manager import PACKAGE_VERSION
 
 if TYPE_CHECKING:
@@ -183,7 +183,7 @@ def list_pipes_cmd() -> None:
     Pipelex.make()
 
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPES}")
 
@@ -203,7 +203,7 @@ def show_pipe_cmd(
     Pipelex.make()
 
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
@@ -229,7 +229,7 @@ def show_models_cmd(
     """
     Pipelex.make()
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MODELS}")
 
@@ -255,7 +255,7 @@ def show_backends_cmd(
     """
     Pipelex.make()
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_BACKENDS}")
 

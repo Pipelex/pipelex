@@ -3,6 +3,7 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.telemetry_config import TelemetryMode
 
@@ -18,7 +19,7 @@ class TelemetryManagerAbstract(ABC):
             return cls.telemetry_mode_just_set if cls.telemetry_mode_just_set.is_enabled else None
 
     @abstractmethod
-    def setup(self):
+    def setup(self, integration_mode: IntegrationMode):
         pass
 
     @abstractmethod
@@ -32,7 +33,7 @@ class TelemetryManagerAbstract(ABC):
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
-    def setup(self):
+    def setup(self, integration_mode: IntegrationMode):
         pass
 
     @override

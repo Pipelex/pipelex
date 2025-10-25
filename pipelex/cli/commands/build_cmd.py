@@ -16,8 +16,8 @@ from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
-from pipelex.system.telemetry.telemetry_config import TelemetryIntegration
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
 
@@ -115,7 +115,7 @@ def build_pipe_cmd(
         typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
@@ -266,7 +266,7 @@ def prepare_runner_cmd(
             raise typer.Exit(1) from exc
 
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
 
@@ -327,7 +327,7 @@ def build_one_shot_cmd(
         typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_ONE_SHOT_PIPE}")
 
@@ -422,7 +422,7 @@ def build_partial_cmd(
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
 
     with new_context():
-        tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PARTIAL_PIPE}")
 
