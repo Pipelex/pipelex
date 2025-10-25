@@ -360,15 +360,15 @@ def build_partial_cmd(
             )
             ensure_directory_for_file_path(file_path=output_path)
 
-        inputs: PipelineInputs | None = None
+        pipeline_inputs: PipelineInputs | None = None
         if inputs.endswith(".json"):
-            inputs = load_json_dict_from_path(inputs)
+            pipeline_inputs = load_json_dict_from_path(inputs)
         else:
-            inputs = {"brief": inputs}
+            pipeline_inputs = {"brief": inputs}
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=builder_pipe,
-                inputs=inputs,
+                inputs=pipeline_inputs,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)

@@ -136,13 +136,13 @@ def run_cmd(
 
         try:
             # Load inputs if provided
-            inputs = None
+            pipeline_inputs = None
             if inputs:
                 if inputs.startswith("{"):
-                    inputs = json.loads(inputs)
+                    pipeline_inputs = json.loads(inputs)
                 else:
                     try:
-                        inputs = load_json_dict_from_path(inputs)
+                        pipeline_inputs = load_json_dict_from_path(inputs)
                         typer.echo(f"Loaded inputs from: {inputs}")
                     except FileNotFoundError as file_not_found_exc:
                         typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
@@ -157,7 +157,7 @@ def run_cmd(
             try:
                 pipe_output = await execute_pipeline(
                     pipe_code=pipe_code,
-                    inputs=inputs,
+                    inputs=pipeline_inputs,
                 )
             except PipelineExecutionError as exc:
                 typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
