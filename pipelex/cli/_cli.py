@@ -114,9 +114,9 @@ def check_telemetry_consent() -> None:
     except typer.Exit:
         # Re-raise Exit exceptions (e.g., when user quits)
         raise
-    except Exception as e:
+    except Exception as exc:
         # Silently fail if there's any issue - don't block CLI usage
-        typer.echo(f"Warning: Could not save telemetry preference: {e}", err=True)
+        typer.echo(f"Warning: Could not save telemetry preference: {exc}", err=True)
 
 
 def main() -> None:

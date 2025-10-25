@@ -12,6 +12,12 @@ class EventName(StrEnum):
 
 
 class EventProperty(StrEnum):
+    # Context
+    INTEGRATION = "integration"
+    PIPELEX_VERSION = "pipelex_version"
+    # Sub-context
+    CLI_COMMAND = "cli_command"
+
     # Pipeline
     PIPELINE_RUN_ID = "pipeline_run_id"
     PIPELINE_EXECUTE_OUTCOME = "pipeline_execute_outcome"
