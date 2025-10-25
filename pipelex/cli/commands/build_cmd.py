@@ -73,7 +73,7 @@ def build_pipe_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make()
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
     typer.echo("=" * 70)
     typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
     typer.echo("")
@@ -208,7 +208,7 @@ def prepare_runner_cmd(
 
     async def prepare_runner(pipe_code: str | None = None, bundle_path: str | None = None):
         # Initialize Pipelex
-        Pipelex.make()
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
 
         if bundle_path:
             try:
@@ -292,7 +292,7 @@ def build_one_shot_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make()
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
     typer.echo("=" * 70)
     typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
     typer.echo("")
@@ -369,7 +369,7 @@ def build_partial_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make()
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
     typer.echo("=" * 70)
     typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
     typer.echo("")

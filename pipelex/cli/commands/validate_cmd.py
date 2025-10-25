@@ -30,7 +30,7 @@ COMMAND = "validate"
 
 def do_validate_all_libraries_and_dry_run() -> None:
     """Validate libraries and dry-run all pipes."""
-    pipelex_instance = Pipelex.make()
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
@@ -159,7 +159,7 @@ def validate_cmd(
 
     # Initialize Pipelex
     try:
-        pipelex_instance = Pipelex.make()
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     except LibraryLoadingError as library_loading_error:
         typer.secho(f"Failed to validate: {library_loading_error}", fg=typer.colors.RED, err=True)
         present_validation_error(details_provider=library_loading_error)

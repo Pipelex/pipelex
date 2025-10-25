@@ -111,7 +111,7 @@ def run_cmd(
 
     async def run_pipeline(pipe_code: str | None = None, bundle_path: str | None = None):
         # Initialize Pipelex
-        Pipelex.make()
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
         source_description: str
         if bundle_path:
             try:

@@ -180,7 +180,7 @@ def list_pipes_cmd() -> None:
     This includes pipes from your project's .plx files and any
     pipes from imported packages.
     """
-    Pipelex.make()
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
 
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -200,7 +200,7 @@ def show_pipe_cmd(
     Example:
         pipelex show pipe hello_world
     """
-    Pipelex.make()
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
 
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -227,7 +227,7 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    Pipelex.make()
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
@@ -253,7 +253,7 @@ def show_backends_cmd(
         pipelex show backends
         pipelex show backends --all
     """
-    Pipelex.make()
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
