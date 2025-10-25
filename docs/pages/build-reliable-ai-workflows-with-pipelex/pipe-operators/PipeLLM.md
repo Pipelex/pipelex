@@ -32,7 +32,7 @@ Describe the provided image in great detail.
 """
 ```
 
-**Important**: Do NOT reference image variables in your prompt template using `@image` or `$image`. Images are automatically passed to vision-enabled LLMs and should not be treated as text variables.
+**Important**: It is necessary to tag the image variable in the prompt with `@image` or `$image`, just like with regular objects.
 
 **Flexible Image Inputs**
 
