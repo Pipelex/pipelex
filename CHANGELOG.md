@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## [v0.13.2] - 2025-10-25
+
+### Added
+
+- Added the `n8n` documentation page for the [n8n-nodes-pipelex](https://github.com/Pipelex/n8n-nodes-pipelex) package.
 
 ### Changed
 
