@@ -66,7 +66,7 @@ export DO_NOT_TRACK=1
 You can change your telemetry settings at any time:
 
 1. **Via configuration file**: Edit `.pipelex/telemetry.toml` directly (see [Telemetry Configuration](../configuration/config-practical/telemetry-config.md))
-2. **Trigger the prompt again**: Set `settings_customized = false` in `.pipelex/telemetry.toml`, and the prompt will appear next time you run a command
+2. **Trigger the prompt again**: Delete `.pipelex/telemetry.toml`, and the prompt will appear next time you run a command
 
 ## Privacy
 

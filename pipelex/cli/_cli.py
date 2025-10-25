@@ -12,8 +12,9 @@ from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
+from pipelex.kit.paths import get_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.telemetry.telemetry_config import TelemetryMode
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
@@ -36,7 +37,7 @@ class PipelexCLI(TyperGroup):
 
 
 def check_telemetry_consent() -> TelemetryMode | None:
-    """Check if user has customized telemetry settings and prompt if not."""
+    """Check if user has configured telemetry and prompt if not."""
     # Check if .pipelex directory exists - if not, user must run pipelex init first
     pipelex_config_dir = config_manager.pipelex_config_dir
     if not path_exists(pipelex_config_dir):
@@ -44,20 +45,14 @@ def check_telemetry_consent() -> TelemetryMode | None:
         typer.echo("Please run 'pipelex init' first to set up the configuration.", err=True)
         raise typer.Exit(code=1)
 
-    telemetry_config_path = os.path.join(pipelex_config_dir, "telemetry.toml")
-    if not path_exists(telemetry_config_path):
-        typer.echo(f"Telemetry configuration file not found at {telemetry_config_path}", err=True)
-        typer.echo("Please run 'pipelex init' to restore the configuration.", err=True)
-        raise typer.Exit(code=1)
+    telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
 
-    # Load the TOML file with tomlkit to preserve formatting and comments
-    toml_doc = load_toml_with_tomlkit(telemetry_config_path)
+    # If telemetry.toml exists, settings are already configured
+    if path_exists(telemetry_config_path):
+        return None
 
+    # If file doesn't exist, prompt user and create it
     try:
-        # Check if settings have already been customized
-        if toml_doc["settings_customized"]:
-            return None
-
         # Map choice to telemetry mode using enum
         mode_map: dict[str, TelemetryMode] = {
             "1": TelemetryMode.OFF,
@@ -102,11 +97,12 @@ def check_telemetry_consent() -> TelemetryMode | None:
             else:
                 typer.echo(f"Invalid choice: '{choice_str}'. Please enter 1, 2, 3, off, anonymous, identified, or q to quit.\n")
 
-        # Update the settings
-        toml_doc["settings_customized"] = True
+        # Load template and set the chosen mode
+        template_path = os.path.join(str(get_configs_dir()), TELEMETRY_CONFIG_FILE_NAME)
+        toml_doc = load_toml_with_tomlkit(template_path)
         toml_doc["telemetry_mode"] = telemetry_mode
 
-        # Save back to file
+        # Save to user's .pipelex directory
         save_toml_to_path(toml_doc, telemetry_config_path)
 
         typer.echo(f"\n✓ Telemetry mode set to: {telemetry_mode}")

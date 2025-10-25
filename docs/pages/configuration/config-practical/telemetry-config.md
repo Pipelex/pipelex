@@ -2,7 +2,7 @@
 
 ## Overview
 
-Telemetry configuration is stored in `.pipelex/telemetry.toml`, separate from the main `pipelex.toml` configuration. This file is created automatically when you run `pipelex init`.
+Telemetry configuration is stored in `.pipelex/telemetry.toml`, separate from the main `pipelex.toml` configuration. This file is created automatically the first time you run a Pipelex command (after `pipelex init config`) and are prompted to choose your telemetry preference.
 
 For a user-friendly introduction to telemetry, see [Telemetry Setup](../../setup/telemetry.md).
 
@@ -19,7 +19,6 @@ This file is created in the `.pipelex` directory at your project root.
 ### Example Configuration
 
 ```toml
-settings_customized = false
 telemetry_mode = "off"
 host = "https://eu.i.posthog.com"
 project_api_key = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
@@ -32,14 +31,6 @@ user_id = ""
 ```
 
 ### Settings Reference
-
-#### `settings_customized`
-
-- **Type**: `boolean`
-- **Default**: `false`
-- **Description**: Indicates whether the user has configured their telemetry preferences. When `false`, Pipelex will prompt the user to choose their telemetry mode on the next command run.
-
-**Usage**: Set this to `false` to trigger the telemetry configuration prompt again.
 
 #### `telemetry_mode`
 
@@ -97,36 +88,26 @@ user_id = ""
 
 ## Manually Changing Settings
 
-You can manually edit `.pipelex/telemetry.toml` at any time. Changes take effect immediately on the next command run.
-
-### Example: Disable Telemetry
+Edit `.pipelex/telemetry.toml` directly. Changes take effect on the next command run.
 
 ```toml
-settings_customized = true
-telemetry_mode = "off"
-```
-
-### Example: Enable Anonymous Telemetry
-
-```toml
-settings_customized = true
-telemetry_mode = "anonymous"
+telemetry_mode = "off"         # Disable telemetry
+telemetry_mode = "anonymous"   # Enable anonymous telemetry
 ```
 
 ### Example: Enable Identified Telemetry
 
 ```toml
-settings_customized = true
 telemetry_mode = "identified"
 user_id = "user@example.com"
 ```
 
 ## Re-triggering the Configuration Prompt
 
-If you want to see the configuration prompt again (for example, to change your choice through the interactive interface), set `settings_customized` to `false`:
+If you want to see the configuration prompt again (for example, to change your choice through the interactive interface), delete the `.pipelex/telemetry.toml` file:
 
-```toml
-settings_customized = false
+```bash
+rm .pipelex/telemetry.toml
 ```
 
 The next time you run a Pipelex command (except `pipelex init`), you'll be prompted to choose your telemetry preference.
