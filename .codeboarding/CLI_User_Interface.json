@@ -1,0 +1,155 @@
+{
+  "description": "The Pipelex system's command-line interface is orchestrated by the PipelexCLI component, which acts as the central dispatcher for user commands. It delegates specific tasks to CLI Commands, such as run, build, and validate. These commands, in turn, interact with the Pipelex Core, which embodies the fundamental logic for pipeline execution, validation, and bundle management. The Pipelex Core relies on Pipelex System Configuration for managing settings and data, and directly manages Pipelex Pipeline instances. The Pipelex Builder component is responsible for generating pipelines based on user requirements, a function initiated by relevant CLI Commands. This architecture ensures a clear separation of concerns, with the CLI handling user interaction and command dispatch, while the core components manage the underlying pipeline logic and data.",
+  "components": [
+    {
+      "name": "PipelexCLI",
+      "description": "Serves as the primary entry point for the command-line interface. It initializes the CLI application, registers available commands, parses user input, and dispatches control to the appropriate command handler. It acts as the orchestrator for user interactions with the Pipelex system.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.cli._cli.PipelexCLI",
+          "reference_file": "pipelex/cli/_cli.py",
+          "reference_start_line": 14,
+          "reference_end_line": 27
+        }
+      ],
+      "assigned_files": [
+        "pipelex/cli/_cli.py",
+        "pipelex/cli/__init__.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "CLI Commands",
+      "description": "Each module within `pipelex.cli.commands` implements the specific business logic for a particular CLI command (e.g., run, build, validate). This includes handling command-line arguments, validating inputs, and invoking the relevant core Pipelex functionalities to perform tasks such as running, building, validating, or managing pipelines and concepts.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.cli.commands.run_cmd.run_cmd",
+          "reference_file": "pipelex/cli/commands/run_cmd.py",
+          "reference_start_line": 19,
+          "reference_end_line": 182
+        },
+        {
+          "qualified_name": "pipelex.cli.commands.build_cmd.build_app",
+          "reference_file": "pipelex/cli/commands/build_cmd.py",
+          "reference_start_line": 24,
+          "reference_end_line": 24
+        },
+        {
+          "qualified_name": "pipelex.cli.commands.validate_cmd.validate_cmd",
+          "reference_file": "pipelex/cli/commands/validate_cmd.py",
+          "reference_start_line": 33,
+          "reference_end_line": 148
+        }
+      ],
+      "assigned_files": [
+        "pipelex/cli/commands/__init__.py",
+        "pipelex/cli/commands/build_cmd.py",
+        "pipelex/cli/commands/kit_cmd.py",
+        "pipelex/cli/commands/init_cmd.py",
+        "pipelex/cli/commands/validate_cmd.py",
+        "pipelex/cli/commands/run_cmd.py",
+        "pipelex/cli/commands/show_cmd.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Pipelex Core",
+      "description": "Encapsulates the central functionalities of the Pipelex system, including pipeline execution, validation logic, and interaction with bundles. It provides the underlying mechanisms for processing and managing pipelines and their associated data.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.core.Pipelex",
+          "reference_file": "pipelex/pipelex.py",
+          "reference_start_line": 64,
+          "reference_end_line": 292
+        },
+        {
+          "qualified_name": "pipelex.core.interpreter.PipelexInterpreter",
+          "reference_file": "pipelex/core/interpreter.py",
+          "reference_start_line": 17,
+          "reference_end_line": 92
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Pipelex System Configuration",
+      "description": "Manages the configuration settings and input/output data for the Pipelex system. This includes loading and saving JSON files for inputs and outputs, and potentially other system-wide settings.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.utils.io.load_json_dict_from_path",
+          "reference_file": "pipelex/tools/misc/json_utils.py",
+          "reference_start_line": 106,
+          "reference_end_line": 128
+        },
+        {
+          "qualified_name": "pipelex.utils.io.save_as_json_to_path",
+          "reference_file": "pipelex/tools/misc/json_utils.py",
+          "reference_start_line": 59,
+          "reference_end_line": 81
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": false
+    },
+    {
+      "name": "Pipelex Pipeline",
+      "description": "Represents the actual pipelines within the Pipelex system, including their definition, structure, and execution flow. This component is responsible for the logical representation and operational aspects of a pipeline.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.core.pipeline.execute_pipeline",
+          "reference_file": "pipelex/pipeline/execute.py",
+          "reference_start_line": 22,
+          "reference_end_line": 107
+        },
+        {
+          "qualified_name": "pipelex.core.pipeline.get_required_pipe",
+          "reference_file": "pipelex/core/pipes/pipe_abstract.py",
+          "reference_start_line": 41,
+          "reference_end_line": 49
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "delegates to",
+      "src_name": "PipelexCLI",
+      "dst_name": "CLI Commands"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "PipelexCLI",
+      "dst_name": "Pipelex System Configuration"
+    },
+    {
+      "relation": "initiates operations on",
+      "src_name": "CLI Commands",
+      "dst_name": "Pipelex Core"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "CLI Commands",
+      "dst_name": "Pipelex System Configuration"
+    },
+    {
+      "relation": "manages",
+      "src_name": "Pipelex Core",
+      "dst_name": "Pipelex Pipeline"
+    },
+    {
+      "relation": "interacts with",
+      "src_name": "Pipelex Core",
+      "dst_name": "Pipelex System Configuration"
+    }
+  ]
+}

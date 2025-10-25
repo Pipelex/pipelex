@@ -1,0 +1,93 @@
+{
+  "description": "The Pipelex system's core execution is driven by the `Pipelex Core Execution Components`, which are responsible for building and running pipelines defined by `PipelexBundleSpec` objects. The `FlowFactory` constructs a high-level `Flow` representation, while `WorkingMemory` manages the runtime state. During this execution, the `LocalObserver` passively collects detailed event and metric data, storing it locally. This collected data is then consumed by the `ReportingManager`, which processes and aggregates it to generate comprehensive reports, particularly focusing on resource usage and costs associated with pipeline operations. This architecture ensures a clear separation of concerns between pipeline execution, data observation, and reporting.",
+  "components": [
+    {
+      "name": "Pipelex Core Execution Components",
+      "description": "This logical grouping represents the operational parts of the Pipelex system responsible for building, interpreting, and executing pipelines. It includes the core logic for defining pipeline flows, managing pipe specifications, and handling working memory during execution. These components are the source of all observable events, metrics, and logs.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.builder.builder.assemble_pipelex_bundle_spec",
+          "reference_file": "pipelex/builder/builder.py",
+          "reference_start_line": 53,
+          "reference_end_line": 123
+        },
+        {
+          "qualified_name": "pipelex.builder.flow.Flow",
+          "reference_file": "pipelex/builder/flow.py",
+          "reference_start_line": 31,
+          "reference_end_line": 54
+        },
+        {
+          "qualified_name": "pipelex.builder.flow_factory.FlowFactory",
+          "reference_file": "pipelex/builder/flow_factory.py",
+          "reference_start_line": 22,
+          "reference_end_line": 119
+        },
+        {
+          "qualified_name": "pipelex.core.memory.working_memory.WorkingMemory",
+          "reference_file": "pipelex/core/memory/working_memory.py",
+          "reference_start_line": 42,
+          "reference_end_line": 385
+        }
+      ],
+      "assigned_files": [],
+      "can_expand": true
+    },
+    {
+      "name": "LocalObserver",
+      "description": "The `LocalObserver` acts as the primary data collection agent within the subsystem. It actively monitors and captures specific events, performance metrics, and resource usage directly from the `Pipelex Core Execution Components` during pipeline execution. It writes these observations to local JSONL files.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.observer.local_observer.LocalObserver",
+          "reference_file": "pipelex/observer/local_observer.py",
+          "reference_start_line": 10,
+          "reference_end_line": 35
+        }
+      ],
+      "assigned_files": [
+        "pipelex/observer/__init__.py",
+        "pipelex/observer/observer_protocol.py",
+        "pipelex/observer/multi_observer.py",
+        "pipelex/observer/local_observer.py"
+      ],
+      "can_expand": false
+    },
+    {
+      "name": "ReportingManager",
+      "description": "The `ReportingManager` is the central hub for processing, aggregating, and presenting all collected observability data. It takes raw or preprocessed data from the `LocalObserver`, transforms it into meaningful insights, and manages the output of reports, particularly for LLM token usage and costs.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.reporting.reporting_manager.ReportingManager",
+          "reference_file": "pipelex/reporting/reporting_manager.py",
+          "reference_start_line": 29,
+          "reference_end_line": 123
+        }
+      ],
+      "assigned_files": [
+        "pipelex/reporting/__init__.py",
+        "pipelex/reporting/reporting_manager.py",
+        "pipelex/reporting/reporting_protocol.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Unclassified",
+      "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
+      "referenced_source_code": [],
+      "assigned_files": [],
+      "can_expand": false
+    }
+  ],
+  "components_relations": [
+    {
+      "relation": "Exposes data to",
+      "src_name": "Pipelex Core Execution Components",
+      "dst_name": "LocalObserver"
+    },
+    {
+      "relation": "Feeds data to",
+      "src_name": "LocalObserver",
+      "dst_name": "ReportingManager"
+    }
+  ]
+}

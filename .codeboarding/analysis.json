@@ -1,151 +1,177 @@
 {
-  "description": "The Pipelex architecture is structured around a core set of components designed to facilitate the creation, execution, and monitoring of AI-driven pipelines. The User Interface (CLI/API) serves as the primary entry point, allowing users to interact with the system, initiate pipeline runs, and manage configurations. This interaction triggers the System Core & Configuration component, which is responsible for initializing the Pipelex environment, loading configurations, and setting up essential services.\n\nOnce configured, the system leverages the PLX Definition & Parsing component to interpret user-defined pipeline logic written in the Pipelex Language (PLX), transforming these declarative definitions into executable blueprints. These blueprints are then handed over to the Pipeline Orchestration component, which takes charge of managing the entire pipeline lifecycle, including sequential, parallel, conditional, and batch execution of individual pipeline steps.\n\nThe actual work within each pipeline step is performed by Pipe Execution Units. These units are specialized to handle various tasks, such as interacting with external AI Services & Integration for LLM, OCR, or image generation tasks, or performing custom data transformations. Both the Pipeline Orchestration and Pipe Execution Units rely heavily on the Data & Knowledge Management component to manage data objects, maintain working memory, and access predefined data structures and domains.\n\nThroughout the pipeline's execution, the Monitoring & Reporting component actively tracks performance, resource usage (especially AI model costs), and generates comprehensive reports and visual flowcharts, providing crucial observability into the system's operations. This interconnected design ensures a robust and observable framework for building and running complex AI workflows.",
+  "description": "The Pipelex project is structured around a core orchestration engine that manages the execution of AI pipelines. User interaction primarily occurs through a Command-Line Interface (CLI), which initiates pipeline building and execution. Pipeline definitions, written in a declarative PLX format, are processed by a dedicated builder component to create an executable flow. During execution, the orchestration engine dispatches tasks to various pipe operators and controllers, which interact with AI inference and model management services for AI-driven tasks. Data and memory management components handle the flow and storage of information throughout the pipeline. Finally, a reporting and observability component tracks pipeline execution and generates reports.",
   "components": [
     {
-      "name": "System Core & Configuration",
-      "description": "Manages the foundational setup of the Pipelex environment, including loading global and local configurations, and providing a central registry for core services. It acts as the initial entry point for system initialization.",
+      "name": "CLI & User Interface",
+      "description": "Provides the command-line interface for users to interact with Pipelex, enabling them to run, build, validate, and manage pipelines.",
       "referenced_source_code": [
         {
-          "qualified_name": "pipelex.Pipelex.make",
-          "reference_file": "pipelex/pipelex.py",
-          "reference_start_line": 261,
-          "reference_end_line": 316
-        },
-        {
-          "qualified_name": "pipelex.hub.PipelexHub",
-          "reference_file": "pipelex/hub.py",
+          "qualified_name": "pipelex.cli.PipelexCLI",
+          "reference_file": "pipelex/cli/_cli.py",
           "reference_start_line": null,
           "reference_end_line": null
         },
         {
-          "qualified_name": "pipelex.tools.config.manager.ConfigManager",
-          "reference_file": "pipelex/tools/config/manager.py",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.cli.commands.run_cmd.run_cmd",
+          "reference_file": "pipelex/cli/commands/run_cmd.py",
+          "reference_start_line": 19,
+          "reference_end_line": 182
         }
       ],
       "assigned_files": [
-        "pipelex/__init__.py",
+        "pipelex/cli/_cli.py",
+        "pipelex/cli/__init__.py",
+        "pipelex/cli/commands/__init__.py",
+        "pipelex/cli/commands/build_cmd.py",
+        "pipelex/cli/commands/kit_cmd.py",
+        "pipelex/cli/commands/init_cmd.py",
+        "pipelex/cli/commands/validate_cmd.py",
+        "pipelex/cli/commands/run_cmd.py",
+        "pipelex/cli/commands/show_cmd.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Pipeline Definition & Builder",
+      "description": "Responsible for defining, parsing, and validating pipeline configurations (PLX files). It translates the declarative pipeline definitions into an executable flow graph.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.builder.flow_factory.FlowFactory",
+          "reference_file": "pipelex/builder/flow_factory.py",
+          "reference_start_line": 22,
+          "reference_end_line": 119
+        },
+        {
+          "qualified_name": "pipelex.language.plx_factory.PlxFactory",
+          "reference_file": "pipelex/language/plx_factory.py",
+          "reference_start_line": 28,
+          "reference_end_line": 336
+        }
+      ],
+      "assigned_files": [
+        "pipelex/builder/builder.py",
+        "pipelex/builder/builder_validation.py",
+        "pipelex/builder/builder_loop.py",
+        "pipelex/builder/__init__.py",
+        "pipelex/builder/bundle_header_spec.py",
+        "pipelex/builder/runner_code.py",
+        "pipelex/builder/builder_errors.py",
+        "pipelex/builder/flow.py",
+        "pipelex/builder/bundle_spec.py",
+        "pipelex/builder/validation_error_data.py",
+        "pipelex/builder/pipe/pipe_spec_exceptions.py",
+        "pipelex/builder/pipe/sub_pipe_spec.py",
+        "pipelex/builder/pipe/pipe_parallel_spec.py",
+        "pipelex/builder/pipe/__init__.py",
+        "pipelex/builder/pipe/pipe_img_gen_spec.py",
+        "pipelex/builder/pipe/pipe_spec_union.py",
+        "pipelex/builder/pipe/pipe_compose_spec.py",
+        "pipelex/builder/pipe/pipe_spec.py",
+        "pipelex/builder/pipe/pipe_spec_map.py",
+        "pipelex/builder/pipe/pipe_llm_spec.py",
+        "pipelex/builder/pipe/pipe_extract_spec.py",
+        "pipelex/builder/pipe/pipe_batch_spec.py",
+        "pipelex/builder/pipe/pipe_condition_spec.py",
+        "pipelex/builder/pipe/pipe_sequence_spec.py",
+        "pipelex/builder/pipe/pipe_func_spec.py",
+        "pipelex/builder/pipe/pipe_signature.py",
+        "pipelex/builder/concept/__init__.py",
+        "pipelex/builder/concept/concept_spec_factory.py",
+        "pipelex/builder/concept/concept_spec.py",
+        "pipelex/language/plx_config.py",
+        "pipelex/language/__init__.py",
+        "pipelex/core/validation.py",
+        "pipelex/core/validation_errors.py",
+        "pipelex/core/pipes/__init__.py",
+        "pipelex/core/pipes/input_requirements_factory.py",
+        "pipelex/core/pipes/pipe_blueprint.py",
+        "pipelex/core/pipes/pipe_output.py",
+        "pipelex/core/pipes/variable_multiplicity.py",
+        "pipelex/core/pipes/pipe_library_abstract.py",
+        "pipelex/core/pipes/pipe_factory.py",
+        "pipelex/core/pipes/input_requirements.py",
+        "pipelex/core/pipes/pipe_abstract.py",
+        "pipelex/core/pipes/exceptions.py",
+        "pipelex/core/pipes/pipe_library.py",
+        "pipelex/core/domains/__init__.py",
+        "pipelex/core/domains/domain.py",
+        "pipelex/core/domains/domain_library.py",
+        "pipelex/core/domains/domain_library_abstract.py",
+        "pipelex/core/domains/domain_factory.py",
+        "pipelex/core/domains/exceptions.py",
+        "pipelex/core/domains/domain_blueprint.py",
+        "pipelex/core/bundles/__init__.py",
+        "pipelex/core/bundles/pipelex_bundle_blueprint.py",
+        "pipelex/core/bundles/pipe_sorter.py",
+        "pipelex/core/bundles/exceptions.py"
+      ],
+      "can_expand": true
+    },
+    {
+      "name": "Core Orchestration Engine",
+      "description": "The central component that manages the entire lifecycle of a pipeline, from loading and execution to tracking and error handling. It orchestrates the flow of data and control between different pipe operators.",
+      "referenced_source_code": [
+        {
+          "qualified_name": "pipelex.Pipelex",
+          "reference_file": "pipelex/pipelex.py",
+          "reference_start_line": 64,
+          "reference_end_line": 370
+        },
+        {
+          "qualified_name": "pipelex.pipeline.pipeline_manager.PipelineManager",
+          "reference_file": "pipelex/pipeline/pipeline_manager.py",
+          "reference_start_line": 12,
+          "reference_end_line": 43
+        }
+      ],
+      "assigned_files": [
         "pipelex/pipelex.py",
         "pipelex/hub.py",
-        "pipelex/_bootstrap_user_libs.py",
-        "pipelex/types.py",
-        "pipelex/exceptions.py",
-        "pipelex/config.py",
-        "pipelex/tools/runtime_manager.py",
-        "pipelex/tools/func_registry.py",
-        "pipelex/tools/environment.py",
-        "pipelex/tools/class_registry_utils.py",
-        "pipelex/tools/func_registry_utils.py",
-        "pipelex/tools/registry_models.py",
-        "pipelex/tools/secrets/__init__.py",
-        "pipelex/tools/secrets/env_secrets_provider.py",
-        "pipelex/tools/secrets/secrets_errors.py",
-        "pipelex/tools/secrets/secrets_utils.py",
-        "pipelex/tools/secrets/secrets_provider_abstract.py",
-        "pipelex/tools/config/__init__.py",
-        "pipelex/tools/config/manager.py",
-        "pipelex/tools/config/config_model.py",
-        "pipelex/tools/config/config_root.py",
+        "pipelex/pipeline/pipeline_models.py",
+        "pipelex/pipeline/__init__.py",
+        "pipelex/pipeline/pipeline_manager_abstract.py",
+        "pipelex/pipeline/job_metadata.py",
+        "pipelex/pipeline/pipeline_manager.py",
+        "pipelex/pipeline/start.py",
+        "pipelex/pipeline/pipeline_factory.py",
+        "pipelex/pipeline/pipeline.py",
+        "pipelex/pipeline/execute.py",
+        "pipelex/pipeline/track/__init__.py",
+        "pipelex/pipeline/track/pipeline_tracker_protocol.py",
+        "pipelex/pipeline/track/tracker_models.py",
+        "pipelex/pipeline/track/pipeline_tracker.py",
+        "pipelex/pipeline/track/flow_chart.py",
+        "pipelex/pipeline/track/tracker_config.py",
+        "pipelex/pipe_run/__init__.py",
+        "pipelex/pipe_run/pipe_run_params.py",
+        "pipelex/pipe_run/pipe_router.py",
+        "pipelex/pipe_run/pipe_job.py",
+        "pipelex/pipe_run/dry_run.py",
+        "pipelex/pipe_run/pipe_router_protocol.py",
+        "pipelex/pipe_run/pipe_run_params_factory.py",
+        "pipelex/pipe_run/pipe_job_factory.py",
+        "pipelex/core/pipe_errors.py",
+        "pipelex/core/interpreter.py",
+        "pipelex/core/exceptions.py",
         "pipelex/core/registry_models.py"
       ],
       "can_expand": true
     },
     {
-      "name": "PLX Definition & Parsing",
-      "description": "Handles the declarative Pipelex Language (PLX). This component is responsible for parsing PLX definitions into internal, executable blueprints and can also generate PLX content.",
+      "name": "Pipe Operators & Controllers",
+      "description": "This component group encompasses the individual processing units (operators) and control flow mechanisms (controllers) within a pipeline. Operators perform specific AI-driven tasks, while controllers manage the execution logic.",
       "referenced_source_code": [
         {
-          "qualified_name": "pipelex.language.plx_factory.PlxFactory",
-          "reference_file": "pipelex/language/plx_factory.py",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.pipe_operators.pipe_operator.PipeOperator",
+          "reference_file": "pipelex/pipe_operators/pipe_operator.py",
+          "reference_start_line": 17,
+          "reference_end_line": 94
         },
         {
-          "qualified_name": "pipelex.core.interpreter.PipelexInterpreter",
-          "reference_file": "pipelex/core/interpreter.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.libraries.pipelines.builder.builder.Builder",
-          "reference_file": "pipelex/libraries/pipelines/builder/builder.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        }
-      ],
-      "assigned_files": [
-        "pipelex/tools/templating/jinja2_required_variables.py",
-        "pipelex/tools/templating/__init__.py",
-        "pipelex/tools/templating/template_library.py",
-        "pipelex/tools/templating/jinja2_models.py",
-        "pipelex/tools/templating/templating_models.py",
-        "pipelex/tools/templating/jinja2_blueprint.py",
-        "pipelex/tools/templating/jinja2_template_loader.py",
-        "pipelex/tools/templating/template_preprocessor.py",
-        "pipelex/tools/templating/jinja2_errors.py",
-        "pipelex/tools/templating/jinja2_rendering.py",
-        "pipelex/tools/templating/template_provider_abstract.py",
-        "pipelex/tools/templating/jinja2_environment.py",
-        "pipelex/tools/templating/jinja2_parsing.py",
-        "pipelex/tools/templating/jinja2_template_category.py",
-        "pipelex/tools/templating/jinja2_filters.py",
-        "pipelex/tools/templating/templates/__init__.py",
-        "pipelex/language/plx_config.py",
-        "pipelex/language/__init__.py",
-        "pipelex/language/plx_factory.py",
-        "pipelex/core/interpreter.py",
-        "pipelex/core/bundles/__init__.py",
-        "pipelex/core/bundles/pipelex_bundle_blueprint.py",
-        "pipelex/core/bundles/exceptions.py",
-        "pipelex/libraries/__init__.py",
-        "pipelex/libraries/library_manager.py",
-        "pipelex/libraries/library_config.py",
-        "pipelex/libraries/library_manager_abstract.py",
-        "pipelex/libraries/library_manager_factory.py",
-        "pipelex/libraries/pipelines/__init__.py",
-        "pipelex/libraries/pipelines/builder/builder.py",
-        "pipelex/libraries/pipelines/builder/builder_loop.py",
-        "pipelex/libraries/pipelines/builder/__init__.py",
-        "pipelex/libraries/pipelines/builder/builder_errors.py",
-        "pipelex/libraries/pipelines/builder/pipe/sub_pipe_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_parallel_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/__init__.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_compose_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_img_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_llm_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_batch_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_ocr_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_condition_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_sequence_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_func_spec.py",
-        "pipelex/libraries/pipelines/builder/pipe/pipe_signature.py",
-        "pipelex/libraries/pipelines/builder/concept/__init__.py",
-        "pipelex/libraries/pipelines/builder/concept/concept_spec.py"
-      ],
-      "can_expand": true
-    },
-    {
-      "name": "Pipeline Orchestration",
-      "description": "Controls the overall execution flow of a pipeline. It manages sequences, parallel execution, conditional branching, and batch processing of individual pipes based on the generated blueprints.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "pipelex.pipeline.pipeline_manager.PipelineManager",
-          "reference_file": "pipelex/pipeline/pipeline_manager.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.pipe_controllers",
-          "reference_file": "pipelex/pipe_controllers",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.pipe_works",
-          "reference_file": "pipelex/pipe_works",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.pipe_controllers.pipe_controller.PipeController",
+          "reference_file": "pipelex/pipe_controllers/pipe_controller.py",
+          "reference_start_line": 14,
+          "reference_end_line": 86
         }
       ],
       "assigned_files": [
@@ -162,6 +188,7 @@
         "pipelex/pipe_controllers/condition/pipe_condition_details.py",
         "pipelex/pipe_controllers/condition/pipe_condition.py",
         "pipelex/pipe_controllers/condition/pipe_condition_blueprint.py",
+        "pipelex/pipe_controllers/condition/special_outcome.py",
         "pipelex/pipe_controllers/condition/pipe_condition_factory.py",
         "pipelex/pipe_controllers/sequence/__init__.py",
         "pipelex/pipe_controllers/sequence/pipe_sequence.py",
@@ -172,48 +199,7 @@
         "pipelex/pipe_controllers/batch/pipe_batch.py",
         "pipelex/pipe_controllers/batch/pipe_batch_factory.py",
         "pipelex/pipe_controllers/batch/pipe_batch_blueprint.py",
-        "pipelex/pipeline/pipeline_models.py",
-        "pipelex/pipeline/__init__.py",
-        "pipelex/pipeline/pipeline_manager_abstract.py",
-        "pipelex/pipeline/job_metadata.py",
-        "pipelex/pipeline/pipeline_manager.py",
-        "pipelex/pipeline/start.py",
-        "pipelex/pipeline/pipeline_factory.py",
-        "pipelex/pipeline/pipeline.py",
-        "pipelex/pipeline/execute.py",
-        "pipelex/pipe_works/__init__.py",
-        "pipelex/pipe_works/pipe_dry.py",
-        "pipelex/pipe_works/pipe_router.py",
-        "pipelex/pipe_works/pipe_job.py",
-        "pipelex/pipe_works/pipe_router_protocol.py",
-        "pipelex/pipe_works/pipe_job_factory.py"
-      ],
-      "can_expand": true
-    },
-    {
-      "name": "Pipe Execution Units",
-      "description": "Encapsulates the specific operational logic for individual steps (pipes) within a pipeline. These units perform tasks such as interacting with AI models, executing custom functions, or performing data transformations.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "pipelex.pipe_operators",
-          "reference_file": "pipelex/pipe_operators",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.core.pipes",
-          "reference_file": "pipelex/core/pipes",
-          "reference_start_line": null,
-          "reference_end_line": null
-        }
-      ],
-      "assigned_files": [
         "pipelex/pipe_operators/__init__.py",
-        "pipelex/pipe_operators/pipe_operator.py",
-        "pipelex/pipe_operators/ocr/__init__.py",
-        "pipelex/pipe_operators/ocr/pipe_ocr_factory.py",
-        "pipelex/pipe_operators/ocr/pipe_ocr_blueprint.py",
-        "pipelex/pipe_operators/ocr/pipe_ocr.py",
         "pipelex/pipe_operators/func/__init__.py",
         "pipelex/pipe_operators/func/pipe_func_blueprint.py",
         "pipelex/pipe_operators/func/pipe_func_factory.py",
@@ -222,69 +208,43 @@
         "pipelex/pipe_operators/compose/pipe_compose.py",
         "pipelex/pipe_operators/compose/pipe_compose_factory.py",
         "pipelex/pipe_operators/compose/pipe_compose_blueprint.py",
+        "pipelex/pipe_operators/extract/__init__.py",
+        "pipelex/pipe_operators/extract/pipe_extract.py",
+        "pipelex/pipe_operators/extract/pipe_extract_blueprint.py",
+        "pipelex/pipe_operators/extract/pipe_extract_factory.py",
         "pipelex/pipe_operators/llm/__init__.py",
         "pipelex/pipe_operators/llm/pipe_llm_factory.py",
+        "pipelex/pipe_operators/llm/llm_prompt_blueprint.py",
         "pipelex/pipe_operators/llm/pipe_llm_blueprint.py",
         "pipelex/pipe_operators/llm/pipe_llm.py",
         "pipelex/pipe_operators/img_gen/__init__.py",
         "pipelex/pipe_operators/img_gen/pipe_img_gen_factory.py",
         "pipelex/pipe_operators/img_gen/pipe_img_gen_blueprint.py",
-        "pipelex/pipe_operators/img_gen/pipe_img_gen.py",
-        "pipelex/core/pipes/__init__.py",
-        "pipelex/core/pipes/pipe_run_params.py",
-        "pipelex/core/pipes/pipe_blueprint.py",
-        "pipelex/core/pipes/specific_pipe.py",
-        "pipelex/core/pipes/pipe_provider_abstract.py",
-        "pipelex/core/pipes/pipe_input_blueprint.py",
-        "pipelex/core/pipes/pipe_output.py",
-        "pipelex/core/pipes/pipe_input.py",
-        "pipelex/core/pipes/pipe_input_factory.py",
-        "pipelex/core/pipes/pipe_factory.py",
-        "pipelex/core/pipes/pipe_abstract.py",
-        "pipelex/core/pipes/exceptions.py",
-        "pipelex/core/pipes/pipe_run_params_factory.py",
-        "pipelex/core/pipes/pipe_library.py"
+        "pipelex/pipe_operators/img_gen/pipe_img_gen.py"
       ],
       "can_expand": true
     },
     {
-      "name": "AI Services & Integration",
-      "description": "Provides a unified, abstract interface for interacting with various AI models (LLMs, OCR, Image Generation) and contains concrete implementations for integrating with specific third-party AI service providers.",
+      "name": "AI Inference & Model Management",
+      "description": "Provides a standardized interface for interacting with various external AI models and inference services. It abstracts away the complexities of different AI provider APIs and manages model configurations.",
       "referenced_source_code": [
         {
-          "qualified_name": "pipelex.cogt",
-          "reference_file": "pipelex/cogt",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.cogt.inference.inference_manager.InferenceManager",
+          "reference_file": "pipelex/cogt/inference/inference_manager.py",
+          "reference_start_line": 18,
+          "reference_end_line": 150
         },
         {
-          "qualified_name": "pipelex.cogt.inference",
-          "reference_file": "pipelex/cogt/inference",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.plugins",
-          "reference_file": "pipelex/plugins",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.cogt.models.model_manager.ModelManager",
+          "reference_file": "pipelex/cogt/models/model_manager.py",
+          "reference_start_line": 20,
+          "reference_end_line": 148
         }
       ],
       "assigned_files": [
-        "pipelex/tools/aws/__init__.py",
-        "pipelex/tools/aws/aws_config.py",
         "pipelex/cogt/__init__.py",
         "pipelex/cogt/config_cogt.py",
         "pipelex/cogt/exceptions.py",
-        "pipelex/cogt/ocr/__init__.py",
-        "pipelex/cogt/ocr/ocr_worker_abstract.py",
-        "pipelex/cogt/ocr/ocr_job_components.py",
-        "pipelex/cogt/ocr/ocr_input.py",
-        "pipelex/cogt/ocr/ocr_setting.py",
-        "pipelex/cogt/ocr/ocr_job.py",
-        "pipelex/cogt/ocr/ocr_job_factory.py",
-        "pipelex/cogt/ocr/ocr_output.py",
-        "pipelex/cogt/ocr/ocr_worker_factory.py",
         "pipelex/cogt/inference/__init__.py",
         "pipelex/cogt/inference/inference_job_abstract.py",
         "pipelex/cogt/inference/inference_manager_protocol.py",
@@ -300,6 +260,21 @@
         "pipelex/cogt/model_backends/backend_library.py",
         "pipelex/cogt/model_backends/model_spec.py",
         "pipelex/cogt/model_backends/model_type.py",
+        "pipelex/cogt/extract/extract_job_components.py",
+        "pipelex/cogt/extract/__init__.py",
+        "pipelex/cogt/extract/extract_setting.py",
+        "pipelex/cogt/extract/extract_job.py",
+        "pipelex/cogt/extract/extract_job_factory.py",
+        "pipelex/cogt/extract/extract_input.py",
+        "pipelex/cogt/extract/extract_worker_abstract.py",
+        "pipelex/cogt/extract/extract_output.py",
+        "pipelex/cogt/extract/extract_worker_factory.py",
+        "pipelex/cogt/templating/__init__.py",
+        "pipelex/cogt/templating/template_rendering.py",
+        "pipelex/cogt/templating/template_preprocessor.py",
+        "pipelex/cogt/templating/template_blueprint.py",
+        "pipelex/cogt/templating/template_category.py",
+        "pipelex/cogt/templating/templating_style.py",
         "pipelex/cogt/image/prompt_image.py",
         "pipelex/cogt/image/__init__.py",
         "pipelex/cogt/image/prompt_image_factory.py",
@@ -313,10 +288,10 @@
         "pipelex/cogt/llm/llm_job_components.py",
         "pipelex/cogt/llm/llm_prompt_template.py",
         "pipelex/cogt/llm/__init__.py",
+        "pipelex/cogt/llm/llm_utils.py",
         "pipelex/cogt/llm/llm_worker_abstract.py",
         "pipelex/cogt/llm/llm_setting.py",
         "pipelex/cogt/llm/llm_worker_factory.py",
-        "pipelex/cogt/llm/llm_prompt_spec.py",
         "pipelex/cogt/llm/llm_worker_internal_abstract.py",
         "pipelex/cogt/llm/llm_job_factory.py",
         "pipelex/cogt/llm/llm_prompt_factory_abstract.py",
@@ -332,10 +307,10 @@
         "pipelex/cogt/content_generation/__init__.py",
         "pipelex/cogt/content_generation/content_generator_dry.py",
         "pipelex/cogt/content_generation/assignment_models.py",
-        "pipelex/cogt/content_generation/jinja2_generate.py",
         "pipelex/cogt/content_generation/llm_generate.py",
+        "pipelex/cogt/content_generation/templating_generate.py",
+        "pipelex/cogt/content_generation/extract_generate.py",
         "pipelex/cogt/content_generation/content_generator_protocol.py",
-        "pipelex/cogt/content_generation/ocr_generate.py",
         "pipelex/cogt/content_generation/content_generator.py",
         "pipelex/cogt/content_generation/img_gen_generate.py",
         "pipelex/cogt/img_gen/img_gen_job_components.py",
@@ -385,123 +360,86 @@
         "pipelex/plugins/google/google_factory.py",
         "pipelex/plugins/google/google_llm_worker.py",
         "pipelex/plugins/mistral/__init__.py",
-        "pipelex/plugins/mistral/mistral_utils.py",
         "pipelex/plugins/mistral/mistral_factory.py",
         "pipelex/plugins/mistral/mistral_exceptions.py",
         "pipelex/plugins/mistral/mistral_llms.py",
-        "pipelex/plugins/mistral/mistral_ocr_worker.py",
-        "pipelex/plugins/mistral/mistral_llm_worker.py"
+        "pipelex/plugins/mistral/mistral_llm_worker.py",
+        "pipelex/plugins/mistral/mistral_extract_worker.py"
       ],
       "can_expand": true
     },
     {
-      "name": "Data & Knowledge Management",
-      "description": "Manages the lifecycle of data objects ('Stuff') within the pipeline, maintains the 'WorkingMemory', and defines/manages reusable data structures ('Concepts') and their organizational groupings ('Domains').",
+      "name": "Data & Memory Management",
+      "description": "Manages the flow, storage, and retrieval of data (\"stuffs\" and \"concepts\") within a running pipeline. This includes inputs, intermediate results, and final outputs.",
       "referenced_source_code": [
         {
-          "qualified_name": "pipelex.core.stuffs",
-          "reference_file": "pipelex/core/stuffs",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.core.memory.working_memory.WorkingMemory",
+          "reference_file": "pipelex/core/memory/working_memory.py",
+          "reference_start_line": 42,
+          "reference_end_line": 385
         },
         {
-          "qualified_name": "pipelex.core.memory",
-          "reference_file": "pipelex/core/memory",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.core.concepts",
-          "reference_file": "pipelex/core/concepts",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.core.domains",
-          "reference_file": "pipelex/core/domains",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.core.stuffs.stuff_factory.StuffFactory",
+          "reference_file": "pipelex/core/stuffs/stuff_factory.py",
+          "reference_start_line": 38,
+          "reference_end_line": 487
         }
       ],
       "assigned_files": [
-        "pipelex/tools/storage/__init__.py",
-        "pipelex/tools/storage/storage_provider_abstract.py",
-        "pipelex/core/domains/__init__.py",
-        "pipelex/core/domains/domain.py",
-        "pipelex/core/domains/domain_library.py",
-        "pipelex/core/domains/domain_provider_abstract.py",
-        "pipelex/core/domains/domain_factory.py",
-        "pipelex/core/domains/exceptions.py",
-        "pipelex/core/domains/domain_blueprint.py",
+        "pipelex/core/stuffs/text_and_images_content.py",
         "pipelex/core/stuffs/__init__.py",
+        "pipelex/core/stuffs/image_field_search.py",
+        "pipelex/core/stuffs/list_content.py",
         "pipelex/core/stuffs/stuff_factory.py",
         "pipelex/core/stuffs/stuff_content.py",
         "pipelex/core/stuffs/stuff_artefact.py",
+        "pipelex/core/stuffs/pdf_content.py",
+        "pipelex/core/stuffs/text_content.py",
         "pipelex/core/stuffs/stuff.py",
+        "pipelex/core/stuffs/number_content.py",
+        "pipelex/core/stuffs/mermaid_content.py",
+        "pipelex/core/stuffs/page_content.py",
+        "pipelex/core/stuffs/json_content.py",
+        "pipelex/core/stuffs/dynamic_content.py",
+        "pipelex/core/stuffs/image_content.py",
+        "pipelex/core/stuffs/structured_content.py",
+        "pipelex/core/stuffs/html_content.py",
         "pipelex/core/memory/__init__.py",
         "pipelex/core/memory/working_memory.py",
         "pipelex/core/memory/working_memory_factory.py",
         "pipelex/core/concepts/__init__.py",
-        "pipelex/core/concepts/concept_provider_abstract.py",
         "pipelex/core/concepts/structure_generator.py",
         "pipelex/core/concepts/concept_blueprint.py",
         "pipelex/core/concepts/concept.py",
         "pipelex/core/concepts/concept_library.py",
         "pipelex/core/concepts/concept_native.py",
         "pipelex/core/concepts/exceptions.py",
-        "pipelex/core/concepts/concept_factory.py"
+        "pipelex/core/concepts/concept_factory.py",
+        "pipelex/core/concepts/concept_library_abstract.py"
       ],
       "can_expand": true
     },
     {
-      "name": "Monitoring & Reporting",
-      "description": "Monitors pipeline execution, records AI model usage and costs, and generates reports, logs, and visual flowcharts of the pipeline's activity for observability and analysis.",
+      "name": "Reporting & Observability",
+      "description": "Gathers and presents metrics and logs related to pipeline execution, offering insights into performance, resource usage, and potential issues.",
       "referenced_source_code": [
         {
-          "qualified_name": "pipelex.reporting",
-          "reference_file": "pipelex/reporting",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.reporting.reporting_manager.ReportingManager",
+          "reference_file": "pipelex/reporting/reporting_manager.py",
+          "reference_start_line": 29,
+          "reference_end_line": 123
         },
         {
-          "qualified_name": "pipelex.observer",
-          "reference_file": "pipelex/observer",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.pipeline.track",
-          "reference_file": "pipelex/pipeline/track",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.pipeline.activity",
-          "reference_file": "pipelex/pipeline/activity",
-          "reference_start_line": null,
-          "reference_end_line": null
+          "qualified_name": "pipelex.observer.local_observer.LocalObserver",
+          "reference_file": "pipelex/observer/local_observer.py",
+          "reference_start_line": 10,
+          "reference_end_line": 35
         }
       ],
       "assigned_files": [
-        "pipelex/tools/log/__init__.py",
-        "pipelex/tools/log/log_config.py",
-        "pipelex/tools/log/log_formatter.py",
-        "pipelex/tools/log/log_levels.py",
-        "pipelex/tools/log/log_dispatch.py",
-        "pipelex/tools/log/log.py",
-        "pipelex/pipeline/track/__init__.py",
-        "pipelex/pipeline/track/pipeline_tracker_protocol.py",
-        "pipelex/pipeline/track/tracker_models.py",
-        "pipelex/pipeline/track/pipeline_tracker.py",
-        "pipelex/pipeline/track/flow_chart.py",
-        "pipelex/pipeline/track/tracker_config.py",
-        "pipelex/pipeline/activity/__init__.py",
-        "pipelex/pipeline/activity/activity_manager.py",
-        "pipelex/pipeline/activity/activity_models.py",
-        "pipelex/pipeline/activity/activity_handler.py",
-        "pipelex/pipeline/activity/activity_manager_protocol.py",
         "pipelex/observer/__init__.py",
         "pipelex/observer/observer_protocol.py",
+        "pipelex/observer/multi_observer.py",
         "pipelex/observer/local_observer.py",
         "pipelex/reporting/__init__.py",
         "pipelex/reporting/reporting_manager.py",
@@ -510,53 +448,21 @@
       "can_expand": true
     },
     {
-      "name": "User Interface (CLI/API)",
-      "description": "Provides command-line tools and a programmatic API for users to interact with Pipelex, including initiating pipelines, validating configurations, and querying pipeline status and details.",
-      "referenced_source_code": [
-        {
-          "qualified_name": "pipelex.cli._cli.PipelexCLI",
-          "reference_file": "pipelex/cli/_cli.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.cli.commands",
-          "reference_file": "pipelex/cli/commands",
-          "reference_start_line": null,
-          "reference_end_line": null
-        },
-        {
-          "qualified_name": "pipelex.client.client.PipelexClient",
-          "reference_file": "pipelex/client/client.py",
-          "reference_start_line": null,
-          "reference_end_line": null
-        }
-      ],
-      "assigned_files": [
-        "pipelex/client/__init__.py",
-        "pipelex/client/pipeline_request_factory.py",
-        "pipelex/client/api_serializer.py",
-        "pipelex/client/pipeline_response_factory.py",
-        "pipelex/client/client.py",
-        "pipelex/client/protocol.py",
-        "pipelex/cli/_cli.py",
-        "pipelex/cli/__init__.py",
-        "pipelex/cli/commands/__init__.py",
-        "pipelex/cli/commands/common.py",
-        "pipelex/cli/commands/build_cmd.py",
-        "pipelex/cli/commands/init_cmd.py",
-        "pipelex/cli/commands/validate_cmd.py",
-        "pipelex/cli/commands/show_cmd.py"
-      ],
-      "can_expand": true
-    },
-    {
       "name": "Unclassified",
       "description": "Component for all unclassified files and utility functions (Utility functions/External Libraries/Dependencies)",
       "referenced_source_code": [],
       "assigned_files": [
+        "pipelex/__init__.py",
+        "pipelex/types.py",
+        "pipelex/urls.py",
+        "pipelex/exceptions.py",
+        "pipelex/config.py",
         "pipelex/tools/__init__.py",
-        "pipelex/tools/exceptions.py",
+        "pipelex/tools/secrets/__init__.py",
+        "pipelex/tools/secrets/env_secrets_provider.py",
+        "pipelex/tools/secrets/secrets_errors.py",
+        "pipelex/tools/secrets/secrets_utils.py",
+        "pipelex/tools/secrets/secrets_provider_abstract.py",
         "pipelex/tools/misc/__init__.py",
         "pipelex/tools/misc/context_provider_abstract.py",
         "pipelex/tools/misc/attribute_utils.py",
@@ -564,7 +470,6 @@
         "pipelex/tools/misc/path_utils.py",
         "pipelex/tools/misc/file_fetch_utils.py",
         "pipelex/tools/misc/pretty.py",
-        "pipelex/tools/misc/instructor_utils.py",
         "pipelex/tools/misc/toml_utils.py",
         "pipelex/tools/misc/filetype_utils.py",
         "pipelex/tools/misc/placeholder.py",
@@ -575,87 +480,109 @@
         "pipelex/tools/misc/json_utils.py",
         "pipelex/tools/misc/markdown_utils.py",
         "pipelex/tools/misc/mermaid_utils.py",
+        "pipelex/tools/aws/__init__.py",
+        "pipelex/tools/aws/aws_config.py",
+        "pipelex/tools/storage/__init__.py",
+        "pipelex/tools/storage/storage_provider_abstract.py",
+        "pipelex/tools/log/__init__.py",
+        "pipelex/tools/log/log_config.py",
+        "pipelex/tools/log/log_formatter.py",
+        "pipelex/tools/log/log_levels.py",
+        "pipelex/tools/log/log_dispatch.py",
+        "pipelex/tools/log/log.py",
         "pipelex/tools/typing/validation_utils.py",
         "pipelex/tools/typing/__init__.py",
         "pipelex/tools/typing/module_inspector.py",
         "pipelex/tools/typing/structure_printer.py",
+        "pipelex/tools/typing/class_utils.py",
         "pipelex/tools/typing/pydantic_utils.py",
         "pipelex/tools/pdf/__init__.py",
         "pipelex/tools/pdf/pypdfium2_renderer.py",
-        "pipelex/migration/__init__.py",
-        "pipelex/migration/migration_result.py",
-        "pipelex/migration/migrate_v0_1_0_to_v0_2_0.py",
+        "pipelex/tools/jinja2/jinja2_required_variables.py",
+        "pipelex/tools/jinja2/__init__.py",
+        "pipelex/tools/jinja2/jinja2_models.py",
+        "pipelex/tools/jinja2/jinja2_errors.py",
+        "pipelex/tools/jinja2/jinja2_rendering.py",
+        "pipelex/tools/jinja2/jinja2_environment.py",
+        "pipelex/tools/jinja2/jinja2_parsing.py",
+        "pipelex/tools/jinja2/jinja2_filters.py",
+        "pipelex/system/__init__.py",
+        "pipelex/system/environment.py",
+        "pipelex/system/runtime.py",
+        "pipelex/system/exceptions.py",
+        "pipelex/system/configuration/config_loader.py",
+        "pipelex/system/configuration/__init__.py",
+        "pipelex/system/configuration/config_model.py",
+        "pipelex/system/configuration/config_root.py",
+        "pipelex/system/registries/__init__.py",
+        "pipelex/system/registries/func_registry.py",
+        "pipelex/system/registries/registry_base.py",
+        "pipelex/system/registries/class_registry_utils.py",
+        "pipelex/system/registries/func_registry_utils.py",
+        "pipelex/client/__init__.py",
+        "pipelex/client/pipeline_request_factory.py",
+        "pipelex/client/api_serializer.py",
+        "pipelex/client/pipeline_response_factory.py",
+        "pipelex/client/client.py",
+        "pipelex/client/protocol.py",
         "pipelex/core/__init__.py",
-        "pipelex/core/exceptions.py"
+        "pipelex/libraries/__init__.py",
+        "pipelex/libraries/library_manager.py",
+        "pipelex/libraries/library_utils.py",
+        "pipelex/libraries/library_manager_abstract.py",
+        "pipelex/libraries/library_manager_factory.py",
+        "pipelex/kit/paths.py",
+        "pipelex/kit/index_models.py",
+        "pipelex/kit/__init__.py",
+        "pipelex/kit/index_loader.py",
+        "pipelex/kit/markers.py",
+        "pipelex/kit/migrations_export.py",
+        "pipelex/kit/targets_update.py",
+        "pipelex/kit/cursor_export.py"
       ],
       "can_expand": false
     }
   ],
   "components_relations": [
     {
-      "relation": "initiates system setup",
-      "src_name": "User Interface (CLI/API)",
-      "dst_name": "System Core & Configuration"
+      "relation": "initiates",
+      "src_name": "CLI & User Interface",
+      "dst_name": "Pipeline Definition & Builder"
     },
     {
-      "relation": "provides PLX definitions",
-      "src_name": "User Interface (CLI/API)",
-      "dst_name": "PLX Definition & Parsing"
+      "relation": "initiates",
+      "src_name": "CLI & User Interface",
+      "dst_name": "Core Orchestration Engine"
     },
     {
-      "relation": "triggers pipeline execution",
-      "src_name": "User Interface (CLI/API)",
-      "dst_name": "Pipeline Orchestration"
+      "relation": "outputs pipeline configuration to",
+      "src_name": "Pipeline Definition & Builder",
+      "dst_name": "Core Orchestration Engine"
     },
     {
-      "relation": "configures PLX processing",
-      "src_name": "System Core & Configuration",
-      "dst_name": "PLX Definition & Parsing"
+      "relation": "orchestrates",
+      "src_name": "Core Orchestration Engine",
+      "dst_name": "Pipe Operators & Controllers"
     },
     {
-      "relation": "provides core services",
-      "src_name": "System Core & Configuration",
-      "dst_name": "Pipeline Orchestration"
+      "relation": "interacts with",
+      "src_name": "Pipe Operators & Controllers",
+      "dst_name": "AI Inference & Model Management"
     },
     {
-      "relation": "generates executable blueprints",
-      "src_name": "PLX Definition & Parsing",
-      "dst_name": "Pipeline Orchestration"
+      "relation": "reads from/writes to",
+      "src_name": "Pipe Operators & Controllers",
+      "dst_name": "Data & Memory Management"
     },
     {
-      "relation": "orchestrates pipe tasks",
-      "src_name": "Pipeline Orchestration",
-      "dst_name": "Pipe Execution Units"
+      "relation": "interacts with",
+      "src_name": "Core Orchestration Engine",
+      "dst_name": "Data & Memory Management"
     },
     {
-      "relation": "manages pipeline data",
-      "src_name": "Pipeline Orchestration",
-      "dst_name": "Data & Knowledge Management"
-    },
-    {
-      "relation": "reports execution activity",
-      "src_name": "Pipeline Orchestration",
-      "dst_name": "Monitoring & Reporting"
-    },
-    {
-      "relation": "requests AI tasks",
-      "src_name": "Pipe Execution Units",
-      "dst_name": "AI Services & Integration"
-    },
-    {
-      "relation": "accesses pipe data",
-      "src_name": "Pipe Execution Units",
-      "dst_name": "Data & Knowledge Management"
-    },
-    {
-      "relation": "reports AI usage",
-      "src_name": "AI Services & Integration",
-      "dst_name": "Monitoring & Reporting"
-    },
-    {
-      "relation": "provides data structure definitions",
-      "src_name": "Data & Knowledge Management",
-      "dst_name": "PLX Definition & Parsing"
+      "relation": "sends events to",
+      "src_name": "Core Orchestration Engine",
+      "dst_name": "Reporting & Observability"
     }
   ]
 }
