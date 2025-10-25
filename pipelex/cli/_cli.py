@@ -59,9 +59,12 @@ def check_telemetry_consent() -> None:
 
         # Map choice to telemetry mode using enum
         mode_map = {
-            1: TelemetryMode.OFF,
-            2: TelemetryMode.ANONYMOUS,
-            3: TelemetryMode.IDENTIFIED,
+            "1": TelemetryMode.OFF,
+            "2": TelemetryMode.ANONYMOUS,
+            "3": TelemetryMode.IDENTIFIED,
+            "off": TelemetryMode.OFF,
+            "anonymous": TelemetryMode.ANONYMOUS,
+            "identified": TelemetryMode.IDENTIFIED,
         }
 
         # Prompt user for telemetry preference
@@ -70,36 +73,33 @@ def check_telemetry_consent() -> None:
         typer.echo("=" * 70)
         typer.echo("\nPipelex can collect anonymous usage data to help improve the product.")
         typer.echo("\nPlease choose your telemetry preference:")
-        typer.echo(f"  [1] {mode_map[1]:11} - No telemetry data collected")
-        typer.echo(f"  [2] {mode_map[2]:11} - Anonymous usage data only (default)")
-        typer.echo(f"  [3] {mode_map[3]:11} - Usage data with user identification")
-        typer.echo(f"  [q] {'quit':11} - Exit without configuring")
+        typer.echo(f"  [1]  {TelemetryMode.OFF:11} - No telemetry data collected")
+        typer.echo(f"  [2]  {TelemetryMode.ANONYMOUS:11} - Anonymous usage data only")
+        typer.echo(f"  [3]  {TelemetryMode.IDENTIFIED:11} - Usage data with user identification")
+        typer.echo(f"  [q]  {'quit':11} - Exit without configuring")
         typer.echo()
 
-        choice_str = typer.prompt(
-            "Enter your choice",
-            type=str,
-            default="2",
-            show_default=True,
-        )
+        # Loop until valid input is received
+        telemetry_mode = None
+        while telemetry_mode is None:
+            choice_str = typer.prompt(
+                "Enter your choice",
+                type=str,
+            )
 
-        # Handle quit option
-        if choice_str.lower() == "q":
-            typer.echo("\nExiting without configuring telemetry.")
-            raise typer.Exit(code=0)
+            # Normalize input to lowercase
+            choice_normalized = choice_str.lower().strip()
 
-        # Parse and validate choice
-        try:
-            choice = int(choice_str)
-        except ValueError:
-            typer.echo(f"Invalid choice: {choice_str}. Defaulting to anonymous.")
-            choice = 2
+            # Handle quit option
+            if choice_normalized in ("q", "quit"):
+                typer.echo("\nExiting without configuring telemetry.")
+                raise typer.Exit(code=0)
 
-        if choice not in mode_map:
-            typer.echo(f"Invalid choice: {choice}. Defaulting to anonymous.")
-            choice = 2
-
-        telemetry_mode = mode_map[choice]
+            # Check if valid choice
+            if choice_normalized in mode_map:
+                telemetry_mode = mode_map[choice_normalized]
+            else:
+                typer.echo(f"Invalid choice: '{choice_str}'. Please enter 1, 2, 3, off, anonymous, identified, or q to quit.\n")
 
         # Update the settings
         toml_doc["settings_customized"] = True

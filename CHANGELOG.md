@@ -5,6 +5,8 @@
 ### Added
 
 - Added the `n8n` documentation page for the [n8n-nodes-pipelex](https://github.com/Pipelex/n8n-nodes-pipelex) package.
+- Added optional telemetry system with first-run interactive prompt offering three modes: off (no data collected), anonymous (usage data without identification), and identified (usage data with user identification). Automatically respects `DO_NOT_TRACK` environment variable and redacts sensitive data (prompts, responses, file paths, URLs). Configuration stored in `.pipelex/telemetry.toml`.
+- Added telemetry documentation: user-friendly setup guide and comprehensive configuration reference.
 
 ### Changed
 
