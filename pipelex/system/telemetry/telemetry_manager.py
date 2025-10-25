@@ -64,7 +64,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 else:
                     self._track_identified_event(event_name=event_name, properties=tracked_properties, user_id=self.telemetry_config.user_id)
             case TelemetryMode.OFF:
-                log.dev(f"Telemetry is off, skipping event '{event_name}'")
+                log.verbose(f"Telemetry is off, skipping event '{event_name}'")
 
     def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
         if not self.posthog:
