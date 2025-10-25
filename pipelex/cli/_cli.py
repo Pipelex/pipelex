@@ -14,6 +14,7 @@ from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TelemetryMode
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
@@ -34,7 +35,7 @@ class PipelexCLI(TyperGroup):
         return cmd
 
 
-def check_telemetry_consent() -> None:
+def check_telemetry_consent() -> TelemetryMode | None:
     """Check if user has customized telemetry settings and prompt if not."""
     # Check if .pipelex directory exists - if not, user must run pipelex init first
     pipelex_config_dir = config_manager.pipelex_config_dir
@@ -55,10 +56,10 @@ def check_telemetry_consent() -> None:
     try:
         # Check if settings have already been customized
         if toml_doc["settings_customized"]:
-            return
+            return None
 
         # Map choice to telemetry mode using enum
-        mode_map = {
+        mode_map: dict[str, TelemetryMode] = {
             "1": TelemetryMode.OFF,
             "2": TelemetryMode.ANONYMOUS,
             "3": TelemetryMode.IDENTIFIED,
@@ -80,7 +81,7 @@ def check_telemetry_consent() -> None:
         typer.echo()
 
         # Loop until valid input is received
-        telemetry_mode = None
+        telemetry_mode: TelemetryMode | None = None
         while telemetry_mode is None:
             choice_str = typer.prompt(
                 "Enter your choice",
@@ -111,12 +112,15 @@ def check_telemetry_consent() -> None:
         typer.echo(f"\n✓ Telemetry mode set to: {telemetry_mode}")
         typer.echo("=" * 70 + "\n")
 
+        return telemetry_mode
+
     except typer.Exit:
         # Re-raise Exit exceptions (e.g., when user quits)
         raise
     except Exception as exc:
         # Silently fail if there's any issue - don't block CLI usage
         typer.echo(f"Warning: Could not save telemetry preference: {exc}", err=True)
+        return None
 
 
 def main() -> None:
@@ -155,7 +159,7 @@ def app_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand == "init":
         return
 
-    check_telemetry_consent()
+    TelemetryManagerAbstract.telemetry_mode_just_set = check_telemetry_consent()
 
 
 app.add_typer(init_app, name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")

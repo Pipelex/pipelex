@@ -9,6 +9,16 @@ class TelemetryMode(StrEnum):
     ANONYMOUS = "anonymous"
     IDENTIFIED = "identified"
 
+    @property
+    def is_enabled(self) -> bool:
+        match self:
+            case TelemetryMode.OFF:
+                return False
+            case TelemetryMode.ANONYMOUS:
+                return True
+            case TelemetryMode.IDENTIFIED:
+                return True
+
 
 class TelemetryIntegration(StrEnum):
     CLI = "cli"

@@ -1,14 +1,17 @@
+from importlib.metadata import metadata
 from typing import Any
 
-from posthog import Posthog
+from posthog import Posthog, new_context, tag
 from typing_extensions import override
 
-from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
+from pipelex.system.telemetry.events import EventName, EventProperty, Setting
+from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryIntegration, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
 
 DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
+PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
+PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
 
 class TelemetryManager(TelemetryManagerAbstract):
@@ -23,7 +26,18 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def setup(self):
-        pass
+        if telemetry_mode := TelemetryManagerAbstract.telemetry_was_just_enabled():
+            with new_context():
+                tag(name=EventProperty.INTEGRATION, value=TelemetryIntegration.CLI)
+                tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+                tag(name=EventProperty.SETTING, value=Setting.TELEMETRY_MODE)
+            self.posthog.capture(
+                EventName.TELEMETRY_JUST_ENABLED,
+                properties={
+                    EventProperty.TELEMETRY_MODE: telemetry_mode,
+                    EventProperty.PIPELEX_VERSION: PACKAGE_VERSION,
+                },
+            )
 
     @override
     def teardown(self):

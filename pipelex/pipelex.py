@@ -254,10 +254,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             config_path = os.path.join(config_manager.pipelex_config_dir, "telemetry.toml")
             telemetry_config_toml = load_toml_from_path(path=config_path)
             telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
+
         if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
             self.telemetry_manager = TelemetryManagerNoOp()
             log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
-            self.posthog = None
         else:
             self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
 

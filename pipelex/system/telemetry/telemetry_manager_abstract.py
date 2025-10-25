@@ -4,9 +4,19 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.system.telemetry.telemetry_config import TelemetryMode
 
 
 class TelemetryManagerAbstract(ABC):
+    telemetry_mode_just_set: TelemetryMode | None = None
+
+    @classmethod
+    def telemetry_was_just_enabled(cls) -> TelemetryMode | None:
+        if cls.telemetry_mode_just_set is None:
+            return None
+        else:
+            return cls.telemetry_mode_just_set if cls.telemetry_mode_just_set.is_enabled else None
+
     @abstractmethod
     def setup(self):
         pass
