@@ -66,7 +66,7 @@ llm_cheap = { model = "base-gemini", temperature = 0.1 }
 
 # Generation skills
 llm_for_factual_writing = { model = "base-gpt", temperature = 0.1 }
-llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
+llm_for_creative_writing = { model = "base-gpt", temperature = 0.9 }
 llm_to_write_questions = { model = "gpt-4o-mini", temperature = 0.3 }
 
 # Reasoning skills

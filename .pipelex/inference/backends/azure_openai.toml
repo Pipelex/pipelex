@@ -96,3 +96,8 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 
+[gpt-5]
+model_id = "gpt-5-2025-08-07"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }

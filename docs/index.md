@@ -43,8 +43,9 @@ pipelex build pipe "Imagine a cute animal mascot for a startup based on its elev
 **Other useful use-cases for business:**
 
 ```bash
-pipelex build pipe "Given an expense report, apply company rules"
-pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match"
+pipelex build pipe "Given an expense report, apply company rules" --output results/expense.plx
+pipelex build pipe "Take a resume PDF, a Job offer text, and analyze if they match" --output results/resume_match.plx
+pipelex build pipe "Take a theme, write a joke about it, then roast the joke" --output results/self_roaster.plx
 ```
 
 Each of these commands generates a complete production-ready script in our Pipelex language, saved as `.plx` file including domain definition, concepts, and the multiple _pipe_ steps to take to achieve the goal.
@@ -55,16 +56,8 @@ Each of these commands generates a complete production-ready script in our Pipel
 
 ```bash
 # Run a pipe by code
-pipelex run <pipe_code>
-
-# Run with inputs (JSON file containing input_memory dict)
-pipelex run <pipe_code> --inputs input.json
-
-# Run a bundle's main_pipe (auto-detected from .plx extension)
-pipelex run bundle.plx --inputs input.json
-
-# Customize output location
-pipelex run <pipe_code> --output results/output.json
+pipelex run results/resume_match.plx --inputs inputs.json
+pipelex run results/self_roaster.plx --inputs '{"theme": "the prisoner dilemma"}'
 ```
 
 The `--inputs` file should be a JSON dictionary where keys are input variable names and values are the input data. For native concepts like Text, you can use strings directly. For structured types, provide objects matching the expected structure.
