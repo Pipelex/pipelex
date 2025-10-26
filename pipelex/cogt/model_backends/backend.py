@@ -8,6 +8,7 @@ from pipelex.system.configuration.config_model import ConfigModel
 
 class InferenceBackend(ConfigModel):
     name: str
+    display_name: str | None = None
     enabled: bool = True
     endpoint: str | None = None
     api_key: str | None = None
