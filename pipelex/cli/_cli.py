@@ -12,7 +12,6 @@ from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 
 class PipelexCLI(TyperGroup):
@@ -67,7 +66,7 @@ def app_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand == "init":
         return
 
-    TelemetryManagerAbstract.telemetry_mode_just_set = init_cmd()
+    init_cmd()
 
 
 @app.command(name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")

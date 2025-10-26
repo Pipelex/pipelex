@@ -126,8 +126,8 @@ class TestBackendCustomization:
         assert toml_doc["anthropic"]["enabled"] is False  # type: ignore[index]
         assert toml_doc["mistral"]["enabled"] is False  # type: ignore[index]
 
-    def test_init_config_full_flow_with_backend_customization(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test the full init_config flow including backend customization."""
+    def test_init_config_copies_files_without_customizing(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that init_config copies files but doesn't customize backends (that's init_cmd's job)."""
         # Setup template directories
         kit_configs_dir = tmp_path / "kit" / "configs"
         kit_configs_dir.mkdir(parents=True)
@@ -143,17 +143,14 @@ class TestBackendCustomization:
         target_dir = tmp_path / ".pipelex"
         target_dir.mkdir()
 
-        # Mock config_manager and user input
+        # Mock config_manager
         mocker.patch("pipelex.cli.commands.init_cmd.get_configs_dir", return_value=str(kit_configs_dir))
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(target_dir)
         mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
-
-        mocker.patch("pipelex.cli.commands.init_cmd.Console")
-        mocker.patch("pipelex.cli.commands.init_cmd.Prompt.ask", return_value="5,6")  # openai, anthropic
         mocker.patch("typer.echo")
 
-        # Execute full init_config
+        # Execute init_config
         result = init_config(reset=False)
 
         # Verify files were copied
@@ -161,13 +158,13 @@ class TestBackendCustomization:
         assert (target_dir / "pipelex.toml").exists()
         assert (target_dir / "inference" / "backends.toml").exists()
 
-        # Verify backend customization was applied
+        # Verify backend customization was NOT applied (original values preserved)
         toml_doc = load_toml_with_tomlkit(str(target_dir / "inference" / "backends.toml"))
 
+        # Verify original enabled states from template
         assert toml_doc["openai"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["anthropic"]["enabled"] is True  # type: ignore[index]
-        assert toml_doc["pipelex_inference"]["enabled"] is False  # type: ignore[index]
-        assert toml_doc["mistral"]["enabled"] is False  # type: ignore[index]
+        assert toml_doc["mistral"]["enabled"] is True  # type: ignore[index]
 
     def test_customize_backends_handles_missing_file_gracefully(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test that customize_backends_config handles missing backends.toml gracefully."""

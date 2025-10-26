@@ -222,7 +222,7 @@ class TestInitCmd:
         assert not (target_dir / "pipelex.toml").exists()
         assert not (target_dir / "inference").exists()
 
-    def test_do_init_config_calls_customize_backends(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    def test_do_init_config_does_not_call_customize_backends(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories with inference structure
         kit_configs_dir = tmp_path / "kit" / "configs"
         kit_configs_dir.mkdir(parents=True)
@@ -247,8 +247,8 @@ class TestInitCmd:
         # Execute
         init_config(reset=False)
 
-        # Verify customize_backends_config was called
-        mock_customize.assert_called_once()
+        # Verify customize_backends_config was NOT called (separation of concerns)
+        mock_customize.assert_not_called()
 
     def test_do_init_config_skips_customize_when_no_files_copied(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories with all files already existing

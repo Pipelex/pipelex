@@ -13,6 +13,7 @@ from pipelex.exceptions import PipelexCLIError
 from pipelex.kit.paths import get_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryMode
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from pipelex.types import StrEnum
@@ -42,6 +43,7 @@ class InitFocus(StrEnum):
 
     ALL = "all"
     CONFIG = "config"
+    INFERENCE = "inference"
     TELEMETRY = "telemetry"
 
 
@@ -185,10 +187,6 @@ def init_config(reset: bool = False, dry_run: bool = False) -> int:
         if dry_run:
             return len(copied_files)
 
-        # Customize backends if files were copied
-        if copied_files:
-            customize_backends_config()
-
         # Report results
         if copied_files:
             typer.echo(f"✅ Copied {len(copied_files)} files to {target_config_dir}:")
@@ -213,32 +211,52 @@ def init_config(reset: bool = False, dry_run: bool = False) -> int:
 def init_cmd(
     focus: InitFocus = InitFocus.ALL,
     reset: bool = False,
-) -> TelemetryMode | None:
-    """Initialize Pipelex configuration and telemetry if needed, in a unified flow.
+):
+    """Initialize Pipelex configuration, inference backends, and telemetry if needed, in a unified flow.
 
     Args:
-        focus: What to initialize - 'config', 'telemetry', or 'all' (default)
+        focus: What to initialize - 'config', 'inference', 'telemetry', or 'all' (default)
         reset: Whether to reset/overwrite existing files
     """
     console = Console()
     pipelex_config_dir = config_manager.pipelex_config_dir
     telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
+    backends_toml_path = os.path.join(pipelex_config_dir, "inference", "backends.toml")
 
     # Determine what to check based on focus parameter
     check_config = focus in (InitFocus.ALL, InitFocus.CONFIG)
+    check_inference = focus in (InitFocus.ALL, InitFocus.INFERENCE)
     check_telemetry = focus in (InitFocus.ALL, InitFocus.TELEMETRY)
 
     # Check what needs to be initialized
     nb_missing_config_files = init_config(reset=False, dry_run=True) if check_config else 0
     needs_config = check_config and (nb_missing_config_files > 0 or reset)
+    needs_inference = check_inference and (not path_exists(backends_toml_path) or reset)
     needs_telemetry = check_telemetry and (not path_exists(telemetry_config_path) or reset)
 
     # Track if user already confirmed to avoid double prompting
     user_already_confirmed = False
 
     # If nothing needs to be done, handle based on focus
-    if not needs_config and not needs_telemetry:
+    if not needs_config and not needs_inference and not needs_telemetry:
         match focus:
+            case InitFocus.INFERENCE:
+                # Special case: if user explicitly asked for inference, offer to reconfigure
+                console.print()
+                console.print("[green]✓[/green] Inference backends are already configured!")
+                console.print()
+                console.print(f"[dim]Configuration file:[/dim] [cyan]{backends_toml_path}[/cyan]")
+                console.print()
+
+                if Confirm.ask("[bold]Would you like to reconfigure inference backends?[/bold]", default=False):
+                    # User wants to reconfigure, so proceed with inference setup
+                    needs_inference = True
+                    user_already_confirmed = True
+                else:
+                    console.print("\n[dim]No changes made.[/dim]")
+                    console.print()
+                    return
+
             case InitFocus.TELEMETRY:
                 # Special case: if user explicitly asked for telemetry, offer to reconfigure
                 console.print()
@@ -254,7 +272,7 @@ def init_cmd(
                 else:
                     console.print("\n[dim]No changes made.[/dim]")
                     console.print()
-                    return None
+                    return
 
             case InitFocus.ALL:
                 console.print()
@@ -266,7 +284,7 @@ def init_cmd(
                 console.print("[dim]💡 Tip: Use[/dim] [cyan]--reset[/cyan] [dim]to reconfigure or troubleshoot:[/dim]")
                 console.print("   [cyan]pipelex init --reset[/cyan]")
                 console.print()
-                return None
+                return
 
             case InitFocus.CONFIG:
                 console.print()
@@ -277,7 +295,7 @@ def init_cmd(
                 console.print("[dim]💡 Tip: Use[/dim] [cyan]--reset[/cyan] [dim]to reconfigure or troubleshoot:[/dim]")
                 console.print(f"   [cyan]pipelex init {focus} --reset[/cyan]")
                 console.print()
-                return None
+                return
 
     try:
         # Show unified initialization prompt (skip if user already confirmed)
@@ -287,27 +305,39 @@ def init_cmd(
             # Build message based on what's being initialized
             message_parts: list[str] = []
             if reset:
-                if needs_config and needs_telemetry:
+                if needs_config:
                     message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
+                if needs_inference:
+                    message_parts.append("• [yellow]Reset and reconfigure[/yellow] inference backends")
+                if needs_telemetry:
                     message_parts.append("• [yellow]Reset and reconfigure[/yellow] telemetry preferences")
-                elif needs_config:
-                    message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
-                elif needs_telemetry:
-                    message_parts.append("• [yellow]Reset and reconfigure[/yellow] telemetry preferences")
-            elif needs_config and needs_telemetry:
-                message_parts.append("• Create required configuration files in [cyan].pipelex/[/cyan]")
-                message_parts.append("• Ask you to choose your telemetry preferences")
-            elif needs_config:
-                message_parts.append("• Create required configuration files in [cyan].pipelex/[/cyan]")
-            elif needs_telemetry:
-                message_parts.append("• Ask you to choose your telemetry preferences")
-
-            if needs_config and needs_telemetry:
-                title_text = "[bold yellow]Resetting Configuration[/bold yellow]" if reset else "[bold cyan]Pipelex Initialization[/bold cyan]"
-            elif needs_config:
-                title_text = "[bold yellow]Resetting Configuration Files[/bold yellow]" if reset else "[bold cyan]Configuration Setup[/bold cyan]"
             else:
-                title_text = "[bold yellow]Resetting Telemetry[/bold yellow]" if reset else "[bold cyan]Telemetry Setup[/bold cyan]"
+                if needs_config:
+                    message_parts.append("• Create required configuration files in [cyan].pipelex/[/cyan]")
+                if needs_inference:
+                    message_parts.append("• Ask you to choose your inference backends")
+                if needs_telemetry:
+                    message_parts.append("• Ask you to choose your telemetry preferences")
+
+            # Determine title based on what's being initialized
+            num_items = sum([needs_config, needs_inference, needs_telemetry])
+            if reset:
+                if num_items > 1:
+                    title_text = "[bold yellow]Resetting Configuration[/bold yellow]"
+                elif needs_config:
+                    title_text = "[bold yellow]Resetting Configuration Files[/bold yellow]"
+                elif needs_inference:
+                    title_text = "[bold yellow]Resetting Inference Backends[/bold yellow]"
+                else:
+                    title_text = "[bold yellow]Resetting Telemetry[/bold yellow]"
+            elif num_items > 1:
+                title_text = "[bold cyan]Pipelex Initialization[/bold cyan]"
+            elif needs_config:
+                title_text = "[bold cyan]Configuration Setup[/bold cyan]"
+            elif needs_inference:
+                title_text = "[bold cyan]Inference Backend Setup[/bold cyan]"
+            else:
+                title_text = "[bold cyan]Telemetry Setup[/bold cyan]"
 
             message = "\n".join(message_parts)
             border_color = "yellow" if reset else "cyan"
@@ -322,13 +352,11 @@ def init_cmd(
 
             if not Confirm.ask("[bold]Continue with initialization?[/bold]", default=True):
                 console.print("\n[yellow]Initialization cancelled.[/yellow]")
-                if needs_config:
+                if needs_config or needs_inference or needs_telemetry:
                     match focus:
                         case InitFocus.ALL:
                             init_cmd_str = "pipelex init"
-                        case InitFocus.CONFIG:
-                            init_cmd_str = f"pipelex init {focus}"
-                        case InitFocus.TELEMETRY:
+                        case InitFocus.CONFIG | InitFocus.INFERENCE | InitFocus.TELEMETRY:
                             init_cmd_str = f"pipelex init {focus}"
                     console.print(f"[dim]You can initialize later by running:[/dim] [cyan]{init_cmd_str}[/cyan]")
                 console.print()
@@ -341,8 +369,16 @@ def init_cmd(
         if needs_config:
             console.print()
             init_config(reset=reset)
+            # If we just initialized config and focus includes inference, enable inference setup
+            if check_inference and path_exists(backends_toml_path):
+                needs_inference = True
 
-        # Step 2: Set up telemetry if needed
+        # Step 2: Set up inference backends if needed
+        if needs_inference:
+            console.print()
+            customize_backends_config()
+
+        # Step 3: Set up telemetry if needed
         telemetry_mode: TelemetryMode | None = None
         if needs_telemetry:
             console.print()
@@ -407,7 +443,7 @@ def init_cmd(
             console.print(f"\n[green]✓[/green] Telemetry mode set to: [bold cyan]{telemetry_mode}[/bold cyan]")
 
         console.print()
-        return telemetry_mode
+        TelemetryManagerAbstract.telemetry_mode_just_set = telemetry_mode
 
     except typer.Exit:
         # Re-raise Exit exceptions
@@ -416,4 +452,4 @@ def init_cmd(
         console.print(f"\n[red]⚠ Warning: Initialization failed: {exc}[/red]", style="bold")
         if needs_config:
             console.print("[red]Please run 'pipelex init config' manually.[/red]")
-        return None
+        return
