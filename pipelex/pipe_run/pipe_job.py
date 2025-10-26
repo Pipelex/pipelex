@@ -12,3 +12,7 @@ class PipeJob(BaseModel):
     pipe_run_params: PipeRunParams
     job_metadata: JobMetadata
     output_name: str | None = None
+
+    @property
+    def pipe_type(self) -> str:
+        return self.pipe.__class__.__name__

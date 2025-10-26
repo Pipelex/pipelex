@@ -24,6 +24,10 @@ class PipeAbstract(ABC, BaseModel):
     inputs: InputRequirements = Field(default_factory=InputRequirements)
     output: Concept
 
+    @property
+    def pipe_type(self) -> str:
+        return self.__class__.__name__
+
     @field_validator("code", mode="before")
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:

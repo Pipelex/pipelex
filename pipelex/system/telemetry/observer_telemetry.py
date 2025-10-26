@@ -11,15 +11,19 @@ class ObserverTelemetry(ObserverProtocol):
 
     @override
     async def observe_before_run(self, payload: PayloadType) -> None:
+        pipe_job = payload[PayloadKey.PIPE_JOB]
         properties = {
             EventProperty.PIPELINE_RUN_ID: payload[PayloadKey.PIPELINE_RUN_ID],
+            EventProperty.PIPE_TYPE: pipe_job.pipe_type,
         }
         self.telemetry_manager.track_event(event_name=EventName.PIPE_RUN, properties=properties)
 
     @override
     async def observe_after_successful_run(self, payload: PayloadType) -> None:
+        pipe_job = payload[PayloadKey.PIPE_JOB]
         properties = {
             EventProperty.PIPELINE_RUN_ID: payload[PayloadKey.PIPELINE_RUN_ID],
+            EventProperty.PIPE_TYPE: pipe_job.pipe_type,
             EventProperty.PIPE_RUN_OUTCOME: Outcome.SUCCESS,
         }
         self.telemetry_manager.track_event(event_name=EventName.PIPE_COMPLETE, properties=properties)
@@ -29,8 +33,10 @@ class ObserverTelemetry(ObserverProtocol):
         self,
         payload: PayloadType,
     ) -> None:
+        pipe_job = payload[PayloadKey.PIPE_JOB]
         properties = {
             EventProperty.PIPELINE_RUN_ID: payload[PayloadKey.PIPELINE_RUN_ID],
+            EventProperty.PIPE_TYPE: pipe_job.pipe_type,
             EventProperty.PIPE_RUN_OUTCOME: Outcome.FAILURE,
         }
         self.telemetry_manager.track_event(event_name=EventName.PIPE_COMPLETE, properties=properties)
