@@ -7,6 +7,7 @@ import pipelex.pipelex
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_report_delegate
+from pipelex.system.runtime import IntegrationMode
 
 pytest_plugins = [
     "pipelex.test_extras.shared_pytest_plugins",
@@ -20,7 +21,7 @@ def reset_pipelex_config_fixture():
     # Code to run before each test
     Console().print("[magenta]pipelex setup[/magenta]")
     try:
-        pipelex_instance = pipelex.pipelex.Pipelex.make()
+        pipelex_instance = pipelex.pipelex.Pipelex.make(integration_mode=IntegrationMode.PYTEST)
         config = get_config()
         log.verbose(config, title="Test config")
         assert isinstance(config, pipelex.config.PipelexConfig)

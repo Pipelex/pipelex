@@ -8,6 +8,7 @@ import typer
 from pipelex.exceptions import PipelexCLIError
 from pipelex.kit.paths import get_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
@@ -30,6 +31,10 @@ def do_init_config(reset: bool = False) -> None:
                 src_item = os.path.join(src_dir, item)
                 dst_item = os.path.join(dst_dir, item)
                 relative_item = os.path.join(relative_path, item) if relative_path else item
+
+                # Skip telemetry.toml - it will be created when user is prompted
+                if item == TELEMETRY_CONFIG_FILE_NAME:
+                    continue
 
                 if os.path.isdir(src_item):
                     os.makedirs(dst_item, exist_ok=True)

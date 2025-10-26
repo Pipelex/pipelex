@@ -89,6 +89,7 @@ nav:
     - Setup:
       - Configure AI Providers: pages/setup/configure-ai-providers.md
       - Project Organization: pages/setup/project-organization.md
+      - Telemetry: pages/setup/telemetry.md
     - Understand Pipelex:
       - The Knowledge Pipeline Manifesto: manifesto.md
       - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
@@ -144,6 +145,7 @@ nav:
       - Logging: pages/configuration/config-practical/logging-config.md
       - Pipe Run: pages/configuration/config-practical/pipe-run-config.md
       - Reporting: pages/configuration/config-practical/reporting-config.md
+      - Telemetry: pages/configuration/config-practical/telemetry-config.md
       - Tracker: pages/configuration/config-practical/tracker-config.md
     - Technical Configuration:
       - AWS: pages/configuration/config-technical/aws-config.md

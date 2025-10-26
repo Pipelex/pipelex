@@ -1,42 +1,105 @@
-import os
-from typing import Any
+from importlib.metadata import metadata
+from typing import Any, Callable
 
-from posthog import Posthog
-from typing_extensions import override
+import posthog
+from posthog import Posthog, new_context, tag
+from posthog.args import ExceptionArg, OptionalCaptureArgs
+from typing_extensions import Unpack, override
 
-from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.environment import get_optional_env
-from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.system.exceptions import RootException
+from pipelex.system.runtime import IntegrationMode
+from pipelex.system.telemetry.events import EventName, EventProperty, Setting
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
-from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
+PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
+PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
 
 class TelemetryManager(TelemetryManagerAbstract):
-    def __init__(self):
-        config_path = os.path.join(config_manager.pipelex_config_dir, "telemetry.toml")
-        telemetry_config_toml = load_toml_from_path(path=config_path)
-        self.telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
-        self.do_not_track: bool
-        self.posthog: Posthog | None
-        if self.telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
-            self.do_not_track = True
-            log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
-            self.posthog = None
-        else:
-            self.do_not_track = False
-            self.posthog = Posthog(project_api_key=self.telemetry_config.project_api_key, host=self.telemetry_config.host)
+    PRIVACY_NOTICE = "[Privacy: exception message redacted]"
+
+    def __init__(self, telemetry_config: TelemetryConfig):
+        self.telemetry_config = telemetry_config
+
+        # Create PostHog client
+        self.posthog = Posthog(
+            project_api_key=self.telemetry_config.project_api_key,
+            host=self.telemetry_config.host,
+            disable_geoip=not self.telemetry_config.geoip_enabled,
+            debug=self.telemetry_config.verbose_enabled,
+            on_error=self._handle_transmission_error,
+        )
+
+        # Store original capture_exception method
+        self._original_capture_exception: Callable[..., Any] = self.posthog.capture_exception
+
+        # Wrap capture_exception to sanitize before sending
+        self._wrap_capture_exception()
+
+        posthog.privacy_mode = True
+        posthog.default_client = self.posthog
+
+    def _handle_transmission_error(self, error: Exception | None, _items: list[dict[str, Any]]) -> None:
+        """Handle errors that occur during telemetry transmission.
+
+        Args:
+            error: The transmission error that occurred
+            _items: List of telemetry items that failed to send
+        """
+        if error:
+            log.error(f"Telemetry transmission error: {error}")
+
+    def _wrap_capture_exception(self) -> None:
+        """Wrap the PostHog capture_exception method to sanitize exception messages."""
+
+        def sanitized_capture_exception(
+            exception: ExceptionArg | None = None,
+            **kwargs: Unpack[OptionalCaptureArgs],
+        ) -> Any:
+            """Capture exception with message sanitization for RootException subclasses."""
+            if exception and isinstance(exception, RootException):
+                # Create a new exception with sanitized message while preserving the class type
+                # Use __new__ to create an instance without calling __init__, which may require extra args
+                # This creates a "shell" instance with NO custom attributes (e.g., no tested_concept, wanted_concept, etc.)
+                exception_type = type(exception)
+                sanitized_exception = exception_type.__new__(exception_type)
+
+                # Set the exception args to our privacy notice
+                # This is what str(exception) will return
+                sanitized_exception.args = (self.PRIVACY_NOTICE,)
+
+                # Preserve the traceback so we still get stack trace information
+                if hasattr(exception, "__traceback__"):
+                    sanitized_exception.__traceback__ = exception.__traceback__
+
+                # Note: No custom attributes (tested_concept, wanted_concept, etc.) are present
+                # because we used __new__() without calling __init__(). The __dict__ is already empty.
+
+                return self._original_capture_exception(sanitized_exception, **kwargs)
+            else:
+                # For non-RootException, capture as-is (or auto-detect current exception)
+                return self._original_capture_exception(exception, **kwargs)
+
+        # Replace the method
+        self.posthog.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
     @override
-    def get_telemetry_config(self) -> TelemetryConfig:
-        return self.telemetry_config
-
-    @override
-    def setup(self):
-        pass
+    def setup(self, integration_mode: IntegrationMode):
+        if telemetry_mode := TelemetryManagerAbstract.telemetry_was_just_enabled():
+            with new_context():
+                tag(name=EventProperty.INTEGRATION, value=integration_mode)
+                tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+                tag(name=EventProperty.SETTING, value=Setting.TELEMETRY_MODE)
+            self.posthog.capture(
+                EventName.TELEMETRY_JUST_ENABLED,
+                properties={
+                    EventProperty.TELEMETRY_MODE: telemetry_mode,
+                    EventProperty.PIPELEX_VERSION: PACKAGE_VERSION,
+                },
+            )
 
     @override
     def teardown(self):
@@ -44,8 +107,6 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):
-        if self.do_not_track:
-            return
         # We copy the incoming properties to avoid modifying the original dictionary
         # and to convert the keys to str
         # and to remove the properties that are in the redact list
@@ -69,7 +130,7 @@ class TelemetryManager(TelemetryManagerAbstract):
     def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
         if not self.posthog:
             return
-        if self.telemetry_config.debug:
+        if self.telemetry_config.dry_mode_enabled:
             if properties:
                 log.debug(properties, title=f"Tracking anonymous event '{event_name}'. Properties")
             else:
@@ -82,7 +143,7 @@ class TelemetryManager(TelemetryManagerAbstract):
     def _track_identified_event(self, event_name: str, properties: dict[str, Any], user_id: str):
         if not self.posthog:
             return
-        if self.telemetry_config.debug:
+        if self.telemetry_config.dry_mode_enabled:
             if properties:
                 log.debug(properties, title=f"Tracking identified event '{event_name}'. Properties")
             else:

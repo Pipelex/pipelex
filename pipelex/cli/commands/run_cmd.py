@@ -6,6 +6,7 @@ from typing import Annotated
 
 import click
 import typer
+from posthog import new_context, tag
 
 from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_and_validate_bundle
@@ -13,8 +14,13 @@ from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.exceptions import PipeInputError, PipelineExecutionError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.system.runtime import IntegrationMode
+from pipelex.system.telemetry.events import EventProperty
+from pipelex.system.telemetry.telemetry_manager import PACKAGE_VERSION
 from pipelex.tools.misc.file_utils import get_incremental_file_path
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
+
+COMMAND = "run"
 
 
 def run_cmd(
@@ -105,7 +111,7 @@ def run_cmd(
 
     async def run_pipeline(pipe_code: str | None = None, bundle_path: str | None = None):
         # Initialize Pipelex
-        Pipelex.make()
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
         source_description: str
         if bundle_path:
             try:
@@ -187,4 +193,8 @@ def run_cmd(
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
-    asyncio.run(run_pipeline(pipe_code=pipe_code, bundle_path=bundle_path))
+    with new_context():
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.CLI_COMMAND, value=COMMAND)
+        asyncio.run(run_pipeline(pipe_code=pipe_code, bundle_path=bundle_path))

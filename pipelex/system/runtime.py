@@ -6,6 +6,33 @@ from pipelex.types import StrEnum
 RUN_MODE_ENV_VAR_KEY = "RUN_MODE"
 
 
+class IntegrationMode(StrEnum):
+    CLI = "cli"
+    FASTAPI = "fastapi"
+    DOCKER = "docker"
+    MCP = "mcp"
+    N8N = "n8n"
+    PYTHON = "python"
+    PYTEST = "pytest"
+
+    def allows_telemetry(self) -> bool:
+        match self:
+            case IntegrationMode.CLI:
+                return True
+            case IntegrationMode.FASTAPI:
+                return True
+            case IntegrationMode.DOCKER:
+                return True
+            case IntegrationMode.MCP:
+                return True
+            case IntegrationMode.N8N:
+                return True
+            case IntegrationMode.PYTHON:
+                return False
+            case IntegrationMode.PYTEST:
+                return False
+
+
 class RunMode(StrEnum):
     NORMAL = "normal"
     UNIT_TEST = "unit_test"

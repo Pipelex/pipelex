@@ -4,6 +4,7 @@ import asyncio
 from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
+from posthog import new_context, tag
 from rich import box
 from rich.console import Console
 from rich.table import Table
@@ -12,12 +13,21 @@ from pipelex import pretty_print
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe
+from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.runtime import IntegrationMode
+from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.system.telemetry.telemetry_manager import PACKAGE_VERSION
 
 if TYPE_CHECKING:
     from pipelex.cogt.models.model_manager import ModelManager
+
+COMMAND = "show"
+SUB_COMMAND_PIPES = "pipes"
+SUB_COMMAND_PIPE = "pipe"
+SUB_COMMAND_MODELS = "models"
+SUB_COMMAND_BACKENDS = "backends"
 
 
 def do_show_config() -> None:
@@ -32,10 +42,9 @@ def do_show_config() -> None:
 
 def do_list_pipes() -> None:
     """List all available pipes."""
-    Pipelex.make()
-
     try:
-        get_pipe_library().pretty_list_pipes()
+        nb_pipes = get_pipe_library().pretty_list_pipes()
+        get_telemetry_manager().track_event(EventName.PIPES_LIST, properties={EventProperty.NB_PIPES: nb_pipes})
     except Exception as exc:
         msg = f"Failed to list pipes: {exc}"
         raise PipelexCLIError(msg) from exc
@@ -43,15 +52,13 @@ def do_list_pipes() -> None:
 
 def do_show_pipe(pipe_code: str) -> None:
     """Show a single pipe definition from the library."""
-    Pipelex.make()
     pipe = get_required_pipe(pipe_code=pipe_code)
+    get_telemetry_manager().track_event(EventName.PIPE_SHOW, properties={EventProperty.PIPE_TYPE: pipe.type})
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 
 
 def do_show_backends(show_all: bool = False) -> None:
     """Display all backends and the active routing profile."""
-    Pipelex.make()
-
     try:
         models_manager = cast("ModelManager", get_models_manager())
 
@@ -152,6 +159,7 @@ def do_show_backends(show_all: bool = False) -> None:
 
     console.print("[dim]💡 To enable more backends, edit: [bold].pipelex/inference/backends.toml[/bold][/dim]")
     console.print("[dim]💡 To list available models for a backend: [bold]pipelex show models <backend_name>[/bold][/dim]\n")
+    get_telemetry_manager().track_event(EventName.BACKENDS_SHOW, properties={EventProperty.NB_BACKENDS: len(all_backends)})
 
 
 # Typer group for show commands
@@ -172,7 +180,14 @@ def list_pipes_cmd() -> None:
     This includes pipes from your project's .plx files and any
     pipes from imported packages.
     """
-    do_list_pipes()
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
+
+    with new_context():
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPES}")
+
+        do_list_pipes()
 
 
 @show_app.command("pipe", help="Display the detailed definition of a specific pipe")
@@ -185,7 +200,14 @@ def show_pipe_cmd(
     Example:
         pipelex show pipe hello_world
     """
-    do_show_pipe(pipe_code=pipe_code)
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
+
+    with new_context():
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
+
+        do_show_pipe(pipe_code=pipe_code)
 
 
 @show_app.command("models", help="List available AI models from a specific backend provider")
@@ -205,12 +227,18 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    asyncio.run(
-        ModelLister.list_models(
-            backend_name=backend_name,
-            flat=flat,
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    with new_context():
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MODELS}")
+
+        asyncio.run(
+            ModelLister.list_models(
+                backend_name=backend_name,
+                flat=flat,
+            )
         )
-    )
 
 
 @show_app.command("backends", help="Display backend configurations and active routing profile")
@@ -225,4 +253,10 @@ def show_backends_cmd(
         pipelex show backends
         pipelex show backends --all
     """
-    do_show_backends(show_all=show_all_backends)
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    with new_context():
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_BACKENDS}")
+
+        do_show_backends(show_all=show_all_backends)

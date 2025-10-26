@@ -235,6 +235,18 @@ Using `uv`:
 uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
+### Privacy & Telemetry
+
+Pipelex collects optional, anonymous usage data to help improve the product. On first run, you'll be prompted to choose your telemetry preference:
+
+- **Off**: No telemetry data collected
+- **Anonymous**: Anonymous usage data only (command usage, performance metrics, feature usage)
+- **Identified**: Usage data with user identification (helps us provide better support)
+
+Your prompts, LLM responses, file paths, and URLs are automatically redacted and never transmitted. You can change your preference at any time or disable telemetry completely by setting the `DO_NOT_TRACK` environment variable.
+
+For more details, see the [Telemetry Documentation](https://docs.pipelex.com/pages/setup/telemetry/).
+
 ---
 
 ## Example: optimizing a tweet in 2 steps

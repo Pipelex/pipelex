@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import click
 import typer
+from posthog import new_context, tag
 from rich.console import Console
 from rich.syntax import Syntax
 
@@ -13,21 +14,33 @@ from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.exceptions import LibraryLoadingError, PipeInputError
-from pipelex.hub import get_pipes, get_required_pipe
+from pipelex.hub import get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
+from pipelex.system.runtime import IntegrationMode
+from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.system.telemetry.telemetry_manager import PACKAGE_VERSION
 
 if TYPE_CHECKING:
     from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
 console = Console()
 
+COMMAND = "validate"
+
 
 def do_validate_all_libraries_and_dry_run() -> None:
     """Validate libraries and dry-run all pipes."""
-    pipelex_instance = Pipelex.make()
-    pipelex_instance.validate_libraries()
-    asyncio.run(dry_run_pipes(pipes=get_pipes(), raise_on_failure=True))
-    log.info("Setup sequence passed OK, config and pipelines are validated.")
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    with new_context():
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
+
+        pipelex_instance.validate_libraries()
+        pipes = get_pipes()
+        get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
+        asyncio.run(dry_run_pipes(pipes=pipes, raise_on_failure=True))
+        log.info("Setup sequence passed OK, config and pipelines are validated.")
 
 
 def validate_cmd(
@@ -103,18 +116,14 @@ def validate_cmd(
         raise typer.Exit(1)
 
     async def validate_pipe(pipe_code: str | None = None, bundle_path: str | None = None):
-        # Initialize Pipelex
-        try:
-            pipelex_instance = Pipelex.make()
-        except LibraryLoadingError as library_loading_error:
-            typer.secho(f"Failed to validate: {library_loading_error}", fg=typer.colors.RED, err=True)
-            present_validation_error(details_provider=library_loading_error)
-            raise typer.Exit(1) from library_loading_error
-
         if bundle_path:
             # When validating a bundle, load_pipe_from_bundle validates ALL pipes in the bundle
             try:
                 bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
+                get_telemetry_manager().track_event(
+                    EventName.BUNDLE_DRY_RUN,
+                    properties={EventProperty.NB_PIPES: bundle_blueprint.nb_pipes, EventProperty.NB_CONCEPTS: bundle_blueprint.nb_concepts},
+                )
                 await validate_dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
                 if not pipe_code:
                     typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}'", fg=typer.colors.GREEN)
@@ -135,6 +144,9 @@ def validate_cmd(
         elif pipe_code:
             # Validate a single pipe by code
             typer.echo(f"Validating pipe '{pipe_code}'...")
+            get_telemetry_manager().track_event(
+                EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: get_required_pipe(pipe_code=pipe_code).type}
+            )
             pipelex_instance.validate_libraries()
             await dry_run_pipe(
                 get_required_pipe(pipe_code=pipe_code),
@@ -145,7 +157,23 @@ def validate_cmd(
             typer.secho("Failed to validate: no pipe code or bundle specified", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
 
-    asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path))
+    # Initialize Pipelex
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        typer.secho(f"Failed to validate: {library_loading_error}", fg=typer.colors.RED, err=True)
+        present_validation_error(details_provider=library_loading_error)
+        raise typer.Exit(1) from library_loading_error
+
+    with new_context():
+        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        if bundle_path:
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} bundle")
+        else:
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} pipe")
+
+        asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path))
 
 
 def present_validation_error(details_provider: ValidationErrorDetailsProtocol):

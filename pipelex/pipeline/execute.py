@@ -141,6 +141,7 @@ async def execute_pipeline(
 
     properties = {
         EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+        EventProperty.PIPE_TYPE: pipe.pipe_type,
     }
     get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
 
@@ -159,6 +160,7 @@ async def execute_pipeline(
             get_library_manager().remove_from_blueprint(blueprint=blueprint)
     properties = {
         EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+        EventProperty.PIPE_TYPE: pipe.pipe_type,
         EventProperty.PIPELINE_EXECUTE_OUTCOME: Outcome.SUCCESS,
     }
     get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)

@@ -32,7 +32,7 @@ class PipeLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def pretty_list_pipes(self) -> None:
+    def pretty_list_pipes(self) -> int:
         pass
 
     @abstractmethod

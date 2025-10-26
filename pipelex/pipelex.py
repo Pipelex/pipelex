@@ -1,3 +1,4 @@
+import os
 from importlib.metadata import metadata
 from typing import Any, cast
 
@@ -47,13 +48,17 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.environment import get_optional_env
 from pipelex.system.registries.func_registry import func_registry
-from pipelex.system.runtime import runtime_manager
+from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
-from pipelex.system.telemetry.telemetry_manager import TelemetryManager
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
+from pipelex.system.telemetry.telemetry_manager import DO_NOT_TRACK_ENV_VAR_KEY, TelemetryManager
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract, TelemetryManagerNoOp
 from pipelex.test_extras.registry_test_models import TestRegistryModels
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -108,7 +113,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         self.reporting_delegate: ReportingProtocol | None = None
-
+        self.telemetry_manager: TelemetryManagerAbstract | None = None
         # pipeline
         self.pipeline_tracker: PipelineTrackerProtocol | None = None
 
@@ -142,6 +147,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     def setup(
         self,
+        integration_mode: IntegrationMode,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -152,6 +158,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
+        force_enable_telemetry: bool = False,
+        telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         **kwargs: Any,
@@ -244,11 +252,27 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
-        telemetry_manager = telemetry_manager or TelemetryManager()
-        self.pipelex_hub.set_telemetry_manager(telemetry_manager=telemetry_manager)
+        if integration_mode.allows_telemetry() or force_enable_telemetry:
+            if not telemetry_config:
+                config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
+                telemetry_config_toml = load_toml_from_path(path=config_path)
+                telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
+
+            if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
+                self.telemetry_manager = TelemetryManagerNoOp()
+                log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
+            else:
+                self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
+        else:
+            self.telemetry_manager = TelemetryManagerNoOp()
+            log.debug(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
+
+        self.telemetry_manager.setup(integration_mode=integration_mode)
+
+        self.pipelex_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
         if not observers:
             local_observer = LocalObserver()
-            observer_telemetry = ObserverTelemetry(telemetry_manager=telemetry_manager)
+            observer_telemetry = ObserverTelemetry(telemetry_manager=self.telemetry_manager)
             observers = {"local": local_observer, "telemetry": observer_telemetry}
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
@@ -279,6 +303,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipeline_manager.teardown()
         if self.pipeline_tracker:
             self.pipeline_tracker.teardown()
+        if self.telemetry_manager:
+            self.telemetry_manager.teardown()
         self.library_manager.teardown()
 
         # cogt
@@ -302,6 +328,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     @classmethod
     def make(
         cls,
+        integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -312,6 +339,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
+        force_enable_telemetry: bool = False,
+        telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         **kwargs: Any,
@@ -323,6 +352,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         management, storage, model routing, and pipeline execution.
 
         Args:
+            integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
             class_registry: Custom class registry for dynamic loading
             secrets_provider: Custom secrets/credentials provider
             storage_provider: Custom storage backend
@@ -333,6 +363,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipeline_tracker: Custom pipeline tracking/logging
             pipe_router: Custom pipe routing logic
             reporting_delegate: Custom reporting handler
+            force_enable_telemetry: Force enable telemetry even if the integration mode does not allow it
+            telemetry_config: Custom telemetry configuration
             telemetry_manager: Custom telemetry manager
             observers: Custom observers for pipeline events
             **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
@@ -350,6 +382,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         pipelex_instance = cls()
         pipelex_instance.setup(
+            integration_mode=integration_mode,
             class_registry=class_registry,
             secrets_provider=secrets_provider,
             storage_provider=storage_provider,
@@ -360,6 +393,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipeline_tracker=pipeline_tracker,
             pipe_router=pipe_router,
             reporting_delegate=reporting_delegate,
+            force_enable_telemetry=force_enable_telemetry,
+            telemetry_config=telemetry_config,
             telemetry_manager=telemetry_manager,
             observers=observers,
             **kwargs,
