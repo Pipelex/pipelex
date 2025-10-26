@@ -1,5 +1,6 @@
 """Dictionary utility functions for manipulating dictionary order and structure."""
 
+import re
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
@@ -157,3 +158,68 @@ def substitute_nested_in_context(context: dict[str, Any], extra_params: dict[str
             current[last_segment] = value
 
     return context
+
+
+def extract_vars_from_strings_recursive(data: Any) -> set[str]:
+    """Recursively traverse a data structure and extract all variable placeholders.
+
+    This function walks through dictionaries, lists, and other nested structures,
+    extracting variable names from placeholders in the format ${VAR_NAME},
+    ${env:VAR}, ${secret:VAR}, and ${env:VAR|secret:VAR}.
+
+    Args:
+        data: The data structure to traverse (dict, list, or any value)
+
+    Returns:
+        Set of variable names found (without prefixes or ${} wrappers)
+
+    Example:
+        >>> data = {'a': 'hello ${USER}', 'b': {'c': '${env:HOME|secret:HOME_SECRET}'}}
+        >>> extract_vars_from_strings_recursive(data)
+        {'USER', 'HOME', 'HOME_SECRET'}
+
+    """
+    var_names: set[str] = set()
+
+    def extract_from_string(text: str) -> None:
+        """Extract variable names from a single string."""
+        # Pattern matches ${VAR_NAME} or ${prefix:VAR_NAME} or ${env:VAR|secret:VAR}
+        # Same pattern as in substitute_vars
+        pattern = r"\$\{([^}\n\"'$]+)\}"
+        matches = re.findall(pattern, text)
+
+        for var_spec in matches:
+            # Handle fallback pattern (contains |)
+            if "|" in var_spec:
+                parts = [part.strip() for part in var_spec.split("|")]
+                for part in parts:
+                    if ":" in part:
+                        # Extract variable name after prefix
+                        _, var_name = part.split(":", 1)
+                        var_names.add(var_name.strip())
+                    else:
+                        # No prefix
+                        var_names.add(part)
+            # Handle prefixed variable (contains :)
+            elif ":" in var_spec:
+                _, var_name = var_spec.split(":", 1)
+                var_names.add(var_name.strip())
+            else:
+                # Simple variable without prefix
+                var_names.add(var_spec.strip())
+
+    def traverse(value: Any) -> None:
+        """Recursively traverse the data structure."""
+        if isinstance(value, dict):
+            dict_value: dict[Any, Any] = cast("dict[Any, Any]", value)
+            for v in dict_value.values():
+                traverse(v)
+        elif isinstance(value, list):
+            list_value: list[Any] = cast("list[Any]", value)
+            for item in list_value:
+                traverse(item)
+        elif isinstance(value, str):
+            extract_from_string(value)
+
+    traverse(data)
+    return var_names

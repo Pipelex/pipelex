@@ -265,7 +265,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
         else:
             self.telemetry_manager = TelemetryManagerNoOp()
-            log.debug(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
+            log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
 
         self.telemetry_manager.setup(integration_mode=integration_mode)
 

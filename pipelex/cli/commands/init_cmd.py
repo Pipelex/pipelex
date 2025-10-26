@@ -323,10 +323,17 @@ def execute_initialization(
     """
     # Step 1: Initialize config if needed
     if needs_config:
+        # Check if backends.toml exists before copying
+        backends_existed_before = path_exists(backends_toml_path)
+
         console.print()
         init_config(reset=reset)
-        # If we just initialized config and focus includes inference, enable inference setup
-        if check_inference and path_exists(backends_toml_path):
+
+        # If backends.toml was just created (freshly copied), always prompt for backend selection
+        backends_exists_now = path_exists(backends_toml_path)
+        backends_just_copied = not backends_existed_before and backends_exists_now
+
+        if backends_just_copied or (check_inference and backends_exists_now):
             needs_inference = True
 
     # Step 2: Set up inference backends if needed
@@ -345,12 +352,14 @@ def execute_initialization(
 def init_cmd(
     focus: InitFocus = InitFocus.ALL,
     reset: bool = False,
+    skip_confirmation: bool = False,
 ):
     """Initialize Pipelex configuration, inference backends, and telemetry if needed, in a unified flow.
 
     Args:
         focus: What to initialize - 'config', 'inference', 'telemetry', or 'all' (default)
         reset: Whether to reset/overwrite existing files
+        skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
     """
     console = Console()
     pipelex_config_dir = config_manager.pipelex_config_dir
@@ -388,8 +397,8 @@ def init_cmd(
             return
 
     try:
-        # Show unified initialization prompt (skip if user already confirmed)
-        if not user_already_confirmed:
+        # Show unified initialization prompt (skip if user already confirmed or skip_confirmation is True)
+        if not user_already_confirmed and not skip_confirmation:
             confirm_initialization(
                 console=console,
                 needs_config=needs_config,
@@ -399,7 +408,7 @@ def init_cmd(
                 focus=focus,
             )
         else:
-            # User already confirmed, just add a blank line for spacing
+            # User already confirmed or skip_confirmation is True, just add a blank line for spacing
             console.print()
 
         # Execute initialization steps

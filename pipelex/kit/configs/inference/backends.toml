@@ -1,11 +1,12 @@
 [pipelex_inference]
 display_name = "⭐ Pipelex Inference"
+enabled = true
 endpoint = "https://inference.pipelex.com/v1"
 api_key = "${PIPELEX_INFERENCE_API_KEY}"
 
 [azure_openai]
 display_name = "Azure OpenAI"
-enabled = true
+enabled = false
 endpoint = "${AZURE_API_BASE}"
 api_key = "${AZURE_API_KEY}"
 api_version = "${AZURE_API_VERSION}"
@@ -29,17 +30,17 @@ gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"
 
 [openai]
 display_name = "OpenAI"
-enabled = true
+enabled = false
 api_key = "${OPENAI_API_KEY}"
 
 [anthropic]
-enabled = true
+enabled = false
 api_key = "${ANTHROPIC_API_KEY}"
 claude_4_tokens_limit = 8192
 
 [mistral]
 display_name = "Mistral AI"
-enabled = true
+enabled = false
 api_key = "${MISTRAL_API_KEY}"
 
 [xai]

@@ -129,7 +129,8 @@ def build_backend_selection_panel(backend_options: list[tuple[str, str]], curren
         status = "[green]✓ enabled[/green]" if currently_enabled and (idx - 1) in currently_enabled else ""
         table.add_row(f"[{idx}]", backend_name, status)
 
-    # Add quit option at the end
+    # Add special options at the end
+    table.add_row("[A]", "[dim]all - Select all backends[/dim]", "")
     table.add_row("[Q]", "[dim]quit - Exit without configuring[/dim]", "")
 
     # Update description based on whether we're showing current selection
@@ -143,14 +144,14 @@ def build_backend_selection_panel(backend_options: list[tuple[str, str]], curren
         description = Text(
             f"Current selection: {current_selection}\n"
             "Select which inference backends you have access to.\n"
-            "Enter numbers separated by commas or spaces (e.g., '1,5,6' or '1 5 6').\n"
+            "Enter numbers separated by commas or spaces (e.g., '1,5,6' or '1 5 6'), 'a' for all.\n"
             "Press Enter to keep current selection.",
             style="dim",
         )
     else:
         description = Text(
             "Select which inference backends you have access to.\n"
-            "Enter numbers separated by commas or spaces (e.g., '1,5,6' or '1 5 6').\n"
+            "Enter numbers separated by commas or spaces (e.g., '1,5,6' or '1 5 6'), 'a' for all.\n"
             "Press Enter for the recommended default (1).",
             style="dim",
         )
@@ -195,6 +196,11 @@ def prompt_backend_indices(console: Console, backend_options: list[tuple[str, st
             console.print("\n[yellow]Exiting without configuring backends.[/yellow]")
             raise typer.Exit(code=0)
 
+        # Handle all option
+        if choice_input in ("a", "all"):
+            selected_indices = list(range(len(backend_options)))
+            break
+
         # Parse input - handle empty (use default)
         if not choice_input:
             selected_indices = default_indices
@@ -212,7 +218,8 @@ def prompt_backend_indices(console: Console, backend_options: list[tuple[str, st
             if invalid_indices:
                 max_idx = len(backend_options)
                 console.print(
-                    f"[red]Invalid choice(s): {invalid_indices}.[/red] Please enter numbers between 1 and {max_idx}, or [cyan]q[/cyan] to quit.\n"
+                    f"[red]Invalid choice(s): {invalid_indices}.[/red] "
+                    f"Please enter numbers between 1 and {max_idx}, [cyan]a[/cyan] for all, or [cyan]q[/cyan] to quit.\n"
                 )
                 continue
 
@@ -222,7 +229,8 @@ def prompt_backend_indices(console: Console, backend_options: list[tuple[str, st
 
         except ValueError:
             console.print(
-                f"[red]Invalid input: '{choice_str}'.[/red] Please enter numbers separated by commas or spaces, or [cyan]q[/cyan] to quit.\n"
+                f"[red]Invalid input: '{choice_str}'.[/red] "
+                f"Please enter numbers separated by commas or spaces, [cyan]a[/cyan] for all, or [cyan]q[/cyan] to quit.\n"
             )
 
     return selected_indices

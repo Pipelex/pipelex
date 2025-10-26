@@ -14,8 +14,11 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
 from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
 from pipelex.config import get_config
+from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.environment import get_optional_env
 from pipelex.system.runtime import runtime_manager
-from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
+from pipelex.tools.misc.dict_utils import apply_to_strings_recursive, extract_vars_from_strings_recursive
+from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
 from pipelex.types import Self
@@ -24,6 +27,31 @@ if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
+
+
+class BackendCredentialStatus(ConfigModel):
+    """Status of a single credential variable."""
+
+    var_name: str
+    is_set: bool
+    is_placeholder: bool  # True if value exists but is a placeholder like "${VAR}"
+
+
+class BackendCredentialsReport(ConfigModel):
+    """Report of credential status for a backend."""
+
+    backend_name: str
+    required_vars: list[str]
+    missing_vars: list[str]
+    placeholder_vars: list[str]
+    all_credentials_valid: bool
+
+
+class CredentialsValidationReport(ConfigModel):
+    """Complete report of credentials validation across all backends."""
+
+    backend_reports: dict[str, BackendCredentialsReport]
+    all_backends_valid: bool
 
 
 class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
@@ -138,6 +166,78 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 model_specs=backend_model_specs,
             )
             self.root[backend_name] = backend
+
+    def check_backend_credentials(self, path: str, include_disabled: bool = False) -> CredentialsValidationReport:
+        """Check if required environment variables are set for enabled backends.
+
+        This method loads backend configurations and extracts variable placeholders
+        without performing actual substitution or loading model specs.
+
+        Args:
+            path: Path to the backend library TOML file
+            include_disabled: If True, check disabled backends too
+
+        Returns:
+            CredentialsValidationReport with detailed status per backend
+
+        """
+        try:
+            backends_dict = load_toml_from_path(path=path)
+        except FileNotFoundError as file_not_found_exc:
+            msg = f"Could not find inference backend library at '{path}': {file_not_found_exc}"
+            raise InferenceBackendLibraryNotFoundError(msg) from file_not_found_exc
+
+        backend_reports: dict[str, BackendCredentialsReport] = {}
+        all_backends_valid = True
+
+        for backend_name, backend_dict in backends_dict.items():
+            enabled = backend_dict.get("enabled", True)
+            if not enabled and not include_disabled:
+                continue
+
+            # Skip internal backend
+            if backend_name == "internal":
+                continue
+
+            # Skip vertexai in CI testing
+            if runtime_manager.is_ci_testing and backend_name == "vertexai":
+                continue
+
+            # Extract all variable placeholders from the backend config
+            required_vars_set = extract_vars_from_strings_recursive(backend_dict)
+            required_vars = sorted(required_vars_set)
+
+            # Check status of each variable
+            missing_vars: list[str] = []
+            placeholder_vars: list[str] = []
+
+            for var_name in required_vars:
+                var_value = get_optional_env(var_name)
+                if var_value is None:
+                    missing_vars.append(var_name)
+                elif value_is_placeholder(var_value):
+                    placeholder_vars.append(var_name)
+
+            # Determine if all credentials are valid for this backend
+            backend_valid = len(missing_vars) == 0 and len(placeholder_vars) == 0
+
+            # Create report for this backend
+            backend_report = BackendCredentialsReport(
+                backend_name=backend_name,
+                required_vars=required_vars,
+                missing_vars=missing_vars,
+                placeholder_vars=placeholder_vars,
+                all_credentials_valid=backend_valid,
+            )
+            backend_reports[backend_name] = backend_report
+
+            if not backend_valid:
+                all_backends_valid = False
+
+        return CredentialsValidationReport(
+            backend_reports=backend_reports,
+            all_backends_valid=all_backends_valid,
+        )
 
     def list_backend_names(self) -> list[str]:
         return list(self.root.keys())

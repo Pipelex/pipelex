@@ -165,7 +165,6 @@ reportPropertyTypeMismatch = true
 reportRedeclaration = "error"
 reportReturnType = "error"
 reportSelfClsParameterName = "error"
-reportShadowedImports = true
 reportTypeCommentUsage = "error"
 reportTypedDictNotRequiredAccess = "error"
 reportUnboundVariable = "error"
