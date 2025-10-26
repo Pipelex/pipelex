@@ -1,0 +1,9 @@
+telemetry_mode = "anonymous"                                               # Values: "off" | "anonymous" | "identified"
+host = "https://eu.i.posthog.com"
+project_api_key = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
+respect_dnt = true
+redact = ["prompt", "system_prompt", "response", "file_path", "url"]
+geoip_enabled = true
+dry_mode_enabled = false
+verbose_enabled = false
+user_id = ""
