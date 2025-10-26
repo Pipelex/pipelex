@@ -7,7 +7,7 @@ from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.commands.build_cmd import build_app
-from pipelex.cli.commands.init_cmd import init_app
+from pipelex.cli.commands.init_cmd import do_init_config, init_app
 from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
@@ -36,15 +36,55 @@ class PipelexCLI(TyperGroup):
         return cmd
 
 
-def check_telemetry_consent() -> TelemetryMode | None:
-    """Check if user has configured telemetry and prompt if not."""
-    # Check if .pipelex directory exists - if not, user must run pipelex init first
+def check_and_init_config() -> None:
+    """Check if config directory exists and prompt to initialize if not."""
     pipelex_config_dir = config_manager.pipelex_config_dir
-    if not path_exists(pipelex_config_dir):
-        typer.echo("Pipelex has not been initialized in this directory.", err=True)
-        typer.echo("Please run 'pipelex init' first to set up the configuration.", err=True)
+
+    # If .pipelex directory already exists, nothing to do
+    if path_exists(pipelex_config_dir):
+        return
+
+    # Prompt user to initialize
+    try:
+        typer.echo("\n" + "=" * 70)
+        typer.echo("Pipelex Configuration")
+        typer.echo("=" * 70)
+        typer.echo("\nPipelex configuration not found in this directory.")
+        typer.echo("Would you like to initialize it now?")
+        typer.echo()
+
+        choice = typer.prompt(
+            "Initialize Pipelex configuration? [Y/n]",
+            type=str,
+            default="Y",
+            show_default=False,
+        )
+
+        # Normalize input
+        choice_normalized = choice.lower().strip()
+
+        if choice_normalized in ("y", "yes", ""):
+            typer.echo()
+            do_init_config(reset=False)
+            typer.echo("=" * 70 + "\n")
+        else:
+            typer.echo("\nPipelex configuration not initialized.")
+            typer.echo("You can initialize it later by running: pipelex init config")
+            typer.echo("=" * 70 + "\n")
+            raise typer.Exit(code=0)
+
+    except typer.Exit:
+        # Re-raise Exit exceptions
+        raise
+    except Exception as exc:
+        typer.echo(f"Warning: Could not initialize configuration: {exc}", err=True)
+        typer.echo("Please run 'pipelex init config' manually.", err=True)
         raise typer.Exit(code=1)
 
+
+def check_telemetry_consent() -> TelemetryMode | None:
+    """Check if user has configured telemetry and prompt if not."""
+    pipelex_config_dir = config_manager.pipelex_config_dir
     telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
 
     # If telemetry.toml exists, settings are already configured
@@ -155,6 +195,7 @@ def app_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand == "init":
         return
 
+    check_and_init_config()
     TelemetryManagerAbstract.telemetry_mode_just_set = check_telemetry_consent()
 
 
