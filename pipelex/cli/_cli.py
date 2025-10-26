@@ -2,7 +2,11 @@ import os
 
 import typer
 from click import Command, Context
-from rich.console import Console
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.prompt import Confirm, Prompt
+from rich.table import Table
+from rich.text import Text
 from typer.core import TyperGroup
 from typing_extensions import override
 
@@ -36,126 +40,128 @@ class PipelexCLI(TyperGroup):
         return cmd
 
 
-def check_and_init_config() -> None:
-    """Check if config directory exists and prompt to initialize if not."""
+def initialize_pipelex_if_needed() -> TelemetryMode | None:
+    """Initialize Pipelex configuration and telemetry if needed, in a unified flow."""
+    console = Console()
     pipelex_config_dir = config_manager.pipelex_config_dir
+    telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
 
-    # If .pipelex directory already exists, nothing to do
-    if path_exists(pipelex_config_dir):
-        return
+    # Check what needs to be initialized
+    needs_config = not path_exists(pipelex_config_dir)
+    needs_telemetry = not path_exists(telemetry_config_path)
 
-    # Prompt user to initialize
+    # If both are already set up, nothing to do
+    if not needs_config and not needs_telemetry:
+        return None
+
     try:
-        typer.echo("\n" + "=" * 70)
-        typer.echo("Pipelex Configuration")
-        typer.echo("=" * 70)
-        typer.echo("\nPipelex configuration not found in this directory.")
-        typer.echo("Would you like to initialize it now?")
-        typer.echo()
+        # Show unified initialization prompt
+        console.print()
+        if needs_config and needs_telemetry:
+            message = (
+                "Pipelex needs to be initialized. This will:\n\n"
+                "• Create configuration files in [cyan].pipelex/[/cyan]\n"
+                "• Ask you to choose your telemetry preferences"
+            )
+        elif needs_config:
+            message = "Pipelex configuration not found. This will:\n\n• Create configuration files in [cyan].pipelex/[/cyan]"
+        else:  # needs_telemetry only
+            message = "Telemetry preferences need to be configured."
 
-        choice = typer.prompt(
-            "Initialize Pipelex configuration? [Y/n]",
-            type=str,
-            default="Y",
-            show_default=False,
+        panel = Panel(
+            message,
+            title="[bold cyan]Pipelex Initialization[/bold cyan]",
+            border_style="cyan",
+            padding=(1, 2),
         )
+        console.print(panel)
 
-        # Normalize input
-        choice_normalized = choice.lower().strip()
-
-        if choice_normalized in ("y", "yes", ""):
-            typer.echo()
-            do_init_config(reset=False)
-            typer.echo("=" * 70 + "\n")
-        else:
-            typer.echo("\nPipelex configuration not initialized.")
-            typer.echo("You can initialize it later by running: pipelex init config")
-            typer.echo("=" * 70 + "\n")
+        if not Confirm.ask("[bold]Continue with initialization?[/bold]", default=True):
+            console.print("\n[yellow]Initialization cancelled.[/yellow]")
+            if needs_config:
+                console.print("[dim]You can initialize later by running:[/dim] [cyan]pipelex init config[/cyan]")
+            console.print()
             raise typer.Exit(code=0)
+
+        # Step 1: Initialize config if needed
+        if needs_config:
+            console.print()
+            do_init_config(reset=False)
+
+        # Step 2: Set up telemetry if needed
+        telemetry_mode: TelemetryMode | None = None
+        if needs_telemetry:
+            console.print()
+
+            # Create a table for telemetry options
+            table = Table(show_header=False, box=None, padding=(0, 2))
+            table.add_column(style="bold cyan", justify="right")
+            table.add_column(style="bold")
+            table.add_column()
+
+            table.add_row("[1]", TelemetryMode.OFF, "No telemetry data collected")
+            table.add_row("[2]", TelemetryMode.ANONYMOUS, "Anonymous usage data only")
+            table.add_row("[3]", TelemetryMode.IDENTIFIED, "Usage data with user identification")
+            table.add_row("[Q]", "[dim]quit[/dim]", "[dim]Exit without configuring[/dim]")
+
+            description = Text(
+                "Pipelex can collect anonymous usage data to help improve the product.",
+                style="dim",
+            )
+            telemetry_panel = Panel(
+                Group(description, Text(""), table),
+                title="[bold yellow]Telemetry Configuration[/bold yellow]",
+                border_style="yellow",
+                padding=(1, 2),
+            )
+            console.print(telemetry_panel)
+
+            # Map choice to telemetry mode
+            mode_map: dict[str, TelemetryMode] = {
+                "1": TelemetryMode.OFF,
+                "2": TelemetryMode.ANONYMOUS,
+                "3": TelemetryMode.IDENTIFIED,
+                "off": TelemetryMode.OFF,
+                "anonymous": TelemetryMode.ANONYMOUS,
+                "identified": TelemetryMode.IDENTIFIED,
+            }
+
+            # Loop until valid input
+            while telemetry_mode is None:
+                choice_str = Prompt.ask("[bold]Enter your choice[/bold]", console=console)
+                choice_normalized = choice_str.lower().strip()
+
+                # Handle quit option
+                if choice_normalized in ("q", "quit"):
+                    console.print("\n[yellow]Exiting without configuring telemetry.[/yellow]")
+                    raise typer.Exit(code=0)
+
+                if choice_normalized in mode_map:
+                    telemetry_mode = mode_map[choice_normalized]
+                else:
+                    console.print(
+                        f"[red]Invalid choice: '{choice_str}'.[/red] "
+                        "Please enter [cyan]1[/cyan], [cyan]2[/cyan], [cyan]3[/cyan], or [cyan]q[/cyan] to quit.\n"
+                    )
+
+            # Save telemetry config
+            template_path = os.path.join(str(get_configs_dir()), TELEMETRY_CONFIG_FILE_NAME)
+            toml_doc = load_toml_with_tomlkit(template_path)
+            toml_doc["telemetry_mode"] = telemetry_mode
+            save_toml_to_path(toml_doc, telemetry_config_path)
+
+            console.print(f"\n[green]✓[/green] Telemetry mode set to: [bold cyan]{telemetry_mode}[/bold cyan]")
+
+        console.print()
+        return telemetry_mode
 
     except typer.Exit:
         # Re-raise Exit exceptions
         raise
     except Exception as exc:
-        typer.echo(f"Warning: Could not initialize configuration: {exc}", err=True)
-        typer.echo("Please run 'pipelex init config' manually.", err=True)
-        raise typer.Exit(code=1)
-
-
-def check_telemetry_consent() -> TelemetryMode | None:
-    """Check if user has configured telemetry and prompt if not."""
-    pipelex_config_dir = config_manager.pipelex_config_dir
-    telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
-
-    # If telemetry.toml exists, settings are already configured
-    if path_exists(telemetry_config_path):
-        return None
-
-    # If file doesn't exist, prompt user and create it
-    try:
-        # Map choice to telemetry mode using enum
-        mode_map: dict[str, TelemetryMode] = {
-            "1": TelemetryMode.OFF,
-            "2": TelemetryMode.ANONYMOUS,
-            "3": TelemetryMode.IDENTIFIED,
-            "off": TelemetryMode.OFF,
-            "anonymous": TelemetryMode.ANONYMOUS,
-            "identified": TelemetryMode.IDENTIFIED,
-        }
-
-        # Prompt user for telemetry preference
-        typer.echo("\n" + "=" * 70)
-        typer.echo("Telemetry Configuration")
-        typer.echo("=" * 70)
-        typer.echo("\nPipelex can collect anonymous usage data to help improve the product.")
-        typer.echo("\nPlease choose your telemetry preference:")
-        typer.echo(f"  [1]  {TelemetryMode.OFF:11} - No telemetry data collected")
-        typer.echo(f"  [2]  {TelemetryMode.ANONYMOUS:11} - Anonymous usage data only")
-        typer.echo(f"  [3]  {TelemetryMode.IDENTIFIED:11} - Usage data with user identification")
-        typer.echo(f"  [q]  {'quit':11} - Exit without configuring")
-        typer.echo()
-
-        # Loop until valid input is received
-        telemetry_mode: TelemetryMode | None = None
-        while telemetry_mode is None:
-            choice_str = typer.prompt(
-                "Enter your choice",
-                type=str,
-            )
-
-            # Normalize input to lowercase
-            choice_normalized = choice_str.lower().strip()
-
-            # Handle quit option
-            if choice_normalized in ("q", "quit"):
-                typer.echo("\nExiting without configuring telemetry.")
-                raise typer.Exit(code=0)
-
-            # Check if valid choice
-            if choice_normalized in mode_map:
-                telemetry_mode = mode_map[choice_normalized]
-            else:
-                typer.echo(f"Invalid choice: '{choice_str}'. Please enter 1, 2, 3, off, anonymous, identified, or q to quit.\n")
-
-        # Load template and set the chosen mode
-        template_path = os.path.join(str(get_configs_dir()), TELEMETRY_CONFIG_FILE_NAME)
-        toml_doc = load_toml_with_tomlkit(template_path)
-        toml_doc["telemetry_mode"] = telemetry_mode
-
-        # Save to user's .pipelex directory
-        save_toml_to_path(toml_doc, telemetry_config_path)
-
-        typer.echo(f"\n✓ Telemetry mode set to: {telemetry_mode}")
-        typer.echo("=" * 70 + "\n")
-
-        return telemetry_mode
-
-    except typer.Exit:
-        # Re-raise Exit exceptions (e.g., when user quits)
-        raise
-    except Exception as exc:
-        # Silently fail if there's any issue - don't block CLI usage
-        typer.echo(f"Warning: Could not save telemetry preference: {exc}", err=True)
+        console.print(f"\n[red]⚠ Warning: Initialization failed: {exc}[/red]", style="bold")
+        if needs_config:
+            console.print("[red]Please run 'pipelex init config' manually.[/red]")
         return None
 
 
@@ -195,8 +201,7 @@ def app_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand == "init":
         return
 
-    check_and_init_config()
-    TelemetryManagerAbstract.telemetry_mode_just_set = check_telemetry_consent()
+    TelemetryManagerAbstract.telemetry_mode_just_set = initialize_pipelex_if_needed()
 
 
 app.add_typer(init_app, name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")
