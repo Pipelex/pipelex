@@ -7,17 +7,17 @@ TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
 
 
 class TelemetryMode(StrEnum):
-    OFF = "off"
     ANONYMOUS = "anonymous"
+    OFF = "off"
     IDENTIFIED = "identified"
 
     @property
     def is_enabled(self) -> bool:
         match self:
-            case TelemetryMode.OFF:
-                return False
             case TelemetryMode.ANONYMOUS:
                 return True
+            case TelemetryMode.OFF:
+                return False
             case TelemetryMode.IDENTIFIED:
                 return True
 

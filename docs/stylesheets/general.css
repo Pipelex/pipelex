@@ -6,3 +6,10 @@
     max-width: 300px;
     display: inline-block;
 }
+
+/* Enable word wrapping in code blocks */
+pre code {
+    white-space: pre-wrap !important;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}

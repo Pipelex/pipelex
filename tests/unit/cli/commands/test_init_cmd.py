@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-from pipelex.cli.commands.init_cmd import do_init_config
+from pipelex.cli.commands.init_cmd import init_config
 from pipelex.exceptions import PipelexCLIError
 
 
@@ -33,7 +33,7 @@ class TestInitCmd:
         mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        do_init_config(reset=False)
+        init_config(reset=False)
 
         # Verify
         assert (target_dir / "pipelex.toml").exists()
@@ -59,7 +59,7 @@ class TestInitCmd:
         mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        do_init_config(reset=False)
+        init_config(reset=False)
 
         # Verify existing file was not overwritten
         content = (target_dir / "pipelex.toml").read_text()
@@ -92,7 +92,7 @@ class TestInitCmd:
         mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        do_init_config(reset=True)
+        init_config(reset=True)
 
         # Verify file was overwritten
         content = (target_dir / "pipelex.toml").read_text()
@@ -129,7 +129,7 @@ class TestInitCmd:
         mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        do_init_config(reset=False)
+        init_config(reset=False)
 
         # Verify all files and directories were created
         assert (target_dir / "pipelex.toml").exists()
@@ -161,7 +161,7 @@ class TestInitCmd:
 
         # Execute and verify exception
         with pytest.raises(PipelexCLIError) as exc_info:
-            do_init_config(reset=False)
+            init_config(reset=False)
 
         assert "Failed to initialize configuration" in str(exc_info.value)
 
@@ -182,7 +182,7 @@ class TestInitCmd:
         mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        do_init_config(reset=False)
+        init_config(reset=False)
 
         # Verify directory was created and file was copied
         assert target_dir.exists()
