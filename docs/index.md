@@ -10,22 +10,20 @@ title: "Open-source AI workflows"
 
 ```bash
 pip install pipelex
-pipelex init config
+pipelex init
 ```
 
-## Set your API key
+## Set your API key(s)
 
 ```bash
 # Linux/MacOS
 export PIPELEX_INFERENCE_API_KEY=###
-
 # Windows PowerShell
 $env:PIPELEX_INFERENCE_API_KEY="###"
-
 # Windows CMD
 set PIPELEX_INFERENCE_API_KEY=###
 
-# Note: of course, Pipelex automatically loads environment variables from `.env` files, that works too.
+# Note: Pipelex automatically loads environment variables from `.env` files, that works too.
 ```
 
 **Where to get an API key:**

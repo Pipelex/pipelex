@@ -1,14 +1,23 @@
 import os
 import shutil
 from importlib.metadata import metadata
+from typing import Any
 
 import typer
-from rich.console import Console, Group
-from rich.panel import Panel
-from rich.prompt import Confirm, Prompt
-from rich.table import Table
-from rich.text import Text
+from rich.console import Console
+from rich.prompt import Confirm
 
+from pipelex.cli.commands.init_ui import (
+    BACKEND_OPTIONS,
+    InitFocus,
+    build_backend_selection_panel,
+    build_initialization_panel,
+    build_telemetry_selection_panel,
+    display_already_configured_message,
+    display_selected_backends,
+    prompt_backend_indices,
+    prompt_telemetry_mode,
+)
 from pipelex.exceptions import PipelexCLIError
 from pipelex.kit.paths import get_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
@@ -16,35 +25,25 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
-from pipelex.types import StrEnum
 
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
-# Backend definitions for interactive selection
-BACKEND_OPTIONS = [
-    ("pipelex_inference", "⭐ Pipelex Inference", "Unified access to all providers (Recommended)"),
-    ("azure_openai", "Azure OpenAI", "Azure OpenAI Service"),
-    ("bedrock", "AWS Bedrock", "AWS Bedrock"),
-    ("google", "Google AI", "Google AI"),
-    ("vertexai", "Google Vertex AI", "Google Vertex AI"),
-    ("openai", "OpenAI", "OpenAI"),
-    ("anthropic", "Anthropic", "Anthropic"),
-    ("mistral", "Mistral AI", "Mistral AI"),
-    ("xai", "xAI", "xAI"),
-    ("ollama", "Ollama", "Ollama (local)"),
-    ("blackboxai", "BlackBox AI", "BlackBox AI"),
-    ("fal", "FAL", "FAL (image generation)"),
-]
 
+def update_backends_in_toml(toml_doc: Any, selected_indices: list[int]) -> None:
+    """Update the backends.toml document with selected backends.
 
-class InitFocus(StrEnum):
-    """Focus options for initialization."""
+    Args:
+        toml_doc: The TOML document to update.
+        selected_indices: List of backend indices to enable.
+    """
+    selected_backend_keys = {BACKEND_OPTIONS[idx][0] for idx in selected_indices}
 
-    ALL = "all"
-    CONFIG = "config"
-    INFERENCE = "inference"
-    TELEMETRY = "telemetry"
+    for backend_key, _, _ in BACKEND_OPTIONS:
+        if backend_key in toml_doc:
+            backend_section = toml_doc[backend_key]
+            # Set enabled field based on selection (works with tomlkit's special types)
+            backend_section["enabled"] = backend_key in selected_backend_keys  # type: ignore[index]
 
 
 def customize_backends_config() -> None:
@@ -59,82 +58,18 @@ def customize_backends_config() -> None:
     try:
         # Load the backends.toml file
         toml_doc = load_toml_with_tomlkit(backends_toml_path)
-
         console.print()
 
-        # Create table for backend options
-        table = Table(show_header=False, box=None, padding=(0, 2))
-        table.add_column(style="bold cyan", justify="right", width=4)
-        table.add_column(style="bold", width=25)
-        table.add_column(style="dim")
+        # UI: Display panel and get user selection
+        console.print(build_backend_selection_panel())
+        selected_indices = prompt_backend_indices(console)
 
-        for idx, (_, backend_name, backend_desc) in enumerate(BACKEND_OPTIONS):
-            table.add_row(f"[{idx}]", backend_name, backend_desc)
-
-        description = Text(
-            "Select which inference backends you have access to.\n"
-            "Enter numbers separated by commas or spaces (e.g., '0,5,6' or '0 5 6').\n"
-            "Press Enter for the recommended default.",
-            style="dim",
-        )
-
-        panel = Panel(
-            Group(description, Text(""), table),
-            title="[bold yellow]Inference Backend Selection[/bold yellow]",
-            border_style="yellow",
-            padding=(1, 2),
-        )
-        console.print(panel)
-
-        # Get user input with validation loop
-        selected_indices: list[int] = []
-        while True:
-            choice_str = Prompt.ask("[bold]Enter your choices[/bold]", default="0", console=console)
-            choice_normalized = choice_str.strip()
-
-            # Parse input - handle empty, comma-separated, and space-separated
-            if not choice_normalized or choice_normalized == "0":
-                # Default: only pipelex_inference
-                selected_indices = [0]
-                break
-
-            # Split by comma or space
-            parts = choice_normalized.replace(",", " ").split()
-
-            try:
-                indices = [int(part.strip()) for part in parts if part.strip()]
-
-                # Validate all indices are in range
-                invalid_indices = [i for i in indices if i < 0 or i >= len(BACKEND_OPTIONS)]
-                if invalid_indices:
-                    console.print(
-                        f"[red]Invalid choice(s): {invalid_indices}.[/red] Please enter numbers between 0 and {len(BACKEND_OPTIONS) - 1}.\n"
-                    )
-                    continue
-
-                selected_indices = indices
-                break
-
-            except ValueError:
-                console.print(f"[red]Invalid input: '{choice_str}'.[/red] Please enter numbers separated by commas or spaces.\n")
-
-        # Update backends.toml based on selections
-        selected_backend_keys = {BACKEND_OPTIONS[idx][0] for idx in selected_indices}
-
-        for backend_key, _, _ in BACKEND_OPTIONS:
-            if backend_key in toml_doc:
-                backend_section = toml_doc[backend_key]
-                # Set enabled field based on selection (works with tomlkit's special types)
-                backend_section["enabled"] = backend_key in selected_backend_keys  # type: ignore[index]
-
-        # Save the modified file
+        # Business logic: Update TOML
+        update_backends_in_toml(toml_doc, selected_indices)
         save_toml_to_path(toml_doc, backends_toml_path)
 
-        # Display selected backends
-        selected_names = [BACKEND_OPTIONS[idx][1] for idx in sorted(selected_indices)]
-        console.print(f"\n[green]✓[/green] Configured {len(selected_names)} backend(s):")
-        for name in selected_names:
-            console.print(f"   • {name}")
+        # UI: Display confirmation
+        display_selected_backends(console, selected_indices)
 
     except Exception as exc:
         console.print(f"[yellow]⚠ Warning: Failed to customize backends: {exc}[/yellow]")
@@ -208,6 +143,194 @@ def init_config(reset: bool = False, dry_run: bool = False) -> int:
     return len(copied_files)
 
 
+def setup_telemetry(console: Console, telemetry_config_path: str) -> TelemetryMode:
+    """Set up telemetry configuration interactively.
+
+    Args:
+        console: Rich Console instance for user interaction.
+        telemetry_config_path: Path to save the telemetry configuration.
+
+    Returns:
+        The selected TelemetryMode.
+
+    Raises:
+        typer.Exit: If user chooses to quit.
+    """
+    console.print()
+    console.print(build_telemetry_selection_panel())
+
+    telemetry_mode = prompt_telemetry_mode(console)
+
+    # Save telemetry config
+    template_path = os.path.join(str(get_configs_dir()), TELEMETRY_CONFIG_FILE_NAME)
+    toml_doc = load_toml_with_tomlkit(template_path)
+    toml_doc["telemetry_mode"] = telemetry_mode
+    save_toml_to_path(toml_doc, telemetry_config_path)
+
+    console.print(f"\n[green]✓[/green] Telemetry mode set to: [bold cyan]{telemetry_mode}[/bold cyan]")
+
+    return telemetry_mode
+
+
+def determine_needs(
+    reset: bool,
+    check_config: bool,
+    check_inference: bool,
+    check_telemetry: bool,
+    backends_toml_path: str,
+    telemetry_config_path: str,
+) -> tuple[bool, bool, bool]:
+    """Determine what needs to be initialized based on current state.
+
+    Args:
+        reset: Whether this is a reset operation.
+        check_config: Whether to check config files.
+        check_inference: Whether to check inference setup.
+        check_telemetry: Whether to check telemetry setup.
+        backends_toml_path: Path to backends.toml file.
+        telemetry_config_path: Path to telemetry config file.
+
+    Returns:
+        Tuple of (needs_config, needs_inference, needs_telemetry) booleans.
+    """
+    nb_missing_config_files = init_config(reset=False, dry_run=True) if check_config else 0
+    needs_config = check_config and (nb_missing_config_files > 0 or reset)
+    needs_inference = check_inference and (not path_exists(backends_toml_path) or reset)
+    needs_telemetry = check_telemetry and (not path_exists(telemetry_config_path) or reset)
+
+    return needs_config, needs_inference, needs_telemetry
+
+
+def handle_already_configured(
+    focus: InitFocus,
+    console: Console,
+    backends_toml_path: str,
+    telemetry_config_path: str,
+) -> bool:
+    """Handle the case when everything is already configured.
+
+    Args:
+        focus: The initialization focus area.
+        console: Rich Console instance for output.
+        backends_toml_path: Path to backends.toml file.
+        telemetry_config_path: Path to telemetry config file.
+
+    Returns:
+        True if user wants to reconfigure, False otherwise.
+    """
+    # Map focus to config path for display
+    config_path_map = {
+        InitFocus.INFERENCE: backends_toml_path,
+        InitFocus.TELEMETRY: telemetry_config_path,
+        InitFocus.CONFIG: ".pipelex/",
+    }
+
+    config_path = config_path_map.get(focus, "")
+    return display_already_configured_message(focus, console, config_path)
+
+
+def update_needs_for_reconfigure(focus: InitFocus) -> tuple[bool, bool, bool]:
+    """Update needs flags when user wants to reconfigure.
+
+    Args:
+        focus: The initialization focus area.
+
+    Returns:
+        Tuple of (needs_config, needs_inference, needs_telemetry) booleans.
+    """
+    needs_config = focus == InitFocus.CONFIG
+    needs_inference = focus == InitFocus.INFERENCE
+    needs_telemetry = focus == InitFocus.TELEMETRY
+
+    return needs_config, needs_inference, needs_telemetry
+
+
+def confirm_initialization(
+    console: Console,
+    needs_config: bool,
+    needs_inference: bool,
+    needs_telemetry: bool,
+    reset: bool,
+    focus: InitFocus,
+) -> bool:
+    """Ask user to confirm initialization.
+
+    Args:
+        console: Rich Console instance for user interaction.
+        needs_config: Whether config initialization is needed.
+        needs_inference: Whether inference setup is needed.
+        needs_telemetry: Whether telemetry setup is needed.
+        reset: Whether this is a reset operation.
+        focus: The initialization focus area.
+
+    Returns:
+        True if user confirms, False otherwise.
+
+    Raises:
+        typer.Exit: If user cancels initialization.
+    """
+    console.print()
+    console.print(build_initialization_panel(needs_config, needs_inference, needs_telemetry, reset))
+
+    if not Confirm.ask("[bold]Continue with initialization?[/bold]", default=True):
+        console.print("\n[yellow]Initialization cancelled.[/yellow]")
+        if needs_config or needs_inference or needs_telemetry:
+            match focus:
+                case InitFocus.ALL:
+                    init_cmd_str = "pipelex init"
+                case InitFocus.CONFIG | InitFocus.INFERENCE | InitFocus.TELEMETRY:
+                    init_cmd_str = f"pipelex init {focus}"
+            console.print(f"[dim]You can initialize later by running:[/dim] [cyan]{init_cmd_str}[/cyan]")
+        console.print()
+        raise typer.Exit(code=0)
+
+    return True
+
+
+def execute_initialization(
+    console: Console,
+    needs_config: bool,
+    needs_inference: bool,
+    needs_telemetry: bool,
+    reset: bool,
+    check_inference: bool,
+    backends_toml_path: str,
+    telemetry_config_path: str,
+):
+    """Execute the initialization steps.
+
+    Args:
+        console: Rich Console instance for output.
+        needs_config: Whether to initialize config files.
+        needs_inference: Whether to set up inference backends.
+        needs_telemetry: Whether to set up telemetry.
+        reset: Whether this is a reset operation.
+        check_inference: Whether inference was in focus.
+        backends_toml_path: Path to backends.toml file.
+        telemetry_config_path: Path to telemetry config file.
+
+    """
+    # Step 1: Initialize config if needed
+    if needs_config:
+        console.print()
+        init_config(reset=reset)
+        # If we just initialized config and focus includes inference, enable inference setup
+        if check_inference and path_exists(backends_toml_path):
+            needs_inference = True
+
+    # Step 2: Set up inference backends if needed
+    if needs_inference:
+        console.print()
+        customize_backends_config()
+
+    # Step 3: Set up telemetry if needed
+    if needs_telemetry:
+        telemetry_mode = setup_telemetry(console, telemetry_config_path)
+        TelemetryManagerAbstract.telemetry_mode_just_set = telemetry_mode
+
+    console.print()
+
+
 def init_cmd(
     focus: InitFocus = InitFocus.ALL,
     reset: bool = False,
@@ -229,221 +352,56 @@ def init_cmd(
     check_telemetry = focus in (InitFocus.ALL, InitFocus.TELEMETRY)
 
     # Check what needs to be initialized
-    nb_missing_config_files = init_config(reset=False, dry_run=True) if check_config else 0
-    needs_config = check_config and (nb_missing_config_files > 0 or reset)
-    needs_inference = check_inference and (not path_exists(backends_toml_path) or reset)
-    needs_telemetry = check_telemetry and (not path_exists(telemetry_config_path) or reset)
+    needs_config, needs_inference, needs_telemetry = determine_needs(
+        reset=reset,
+        check_config=check_config,
+        check_inference=check_inference,
+        check_telemetry=check_telemetry,
+        backends_toml_path=backends_toml_path,
+        telemetry_config_path=telemetry_config_path,
+    )
 
     # Track if user already confirmed to avoid double prompting
     user_already_confirmed = False
 
     # If nothing needs to be done, handle based on focus
     if not needs_config and not needs_inference and not needs_telemetry:
-        match focus:
-            case InitFocus.INFERENCE:
-                # Special case: if user explicitly asked for inference, offer to reconfigure
-                console.print()
-                console.print("[green]✓[/green] Inference backends are already configured!")
-                console.print()
-                console.print(f"[dim]Configuration file:[/dim] [cyan]{backends_toml_path}[/cyan]")
-                console.print()
-
-                if Confirm.ask("[bold]Would you like to reconfigure inference backends?[/bold]", default=False):
-                    # User wants to reconfigure, so proceed with inference setup
-                    needs_inference = True
-                    user_already_confirmed = True
-                else:
-                    console.print("\n[dim]No changes made.[/dim]")
-                    console.print()
-                    return
-
-            case InitFocus.TELEMETRY:
-                # Special case: if user explicitly asked for telemetry, offer to reconfigure
-                console.print()
-                console.print("[green]✓[/green] Telemetry preferences are already configured!")
-                console.print()
-                console.print(f"[dim]Configuration file:[/dim] [cyan]{telemetry_config_path}[/cyan]")
-                console.print()
-
-                if Confirm.ask("[bold]Would you like to reconfigure telemetry preferences?[/bold]", default=False):
-                    # User wants to reconfigure, so proceed with telemetry setup
-                    needs_telemetry = True
-                    user_already_confirmed = True
-                else:
-                    console.print("\n[dim]No changes made.[/dim]")
-                    console.print()
-                    return
-
-            case InitFocus.ALL:
-                console.print()
-                console.print("[green]✓[/green] Pipelex is already fully initialized!")
-                console.print()
-                console.print("[dim]Configuration files are in place:[/dim] [cyan].pipelex/[/cyan]")
-                console.print("[dim]Telemetry preferences are configured[/dim]")
-                console.print()
-                console.print("[dim]💡 Tip: Use[/dim] [cyan]--reset[/cyan] [dim]to reconfigure or troubleshoot:[/dim]")
-                console.print("   [cyan]pipelex init --reset[/cyan]")
-                console.print()
-                return
-
-            case InitFocus.CONFIG:
-                console.print()
-                console.print("[green]✓[/green] Configuration files are already in place!")
-                console.print()
-                console.print("[dim]Configuration directory:[/dim] [cyan].pipelex/[/cyan]")
-                console.print()
-                console.print("[dim]💡 Tip: Use[/dim] [cyan]--reset[/cyan] [dim]to reconfigure or troubleshoot:[/dim]")
-                console.print(f"   [cyan]pipelex init {focus} --reset[/cyan]")
-                console.print()
-                return
+        if handle_already_configured(focus, console, backends_toml_path, telemetry_config_path):
+            # User wants to reconfigure
+            needs_config, needs_inference, needs_telemetry = update_needs_for_reconfigure(focus)
+            user_already_confirmed = True
+        else:
+            # User doesn't want to reconfigure, exit
+            console.print("\n[dim]No changes made.[/dim]")
+            console.print()
+            return
 
     try:
         # Show unified initialization prompt (skip if user already confirmed)
         if not user_already_confirmed:
-            console.print()
-
-            # Build message based on what's being initialized
-            message_parts: list[str] = []
-            if reset:
-                if needs_config:
-                    message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
-                if needs_inference:
-                    message_parts.append("• [yellow]Reset and reconfigure[/yellow] inference backends")
-                if needs_telemetry:
-                    message_parts.append("• [yellow]Reset and reconfigure[/yellow] telemetry preferences")
-            else:
-                if needs_config:
-                    message_parts.append("• Create required configuration files in [cyan].pipelex/[/cyan]")
-                if needs_inference:
-                    message_parts.append("• Ask you to choose your inference backends")
-                if needs_telemetry:
-                    message_parts.append("• Ask you to choose your telemetry preferences")
-
-            # Determine title based on what's being initialized
-            num_items = sum([needs_config, needs_inference, needs_telemetry])
-            if reset:
-                if num_items > 1:
-                    title_text = "[bold yellow]Resetting Configuration[/bold yellow]"
-                elif needs_config:
-                    title_text = "[bold yellow]Resetting Configuration Files[/bold yellow]"
-                elif needs_inference:
-                    title_text = "[bold yellow]Resetting Inference Backends[/bold yellow]"
-                else:
-                    title_text = "[bold yellow]Resetting Telemetry[/bold yellow]"
-            elif num_items > 1:
-                title_text = "[bold cyan]Pipelex Initialization[/bold cyan]"
-            elif needs_config:
-                title_text = "[bold cyan]Configuration Setup[/bold cyan]"
-            elif needs_inference:
-                title_text = "[bold cyan]Inference Backend Setup[/bold cyan]"
-            else:
-                title_text = "[bold cyan]Telemetry Setup[/bold cyan]"
-
-            message = "\n".join(message_parts)
-            border_color = "yellow" if reset else "cyan"
-
-            panel = Panel(
-                message,
-                title=title_text,
-                border_style=border_color,
-                padding=(1, 2),
+            confirm_initialization(
+                console=console,
+                needs_config=needs_config,
+                needs_inference=needs_inference,
+                needs_telemetry=needs_telemetry,
+                reset=reset,
+                focus=focus,
             )
-            console.print(panel)
-
-            if not Confirm.ask("[bold]Continue with initialization?[/bold]", default=True):
-                console.print("\n[yellow]Initialization cancelled.[/yellow]")
-                if needs_config or needs_inference or needs_telemetry:
-                    match focus:
-                        case InitFocus.ALL:
-                            init_cmd_str = "pipelex init"
-                        case InitFocus.CONFIG | InitFocus.INFERENCE | InitFocus.TELEMETRY:
-                            init_cmd_str = f"pipelex init {focus}"
-                    console.print(f"[dim]You can initialize later by running:[/dim] [cyan]{init_cmd_str}[/cyan]")
-                console.print()
-                raise typer.Exit(code=0)
         else:
             # User already confirmed, just add a blank line for spacing
             console.print()
 
-        # Step 1: Initialize config if needed
-        if needs_config:
-            console.print()
-            init_config(reset=reset)
-            # If we just initialized config and focus includes inference, enable inference setup
-            if check_inference and path_exists(backends_toml_path):
-                needs_inference = True
-
-        # Step 2: Set up inference backends if needed
-        if needs_inference:
-            console.print()
-            customize_backends_config()
-
-        # Step 3: Set up telemetry if needed
-        telemetry_mode: TelemetryMode | None = None
-        if needs_telemetry:
-            console.print()
-
-            # Create a table for telemetry options
-            table = Table(show_header=False, box=None, padding=(0, 2))
-            table.add_column(style="bold cyan", justify="right")
-            table.add_column(style="bold")
-            table.add_column()
-
-            table.add_row("[1]", TelemetryMode.OFF, "No telemetry data collected")
-            table.add_row("[2]", TelemetryMode.ANONYMOUS, "Anonymous usage data only")
-            table.add_row("[3]", TelemetryMode.IDENTIFIED, "Usage data with user identification")
-            table.add_row("[Q]", "[dim]quit[/dim]", "[dim]Exit without configuring[/dim]")
-
-            description = Text(
-                "Pipelex can collect anonymous usage data to help improve the product.",
-                style="dim",
-            )
-            telemetry_panel = Panel(
-                Group(description, Text(""), table),
-                title="[bold yellow]Telemetry Configuration[/bold yellow]",
-                border_style="yellow",
-                padding=(1, 2),
-            )
-            console.print(telemetry_panel)
-
-            # Map choice to telemetry mode
-            mode_map: dict[str, TelemetryMode] = {
-                "1": TelemetryMode.OFF,
-                "2": TelemetryMode.ANONYMOUS,
-                "3": TelemetryMode.IDENTIFIED,
-                "off": TelemetryMode.OFF,
-                "anonymous": TelemetryMode.ANONYMOUS,
-                "identified": TelemetryMode.IDENTIFIED,
-            }
-
-            # Loop until valid input
-            while telemetry_mode is None:
-                choice_str = Prompt.ask("[bold]Enter your choice[/bold]", console=console)
-                choice_normalized = choice_str.lower().strip()
-
-                # Handle quit option
-                if choice_normalized in ("q", "quit"):
-                    console.print("\n[yellow]Exiting without configuring telemetry.[/yellow]")
-                    raise typer.Exit(code=0)
-
-                if choice_normalized in mode_map:
-                    telemetry_mode = mode_map[choice_normalized]
-                else:
-                    console.print(
-                        f"[red]Invalid choice: '{choice_str}'.[/red] "
-                        "Please enter [cyan]1[/cyan], [cyan]2[/cyan], [cyan]3[/cyan], or [cyan]q[/cyan] to quit.\n"
-                    )
-
-            # Save telemetry config
-            template_path = os.path.join(str(get_configs_dir()), TELEMETRY_CONFIG_FILE_NAME)
-            toml_doc = load_toml_with_tomlkit(template_path)
-            toml_doc["telemetry_mode"] = telemetry_mode
-            save_toml_to_path(toml_doc, telemetry_config_path)
-
-            console.print(f"\n[green]✓[/green] Telemetry mode set to: [bold cyan]{telemetry_mode}[/bold cyan]")
-
-        console.print()
-        TelemetryManagerAbstract.telemetry_mode_just_set = telemetry_mode
+        # Execute initialization steps
+        execute_initialization(
+            console=console,
+            needs_config=needs_config,
+            needs_inference=needs_inference,
+            needs_telemetry=needs_telemetry,
+            reset=reset,
+            check_inference=check_inference,
+            backends_toml_path=backends_toml_path,
+            telemetry_config_path=telemetry_config_path,
+        )
 
     except typer.Exit:
         # Re-raise Exit exceptions

@@ -35,7 +35,7 @@ class TestBackendCustomization:
 
         # Mock Console and Prompt to simulate user selecting default [0]
         mocker.patch("pipelex.cli.commands.init_cmd.Console")
-        mocker.patch("pipelex.cli.commands.init_cmd.Prompt.ask", return_value="0")
+        mocker.patch("pipelex.cli.commands.init_ui.Prompt.ask", return_value="0")
 
         # Execute
         customize_backends_config()
@@ -72,7 +72,7 @@ class TestBackendCustomization:
 
         # Mock user input: select [5,6,7] (openai, anthropic, mistral)
         mocker.patch("pipelex.cli.commands.init_cmd.Console")
-        mocker.patch("pipelex.cli.commands.init_cmd.Prompt.ask", return_value="5,6,7")
+        mocker.patch("pipelex.cli.commands.init_ui.Prompt.ask", return_value="5,6,7")
 
         # Execute
         customize_backends_config()
@@ -109,7 +109,7 @@ class TestBackendCustomization:
 
         # Mock user input with spaces: "0 5 11"
         mocker.patch("pipelex.cli.commands.init_cmd.Console")
-        mocker.patch("pipelex.cli.commands.init_cmd.Prompt.ask", return_value="0 5 11")
+        mocker.patch("pipelex.cli.commands.init_ui.Prompt.ask", return_value="0 5 11")
 
         # Execute
         customize_backends_config()
