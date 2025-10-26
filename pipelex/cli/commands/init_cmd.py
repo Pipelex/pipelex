@@ -20,6 +20,22 @@ from pipelex.types import StrEnum
 PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
 PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
+# Backend definitions for interactive selection
+BACKEND_OPTIONS = [
+    ("pipelex_inference", "⭐ Pipelex Inference", "Unified access to all providers (Recommended)"),
+    ("azure_openai", "Azure OpenAI", "Azure OpenAI Service"),
+    ("bedrock", "AWS Bedrock", "AWS Bedrock"),
+    ("google", "Google AI", "Google AI"),
+    ("vertexai", "Google Vertex AI", "Google Vertex AI"),
+    ("openai", "OpenAI", "OpenAI"),
+    ("anthropic", "Anthropic", "Anthropic"),
+    ("mistral", "Mistral AI", "Mistral AI"),
+    ("xai", "xAI", "xAI"),
+    ("ollama", "Ollama", "Ollama (local)"),
+    ("blackboxai", "BlackBox AI", "BlackBox AI"),
+    ("fal", "FAL", "FAL (image generation)"),
+]
+
 
 class InitFocus(StrEnum):
     """Focus options for initialization."""
@@ -27,6 +43,100 @@ class InitFocus(StrEnum):
     ALL = "all"
     CONFIG = "config"
     TELEMETRY = "telemetry"
+
+
+def customize_backends_config() -> None:
+    """Interactively customize which inference backends are enabled in backends.toml."""
+    console = Console()
+    backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
+
+    if not path_exists(backends_toml_path):
+        console.print("[yellow]⚠ Warning: backends.toml not found, skipping backend customization[/yellow]")
+        return
+
+    try:
+        # Load the backends.toml file
+        toml_doc = load_toml_with_tomlkit(backends_toml_path)
+
+        console.print()
+
+        # Create table for backend options
+        table = Table(show_header=False, box=None, padding=(0, 2))
+        table.add_column(style="bold cyan", justify="right", width=4)
+        table.add_column(style="bold", width=25)
+        table.add_column(style="dim")
+
+        for idx, (_, backend_name, backend_desc) in enumerate(BACKEND_OPTIONS):
+            table.add_row(f"[{idx}]", backend_name, backend_desc)
+
+        description = Text(
+            "Select which inference backends you have access to.\n"
+            "Enter numbers separated by commas or spaces (e.g., '0,5,6' or '0 5 6').\n"
+            "Press Enter for the recommended default.",
+            style="dim",
+        )
+
+        panel = Panel(
+            Group(description, Text(""), table),
+            title="[bold yellow]Inference Backend Selection[/bold yellow]",
+            border_style="yellow",
+            padding=(1, 2),
+        )
+        console.print(panel)
+
+        # Get user input with validation loop
+        selected_indices: list[int] = []
+        while True:
+            choice_str = Prompt.ask("[bold]Enter your choices[/bold]", default="0", console=console)
+            choice_normalized = choice_str.strip()
+
+            # Parse input - handle empty, comma-separated, and space-separated
+            if not choice_normalized or choice_normalized == "0":
+                # Default: only pipelex_inference
+                selected_indices = [0]
+                break
+
+            # Split by comma or space
+            parts = choice_normalized.replace(",", " ").split()
+
+            try:
+                indices = [int(part.strip()) for part in parts if part.strip()]
+
+                # Validate all indices are in range
+                invalid_indices = [i for i in indices if i < 0 or i >= len(BACKEND_OPTIONS)]
+                if invalid_indices:
+                    console.print(
+                        f"[red]Invalid choice(s): {invalid_indices}.[/red] Please enter numbers between 0 and {len(BACKEND_OPTIONS) - 1}.\n"
+                    )
+                    continue
+
+                selected_indices = indices
+                break
+
+            except ValueError:
+                console.print(f"[red]Invalid input: '{choice_str}'.[/red] Please enter numbers separated by commas or spaces.\n")
+
+        # Update backends.toml based on selections
+        selected_backend_keys = {BACKEND_OPTIONS[idx][0] for idx in selected_indices}
+
+        for backend_key, _, _ in BACKEND_OPTIONS:
+            if backend_key in toml_doc:
+                backend_section = toml_doc[backend_key]
+                # Set enabled field based on selection (works with tomlkit's special types)
+                backend_section["enabled"] = backend_key in selected_backend_keys  # type: ignore[index]
+
+        # Save the modified file
+        save_toml_to_path(toml_doc, backends_toml_path)
+
+        # Display selected backends
+        selected_names = [BACKEND_OPTIONS[idx][1] for idx in sorted(selected_indices)]
+        console.print(f"\n[green]✓[/green] Configured {len(selected_names)} backend(s):")
+        for name in selected_names:
+            console.print(f"   • {name}")
+
+    except Exception as exc:
+        console.print(f"[yellow]⚠ Warning: Failed to customize backends: {exc}[/yellow]")
+        console.print("[dim]You can manually edit .pipelex/inference/backends.toml later[/dim]")
 
 
 def init_config(reset: bool = False, dry_run: bool = False) -> int:
@@ -60,19 +170,24 @@ def init_config(reset: bool = False, dry_run: bool = False) -> int:
                     continue
 
                 if os.path.isdir(src_item):
-                    os.makedirs(dst_item, exist_ok=True)
-                    copy_directory_structure(src_item, dst_item, relative_item)
+                    if not dry_run:
+                        os.makedirs(dst_item, exist_ok=True)
+                    copy_directory_structure(src_item, dst_item, relative_item, dry_run)
                 elif os.path.exists(dst_item) and not reset:
                     existing_files.append(relative_item)
                 else:
-                    shutil.copy2(src_item, dst_item)
                     if not dry_run:
-                        copied_files.append(relative_item)
+                        shutil.copy2(src_item, dst_item)
+                    copied_files.append(relative_item)
 
         copy_directory_structure(src_dir=config_template_dir, dst_dir=target_config_dir, dry_run=dry_run)
 
         if dry_run:
             return len(copied_files)
+
+        # Customize backends if files were copied
+        if copied_files:
+            customize_backends_config()
 
         # Report results
         if copied_files:
