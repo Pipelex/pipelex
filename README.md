@@ -35,36 +35,11 @@ Write business logic, not API calls.</h3>
   <p align="center">
     <a href="https://go.pipelex.com/manifesto"><strong>Read why we built Pipelex to transform unreliable AI workflows into deterministic pipelines 🔗</strong></a>
   </p>
-
-  <h2 align="center">🚀 See Pipelex in Action</h2>
-  
-  <table align="center">
-    <tr>
-      <td align="center" width="50%">
-        <h3>From Whiteboard to AI Workflow in less than 5 minutes with no hands (2025-07)</h3>
-        <a href="https://go.pipelex.com/demo">
-          <img src="https://go.pipelex.com/demo-thumbnail" alt="Pipelex Demo" width="100%" style="max-width: 500px; height: auto;">
-        </a>
-      </td>
-      <td align="center" width="50%">
-        <h3>The AI workflow that writes an AI workflow in 64 seconds (2025-09)</h3>
-        <a href="https://go.pipelex.com/Demo-Live">
-          <img src="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_play_video_demo_live.jpg" alt="Pipelex Live Demo" width="100%" style="max-width: 500px; height: auto;">
-        </a>
-      </td>
-    </tr>
-  </table>
-  
 </div>
 
 # 📑 Table of Contents
 
 - [🚀 Quick Start](#-quick-start)
-  - [1. Install Pipelex](#1-install-pipelex)
-  - [2. Get Your API Key](#2-get-your-api-key-free)
-  - [3. Generate Your First Workflow](#3-generate-your-first-workflow)
-  - [4. Run Your Pipeline](#4-run-your-pipeline)
-  - [5. Iterate with AI Assistance](#5-iterate-with-ai-assistance)
 - [💡 What is Pipelex?](#-what-is-pipelex)
 - [📖 Next Steps](#-next-steps)
 - [🔧 IDE Extension](#-ide-extension)
@@ -329,6 +304,28 @@ This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, 
 - "Include confidence scores between 0 and 100 in the match analysis"
 - "Write a recap email at the end"
 - "Add error handling for invalid inputs"
+
+<div>
+  <h2 align="center">🚀 See Pipelex in Action</h2>
+  
+  <table align="center">
+    <tr>
+      <td align="center" width="50%">
+        <h3>From Whiteboard to AI Workflow in less than 5 minutes with no hands (2025-07)</h3>
+        <a href="https://go.pipelex.com/demo">
+          <img src="https://go.pipelex.com/demo-thumbnail" alt="Pipelex Demo" width="100%" style="max-width: 500px; height: auto;">
+        </a>
+      </td>
+      <td align="center" width="50%">
+        <h3>The AI workflow that writes an AI workflow in 64 seconds (2025-09)</h3>
+        <a href="https://go.pipelex.com/Demo-Live">
+          <img src="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_play_video_demo_live.jpg" alt="Pipelex Live Demo" width="100%" style="max-width: 500px; height: auto;">
+        </a>
+      </td>
+    </tr>
+  </table>
+  
+</div>
 
 ## 💡 What is Pipelex?
 
