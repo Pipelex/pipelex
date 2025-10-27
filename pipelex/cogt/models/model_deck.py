@@ -210,7 +210,16 @@ class ModelDeck(ConfigModel):
     def get_required_inference_model(self, model_handle: str) -> InferenceModelSpec:
         inference_model = self.get_optional_inference_model(model_handle=model_handle)
         if inference_model is None:
-            msg = f"Model handle '{model_handle}' not found in deck"
+            msg = (
+                f"Model handle '{model_handle}' not found in deck. "
+                "Make sure its defined in the model decks '.pipelex/inference/deck/base_deck.toml' or '.pipelex/inference/deck/overrides.toml'"
+                "If the model handle is indeed in the deck, make sure the required backend for this model to run is enabled in "
+                "'.pipelex/inference/backends.toml' and that you have the necessary credentials."
+                "To find what backend is required for this model, look at the routing profile in .pipelex/inference/routing_profiles.toml"
+                "Learn more about the inference backend system in the Pipelex documentation: "
+                "https://docs.pipelex.com/pages/configuration/config-technical/inference-backend-config/"
+            )
+
             raise ModelNotFoundError(msg)
         if model_handle not in self.inference_models:
             log.verbose(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
