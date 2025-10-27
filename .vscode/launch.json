@@ -41,16 +41,29 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug Validate Pipe",
+            "name": "Debug validate pipe",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "validate",
-                "pipe",
                 "describe_image",
                 "-c",
                 "pipelex/libraries",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug run pipe",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "run",
+                "results/test_1.plx",
+                "--inputs",
+                "results/inputs_1.json",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
