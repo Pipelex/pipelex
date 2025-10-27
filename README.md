@@ -62,153 +62,142 @@ Stop reinventing AI workflows from scratch. With Pipelex, your proven methods be
 
 # 📑 Table of Contents
 
-- [Introduction](#introduction)
-- [Quick start](#-quick-start)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [API Key Configuration](#api-key-configuration)
-  - [Optional features](#optional-features)
-- [Contributing](#-contributing)
-- [Support](#-support)
-- [License](#-license)
-
-# Introduction
-
-Pipelex makes it easy for developers to define and run repeatable AI workflows. At its core is a clear, declarative pipeline language specifically crafted for knowledge-processing tasks.
-
-Build **pipelines** from modular pipes that snap together. Each pipe can use different AI models - language models (LLMs) for text generation, OCR models for document processing, or image generation models for creating visuals. Pipes consistently deliver **structured, predictable outputs** at each stage.
-
-Pipelex uses its own syntax PLX, based on TOML, making workflows readable and shareable. Business professionals, developers, and AI coding agents can all understand and modify the same pipeline definitions.
-
-Example:
-```plx
-[concept]
-Buyer = "The person who made the purchase"
-PurchaseDocumentText = "Transcript of a receipt, invoice, or order confirmation"
-
-[pipe.extract_buyer]
-type = "PipeLLM"
-description = "Extract buyer from purchase document"
-inputs = { purchase_document_text = "PurchaseDocumentText" }
-output = "Buyer"
-model = "llm_to_extract_info"
-prompt = """
-Extract the first and last name of the buyer from this purchase document:
-@purchase_document_text
-"""
-```
-
-Pipes are modular building blocks that **connect sequentially, run in parallel, or call sub-pipes.** Like function calls in traditional programming, but with a clear contract: knowledge-in, knowledge-out. This modularity makes pipelines perfect for sharing: fork someone's invoice processor, adapt it for receipts, share it back. 
-
-Pipelex is an **open-source Python library** with a hosted API launching soon. It integrates seamlessly into existing systems and automation frameworks. Plus, it works as an [MCP server](https://github.com/Pipelex/pipelex-mcp) so AI agents can use pipelines as tools.
+- [🚀 Quick Start](#-quick-start)
+  - [1. Install Pipelex](#1-install-pipelex)
+  - [2. Get Your API Key](#2-get-your-api-key-free)
+  - [3. Generate Your First Workflow](#3-generate-your-first-workflow)
+  - [4. Run Your Pipeline](#4-run-your-pipeline)
+  - [5. Iterate with AI Assistance](#5-iterate-with-ai-assistance)
+- [💡 What is Pipelex?](#-what-is-pipelex)
+- [📖 Next Steps](#-next-steps)
+- [🔧 IDE Extension](#-ide-extension)
+- [📚 Examples & Cookbook](#-examples--cookbook)
+- [🎯 Optional Features](#-optional-features)
+- [🔒 Privacy & Telemetry](#privacy--telemetry)
+- [🤝 Contributing](#-contributing)
+- [👥 Join the Community](#-join-the-community)
 
 # 🚀 Quick start
 
-> :books: Note that you can check out the [Pipelex Documentation](https://docs.pipelex.com/) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run examples.
+Follow this step-by-step tutorial to build your first AI workflow in minutes:
 
-Follow these steps to get started:
-
-## Installation
-
-### Prerequisites
-
-- Python ≥3.10
-- [pip](https://pip.pypa.io/en/stable/), [poetry](https://python-poetry.org/), or [uv](https://github.com/astral-sh/uv) package manager
-
-We **highly** recommend installing our own extension for PLX files into your IDE of choice. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too and if you are using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
-
-### Option #1: Run examples
-
-Visit the 
-[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/): you can clone it, fork it, play with it 
-
-### Option #2: Install the package
+## 1. Install Pipelex
 
 ```bash
-# Using pip
 pip install pipelex
-
-# Using Poetry
-poetry add pipelex
-
-# Using uv (Recommended)
-uv pip install pipelex
+pipelex init
 ```
 
-### API Key Configuration
+## 2. Get Your API Key (Free)
 
-Pipelex supports two approaches for accessing AI models:
+To use AI models, you need an API key:
 
-#### Option A: Pipelex Inference (Optional & Free)
+- **Free Pipelex API Key**: Join our [Discord community](https://go.pipelex.com/discord) and request your **free API key** (no credit card required) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
+- **Alternative Options**: Use [BlackBox AI](https://docs.blackbox.ai/), bring your own API keys (OpenAI, Anthropic, Google, Mistral), or run local AI.
 
-Get a single API key that works with all providers (OpenAI, Anthropic, Google, Mistral, FAL, and more):
+See [Configure AI Providers](https://docs.pipelex.com/pages/setup/configure-ai-providers/) for details.
 
-1. **Get your API key:**
-   - Join our Discord community: [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
-   - Request your free API key (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel
+## 3. Generate Your First Workflow
 
-2. **Configure environment variables:**
-   ```bash
-   # Copy the example file
-   cp .env.example .env
-   
-   # Edit .env and add your Pipelex Inference API key
-   # PIPELEX_INFERENCE_API_KEY="your-api-key"
-   ```
-   
-   > **Note:** Pipelex automatically loads environment variables from `.env` files. No need to manually source or export them.
+Create a complete AI workflow with a single command:
 
-3. **Verify backend configuration:**
-   - The `pipelex_inference` backend is already enabled in `.pipelex/inference/backends.toml`
-   - The default routing profile `pipelex_first` is configured to use Pipelex Inference
+```bash
+# CV matching with interview prep
+pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview" --output results/cv_match.plx
+```
 
-#### Option B: Bring Your Own Keys
+This command generates a production-ready `.plx` file with domain definitions, concepts, and multiple processing steps that analyzes CV-job fit and prepares interview questions.
 
-Use your own API keys from individual providers (OpenAI, Anthropic, Google, Mistral, Amazon Bedrock, Azure OpenAI, FAL):
+## 4. Run Your Pipeline
 
-1. **Configure environment variables:**
-   ```bash
-   # Copy the example file
-   cp .env.example .env
-   
-   # Edit .env and add your provider API keys
-   # OPENAI_API_KEY="your-openai-key"
-   # ANTHROPIC_API_KEY="your-anthropic-key"
-   # GOOGLE_API_KEY="your-google-key"
-   # ... (add the keys you need)
-   ```
+**Via CLI:**
 
-2. **Configure backends:**
-   - Edit `.pipelex/inference/backends.toml` to enable/disable backends
-   - Set `enabled = true` for the backends you want to use
-   - Set `enabled = false` for backends you don't need
+```bash
+# Run with input file
+pipelex run results/cv_match.plx --inputs inputs.json
+```
 
-3. **Select routing profile:**
-   - Edit `.pipelex/inference/routing_profiles.toml`
-   - Set `active = "custom_routing"` or create your own profile
-   - Configure which backend handles which models
+Create an `inputs.json` file with your PDF URLs:
 
-#### Option C: Mix & Match (Custom Routing)
+```json
+{
+  "cv_pdf": {
+    "concept": "PDF",
+    "content": {
+      "url": "https://pipelex-web.s3.amazonaws.com/demo/John-Doe-CV.pdf"
+    }
+  },
+  "job_offer_pdf": {
+    "concept": "PDF",
+    "content": {
+      "url": "https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"
+    }
+  }
+}
+```
 
-Combine Pipelex Inference with your own keys for maximum flexibility:
+**Via Python:**
 
-1. **Configure environment variables:**
-   ```bash
-   # Copy and edit .env with both Pipelex and provider keys
-   cp .env.example .env
-   ```
+```python
+import asyncio
+import json
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipelex import Pipelex
 
-2. **Enable multiple backends:**
-   - Keep `pipelex_inference` enabled in `.pipelex/inference/backends.toml`
-   - Enable specific provider backends (e.g., `openai`, `fal`)
+async def run_pipeline():
+    with open("inputs.json", encoding="utf-8") as f:
+        inputs = json.load(f)
 
-3. **Create custom routing:**
-   - Edit `.pipelex/inference/routing_profiles.toml`
-   - Set up a hybrid profile routing some models to Pipelex, others to your backends
+    pipe_output = await execute_pipeline(
+        pipe_code="cv_match",
+        inputs=inputs
+    )
+    print(pipe_output.main_stuff_as_str)
 
-See the [configuration documentation](https://docs.pipelex.com/pages/configuration/config-technical/inference-backend-config/) for detailed setup instructions.
+Pipelex.make()
+asyncio.run(run_pipeline())
+```
 
-### Optional Features
+## 5. Iterate with AI Assistance
+
+Install AI assistant rules to easily modify your pipelines:
+
+```bash
+pipelex kit rules
+```
+
+This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI. Now you can refine pipelines with natural language:
+
+- "Include confidence scores between 0 and 100 in the match analysis"
+- "Write a recap email at the end"
+- "Add error handling for invalid inputs"
+
+## 💡 What is Pipelex?
+
+Pipelex is an open-source language that enables you to build and run **repeatable AI workflows**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+
+Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.plx` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
+
+## 📖 Next Steps
+
+**Learn More:**
+- [Writing Workflows Tutorial](https://docs.pipelex.com/pages/writing-workflows/) - Complete guide with examples
+- [Build Reliable AI Workflows](https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project/) - Deep dive into Pipelex
+- [Configuration Guide](https://docs.pipelex.com/pages/setup/configure-ai-providers/) - Set up AI providers and models
+
+## 🔧 IDE Extension
+
+We **highly** recommend installing our extension for `.plx` files into your IDE. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too. If you're using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
+
+## 📚 Examples & Cookbook
+
+Explore real-world examples in our **Cookbook** repository:
+
+[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
+
+Clone it, fork it, and experiment with production-ready pipelines for various use cases.
+
+## 🎯 Optional Features
 
 The package supports the following additional features:
 
@@ -225,17 +214,7 @@ Using `pip`:
 pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
-Using `poetry`:
-```bash
-poetry add "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
-```
-
-Using `uv`:
-```bash
-uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
-```
-
-### Privacy & Telemetry
+## Privacy & Telemetry
 
 Pipelex collects optional, anonymous usage data to help improve the product. On first run, you'll be prompted to choose your telemetry preference:
 
@@ -245,142 +224,7 @@ Pipelex collects optional, anonymous usage data to help improve the product. On 
 
 Your prompts, LLM responses, file paths, and URLs are automatically redacted and never transmitted. You can change your preference at any time or disable telemetry completely by setting the `DO_NOT_TRACK` environment variable.
 
-For more details, see the [Telemetry Documentation](https://docs.pipelex.com/pages/setup/telemetry/).
-
----
-
-## Example: optimizing a tweet in 2 steps
-
-Example with the extension you can download now on Cursor, Windsurf or another VS Code fork. (Coming soon for VS Code Marketplace)
-
-<div>
-<a href="https://open-vsx.org/extension/Pipelex/pipelex">
-<img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/sample_code.png" alt="Pipelex Code Sample" style="max-width: 100%; height: auto;">
-</a>
-</div>
-
-### 1. Define the pipeline in PLX
-
-```plx
-domain = "tech_tweet"
-description = "A pipeline for optimizing tech tweets using Twitter/X best practices"
-
-[concept]
-DraftTweet = "A draft version of a tech tweet that needs optimization"
-OptimizedTweet = "A tweet optimized for Twitter/X engagement following best practices"
-TweetAnalysis = "Analysis of the tweet's structure and potential improvements"
-WritingStyle = "A style of writing"
-
-[pipe]
-[pipe.analyze_tweet]
-type = "PipeLLM"
-description = "Analyze the draft tweet and identify areas for improvement"
-inputs = { draft_tweet = "DraftTweet" }
-output = "TweetAnalysis"
-model = "llm_for_writing_analysis"
-system_prompt = """
-You are an expert in social media optimization, particularly for tech content on Twitter/X.
-Your role is to analyze tech tweets and check if they display typical startup communication pitfalls.
-"""
-prompt = """
-Evaluate the tweet for these key issues:
-
-**Fluffiness** - Overuse of buzzwords without concrete meaning (e.g., "synergizing disruptive paradigms")
-
-**Cringiness** - Content that induces secondhand embarrassment (overly enthusiastic, trying too hard to be cool, excessive emoji use)
-
-**Humblebragginess** - Disguising boasts as casual updates or false modesty ("just happened to close our $ 10M round 🤷")
-
-**Vagueness** - Failing to clearly communicate what the product/service actually does
-
-For each criterion, provide:
-1. A score (1-5) where 1 = not present, 5 = severely present
-2. If the problem is not present, no comment. Otherwise, explain of the issue and give concise guidance on fixing it, 
-without providing an actual rewrite
-
-@draft_tweet
-"""
-
-[pipe.optimize_tweet]
-type = "PipeLLM"
-description = "Optimize the tweet based on the analysis"
-inputs = { draft_tweet = "DraftTweet", tweet_analysis = "TweetAnalysis", writing_style = "WritingStyle" }
-output = "OptimizedTweet"
-model = "llm_for_social_post_writing"
-system_prompt = """
-You are an expert in writing engaging tech tweets that drive meaningful discussions and engagement.
-Your goal is to rewrite tweets to be impactful and avoid the pitfalls identified in the analysis.
-"""
-prompt = """
-Rewrite this tech tweet to be more engaging and effective, based on the analysis:
-
-Original tweet:
-@draft_tweet
-
-Analysis:
-@tweet_analysis
-
-Requirements:
-- Include a clear call-to-action
-- Make it engaging and shareable
-- Use clear, concise language
-
-### Reference style example
-
-@writing_style
-
-### Additional style instructions
-
-No hashtags.
-Minimal emojis.
-Keep the core meaning of the original tweet.
-"""
-
-[pipe.optimize_tweet_sequence]
-type = "PipeSequence"
-description = "Analyze and optimize a tech tweet in sequence"
-inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
-output = "OptimizedTweet"
-steps = [
-    { pipe = "analyze_tweet", result = "tweet_analysis" },
-    { pipe = "optimize_tweet", result = "optimized_tweet" },
-]
-```
-
-### 2. Run the pipeline
-
-Here is the flowchart generated during this run:
-```mermaid
----
-config:
-  layout: dagre
-  theme: base
----
-flowchart LR
-    subgraph "optimize_tweet_sequence"
-    direction LR
-        FGunn["draft_tweet:<br>**Draft tweet**"]
-        EWhtJ["tweet_analysis:<br>**Tweet analysis**"]
-        65Eb2["optimized_tweet:<br>**Optimized tweet**"]
-        i34D5["writing_style:<br>**Writing style**"]
-    end
-class optimize_tweet_sequence sub_a;
-
-    classDef sub_a fill:#e6f5ff,color:#333,stroke:#333;
-
-    classDef sub_b fill:#fff5f7,color:#333,stroke:#333;
-
-    classDef sub_c fill:#f0fff0,color:#333,stroke:#333;
-    FGunn -- "Analyze tweet" ----> EWhtJ
-    FGunn -- "Optimize tweet" ----> 65Eb2
-    EWhtJ -- "Optimize tweet" ----> 65Eb2
-    i34D5 -- "Optimize tweet" ----> 65Eb2
-```
-
-
-### 3. wait… no, there is no step 3, you're done!
-
----
+For more details, see the [Telemetry Documentation](https://docs.pipelex.com/pages/setup/telemetry/) or read our [Privacy Policy](https://www.pipelex.com/privacy-policy).
 
 ## 🤝 Contributing
 
