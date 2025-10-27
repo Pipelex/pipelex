@@ -29,18 +29,6 @@ Write business logic, not API calls.</p>
     <br/>
 </div>
 
-# 📑 Table of Contents
-
-- [🚀 Quick Start](#-quick-start)
-- [💡 What is Pipelex?](#-what-is-pipelex)
-- [📖 Next Steps](#-next-steps)
-- [🔧 IDE Extension](#-ide-extension)
-- [📚 Examples & Cookbook](#-examples--cookbook)
-- [🎯 Optional Features](#-optional-features)
-- [🔒 Privacy & Telemetry](#privacy--telemetry)
-- [🤝 Contributing](#-contributing)
-- [👥 Join the Community](#-join-the-community)
-
 # 🚀 Quick start
 
 Follow this step-by-step tutorial to build your first AI workflow in minutes:
