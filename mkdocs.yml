@@ -109,7 +109,7 @@ nav:
         - Screenplay Generator (wip): pages/cookbook-examples/write-screenplay.md
         - Tweet Optimizer (wip): pages/cookbook-examples/write-tweet.md
     - Build Reliable AI Workflows:
-      - Kick off a Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md
+      - Kick off a Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md
       - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
       - Structuring Concepts: pages/build-reliable-ai-workflows-with-pipelex/structuring-concepts.md
       - Design and Run Pipelines: pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md

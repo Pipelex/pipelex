@@ -12,7 +12,7 @@ api_key = "${AZURE_API_KEY}"
 api_version = "${AZURE_API_VERSION}"
 
 [bedrock]
-display_name = "AWS Bedrock"
+display_name = "Amazon Bedrock"
 enabled = true
 aws_region = "${AWS_REGION}"
 

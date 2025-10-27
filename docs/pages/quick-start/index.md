@@ -299,7 +299,7 @@ Now that you understand the basics, explore more:
 **Learn More:**
 
 - [Cookbook Examples](../cookbook-examples/index.md) - Real-world examples and patterns
-- [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md) - Deep dive into pipeline design
+- [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md) - Deep dive into pipeline design
 - [Pipe Operators](../build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
 - [Pipe Controllers](../build-reliable-ai-workflows-with-pipelex/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
 

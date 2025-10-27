@@ -314,7 +314,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
 
 - **Get started in seconds** with [Pipelex Inference](pages/configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
-- **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, AWS Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
+- **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, Amazon Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
 - **Smart model routing**: Automatically route models to the right backend using [routing profiles](pages/configuration/config-technical/inference-backend-config.md#routing-profiles) with pattern matching
 - **User-friendly aliases**: Define shortcuts like `best-claude` → `claude-4.1-opus` with optional fallback chains
 - **Cost-aware model specs**: Each model includes detailed pricing, capabilities, and constraints for better cost management
@@ -324,7 +324,7 @@ For complete details, see the [Inference Backend Configuration](pages/configurat
 ### Added
 
 - New inference backend configuration system in `.pipelex/inference/` directory
-- Support for 10+ inference backends: OpenAI, Anthropic, Azure OpenAI, AWS Bedrock, Mistral, Vertex AI, XAI, BlackboxAI, Perplexity, Ollama, and **Pipelex Inference**
+- Support for 10+ inference backends: OpenAI, Anthropic, Azure OpenAI, Amazon Bedrock, Mistral, Vertex AI, XAI, BlackboxAI, Perplexity, Ollama, and **Pipelex Inference**
 - Model routing profiles with pattern matching (`*model*`, `model*`, `*model`)
 - Model aliases with waterfall fallback chains
 - Environment variable and secret substitution in TOML configs (`${VAR}` and `${secret:KEY}`)

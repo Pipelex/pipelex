@@ -164,7 +164,7 @@ Get a single API key that works with all providers (OpenAI, Anthropic, Google, M
 
 #### Option B: Bring Your Own Keys
 
-Use your own API keys from individual providers (OpenAI, Anthropic, Google, Mistral, AWS Bedrock, Azure OpenAI, FAL):
+Use your own API keys from individual providers (OpenAI, Anthropic, Google, Mistral, Amazon Bedrock, Azure OpenAI, FAL):
 
 1. **Configure environment variables:**
    ```bash
@@ -215,7 +215,7 @@ The package supports the following additional features:
 - `anthropic`: Anthropic/Claude support for text generation
 - `google`: Google models (Vertex) support for text generation
 - `mistralai`: Mistral AI support for text generation and OCR
-- `bedrock`: AWS Bedrock support for text generation
+- `bedrock`: Amazon Bedrock support for text generation
 - `fal`: Image generation with Black Forest Labs "FAL" service
 
 Install all extras:
