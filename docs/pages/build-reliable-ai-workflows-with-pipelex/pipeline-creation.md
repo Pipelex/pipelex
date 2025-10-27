@@ -1,14 +1,15 @@
-# Pipeline Creation
+# Pipeline Creation using the Pipe Builder
 
 Pipelex provides powerful tools to automatically generate complete, working pipelines from natural language requirements. This feature leverages AI to translate your ideas into fully functional pipeline code, dramatically speeding up development.
+
+!!! tip "Pipe Builder Requirements"
+    For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BlackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key or see [Configure AI Providers](../setup/configure-ai-providers.md) for details. Otherwise, you can also create the workflows yourself, following our [documentation guide](kick-off-a-pipelex-workflow-project.md).
 
 ## Overview
 
 The pipeline creation system can generate pipelines in different modes depending on your needs - from quick one-shot generation to validated, production-ready pipelines that have been automatically tested and fixed.
 
-## Core Commands
-
-### Build Pipe (Recommended)
+## Build Pipe
 
 Generate a validated pipeline with automatic fixing of deterministic issues:
 
@@ -29,42 +30,6 @@ pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 
 - `--output, -o`: Output path for generated PLX file
 - `--no-output`: Skip saving the pipeline to file
-
-### Build One-Shot (Fast)
-
-Generate a pipeline quickly without validation:
-
-```bash
-pipelex build one-shot "BRIEF IN NATURAL LANGUAGE" [OPTIONS]
-```
-
-This command generates the pipeline in a single pass without validation. It's faster but may produce pipelines that need manual fixes.
-
-**Example:**
-
-```bash
-pipelex build one-shot "Extract invoice data from PDF documents" \
-  -o results/invoice_extractor.plx
-```
-
-**Use when:** You want to quickly iterate on ideas or plan to manually review/modify the pipeline.
-
-### Build Partial (Debug)
-
-Generate a partial pipeline specification as JSON for debugging:
-
-```bash
-pipelex build partial "BRIEF IN NATURAL LANGUAGE" [OPTIONS]
-```
-
-This outputs the internal pipeline specification in JSON format, useful for debugging and understanding how Pipelex interprets your requirements.
-
-**Example:**
-
-```bash
-pipelex build partial "Analyze sentiment from customer reviews" \
-  -o results/debug_spec.json
-```
 
 ## Quick Start Example
 

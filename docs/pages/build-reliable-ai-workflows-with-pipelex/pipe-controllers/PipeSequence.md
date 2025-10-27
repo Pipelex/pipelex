@@ -33,7 +33,8 @@ Each entry in the `steps` array is a table with the following keys:
 | `pipe`   | string | The name of the pipe to execute for this step.                     | Yes      |
 | `result` | string | The name to give to the output of this step in the working memory. | Yes      |
 
-**Important**: The output concept of the `PipeSequence` has to match the output of the last pipe in the sequence.
+!!! important "Output Concept Matching"
+    The output concept of the `PipeSequence` has to match the output of the last pipe in the sequence.
 
 ### Example
 

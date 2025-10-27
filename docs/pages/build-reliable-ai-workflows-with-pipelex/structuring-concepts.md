@@ -426,6 +426,6 @@ This will enable building complex, nested data models entirely within `.plx` fil
 ## Related Documentation
 
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
-- [Quick Start](../quick-start/index.md) - Get started with structured outputs
+- [Writing Workflows Tutorial](../writing-workflows/index.md) - Get started with structured outputs
 - [Design and Run Pipelines](design_and_run_pipelines.md) - Use structured concepts in pipes
 

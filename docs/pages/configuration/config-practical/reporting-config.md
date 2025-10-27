@@ -86,4 +86,5 @@ cost_report_unit_scale = 1000.0
 
 ## Best Practices
 
-⚠️ Under construction
+!!! warning "Under Construction"
+    This section is currently under development.

@@ -11,6 +11,9 @@
 # - Headers with dots must be quoted (e.g., ["gemini-2.0-flash"])
 # - Model costs are in USD per million tokens (input/output)
 #
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
 ################################################################################
 
 ################################################################################

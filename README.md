@@ -1,12 +1,9 @@
 <div align="center">
   <a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
-  <h2 align="center">Open-source language for repeatable AI workflows</h2>
-Pipelex is an open-source devtool that transforms how you build repeatable AI workflows. Think of it as Docker or SQL for AI operations.
-
-Create modular "pipes", each using a different LLM and guaranteeing structured outputs. Connect them like LEGO blocks sequentially, in parallel, or conditionally, to build complex knowledge transformations from simple, reusable components.
-
-Stop reinventing AI workflows from scratch. With Pipelex, your proven methods become shareable, versioned artifacts that work across different LLMs. What took weeks to perfect can now be forked, adapted, and scaled instantly.
+  <h2 align="center">AI Workflows That Agents Build & Run</h2>
+  <p align="center">Pipelex is developing the open standard for repeatable AI workflows.<br/>
+Write business logic, not API calls.</p>
 
   <div>
     <a href="https://go.pipelex.com/demo"><strong>Demo</strong></a> -
@@ -22,7 +19,6 @@ Stop reinventing AI workflows from scratch. With Pipelex, your proven methods be
     <img src="https://img.shields.io/pypi/v/pipelex?logo=pypi&logoColor=white&color=blue&style=flat-square"
      alt="PyPI – latest release">
     <br/>
-    <br/>
     <a href="https://go.pipelex.com/discord"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
     <a href="https://www.youtube.com/@PipelexAI"><img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white" alt="YouTube"></a>
     <a href="https://pipelex.com"><img src="https://img.shields.io/badge/Homepage-03bb95?logo=google-chrome&logoColor=white&style=flat" alt="Website"></a>
@@ -33,12 +29,263 @@ Stop reinventing AI workflows from scratch. With Pipelex, your proven methods be
     <br/>
 </div>
 
-<div align="center">
-  <h2 align="center">📜 The Knowledge Pipeline Manifesto</h2>
-  <p align="center">
-    <a href="https://go.pipelex.com/manifesto"><strong>Read why we built Pipelex to transform unreliable AI workflows into deterministic pipelines 🔗</strong></a>
-  </p>
+# 🚀 Quick start
 
+## 1. Install Pipelex
+
+```bash
+pip install pipelex
+pipelex init
+```
+
+## 2. Get Your API Key (Free)
+
+To use AI models, you need an API key:
+
+- **Free Pipelex API Key**: Join our [Discord community](https://go.pipelex.com/discord) and request your **free API key** (no credit card required) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
+- **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral)
+- **Local AI**: Ollama, vLLM, LM Studio, llama.cpp... any endpoint based on the OpenAI API or not, as you can plug-in your own non-standard APIs.
+
+See [Configure AI Providers](https://docs.pipelex.com/pages/setup/configure-ai-providers/) for details.
+
+## 3. Generate Your First Workflow
+
+Create a complete AI workflow with a single command:
+
+```bash
+pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview" --output results/cv_match.plx
+```
+
+This command generates a production-ready `.plx` file with domain definitions, concepts, and multiple processing steps that analyzes CV-job fit and prepares interview questions.
+
+**cv_match.plx**
+```toml
+domain = "cv_match"
+description = "Matching CVs with job offers and generating interview questions"
+main_pipe = "analyze_cv_job_match_and_generate_questions"
+
+[concept.MatchAnalysis]
+description = """
+Analysis of alignment between a candidate and a position, including strengths, gaps, and areas requiring further exploration.
+"""
+
+[concept.MatchAnalysis.structure]
+strengths = { type = "text", description = "Areas where the candidate's profile aligns well with the requirements", required = true }
+gaps = { type = "text", description = "Areas where the candidate's profile does not meet the requirements or lacks evidence", required = true }
+areas_to_probe = { type = "text", description = "Topics or competencies that need clarification or deeper assessment during the interview", required = true }
+
+[concept.Question]
+description = "A single interview question designed to assess a candidate."
+refines = "Text"
+
+[pipe.analyze_cv_job_match_and_generate_questions]
+type = "PipeSequence"
+description = """
+Main pipeline that orchestrates the complete CV-job matching and interview question generation workflow. Takes a candidate's CV and a job offer as PDF documents, extracts their content, performs a comprehensive match analysis identifying strengths, gaps, and areas to probe, and generates exactly 5 targeted interview questions based on the analysis results.
+"""
+inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
+output = "Question[5]"
+steps = [
+    { pipe = "extract_documents_parallel", result = "extracted_documents" },
+    { pipe = "analyze_match", result = "match_analysis" },
+    { pipe = "generate_interview_questions", result = "interview_questions" },
+]
+```
+
+<details>
+<summary><b>📄 Click to view the supporting pipes implementation</b></summary>
+
+```toml
+[pipe.extract_documents_parallel]
+type = "PipeParallel"
+description = """
+Executes parallel extraction of text content from both the CV PDF and job offer PDF simultaneously to optimize processing time.
+"""
+inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
+output = "Dynamic"
+parallels = [
+    { pipe = "extract_cv_text", result = "cv_pages" },
+    { pipe = "extract_job_offer_text", result = "job_offer_pages" },
+]
+add_each_output = true
+
+[pipe.extract_cv_text]
+type = "PipeExtract"
+description = """
+Extracts text content from the candidate's CV PDF document using OCR technology, converting all pages into machine-readable text format for subsequent analysis.
+"""
+inputs = { cv_pdf = "PDF" }
+output = "Page[]"
+model = "extract_text_from_pdf"
+
+[pipe.extract_job_offer_text]
+type = "PipeExtract"
+description = """
+Extracts text content from the job offer PDF document using OCR technology, converting all pages into machine-readable text format for subsequent analysis.
+"""
+inputs = { job_offer_pdf = "PDF" }
+output = "Page[]"
+model = "extract_text_from_pdf"
+
+[pipe.analyze_match]
+type = "PipeLLM"
+description = """
+Performs comprehensive analysis comparing the candidate's CV against the job offer requirements. Identifies and structures: (1) strengths where the candidate's profile aligns well with requirements, (2) gaps where the profile lacks evidence or doesn't meet requirements, and (3) specific areas requiring deeper exploration or clarification during the interview process.
+"""
+inputs = { cv_pages = "Page[]", job_offer_pages = "Page[]" }
+output = "MatchAnalysis"
+model = "llm_to_answer_hard_questions"
+system_prompt = """
+You are an expert HR analyst and recruiter specializing in candidate-job fit assessment. Your task is to generate a structured MatchAnalysis comparing a candidate's CV against job requirements.
+"""
+prompt = """
+Analyze the match between the candidate's CV and the job offer requirements.
+
+Candidate CV:
+@cv_pages
+
+Job Offer:
+@job_offer_pages
+
+Perform a comprehensive comparison and provide a structured analysis.
+"""
+
+[pipe.generate_interview_questions]
+type = "PipeLLM"
+description = """
+Generates exactly 5 targeted, relevant interview questions based on the match analysis results. Questions are designed to probe identified gaps, clarify areas of uncertainty, validate strengths, and assess competencies that require deeper evaluation to determine candidate-position fit.
+"""
+inputs = { match_analysis = "MatchAnalysis" }
+output = "Question[5]"
+model = "llm_to_write_questions"
+system_prompt = """
+You are an expert HR interviewer and talent assessment specialist. Your task is to generate structured interview questions based on candidate-position match analysis.
+"""
+prompt = """
+Based on the following match analysis between a candidate and a position, generate exactly 5 targeted interview questions.
+
+@match_analysis
+
+The questions should:
+- Probe the identified gaps to assess if they are deal-breakers or can be mitigated
+- Clarify areas that require deeper exploration
+- Validate the candidate's strengths with concrete examples
+- Be open-ended and behavioral when appropriate
+- Help determine overall candidate-position fit
+
+Generate exactly 5 interview questions.
+"""
+```
+</details>
+
+
+**View the pipeline flowchart:**
+
+```mermaid
+flowchart TD
+ subgraph PAR["extract_documents_parallel (PipeParallel)"]
+    direction LR
+        EXTRACT_CV["extract_cv_text (PipeExtract)"]
+        EXTRACT_JOB["extract_job_offer_text (PipeExtract)"]
+  end
+ subgraph MAIN["analyze_cv_job_match_and_generate_questions (PipeSequence)"]
+    direction TB
+        PAR
+        CV_PAGES[["cv_pages: Page"]]
+        JOB_PAGES[["job_offer_pages: Page"]]
+        ANALYZE["analyze_match (PipeLLM)"]
+        MATCH[["MatchAnalysis"]]
+        GENERATE["generate_interview_questions (PipeLLM)"]
+        OUT[["Question"]]
+  end
+    CV_IN[["cv_pdf: PDF"]] --> EXTRACT_CV
+    JOB_IN[["job_offer_pdf: PDF"]] --> EXTRACT_JOB
+    EXTRACT_CV --> CV_PAGES
+    EXTRACT_JOB --> JOB_PAGES
+    CV_PAGES --> ANALYZE
+    JOB_PAGES --> ANALYZE
+    ANALYZE --> MATCH
+    MATCH --> GENERATE
+    GENERATE --> OUT
+    classDef default stroke:#1976D2,stroke-width:2px,fill:#E3F2FD,color:#0D47A1
+    style EXTRACT_CV stroke:#1565C0,fill:#BBDEFB,color:#0D47A1
+    style EXTRACT_JOB stroke:#1565C0,fill:#BBDEFB,color:#0D47A1
+    style PAR fill:#FFF9C4,stroke:#F57C00,stroke-width:2px
+    style CV_PAGES stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style JOB_PAGES stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style ANALYZE stroke:#1565C0,fill:#BBDEFB,color:#0D47A1
+    style MATCH stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style GENERATE stroke:#1565C0,fill:#BBDEFB,color:#0D47A1
+    style OUT stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style CV_IN stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style JOB_IN stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style MAIN fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
+```
+## 4. Run Your Pipeline
+
+**Via CLI:**
+
+```bash
+# Run with input file
+pipelex run results/cv_match.plx --inputs inputs.json
+```
+
+Create an `inputs.json` file with your PDF URLs:
+
+```json
+{
+  "cv_pdf": {
+    "concept": "PDF",
+    "content": {
+      "url": "https://pipelex-web.s3.amazonaws.com/demo/John-Doe-CV.pdf"
+    }
+  },
+  "job_offer_pdf": {
+    "concept": "PDF",
+    "content": {
+      "url": "https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"
+    }
+  }
+}
+```
+
+**Via Python:**
+
+```python
+import asyncio
+import json
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipelex import Pipelex
+
+async def run_pipeline():
+    with open("inputs.json", encoding="utf-8") as f:
+        inputs = json.load(f)
+
+    pipe_output = await execute_pipeline(
+        pipe_code="cv_match",
+        inputs=inputs
+    )
+    print(pipe_output.main_stuff_as_str)
+
+Pipelex.make()
+asyncio.run(run_pipeline())
+```
+
+## 5. Iterate with AI Assistance
+
+Install AI assistant rules to easily modify your pipelines:
+
+```bash
+pipelex kit rules
+```
+
+This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI. Now you can refine pipelines with natural language:
+
+- "Include confidence scores between 0 and 100 in the match analysis"
+- "Write a recap email at the end"
+- "Add error handling for invalid inputs"
+
+<div>
   <h2 align="center">🚀 See Pipelex in Action</h2>
   
   <table align="center">
@@ -60,162 +307,39 @@ Stop reinventing AI workflows from scratch. With Pipelex, your proven methods be
   
 </div>
 
-# 📑 Table of Contents
+## 💡 What is Pipelex?
 
-- [Introduction](#introduction)
-- [Quick start](#-quick-start)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [API Key Configuration](#api-key-configuration)
-  - [Optional features](#optional-features)
-- [Contributing](#-contributing)
-- [Support](#-support)
-- [License](#-license)
+Pipelex is an open-source language that enables you to build and run **repeatable AI workflows**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
 
-# Introduction
+Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.plx` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
 
-Pipelex makes it easy for developers to define and run repeatable AI workflows. At its core is a clear, declarative pipeline language specifically crafted for knowledge-processing tasks.
+## 📖 Next Steps
 
-Build **pipelines** from modular pipes that snap together. Each pipe can use different AI models - language models (LLMs) for text generation, OCR models for document processing, or image generation models for creating visuals. Pipes consistently deliver **structured, predictable outputs** at each stage.
+**Learn More:**
+- [Writing Workflows Tutorial](https://docs.pipelex.com/pages/writing-workflows/) - Complete guide with examples
+- [Build Reliable AI Workflows](https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project/) - Deep dive into Pipelex
+- [Configuration Guide](https://docs.pipelex.com/pages/setup/configure-ai-providers/) - Set up AI providers and models
 
-Pipelex uses its own syntax PLX, based on TOML, making workflows readable and shareable. Business professionals, developers, and AI coding agents can all understand and modify the same pipeline definitions.
+## 🔧 IDE Extension
 
-Example:
-```plx
-[concept]
-Buyer = "The person who made the purchase"
-PurchaseDocumentText = "Transcript of a receipt, invoice, or order confirmation"
+We **highly** recommend installing our extension for `.plx` files into your IDE. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too. If you're using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
 
-[pipe.extract_buyer]
-type = "PipeLLM"
-description = "Extract buyer from purchase document"
-inputs = { purchase_document_text = "PurchaseDocumentText" }
-output = "Buyer"
-model = "llm_to_extract_info"
-prompt = """
-Extract the first and last name of the buyer from this purchase document:
-@purchase_document_text
-"""
-```
+## 📚 Examples & Cookbook
 
-Pipes are modular building blocks that **connect sequentially, run in parallel, or call sub-pipes.** Like function calls in traditional programming, but with a clear contract: knowledge-in, knowledge-out. This modularity makes pipelines perfect for sharing: fork someone's invoice processor, adapt it for receipts, share it back. 
+Explore real-world examples in our **Cookbook** repository:
 
-Pipelex is an **open-source Python library** with a hosted API launching soon. It integrates seamlessly into existing systems and automation frameworks. Plus, it works as an [MCP server](https://github.com/Pipelex/pipelex-mcp) so AI agents can use pipelines as tools.
+[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
 
-# 🚀 Quick start
+Clone it, fork it, and experiment with production-ready pipelines for various use cases.
 
-> :books: Note that you can check out the [Pipelex Documentation](https://docs.pipelex.com/) for more information and clone the [Pipelex Cookbook](https://github.com/Pipelex/pipelex-cookbook) repository for ready-to-run examples.
-
-Follow these steps to get started:
-
-## Installation
-
-### Prerequisites
-
-- Python ≥3.10
-- [pip](https://pip.pypa.io/en/stable/), [poetry](https://python-poetry.org/), or [uv](https://github.com/astral-sh/uv) package manager
-
-We **highly** recommend installing our own extension for PLX files into your IDE of choice. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too and if you are using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
-
-### Option #1: Run examples
-
-Visit the 
-[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/): you can clone it, fork it, play with it 
-
-### Option #2: Install the package
-
-```bash
-# Using pip
-pip install pipelex
-
-# Using Poetry
-poetry add pipelex
-
-# Using uv (Recommended)
-uv pip install pipelex
-```
-
-### API Key Configuration
-
-Pipelex supports two approaches for accessing AI models:
-
-#### Option A: Pipelex Inference (Optional & Free)
-
-Get a single API key that works with all providers (OpenAI, Anthropic, Google, Mistral, FAL, and more):
-
-1. **Get your API key:**
-   - Join our Discord community: [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
-   - Request your free API key (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel
-
-2. **Configure environment variables:**
-   ```bash
-   # Copy the example file
-   cp .env.example .env
-   
-   # Edit .env and add your Pipelex Inference API key
-   # PIPELEX_INFERENCE_API_KEY="your-api-key"
-   ```
-   
-   > **Note:** Pipelex automatically loads environment variables from `.env` files. No need to manually source or export them.
-
-3. **Verify backend configuration:**
-   - The `pipelex_inference` backend is already enabled in `.pipelex/inference/backends.toml`
-   - The default routing profile `pipelex_first` is configured to use Pipelex Inference
-
-#### Option B: Bring Your Own Keys
-
-Use your own API keys from individual providers (OpenAI, Anthropic, Google, Mistral, AWS Bedrock, Azure OpenAI, FAL):
-
-1. **Configure environment variables:**
-   ```bash
-   # Copy the example file
-   cp .env.example .env
-   
-   # Edit .env and add your provider API keys
-   # OPENAI_API_KEY="your-openai-key"
-   # ANTHROPIC_API_KEY="your-anthropic-key"
-   # GOOGLE_API_KEY="your-google-key"
-   # ... (add the keys you need)
-   ```
-
-2. **Configure backends:**
-   - Edit `.pipelex/inference/backends.toml` to enable/disable backends
-   - Set `enabled = true` for the backends you want to use
-   - Set `enabled = false` for backends you don't need
-
-3. **Select routing profile:**
-   - Edit `.pipelex/inference/routing_profiles.toml`
-   - Set `active = "custom_routing"` or create your own profile
-   - Configure which backend handles which models
-
-#### Option C: Mix & Match (Custom Routing)
-
-Combine Pipelex Inference with your own keys for maximum flexibility:
-
-1. **Configure environment variables:**
-   ```bash
-   # Copy and edit .env with both Pipelex and provider keys
-   cp .env.example .env
-   ```
-
-2. **Enable multiple backends:**
-   - Keep `pipelex_inference` enabled in `.pipelex/inference/backends.toml`
-   - Enable specific provider backends (e.g., `openai`, `fal`)
-
-3. **Create custom routing:**
-   - Edit `.pipelex/inference/routing_profiles.toml`
-   - Set up a hybrid profile routing some models to Pipelex, others to your backends
-
-See the [configuration documentation](https://docs.pipelex.com/pages/configuration/config-technical/inference-backend-config/) for detailed setup instructions.
-
-### Optional Features
+## 🎯 Optional Features
 
 The package supports the following additional features:
 
 - `anthropic`: Anthropic/Claude support for text generation
 - `google`: Google models (Vertex) support for text generation
 - `mistralai`: Mistral AI support for text generation and OCR
-- `bedrock`: AWS Bedrock support for text generation
+- `bedrock`: Amazon Bedrock support for text generation
 - `fal`: Image generation with Black Forest Labs "FAL" service
 
 Install all extras:
@@ -225,17 +349,7 @@ Using `pip`:
 pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 ```
 
-Using `poetry`:
-```bash
-poetry add "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
-```
-
-Using `uv`:
-```bash
-uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
-```
-
-### Privacy & Telemetry
+## Privacy & Telemetry
 
 Pipelex collects optional, anonymous usage data to help improve the product. On first run, you'll be prompted to choose your telemetry preference:
 
@@ -245,142 +359,7 @@ Pipelex collects optional, anonymous usage data to help improve the product. On 
 
 Your prompts, LLM responses, file paths, and URLs are automatically redacted and never transmitted. You can change your preference at any time or disable telemetry completely by setting the `DO_NOT_TRACK` environment variable.
 
-For more details, see the [Telemetry Documentation](https://docs.pipelex.com/pages/setup/telemetry/).
-
----
-
-## Example: optimizing a tweet in 2 steps
-
-Example with the extension you can download now on Cursor, Windsurf or another VS Code fork. (Coming soon for VS Code Marketplace)
-
-<div>
-<a href="https://open-vsx.org/extension/Pipelex/pipelex">
-<img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/sample_code.png" alt="Pipelex Code Sample" style="max-width: 100%; height: auto;">
-</a>
-</div>
-
-### 1. Define the pipeline in PLX
-
-```plx
-domain = "tech_tweet"
-description = "A pipeline for optimizing tech tweets using Twitter/X best practices"
-
-[concept]
-DraftTweet = "A draft version of a tech tweet that needs optimization"
-OptimizedTweet = "A tweet optimized for Twitter/X engagement following best practices"
-TweetAnalysis = "Analysis of the tweet's structure and potential improvements"
-WritingStyle = "A style of writing"
-
-[pipe]
-[pipe.analyze_tweet]
-type = "PipeLLM"
-description = "Analyze the draft tweet and identify areas for improvement"
-inputs = { draft_tweet = "DraftTweet" }
-output = "TweetAnalysis"
-model = "llm_for_writing_analysis"
-system_prompt = """
-You are an expert in social media optimization, particularly for tech content on Twitter/X.
-Your role is to analyze tech tweets and check if they display typical startup communication pitfalls.
-"""
-prompt = """
-Evaluate the tweet for these key issues:
-
-**Fluffiness** - Overuse of buzzwords without concrete meaning (e.g., "synergizing disruptive paradigms")
-
-**Cringiness** - Content that induces secondhand embarrassment (overly enthusiastic, trying too hard to be cool, excessive emoji use)
-
-**Humblebragginess** - Disguising boasts as casual updates or false modesty ("just happened to close our $ 10M round 🤷")
-
-**Vagueness** - Failing to clearly communicate what the product/service actually does
-
-For each criterion, provide:
-1. A score (1-5) where 1 = not present, 5 = severely present
-2. If the problem is not present, no comment. Otherwise, explain of the issue and give concise guidance on fixing it, 
-without providing an actual rewrite
-
-@draft_tweet
-"""
-
-[pipe.optimize_tweet]
-type = "PipeLLM"
-description = "Optimize the tweet based on the analysis"
-inputs = { draft_tweet = "DraftTweet", tweet_analysis = "TweetAnalysis", writing_style = "WritingStyle" }
-output = "OptimizedTweet"
-model = "llm_for_social_post_writing"
-system_prompt = """
-You are an expert in writing engaging tech tweets that drive meaningful discussions and engagement.
-Your goal is to rewrite tweets to be impactful and avoid the pitfalls identified in the analysis.
-"""
-prompt = """
-Rewrite this tech tweet to be more engaging and effective, based on the analysis:
-
-Original tweet:
-@draft_tweet
-
-Analysis:
-@tweet_analysis
-
-Requirements:
-- Include a clear call-to-action
-- Make it engaging and shareable
-- Use clear, concise language
-
-### Reference style example
-
-@writing_style
-
-### Additional style instructions
-
-No hashtags.
-Minimal emojis.
-Keep the core meaning of the original tweet.
-"""
-
-[pipe.optimize_tweet_sequence]
-type = "PipeSequence"
-description = "Analyze and optimize a tech tweet in sequence"
-inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
-output = "OptimizedTweet"
-steps = [
-    { pipe = "analyze_tweet", result = "tweet_analysis" },
-    { pipe = "optimize_tweet", result = "optimized_tweet" },
-]
-```
-
-### 2. Run the pipeline
-
-Here is the flowchart generated during this run:
-```mermaid
----
-config:
-  layout: dagre
-  theme: base
----
-flowchart LR
-    subgraph "optimize_tweet_sequence"
-    direction LR
-        FGunn["draft_tweet:<br>**Draft tweet**"]
-        EWhtJ["tweet_analysis:<br>**Tweet analysis**"]
-        65Eb2["optimized_tweet:<br>**Optimized tweet**"]
-        i34D5["writing_style:<br>**Writing style**"]
-    end
-class optimize_tweet_sequence sub_a;
-
-    classDef sub_a fill:#e6f5ff,color:#333,stroke:#333;
-
-    classDef sub_b fill:#fff5f7,color:#333,stroke:#333;
-
-    classDef sub_c fill:#f0fff0,color:#333,stroke:#333;
-    FGunn -- "Analyze tweet" ----> EWhtJ
-    FGunn -- "Optimize tweet" ----> 65Eb2
-    EWhtJ -- "Optimize tweet" ----> 65Eb2
-    i34D5 -- "Optimize tweet" ----> 65Eb2
-```
-
-
-### 3. wait… no, there is no step 3, you're done!
-
----
+For more details, see the [Telemetry Documentation](https://docs.pipelex.com/pages/setup/telemetry/) or read our [Privacy Policy](https://www.pipelex.com/privacy-policy).
 
 ## 🤝 Contributing
 

@@ -67,6 +67,7 @@ plugins:
 markdown_extensions:
   - meta
   - sane_lists
+  - admonition
   - attr_list
   - md_in_html
   - pymdownx.blocks.caption
@@ -86,7 +87,7 @@ markdown_extensions:
 nav:
   - Home:
     - Welcome: index.md
-    - Quick-start: pages/quick-start/index.md
+    - Writing Workflows: pages/writing-workflows/index.md
     - Setup:
       - Configure AI Providers: pages/setup/configure-ai-providers.md
       - Project Organization: pages/setup/project-organization.md
@@ -110,7 +111,7 @@ nav:
         - Screenplay Generator (wip): pages/cookbook-examples/write-screenplay.md
         - Tweet Optimizer (wip): pages/cookbook-examples/write-tweet.md
     - Build Reliable AI Workflows:
-      - Kick off a Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md
+      - Kick off a Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md
       - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
       - Structuring Concepts: pages/build-reliable-ai-workflows-with-pipelex/structuring-concepts.md
       - Design and Run Pipelines: pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md
@@ -168,13 +169,11 @@ nav:
       - Secrets Provider: pages/advanced-customization/secrets-provider-injection.md
       - Reporting Delegate: pages/advanced-customization/reporting-delegate-injection.md
       - Pipeline Tracker: pages/advanced-customization/pipeline-tracker-injection.md
-      - Activity Manager: pages/advanced-customization/activity-manager-injection.md
       - Storage Provider: pages/advanced-customization/storage-provider-injection.md
       - Template Provider: pages/advanced-customization/template-provider-injection.md
+      - Observer Provider: pages/advanced-customization/observer-provider-injection.md
       - Content Generator: pages/advanced-customization/content-generator-injection.md
       - Pipe Router: pages/advanced-customization/pipe-router-injection.md
-      - Plugin Manager: pages/advanced-customization/plugin-manager-injection.md
-      - Observer Provider: pages/advanced-customization/observer-provider-injection.md
     - License: license.md
     - Contributing: contributing.md
     - Code of Conduct: CODE_OF_CONDUCT.md

@@ -1,15 +1,18 @@
 ################################################################################
-# AWS Bedrock Backend Configuration
+# Amazon Bedrock Backend Configuration
 ################################################################################
 #
-# This file defines the model specifications for AWS Bedrock models.
+# This file defines the model specifications for Amazon Bedrock models.
 # It contains model definitions for various language models
-# accessible through the AWS Bedrock service.
+# accessible through the Amazon Bedrock service.
 #
 # Configuration structure:
 # - Each model is defined in its own section with the model name as the header
 # - Headers with dots must be quoted (e.g., ["claude-3.5-sonnet"])
 # - Model costs are in USD per million tokens (input/output)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
 #
 ################################################################################
 

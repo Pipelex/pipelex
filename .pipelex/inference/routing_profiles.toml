@@ -3,6 +3,9 @@
 # This file controls which backend serves which model.
 # Simply change the 'active' field to switch profiles,
 # or you can add your own custom profiles.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
 # ================================================
 
 # Which profile to use (change this to switch routing)

@@ -9,6 +9,9 @@
 # - Each model is defined in its own section with the model name as the header
 # - Model costs are in USD per million tokens (input/output)
 #
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
 ################################################################################
 
 ################################################################################

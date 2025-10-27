@@ -32,7 +32,8 @@ Describe the provided image in great detail.
 """
 ```
 
-**Important**: It is necessary to tag the image variable in the prompt with `@image` or `$image`, just like with regular objects.
+!!! important "Image Variable Tagging"
+    It is necessary to tag the image variable in the prompt with `@image` or `$image`, just like with regular objects.
 
 **Flexible Image Inputs**
 

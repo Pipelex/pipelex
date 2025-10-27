@@ -1,3 +1,15 @@
+####################################################################################################
+# Pipelex Inference Backends Configuration
+####################################################################################################
+#
+# This file configures the inference backends available to Pipelex.
+# Each backend connects to a different AI service provider (OpenAI, Anthropic, Google, etc.).
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
 [pipelex_inference]
 display_name = "⭐ Pipelex Inference"
 enabled = true
@@ -12,7 +24,7 @@ api_key = "${AZURE_API_KEY}"
 api_version = "${AZURE_API_VERSION}"
 
 [bedrock]
-display_name = "AWS Bedrock"
+display_name = "Amazon Bedrock"
 enabled = false
 aws_region = "${AWS_REGION}"
 

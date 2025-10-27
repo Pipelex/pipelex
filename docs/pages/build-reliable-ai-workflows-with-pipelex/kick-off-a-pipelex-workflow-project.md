@@ -1,4 +1,4 @@
-# Kicking off a Knowledge Pipeline Project
+# Kicking off a Pipelex Workflow Project
 
 ## Creating Your First Pipeline
 

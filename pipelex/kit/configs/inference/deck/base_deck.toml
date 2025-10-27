@@ -1,5 +1,16 @@
-
-# Base model deck
+####################################################################################################
+# Pipelex Model Deck - Base Configuration
+####################################################################################################
+#
+# This file defines model aliases and presets for:
+# - LLMs (language models for text generation and structured output)
+# - Image generation models (for creating images from text prompts)
+# - Document extraction models (OCR and text extraction from PDFs/images)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
 
 ####################################################################################################
 # Aliases

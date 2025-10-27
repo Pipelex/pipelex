@@ -1,14 +1,13 @@
-# Quick-start
-
-## Understanding How It Works
+# Writing Workflows
 
 Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.plx` language.
 
-### Your First LLM Call with Pipelex
+!!! tip "Prefer Automated Workflow Generation?"
+    If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate workflows from natural language descriptions. See the [Getting Started guide](../../index.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write workflows manually or understand the `.plx` language in depth.
 
 Let's build a **character generator** to understand the basics.
 
-#### Write Your First Pipeline
+## Write Your First Pipeline
 
 Create a `.plx` file anywhere in your project (we recommend a `pipelines` directory):
 
@@ -34,7 +33,15 @@ This pipeline:
 - Outputs plain `Text`
 - Uses a simple prompt
 
-#### Run Your First Pipelex Script
+## Run Your First Pipelex Script
+
+**CLI:**
+
+```bash
+pipelex run create_character
+```
+
+**Python:**
 
 Create a Python file to execute the pipeline:
 
@@ -59,17 +66,19 @@ Pipelex.make()
 asyncio.run(create_character())
 ```
 
-#### Get Your First Pipelex Result
+Then run:
 
 ```bash
 python character.py
 ```
 
+## Get Your First Pipelex Result
+
 ![Example of a generated character sheet](character_sheet.png)
 
-### Using Specific LLMs
+## Using Specific LLMs
 
-#### Indicate Your LLM Selection Explicitly
+### Indicate Your LLM Selection Explicitly
 
 ```plx
 [pipe.create_character]
@@ -83,7 +92,7 @@ Think of it and then output the character description.
 """
 ```
 
-#### Or Use an LLM Preset from the LLM Deck
+### Or Use an LLM Preset from the LLM Deck
 
 ```plx
 [pipe.create_character]
@@ -97,19 +106,20 @@ Think of it and then output the character description.
 """
 
 # The llm choice above is defined in `.pipelex/inference/deck/base_deck.toml` as:
-# llm_for_creative_writing = { model = "best-claude", temperature = 0.9 }
+# llm_for_creative_writing = { model = "base-gpt", temperature = 0.9 }
 # it's a base preset that we provide. you can add your own presets, too.
 ```
 
-💡 We have many [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
+!!! tip "LLM Presets"
+    We have many [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
 
 Learn more in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md).
 
-### Generate Structured Outputs
+## Generate Structured Outputs
 
 Let's create a rigorously structured `Character` object instead of plain text.
 
-#### Define the Structure
+### Define the Structure using Pydantic BaseModel
 
 Using [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax:
 
@@ -129,7 +139,7 @@ class Character(StructuredContent):
 !!! tip "Keep Structure Files Clean"
     Keep your `StructuredContent` classes in dedicated files with minimal module-level code. Pipelex imports these modules during auto-discovery, so any module-level code will be executed.
 
-💡 **Alternative: Inline Structure Definition**
+### Define the Structure using Inline Structure Definition
 
 Define structures directly in your `.plx` file:
 
@@ -146,7 +156,7 @@ description = "A description of the character"
 
 Learn more in [Structuring Concepts](../build-reliable-ai-workflows-with-pipelex/structuring-concepts.md).
 
-#### Improve the Pipeline
+### Use your Structured Concept in Your Pipe
 
 Specify that your output is a `Character` instance:
 
@@ -168,9 +178,11 @@ Think of it and then output the character description.
 """
 ```
 
-💡 The concept name matches the class name (`Character`), so Pipelex automatically links them.
+!!! tip "Concept Naming"
+    The concept name matches the class name (`Character`), so Pipelex automatically links them.
 
-💡 Defining concepts removes ambiguity—"character" could mean a letter or symbol, but here it clearly means a fictional person.
+!!! tip "Semantic Clarity"
+    Defining concepts removes ambiguity—"character" could mean a letter or symbol, but here it clearly means a fictional person.
 
 #### Run Your Pipeline
 
@@ -207,7 +219,8 @@ class CharacterMetadata(StructuredContent):
 
 #### Use a Template to Fill Prompts with Data
 
-💡 Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `{{ double.curly.braces }}` or the simpler `@` prefix (recommended).
+!!! tip "Template Syntax"
+    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `{{ double.curly.braces }}` or the simpler `@` prefix (recommended).
 
 ```plx
 [concept]
@@ -228,56 +241,55 @@ Your task is to extract specific data from the following description.
 """
 ```
 
-💡 `@character.description` grabs the `character` stuff from working memory and uses its `description` attribute.
+!!! tip "Template Variables"
+    `@character.description` grabs the `character` stuff from working memory and uses its `description` attribute.
 
 Learn more about Jinja in the [PipeLLM documentation](../build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md).
 
 #### Execute from Python
 
+First, create an inputs JSON file:
+
+`character_inputs.json`
+```json
+{
+    "character": {
+        "concept": "character.Character",
+        "content": {
+            "name": "Elias",
+            "age": 38,
+            "gender": "man",
+            "occupation": "explorer",
+            "description": "Elias Varrin is a 38-year-old man, standing at approximately 1.85 meters tall, with a lean, weathered frame shaped by decades of travel through remote and often unforgiving landscapes. His name, though not widely known, carries weight among historians, explorers, and those who trade in whispered legends. Elias has piercing storm-gray eyes that scan every environment with sharp precision, and his ash-blond hair—flecked with early streaks of grey—is usually tucked beneath a wide-brimmed, timeworn hat."
+        }
+    }
+}
+```
+
+Then load and execute:
+
 ```python
 import asyncio
-
-from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.pipelex import Pipelex
+import json
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipelex import Pipelex
 
-from character_model import Character, CharacterMetadata
+from character_model import CharacterMetadata
 
 
 async def process_existing_character():
-    # Your existing data
-    character = Character(
-        name="Elias",
-        age=38,
-        gender="man",
-        occupation="explorer",
-        description="""Elias Varrin is a 38-year-old man, standing at approximately 1.85 meters tall, with a lean,
-        weathered frame shaped by decades of travel through remote and often unforgiving landscapes.
-        His name, though not widely known, carries weight among historians, explorers, and those who trade in whispered legends.
-        Elias has piercing storm-gray eyes that scan every environment with sharp precision, and his ash-blond hair—flecked with
-        early streaks of grey—is usually tucked beneath a wide-brimmed, timeworn hat.His hands are etched with fine scars and stained
-        with ink, each mark a silent record of years spent charting unrecorded lands and handling fragile relics of lost civilizations.
-        He moves with quiet purpose and speaks with a calm, thoughtful cadence that suggests he's always listening for more than just what's said.""",
-    )
-    # Wrap it into a stuff object
-    character_stuff = StuffFactory.make_from_concept_string(
-        concept_string="character.Character", # <- `character` is the domain, `Character` is the concept name
-        name="character",
-        content=character,
-    )
-    # Add it to the working memory
-    working_memory = WorkingMemoryFactory.make_from_single_stuff(
-        stuff=character_stuff,
-    )
-    # Run the pipe identified by its pipe_code (it's the name of the pipe)
+    # Load inputs from JSON file
+    with open("character_inputs.json", "r", encoding="utf-8") as f:
+        inputs = json.load(f)
+    
+    # Run the pipe with loaded inputs
     pipe_output = await execute_pipeline(
         pipe_code="extract_character_1",
-        working_memory=working_memory,
+        inputs=inputs,
     )
 
     # Get the result as a properly typed instance
-    extracted_metadata = pipe_output.main_stuff_as(content_type=CharacterMetadata) # <- This is the output of your pipe, properly typed
+    extracted_metadata = pipe_output.main_stuff_as(content_type=CharacterMetadata)
 
     print(extracted_metadata)
 
@@ -299,7 +311,7 @@ Now that you understand the basics, explore more:
 **Learn More:**
 
 - [Cookbook Examples](../cookbook-examples/index.md) - Real-world examples and patterns
-- [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-knowledge-pipeline-project.md) - Deep dive into pipeline design
+- [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md) - Deep dive into pipeline design
 - [Pipe Operators](../build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
 - [Pipe Controllers](../build-reliable-ai-workflows-with-pipelex/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
 

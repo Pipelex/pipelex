@@ -29,8 +29,8 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 | `default_pipe_code`            | string         | The name of a pipe to execute if the expression result does not match any key in `pipe_map`.                                                             | No                             |
 | `add_alias_from_expression_to` | string         | An advanced feature. If provided, the string result of the expression evaluation is added to the working memory as an alias with this name.               | No                             |
 
-
-**Important**: The output concept of the `PipeCondition` has to match the output of all the pipes in the `pipe_map`.
+!!! important "Output Concept Matching"
+    The output concept of the `PipeCondition` has to match the output of all the pipes in the `pipe_map`.
 
 ### Example: Simple routing based on category
 
