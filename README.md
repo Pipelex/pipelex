@@ -108,6 +108,159 @@ pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and ge
 
 This command generates a production-ready `.plx` file with domain definitions, concepts, and multiple processing steps that analyzes CV-job fit and prepares interview questions.
 
+```toml
+domain = "cv_match"
+description = "Matching CVs with job offers and generating interview questions"
+main_pipe = "analyze_cv_job_match_and_generate_questions"
+
+[concept.MatchAnalysis]
+description = """
+Analysis of alignment between a candidate and a position, including strengths, gaps, and areas requiring further exploration.
+"""
+
+[concept.MatchAnalysis.structure]
+strengths = { type = "text", description = "Areas where the candidate's profile aligns well with the requirements", required = true }
+gaps = { type = "text", description = "Areas where the candidate's profile does not meet the requirements or lacks evidence", required = true }
+areas_to_probe = { type = "text", description = "Topics or competencies that need clarification or deeper assessment during the interview", required = true }
+
+[concept.Question]
+description = "A single interview question designed to assess a candidate."
+refines = "Text"
+
+[pipe.analyze_cv_job_match_and_generate_questions]
+type = "PipeSequence"
+description = """
+Main pipeline that orchestrates the complete CV-job matching and interview question generation workflow. Takes a candidate's CV and a job offer as PDF documents, extracts their content, performs a comprehensive match analysis identifying strengths, gaps, and areas to probe, and generates exactly 5 targeted interview questions based on the analysis results.
+"""
+inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
+output = "Question[5]"
+steps = [
+    { pipe = "extract_documents_parallel", result = "extracted_documents" },
+    { pipe = "analyze_match", result = "match_analysis" },
+    { pipe = "generate_interview_questions", result = "interview_questions" },
+]
+
+[pipe.extract_documents_parallel]
+type = "PipeParallel"
+description = """
+Executes parallel extraction of text content from both the CV PDF and job offer PDF simultaneously to optimize processing time.
+"""
+inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
+output = "Dynamic"
+parallels = [
+    { pipe = "extract_cv_text", result = "cv_pages" },
+    { pipe = "extract_job_offer_text", result = "job_offer_pages" },
+]
+add_each_output = true
+
+[pipe.extract_cv_text]
+type = "PipeExtract"
+description = """
+Extracts text content from the candidate's CV PDF document using OCR technology, converting all pages into machine-readable text format for subsequent analysis.
+"""
+inputs = { cv_pdf = "PDF" }
+output = "Page[]"
+model = "extract_text_from_pdf"
+
+[pipe.extract_job_offer_text]
+type = "PipeExtract"
+description = """
+Extracts text content from the job offer PDF document using OCR technology, converting all pages into machine-readable text format for subsequent analysis.
+"""
+inputs = { job_offer_pdf = "PDF" }
+output = "Page[]"
+model = "extract_text_from_pdf"
+
+[pipe.analyze_match]
+type = "PipeLLM"
+description = """
+Performs comprehensive analysis comparing the candidate's CV against the job offer requirements. Identifies and structures: (1) strengths where the candidate's profile aligns well with requirements, (2) gaps where the profile lacks evidence or doesn't meet requirements, and (3) specific areas requiring deeper exploration or clarification during the interview process.
+"""
+inputs = { cv_pages = "Page[]", job_offer_pages = "Page[]" }
+output = "MatchAnalysis"
+model = "llm_to_answer_hard_questions"
+system_prompt = """
+You are an expert HR analyst and recruiter specializing in candidate-job fit assessment. Your task is to generate a structured MatchAnalysis comparing a candidate's CV against job requirements.
+"""
+prompt = """
+Analyze the match between the candidate's CV and the job offer requirements.
+
+Candidate CV:
+@cv_pages
+
+Job Offer:
+@job_offer_pages
+
+Perform a comprehensive comparison and provide a structured analysis.
+"""
+
+[pipe.generate_interview_questions]
+type = "PipeLLM"
+description = """
+Generates exactly 5 targeted, relevant interview questions based on the match analysis results. Questions are designed to probe identified gaps, clarify areas of uncertainty, validate strengths, and assess competencies that require deeper evaluation to determine candidate-position fit.
+"""
+inputs = { match_analysis = "MatchAnalysis" }
+output = "Question[5]"
+model = "llm_to_write_questions"
+system_prompt = """
+You are an expert HR interviewer and talent assessment specialist. Your task is to generate structured interview questions based on candidate-position match analysis.
+"""
+prompt = """
+Based on the following match analysis between a candidate and a position, generate exactly 5 targeted interview questions.
+
+@match_analysis
+
+The questions should:
+- Probe the identified gaps to assess if they are deal-breakers or can be mitigated
+- Clarify areas that require deeper exploration
+- Validate the candidate's strengths with concrete examples
+- Be open-ended and behavioral when appropriate
+- Help determine overall candidate-position fit
+
+Generate exactly 5 interview questions.
+"""
+```
+
+```mermaid
+flowchart TD
+ subgraph PAR["extract_documents_parallel (PipeParallel)"]
+    direction LR
+        EXTRACT_CV["extract_cv_text (PipeExtract)"]
+        EXTRACT_JOB["extract_job_offer_text (PipeExtract)"]
+  end
+ subgraph MAIN["analyze_cv_job_match_and_generate_questions (PipeSequence)"]
+    direction TB
+        PAR
+        CV_PAGES[["cv_pages: Page"]]
+        JOB_PAGES[["job_offer_pages: Page"]]
+        ANALYZE["analyze_match (PipeLLM)"]
+        MATCH[["MatchAnalysis"]]
+        GENERATE["generate_interview_questions (PipeLLM)"]
+        OUT[["Question"]]
+  end
+    CV_IN[["cv_pdf: PDF"]] --> EXTRACT_CV
+    JOB_IN[["job_offer_pdf: PDF"]] --> EXTRACT_JOB
+    EXTRACT_CV --> CV_PAGES
+    EXTRACT_JOB --> JOB_PAGES
+    CV_PAGES --> ANALYZE
+    JOB_PAGES --> ANALYZE
+    ANALYZE --> MATCH
+    MATCH --> GENERATE
+    GENERATE --> OUT
+    classDef default stroke:#8AB4F8,stroke-width:1.8px,fill-opacity:0,color:#E8EEF7
+    style EXTRACT_CV stroke:#2962FF
+    style EXTRACT_JOB stroke:#2962FF
+    style PAR fill:transparent,stroke:#757575
+    style CV_PAGES stroke:#00C853
+    style JOB_PAGES stroke:#00C853
+    style ANALYZE stroke:#2962FF
+    style MATCH stroke:#00C853
+    style GENERATE stroke:#2962FF
+    style OUT stroke:#00C853
+    style CV_IN stroke:#00C853
+    style JOB_IN stroke:#00C853
+    style MAIN fill:transparent,stroke:#757575
+```
 ## 4. Run Your Pipeline
 
 **Via CLI:**
