@@ -6,12 +6,11 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
-from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
+from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
-from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -67,45 +66,20 @@ class SubPipe(BaseModel):
                 blueprint=pipe_batch_blueprint,
                 concept_codes_from_the_same_domain=self.concept_codes_from_the_same_domain,
             )
-            # This is the only line that changes between run and dry_run
-            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
-                sub_pipe_run_params.run_mode = PipeRunMode.DRY
-                pipe_output = await pipe_batch.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
-                )
-            else:
-                sub_pipe_run_params.run_mode = PipeRunMode.LIVE
-                pipe_output = await pipe_batch.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
-                )
+            pipe_output = await pipe_batch.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=self.output_name,
+            )
         # Case 2: Condition processing
         elif isinstance(sub_pipe, PipeCondition):
-            # This is the only line that changes between run and dry_run
-            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
-                sub_pipe_run_params.run_mode = PipeRunMode.DRY
-                pipe_output = await sub_pipe.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
-                )
-            else:
-                sub_pipe_run_params.run_mode = PipeRunMode.LIVE
-                pipe_output = await get_pipe_router().run(
-                    pipe_job=PipeJobFactory.make_pipe_job(
-                        pipe=get_required_pipe(pipe_code=self.pipe_code),
-                        job_metadata=job_metadata,
-                        working_memory=working_memory,
-                        output_name=self.output_name,
-                        pipe_run_params=sub_pipe_run_params,
-                    ),
-                )
+            pipe_output = await sub_pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=self.output_name,
+            )
         else:
             # Case 3: Normal processing
             required_variables = sub_pipe.required_variables()
@@ -119,33 +93,19 @@ class SubPipe(BaseModel):
                 msg = f"Some required stuff(s) not found: {error_details}"
                 raise PipeInputError(message=msg, pipe_code=self.pipe_code, variable_name=exc.variable_name, concept_code=None) from exc
             log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
-            # This is the only line that changes between run and dry_run
-
-            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
-                pipe_output = await sub_pipe.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
-                )
-            else:
-                sub_pipe_run_params.run_mode = PipeRunMode.LIVE
-                pipe_output = await get_pipe_router().run(
-                    pipe_job=PipeJobFactory.make_pipe_job(
-                        pipe=get_required_pipe(pipe_code=self.pipe_code),
-                        job_metadata=job_metadata,
-                        working_memory=working_memory,
-                        output_name=self.output_name,
-                        pipe_run_params=sub_pipe_run_params,
-                    ),
-                )
-            new_output_stuff = pipe_output.main_stuff
-            for stuff in required_stuffs:
-                get_pipeline_tracker().add_pipe_step(
-                    from_stuff=stuff,
-                    to_stuff=new_output_stuff,
-                    pipe_code=self.pipe_code,
-                    pipe_layer=sub_pipe_run_params.pipe_layers,
-                    comment="SubPipe on required_stuff",
-                )
+            pipe_output = await sub_pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=self.output_name,
+            )
+            if new_output_stuff := pipe_output.working_memory.get_optional_main_stuff():
+                for stuff in required_stuffs:
+                    get_pipeline_tracker().add_pipe_step(
+                        from_stuff=stuff,
+                        to_stuff=new_output_stuff,
+                        pipe_code=self.pipe_code,
+                        pipe_layer=sub_pipe_run_params.pipe_layers,
+                        comment="SubPipe on required_stuff",
+                    )
         return pipe_output
