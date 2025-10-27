@@ -240,51 +240,63 @@ def display_health_report(
 
     # Recommended actions
     if not all_healthy:
-        console.print("[bold]Recommended Actions[/bold]")
-
         # Check what can be auto-fixed
         can_auto_fix_config = not config_healthy and config_missing_count > 0
         can_auto_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
+        has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
 
-        if can_auto_fix_config:
-            console.print("  • Run [cyan]pipelex init config[/cyan] to install missing configuration files")
+        # Determine if we have any recommendations to show
+        has_recommendations = (
+            can_auto_fix_config or can_auto_fix_telemetry or has_telemetry_validation_error or (not backends_healthy and backend_reports)
+        )
 
-        if can_auto_fix_telemetry:
-            console.print("  • Run [cyan]pipelex init telemetry[/cyan] to configure telemetry preferences")
+        if has_recommendations:
+            console.print("[bold]Recommended Actions[/bold]")
 
-        if not backends_healthy and backend_reports:
-            # Collect all missing and placeholder vars
-            all_missing_vars: set[str] = set()
-            all_placeholder_vars: set[str] = set()
+            if can_auto_fix_config:
+                console.print("  • Run [cyan]pipelex init config[/cyan] to install missing configuration files")
 
-            for backend_report in backend_reports.values():
-                if not backend_report.all_credentials_valid:
-                    all_missing_vars.update(backend_report.missing_vars)
-                    all_placeholder_vars.update(backend_report.placeholder_vars)
+            if can_auto_fix_telemetry:
+                console.print("  • Run [cyan]pipelex init telemetry[/cyan] to configure telemetry preferences")
 
-            if all_missing_vars:
-                console.print("  • Set the following environment variables:")
-                for var_name in sorted(all_missing_vars):
-                    console.print(f"    - {var_name}")
+            if has_telemetry_validation_error:
+                console.print("  • Fix validation errors in [cyan].pipelex/telemetry.toml[/cyan]")
+                console.print("    or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate")
 
-            if all_placeholder_vars:
-                console.print("  • Replace placeholder values for:")
-                for var_name in sorted(all_placeholder_vars):
-                    console.print(f"    - {var_name}")
+            if not backends_healthy and backend_reports:
+                # Collect all missing and placeholder vars
+                all_missing_vars: set[str] = set()
+                all_placeholder_vars: set[str] = set()
 
-        console.print()
+                for backend_report in backend_reports.values():
+                    if not backend_report.all_credentials_valid:
+                        all_missing_vars.update(backend_report.missing_vars)
+                        all_placeholder_vars.update(backend_report.placeholder_vars)
 
-        # Only suggest --fix if there are auto-fixable issues
-        if can_auto_fix_config or can_auto_fix_telemetry:
-            console.print("[dim]Run[/dim] [cyan]pipelex doctor --fix[/cyan] [dim]to interactively fix auto-fixable issues.[/dim]")
+                if all_missing_vars:
+                    console.print("  • Set the following environment variables:")
+                    for var_name in sorted(all_missing_vars):
+                        console.print(f"    - {var_name}")
+
+                if all_placeholder_vars:
+                    console.print("  • Replace placeholder values for:")
+                    for var_name in sorted(all_placeholder_vars):
+                        console.print(f"    - {var_name}")
+
             console.print()
+
+            # Only suggest --fix if there are auto-fixable issues
+            if can_auto_fix_config or can_auto_fix_telemetry:
+                console.print("[dim]Run[/dim] [cyan]pipelex doctor --fix[/cyan] [dim]to interactively fix auto-fixable issues.[/dim]")
+                console.print()
 
         # Show Discord support for manual-fix issues (regardless of --fix flag)
         has_config_validation_error = not config_healthy and config_missing_count == 0
         has_backend_credential_issues = not backends_healthy and backend_reports
-        if has_config_validation_error or has_backend_credential_issues:
-            console.print("[dim]If you need help with manual fixes, join our Discord community:[/dim]")
-            console.print("[cyan]https://go.pipelex.com/discord[/cyan]")
+        if has_config_validation_error or has_backend_credential_issues or has_telemetry_validation_error:
+            console.print("[dim]If you need help with manual fixes:[/dim]")
+            console.print("  [cyan]https://docs.pipelex.com[/cyan] - Documentation")
+            console.print("  [cyan]https://go.pipelex.com/discord[/cyan] - Discord Community")
             console.print()
 
 
@@ -330,6 +342,7 @@ def doctor_cmd(
 
         # Determine what requires manual fixes
         has_config_validation_error = not config_healthy and config_missing_count == 0
+        has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
         has_backend_credential_issues = not backends_healthy and backend_reports
 
         # If --fix flag is provided, offer to fix auto-fixable issues
@@ -360,7 +373,7 @@ def doctor_cmd(
                     console.print()
 
         # Handle issues that can't be auto-fixed
-        if has_config_validation_error or has_backend_credential_issues:
+        if has_config_validation_error or has_telemetry_validation_error or has_backend_credential_issues:
             console.print("[bold yellow]Manual Fixes Required[/bold yellow]")
             console.print()
 
@@ -371,6 +384,15 @@ def doctor_cmd(
                 console.print()
                 console.print("You can fix this manually by editing [cyan].pipelex/pipelex.toml[/cyan]")
                 console.print("or run [cyan]pipelex init config --reset[/cyan] to regenerate from template.")
+                console.print()
+
+            # Telemetry validation errors
+            if has_telemetry_validation_error:
+                console.print("[bold]Telemetry validation error:[/bold]")
+                console.print(f"  {telemetry_message}")
+                console.print()
+                console.print("You can fix this manually by editing [cyan].pipelex/telemetry.toml[/cyan]")
+                console.print("or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate from template.")
                 console.print()
 
             # Backend credentials
@@ -421,7 +443,8 @@ def doctor_cmd(
         console.print()
         console.print(f"[red]✗ Unexpected error: {exc!s}[/red]")
         console.print()
-        console.print("[dim]If you need help, join our Discord community:[/dim]")
-        console.print("[cyan]https://go.pipelex.com/discord[/cyan]")
+        console.print("[dim]If you need help:[/dim]")
+        console.print("  [cyan]https://docs.pipelex.com[/cyan] - Documentation")
+        console.print("  [cyan]https://go.pipelex.com/discord[/cyan] - Discord Community")
         console.print()
         sys.exit(1)
