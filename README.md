@@ -228,7 +228,7 @@ Generate exactly 5 interview questions.
 
 </details>
 
-** 📊 View the pipeline flowchart:**
+**View the pipeline flowchart:**
 
 ```mermaid
 flowchart TD
