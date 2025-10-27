@@ -222,19 +222,6 @@ Generate exactly 5 interview questions.
 ```
 
 ```mermaid
----
-config:
-  theme: dark
-  themeVariables:
-    background: transparent
-    primaryTextColor: '#E8EEF7'
-    lineColor: '#9BB3D7'
-    fontFamily: ''
-  flowchart:
-    nodeSpacing: 100     # horizontal spacing between nodes
-    rankSpacing: 70     # vertical spacing between ranks
-    padding: 30   
----
 flowchart TD
  subgraph PAR["extract_documents_parallel (PipeParallel)"]
     direction LR
@@ -260,19 +247,19 @@ flowchart TD
     ANALYZE --> MATCH
     MATCH --> GENERATE
     GENERATE --> OUT
-    classDef default stroke:#8AB4F8,stroke-width:1.8px,fill-opacity:0,color:#E8EEF7
-    style EXTRACT_CV stroke:#2962FF
-    style EXTRACT_JOB stroke:#2962FF
-    style PAR fill:transparent,stroke:#757575
-    style CV_PAGES stroke:#00C853
-    style JOB_PAGES stroke:#00C853
-    style ANALYZE stroke:#2962FF
-    style MATCH stroke:#00C853
-    style GENERATE stroke:#2962FF
-    style OUT stroke:#00C853
-    style CV_IN stroke:#00C853
-    style JOB_IN stroke:#00C853
-    style MAIN fill:transparent,stroke:#757575
+    classDef default stroke:#1976D2,stroke-width:2px,fill:#E3F2FD,color:#0D47A1
+    style EXTRACT_CV stroke:#1565C0,fill:#BBDEFB,color:#0D47A1
+    style EXTRACT_JOB stroke:#1565C0,fill:#BBDEFB,color:#0D47A1
+    style PAR fill:#FFF9C4,stroke:#F57C00,stroke-width:2px
+    style CV_PAGES stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style JOB_PAGES stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style ANALYZE stroke:#1565C0,fill:#BBDEFB,color:#0D47A1
+    style MATCH stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style GENERATE stroke:#1565C0,fill:#BBDEFB,color:#0D47A1
+    style OUT stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style CV_IN stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style JOB_IN stroke:#2E7D32,fill:#C8E6C9,color:#1B5E20
+    style MAIN fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
 ```
 ## 4. Run Your Pipeline
 
