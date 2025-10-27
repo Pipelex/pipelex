@@ -1,5 +1,20 @@
 # Guide to execute a pipeline and write example code
 
+## Prerequisites: Virtual Environment
+
+**CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST activate the appropriate Python virtual environment. Without proper venv activation, these commands will not work.
+
+For standard installations, the virtual environment is named `.venv`. Always check this first:
+
+```bash
+# Activate the virtual environment (standard installation)
+source .venv/bin/activate  # On macOS/Linux
+# or
+.venv\Scripts\activate  # On Windows
+```
+
+If your installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
+
 ## Example to execute a pipeline with text output
 
 ```python
