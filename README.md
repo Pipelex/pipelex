@@ -1,12 +1,9 @@
 <div align="center">
   <a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
-  <h2 align="center">Open-source language for repeatable AI workflows</h2>
-Pipelex is an open-source devtool that transforms how you build repeatable AI workflows. Think of it as Docker or SQL for AI operations.
-
-Create modular "pipes", each using a different LLM and guaranteeing structured outputs. Connect them like LEGO blocks sequentially, in parallel, or conditionally, to build complex knowledge transformations from simple, reusable components.
-
-Stop reinventing AI workflows from scratch. With Pipelex, your proven methods become shareable, versioned artifacts that work across different LLMs. What took weeks to perfect can now be forked, adapted, and scaled instantly.
+  <h2 align="center">AI Workflows That Agents Build & Run</h2>
+  <h3 align="center">Pipelex is developing the open standard for repeatable AI workflows.<br/>
+Write business logic, not API calls.</h3>
 
   <div>
     <a href="https://go.pipelex.com/demo"><strong>Demo</strong></a> -
