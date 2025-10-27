@@ -85,7 +85,7 @@ markdown_extensions:
 nav:
   - Home:
     - Welcome: index.md
-    - Quick-start: pages/quick-start/index.md
+    - Writing Workflows: pages/writing-workflows/index.md
     - Setup:
       - Configure AI Providers: pages/setup/configure-ai-providers.md
       - Project Organization: pages/setup/project-organization.md

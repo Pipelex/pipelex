@@ -6,9 +6,9 @@ This guide covers everything you need to know about using the Pipelex API to exe
 
 1. [Quick Reference](#quick-reference)
 2. [Execute Pipeline](#execute-pipeline)
-3. [Input Format: PipelineInputs](#input-format-implicitmemory)
+3. [Input Format: PipelineInputs](#input-format-pipelineinputs)
    - [Case 1: Direct Content Format](#case-1-direct-content-format)
-   - [Case 2: Explicit Format](#case-2-explicit-format-concept--content)
+   - [Case 2: Explicit Format](#case-2-explicit-format-concept-content)
 4. [Search Domains Explained](#search-domains-explained)
 5. [PLX Content: Execute Pipelines Inline](#plx-content-execute-pipelines-inline)
 6. [Error Handling](#error-handling)
@@ -94,7 +94,7 @@ Execute a Pipelex pipeline with flexible inputs.
 ```
 
 **Request Fields:**
-- `inputs` (PipelineInputs): Flexible input format - see [Input Format](#input-format-implicitmemory) below
+- `inputs` (PipelineInputs): Flexible input format - see [Input Format](#input-format-pipelineinputs) below
 - `output_name` (string, optional): Name for the output slot
 - `output_multiplicity` (string, optional): Output multiplicity setting
 - `dynamic_output_concept_code` (string, optional): Override output concept

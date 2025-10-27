@@ -147,7 +147,7 @@ Learn more in our [Inference Backend Configuration](../configuration/config-tech
 Now that you have your backend configured:
 
 1. **Organize your project**: [Project Organization](project-organization.md)
-2. **Learn the concepts**: [Full Tutorial](../quick-start/index.md)
+2. **Learn the concepts**: [Writing Workflows Tutorial](../writing-workflows/index.md)
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook)
 4. **Deep dive**: [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md)
 

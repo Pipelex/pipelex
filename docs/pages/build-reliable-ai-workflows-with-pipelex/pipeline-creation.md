@@ -2,7 +2,7 @@
 
 Pipelex provides powerful tools to automatically generate complete, working pipelines from natural language requirements. This feature leverages AI to translate your ideas into fully functional pipeline code, dramatically speeding up development.
 
-💡 For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key or see [Configure AI Providers](pages/setup/configure-ai-providers.md) for details. Otherwise, you can also create the workflows yourself, following our [documentation guide](pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md).
+💡 For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key or see [Configure AI Providers](../setup/configure-ai-providers.md) for details. Otherwise, you can also create the workflows yourself, following our [documentation guide](kick-off-a-pipelex-workflow-project.md).
 
 ## Overview
 
