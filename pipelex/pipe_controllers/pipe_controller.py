@@ -7,6 +7,7 @@ from pipelex import log
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.exceptions import PipeRunInputsError, WorkingMemoryStuffNotFoundError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -18,6 +19,19 @@ class PipeController(PipeAbstract):
     @property
     def class_name(self) -> str:
         return self.__class__.__name__
+
+    def _validate_inputs_in_memory(self, working_memory: WorkingMemory) -> None:
+        missing_inputs: dict[str, str] = {}
+        for required_stuff_name, requirement in self.needed_inputs().items:
+            try:
+                working_memory.get_stuff(required_stuff_name)
+            except WorkingMemoryStuffNotFoundError as exc:
+                variable_name: str = exc.variable_name or required_stuff_name
+                missing_inputs[variable_name] = exc.concept_code or requirement.concept.code
+        if missing_inputs:
+            raise PipeRunInputsError(
+                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
+            )
 
     @override
     async def run_pipe(
@@ -35,6 +49,9 @@ class PipeController(PipeAbstract):
             pipe_job_ids=[self.code],
         )
         job_metadata.update(updated_metadata=updated_metadata)
+
+        # check we have the required inputs in the working memory
+        self._validate_inputs_in_memory(working_memory=working_memory)
 
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:

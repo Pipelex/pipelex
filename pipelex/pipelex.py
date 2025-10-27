@@ -399,7 +399,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             **kwargs,
         )
         pipelex_instance.setup_libraries()
-        log.info(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 
     @classmethod

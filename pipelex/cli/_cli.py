@@ -68,7 +68,7 @@ def app_callback(ctx: typer.Context) -> None:
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand in ("init", "doctor"):
         return
 
-    init_cmd()
+    init_cmd(silent=True)
 
 
 @app.command(name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")

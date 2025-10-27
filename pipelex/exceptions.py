@@ -97,7 +97,10 @@ class WorkingMemoryStuffAttributeNotFoundError(WorkingMemoryVariableError):
 
 
 class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
-    pass
+    def __init__(self, message: str, variable_name: str, pipe_code: str | None = None, concept_code: str | None = None):
+        super().__init__(message, variable_name)
+        self.pipe_code = pipe_code
+        self.concept_code = concept_code
 
 
 class PipelexCLIError(PipelexException, ClickException):
@@ -224,6 +227,13 @@ class PipeInputError(PipelexException):
         self.pipe_code = pipe_code
         self.variable_name = variable_name
         self.concept_code = concept_code
+        super().__init__(message)
+
+
+class PipeRunInputsError(PipelexException):
+    def __init__(self, message: str, pipe_code: str, missing_inputs: dict[str, str]):
+        self.pipe_code = pipe_code
+        self.missing_inputs = missing_inputs
         super().__init__(message)
 
 

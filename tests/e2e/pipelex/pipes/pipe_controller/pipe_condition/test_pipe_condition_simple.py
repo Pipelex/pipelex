@@ -8,7 +8,7 @@ from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
-from pipelex.exceptions import DryRunMissingInputsError
+from pipelex.exceptions import DryRunMissingInputsError, PipeRunInputsError
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -42,7 +42,7 @@ class TestPipeConditionSimple:
         # Test with empty working memory - should FAIL
         empty_working_memory = WorkingMemoryFactory.make_empty()
 
-        with pytest.raises(DryRunMissingInputsError) as exc_info:
+        with pytest.raises(PipeRunInputsError) as exc_info:
             await pipe_condition.run_pipe(
                 job_metadata=JobMetadata(job_name="test_direct_condition_fail"),
                 working_memory=empty_working_memory,
@@ -53,7 +53,7 @@ class TestPipeConditionSimple:
         error = exc_info.value
         assert error.pipe_code == "test_condition_fail"
         assert "user_category" in error.missing_inputs
-        assert "missing required inputs" in str(error)
+        assert "Missing required inputs" in str(error)
 
     async def test_direct_pipe_condition_should_succeed(self):
         """Test a PipeCondition created directly in code that should SUCCEED dry run."""

@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import PipeRouterError
+from pipelex.exceptions import PipeRunInputsError
 from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -280,7 +280,7 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_single_stuff(doc_stuff)
 
-        with pytest.raises(PipeRouterError) as exc_info:
+        with pytest.raises(PipeRunInputsError) as exc_info:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="complex_document_processor"),
@@ -294,7 +294,7 @@ class TestPipeConditionComplex:
         assert error.pipe_code == "complex_document_processor"
         assert error.missing_inputs is not None
         assert "user_profile" in error.missing_inputs
-        assert "missing required inputs" in str(error)
+        assert "Missing required inputs" in str(error)
 
     @pytest.mark.parametrize(
         ("doc_type", "priority", "user_level", "department", "complexity", "language", "expected_output_contains"),

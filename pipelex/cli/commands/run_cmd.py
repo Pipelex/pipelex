@@ -7,6 +7,7 @@ from typing import Annotated
 import click
 import typer
 from posthog import new_context, tag
+from rich.console import Console
 
 from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_and_validate_bundle
@@ -190,7 +191,9 @@ def run_cmd(
 
         except Exception as exc:
             log.error(f"Error executing pipeline: {exc}")
-            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
+            console = Console(stderr=True)
+            console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
+            console.print_exception(show_locals=True)
             raise typer.Exit(1) from exc
 
     with new_context():

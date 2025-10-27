@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
@@ -14,6 +15,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeInputError,
     PipeInputNotFoundError,
+    PipeRunInputsError,
     WorkingMemoryStuffNotFoundError,
 )
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
@@ -76,6 +78,20 @@ class PipeBatch(PipeController):
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         return self.inputs
+
+    @override
+    def _validate_inputs_in_memory(self, working_memory: WorkingMemory) -> None:
+        if not self.batch_params:
+            raise PipeDefinitionError(message=f"PipeBatch '{self.code}' must have a batch_params", pipe_code=self.code)
+        required_concept_code = self.inputs.get_required_input_requirement(variable_name=self.batch_params.input_item_stuff_name).concept.code
+        required_stuff_name = self.batch_params.input_list_stuff_name
+        try:
+            working_memory.get_stuff(required_stuff_name)
+        except WorkingMemoryStuffNotFoundError as exc:
+            variable_name: str = exc.variable_name or required_stuff_name
+            missing_inputs: dict[str, str] = {variable_name: exc.concept_code or required_concept_code}
+            msg = f"Missing required inputs for pipe '{self.code}': {missing_inputs}"
+            raise PipeRunInputsError(message=msg, pipe_code=self.code, missing_inputs=missing_inputs) from exc
 
     async def _run_batch_pipe(
         self,

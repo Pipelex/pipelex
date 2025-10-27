@@ -61,7 +61,7 @@ class PipeAbstract(ABC, BaseModel):
                           If None, starts recursion detection with an empty set.
 
         Returns:
-            PipeInput containing all needed inputs for this pipe
+            InputRequirements containing all needed inputs for this pipe
 
         """
 

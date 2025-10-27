@@ -87,7 +87,7 @@ class SubPipe(BaseModel):
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:
-                sub_pipe_path = [*sub_pipe_run_params.pipe_layers, self.pipe_code]
+                sub_pipe_path = [*sub_pipe_run_params.pipe_stack, self.pipe_code]
                 sub_pipe_path_str = ".".join(sub_pipe_path)
                 error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
                 msg = f"Some required stuff(s) not found: {error_details}"

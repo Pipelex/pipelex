@@ -35,6 +35,7 @@ pipelex build pipe "Imagine a cute animal mascot for a startup based on its elev
 pipelex build pipe "Given an expense report, apply company rules"
 pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match"
 pipelex build pipe "Take a CV in a PDF file and a Job offer text, analyze if they match and generate 5 questions for the interview"
+pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview"
 
 pipelex build partial "Given an expense report, apply company rules" -o results/generated.json
 pipelex build flow "Given an expense report, apply company rules" -o results/flow.json
@@ -74,9 +75,7 @@ def build_pipe_cmd(
     ] = False,
 ) -> None:
     Pipelex.make(integration_mode=IntegrationMode.CLI)
-    typer.echo("=" * 70)
-    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
-    typer.echo("")
+    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
         if no_output:
@@ -293,9 +292,7 @@ def build_one_shot_cmd(
     ] = False,
 ) -> None:
     Pipelex.make(integration_mode=IntegrationMode.CLI)
-    typer.echo("=" * 70)
-    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
-    typer.echo("")
+    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
         if no_output:
@@ -370,9 +367,7 @@ def build_partial_cmd(
     ] = False,
 ) -> None:
     Pipelex.make(integration_mode=IntegrationMode.CLI)
-    typer.echo("=" * 70)
-    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
-    typer.echo("")
+    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
         output_path: str | None = None
