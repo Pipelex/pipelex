@@ -81,7 +81,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     def get_main_stuff(self) -> Stuff:
         return self.get_stuff(name=MAIN_STUFF_NAME)
 
-    # TODO: all calls to get_stuff should catch WorkingMemoryStuffNotFoundError in order to indicate what pipe is missing a required stuff
     def get_stuff(self, name: str) -> Stuff:
         if named_stuff := self.root.get(name):
             return named_stuff

@@ -15,6 +15,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeInputError,
     PipeInputNotFoundError,
+    PipeRunInputsError,
     WorkingMemoryStuffNotFoundError,
 )
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
@@ -84,14 +85,13 @@ class PipeBatch(PipeController):
             raise PipeDefinitionError(message=f"PipeBatch '{self.code}' must have a batch_params", pipe_code=self.code)
         required_concept_code = self.inputs.get_required_input_requirement(variable_name=self.batch_params.input_item_stuff_name).concept.code
         required_stuff_name = self.batch_params.input_list_stuff_name
-        if not working_memory.get_optional_stuff(required_stuff_name):
-            msg = f"Required stuff '{required_stuff_name}' not found in working memory"
-            raise WorkingMemoryStuffNotFoundError(
-                message=msg,
-                pipe_code=self.code,
-                variable_name=required_stuff_name,
-                concept_code=required_concept_code,
-            )
+        try:
+            working_memory.get_stuff(required_stuff_name)
+        except WorkingMemoryStuffNotFoundError as exc:
+            variable_name: str = exc.variable_name or required_stuff_name
+            missing_inputs: dict[str, str] = {variable_name: exc.concept_code or required_concept_code}
+            msg = f"Missing required inputs for pipe '{self.code}'"
+            raise PipeRunInputsError(message=msg, pipe_code=self.code, missing_inputs=missing_inputs) from exc
 
     async def _run_batch_pipe(
         self,
