@@ -58,6 +58,7 @@ pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and ge
 
 This command generates a production-ready `.plx` file with domain definitions, concepts, and multiple processing steps that analyzes CV-job fit and prepares interview questions.
 
+**cv_match.plx**
 ```toml
 domain = "cv_match"
 description = "Matching CVs with job offers and generating interview questions"
@@ -175,8 +176,8 @@ The questions should:
 Generate exactly 5 interview questions.
 """
 ```
-
 </details>
+
 
 **View the pipeline flowchart:**
 
