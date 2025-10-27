@@ -102,7 +102,6 @@ See [Configure AI Providers](https://docs.pipelex.com/pages/setup/configure-ai-p
 Create a complete AI workflow with a single command:
 
 ```bash
-# CV matching with interview prep
 pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview" --output results/cv_match.plx
 ```
 
