@@ -16,7 +16,6 @@ from pipelex import Pipelex
 pipelex = Pipelex.make(
     template_provider=MyTemplateProvider(),
     pipeline_tracker=MyPipelineTracker(),
-    activity_manager=MyActivityManager(),
     reporting_delegate=MyReportingDelegate(),
     secrets_provider=MySecretsProvider(),
     content_generator=MyContentGenerator(),
@@ -67,43 +66,36 @@ When a feature is disabled, the corresponding NoOp implementation is used automa
 
 Pipelex supports injection of the following components:
 
-1. **Template Provider** (`TemplateLibrary`)
+**Template Provider** (`TemplateLibrary`)
 
-    - Protocol: `TemplateProviderAbstract`
-    - Default: `TemplateLibrary`
-    - [Details](template-provider-injection.md)
+ - Protocol: `TemplateProviderAbstract`
+ - Default: `TemplateLibrary`
+ - [Details](template-provider-injection.md)
 
-2. **Reporting Delegate** (`ReportingManager`)
+**Reporting Delegate** (`ReportingManager`)
 
-    - Protocol: `ReportingProtocol`
-    - Default: `ReportingManager` or `ReportingNoOp` if disabled
-    - [Details](reporting-delegate-injection.md)
+ - Protocol: `ReportingProtocol`
+ - Default: `ReportingManager` or `ReportingNoOp` if disabled
+ - [Details](reporting-delegate-injection.md)
 
-3. **Pipeline Tracker** (`PipelineTracker`)
+**Pipeline Tracker** (`PipelineTracker`)
 
-    - Protocol: `PipelineTrackerProtocol`
-    - Default: `PipelineTracker` or `PipelineTrackerNoOp` if disabled
-    - [Details](pipeline-tracker-injection.md)
+ - Protocol: `PipelineTrackerProtocol`
+ - Default: `PipelineTracker` or `PipelineTrackerNoOp` if disabled
+ - [Details](pipeline-tracker-injection.md)
 
-4. **Activity Manager** (`ActivityManager`)
+**Secrets Provider** (`EnvSecretsProvider`)
 
-    - Protocol: `ActivityManagerProtocol`
-    - Default: `ActivityManager` or `ActivityManagerNoOp` if disabled
-    - [Details](activity-manager-injection.md)
+ - Protocol: `SecretsProviderAbstract`
+ - Default: `EnvSecretsProvider`
+ - [Details](secrets-provider-injection.md)
 
-5. **Secrets Provider** (`EnvSecretsProvider`)
-
-    - Protocol: `SecretsProviderAbstract`
-    - Default: `EnvSecretsProvider`
-    - [Details](secrets-provider-injection.md)
-
-6. **Content Generator** (`ContentGenerator`)
-
-    - Protocol: `ContentGeneratorProtocol`
-    - Default: `ContentGenerator`
-    - [Details](content-generator-injection.md)
-
-7. **Pipe Router** (`PipeRouter`)
+**Content Generator** (`ContentGenerator`)
+ - Protocol: `ContentGeneratorProtocol`
+ - Default: `ContentGenerator`
+ - [Details](content-generator-injection.md)
+ 
+**Pipe Router** (`PipeRouter`)
 
     - Protocol: `PipeRouterProtocol`
     - Default: `PipeRouter`

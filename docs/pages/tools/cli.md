@@ -156,7 +156,8 @@ pipelex validate --bundle my_pipeline.plx --pipe extract_invoice
 pipelex validate --bundle invoice_processor.plx --pipe validate_amounts
 ```
 
-**Important:** The specified pipe must be defined in the bundle. This is useful when you want to validate a bundle and confirm a specific pipe is present and valid within it. However, the entire bundle will be validated regardless.
+!!! important "Bundle Validation Behavior"
+    The specified pipe must be defined in the bundle. This is useful when you want to validate a bundle and confirm a specific pipe is present and valid within it. However, the entire bundle will be validated regardless.
 
 ### What Validation Checks
 

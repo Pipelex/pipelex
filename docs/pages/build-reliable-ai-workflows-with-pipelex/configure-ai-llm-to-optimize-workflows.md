@@ -31,7 +31,8 @@ base-gpt = "gpt-5"
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
 
-💡 Defining an alias is always meant to describe what model it is. Never define an alias to describe what it is for or what it's good at. LLM Presets are for that.
+!!! tip "Alias Naming Convention"
+    Defining an alias is always meant to describe what model it is. Never define an alias to describe what it is for or what it's good at. LLM Presets are for that.
 
 ## LLM Settings & LLM Presets
 

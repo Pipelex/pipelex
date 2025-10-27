@@ -668,7 +668,8 @@ When you provide `plx_content`:
 3. The pipeline is executed if valid
 4. Errors are returned if the pipeline definition is invalid
 
-**Important:** `plx_content` and `pipe_code` are mutually exclusive. Use one or the other, not both.
+!!! important "Mutually Exclusive Parameters"
+    `plx_content` and `pipe_code` are mutually exclusive. Use one or the other, not both.
 
 ---
 

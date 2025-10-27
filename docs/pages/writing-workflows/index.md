@@ -2,8 +2,8 @@
 
 Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.plx` language.
 
-💡 Prefer automated workflow generation?"
-If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate workflows from natural language descriptions. See the [Getting Started guide](../../index.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write workflows manually or understand the `.plx` language in depth.
+!!! tip "Prefer Automated Workflow Generation?"
+    If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate workflows from natural language descriptions. See the [Getting Started guide](../../index.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write workflows manually or understand the `.plx` language in depth.
 
 Let's build a **character generator** to understand the basics.
 
@@ -110,7 +110,8 @@ Think of it and then output the character description.
 # it's a base preset that we provide. you can add your own presets, too.
 ```
 
-💡 We have many [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
+!!! tip "LLM Presets"
+    We have many [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
 
 Learn more in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md).
 
@@ -177,9 +178,11 @@ Think of it and then output the character description.
 """
 ```
 
-💡 The concept name matches the class name (`Character`), so Pipelex automatically links them.
+!!! tip "Concept Naming"
+    The concept name matches the class name (`Character`), so Pipelex automatically links them.
 
-💡 Defining concepts removes ambiguity—"character" could mean a letter or symbol, but here it clearly means a fictional person.
+!!! tip "Semantic Clarity"
+    Defining concepts removes ambiguity—"character" could mean a letter or symbol, but here it clearly means a fictional person.
 
 #### Run Your Pipeline
 
@@ -216,7 +219,8 @@ class CharacterMetadata(StructuredContent):
 
 #### Use a Template to Fill Prompts with Data
 
-💡 Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `{{ double.curly.braces }}` or the simpler `@` prefix (recommended).
+!!! tip "Template Syntax"
+    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `{{ double.curly.braces }}` or the simpler `@` prefix (recommended).
 
 ```plx
 [concept]
@@ -237,7 +241,8 @@ Your task is to extract specific data from the following description.
 """
 ```
 
-💡 `@character.description` grabs the `character` stuff from working memory and uses its `description` attribute.
+!!! tip "Template Variables"
+    `@character.description` grabs the `character` stuff from working memory and uses its `description` attribute.
 
 Learn more about Jinja in the [PipeLLM documentation](../build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md).
 

@@ -34,7 +34,8 @@ pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and ge
 
 Each of these commands generates a complete production-ready script in our Pipelex language, saved as `.plx` file including domain definition, concepts, and the multiple _pipe_ steps to take to achieve the goal.
 
-💡 For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key, otherwise, you can also create the workflows yourself, following our [documentation guide](pages/writing-workflows/index.md).
+!!! tip "Pipe Builder Requirements"
+    For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BlackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key, otherwise, you can also create the workflows yourself, following our [documentation guide](pages/writing-workflows/index.md).
 
 
 ## Run your pipeline

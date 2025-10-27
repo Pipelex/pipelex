@@ -66,6 +66,7 @@ plugins:
 
 markdown_extensions:
   - meta
+  - admonition
   - attr_list
   - md_in_html
   - pymdownx.blocks.caption
@@ -165,12 +166,10 @@ nav:
       - Secrets Provider: pages/advanced-customization/secrets-provider-injection.md
       - Reporting Delegate: pages/advanced-customization/reporting-delegate-injection.md
       - Pipeline Tracker: pages/advanced-customization/pipeline-tracker-injection.md
-      - Activity Manager: pages/advanced-customization/activity-manager-injection.md
       - Storage Provider: pages/advanced-customization/storage-provider-injection.md
       - Template Provider: pages/advanced-customization/template-provider-injection.md
       - Content Generator: pages/advanced-customization/content-generator-injection.md
       - Pipe Router: pages/advanced-customization/pipe-router-injection.md
-      - Plugin Manager: pages/advanced-customization/plugin-manager-injection.md
     - License: license.md
     - Contributing: contributing.md
     - Code of Conduct: CODE_OF_CONDUCT.md

@@ -151,5 +151,6 @@ Now that you have your backend configured:
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook)
 4. **Deep dive**: [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md)
 
-💡 For detailed backend configuration options, see [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md).
+!!! tip "Advanced Configuration"
+    For detailed backend configuration options, see [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md).
 
