@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [v0.14.0] - 2025-10-27
 
 ### Added
  - **`pipelex doctor` command**: Diagnoses and fixes common configuration issues including missing files, invalid telemetry settings, and unset environment variables for enabled backends.
@@ -18,6 +18,10 @@
  - **Error handling improvements**: Pipelines now validate required inputs upfront and fail early with `PipeRunInputsError`. `pipelex run` prints full rich-formatted exception tracebacks on error.
  - **Default enabled backends**: Amazon Bedrock, Google AI, and Google Vertex AI are now enabled by default.
  - **Naming consistency**: "AWS Bedrock" renamed to "Amazon Bedrock" throughout codebase, configuration, and documentation.
+
+### Fixed
+
+- Some documentation links were broken.
 
 ## [v0.13.2] - 2025-10-25
 
