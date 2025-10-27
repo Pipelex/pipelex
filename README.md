@@ -222,6 +222,19 @@ Generate exactly 5 interview questions.
 ```
 
 ```mermaid
+---
+config:
+  theme: dark
+  themeVariables:
+    background: transparent
+    primaryTextColor: '#E8EEF7'
+    lineColor: '#9BB3D7'
+    fontFamily: ''
+  flowchart:
+    nodeSpacing: 100     # horizontal spacing between nodes
+    rankSpacing: 70     # vertical spacing between ranks
+    padding: 30   
+---
 flowchart TD
  subgraph PAR["extract_documents_parallel (PipeParallel)"]
     direction LR
