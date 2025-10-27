@@ -31,8 +31,6 @@ Write business logic, not API calls.</p>
 
 # 🚀 Quick start
 
-Follow this step-by-step tutorial to build your first AI workflow in minutes:
-
 ## 1. Install Pipelex
 
 ```bash
