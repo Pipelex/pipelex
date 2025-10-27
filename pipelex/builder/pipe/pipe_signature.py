@@ -2,10 +2,13 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
+from typing_extensions import override
 
+from pipelex import pretty_print
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 
 
 class PipeSignature(StructuredContent):
@@ -61,3 +64,20 @@ class PipeSignature(StructuredContent):
     @classmethod
     def validate_type(cls, type_value: str) -> AllowedPipeTypes:
         return AllowedPipeTypes(type_value)
+
+    @override
+    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
+        the_dict: dict[str, Any] = self.smart_dump()
+        the_dict = remove_none_values_from_dict(data=the_dict)
+        if number:
+            title = f"Pipe signature #{number}: {self.code}"
+        else:
+            title = f"Pipe signature: {self.code}"
+        title += f" • {self.type} -> {self.result}"
+        subtitle = self.description
+        the_dict.pop("code")
+        the_dict.pop("description")
+        the_dict.pop("type")
+        the_dict.pop("pipe_category")
+        the_dict.pop("result")
+        pretty_print(the_dict, title=title, subtitle=subtitle)

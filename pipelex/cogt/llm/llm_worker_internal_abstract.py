@@ -37,7 +37,7 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @property
     @override
     def desc(self) -> str:
-        return f"LLM-Worker: {self.inference_model.tag}"
+        return self.inference_model.tag
 
     @property
     @override
@@ -49,7 +49,7 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         self,
         llm_job: LLMJob,
     ):
-        log.info(f"{self.desc} --------------------------------")
+        log.info(f"✨ {self.desc} ✨")
         await super()._before_job(llm_job=llm_job)
         llm_job.llm_job_before_start(inference_model=self.inference_model)
         if get_config().cogt.llm_config.is_dump_text_prompts_enabled:

@@ -2,13 +2,15 @@ import re
 from typing import Any
 
 from pydantic import Field, field_validator
+from typing_extensions import override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
 
 
@@ -129,3 +131,19 @@ class PipeSpec(StructuredContent):
             type=self.type,
             pipe_category=self.pipe_category,
         )
+
+    @override
+    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
+        the_dict: dict[str, Any] = self.smart_dump()
+        the_dict = remove_none_values_from_dict(data=the_dict)
+        if number:
+            title = f"Pipe #{number}: {self.pipe_code}"
+        else:
+            title = f"Pipe: {self.pipe_code}"
+        title += f" • {self.type}"
+        subtitle = self.description
+        the_dict.pop("pipe_code")
+        the_dict.pop("description")
+        the_dict.pop("type")
+        the_dict.pop("pipe_category")
+        pretty_print(the_dict, title=title, subtitle=subtitle)

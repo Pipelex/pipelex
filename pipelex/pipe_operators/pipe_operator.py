@@ -3,7 +3,7 @@ from typing import Generic, Literal, TypeVar
 
 from typing_extensions import override
 
-from pipelex import log, pretty_print, pretty_print_md
+from pipelex import log, pretty_print_md
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -54,9 +54,13 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                     output_name=output_name,
                 )
                 if isinstance(pipe_output.main_stuff.content, TextContent):
+                    print()
                     pretty_print_md(pipe_output.main_stuff_as_str, title=f"PipeOutput of pipe {self.code}")
+                    print()
                 else:
-                    pretty_print(pipe_output.main_stuff, title=f"PipeOutput of pipe {self.code}")
+                    print()
+                    pipe_output.main_stuff.pretty_print_stuff(title=f"PipeOutput of pipe {self.code}: {self.output.code}")
+                    print()
             case PipeRunMode.DRY:
                 name = f"Dry run [cyan]{self.class_name}[/cyan]"
                 indent_level = len(pipe_run_params.pipe_stack) - 1

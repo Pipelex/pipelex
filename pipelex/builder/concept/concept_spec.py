@@ -3,8 +3,9 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
+from typing_extensions import override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptBlueprintError,
@@ -16,6 +17,7 @@ from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringOrConceptCodeError
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
 from pipelex.types import Self, StrEnum
 
@@ -258,3 +260,24 @@ class ConceptSpec(StructuredContent):
                 converted_structure[field_name] = field_spec.to_blueprint()
 
         return ConceptBlueprint(description=self.description, structure=converted_structure, refines=self.refines)
+
+    @override
+    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
+        the_dict: dict[str, Any] = self.smart_dump()
+        the_dict = remove_none_values_from_dict(data=the_dict)
+        if number:
+            title = f"Concept #{number}: {self.the_concept_code}"
+        else:
+            title = f"Concept: {self.the_concept_code}"
+        if self.refines:
+            title += f" • Refines {self.refines}"
+            the_dict.pop("refines")
+
+        description = self.description
+        the_dict.pop("the_concept_code")
+        the_dict.pop("description")
+        if self.structure:
+            structure = the_dict.pop("structure")
+            pretty_print(structure, title=title, subtitle=description)
+        else:
+            pretty_print(description, title=title)

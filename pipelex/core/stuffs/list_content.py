@@ -78,3 +78,14 @@ class ListContent(StuffContent, Generic[StuffContentType]):
                 rendered += item.rendered_str(text_format=TextFormat.MARKDOWN)
                 rendered += "\n"
         return rendered
+
+    @override
+    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
+        for item_index, item in enumerate(self.items):
+            item_number = item_index + 1
+            if title:
+                item_title = f"{title} • Item #{item_number}"
+            else:
+                item_title = f"Item #{item_index + 1}"
+            item.pretty_print_content(title=item_title, number=item_number)
+            print()
