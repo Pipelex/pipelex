@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added a method to provide the template inputs for a pipe in JSON.
+
 ## [v0.13.2] - 2025-10-25
 
 ### Added
