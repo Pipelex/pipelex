@@ -23,7 +23,7 @@
             "args": [
                 "-s",
                 "-vv",
-                "-k test_boot"
+                "-k test_discord_newsletter_dry_run_working_memory"
             ],
             "console": "integratedTerminal"
         },

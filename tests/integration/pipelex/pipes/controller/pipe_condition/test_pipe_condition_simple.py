@@ -12,7 +12,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import PipeRouterError
+from pipelex.exceptions import PipeRunInputsError
 from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
@@ -219,7 +219,7 @@ class TestPipeConditionSimple:
         empty_working_memory = WorkingMemoryFactory.make_empty()
 
         # Run dry run using the real pipe - this should fail with PipeRouterError
-        with pytest.raises(PipeRouterError) as exc_info:
+        with pytest.raises(PipeRunInputsError) as exc_info:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
@@ -234,8 +234,7 @@ class TestPipeConditionSimple:
         assert error.pipe_code == "basic_condition_by_category_2"
         assert error.missing_inputs is not None
         assert "input_data" in error.missing_inputs
-        assert "missing required inputs" in str(error)
-        assert "input_data" in str(error)
+        assert "Missing required inputs" in str(error)
 
     async def test_condition_dry_run_medium_category_validation(self, request: FixtureRequest):
         """Test PipeCondition dry run with medium category - should validate the 'medium' branch."""

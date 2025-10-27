@@ -230,6 +230,13 @@ class PipeInputError(PipelexException):
         super().__init__(message)
 
 
+class PipeRunInputsError(PipelexException):
+    def __init__(self, message: str, pipe_code: str, missing_inputs: dict[str, str]):
+        self.pipe_code = pipe_code
+        self.missing_inputs = missing_inputs
+        super().__init__(message)
+
+
 class DomainLoadingError(LibraryLoadingError):
     def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
         self.domain_code = domain_code
