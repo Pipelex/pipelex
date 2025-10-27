@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
@@ -76,6 +77,21 @@ class PipeBatch(PipeController):
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         return self.inputs
+
+    @override
+    def _validate_inputs_in_memory(self, working_memory: WorkingMemory) -> None:
+        if not self.batch_params:
+            raise PipeDefinitionError(message=f"PipeBatch '{self.code}' must have a batch_params", pipe_code=self.code)
+        required_concept_code = self.inputs.get_required_input_requirement(variable_name=self.batch_params.input_item_stuff_name).concept.code
+        required_stuff_name = self.batch_params.input_list_stuff_name
+        if not working_memory.get_optional_stuff(required_stuff_name):
+            msg = f"Required stuff '{required_stuff_name}' not found in working memory"
+            raise WorkingMemoryStuffNotFoundError(
+                message=msg,
+                pipe_code=self.code,
+                variable_name=required_stuff_name,
+                concept_code=required_concept_code,
+            )
 
     async def _run_batch_pipe(
         self,

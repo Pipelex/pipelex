@@ -63,7 +63,7 @@
                 "run",
                 "results/test_1.plx",
                 "--inputs",
-                "results/inputs_1.json",
+                "results/inputs_2.json",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
