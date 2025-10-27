@@ -279,6 +279,14 @@ def display_health_report(
             console.print("[dim]Run[/dim] [cyan]pipelex doctor --fix[/cyan] [dim]to interactively fix auto-fixable issues.[/dim]")
             console.print()
 
+        # Show Discord support for manual-fix issues (regardless of --fix flag)
+        has_config_validation_error = not config_healthy and config_missing_count == 0
+        has_backend_credential_issues = not backends_healthy and backend_reports
+        if has_config_validation_error or has_backend_credential_issues:
+            console.print("[dim]If you need help with manual fixes, join our Discord community:[/dim]")
+            console.print("[cyan]https://go.pipelex.com/discord[/cyan]")
+            console.print()
+
 
 def doctor_cmd(
     fix: bool = False,
@@ -405,11 +413,6 @@ def doctor_cmd(
                     for var_name in sorted(all_missing_vars):
                         console.print(f"set {var_name}=[yellow]your_value_here[/yellow]")
                     console.print()
-
-            # Offer Discord support
-            console.print("[dim]If you need help fixing these issues, join our Discord community:[/dim]")
-            console.print("[cyan]https://go.pipelex.com/discord[/cyan]")
-            console.print()
 
         sys.exit(1)
 
