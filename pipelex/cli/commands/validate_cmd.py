@@ -19,7 +19,7 @@ from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.telemetry_manager import PACKAGE_VERSION
+from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
     from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
@@ -33,7 +33,7 @@ def do_validate_all_libraries_and_dry_run() -> None:
     pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
 
         pipelex_instance.validate_libraries()
@@ -167,7 +167,7 @@ def validate_cmd(
 
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         if bundle_path:
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} bundle")
         else:

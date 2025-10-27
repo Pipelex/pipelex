@@ -18,7 +18,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.telemetry_manager import PACKAGE_VERSION
+from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
     from pipelex.cogt.models.model_manager import ModelManager
@@ -184,7 +184,7 @@ def list_pipes_cmd() -> None:
 
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPES}")
 
         do_list_pipes()
@@ -204,7 +204,7 @@ def show_pipe_cmd(
 
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
         do_show_pipe(pipe_code=pipe_code)
@@ -230,7 +230,7 @@ def show_models_cmd(
     Pipelex.make(integration_mode=IntegrationMode.CLI)
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MODELS}")
 
         asyncio.run(
@@ -256,7 +256,7 @@ def show_backends_cmd(
     Pipelex.make(integration_mode=IntegrationMode.CLI)
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_BACKENDS}")
 
         do_show_backends(show_all=show_all_backends)

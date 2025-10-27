@@ -1,4 +1,3 @@
-from importlib.metadata import metadata
 from typing import Any, Callable
 
 import posthog
@@ -12,10 +11,9 @@ from pipelex.system.telemetry.events import EventName, EventProperty, Setting
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
+from pipelex.tools.misc.package_utils import get_package_version
 
 DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
-PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
-PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
 
 class TelemetryManager(TelemetryManagerAbstract):
@@ -89,15 +87,16 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def setup(self, integration_mode: IntegrationMode):
         if telemetry_mode := TelemetryManagerAbstract.telemetry_was_just_enabled():
+            package_version = get_package_version()
             with new_context():
                 tag(name=EventProperty.INTEGRATION, value=integration_mode)
-                tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+                tag(name=EventProperty.PIPELEX_VERSION, value=package_version)
                 tag(name=EventProperty.SETTING, value=Setting.TELEMETRY_MODE)
             self.posthog.capture(
                 EventName.TELEMETRY_JUST_ENABLED,
                 properties={
                     EventProperty.TELEMETRY_MODE: telemetry_mode,
-                    EventProperty.PIPELEX_VERSION: PACKAGE_VERSION,
+                    EventProperty.PIPELEX_VERSION: package_version,
                 },
             )
 

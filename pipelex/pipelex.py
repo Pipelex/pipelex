@@ -1,5 +1,4 @@
 import os
-from importlib.metadata import metadata
 from typing import Any, cast
 
 from kajson.class_registry import ClassRegistry
@@ -58,6 +57,7 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.system.telemetry.telemetry_manager import DO_NOT_TRACK_ENV_VAR_KEY, TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract, TelemetryManagerNoOp
 from pipelex.test_extras.registry_test_models import TestRegistryModels
+from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -65,8 +65,7 @@ from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstr
 from pipelex.types import Self
 from pipelex.urls import URLs
 
-PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
-PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
+PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
 
 class Pipelex(metaclass=MetaSingleton):

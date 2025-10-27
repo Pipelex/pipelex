@@ -13,6 +13,7 @@ from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
+from pipelex.tools.misc.package_utils import get_package_version
 
 
 class PipelexCLI(TyperGroup):
@@ -48,8 +49,9 @@ app = typer.Typer(
 def app_callback(ctx: typer.Context) -> None:
     """Run pre-command checks like printing the logo and checking telemetry consent."""
     console = Console()
+    package_version = get_package_version()
     console.print(
-        """
+        f"""
 
 ░█████████  ░[bold green4]██[/bold green4]                      ░██
 ░██     ░██                          ░██
@@ -59,8 +61,7 @@ def app_callback(ctx: typer.Context) -> None:
 ░██         ░██░███   ░██ ░██        ░██ ░██         ░██  ░██
 ░██         ░██░██░█████   ░███████  ░██  ░███████  ░██    ░██
                ░██
-               ░██
-
+               ░██                                     v{package_version}
 """
     )
     # Skip checks if no command is being run (e.g., just --help) or if running init/doctor command

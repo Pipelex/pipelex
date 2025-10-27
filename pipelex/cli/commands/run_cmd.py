@@ -16,9 +16,9 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
-from pipelex.system.telemetry.telemetry_manager import PACKAGE_VERSION
 from pipelex.tools.misc.file_utils import get_incremental_file_path
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "run"
 
@@ -195,6 +195,6 @@ def run_cmd(
 
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=COMMAND)
         asyncio.run(run_pipeline(pipe_code=pipe_code, bundle_path=bundle_path))

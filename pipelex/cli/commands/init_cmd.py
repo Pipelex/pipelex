@@ -1,6 +1,5 @@
 import os
 import shutil
-from importlib.metadata import metadata
 from typing import Any
 
 import typer
@@ -26,9 +25,6 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
-
-PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
-PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
 
 
 def update_backends_in_toml(toml_doc: Any, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
