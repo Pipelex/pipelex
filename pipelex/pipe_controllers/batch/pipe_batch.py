@@ -90,7 +90,7 @@ class PipeBatch(PipeController):
         except WorkingMemoryStuffNotFoundError as exc:
             variable_name: str = exc.variable_name or required_stuff_name
             missing_inputs: dict[str, str] = {variable_name: exc.concept_code or required_concept_code}
-            msg = f"Missing required inputs for pipe '{self.code}'"
+            msg = f"Missing required inputs for pipe '{self.code}': {missing_inputs}"
             raise PipeRunInputsError(message=msg, pipe_code=self.code, missing_inputs=missing_inputs) from exc
 
     async def _run_batch_pipe(

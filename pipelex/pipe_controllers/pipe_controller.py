@@ -29,7 +29,9 @@ class PipeController(PipeAbstract):
                 variable_name: str = exc.variable_name or required_stuff_name
                 missing_inputs[variable_name] = exc.concept_code or requirement.concept.code
         if missing_inputs:
-            raise PipeRunInputsError(message=f"Missing required inputs for pipe '{self.code}'", pipe_code=self.code, missing_inputs=missing_inputs)
+            raise PipeRunInputsError(
+                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
+            )
 
     @override
     async def run_pipe(
