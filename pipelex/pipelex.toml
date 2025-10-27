@@ -300,3 +300,6 @@ ocr = "model"
 llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
+
+
+[migration.migration_maps.telemetry]

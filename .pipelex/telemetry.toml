@@ -1,4 +1,4 @@
-telemetry_mode = "anonymous"                                               # Values: "off" | "anonymous" | "identified"
+telemetry_mode = "anonymous"                                         # Values: "off" | "anonymous" | "identified"
 host = "https://eu.i.posthog.com"
 project_api_key = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
 respect_dnt = true
