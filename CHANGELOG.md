@@ -2,7 +2,22 @@
 
 ## Unreleased
 
-- Added a method to provide the template inputs for a pipe in JSON.
+### Added
+ - **`pipelex doctor` command**: Diagnoses and fixes common configuration issues including missing files, invalid telemetry settings, and unset environment variables for enabled backends.
+ - **Interactive backend selection in `pipelex init`**: Multi-select menu for enabling/disabling inference backends (OpenAI, Anthropic, Amazon Bedrock, etc.).
+ - **JSON input support**: `pipelex run --inputs` flag accepts a JSON file path for passing structured data to pipelines.
+ - **`pretty_print` methods**: Added to `PipeSpec`, `ConceptSpec`, and `Stuff` objects for readable debugging output.
+ - **VS Code debug configuration**: "Debug run pipe" launch configuration for debugging pipeline executions.
+ - **`display_name` attribute**: Added to all inference backends in `backends.toml` for better UI presentation.
+ - **Documentation headers**: All default `.toml` configuration files now include headers with links to documentation and support channels.
+
+### Changed
+ - **`pipelex init` redesign**: Transformed into a unified, interactive setup wizard with rich terminal UI for configuration files, backend selection, and telemetry preferences. Telemetry is now configured here instead of via first-run prompt.
+ - **`README.md` rewrite**: Complete overhaul featuring a simplified 5-step quick-start guide highlighting the `pipelex build` command.
+ - **Documentation updates**: "Quick Start" guide renamed to "Writing Workflows" with simplified content. Python examples updated to use JSON input method, removing manual `Stuff` and `WorkingMemory` object creation boilerplate. Developer guides and AI assistant rules now recommend `pipelex validate` over `make validate`. Added instructions emphasizing `.venv` activation before running commands.
+ - **Error handling improvements**: Pipelines now validate required inputs upfront and fail early with `PipeRunInputsError`. `pipelex run` prints full rich-formatted exception tracebacks on error.
+ - **Default enabled backends**: Amazon Bedrock, Google AI, and Google Vertex AI are now enabled by default.
+ - **Naming consistency**: "AWS Bedrock" renamed to "Amazon Bedrock" throughout codebase, configuration, and documentation.
 
 ## [v0.13.2] - 2025-10-25
 
