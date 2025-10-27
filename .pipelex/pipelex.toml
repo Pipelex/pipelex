@@ -21,6 +21,9 @@
 # - Feature flags for tracking and reporting
 # - Observer and reporting output directories
 #
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
 ####################################################################################################
 
 [pipelex.scan_config]
