@@ -2,8 +2,8 @@
   <a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
   <h2 align="center">AI Workflows That Agents Build & Run</h2>
-  <h3 align="center">Pipelex is developing the open standard for repeatable AI workflows.<br/>
-Write business logic, not API calls.</h3>
+  <p align="center">Pipelex is developing the open standard for repeatable AI workflows.<br/>
+Write business logic, not API calls.</p>
 
   <div>
     <a href="https://go.pipelex.com/demo"><strong>Demo</strong></a> -
