@@ -6,9 +6,9 @@ This guide covers everything you need to know about using the Pipelex API to exe
 
 1. [Quick Reference](#quick-reference)
 2. [Execute Pipeline](#execute-pipeline)
-3. [Input Format: PipelineInputs](#input-format-implicitmemory)
+3. [Input Format: PipelineInputs](#input-format-pipelineinputs)
    - [Case 1: Direct Content Format](#case-1-direct-content-format)
-   - [Case 2: Explicit Format](#case-2-explicit-format-concept--content)
+   - [Case 2: Explicit Format (Concept and Content)](#case-2-explicit-format-concept-and-content)
 4. [Search Domains Explained](#search-domains-explained)
 5. [PLX Content: Execute Pipelines Inline](#plx-content-execute-pipelines-inline)
 6. [Error Handling](#error-handling)
@@ -77,6 +77,7 @@ Execute a Pipelex pipeline with flexible inputs.
 **Endpoint:** `POST /pipeline/{pipe_code}/execute`
 
 **Path Parameters:**
+
 - `pipe_code` (string, required): The code identifying the pipeline to execute
 
 **Request Body:**
@@ -94,7 +95,8 @@ Execute a Pipelex pipeline with flexible inputs.
 ```
 
 **Request Fields:**
-- `inputs` (PipelineInputs): Flexible input format - see [Input Format](#input-format-implicitmemory) below
+
+- `inputs` (PipelineInputs): Flexible input format - see [Input Format: PipelineInputs](#input-format-pipelineinputs) below
 - `output_name` (string, optional): Name for the output slot
 - `output_multiplicity` (string, optional): Output multiplicity setting
 - `dynamic_output_concept_code` (string, optional): Override output concept
@@ -135,6 +137,7 @@ The `inputs` field uses **PipelineInputs** format - a smart, flexible way to pro
 ### How Input Formatting Works
 
 **Case 1: Direct Content** - Provide the value directly (simplest)
+
 - 1.1: String → `"my text"`
 - 1.2: List of strings → `["text1", "text2"]`
 - 1.3: StructuredContent object → `MyClass(arg1="value")`
@@ -144,6 +147,7 @@ The `inputs` field uses **PipelineInputs** format - a smart, flexible way to pro
 **Note:** Cases 1.3 and 1.5 are at the same level - both handle content types that inherit from `StuffContent`, but for different purposes (custom classes vs. list wrappers).
 
 **Case 2: Explicit Format** - Use `{"concept": "...", "content": "..."}` for control (plain dict or DictStuff instance)
+
 - 2.1: String with concept → `{"concept": "Text", "content": "my text"}`
 - 2.2: List of strings with concept → `{"concept": "Text", "content": ["text1", "text2"]}`
 - 2.3: StructuredContent object with concept → `{"concept": "Invoice", "content": InvoiceObject}`
@@ -203,12 +207,14 @@ inputs = {
 ```
 
 **What is StructuredContent?**
+
 - `StructuredContent` is the base class for user-defined data structures in Pipelex
 - You create your own classes by inheriting from `StructuredContent`
 - These classes are defined in your project's Python files
 - Learn more: [Python StructuredContent Classes](../build-reliable-ai-workflows-with-pipelex/define_your_concepts.md#3-python-structuredcontent-classes)
 
 **Concept Resolution:**
+
 - The system searches all available domains for a concept matching the class name
 - If multiple concepts with the same name exist in different domains → **Error**: Must specify domain
 - If no concept is found → **Error**
@@ -228,10 +234,12 @@ inputs = {
 ```
 
 **What it accepts:**
+
 - Lists of `StructuredContent` objects (user-defined classes)
 - Lists of native content objects (`TextContent`, `ImageContent`, etc.)
 
 **Requirements:**
+
 - All items must be of the same type
 - Concept resolution follows the same rules as 1.3
 - Creates a new `ListContent` wrapper internally
@@ -253,16 +261,19 @@ inputs = {
 ```
 
 **Key Difference from Case 1.4:**
+
 - Case 1.4: Plain Python list `[item1, item2]` → **Creates** a new `ListContent` wrapper
 - Case 1.5: Already wrapped `ListContent(items=[item1, item2])` → **Uses** the wrapper directly
 
 **Why Case 1.5 is Separate from Case 1.3:**
+
 - `StructuredContent` and `ListContent` are **sibling classes** (both inherit from `StuffContent`)
 - Case 1.3 handles user-defined structured data classes
 - Case 1.5 handles list container wrappers
 - They're at the same inheritance level, not parent-child
 
 **Requirements:**
+
 - All items within the `ListContent` must be `StuffContent` objects (this includes both `StructuredContent` and native content like `TextContent`, `ImageContent`)
 - All items must be of the same type
 - The `ListContent` cannot be empty
@@ -272,7 +283,7 @@ inputs = {
 
 ---
 
-## Case 2: Explicit Format (Concept + Content)
+## Case 2: Explicit Format (Concept and Content)
 
 Use the explicit format `{"concept": "...", "content": "..."}` when you need precise control over concept selection or when working with domain-specific concepts.
 
@@ -290,6 +301,7 @@ Use the explicit format `{"concept": "...", "content": "..."}` when you need pre
 ```
 
 **Concept Options:**
+
 - `"Text"` or `"native.Text"` for native text
 - Any custom concept that is strictly compatible with `native.Text`
 
@@ -328,6 +340,7 @@ Use the explicit format `{"concept": "...", "content": "..."}` when you need pre
 **Concept Resolution with Search Domains:**
 
 When you specify a concept name without a domain prefix:
+
 - ✅ If the concept exists in only one domain → Automatically found
 - ❌ If the concept exists in multiple domains → **Error**: "Multiple concepts found. Please specify domain as 'domain.Concept'"
 - ❌ If the concept doesn't exist → **Error**: "Concept not found"
@@ -467,10 +480,12 @@ response = await client.execute_pipeline(
 ```
 
 **DictStuff Structure:**
+
 - `concept` (str): The concept code (with optional domain prefix)
 - `content` (dict[str, Any] | list[Any]): The actual data content
 
 **Content Types:**
+
 - **Dictionary**: Single structured object → Creates a single Stuff
 - **List of dicts**: Multiple structured objects → Creates ListContent with validated items
 - **List of strings** (for Text-compatible concepts): Creates ListContent of TextContent
@@ -546,6 +561,7 @@ Combine different input types in a single request:
 ```
 
 In this example:
+
 - `text` uses direct string format (Case 1.1)
 - `category` uses explicit format with structured content (Case 2.5)
 - `options` uses direct list format (Case 1.2)
@@ -560,6 +576,7 @@ The `plx_content` field allows you to execute pipelines by providing their `.plx
 ### When to Use PLX Content
 
 Use `plx_content` when you want to:
+
 - Execute a dynamically generated pipeline
 - Test a pipeline without deploying it
 - Run one-off pipelines that don't need to be stored
@@ -592,6 +609,7 @@ The `plx_content` should contain a valid `.plx` file as a string:
 ```
 
 **Key Points:**
+
 - The `plx_content` must be a valid Pipelex pipeline definition
 - Include newlines (`\n`) to properly format the pipeline
 - The pipeline will be validated before execution
@@ -742,6 +760,7 @@ When you provide `plx_content`:
    ```
 
 3. **Validate Before Sending**
+
    - Ensure all required fields are present
    - Match field types to concept structure
    - Use domain prefixes when concepts might be ambiguous

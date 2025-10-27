@@ -31,6 +31,7 @@ PipeExtract uses the unified inference backend system to manage OCR models. This
 - Route OCR requests to different backends based on your routing profile
 
 Common OCR model handles:
+
 - `mistral-ocr`: Mistral's OCR model for high-quality text and image extraction
 - `pypdfium2-extract-text`: Local PDF text extraction (no API calls required)
 

@@ -17,16 +17,18 @@ The `PipeFunc` operator provides an essential escape hatch, allowing you to exec
 For a function to be automatically registered and available to `PipeFunc`, it **must** meet all of the following criteria:
 
 !!! warning "Function Eligibility Requirements"
-    - **Must be decorated with** `@pipe_func()` (required since v0.12.0)
-    - **Must be an async function** (defined with `async def`)
-    - **Must have exactly 1 parameter** named `working_memory`
-    - **Parameter type must be** `WorkingMemory`
-    - **Return type must be** a subclass of `StuffContent` (or a generic type like `ListContent[SomeType]`)
-    - **Must be discoverable** (not in excluded directories like `.venv`, `__pycache__`, etc.)
+
+- **Must be decorated with** `@pipe_func()` (required since v0.12.0)
+- **Must be an async function** (defined with `async def`)
+- **Must have exactly 1 parameter** named `working_memory`
+- **Parameter type must be** `WorkingMemory`
+- **Return type must be** a subclass of `StuffContent` (or a generic type like `ListContent[SomeType]`)
+- **Must be discoverable** (not in excluded directories like `.venv`, `__pycache__`, etc.)
 
 ### Return values
 
 Your async Python function can return:
+
 -   A `StuffContent` object (e.g., `TextContent`, `ImageContent`, or a custom `StructuredContent` model).
 -   A `ListContent` containing `StuffContent` objects.
 

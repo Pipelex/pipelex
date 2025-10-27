@@ -431,24 +431,28 @@ For complete documentation including all options and examples, see [Kit Commands
 ## Usage Tips
 
 1. **Initial Setup**
-   - Run `pipelex init config` to create configuration files
-   - Configure your AI providers in `.pipelex/inference/backends.toml`
-   - Install agent rules with `pipelex kit rules` if using AI assistants
+
+- Run `pipelex init config` to create configuration files
+- Configure your AI providers in `.pipelex/inference/backends.toml`
+- Install agent rules with `pipelex kit rules` if using AI assistants
 
 2. **Development Workflow**
-   - Write or generate pipelines in `.plx` files
-   - Validate with `pipelex validate your_pipe_code` or `pipelex validate your_bundle.plx` during development
+
+- Write or generate pipelines in `.plx` files
+- Validate with `pipelex validate your_pipe_code` or `pipelex validate your_bundle.plx` during development
    - Run `pipelex validate all` before committing changes
 
 3. **Running Pipelines**
-   - Use `pipelex show pipes` to see available pipes
-   - Use `pipelex show pipe pipe_code` to inspect pipe details
-   - Run with `pipelex run pipe_code`, add the required inputs using `--inputs`
+
+- Use `pipelex show pipes` to see available pipes
+- Use `pipelex show pipe pipe_code` to inspect pipe details
+- Run with `pipelex run pipe_code`, add the required inputs using `--inputs`
 
 4. **Configuration Management**
-   - Use `pipelex show config` to verify current settings
-   - Use `pipelex show backends` to check inference backend setup
-   - Use `pipelex show models backend_name` to see available models
+
+- Use `pipelex show config` to verify current settings
+- Use `pipelex show backends` to check inference backend setup
+- Use `pipelex show models backend_name` to see available models
 
 ## Related Documentation
 

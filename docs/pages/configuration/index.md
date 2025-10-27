@@ -41,6 +41,7 @@ The exact loading sequence is:
 6. Super user overrides (`pipelex_super.toml`) (recommended to put in .gitignore)
 
 Each subsequent configuration file in this sequence can override settings from the previous ones. This means:
+
 - Settings in `pipelex_local.toml` override the base configuration
 - Environment-specific settings override local settings
 - Run mode settings override environment settings

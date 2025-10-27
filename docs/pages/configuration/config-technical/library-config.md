@@ -56,6 +56,7 @@ your_project/
 ```
 
 **Benefits:**
+
 - Related things stay together
 - Easy to find pipeline for a specific module
 - Natural code organization
@@ -77,6 +78,7 @@ your_project/
 ```
 
 **Benefits:**
+
 - All pipelines in one location
 - Simple structure for small projects
 

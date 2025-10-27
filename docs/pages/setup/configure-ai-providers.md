@@ -18,8 +18,9 @@ Get **free credits** for testing and development with a single API key that work
 **Setup:**
 
 1. Join our Discord community to get your free API key:
-   - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
-   - Request your key in the appropriate channel
+   
+- Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
+- Request your key in the appropriate channel
 
 2. Create a `.env` file in your project root:
    ```env
@@ -131,12 +132,15 @@ pipelex init config
 ```
 
 This creates a `.pipelex/` directory with:
-
-- `pipelex.toml`: Feature flags, logging, cost reporting
-- `inference/`: LLM configuration and model presets
-  - `backends.toml`: Enable/disable model providers
-  - `deck/base_deck.toml`: LLM presets and aliases
-  - `routing_profiles.toml`: Model routing configuration
+```
+.pipelex/
+├── pipelex.toml              # Feature flags, logging, cost reporting
+└── inference/                # LLM configuration and model presets
+    ├── backends.toml         # Enable/disable model providers
+    ├── deck/
+    │   └── base_deck.toml    # LLM presets and aliases
+    └── routing_profiles.toml # Model routing configuration
+```
 
 Learn more in our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) guide.
 

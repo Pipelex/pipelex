@@ -66,6 +66,7 @@ Focus on typography, spacing, and overall composition.
 ```
 
 In this example:
+
 - `page_content` is the input variable containing a `PageContent` object
 - `page_view` is the `ImageContent` field within the `PageContent` structure
 - The dot notation `page_content.page_view` tells Pipelex to extract the image from that specific field

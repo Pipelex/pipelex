@@ -84,9 +84,9 @@ Pipelex Inference is a unified inference backend that provides access to all maj
 ### Setup
 
 1. **Get your API key:**
-   - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join our Discord
-   - Request your free API key in the appropriate channel
-   - No credit card required (limited time offer)
+- Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join our Discord
+- Request your free API key in the appropriate channel
+- No credit card required (limited time offer)
 
 2. **Configure environment variables:**
    ```bash

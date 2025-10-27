@@ -26,6 +26,7 @@ PipeImgGen uses the unified inference backend system to manage image generation 
 - Route image generation requests to different backends based on your routing profile
 
 Common image generation model handles:
+
 - `base-img-gen`: Base image generation model (alias for flux-pro/v1.1)
 - `best-img-gen`: Best quality image generation model (alias for flux-pro/v1.1-ultra)  
 - `fast-img-gen`: Fast image generation model (alias for fast-lightning-sdxl)

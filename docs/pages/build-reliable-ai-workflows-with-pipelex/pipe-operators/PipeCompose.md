@@ -61,6 +61,7 @@ extra_context = { report_date = "2023-10-27" }
 ```
 
 In this scenario:
+
 - `PipeCompose` will load the `weekly_report.md` template.
 - It will use the `user` and `activities` objects from the working memory.
 - It will add `report_date` to the context from the `extra_context` table.

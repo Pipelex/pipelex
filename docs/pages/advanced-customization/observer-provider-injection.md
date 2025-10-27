@@ -5,6 +5,7 @@ The Observer system in Pipelex allows you to monitor and collect data about pipe
 ## Overview
 
 The Observer system is designed to collect execution data at three key moments:
+
 - **Before running a pipe**: Capture initial state and inputs
 - **After successful execution**: Record outputs and success metrics
 - **After failed execution**: Log errors and failure context
@@ -136,6 +137,7 @@ get_pipelex_hub().set_observer(local_observer)
 ```
 
 The LocalObserver creates separate JSONL files for each event type:
+
 - `before_run.jsonl` - Pre-execution data
 - `successful_run.jsonl` - Success events
 - `failing_run.jsonl` - Failure events

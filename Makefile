@@ -458,7 +458,7 @@ check-TODOs: env
 
 docs: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
-	$(VENV_MKDOCS) serve --watch docs
+	$(VENV_MKDOCS) serve -a 127.0.0.1:8000 --watch docs
 
 docs-check: env
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")

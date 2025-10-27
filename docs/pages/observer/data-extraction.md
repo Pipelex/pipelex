@@ -26,15 +26,18 @@ The observer extracts data at three critical moments during pipe execution:
 The data extraction location depends on your observer implementation:
 
 ### LocalObserver (Default)
+
 - **Location**: Local filesystem in JSONL format
 - **Default Directory**: Configured in your Pipelex settings under `observer_config.observer_dir`
 - **Files Created**:
-  - `before_run.jsonl` - Pre-execution snapshots
-  - `successful_run.jsonl` - Success events and results
-  - `failing_run.jsonl` - Failure events and error context
+
+- `before_run.jsonl` - Pre-execution snapshots
+- `successful_run.jsonl` - Success events and results
+- `failing_run.jsonl` - Failure events and error context
 
 ### Custom Observers
 You can implement custom data extraction to:
+
 - **Databases**: PostgreSQL, MongoDB, InfluxDB for structured analysis
 - **Cloud Storage**: S3, GCS for large-scale data retention
 - **Streaming Systems**: Kafka, Redis for real-time processing
