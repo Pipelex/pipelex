@@ -65,6 +65,8 @@ class Concept(BaseModel):
 
     @classmethod
     def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept", strict: bool = False) -> bool:
+        if NativeConceptCode.is_dynamic_concept(concept_code=concept_1.code):
+            return True
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_2.code):
             return True
         if concept_1.concept_string == concept_2.concept_string:
