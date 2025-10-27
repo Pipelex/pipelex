@@ -74,9 +74,7 @@ def build_pipe_cmd(
     ] = False,
 ) -> None:
     Pipelex.make(integration_mode=IntegrationMode.CLI)
-    typer.echo("=" * 70)
-    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
-    typer.echo("")
+    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
         if no_output:
@@ -293,9 +291,7 @@ def build_one_shot_cmd(
     ] = False,
 ) -> None:
     Pipelex.make(integration_mode=IntegrationMode.CLI)
-    typer.echo("=" * 70)
-    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
-    typer.echo("")
+    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
         if no_output:
@@ -370,9 +366,7 @@ def build_partial_cmd(
     ] = False,
 ) -> None:
     Pipelex.make(integration_mode=IntegrationMode.CLI)
-    typer.echo("=" * 70)
-    typer.secho("🔥 Starting pipe builder... 🚀", fg=typer.colors.GREEN)
-    typer.echo("")
+    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
         output_path: str | None = None

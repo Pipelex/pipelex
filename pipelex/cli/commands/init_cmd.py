@@ -349,6 +349,7 @@ def init_cmd(
     focus: InitFocus = InitFocus.ALL,
     reset: bool = False,
     skip_confirmation: bool = False,
+    silent: bool = False,
 ):
     """Initialize Pipelex configuration, inference backends, and telemetry if needed, in a unified flow.
 
@@ -356,6 +357,7 @@ def init_cmd(
         focus: What to initialize - 'config', 'inference', 'telemetry', or 'all' (default)
         reset: Whether to reset/overwrite existing files
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
+        silent: If True, suppress all output when everything is already configured
     """
     console = Console()
     pipelex_config_dir = config_manager.pipelex_config_dir
@@ -382,6 +384,10 @@ def init_cmd(
 
     # If nothing needs to be done, handle based on focus
     if not needs_config and not needs_inference and not needs_telemetry:
+        # In silent mode, just return without any output
+        if silent:
+            return
+
         if handle_already_configured(focus, console, backends_toml_path, telemetry_config_path):
             # User wants to reconfigure
             needs_config, needs_inference, needs_telemetry = update_needs_for_reconfigure(focus)
