@@ -29,7 +29,7 @@ Write business logic, not API calls.</p>
     <br/>
 </div>
 
-![Pipelex Tutorial](https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/pipelex-tutorial-v2.gif)
+![Pipelex Tutorial](https://raw.githubusercontent.com/Pipelex/pipelex/dev/.github/assets/pipelex-tutorial-v2.gif)
 
 <div>
 
