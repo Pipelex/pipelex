@@ -25,7 +25,9 @@ Write business logic, not API calls.</p>
     <a href="https://github.com/Pipelex/pipelex-cookbook"><img src="https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat" alt="Cookbook"></a>
     <a href="https://docs.pipelex.com/"><img src="https://img.shields.io/badge/Docs-03bb95?logo=read-the-docs&logoColor=white&style=flat" alt="Documentation"></a>
     <a href="https://docs.pipelex.com/changelog/"><img src="https://img.shields.io/badge/Changelog-03bb95?logo=git&logoColor=white&style=flat" alt="Changelog"></a>
-    <br/> 
+    <br/>
+    <br/>
+    <img src="https://d2cinlfp2qnig1.cloudfront.net/demo/pipelex-tutorial-v2.gif" alt="Pipelex tutorial" width="100%">
     <br/>
 </div>
 
