@@ -67,6 +67,7 @@ class PipeCondition(PipeController):
             if self.output.concept_string not in (
                 pipe.output.concept_string,
                 NativeConceptCode.DYNAMIC.concept_string,
+                NativeConceptCode.ANYTHING.concept_string,
             ):
                 msg = (
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
