@@ -27,7 +27,7 @@ Write business logic, not API calls.</p>
     <a href="https://docs.pipelex.com/changelog/"><img src="https://img.shields.io/badge/Changelog-03bb95?logo=git&logoColor=white&style=flat" alt="Changelog"></a>
     <br/>
     <br/>
-    <img src="https://d2cinlfp2qnig1.cloudfront.net/demo/pipelex-tutorial-v2.gif" alt="Pipelex tutorial" width="100%">
+    <img src="https://d2cinlfp2qnig1.cloudfront.net/demo/pipelex-tutorial-v2.gif" alt="Pipelex tutorial" width="100%"/>
     <br/>
 </div>
 
