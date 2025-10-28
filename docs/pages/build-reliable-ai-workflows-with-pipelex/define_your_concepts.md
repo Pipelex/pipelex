@@ -327,21 +327,21 @@ type = "PipeLLM"
 description = "Analyze a PDF document"
 inputs = { document = "PDF" }
 output = "Text"
-prompt_template = "Analyze this document and provide a summary"
+prompt = "Analyze this document and provide a summary"
 
 [pipe.process_image]
 type = "PipeLLM"
 description = "Describe an image"
 inputs = { photo = "Image" }
 output = "Text"
-prompt_template = "Describe what you see in this image"
+prompt = "Describe what you see in this image"
 
 [pipe.extract_from_page]
 type = "PipeLLM"
 description = "Extract information from a document page"
 inputs = { page_content = "Page" }
 output = "ExtractedInfo"
-prompt_template = "Extract key information from this page content"
+prompt = "Extract key information from this page content"
 ```
 
 ### Refining Native Concepts

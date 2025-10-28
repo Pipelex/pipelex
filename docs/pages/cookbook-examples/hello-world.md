@@ -71,7 +71,7 @@ Write a haiku about Hello World.
     ```
 2.  Install dependencies:
     ```bash
-    pip install -r requirements.txt
+    pip install .
     ```
 3.  Set up your environment variables by copying `.env.example` to `.env` and adding your API keys.
 4.  Run the example:

@@ -49,7 +49,7 @@ class LLMWorkerFactory:
                     lib_name = "anthropic"
                     lib_extra_name = "anthropic"
                     msg = (
-                        "The anthropic SDK is required to use Anthropic models via the anthropic client. "
+                        "The anthropic SDK is required in order to use Anthropic models via the anthropic client. "
                         "However, you can use Anthropic models through bedrock directly "
                         "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
                     )
@@ -79,7 +79,7 @@ class LLMWorkerFactory:
                     lib_name = "mistralai"
                     lib_extra_name = "mistral"
                     msg = (
-                        "The mistralai SDK is required to use Mistral models through the mistralai client. "
+                        "The mistralai SDK is required in order to use Mistral models through the mistralai client. "
                         "However, you can use Mistral models through bedrock directly "
                         "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
                     )
@@ -131,7 +131,10 @@ class LLMWorkerFactory:
                 if importlib.util.find_spec("google.genai") is None:
                     lib_name = "google-genai"
                     lib_extra_name = "google"
-                    msg = "The google-genai SDK is required to use Google Gemini API directly. You can install it with 'pip install google-genai'."
+                    msg = (
+                        "The google-genai SDK is required in order to use Google Gemini API directly. "
+                        "You can install it with 'pip install google-genai'."
+                    )
                     raise MissingDependencyError(
                         lib_name,
                         lib_extra_name,

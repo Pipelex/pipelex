@@ -34,7 +34,7 @@ class ImgGenWorkerFactory:
                 except ImportError as exc:
                     lib_name = "fal-client"
                     lib_extra_name = "fal"
-                    msg = "The fal-client SDK is required to use FAL models (generation of images)."
+                    msg = "The fal-client SDK is required in order to use FAL models (generation of images)."
                     raise MissingDependencyError(
                         lib_name,
                         lib_extra_name,

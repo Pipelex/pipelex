@@ -47,7 +47,7 @@ type = "PipeLLM"
 description = "Summarize a single article"
 inputs = { article = "ArticleText" }
 output = "ArticleSummary"
-prompt_template = "Please provide a one-sentence summary of the following article:\n\n@article_text"
+prompt = "Please provide a one-sentence summary of the following article:\n\n@article_text"
 
 # The PipeBatch definition
 [pipe.summarize_all_articles]

@@ -194,7 +194,6 @@ reportUnusedFunction = "error"
 reportUnusedImport = "none"
 reportUnusedVariable = "error"
 reportWildcardImportFromLibrary = "error"
-reportUnusedParameter = "information"
 strictDictionaryInference = true
 strictListInference = true
 strictParameterNoneValue = true

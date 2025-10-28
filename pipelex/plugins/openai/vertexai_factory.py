@@ -64,7 +64,7 @@ class VertexAIFactory(ConfigModel):
             lib_name = "google-auth-oauthlib"
             lib_extra_name = "google"
             msg = (
-                "The google-auth-oauthlib SDK is required to use Google connection. "
+                "The google-auth-oauthlib SDK is required in order to use Google connection. "
                 "You can install it with 'pip install pipelex[google]', or use this model via another provider "
                 "(such as Azure OpenAI, OpenAI, anthropic or bedrock)."
             )
