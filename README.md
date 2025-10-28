@@ -283,7 +283,6 @@ This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, 
 
 - "Include confidence scores between 0 and 100 in the match analysis"
 - "Write a recap email at the end"
-- "Add error handling for invalid inputs"
 
 <div>
   <h2 align="center">🚀 See Pipelex in Action</h2>
