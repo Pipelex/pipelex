@@ -6,15 +6,11 @@ from pydantic import ConfigDict, Field, field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
-from pipelex.core.concepts.concept_blueprint import (
-    ConceptBlueprint,
-    ConceptBlueprintError,
-    ConceptStructureBlueprint,
-    ConceptStructureBlueprintError,
-    ConceptStructureBlueprintFieldType,
-)
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.exceptions import ConceptStructureBlueprintValueError
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringOrConceptCodeError
+from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptBlueprintValueError
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
@@ -98,7 +94,7 @@ class ConceptStructureSpec(StructuredContent):
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
-        raise ConceptStructureBlueprintError(msg)
+        raise ConceptStructureBlueprintValueError(msg)
 
     def to_blueprint(self) -> ConceptStructureBlueprint:
         # Convert the type enum value - self.type is already a ConceptStructureBlueprintFieldType enum
@@ -160,46 +156,13 @@ class ConceptSpec(StructuredContent):
         ),
     )
 
-    @field_validator("the_concept_code", mode="before")
-    @classmethod
-    def validate_concept_code(cls, value: str) -> str:
-        # Split first to handle domain.ConceptCode format
-        if "." in value:
-            domain, concept_code = value.split(".")
-            # Only normalize the concept code part (not the domain)
-            normalized_concept_code = normalize_to_ascii(concept_code)
-
-            if normalized_concept_code != concept_code:
-                log.warning(
-                    f"Concept code '{value}' contained non-ASCII characters in concept part, normalized to '{domain}.{normalized_concept_code}'"
-                )
-
-            if not is_pascal_case(normalized_concept_code):
-                log.warning(f"Concept code '{domain}.{normalized_concept_code}' is not PascalCase, converting to PascalCase")
-                pascal_cased_value = snake_to_pascal_case(normalized_concept_code)
-                return f"{domain}.{pascal_cased_value}"
-            else:
-                return f"{domain}.{normalized_concept_code}"
-        else:
-            # No dot, normalize the whole thing
-            normalized_value = normalize_to_ascii(value)
-
-            if normalized_value != value:
-                log.warning(f"Concept code '{value}' contained non-ASCII characters, normalized to '{normalized_value}'")
-
-            if not is_pascal_case(normalized_value):
-                log.warning(f"Concept code '{normalized_value}' is not PascalCase, converting to PascalCase")
-                return snake_to_pascal_case(normalized_value)
-            else:
-                return normalized_value
-
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
         if refines is not None:
             if not NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refines):
                 msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
-                raise ConceptBlueprintError(msg)
+                raise ConceptBlueprintValueError(msg)
         return refines
 
     @model_validator(mode="before")
@@ -213,42 +176,6 @@ class ConceptSpec(StructuredContent):
             raise ConceptSpecError(msg)
         return values
 
-    @classmethod
-    def _post_validate_concept_code(cls, concept_code: str) -> None:
-        if not is_pascal_case(concept_code):
-            msg = (
-                f"ConceptSpec _post_validate_concept_code: Concept code '{concept_code}' must be PascalCase "
-                f"(letters and numbers only, starting with uppercase, without `.`)"
-            )
-            raise ConceptCodeError(msg)
-
-    @classmethod
-    def validate_concept_string_or_code(cls, concept_string_or_code: str) -> None:
-        # Strip multiplicity brackets if present (e.g., 'Text[]' or 'Text[2]' -> 'Text')
-
-        multiplicity_pattern = r"^(.+?)(?:\[\d*\])?$"
-        match = re.match(multiplicity_pattern, concept_string_or_code)
-        if not match:
-            msg = f"Invalid concept string format: '{concept_string_or_code}'"
-            raise ConceptStringOrConceptCodeError(msg)
-
-        concept_without_multiplicity = match.group(1)
-
-        if concept_without_multiplicity.count(".") > 1:
-            msg = (
-                f"concept_string_or_code '{concept_without_multiplicity}' is invalid. "
-                "It should either contain a domain in snake_case and a concept code in PascalCase separated by one dot, "
-                "or be a concept code in PascalCase."
-            )
-            raise ConceptStringOrConceptCodeError(msg)
-
-        if concept_without_multiplicity.count(".") == 1:
-            domain, concept_code = concept_without_multiplicity.split(".")
-            # Validate domain code
-            DomainBlueprint.validate_domain_code(code=domain)
-            cls._post_validate_concept_code(concept_code=concept_code)
-        else:
-            cls._post_validate_concept_code(concept_code=concept_without_multiplicity)
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""

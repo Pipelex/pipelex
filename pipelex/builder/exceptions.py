@@ -1,0 +1,2 @@
+class PipelexBundleSpecValueError(ValueError):
+    pass

@@ -214,8 +214,8 @@ class ModelDeck(ConfigModel):
                 f"Model handle '{model_handle}' not found in deck. "
                 "Make sure its defined in the model decks '.pipelex/inference/deck/base_deck.toml' or '.pipelex/inference/deck/overrides.toml'"
                 "If the model handle is indeed in the deck, make sure the required backend for this model to run is enabled in "
-                "'.pipelex/inference/backends.toml' and that you have the necessary credentials."
-                "To find what backend is required for this model, look at the routing profile in .pipelex/inference/routing_profiles.toml"
+                "'.pipelex/inference/backends.toml' and that you have the necessary credentials. "
+                "To find what backend is required for this model, look at the routing profile in '.pipelex/inference/routing_profiles.toml' "
                 "Learn more about the inference backend system in the Pipelex documentation: "
                 "https://docs.pipelex.com/pages/configuration/config-technical/inference-backend-config/"
             )

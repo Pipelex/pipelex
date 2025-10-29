@@ -3,7 +3,7 @@ import pytest
 from pipelex.core.concepts.exceptions import ConceptCodeError
 from pipelex.core.domains.exceptions import DomainError
 from pipelex.core.pipes.input_requirements import InputRequirement
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactorySyntaxError
+from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactoryError
 from pipelex.exceptions import ConceptLibraryConceptNotFoundError
 from tests.unit.core.pipes.data import (
     CONCEPT_CODE_RESOLUTION_TEST_CASES,
@@ -97,7 +97,7 @@ class TestMakeInputRequirementsFromString:
 
     def test_empty_string_raises_value_error(self):
         """Test that an empty string raises InputRequirementsFactorySyntaxError."""
-        with pytest.raises(InputRequirementsFactorySyntaxError, match="Invalid input requirement string"):
+        with pytest.raises(InputRequirementsFactoryError, match="Invalid input requirement string"):
             InputRequirementsFactory.make_from_string(domain="native", requirement_str="")
 
     def test_malformed_brackets_with_non_digit(self):

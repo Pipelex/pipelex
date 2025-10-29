@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from pipelex import log, pretty_print
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.core.pipes.exceptions import PipeBlueprintError
+from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -78,7 +78,7 @@ class PipeSpec(StructuredContent):
     def validate_output(cls, output: str) -> str:
         # Extract concept without multiplicity for validation
         parse_result = parse_concept_with_multiplicity(output)
-        ConceptSpec.validate_concept_string_or_code(concept_string_or_code=parse_result.concept)
+        validate_concept_string(concept_string=parse_result.concept)
         return output  # Return original with brackets intact
 
     @field_validator("inputs", mode="after")

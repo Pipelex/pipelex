@@ -1,10 +1,29 @@
-class ConceptCodeError(Exception):
+from pipelex.exceptions import PipelexException
+
+
+class ConceptBlueprintValueError(ValueError):
     pass
 
 
-class ConceptStringError(Exception):
+class ConceptStructureBlueprintValueError(ValueError):
     pass
 
 
-class ConceptStringOrConceptCodeError(Exception):
+class ConceptFactoryError(PipelexException):
+    pass
+
+
+class StructureClassError(ConceptFactoryError):
+    pass
+
+
+class ConceptCodeError(PipelexException):
+    pass
+
+
+class ConceptStringError(PipelexException):
+    pass
+
+
+class ConceptRefineError(PipelexException):
     pass

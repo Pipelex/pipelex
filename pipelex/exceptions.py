@@ -373,10 +373,6 @@ class PipeConditionError(PipelexException):
     pass
 
 
-class StructureClassError(PipelexException):
-    pass
-
-
 class PipeControllerError(PipelexException):
     pass
 

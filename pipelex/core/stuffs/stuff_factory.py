@@ -5,10 +5,10 @@ from pydantic import BaseModel, ValidationError, field_validator
 
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library import ConceptLibraryConceptNotFoundError
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
@@ -30,8 +30,8 @@ class StuffBlueprint(BaseModel):
 
     @field_validator("concept_string")
     @classmethod
-    def validate_concept_string(cls, concept_string: str) -> str:
-        ConceptBlueprint.validate_concept_string(concept_string)
+    def validate_concept_string_field(cls, concept_string: str) -> str:
+        validate_concept_string(concept_string)
         return concept_string
 
 
@@ -50,7 +50,7 @@ class StuffFactory:
 
     @classmethod
     def make_from_concept_string(cls, concept_string: str, name: str, content: StuffContent) -> Stuff:
-        ConceptBlueprint.validate_concept_string(concept_string)
+        validate_concept_string(concept_string)
         concept = get_required_concept(concept_string=concept_string)
         return cls.make_stuff(
             concept=concept,
