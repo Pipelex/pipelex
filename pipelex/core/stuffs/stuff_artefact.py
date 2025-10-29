@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.exceptions import StuffArtefactError
+from pipelex.core.stuffs.exceptions import StuffArtefactError
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey, Jinja2TaggableAbstract
 
 

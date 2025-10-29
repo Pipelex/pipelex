@@ -4,7 +4,8 @@ from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import PipeExecutionError, PipelineExecutionError, PipeRouterError
+from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,

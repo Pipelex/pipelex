@@ -3,11 +3,10 @@ from typing import Literal
 from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
 
-from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_exceptions import PipeParallelSpecError
-from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
+from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.types import Self
 

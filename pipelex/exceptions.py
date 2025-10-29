@@ -164,16 +164,12 @@ class PipeLibraryError(LibraryError):
     pass
 
 
-class PipeLibraryPipeNotFoundError(PipeLibraryError):
-    pass
 
 
-class PipeFactoryError(PipelexException):
-    pass
 
 
-class LibraryParsingError(LibraryError):
-    pass
+
+
 
 
 class DomainDefinitionError(PipelexException):
@@ -331,134 +327,6 @@ class PipeStackOverflowError(PipeRunError):
         super().__init__(message)
 
 
-class PipeRouterError(PipelexException):
-    def __init__(
-        self,
-        message: str,
-        run_mode: PipeRunMode,
-        pipe_code: str,
-        output_name: str | None,
-        pipe_stack: list[str],
-        missing_inputs: list[str] | None = None,
-    ):
-        self.run_mode = run_mode
-        self.pipe_code = pipe_code
-        self.output_name = output_name
-        self.pipe_stack = pipe_stack
-        self.missing_inputs = missing_inputs
-        super().__init__(message)
 
 
-class PipelineExecutionError(PipelexException):
-    def __init__(
-        self,
-        message: str,
-        run_mode: PipeRunMode,
-        pipe_code: str,
-        output_name: str | None,
-        pipe_stack: list[str],
-    ):
-        self.run_mode = run_mode
-        self.pipe_code = pipe_code
-        self.output_name = output_name
-        self.pipe_stack = pipe_stack
-        super().__init__(message)
 
-
-class BatchParamsError(PipelexException):
-    pass
-
-
-class PipeConditionError(PipelexException):
-    pass
-
-
-class PipeControllerError(PipelexException):
-    pass
-
-
-class PipeControllerOutputConceptMismatchError(PipeControllerError):
-    def __init__(self, message: str, tested_concept: str, wanted_concept: str):
-        self.tested_concept = tested_concept
-        self.wanted_concept = wanted_concept
-        super().__init__(message)
-
-
-class PipeRunParamsError(PipelexException):
-    pass
-
-
-class PipeBatchError(PipelexException):
-    """Base class for all PipeBatch-related errors."""
-
-
-class PipeBatchRecursionError(PipeBatchError):
-    """Raised when a PipeBatch attempts to run itself recursively."""
-
-
-class PipeBatchInputError(PipeBatchError):
-    """Raised when the input to a PipeBatch is not a ListContent or is invalid."""
-
-
-class PipeBatchOutputError(PipeBatchError):
-    """Raised when there's an error with the output structure of a PipeBatch operation."""
-
-
-class PipeBatchBranchError(PipeBatchError):
-    """Raised when there's an error with a branch pipe execution in PipeBatch."""
-
-
-class JobHistoryError(PipelexException):
-    pass
-
-
-class StuffArtefactError(PipelexException):
-    pass
-
-
-class StuffArtefactReservedFieldError(StuffArtefactError):
-    pass
-
-
-class ConceptError(Exception):
-    pass
-
-
-class ConceptCodeError(ConceptError):
-    pass
-
-
-class ConceptRefineError(ConceptError):
-    pass
-
-
-class PipelineManagerNotFoundError(PipelexException):
-    pass
-
-
-class PipeInputSpecError(PipelexException):
-    pass
-
-
-class PipeInputNotFoundError(PipelexException):
-    pass
-
-
-class PipeInputDetailsError(PipelexException):
-    pass
-
-
-class ApiSerializationError(Exception):
-    """Exception raised when API serialization fails."""
-
-
-class StartPipelineError(Exception):
-    pass
-
-
-class PipelineInputError(Exception):
-    pass
-
-
-class PipeExecutionError(PipelexException):
-    pass

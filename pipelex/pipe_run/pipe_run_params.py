@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from pipelex import log
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
-from pipelex.exceptions import BatchParamsError
+from pipelex.pipe_run.exceptions import BatchParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.types import Self, StrEnum
 

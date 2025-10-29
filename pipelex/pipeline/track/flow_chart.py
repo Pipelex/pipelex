@@ -9,7 +9,7 @@ import networkx as nx
 import yaml
 
 from pipelex import log
-from pipelex.exceptions import JobHistoryError
+from pipelex.pipeline.track.exceptions import JobHistoryError
 from pipelex.pipeline.track.tracker_config import TrackerConfig
 from pipelex.pipeline.track.tracker_models import (
     EdgeAttributeKey,

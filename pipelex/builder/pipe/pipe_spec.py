@@ -5,7 +5,7 @@ from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
-from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
@@ -70,7 +70,7 @@ class PipeSpec(StructuredContent):
     def validate_pipe_type(cls, value: Any) -> Any:
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return value
 
     @field_validator("output", mode="after")
@@ -93,7 +93,7 @@ class PipeSpec(StructuredContent):
         for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
-                raise PipeBlueprintError(msg)
+                raise PipeBlueprintValueError(msg)
 
             # Validate the concept spec format with optional multiplicity brackets
             match = re.match(multiplicity_pattern, concept_spec)
@@ -102,11 +102,11 @@ class PipeSpec(StructuredContent):
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
                     f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
                 )
-                raise PipeBlueprintError(msg)
+                raise PipeBlueprintValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
-            ConceptSpec.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            validate_concept_string(concept_string=concept_string_or_code)
 
         return inputs
 
@@ -120,7 +120,7 @@ class PipeSpec(StructuredContent):
 
         if not is_snake_case(normalized_pipe_code):
             msg = f"Invalid pipe code syntax '{normalized_pipe_code}'. Must be in snake_case."
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return normalized_pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:

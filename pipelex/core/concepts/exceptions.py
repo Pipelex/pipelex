@@ -1,6 +1,9 @@
 from pipelex.exceptions import PipelexException
 
 
+class ConceptError(PipelexException):
+    pass
+
 class ConceptBlueprintValueError(ValueError):
     pass
 
@@ -17,13 +20,19 @@ class StructureClassError(ConceptFactoryError):
     pass
 
 
-class ConceptCodeError(PipelexException):
+class ConceptCodeError(ConceptError):
     pass
 
 
-class ConceptStringError(PipelexException):
+class ConceptStringError(ConceptError):
     pass
 
 
-class ConceptRefineError(PipelexException):
+class ConceptRefineError(ConceptError):
     pass
+
+
+
+
+
+

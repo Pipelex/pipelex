@@ -15,7 +15,8 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import StuffArtefactReservedFieldError, StuffContentTypeError, StuffContentValidationError
+from pipelex.exceptions import  StuffContentTypeError, StuffContentValidationError
+from pipelex.core.stuffs.exceptions import StuffArtefactReservedFieldError
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
 

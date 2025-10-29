@@ -18,12 +18,12 @@ from pipelex.exceptions import (
     DryRunMissingInputsError,
     DryRunMissingPipesError,
     DryRunTemplatingError,
-    PipeConditionError,
     PipeInputError,
     StaticValidationError,
     StaticValidationErrorType,
     WorkingMemoryStuffNotFoundError,
 )
+from pipelex.pipe_controllers.condition.exceptions import PipeConditionError
 from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome

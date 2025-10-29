@@ -190,11 +190,16 @@ class TestConcept:
         valid_concept_code = "ConceptCode"
         valid_concept_string = f"{valid_domain}.{valid_concept_code}"
         # Valid cases - should not raise exceptions
-        assert validate_concept_string(valid_concept_string) is None
-        assert validate_concept_string(f"snake_case_domain.{valid_concept_code}") is None
-        assert validate_concept_string(f"domain_123.{valid_concept_code}") is None
-        assert validate_concept_string(f"{valid_domain}.TEXT") is None
-        assert validate_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}") is None
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(valid_concept_string)
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"snake_case_domain.{valid_concept_code}")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"domain_123.{valid_concept_code}")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"{valid_domain}.TEXT")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}")
 
         # Invalid cases - should raise ConceptCodeError
 

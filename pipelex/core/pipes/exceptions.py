@@ -1,2 +1,12 @@
+from pipelex.exceptions import PipelexException
+
 class PipeBlueprintValueError(ValueError):
-    """Exception raised for errors in the PipeBlueprint class."""
+    pass
+
+class PipeInputNotFoundError(PipelexException):
+    pass
+class PipeFactoryError(PipelexException):
+    pass
+
+class PipeLibraryPipeNotFoundError(PipeLibraryError):
+    pass

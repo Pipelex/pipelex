@@ -13,7 +13,8 @@ from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.exceptions import DryRunMissingInputsError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
+from pipelex.exceptions import DryRunMissingInputsError, StaticValidationError, StaticValidationErrorType
+from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe

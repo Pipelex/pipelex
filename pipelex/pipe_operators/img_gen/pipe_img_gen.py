@@ -22,9 +22,9 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.exceptions import (
     PipeInputError,
-    PipeRunParamsError,
     StaticValidationError,
     StaticValidationErrorType,
     StuffContentTypeError,

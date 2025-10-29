@@ -9,9 +9,9 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.pipe_run.exceptions import PipeRunParamsError
+from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.exceptions import (
-    PipeControllerOutputConceptMismatchError,
-    PipeRunParamsError,
     StaticValidationError,
     StaticValidationErrorType,
 )

@@ -1,20 +1,16 @@
-import re
 from datetime import datetime
 from typing import Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import ConceptStructureBlueprintValueError
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptBlueprintValueError
-from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.exceptions import ConceptBlueprintValueError, ConceptStructureBlueprintValueError
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
-from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
 from pipelex.types import Self, StrEnum
 
 
@@ -175,7 +171,6 @@ class ConceptSpec(StructuredContent):
             )
             raise ConceptSpecError(msg)
         return values
-
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""

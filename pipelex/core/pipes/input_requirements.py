@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.exceptions import PipeInputNotFoundError
+from pipelex.core.pipes.exceptions import PipeInputNotFoundError
 
 
 class InputRequirement(BaseModel):

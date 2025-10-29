@@ -1,7 +1,8 @@
 from typing import Protocol
 
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import DryRunMissingInputsError, PipeRouterError, PipeRunError
+from pipelex.exceptions import DryRunMissingInputsError
+from pipelex.pipe_run.exceptions import PipeRouterError, PipeRunError
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
 from pipelex.pipe_run.pipe_job import PipeJob
 

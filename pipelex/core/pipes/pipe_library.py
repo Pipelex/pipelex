@@ -8,7 +8,8 @@ from typing_extensions import override
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
-from pipelex.exceptions import ConceptError, ConceptLibraryConceptNotFoundError, PipeLibraryError, PipeLibraryPipeNotFoundError
+from pipelex.exceptions import ConceptLibraryConceptNotFoundError, PipeLibraryError
+from pipelex.core.concepts.exceptions import ConceptError
 from pipelex.hub import get_concept_library
 from pipelex.types import Self
 

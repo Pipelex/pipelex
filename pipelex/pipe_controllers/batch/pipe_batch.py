@@ -14,10 +14,10 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.exceptions import (
     PipeInputError,
-    PipeInputNotFoundError,
     PipeRunInputsError,
     WorkingMemoryStuffNotFoundError,
 )
+from pipelex.core.pipes.exceptions import PipeInputNotFoundError
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
