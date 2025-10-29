@@ -11,7 +11,6 @@ from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 if TYPE_CHECKING:
