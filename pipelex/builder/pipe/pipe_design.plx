@@ -23,9 +23,9 @@ PipeFailure = "Details of a single pipe failure during dry run."
 type = "PipeCondition"
 description = "Route by signature.type to the correct spec emitter."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "ConceptSpec" }
-output = "Dynamic"
+output = "Anything"
 expression = "pipe_signature.type"
-default_outcome = "continue"
+default_outcome = "fail"
 
 [pipe.detail_pipe_spec.outcomes]
 PipeSequence  = "detail_pipe_sequence"
@@ -34,6 +34,7 @@ PipeCondition = "detail_pipe_condition"
 PipeLLM       = "detail_pipe_llm"
 PipeExtract   = "detail_pipe_extract"
 PipeImgGen    = "detail_pipe_img_gen"
+PipeBatch     = "detail_pipe_batch"
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PIPE CONTROLLERS
@@ -43,21 +44,23 @@ PipeImgGen    = "detail_pipe_img_gen"
 type = "PipeLLM"
 description = "Build a PipeSequenceSpec from the signature (children referenced by code)."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
-output = "PipeSequenceSpec"
+output = "pipe_design.PipeSequenceSpec"
 model = "llm_to_engineer"
 prompt = """
-Your job is to design a PipeSequenceSpec to orchestrate a sequence of pipe steps that will run one after the other.
+# Orchestrate a sequence of pipe steps that will run one after the other.
 
-This PipeSequence is part of a larger pipeline:
 @plan_draft
 
-You will specifically generate the PipeSequence related to this signature:
-@pipe_signature
-
-Here are the concepts you can use for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-- If you are to apply a pipe step to a previous output which is multiple, use batch_over/batch_as attributes in that step.
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
+@pipe_signature
+
+Based on the pipe signature, build the PipeSequenceSpec.
+
+Note:
 - The output concept of a pipe sequence must always be the same as the output concept of the last pipe in the sequence.
 """
 
@@ -65,38 +68,63 @@ Here are the concepts you can use for inputs/outputs:
 type = "PipeLLM"
 description = "Build a PipeParallelSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
-output = "PipeParallelSpec"
+output = "pipe_design.PipeParallelSpec"
 model = "llm_to_engineer"
 prompt = """
-Your job is to design a PipeParallelSpec to orchestrate a bunch of pipe steps that will run in parallel.
+Orchestrate a set of independent pipes that will run concurrently.
 
-This PipeParallel is part of a larger pipeline:
 @plan_draft
 
-You will specifically generate the PipeParallel related to this signature:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
+@concept_specs
+
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
 @pipe_signature
 
-Here are the concepts you can use for inputs/outputs:
-@concept_specs
+Based on the pipe signature, build the PipeParallelSpec.
 """
 
 [pipe.detail_pipe_condition]
 type = "PipeLLM"
 description = "Build a PipeConditionSpec from the signature (provide expression/outcome consistent with children)."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
-output = "PipeConditionSpec"
+output = "pipe_design.PipeConditionSpec"
 model = "llm_to_engineer"
 prompt = """
-Your job is to design a PipeConditionSpec to route to the correct pipe step based on a conditional expression.
+Design a PipeConditionSpec to route to the correct pipe based on a conditional expression.
 
-This PipeCondition is part of a larger pipeline:
 @plan_draft
 
-You will specifically generate the PipeCondition related to this signature:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
+@concept_specs
+
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
 @pipe_signature
 
-Here are the concepts you can use for inputs/outputs:
+Based on the pipe signature, build the PipeConditionSpec.
+"""
+
+[pipe.detail_pipe_batch]
+type = "PipeLLM"
+description = "Build a PipeBatchSpec from the signature."
+inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+output = "pipe_design.PipeBatchSpec"
+model = "llm_to_engineer"
+prompt = """
+Design a PipeBatchSpec to run a pipe in batch.
+Whatever it's really going to do has already been decided as part of this plan:
+@plan_draft
+
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
+
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
+Based on the pipe signature, build the PipeComposeSpec.
+
+@pipe_signature
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -107,91 +135,91 @@ Here are the concepts you can use for inputs/outputs:
 type = "PipeLLM"
 description = "Build a PipeLLMSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
-output = "PipeLLMSpec"
+output = "pipe_design.PipeLLMSpec"
 model = "llm_to_engineer"
 prompt = """
-Your job is to design a PipeLLMSpec to use an LLM to generate a text, or a structured object using different kinds of inputs.
-Whatever it's really going to do has already been decided, as you can see:
-
-This PipeLLM is part of a larger pipeline:
+Design a PipeLLMSpec to use an LLM to generate a text, or a structured object using different kinds of inputs.
+Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
-You will specifically generate the PipeLLM related to this signature:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
+@concept_specs
+
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
+Based on the pipe signature, build the PipeLLMSpec.
+
 @pipe_signature
 
-If we are generating a structured concept, indicate it in the system_prompt to clarify the task. But DO NOT detail the structure in any of the user/system prompts: we will add the schema later. So, don't write a bullet-list of all the attributes to determine.
-If it's to generate free form text, the prompt should indicate to be concise.
-If it's to generate an image generation prompt, the prompt should indicate to be VERY concise and focus and apply the best practice for image generation.
-
-Here are the concepts you can use for inputs/outputs:
-@concept_specs
+Notes: 
+- If we are generating a structured concept, indicate it in the system_prompt to clarify the task.
+- But DO NOT detail the structure in any of the user/system prompts: we will add the schema later. So, don't write a bullet-list of all the attributes to determine.
+- If it's to generate free form text, the prompt should indicate to be concise.
+- If it's to generate an image generation prompt, the prompt should indicate to be VERY concise and focus and apply the best practice for image generation.
 """
 
 [pipe.detail_pipe_extract]
 type = "PipeLLM"
 description = "Build a PipeExtractSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
-output = "PipeExtractSpec"
+output = "pipe_design.PipeExtractSpec"
 model = "llm_to_engineer"
 prompt = """
-Your job is to design a PipeExtractSpec to extract text from an image or a pdf.
-
-This PipeExtract is part of a larger pipeline:
+Design a PipeExtractSpec to extract text from an image or a pdf.
+Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
-You will specifically generate the PipeExtract related to this signature:
-@pipe_signature
-
-Here are the concepts you can use for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
+
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
+Based on the pipe signature, build the PipeExtractSpec.
+
+@pipe_signature
 """
 
 [pipe.detail_pipe_img_gen]
 type = "PipeLLM"
 description = "Build a PipeImgGenSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
-output = "PipeImgGenSpec"
+output = "pipe_design.PipeImgGenSpec"
 model = "llm_to_engineer"
 prompt = """
 Your job is to design a PipeImgGenSpec to generate an image from a text prompt.
-
-This PipeImgGen is part of a larger pipeline:
+Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
-You will specifically generate the PipeImgGen related to this signature:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
+@concept_specs
+
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
+Based on the pipe signature, build the PipeImgGenSpec.
+
 @pipe_signature
 
-The inputs for the image has to be a single input which must be a Text or another concept which refines Text.
-
-Here are the concepts you can use for inputs/outputs:
-@concept_specs
+Notes:
+- The inputs for the image has to be a single input which must be a Text or another concept which refines Text.
 """
 
 [pipe.detail_pipe_compose]
 type = "PipeLLM"
 description = "Build a PipeComposeSpec from the signature."
 inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
-output = "PipeComposeSpec"
+output = "pipe_design.PipeComposeSpec"
 model = "llm_to_engineer"
 prompt = """
-Your job is to design a PipeComposeSpec to render a jinja2 template.
-
-This PipeCompose is part of a larger pipeline:
+Design a PipeComposeSpec to render a jinja2 template.
+Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
-You will specifically generate the PipeCompose related to this signature:
-@pipe_signature
-
-You can ONLY USE THE INPUTS IN THIS PIPE SIGNATURE.
-
-Here are the Jinja2 filters that are supported:
-default — Returns a fallback value if the input is undefined (or falsey if enabled).
-tag - Returns by tagging it with a title.
-format - Apply the given values to a printf-style format string, like string % values.
-length — Returns the number of items (alias: count).
-upper — Converts a string to uppercase.
-lower — Converts a string to lowercase.
-
-Here are the concepts you can use for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
+
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
+Based on the pipe signature, build the PipeComposeSpec.
+
+@pipe_signature
 """

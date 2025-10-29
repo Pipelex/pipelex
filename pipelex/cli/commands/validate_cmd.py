@@ -8,6 +8,7 @@ import typer
 from posthog import new_context, tag
 from rich.console import Console
 from rich.syntax import Syntax
+from rich.traceback import Traceback
 
 from pipelex import log, pretty_print
 from pipelex.builder.builder_errors import PipelexBundleError
@@ -130,16 +131,17 @@ def validate_cmd(
                 else:
                     typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}' (including '{pipe_code}')", fg=typer.colors.GREEN)
             except FileNotFoundError as exc:
-                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
-                console.print(exc)
+                console.print(Traceback())
+                typer.secho(f"Failed to load bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
             except PipelexBundleError as bundle_error:
+                console.print(Traceback())
                 typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
                 present_validation_error(details_provider=bundle_error)
                 raise typer.Exit(1) from bundle_error
             except PipeInputError as exc:
-                typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
-                console.print(exc)
+                console.print(Traceback())
+                typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
         elif pipe_code:
             # Validate a single pipe by code

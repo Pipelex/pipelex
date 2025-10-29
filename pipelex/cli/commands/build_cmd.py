@@ -32,10 +32,17 @@ pipelex build pipe "Imagine a cute animal mascot for a startup based on its elev
 pipelex build pipe "Imagine a cute animal mascot for a startup based on its elevator pitch and some brand guidelines"
 pipelex build pipe "Imagine a cute animal mascot for a startup based on its elevator pitch and some brand guidelines, \
     include 3 variants of the ideas and 2 variants of each prompt"
+pipelex build pipe "Imagine a cute animal mascot for a startup based on its elevator pitch \
+    and some brand guidelines, propose 2 different ideas, and for each, 3 style variants in the image generation prompt, \
+        at the end we want the rendered image" --output results/mascot.plx
+
 pipelex build pipe "Given an expense report, apply company rules"
 pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match"
 pipelex build pipe "Take a CV in a PDF file and a Job offer text, analyze if they match and generate 5 questions for the interview"
 pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview"
+
+pipelex build pipe \
+    "Take a Job offer text and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
 
 pipelex build partial "Given an expense report, apply company rules" -o results/generated.json
 pipelex build flow "Given an expense report, apply company rules" -o results/flow.json

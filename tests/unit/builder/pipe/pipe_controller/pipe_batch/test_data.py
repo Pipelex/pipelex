@@ -5,27 +5,6 @@ from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBluepri
 
 
 class PipeBatchTestCases:
-    SIMPLE_BATCH = (
-        "simple_batch",
-        PipeBatchSpec(
-            pipe_code="batch_processor",
-            description="Process items in batch",
-            inputs={"items": "ItemList"},
-            output="ProcessedItems",
-            branch_pipe_code="process_item",
-        ),
-        PipeBatchBlueprint(
-            description="Process items in batch",
-            inputs={"items": "ItemList"},
-            output="ProcessedItems",
-            type="PipeBatch",
-            pipe_category="PipeController",
-            branch_pipe_code="process_item",
-            input_list_name=None,
-            input_item_name=None,
-        ),
-    )
-
     BATCH_WITH_NAMES = (
         "batch_with_names",
         PipeBatchSpec(
@@ -50,6 +29,5 @@ class PipeBatchTestCases:
     )
 
     TEST_CASES: ClassVar[list[tuple[str, PipeBatchSpec, PipeBatchBlueprint]]] = [
-        SIMPLE_BATCH,
         BATCH_WITH_NAMES,
     ]

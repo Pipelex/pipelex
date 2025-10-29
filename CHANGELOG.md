@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## [v0.14.2] - 2025-10-29
+
+### Chaged
+
+- Improved pipe builder.
 
 ### Added
 
