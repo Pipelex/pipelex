@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import ConceptStructureBlueprintValueError, ConceptStructureBlueprintError
+from pipelex.core.concepts.exceptions import ConceptStructureBlueprintValueError
 
 
 class TestConceptStructureBlueprintValidation:
