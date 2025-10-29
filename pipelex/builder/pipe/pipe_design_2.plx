@@ -35,6 +35,7 @@ PipeCondition = "detail_pipe_condition_2"
 PipeLLM       = "detail_pipe_llm_2"
 PipeExtract   = "detail_pipe_extract_2"
 PipeImgGen    = "detail_pipe_img_gen_2"
+PipeBatch     = "detail_pipe_batch_2"
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PIPE CONTROLLERS
@@ -51,10 +52,10 @@ prompt = """
 
 @plan_draft
 
-You must use the following concepts for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, PDF, Number, Page
 
 @pipe_signature
 
@@ -76,10 +77,10 @@ Orchestrate a set of independent pipes that will run concurrently.
 
 @plan_draft
 
-You must use the following concepts for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, PDF, Number, Page
 
 @pipe_signature
 
@@ -96,10 +97,11 @@ prompt = """
 Design a PipeConditionSpec to route to the correct pipe based on a conditional expression.
 
 @plan_draft
-You must use the following concepts for inputs/outputs:
+
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, PDF, Number, Page
 
 @pipe_signature
 
@@ -121,10 +123,10 @@ Design a PipeLLMSpec to use an LLM to generate a text, or a structured object us
 Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
-You must use the following concepts for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, PDF, Number, Page
 
 Based on the pipe signature, build the PipeLLMSpec.
 
@@ -148,10 +150,10 @@ Design a PipeExtractSpec to extract text from an image or a pdf.
 Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
-You must use the following concepts for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, PDF, Number, Page
 
 Based on the pipe signature, build the PipeExtractSpec.
 
@@ -169,10 +171,10 @@ Your job is to design a PipeImgGenSpec to generate an image from a text prompt.
 Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
-You must use the following concepts for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, PDF, Number, Page
 
 Based on the pipe signature, build the PipeImgGenSpec.
 
@@ -193,10 +195,31 @@ Design a PipeComposeSpec to render a jinja2 template.
 Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
-You must use the following concepts for inputs/outputs:
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, PDF, Number, Page
+
+Based on the pipe signature, build the PipeComposeSpec.
+
+@pipe_signature
+"""
+
+[pipe.detail_pipe_batch_2]
+type = "PipeLLM"
+description = "Build a PipeBatchSpec from the signature."
+inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+output = "pipe_design.PipeBatchSpec"
+model = "llm_to_engineer"
+prompt = """
+Design a PipeBatchSpec to run a pipe in batch.
+Whatever it's really going to do has already been decided as part of this plan:
+@plan_draft
+
+You must pick the relevant concepts for inputs and outputs from the following possibilities:
+@concept_specs
+
++ you can use the native concepts: Text, Image, PDF, Number, Page
 
 Based on the pipe signature, build the PipeComposeSpec.
 

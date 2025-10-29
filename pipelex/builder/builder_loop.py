@@ -18,6 +18,7 @@ from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
+from pipelex.tools.misc.json_utils import save_as_json_to_path
 
 
 class BuilderLoop:
@@ -27,6 +28,7 @@ class BuilderLoop:
         inputs: PipelineInputs | None = None,
         is_save_first_iteration_enabled: bool = True,
         is_save_second_iteration_enabled: bool = True,
+        is_save_working_memory_enabled: bool = True,
     ) -> PipelexBundleSpec:
         pretty_print(f"Building and fixing with {pipe_code}")
         try:
@@ -38,6 +40,14 @@ class BuilderLoop:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."
             raise PipeBuilderError(message=msg) from exc
         pretty_print(pipe_output, title="Pipe Output")
+
+        if is_save_working_memory_enabled:
+            working_memory_path = get_incremental_file_path(
+                base_path="results",
+                base_name="working_memory",
+                extension="json",
+            )
+            save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=working_memory_path)
 
         try:
             pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)

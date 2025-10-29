@@ -53,7 +53,7 @@ When describing the task of a pipe controller, be concise, don't detail all the 
 
 ## Available pipe operators:
 - LLM: uses a Vision/LLM to generate text or structured objects. It can be single items or lists of items.
-- IMGGEN: uses an AI model to generate images from a prompt that is either the result of a previous step or the pipeline's original inputs.
+- IMG_GEN: uses an AI model to generate images from a prompt that is either the result of a previous step or the pipeline's original inputs. As the image generation prompt MUST be a text, you can plan to use an LLM step to write it.
 - EXTRACT: extracts text from an image or a pdf, always outputs a list of pages (can be a list of one page).
 
 ---
@@ -140,6 +140,8 @@ description = "Write the pipe signatures for the plan."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeSignature[]"
 model = "llm_to_engineer"
+model_to_structure = "cheap_llm_to_structure"
+structuring_method = "preliminary_text"
 system_prompt = """
 You are a Senior engineer.
 """
@@ -166,9 +168,12 @@ You can use the native concepts for the inputs and outputs of the pipes, as requ
   - The concept is singular, like "Article" (not "Articles")
   - You can set output = "Article[]" to get a list of arbitrary length, or set output = "Article[5]" for exactly 5 items
   - Examples: output = "Text[]" (multiple texts), output = "Image[3]" (exactly 3 images), output = "Employee[]" (list of employees)
-- The output concept of a pipe sequence must always be the same as the output concept of the last pipe in the sequence.
+- The output concept of a PipeSequence must always be the same as the output concept of the last pipe in the sequence.
+- Pipe controllers (PipeSequence, PipeParallel, PipeCondition) depend on other pipes, so you must list these dependencies in the pipe_dependencies attribute.
+- Regarding PipeImgGen, which uses an AI model to generate images from a text prompt: as the image generation prompt MUST be a text, you must use a PipeLLM step to write the prompt, unless it's part of the pipeline's initial inputs.
 
-## Memory and flow:
+
+## Flow:
 - Do not bother with planning a final step that gathers all the elements unless it's clear from the brief that the user wants the pipe to do that.
 - We have a memory system: the outputs of each pipe are added to the memory and can be used as inputs by subsequent pipes.
 - The pipeline's initial inputs are added to the memory at the beginning.

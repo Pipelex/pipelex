@@ -9,8 +9,8 @@ class PipeBatchBlueprint(PipeBlueprint):
     type: Literal["PipeBatch"] = "PipeBatch"
     pipe_category: Literal["PipeController"] = "PipeController"
     branch_pipe_code: str
-    input_list_name: str | None = None
-    input_item_name: str | None = None
+    input_list_name: str
+    input_item_name: str
 
     @property
     @override

@@ -122,6 +122,8 @@ class PipeSorterTestCases:
             inputs={},
             output="Text",
             branch_pipe_code="process_item",
+            input_list_name="items",
+            input_item_name="item",
         ),
         "process_item": PipeLLMBlueprint(type="PipeLLM", pipe_category="PipeOperator", description="Process", inputs={}, output="Text"),
     }
