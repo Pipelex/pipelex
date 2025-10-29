@@ -16,10 +16,14 @@ class SubPipeFactory:
             nb_items=blueprint.nb_output,
             multiple_items=blueprint.multiple_output,
         )
-        batch_params = BatchParams.make_optional_batch_params(
-            input_list_name=blueprint.batch_over,
-            input_item_name=blueprint.batch_as,
-        )
+        batch_params: BatchParams | None = None
+        if blueprint.batch_over and blueprint.batch_as:
+            batch_params = BatchParams.make_batch_params(
+                input_list_name=blueprint.batch_over,
+                input_item_name=blueprint.batch_as,
+            )
+        else:
+            batch_params = None
         return SubPipe(
             pipe_code=blueprint.pipe,
             output_name=blueprint.result,

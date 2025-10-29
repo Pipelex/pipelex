@@ -8,20 +8,18 @@ from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBluepri
 
 
 class PipeBatchSpec(PipeSpec):
-    """Spec for batch processing pipe operations in the Pipelex framework.
+    """Spec for batch processing pipe operations concurrently.
 
-    PipeBatch enables parallel execution of a single pipe across multiple items
-    in a list. Each item is processed independently, making it ideal for data
-    transformation, enrichment, or analysis tasks on collections.
-
-    This controller is commonly used within PipeSequence for inline batch processing,
-    where the batch configuration is specified directly in the sequence step using
-    batch_over and batch_as parameters in SubPipeBlueprint.
+    PipeBatch enables concurrent execution of the same pipe applied to multiple items
+    provided as an input list. Each item is processed independently. The result is a list
+    the results of each branch. So this like a map operation.
 
     Validation Rules:
-        1. branch_pipe_code must reference an existing pipe in the pipeline.
-        2. When input_list_name is specified, it must reference a list in context.
-        3. The branch pipe should be designed to process single items.
+        - There must be at least one input which is a list, corresponding to input_list_name.
+          That name is typically a plural noun like "ideas" or "images".
+          And the concept corresponding to that input list must be multiple, using the [] notation,
+          i.e. something like "Ideas[]" or "Images[]".
+        - input_item_name is typically the singular noun corresponding to the items in the list, like "idea" or "image".
 
     """
 
@@ -30,9 +28,8 @@ class PipeBatchSpec(PipeSpec):
     branch_pipe_code: str = Field(
         description="The pipe code to execute for each item in the input list. This pipe is instantiated once per item in parallel."
     )
-    input_list_name: str | None = Field(default=None, description="Name of the list in WorkingMemory to iterate over, if needed.")
-    input_item_name: str | None = Field(
-        default=None,
+    input_list_name: str = Field(description="Name of the list in WorkingMemory to iterate over, if needed.")
+    input_item_name: str = Field(
         description="Name assigned to individual items within each execution branch. This is how the branch pipe accesses its specific input item.",
     )
 

@@ -67,6 +67,7 @@ class PipeCondition(PipeController):
             if self.output.concept_string not in (
                 pipe.output.concept_string,
                 NativeConceptCode.DYNAMIC.concept_string,
+                NativeConceptCode.ANYTHING.concept_string,
             ):
                 msg = (
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
@@ -293,7 +294,12 @@ class PipeCondition(PipeController):
 
         # Handle continue case
         if SpecialOutcome.is_continue(outcome):
+            log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
             return PipeOutput(working_memory=working_memory)
+
+        if SpecialOutcome.is_fail(outcome):
+            msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
+            raise PipeConditionError(message=msg)
 
         chosen_pipe = get_required_pipe(pipe_code=outcome)
 

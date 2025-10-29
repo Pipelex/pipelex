@@ -25,3 +25,16 @@ class SpecialOutcome(StrEnum):
                 return True
             # case SpecificPipeCodesEnum.BREAK:  # Uncomment when BREAK is implemented
             #     return False
+
+    @classmethod
+    def is_fail(cls, outcome: str) -> bool:
+        try:
+            enum_value = SpecialOutcome(outcome)
+        except ValueError:
+            return False
+
+        match enum_value:
+            case SpecialOutcome.FAIL:
+                return True
+            case SpecialOutcome.CONTINUE:
+                return False

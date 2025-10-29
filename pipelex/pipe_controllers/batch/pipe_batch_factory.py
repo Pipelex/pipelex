@@ -44,7 +44,7 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
                 ),
             ),
             branch_pipe_code=blueprint.branch_pipe_code,
-            batch_params=BatchParams.make_optional_batch_params(
+            batch_params=BatchParams.make_batch_params(
                 input_list_name=blueprint.input_list_name,
                 input_item_name=blueprint.input_item_name,
             ),

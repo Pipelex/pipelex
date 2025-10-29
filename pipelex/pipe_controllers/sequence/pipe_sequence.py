@@ -11,6 +11,8 @@ from pipelex.core.pipes.input_requirements_factory import InputRequirementsFacto
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.exceptions import (
     PipeControllerOutputConceptMismatchError,
+    PipeInputError,
+    PipeInputNotFoundError,
     PipeRunParamsError,
     StaticValidationError,
     StaticValidationErrorType,
@@ -55,11 +57,21 @@ class PipeSequence(PipeController):
 
             if sequential_sub_pipe.batch_params:
                 if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
+                    try:
+                        requirement = sub_pipe_needed_inputs.get_required_input_requirement(
+                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
+                        )
+                    except PipeInputNotFoundError as exc:
+                        msg = (
+                            f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
+                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
+                        )
+                        raise PipeInputError(
+                            message=msg, pipe_code=self.code, variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name, concept_code=None
+                        ) from exc
                     needed_inputs.add_requirement(
                         variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
-                        concept=sub_pipe_needed_inputs.get_required_input_requirement(
-                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name,
-                        ).concept,
+                        concept=requirement.concept,
                         multiplicity=True,
                     )
                     for input_name, requirement in sub_pipe_needed_inputs.items:

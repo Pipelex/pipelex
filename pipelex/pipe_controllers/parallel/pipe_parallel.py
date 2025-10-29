@@ -13,7 +13,14 @@ from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.exceptions import DryRunMissingInputsError, PipeRunParamsError, StaticValidationError, StaticValidationErrorType
+from pipelex.exceptions import (
+    DryRunMissingInputsError,
+    PipeInputError,
+    PipeInputNotFoundError,
+    PipeRunParamsError,
+    StaticValidationError,
+    StaticValidationErrorType,
+)
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -76,9 +83,19 @@ class PipeParallel(PipeController):
             # Use the centralized recursion detection
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
             if sub_pipe.batch_params:
+                try:
+                    requirement = pipe_needed_inputs.get_required_input_requirement(variable_name=sub_pipe.batch_params.input_item_stuff_name)
+                except PipeInputNotFoundError as exc:
+                    msg = (
+                        f"Batch input item named '{sub_pipe.batch_params.input_item_stuff_name}' is not "
+                        f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
+                    )
+                    raise PipeInputError(
+                        message=msg, pipe_code=self.code, variable_name=sub_pipe.batch_params.input_item_stuff_name, concept_code=None
+                    ) from exc
                 needed_inputs.add_requirement(
                     variable_name=sub_pipe.batch_params.input_list_stuff_name,
-                    concept=pipe_needed_inputs.get_required_input_requirement(variable_name=sub_pipe.batch_params.input_item_stuff_name).concept,
+                    concept=requirement.concept,
                     multiplicity=True,
                 )
                 for input_name, requirement in pipe_needed_inputs.items:
