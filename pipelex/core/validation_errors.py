@@ -1,6 +1,6 @@
 from typing_extensions import Protocol
 
-from pipelex.builder.validation_error_data import ConceptDefinitionErrorData
+from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
 
 
 class ValidationErrorDetailsProtocol(Protocol):

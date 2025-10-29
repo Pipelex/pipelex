@@ -1,6 +1,8 @@
 from typing_extensions import override
 
-from pipelex.builder.validation_error_data import ConceptDefinitionErrorData, LibraryLoadingErrorData, PipeDefinitionErrorData
+from pydantic import BaseModel, Field
+
+from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
 from pipelex.core.concepts.exceptions import ConceptDefinitionError
 from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
 from pipelex.exceptions import PipelexException
@@ -9,6 +11,21 @@ from pipelex.exceptions import PipelexException
 class LibraryError(PipelexException):
     pass
 
+class PipeDefinitionErrorData(BaseModel):
+    """Structured data for PipeDefinitionError."""
+
+    message: str = Field(description="The error message")
+    domain_code: str | None = Field(None, description="The domain code")
+    pipe_code: str | None = Field(None, description="The pipe code")
+    description: str | None = Field(None, description="Description of the pipe")
+    source: str | None = Field(None, description="Source of the error")
+
+class LibraryLoadingErrorData(BaseModel):
+    """Structured data for LibraryLoadingError."""
+
+    message: str = Field(description="The main error message")
+    concept_definition_errors: list[ConceptDefinitionErrorData] | None = Field(None, description="List of concept definition errors")
+    pipe_definition_errors: list[PipeDefinitionErrorData] | None = Field(None, description="List of pipe definition errors")
 
 class LibraryLoadingError(LibraryError, ValidationErrorDetailsProtocol):
     """Error raised when loading library components fails."""

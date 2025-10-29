@@ -1,4 +1,6 @@
-from pipelex.builder.validation_error_data import ConceptDefinitionErrorData, SyntaxErrorData
+from pydantic import BaseModel, Field
+
+from pipelex.builder.validation_error_data import SyntaxErrorData
 from pipelex.exceptions import PipelexException
 
 
@@ -36,6 +38,18 @@ class ConceptRefineError(ConceptError):
 
 class ConceptLibraryConceptNotFoundError(PipelexException):
     pass
+
+
+class ConceptDefinitionErrorData(BaseModel):
+    """Structured data for ConceptDefinitionError."""
+
+    message: str = Field(description="The error message")
+    domain_code: str = Field(description="The domain code")
+    concept_code: str = Field(description="The concept code")
+    description: str = Field(description="Description of the concept")
+    structure_class_python_code: str | None = Field(None, description="Python code for the structure class if available")
+    structure_class_syntax_error_data: SyntaxErrorData | None = Field(None, description="Syntax error data for the structure class if available")
+    source: str | None = Field(None, description="Source of the error")
 
 
 class ConceptDefinitionError(PipelexException):
