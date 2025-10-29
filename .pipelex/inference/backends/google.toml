@@ -58,3 +58,15 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 0.10, output = 0.40 }
+
+################################################################################
+# EXTRACTION MODELS
+################################################################################
+
+["extract-by-gemini-2.5-flash"]
+model_type = "text_extractor"
+model_id = "gemini-2.5-flash"
+max_tokens = 131072
+inputs = ["image"]
+outputs = ["pages"]
+costs = { input = 0.4, output = 2.0 }

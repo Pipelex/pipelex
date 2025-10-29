@@ -40,6 +40,7 @@ default = "pipelex_inference"
 "nano-banana" = "blackboxai"
 "gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
+"extract-by-gemini-2.5-flash" = "google"
 
 [profiles.all_blackboxai]
 description = "Use BlackBoxAI backend for all its supported models"

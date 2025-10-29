@@ -19,7 +19,6 @@ class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
         # TODO: we don't need instances of the factories, we can just use them via class methods
         self.img_gen_worker_factory = ImgGenWorkerFactory()
-        self.extract_worker_factory = ExtractWorkerFactory()
         self.llm_workers: dict[str, LLMWorkerAbstract] = {}
         self.img_gen_workers: dict[str, ImgGenWorkerAbstract] = {}
         self.extract_workers: dict[str, ExtractWorkerAbstract] = {}
@@ -27,7 +26,6 @@ class InferenceManager(InferenceManagerProtocol):
     @override
     def teardown(self):
         self.img_gen_worker_factory = ImgGenWorkerFactory()
-        self.extract_worker_factory = ExtractWorkerFactory()
         for llm_worker in self.llm_workers.values():
             llm_worker.teardown()
         self.llm_workers = {}
@@ -128,7 +126,7 @@ class InferenceManager(InferenceManagerProtocol):
         inference_model: InferenceModelSpec,
         extract_handle: str,
     ) -> ExtractWorkerAbstract:
-        extract_worker = self.extract_worker_factory.make_extract_worker(
+        extract_worker = ExtractWorkerFactory.make_extract_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )

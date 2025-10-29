@@ -9,8 +9,9 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class ExtractWorkerFactory:
+    @classmethod
     def make_extract_worker(
-        self,
+        cls,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ExtractWorkerAbstract:
@@ -48,6 +49,34 @@ class ExtractWorkerFactory:
                 from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker  # noqa: PLC0415
 
                 extract_worker = Pypdfium2Worker(
+                    extra_config=backend.extra_config,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "google":
+                if importlib.util.find_spec("google.genai") is None:
+                    lib_name = "google-genai"
+                    lib_extra_name = "google"
+                    msg = (
+                        "The google-genai SDK is required in order to use Google Gemini API directly. "
+                        "You can install it with 'pip install google-genai'."
+                    )
+                    raise MissingDependencyError(
+                        lib_name,
+                        lib_extra_name,
+                        msg,
+                    )
+
+                from pipelex.plugins.google.google_extract_worker import GoogleExtractWorker  # noqa: PLC0415
+                from pipelex.plugins.google.google_factory import GoogleFactory  # noqa: PLC0415
+
+                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=GoogleFactory.make_google_client(backend=backend),
+                )
+
+                extract_worker = GoogleExtractWorker(
+                    sdk_instance=sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

@@ -4,20 +4,15 @@ from google import genai
 from google.genai import types
 from typing_extensions import override
 
-from pipelex import log
-from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
-from pipelex.cogt.extract.extract_output import ExtractOutput
+from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
-from pipelex.cogt.extract.extract_worker_factory import ExtractWorkerFactory
+from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.google.google_factory import GoogleFactory
-from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
-from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
 class GoogleExtractWorker(ExtractWorkerAbstract):
@@ -36,17 +31,6 @@ class GoogleExtractWorker(ExtractWorkerAbstract):
         genai_client: genai.Client = sdk_instance
         self.genai_async_client = genai_client.aio
 
-        self.pypdfium2_worker = ExtractWorkerFactory.make_extract_worker(
-            inference_model=InferenceModelSpec(
-                backend_name="internal",
-                name="pypdfium2-extract-text",
-                sdk="pypdfium2",
-                model_id="pypdfium2",
-                inputs=["text"],
-                outputs=["text"],
-            ),
-        )
-
     @override
     async def _extract_pages(
         self,
@@ -59,13 +43,9 @@ class GoogleExtractWorker(ExtractWorkerAbstract):
                 should_caption_image=extract_job.job_params.should_caption_images,
             )
 
-        elif pdf_uri := extract_job.extract_input.pdf_uri:
-            extract_output = await self._make_extract_output_from_pdf(
-                pdf_uri=pdf_uri,
-                should_include_images=extract_job.job_params.should_include_images,
-                should_caption_images=extract_job.job_params.should_caption_images,
-                should_include_page_views=extract_job.job_params.should_include_page_views,
-            )
+        elif _ := extract_job.extract_input.pdf_uri:
+            msg = "PDF extraction is not implemented for Google yet."
+            raise NotImplementedError(msg)
         else:
             msg = "No image nor PDF URI provided in ExtractJob"
             raise ExtractInputError(msg)
@@ -79,43 +59,38 @@ class GoogleExtractWorker(ExtractWorkerAbstract):
         if should_caption_image:
             msg = "Captioning is not implemented for Google OCR."
             raise NotImplementedError(msg)
-        image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
-        if image_url:
-            return await self.extract_from_image_url(
-                image_url=image_url,
-            )
-        assert image_path is not None
-        return await self.extract_from_image_file(
-            image_path=image_path,
+        image = PromptImageFactory.make_prompt_image(url=image_uri)
+        contents = await GoogleFactory.prepare_extract_contents(images=[image])
+
+        # Build generation config
+        generation_config = types.GenerateContentConfig(temperature=0.5)
+        # Generate content using async client
+        response = await self.genai_async_client.models.generate_content(
+            model=self.inference_model.model_id,
+            contents=contents,
+            config=generation_config,
         )
 
-    async def _make_extract_output_from_pdf(
-        self,
-        pdf_uri: str,
-        should_include_images: bool,
-        should_caption_images: bool,
-        should_include_page_views: bool,
-    ) -> ExtractOutput:
-        if should_caption_images:
-            msg = "Captioning is not implemented for Google OCR."
-            raise ExtractCapabilityError(msg)
-        if should_include_page_views:
-            log.verbose("Page views are not implemented for Google OCR.")
-            # TODO: use a model capability flag to check possibility before asking for it
-            # it it's asked and not available, raise
-            # the caller will be responsible to get the page views using other solution if needed
-            # raise OcrCapabilityError("Page views are not implemented for Google OCR.")
-        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
-        extract_output: ExtractOutput
-        if pdf_url:
-            extract_output = await self.extract_from_pdf_url(
-                pdf_url=pdf_url,
-                should_include_images=should_include_images,
-            )
-        else:  # pdf_path must be provided based on validation
-            assert pdf_path is not None
-            extract_output = await self.extract_from_pdf_file(
-                pdf_path=pdf_path,
-                should_include_images=should_include_images,
-            )
-        return extract_output
+        # Extract text from response
+        if not response.candidates:
+            msg = f"No candidates returned from model: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
+
+        candidate = response.candidates[0]
+        if not candidate.content or not candidate.content.parts:
+            msg = f"No content parts in response from model: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
+
+        # Extract text from the first part
+        text_content = candidate.content.parts[0].text
+        if not text_content:
+            msg = f"No text content in response from model: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
+
+        return ExtractOutput(
+            pages={
+                1: Page(
+                    text=text_content,
+                ),
+            },
+        )

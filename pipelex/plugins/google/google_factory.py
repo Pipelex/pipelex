@@ -69,6 +69,23 @@ class GoogleFactory:
         return genai_types.Content(parts=parts, role="user")
 
     @classmethod
+    async def prepare_extract_contents(cls, images: list[PromptImage]) -> genai_types.ContentListUnion:
+        """Prepare contents for Google genai API."""
+        # Build list of parts for multimodal content
+        parts: list[genai_types.Part] = []
+
+        # Add text content if present
+        llm_prompt_text = "Extract the text from the images"
+        parts.append(genai_types.Part.from_text(text=llm_prompt_text))
+
+        # Prepare all images in parallel
+        image_tasks = [cls.prepare_image_part(image) for image in images]
+        image_parts = await asyncio.gather(*image_tasks)
+        parts.extend(image_parts)
+
+        return genai_types.Content(parts=parts, role="user")
+
+    @classmethod
     def extract_token_usage(cls, usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None) -> NbTokensByCategoryDict:
         """Extract token usage from Google's usage metadata."""
         if not usage_metadata:

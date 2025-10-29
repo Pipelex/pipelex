@@ -21,6 +21,7 @@ from pipelex.tools.misc.dict_utils import apply_to_strings_recursive, extract_va
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import Self
 
 if TYPE_CHECKING:
@@ -154,7 +155,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         blueprint=model_spec_blueprint,
                     )
                     backend_model_specs[model_spec_name] = model_spec
-                except (InferenceModelSpecError, ValidationError) as exc:
+                except ValidationError as validation_error:
+                    validation_error_msg = format_pydantic_validation_error(validation_error)
+                    msg = (
+                        f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from "
+                        f"file '{path_to_model_specs_toml}': {validation_error_msg}"
+                    )
+                    raise InferenceBackendLibraryError(msg) from validation_error
+                except InferenceModelSpecError as exc:
                     msg = (
                         f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from file '{path_to_model_specs_toml}'"
                     )

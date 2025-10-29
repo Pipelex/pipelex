@@ -208,8 +208,9 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "pypdfium2-extract-text",
-        "mistral-ocr",
+        # "pypdfium2-extract-text",
+        # "mistral-ocr",
+        "extract-by-gemini-2.5-flash",
     ],
 )
 def extract_handle(request: pytest.FixtureRequest) -> str:
@@ -219,7 +220,8 @@ def extract_handle(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "mistral-ocr",
+        # "mistral-ocr",
+        "extract-by-gemini-2.5-flash",
     ],
 )
 def extract_handle_from_image(request: pytest.FixtureRequest) -> str:

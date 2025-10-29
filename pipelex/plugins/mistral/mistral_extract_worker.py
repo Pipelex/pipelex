@@ -4,7 +4,7 @@ from mistralai import Mistral
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
+from pipelex.cogt.exceptions import ExtractCapabilityError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
