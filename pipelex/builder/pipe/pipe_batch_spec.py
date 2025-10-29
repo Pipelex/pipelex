@@ -15,11 +15,11 @@ class PipeBatchSpec(PipeSpec):
     the results of each branch. So this like a map operation.
 
     Validation Rules:
-        1. branch_pipe_code must reference an existing pipe in the pipeline.
-        2. There must be at least one input list in the inputs of the pipe, corresponding to input_list_name.
-           That name is typically a plural noun like "ideas" or "images".
-           And the concept corresponding to that input must be multiple, using the [] notation.
-        3. input_item_name is typically the singular noun corresponding to the items in the list, like "idea" or "image".
+        - There must be at least one input which is a list, corresponding to input_list_name.
+          That name is typically a plural noun like "ideas" or "images".
+          And the concept corresponding to that input list must be multiple, using the [] notation,
+          i.e. something like "Ideas[]" or "Images[]".
+        - input_item_name is typically the singular noun corresponding to the items in the list, like "idea" or "image".
 
     """
 

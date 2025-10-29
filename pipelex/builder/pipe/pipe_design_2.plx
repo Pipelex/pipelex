@@ -62,7 +62,6 @@ You must pick the relevant concepts for inputs and outputs from the following po
 Based on the pipe signature, build the PipeSequenceSpec.
 
 Note:
-- If you are to apply a pipe step to a previous output which is multiple, use batch_over/batch_as attributes in that step.
 - The output concept of a pipe sequence must always be the same as the output concept of the last pipe in the sequence.
 """
 

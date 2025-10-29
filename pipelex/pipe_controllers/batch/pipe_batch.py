@@ -74,9 +74,9 @@ class PipeBatch(PipeController):
         pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
         for variable_name, _ in pipe.inputs.items:
             required_variables.add(variable_name)
-        # 2. Check that the input_item_stuff_name is in the inputs of the pipe
-        if self.batch_params and self.batch_params.input_item_stuff_name:
-            required_variables.add(self.batch_params.input_item_stuff_name)
+        # 2. Check that the input_list_stuff_name is in the inputs of the pipe
+        required_variables.remove(self.batch_params.input_item_stuff_name)
+        required_variables.add(self.batch_params.input_list_stuff_name)
         return required_variables
 
     @override

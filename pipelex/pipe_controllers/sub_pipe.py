@@ -92,7 +92,7 @@ class SubPipe(BaseModel):
         else:
             # Case 3: Normal processing
             required_variables = sub_pipe.required_variables()
-            required_stuff_names = {rv for rv in required_variables if not rv.startswith("_")}
+            required_stuff_names = {req_var for req_var in required_variables if not req_var.startswith("_")}
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:

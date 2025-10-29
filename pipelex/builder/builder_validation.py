@@ -127,7 +127,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
         for pipe_code, pipe_spec in bundle_spec.pipe.items():
             # Check if this is a PipeController
             if AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
-                log.dev(f"  Fixing inputs for {pipe_spec.type} pipe '{pipe_code}'")
+                log.dev(f"  Checking inputs for {pipe_spec.type} pipe '{pipe_code}'")
 
                 # Get the loaded pipe instance
                 pipe = get_required_pipe(pipe_code=pipe_code)
@@ -138,10 +138,19 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
                 # Store old inputs for logging
                 old_inputs = pipe_spec.inputs.copy()
 
-                # Rebuild the inputs dict from needed_inputs
+                # Rebuild the inputs dict from needed_inputs, preserving multiplicity
                 new_inputs: dict[str, str] = {}
                 for named_requirement in needed_inputs.named_input_requirements:
-                    new_inputs[named_requirement.variable_name] = named_requirement.concept.code
+                    concept_code = named_requirement.concept.code
+                    # Preserve multiplicity brackets
+                    if named_requirement.multiplicity is not None:
+                        if named_requirement.multiplicity is True:
+                            # Variable-length list []
+                            concept_code = f"{concept_code}[]"
+                        else:
+                            # Fixed-length list [N] where N is an int
+                            concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
+                    new_inputs[named_requirement.variable_name] = concept_code
 
                 # Update the pipe spec inputs
                 pipe_spec.inputs = new_inputs
@@ -152,7 +161,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
                     log.dev(f"    New inputs: {new_inputs}")
                     fixed_count += 1
                 else:
-                    log.dev(f"    Inputs already consistent: {new_inputs}")
+                    log.dev("    ✅")
     finally:
         # Clean up by removing the bundle from library manager
         log.dev("Cleaning up: removing bundle from library manager")
