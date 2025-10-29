@@ -1,6 +1,7 @@
 from typing import Any
 
-from mistralai import Mistral
+from google import genai
+from google.genai import types
 from typing_extensions import override
 
 from pipelex import log
@@ -9,18 +10,20 @@ from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.extract.extract_worker_factory import ExtractWorkerFactory
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.plugins.mistral.mistral_factory import MistralFactory
+from pipelex.plugins.google.google_factory import GoogleFactory
+from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
-class MistralExtractWorker(ExtractWorkerAbstract):
+class GoogleExtractWorker(ExtractWorkerAbstract):
     def __init__(
         self,
-        sdk_instance: Mistral,
+        sdk_instance: genai.Client,
         extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -30,8 +33,19 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,
         )
+        genai_client: genai.Client = sdk_instance
+        self.genai_async_client = genai_client.aio
 
-        self.mistral_client: Mistral = sdk_instance
+        self.pypdfium2_worker = ExtractWorkerFactory.make_extract_worker(
+            inference_model=InferenceModelSpec(
+                backend_name="internal",
+                name="pypdfium2-extract-text",
+                sdk="pypdfium2",
+                model_id="pypdfium2",
+                inputs=["text"],
+                outputs=["text"],
+            ),
+        )
 
     @override
     async def _extract_pages(
@@ -63,7 +77,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         should_caption_image: bool = False,
     ) -> ExtractOutput:
         if should_caption_image:
-            msg = "Captioning is not implemented for Mistral OCR."
+            msg = "Captioning is not implemented for Google OCR."
             raise NotImplementedError(msg)
         image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
         if image_url:
@@ -83,14 +97,14 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         should_include_page_views: bool,
     ) -> ExtractOutput:
         if should_caption_images:
-            msg = "Captioning is not implemented for Mistral OCR."
+            msg = "Captioning is not implemented for Google OCR."
             raise ExtractCapabilityError(msg)
         if should_include_page_views:
-            log.verbose("Page views are not implemented for Mistral OCR.")
+            log.verbose("Page views are not implemented for Google OCR.")
             # TODO: use a model capability flag to check possibility before asking for it
             # it it's asked and not available, raise
             # the caller will be responsible to get the page views using other solution if needed
-            # raise OcrCapabilityError("Page views are not implemented for Mistral OCR.")
+            # raise OcrCapabilityError("Page views are not implemented for Google OCR.")
         pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
         extract_output: ExtractOutput
         if pdf_url:
@@ -105,74 +119,3 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                 should_include_images=should_include_images,
             )
         return extract_output
-
-    async def extract_from_image_url(
-        self,
-        image_url: str,
-    ) -> ExtractOutput:
-        extract_response = await self.mistral_client.ocr.process_async(
-            model=self.inference_model.model_id,
-            document={
-                "type": "image_url",
-                "image_url": image_url,
-            },
-        )
-        return await MistralFactory.make_extract_output_from_mistral_response(
-            mistral_extract_response=extract_response,
-        )
-
-    async def extract_from_image_file(
-        self,
-        image_path: str,
-    ) -> ExtractOutput:
-        b64 = await load_binary_as_base64_async(path=image_path)
-
-        file_type = detect_file_type_from_base64(b64=b64)
-        mime_type = file_type.mime
-
-        extract_response = await self.mistral_client.ocr.process_async(
-            model=self.inference_model.model_id,
-            document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64.decode('utf-8')}"},
-        )
-        return await MistralFactory.make_extract_output_from_mistral_response(
-            mistral_extract_response=extract_response,
-        )
-
-    async def extract_from_pdf_url(
-        self,
-        pdf_url: str,
-        should_include_images: bool = False,
-    ) -> ExtractOutput:
-        extract_response = await self.mistral_client.ocr.process_async(
-            model=self.inference_model.model_id,
-            document={
-                "type": "document_url",
-                "document_url": pdf_url,
-            },
-            include_image_base64=should_include_images,
-        )
-
-        return await MistralFactory.make_extract_output_from_mistral_response(
-            mistral_extract_response=extract_response,
-            should_include_images=should_include_images,
-        )
-
-    async def extract_from_pdf_file(
-        self,
-        pdf_path: str,
-        should_include_images: bool = False,
-    ) -> ExtractOutput:
-        # Upload the file
-        uploaded_file_id = await MistralFactory.upload_file_to_mistral_for_ocr(
-            mistral_client=self.mistral_client,
-            file_path=pdf_path,
-        )
-
-        # Get signed URL
-        signed_url = await self.mistral_client.files.get_signed_url_async(
-            file_id=uploaded_file_id,
-        )
-        return await self.extract_from_pdf_url(
-            pdf_url=signed_url.url,
-            should_include_images=should_include_images,
-        )
