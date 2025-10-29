@@ -10,9 +10,10 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
+from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
-from pipelex.exceptions import PipelexCLIError, PipelexConfigError
+from pipelex.exceptions import PipelexConfigError
 from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager

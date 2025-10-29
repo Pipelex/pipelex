@@ -15,14 +15,10 @@ from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.exceptions import (
-    ConceptLoadingError,
-    DomainLoadingError,
-    PipeInputError,
-    PipeLoadingError,
-    StaticValidationError,
-)
+from pipelex.core.pipes.exceptions import PipeInputError
+from pipelex.exceptions import StaticValidationError
 from pipelex.hub import get_library_manager
+from pipelex.libraries.exceptions import ConceptLoadingError, DomainLoadingError, PipeLoadingError
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 
 

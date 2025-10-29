@@ -12,10 +12,12 @@ from pipelex.builder.builder_errors import (
 )
 from pipelex.builder.builder_validation import validate_bundle_spec
 from pipelex.client.protocol import PipelineInputs
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.exceptions import PipelineExecutionError, StaticValidationErrorType, WorkingMemoryStuffNotFoundError
+from pipelex.exceptions import StaticValidationErrorType
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
+from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
 

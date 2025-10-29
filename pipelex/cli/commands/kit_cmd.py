@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 from typing_extensions import Annotated
 
-from pipelex.exceptions import PipelexCLIError
+from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.kit.cursor_export import export_cursor_rules, remove_cursor_rules
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.migrations_export import export_migration_instructions

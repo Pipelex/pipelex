@@ -7,11 +7,12 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
 from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
+from pipelex.libraries.exceptions import ConceptLibraryError
 from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]

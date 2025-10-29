@@ -1,11 +1,14 @@
 from pipelex.exceptions import PipelexException
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
+
 class PipeRunParamsError(PipelexException):
     pass
 
+
 class BatchParamsError(PipelexException):
     pass
+
 
 class PipeRouterError(PipelexException):
     def __init__(
@@ -23,6 +26,7 @@ class PipeRouterError(PipelexException):
         self.pipe_stack = pipe_stack
         self.missing_inputs = missing_inputs
         super().__init__(message)
+
 
 class PipeRunError(PipelexException):
     pass

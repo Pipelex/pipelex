@@ -10,10 +10,12 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library import ConceptLibrary
+from pipelex.core.concepts.exceptions import ConceptDefinitionError
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.domains.domain_library import DomainLibrary
+from pipelex.core.domains.exceptions import DomainDefinitionError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -21,11 +23,9 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
-from pipelex.exceptions import (
-    ConceptDefinitionError,
+from pipelex.libraries.exceptions import (
     ConceptLibraryError,
     ConceptLoadingError,
-    DomainDefinitionError,
     DomainLoadingError,
     LibraryError,
     LibraryLoadingError,

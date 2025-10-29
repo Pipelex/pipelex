@@ -1,5 +1,5 @@
 from pipelex.exceptions import PipelexException
 
 
-class JobHistoryError(PipelexException):
+class ClientAuthenticationError(PipelexException):
     pass

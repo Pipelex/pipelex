@@ -8,8 +8,10 @@ from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 
 PipelineManagerRoot = dict[str, Pipeline]
 
+
 class PipelineManagerNotFoundError(PipelexException):
     pass
+
 
 class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
     root: PipelineManagerRoot = Field(default_factory=dict)

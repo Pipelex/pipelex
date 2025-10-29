@@ -5,15 +5,9 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import PipelexConfigurationError
 from pipelex.core.interpreter import PipelexInterpreter, PLXDecodeError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.exceptions import (
-    ConceptLoadingError,
-    DomainLoadingError,
-    DryRunError,
-    PipeLibraryError,
-    PipeLoadingError,
-)
 from pipelex.hub import get_library_manager
-from pipelex.pipe_run.dry_run import dry_run_pipes
+from pipelex.libraries.exceptions import ConceptLoadingError, DomainLoadingError, PipeLibraryError, PipeLoadingError
+from pipelex.pipe_run.dry_run import DryRunError, dry_run_pipes
 
 
 async def validate_plx(plx_content: str, remove_after_validation: bool = True) -> tuple[PipelexBundleBlueprint, list[PipeAbstract]]:

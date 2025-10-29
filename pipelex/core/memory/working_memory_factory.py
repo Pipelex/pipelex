@@ -9,6 +9,7 @@ from pipelex.client.protocol import PipelineInputs
 from pipelex.core.concepts.concept import SpecialDomain
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_string
+from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.image_content import ImageContent
@@ -18,7 +19,6 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import WorkingMemoryFactoryError
 from pipelex.hub import get_required_concept
 
 

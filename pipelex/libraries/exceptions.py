@@ -1,0 +1,79 @@
+from typing_extensions import override
+
+from pipelex.builder.validation_error_data import ConceptDefinitionErrorData, LibraryLoadingErrorData, PipeDefinitionErrorData
+from pipelex.core.concepts.exceptions import ConceptDefinitionError
+from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
+from pipelex.exceptions import PipelexException
+
+
+class LibraryError(PipelexException):
+    pass
+
+
+class LibraryLoadingError(LibraryError, ValidationErrorDetailsProtocol):
+    """Error raised when loading library components fails."""
+
+    def __init__(
+        self,
+        message: str,
+        concept_definition_errors: list[ConceptDefinitionErrorData] | None = None,
+        pipe_definition_errors: list[PipeDefinitionErrorData] | None = None,
+    ):
+        self.concept_definition_errors = concept_definition_errors
+        self.pipe_definition_errors = pipe_definition_errors
+        super().__init__(message)
+
+    @override
+    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
+        return self.concept_definition_errors or []
+
+    def as_structured_content(self) -> LibraryLoadingErrorData:
+        return LibraryLoadingErrorData(
+            message=str(self),
+            concept_definition_errors=self.concept_definition_errors,
+            pipe_definition_errors=self.pipe_definition_errors,
+        )
+
+
+class DomainLibraryError(LibraryError):
+    pass
+
+
+class ConceptLibraryError(LibraryError):
+    pass
+
+
+class PipeLibraryError(LibraryError):
+    pass
+
+
+class PipeLibraryPipeNotFoundError(PipeLibraryError):
+    pass
+
+
+class DomainLoadingError(LibraryLoadingError):
+    def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
+        self.domain_code = domain_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
+
+
+class ConceptLoadingError(LibraryLoadingError):
+    def __init__(
+        self, message: str, concept_definition_error: ConceptDefinitionError, concept_code: str, description: str, source: str | None = None
+    ):
+        self.concept_definition_error = concept_definition_error
+        self.concept_code = concept_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
+
+
+class PipeLoadingError(LibraryLoadingError):
+    def __init__(self, message: str, pipe_definition_error: PipeDefinitionErrorData, pipe_code: str, description: str, source: str | None = None):
+        self.pipe_definition_error = pipe_definition_error
+        self.pipe_code = pipe_code
+        self.description = description
+        self.source = source
+        super().__init__(message)
