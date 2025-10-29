@@ -86,7 +86,7 @@ marker_end = "<!-- END_PIPELEX_RULES -->"
 heading_1 = "# Pipelex Rules"
 
 [agent_rules.targets.blackbox]
-path = "BLACKBOX_RULES.md"
+path = ".blackboxrules"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
 heading_1 = "# Pipelex Rules"
