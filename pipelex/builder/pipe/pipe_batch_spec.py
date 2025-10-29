@@ -8,7 +8,7 @@ from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBluepri
 
 
 class PipeBatchSpec(PipeSpec):
-    """Spec for batch processing pipe operations in the Pipelex framework.
+    """Spec for batch processing pipe operations concurrently.
 
     PipeBatch enables concurrent execution of the same pipe applied to multiple items
     provided as an input list. Each item is processed independently. The result is a list

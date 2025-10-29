@@ -1,3 +1,5 @@
+from rich.console import Console
+
 from pipelex import log, pretty_print
 from pipelex.builder.builder import (
     PipelexBundleSpec,
@@ -38,6 +40,8 @@ class BuilderLoop:
             )
         except PipelineExecutionError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."
+            console = Console(stderr=True)
+            console.print_exception()
             raise PipeBuilderError(message=msg) from exc
         pretty_print(pipe_output, title="Pipe Output")
 

@@ -293,7 +293,8 @@ class PipeCondition(PipeController):
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 
         # Handle continue case
-        if SpecialOutcome.is_fail(outcome):
+        if SpecialOutcome.is_continue(outcome):
+            log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
             return PipeOutput(working_memory=working_memory)
 
         if SpecialOutcome.is_fail(outcome):
