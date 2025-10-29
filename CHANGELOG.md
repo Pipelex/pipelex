@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- CLI to generate inputs JSON.
+
 ## [v0.14.1] - 2025-10-27
 
 ### Added
