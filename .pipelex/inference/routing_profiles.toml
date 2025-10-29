@@ -9,7 +9,7 @@
 # ================================================
 
 # Which profile to use (change this to switch routing)
-active = "pipelex_first"
+active = "all_blackboxai"
 
 # We recommend using the "pipelex_first" profile to get a head start with all models.
 # The Pipelex Inference backend is currently not recommended for production use,
@@ -35,7 +35,7 @@ default = "pipelex_inference"
 "claude-*" = "pipelex_inference"
 "grok-*" = "pipelex_inference"
 "gemini-*" = "pipelex_inference"
-"*-sdxl" = "fal"
+"*-sdxl" = "blackboxai"
 "flux-*" = "fal"
 "gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
@@ -43,7 +43,6 @@ default = "pipelex_inference"
 [profiles.all_blackboxai]
 description = "Use BlackBoxAI backend for all its supported models"
 default = "blackboxai"
-
 
 [profiles.all_bedrock]
 description = "Use Bedrock backend for all its supported models"

@@ -28,6 +28,7 @@ class OpenAIFactoryError(CogtError):
 class OpenAISdkVariant(StrEnum):
     AZURE_OPENAI = "azure_openai"
     OPENAI = "openai"
+    OPENAI_ALT_IMG_GEN = "openai_alt_img_gen"
 
 
 class AzureExtraField(StrEnum):
@@ -61,6 +62,12 @@ class OpenAIFactory:
                 )
 
             case OpenAISdkVariant.OPENAI:
+                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+                the_client = openai.AsyncOpenAI(
+                    api_key=backend.api_key,
+                    base_url=backend.endpoint,
+                )
+            case OpenAISdkVariant.OPENAI_ALT_IMG_GEN:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=backend.api_key,

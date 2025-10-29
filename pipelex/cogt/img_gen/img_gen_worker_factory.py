@@ -70,6 +70,23 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case "openai_alt_img_gen":
+                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_img_gen_alt_worker import OpenAIImgGenAlternativeWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=OpenAIFactory.make_openai_client(
+                        plugin=plugin,
+                        backend=backend,
+                    ),
+                )
+
+                img_gen_worker = OpenAIImgGenAlternativeWorker(
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
             case _:
                 msg = f"Plugin '{plugin}' is not supported for image generation"
                 raise NotImplementedError(msg)
