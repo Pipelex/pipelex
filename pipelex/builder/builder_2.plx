@@ -134,6 +134,67 @@ prompt = """
 """
 
 
+[pipe.draft_flow]
+type = "PipeLLM"
+description = "Write the pipe signatures for the plan."
+inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "concept.ConceptSpec" }
+output = "pipe_design.PipeSignature[]"
+model = "llm_to_engineer"
+model_to_structure = "cheap_llm_to_structure"
+structuring_method = "preliminary_text"
+system_prompt = """
+You are a Senior engineer.
+"""
+prompt = """
+# Your job is to structure the flow we have drafted based on a brief:
+
+@brief
+
+@plan_draft
+
+{% if concept_specs %}
+We have already defined the concepts you must use for the inputs and outputs of the pipes:
+@concept_specs
+And of course you still have the native concepts if required: Text, Image, PDF, Number, Page.
+{% else %}
+You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Image, PDF, Number, Page.
+{% endif %}
+
+## For PipeOperators:
+
+The flow you design must include the contracts for each of the PipeOperator: PipeLLM, PipeImgGen, PipeExtract.
+Shape of the contract for PipeOperator is:
+- type: PipeLLM | PipeImgGen | PipeExtract
+- description: What the pipe does (string)
+- inputs: Dictionary mapping variable names (snake_case) to concept codes (PascalCase), possibly with multiplicity brackets.
+- result: Variable name for the pipe's result (snake_case). Can be referenced in subsequent pipes.
+- output: Output concept code (PascalCase) possibly with multiplicity: 'Text' (single), 'Article[]' (list), 'Image[5]' (exactly 5).
+
+## For the PipeControllers, which really define the flow, we need a more detailed contract, related to each type of controller:
+
+
+
+
+
+## More rules:
+- For each pipe: give a unique snake_case pipe_code, based on a verb, and craft description of what the pipe does.
+- Be clear which is the main pipe of the pipeline, don't write "main" in its pipe_code, but make it clear in its description.
+- Contrary to the draft, now when specifying the inputs and outputs of the pipes, you must indicate the concept associated to each variable name.
+- The output concept of a PipeSequence must always be the same as the output concept of the last pipe in the sequence.
+- Regarding PipeImgGen, which uses an AI model to generate images from a text prompt: as the image generation prompt MUST be a text, you must use a PipeLLM step to write the prompt, unless it's part of the pipeline's initial inputs.
+
+## Flow:
+- Do not bother with planning a final step that gathers all the elements unless it's clear from the brief that the user wants the pipe to do that.
+- We have a memory system: the outputs of each pipe are added to the memory and can be used as inputs by subsequent pipes.
+- The pipeline's initial inputs are added to the memory at the beginning.
+- At the end of the pipeline, all the memory is delivered so there is not need to gather all the elements unless expressly requested by the brief.
+- You don't need to flatten lists at the end or even in intermediate steps: our system manages branching and the memory flows into each branch.
+- If you're in a sequence and you are to apply that pipe to a previous output which is multiple, use a PipeBatch step.
+- Apply the DRY principle: don't repeat yourself. if you have a task to apply several times, make it a dedicated pipe you can use and reuse.
+- If you have a sequence which has only one step, then don't make that a sequence, make it a single pipe. Or check if you forgot to include another step maybe.
+"""
+
+
 [pipe.design_pipe_signatures_2]
 type = "PipeLLM"
 description = "Write the pipe signatures for the plan."

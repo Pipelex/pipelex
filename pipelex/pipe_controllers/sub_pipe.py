@@ -52,8 +52,8 @@ class SubPipe(BaseModel):
                 item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
             except PipeInputNotFoundError as exc:
                 msg = (
-                    f"Batch input item named '{batch_params.input_item_stuff_name}' is not "
-                    f"in this SubPipe '{self.pipe_code}' input requirements: {sub_pipe.inputs}"
+                    f"Batch input item named '{batch_params.input_item_stuff_name}' from '{calling_pipe_code}' is not "
+                    f"in SubPipe '{self.pipe_code}' input requirements: {sub_pipe.inputs}"
                 )
                 raise PipeInputError(
                     message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_item_stuff_name, concept_code=None
