@@ -1,3 +1,4 @@
+import random
 from typing import TYPE_CHECKING, Any
 
 import openai
@@ -10,6 +11,7 @@ from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 if TYPE_CHECKING:
@@ -37,13 +39,14 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImage:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
-        log.debug(f"Generating image with model: {self.inference_model.desc}")
         img_gen_prompt_text = img_gen_job.img_gen_prompt.positive_text
         messages = [{"role": "user", "content": img_gen_prompt_text}]
+        seed = img_gen_job.job_params.seed or random.randint(0, 2**32 - 1)
         try:
             response = await self.openai_client.chat.completions.create(
                 model=self.inference_model.model_id,
                 messages=messages,  # type: ignore[arg-type]
+                seed=seed,
             )
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here

@@ -329,6 +329,8 @@ ignore = [
     "S106", # Possible hardcoded password assigned to argument: "secret"
     "S105", # Possible hardcoded password assigned to: "child_secret"
 
+    "S311", # Cryptographically weak pseudo-random number generator
+
     "TD002", # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
     "TD003", # Missing issue link for this TODO
 
