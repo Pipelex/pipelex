@@ -73,6 +73,7 @@ class LibraryManager(LibraryManagerAbstract):
         self.domain_library = domain_library
         self.concept_library = concept_library
         self.pipe_library = pipe_library
+        self.loaded_plx_paths: list[str] = []
 
     @override
     def validate_libraries(self):
@@ -96,6 +97,10 @@ class LibraryManager(LibraryManagerAbstract):
     def reset(self) -> None:
         self.teardown()
         self.setup()
+
+    @override
+    def get_loaded_plx_paths(self) -> list[str]:
+        return self.loaded_plx_paths
 
     def _get_pipelex_plx_files_from_dirs(self, dirs: set[Path]) -> list[Path]:
         """Get all valid Pipelex PLX files from the given directories."""
@@ -346,6 +351,8 @@ class LibraryManager(LibraryManagerAbstract):
                 raise LibraryLoadingError(msg) from validation_error
             blueprint.source = str(plx_file_path)
             blueprints.append(blueprint)
+
+        self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
 
         # Load all domains first
         all_domains: list[Domain] = []

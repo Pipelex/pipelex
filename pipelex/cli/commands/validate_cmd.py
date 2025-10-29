@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import click
@@ -15,7 +16,7 @@ from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.exceptions import LibraryLoadingError, PipeInputError
-from pipelex.hub import get_pipes, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
@@ -23,7 +24,9 @@ from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
+    from pipelex.core.pipes.pipe_abstract import PipeAbstract
     from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
+
 console = Console()
 
 COMMAND = "validate"
@@ -118,6 +121,19 @@ def validate_cmd(
 
     async def validate_pipe(pipe_code: str | None = None, bundle_path: str | None = None):
         if bundle_path:
+            absolute_bundle_path = str(Path(bundle_path).resolve())
+            if absolute_bundle_path in get_library_manager().get_loaded_plx_paths():
+                bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
+                if not bundle_blueprint.pipe:
+                    typer.secho(f"Failed to validate bundle '{bundle_path}': no pipes found in bundle", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(1)
+                pipe_codes = list(bundle_blueprint.pipe.keys())
+                pipes: list[PipeAbstract] = []
+                for the_pipe_code in pipe_codes:
+                    pipes.append(get_required_pipe(pipe_code=the_pipe_code))
+                await dry_run_pipes(pipes=pipes, raise_on_failure=True)
+                typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}'", fg=typer.colors.GREEN)
+                return
             # When validating a bundle, load_pipe_from_bundle validates ALL pipes in the bundle
             try:
                 bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
