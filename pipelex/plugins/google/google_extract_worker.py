@@ -16,6 +16,7 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
 class GoogleExtractWorker(ExtractWorkerAbstract):
@@ -84,7 +85,15 @@ class GoogleExtractWorker(ExtractWorkerAbstract):
         if should_caption_image:
             msg = "Captioning is not implemented for Google OCR."
             raise NotImplementedError(msg)
-        image = PromptImageFactory.make_prompt_image(url=image_uri)
+        # Determine if image_uri is a file path or URL
+        image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
+        if image_path:
+            image = PromptImageFactory.make_prompt_image(file_path=image_path)
+        elif image_url:
+            image = PromptImageFactory.make_prompt_image(url=image_url)
+        else:
+            msg = f"Could not determine if image_uri is a path or URL: {image_uri}"
+            raise ExtractInputError(msg)
         contents = await GoogleFactory.prepare_extract_contents(images=[image])
 
         # Build generation config
