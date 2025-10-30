@@ -1,9 +1,12 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from google import genai
 from google.genai import types
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
@@ -30,6 +33,28 @@ class GoogleExtractWorker(ExtractWorkerAbstract):
         )
         genai_client: genai.Client = sdk_instance
         self.genai_async_client = genai_client.aio
+
+    @override
+    def teardown(self):
+        """Close the async client to free resources."""
+        try:
+            # Try to get the running event loop
+            asyncio.get_running_loop()
+            # If there's a running loop, run the close in a separate thread
+            # to avoid blocking or creating conflicts
+            with ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, self.genai_async_client.aclose())
+                future.result(timeout=5)  # Wait up to 5 seconds for cleanup
+        except RuntimeError:
+            # No running event loop, we can safely use asyncio.run()
+            try:
+                asyncio.run(self.genai_async_client.aclose())
+            except Exception as exc:
+                # Log but don't fail teardown if cleanup has issues
+                log.debug(f"Error closing Google async client during teardown: {exc}")
+        except Exception as exc:
+            # Log but don't fail teardown if cleanup has issues
+            log.debug(f"Error during Google async client teardown: {exc}")
 
     @override
     async def _extract_pages(
