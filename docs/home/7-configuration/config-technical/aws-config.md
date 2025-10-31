@@ -42,9 +42,9 @@ When using `api_key_method = "secret_provider"`, Pipelex will:
 !!! warning "Secret Provider Requirements"
     To use the secret provider method, you must:
     
-    1. Configure a secret provider in your project using the `SecretsProviderAbstract`: See more in the [Secrets](../../advanced-customization/secrets-provider-injection.md) documentation.
-    2. Store your AWS credentials in your secret provider
-    3. Ensure your secret provider is properly authenticated
+1. Configure a secret provider in your project using the `SecretsProviderAbstract`: See more in the [Secrets](../../../home/10-advanced-customizations/secrets-provider-injection.md) documentation.
+2. Store your AWS credentials in your secret provider
+3. Ensure your secret provider is properly authenticated
 
 ## Dependency Injection
 
@@ -54,7 +54,7 @@ Pipelex uses dependency injection to manage AWS clients and credentials. You can
 - Override default credential providers
 - Mock AWS services for testing
 
-For detailed information about dependency injection, including examples and best practices, see the [Dependency Injection](../../advanced-customization/index.md) documentation.
+For detailed information about dependency injection, including examples and best practices, see the [Dependency Injection](../../../home/10-advanced-customizations/index.md) documentation.
 
 ## Best Practices
 

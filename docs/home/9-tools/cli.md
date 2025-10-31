@@ -49,8 +49,8 @@ This command creates the `.pipelex/` directory with:
 
 **Related Configuration:**
 
-- [Configure AI Providers](../setup/configure-ai-providers.md)
-- [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md)
+- [Configure AI Providers](../../home/5-setup/configure-ai-providers.md)
+- [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md)
 
 ## Validate Commands
 
@@ -171,8 +171,8 @@ All validation commands check:
 
 **Related Configuration:**
 
-- [Static Validation Configuration](../configuration/config-pipeline-validation/static-validation-config.md)
-- [Dry Run Configuration](../configuration/config-pipeline-validation/dry-run-config.md)
+- [Static Validation Configuration](../../home/7-configuration/config-pipeline-validation/static-validation-config.md)
+- [Dry Run Configuration](../../home/7-configuration/config-pipeline-validation/dry-run-config.md)
 
 ## Show Commands
 
@@ -267,7 +267,7 @@ pipelex show models anthropic --flat
 
 **Related Configuration:**
 
-- [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md)
+- [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md)
 
 ### Show Backends
 
@@ -300,7 +300,7 @@ pipelex show backends --all
 
 **Related Configuration:**
 
-- [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md)
+- [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md)
 - Backend configuration files: `.pipelex/inference/backends.toml`
 - Routing configuration: `.pipelex/inference/routing_profiles.toml`
 
@@ -371,8 +371,8 @@ The output JSON contains the complete working memory after pipeline execution, i
 
 **Related Documentation:**
 
-- [Executing Pipelines with Inputs](../build-reliable-ai-workflows-with-pipelex/executing-pipelines-with-inputs.md)
-- [Design and Run Pipelines](../build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md)
+- [Executing Pipelines with Inputs](../../home/6-build-reliable-ai-workflows/executing-pipelines-with-inputs.md)
+- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/design_and_run_pipelines.md)
 
 ## Build Commands
 
@@ -459,5 +459,5 @@ For complete documentation including all options and examples, see [Kit Commands
 
 - [Pipe Builder](pipe-builder.md) - Generate pipelines from natural language
 - [Kit Commands](kit.md) - Agent rules and migration management
-- [Configure AI Providers](../setup/configure-ai-providers.md) - Set up LLM backends
-- [Design and Run Pipelines](../build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md) - Pipeline development guide
+- [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) - Set up LLM backends
+- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/design_and_run_pipelines.md) - Pipeline development guide

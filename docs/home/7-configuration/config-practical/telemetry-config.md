@@ -4,7 +4,7 @@
 
 Telemetry configuration is stored in `.pipelex/telemetry.toml`, separate from the main `pipelex.toml` configuration. This file is created automatically the first time you run a Pipelex command (after `pipelex init config`) and are prompted to choose your telemetry preference.
 
-For a user-friendly introduction to telemetry, see [Telemetry Setup](../../setup/telemetry.md).
+For a user-friendly introduction to telemetry, see [Telemetry Setup](../../../home/5-setup/telemetry.md).
 
 ## Configuration File Location
 

@@ -3,7 +3,7 @@
 Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.plx` language.
 
 !!! tip "Prefer Automated Workflow Generation?"
-    If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate workflows from natural language descriptions. See the [Getting Started guide](../../index.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write workflows manually or understand the `.plx` language in depth.
+    If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate workflows from natural language descriptions. See the [Pipe Builder guide](./pipe-builder.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write workflows manually or understand the `.plx` language in depth.
 
 Let's build a **character generator** to understand the basics.
 
@@ -74,7 +74,7 @@ python character.py
 
 ## Get Your First Pipelex Result
 
-![Example of a generated character sheet](character_sheet.png)
+![Example of a generated character sheet](./images/character_sheet.png)
 
 ## Using Specific LLMs
 
@@ -113,7 +113,7 @@ Think of it and then output the character description.
 !!! tip "LLM Presets"
     We have many [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
 
-Learn more in our [LLM Configuration Guide](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md).
+Learn more in our [LLM Configuration Guide](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md).
 
 ## Generate Structured Outputs
 
@@ -154,7 +154,7 @@ gender = "The character's gender"
 description = "A description of the character"
 ```
 
-Learn more in [Structuring Concepts](../build-reliable-ai-workflows-with-pipelex/structuring-concepts.md).
+Learn more in [Structuring Concepts](../../home/6-build-reliable-ai-workflows/structuring-concepts.md).
 
 ### Use your Structured Concept in Your Pipe
 
@@ -188,7 +188,7 @@ Think of it and then output the character description.
 
 The output is now a structured `Character` instance:
 
-![Example of a generated character sheet with structure in JSON](structured_character_sheet_json.png)
+![Example of a generated character sheet with structure in JSON](./images/structured_character_sheet_json.png)
 
 ### Using Prompt Templates
 
@@ -244,7 +244,7 @@ Your task is to extract specific data from the following description.
 !!! tip "Template Variables"
     `@character.description` grabs the `character` stuff from working memory and uses its `description` attribute.
 
-Learn more about Jinja in the [PipeLLM documentation](../build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md).
+Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md).
 
 #### Execute from Python
 
@@ -300,7 +300,7 @@ asyncio.run(process_existing_character())
 
 #### Get Result
 
-![Example of extracted character metadata](extracted_character_metadata.png)
+![Example of extracted character metadata](./images/extracted_character_metadata.png)
 
 ---
 
@@ -310,20 +310,20 @@ Now that you understand the basics, explore more:
 
 **Learn More:**
 
-- [Cookbook Examples](../cookbook-examples/index.md) - Real-world examples and patterns
-- [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md) - Deep dive into pipeline design
-- [Pipe Operators](../build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
-- [Pipe Controllers](../build-reliable-ai-workflows-with-pipelex/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
+- [Cookbook Examples](../../home/4-cookbook-examples/index.md) - Real-world examples and patterns
+- [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md) - Deep dive into pipeline design
+- [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
+- [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
 
 **Explore Tools:**
 
-- [Pipe Builder](../tools/pipe-builder.md) - Generate pipelines from natural language
-- [Kit Commands](../tools/kit.md) - Manage agent rules and migrations
-- [CLI Commands](../tools/cli.md) - Command-line interface reference
+- [Pipe Builder](../../home/9-tools/pipe-builder.md) - Generate pipelines from natural language
+- [Kit Commands](../../home/9-tools/kit.md) - Manage agent rules and migrations
+- [CLI Commands](../../home/9-tools/cli.md) - Command-line interface reference
 
 **Configure:**
 
-- [LLM Configuration](../build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md) - Optimize cost and quality
-- [Inference Backend](../configuration/config-technical/inference-backend-config.md) - Configure model providers
+- [LLM Configuration](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md) - Optimize cost and quality
+- [Inference Backend](../../home/7-configuration/config-technical/inference-backend-config.md) - Configure model providers
 
 [![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)

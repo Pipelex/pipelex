@@ -65,7 +65,7 @@ export DO_NOT_TRACK=1
 
 You can change your telemetry settings at any time:
 
-1. **Via configuration file**: Edit `.pipelex/telemetry.toml` directly (see [Telemetry Configuration](../configuration/config-practical/telemetry-config.md))
+1. **Via configuration file**: Edit `.pipelex/telemetry.toml` directly (see [Telemetry Configuration](../../home/7-configuration/config-practical/telemetry-config.md))
 2. **Trigger the prompt again**: Delete `.pipelex/telemetry.toml`, and the prompt will appear next time you run a command
 
 ## Privacy
@@ -77,5 +77,5 @@ We take your privacy seriously:
 - All telemetry can be completely disabled
 - Our telemetry infrastructure uses PostHog, hosted in the EU
 
-For detailed configuration options, see [Telemetry Configuration](../configuration/config-practical/telemetry-config.md).
+For detailed configuration options, see [Telemetry Configuration](../../home/7-configuration/config-practical/telemetry-config.md).
 

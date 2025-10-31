@@ -45,4 +45,4 @@ You can implement custom data extraction to:
 
 ## Current Status: Work in Progress
 
-See [Observer Provider Injection](../advanced-customization/observer-provider-injection.md) for implementation details.
+See [Observer Provider Injection](../../home/10-advanced-customizations/observer-provider-injection.md) for implementation details.

@@ -362,6 +362,6 @@ inputs={
 - [Design and Run Pipelines](design_and_run_pipelines.md) - Learn about pipeline execution basics
 - [Define Your Concepts](define_your_concepts.md) - Understand concepts and their role
 - [Structuring Concepts](structuring-concepts.md) - Create structured data types
-- [Cookbook Examples](../cookbook-examples/index.md) - See real-world input patterns
+- [Cookbook Examples](../../home/4-cookbook-examples/index.md) - See real-world input patterns
 
 

@@ -35,14 +35,14 @@ your_project/
     └── pipelex.toml
 ```
 
-Learn more in our [Project Structure documentation](../build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md).
+Learn more in our [Project Structure documentation](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md).
 
 ---
 
 ## Prerequisites
 
 - **Python**: Version 3.10 or above
-- **API Access**: One of the three options from [Configure AI Providers](configure-ai-providers.md) (Pipelex Inference, your own keys, or local AI)
+- **API Access**: One of the three options from [Configure AI Providers](./configure-ai-providers.md) (Pipelex Inference, your own keys, or local AI)
 
 ---
 
@@ -50,8 +50,8 @@ Learn more in our [Project Structure documentation](../build-reliable-ai-workflo
 
 Now that you understand project organization:
 
-1. **Start building**: [Get Started](../../index.md)
-2. **Learn the concepts**: [Writing Workflows Tutorial](../writing-workflows/index.md)
+1. **Start building**: [Get Started](../../home/2-get-started/pipe-builder.md)
+2. **Learn the concepts**: [Writing Workflows Tutorial](../../home/2-get-started/pipe-builder.md)
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook)
-4. **Deep dive**: [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md)
+4. **Deep dive**: [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md)
 

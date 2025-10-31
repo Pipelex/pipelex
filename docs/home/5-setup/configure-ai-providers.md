@@ -94,7 +94,7 @@ enabled = true
 # Enable any providers you have keys for
 ```
 
-See [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) for all options.
+See [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md) for all options.
 
 ### Option 3: Local AI (No API Keys Required)
 
@@ -119,7 +119,7 @@ Run AI models locally without any API keys. This is perfect if you:
 - **LM Studio**: User-friendly local model interface
 - **llama.cpp**: Lightweight C++ inference
 
-Configure these in `.pipelex/inference/backends.toml`. See our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) for details.
+Configure these in `.pipelex/inference/backends.toml`. See our [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md) for details.
 
 ---
 
@@ -142,7 +142,7 @@ This creates a `.pipelex/` directory with:
     └── routing_profiles.toml # Model routing configuration
 ```
 
-Learn more in our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) guide.
+Learn more in our [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md) guide.
 
 ---
 
@@ -150,11 +150,11 @@ Learn more in our [Inference Backend Configuration](../configuration/config-tech
 
 Now that you have your backend configured:
 
-1. **Organize your project**: [Project Organization](project-organization.md)
-2. **Learn the concepts**: [Writing Workflows Tutorial](../writing-workflows/index.md)
+1. **Organize your project**: [Project Organization](./project-organization.md)
+2. **Learn the concepts**: [Writing Workflows Tutorial](../../home/2-get-started/pipe-builder.md)
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook)
-4. **Deep dive**: [Build Reliable AI Workflows](../build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md)
+4. **Deep dive**: [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md)
 
 !!! tip "Advanced Configuration"
-    For detailed backend configuration options, see [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md).
+    For detailed backend configuration options, see [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md).
 

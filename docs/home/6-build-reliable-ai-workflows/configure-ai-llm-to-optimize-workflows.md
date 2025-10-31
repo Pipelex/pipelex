@@ -10,7 +10,7 @@ The system provides three main concepts for LLM configuration:
 - LLM Presets  
 - Model Deck
 
-For complete details about the inference backend configuration system, see the [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) documentation.
+For complete details about the inference backend configuration system, see the [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md) documentation.
 
 ## LLM Handles (Aliases)
 
