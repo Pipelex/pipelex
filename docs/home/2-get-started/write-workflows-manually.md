@@ -13,27 +13,22 @@ Create a `.plx` file anywhere in your project (we recommend a `pipelines` direct
 
 `character.plx`
 ```plx
-domain = "characters"
+domain = "characters"                         # Declare the domain of existance of your pipe
 
 [pipe]
-[pipe.create_character]
-type = "PipeLLM"
-description = "Creates a character."
-output = "Text"
-prompt = """
+[pipe.create_character]                       # Declare the pipe and give it a code name
+type = "PipeLLM"                              # Specify the type: Here, PipeLLM can provide LLM/vLLM calls.
+description = "Creates a character."          # Give it a description in natural language
+output = "Text"                               # Specify the output of the pipe: Here its will be plain text.
+prompt = """                                  # write your prompt
 You are a book writer. Your task is to create a character.
 Think of it and then output the character description.
 """
 ```
 
-This pipeline:
+This pipeline is a simple LLM call without any input, with the provided prompt and will output a `TextContent` object. See more about native concepts [here](./home/native-concepts)
 
-- Declares a `characters` domain
-- Defines a `create_character` pipe of type `PipeLLM`
-- Outputs plain `Text`
-- Uses a simple prompt
-
-## Run Your First Pipelex Script
+### Run Your First Pipelex Script
 
 **CLI:**
 
@@ -47,79 +42,86 @@ Create a Python file to execute the pipeline:
 
 `character.py`
 ```python
-import asyncio
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipelex import Pipelex
-
-async def create_character():
-    # Run the script with execute_pipe
-    pipe_output = await execute_pipeline(
-        pipe_code="create_character",
-    )
-    # Print the output
-    print(pipe_output.main_stuff_as_str)
 
 # Initialize pipelex to load your pipeline libraries
 Pipelex.make()
 
-# Run using asyncio because our APIs are all async 
-asyncio.run(create_character())
+pipe_output = await execute_pipeline(
+    pipe_code="create_character",
+)
+
+print(pipe_output.main_stuff_as_str)            # `main_stuff_as_str` is allowed here because the output is a `TextContent`
 ```
 
-Then run:
+Then run the python file.
 
 ```bash
 python character.py
 ```
 
-## Get Your First Pipelex Result
+### Get Your First Pipelex Result
 
 ![Example of a generated character sheet](./images/character_sheet.png)
 
-## Using Specific LLMs
-
-### Indicate Your LLM Selection Explicitly
-
-```plx
-[pipe.create_character]
-type = "PipeLLM"
-description = "Create a character."
-output = "Text"
-model = { model = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
-prompt = """
-You are a book writer. Your task is to create a character.
-Think of it and then output the character description.
-"""
-```
-
-### Or Use an LLM Preset from the LLM Deck
-
-```plx
-[pipe.create_character]
-type = "PipeLLM"
-description = "Create a character."
-output = "Text"
-model = "llm_for_creative_writing"
-prompt = """
-You are a book writer. Your task is to create a character.
-Think of it and then output the character description.
-"""
-
-# The llm choice above is defined in `.pipelex/inference/deck/base_deck.toml` as:
-# llm_for_creative_writing = { model = "base-gpt", temperature = 0.9 }
-# it's a base preset that we provide. you can add your own presets, too.
-```
-
-!!! tip "LLM Presets"
-    We have many [LLM presets available by default](https://github.com/Pipelex/pipelex/tree/main/.pipelex/inference/deck/base_deck.toml).
-
-Learn more in our [LLM Configuration Guide](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md).
+As you might notice, this is plan text, and nothing is structured. Now we are going to see how to output a structured obejct instead of plain text.
 
 ## Generate Structured Outputs
 
-Let's create a rigorously structured `Character` object instead of plain text.
+Let's create a rigorously structured `Character` object instead of plain text. We need to create the concept `Character`. The concept names MUST be in PascalCase. [Learn more about defining concepts](../6-build-reliable-ai-workflows/define_your_concepts.md)
 
-### Define the Structure using Pydantic BaseModel
+### Option 1: Define the Structure in your `.plx` file
+
+Define structures directly in your `.plx` file:
+
+```plx
+[concept.Character]                                 # Declare the concept by giving it a name.
+description = "A character in a fiction story"      # Give it a description in natural languae.
+
+[concept.Character.structure]                       # Define the structure
+name = "The character's name"                       # First attribute: name, with the description in natural language "The character's name"
+age = { type = "integer", description = "The character's age", required = true } # Seconde attribute: age, that is mandatory.
+gender = "The character's gender"                   # Third attribute: "gender"
+description = "A description of the character"      # Fourth attribute: "description"
+```
+
+### Now use your structured concept in your pipe
+
+Specify that the output of your Pipellm is a `Character` object:
+
+`characters.plx`
+```plx
+domain = "characters"
+
+[concept.Character]
+description = "A character in a fiction story"
+
+[concept.Character.structure]
+name = "The character's name"
+age = { type = "integer", description = "The character's age", required = true }
+gender = "The character's gender"
+description = "A description of the character"
+
+[pipe]
+[pipe.create_character]
+type = "PipeLLM"
+description = "Create a character. Get a structured result."
+output = "Character"                                 # <- This is the output concept for your pipe
+prompt = """
+You are a book writer. Your task is to create a character.
+Think of it and then output the character description.
+"""
+```
+
+!!! tip "Concept Naming"
+    The concept name matches the class name (`Character`), so Pipelex automatically links them.
+
+!!! tip "Semantic Clarity"
+    Defining concepts removes ambiguity—"character" could mean a letter or symbol, but here it clearly means a fictional person.
+
+
+### Option 2: Define the Structure using Pydantic BaseModel
 
 Using [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax:
 
@@ -128,7 +130,7 @@ Using [Pydantic BaseModel](https://docs.pydantic.dev/latest/) syntax:
 from pipelex.core.stuffs.structured_content import StructuredContent
 
 # Define the structure of your output here
-# This class must inherit from StructuredContent
+# This class MUST be a subclass of StructuredContent
 class Character(StructuredContent):
     name: str
     age: int
@@ -139,39 +141,24 @@ class Character(StructuredContent):
 !!! tip "Keep Structure Files Clean"
     Keep your `StructuredContent` classes in dedicated files with minimal module-level code. Pipelex imports these modules during auto-discovery, so any module-level code will be executed.
 
-### Define the Structure using Inline Structure Definition
-
-Define structures directly in your `.plx` file:
-
-```plx
-[concept.Character]
-description = "A character in a fiction story"
-
-[concept.Character.structure]
-name = "The character's name"
-age = { type = "integer", description = "The character's age", required = true }
-gender = "The character's gender"
-description = "A description of the character"
-```
-
 Learn more in [Structuring Concepts](../../home/6-build-reliable-ai-workflows/structuring-concepts.md).
 
 ### Use your Structured Concept in Your Pipe
 
-Specify that your output is a `Character` instance:
+Specify that the output of your Pipellm is a `Character` object:
 
 `characters.plx`
 ```plx
 domain = "characters"
 
 [concept]
-Character = "A character in a fiction story" # <- Define your output concept
+Character = "A character in a fiction story"         # <- Declare your concept by giving it the same name as the python class
 
 [pipe]
 [pipe.create_character]
 type = "PipeLLM"
 description = "Create a character. Get a structured result."
-output = "Character"    # <- This is the output concept for your pipe
+output = "Character"                                 # <- This is the output concept for your pipe
 prompt = """
 You are a book writer. Your task is to create a character.
 Think of it and then output the character description.
@@ -190,16 +177,95 @@ The output is now a structured `Character` instance:
 
 ![Example of a generated character sheet with structure in JSON](./images/structured_character_sheet_json.png)
 
-### Using Prompt Templates
+### Add variables in your prompt
 
-Pass data into prompts using templates.
+Let's process existing characters and extract metadata from their descriptions. Let's imagine, that I have already an instance of the class `Character`. I would like to use it in a prompt in order to process that information, and extract some of the information.
 
-Let's process existing characters and extract metadata from their descriptions.
+For example, I would like to create and instance of `CharacterMetadata`, that contains the `name`, `age`, and height if it was provided in the description of the character. 
 
-#### Define the Output Structure
 
+```plx
+domain = "characters" 
+
+[concept.Character]
+description = "A character in a fiction story"
+
+[concept.Character.structure]
+name = "The character's name"
+age = { type = "integer", description = "The character's age", required = true }
+gender = "The character's gender"
+description = "A description of the character"
+
+[concept.CharacterMetadata]                     # <- Declare the new concept
+description = "Metadata of a character"
+
+[concept.CharacterMetadata.structure]           # <- Declare its structure
+name = "The character's name"
+age = { type = "integer", description = "The character's age", required = true }
+height = { type = "number", description = "The characters' height" }
+
+[pipe]
+[pipe.extract_character_advanced]
+type = "PipeLLM"
+description = "Get character information from a description."
+inputs = { character = "Character" }                         # <- These inputs are usable in the prompt
+output = "CharacterMetadata"
+prompt = """
+You are given a text description of a character.
+Your task is to extract specific data from the following description.
+
+@character
+"""
+```
+
+!!! tip "Template Syntax"
+    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `@` prefix for tagging a variable in the prompt. Learn more about prompting with Pipelex [here](../6-build-reliable-ai-workflows/TODO) 
+
+!!! tip "Template Variables"
+    `@character.description` grabs the `character` stuff from the instance and uses its `description` attribute.
+
+Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md).
+
+#### Execute from Python
+
+`run_pipe.py`
 ```python
-# character_model.py
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipelex import Pipelex
+
+from character_model import CharacterMetadata
+
+Pipelex.make()
+
+inputs = {
+    "character": {
+        "concept": "character.Character",
+        "content": {
+            "name": "Elias",
+            "age": 38,
+            "gender": "man",
+            "occupation": "explorer",
+            "description": "Elias Varrin is a 38-year-old man, standing at approximately 1.85 meters tall, with a lean, weathered frame shaped by decades of travel through remote and often unforgiving landscapes. His name, though not widely known, carries weight among historians, explorers, and those who trade in whispered legends. Elias has piercing storm-gray eyes that scan every environment with sharp precision, and his ash-blond hair—flecked with early streaks of grey—is usually tucked beneath a wide-brimmed, timeworn hat."
+        }
+    }
+}
+
+# Run the pipe with loaded inputs
+pipe_output = await execute_pipeline(
+    pipe_code="extract_character_advances",
+    inputs=inputs,
+)
+
+# Get the result as a properly typed instance
+print(pipe_output)
+```
+
+### How to type the output ?
+
+You can get an instance of the python class `CharacterMetadata` if you have created the concept with python:
+
+`character_model.py`
+```python
 from pipelex.core.stuffs.structured_content import StructuredContent
 
 # input class
@@ -217,42 +283,16 @@ class CharacterMetadata(StructuredContent):
     height: float
 ```
 
-#### Use a Template to Fill Prompts with Data
+`run_pipe.py`
+```python
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipelex import Pipelex
 
-!!! tip "Template Syntax"
-    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `{{ double.curly.braces }}` or the simpler `@` prefix (recommended).
+from character_model import CharacterMetadata
 
-```plx
-[concept]
-Character = "A character from a book"
-CharacterMetadata = "Metadata regarding a character."
+Pipelex.make()
 
-[pipe]
-[pipe.extract_character_1]
-type = "PipeLLM"
-description = "Get character information from a description."
-inputs = { character = "Character" }  # <- These inputs are usable in the prompt
-output = "CharacterMetadata"
-prompt = """
-You are given a text description of a character.
-Your task is to extract specific data from the following description.
-
-@character.description
-"""
-```
-
-!!! tip "Template Variables"
-    `@character.description` grabs the `character` stuff from working memory and uses its `description` attribute.
-
-Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md).
-
-#### Execute from Python
-
-First, create an inputs JSON file:
-
-`character_inputs.json`
-```json
-{
+inputs = {
     "character": {
         "concept": "character.Character",
         "content": {
@@ -264,54 +304,38 @@ First, create an inputs JSON file:
         }
     }
 }
-```
 
-Then load and execute:
+# Run the pipe with loaded inputs
+pipe_output = await execute_pipeline(
+    pipe_code="extract_character_advances",
+    inputs=inputs,
+)
 
-```python
-import asyncio
-import json
-from pipelex.pipeline.execute import execute_pipeline
-from pipelex.pipelex import Pipelex
-
-from character_model import CharacterMetadata
-
-
-async def process_existing_character():
-    # Load inputs from JSON file
-    with open("character_inputs.json", "r", encoding="utf-8") as f:
-        inputs = json.load(f)
-    
-    # Run the pipe with loaded inputs
-    pipe_output = await execute_pipeline(
-        pipe_code="extract_character_1",
-        inputs=inputs,
-    )
-
-    # Get the result as a properly typed instance
-    extracted_metadata = pipe_output.main_stuff_as(content_type=CharacterMetadata)
-
-    print(extracted_metadata)
-
-
-Pipelex.make()
-asyncio.run(process_existing_character())
+# Get the result as a properly typed instance
+extracted_metadata = pipe_output.main_stuff_as(content_type=CharacterMetadata)
+print(extracted_metadata)
 ```
 
 #### Get Result
 
 ![Example of extracted character metadata](./images/extracted_character_metadata.png)
 
----
-
-## Next Steps
+# Next Steps
 
 Now that you understand the basics, explore more:
 
-**Learn More:**
+**Learn More about the PipeLLM:**
 
-- [Cookbook Examples](../../home/4-cookbook-examples/index.md) - Real-world examples and patterns
+- [LLM Configuration: play with the models](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md) - Optimize cost and quality
+- [Full configuration of the PipeLLM](../../home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md)
+
+**Learn more about Pipelex (domains, project structure, best practices...)**
+
 - [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md) - Deep dive into pipeline design
+- [Cookbook Examples](../../home/4-cookbook-examples/index.md) - Real-world examples and patterns
+
+**Learn More about the other pipes** 
+
 - [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
 - [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
 
@@ -323,7 +347,4 @@ Now that you understand the basics, explore more:
 
 **Configure:**
 
-- [LLM Configuration](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md) - Optimize cost and quality
 - [Inference Backend](../../home/7-configuration/config-technical/inference-backend-config.md) - Configure model providers
-
-[![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)

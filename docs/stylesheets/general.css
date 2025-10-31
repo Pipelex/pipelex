@@ -13,3 +13,26 @@ pre code {
     word-wrap: break-word;
     overflow-wrap: break-word;
 }
+
+/* Make first-level section labels black (non-expandable sections like "Get Started", "Setup") */
+.md-nav--secondary > .md-nav__list > .md-nav__item > label.md-nav__link {
+    color: #000 !important;
+    font-weight: 600 !important;
+}
+
+/* Keep nested expandable sections gray */
+.md-nav__link[for] {
+    color: rgba(0, 0, 0, 0.54) !important;
+    font-weight: 400 !important;
+}
+
+/* Dark mode - first-level section labels */
+[data-md-color-scheme="slate"] .md-nav--secondary > .md-nav__list > .md-nav__item > label.md-nav__link {
+    color: #fff !important;
+    font-weight: 600 !important;
+}
+/* Dark mode - keep nested expandable sections gray */
+[data-md-color-scheme="slate"] .md-nav__link[for] {
+    color: rgba(255, 255, 255, 0.54) !important;
+    font-weight: 400 !important;
+}

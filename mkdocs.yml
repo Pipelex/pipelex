@@ -153,7 +153,7 @@ nav:
         - Library: home/7-configuration/config-technical/library-config.md
         - Feature: home/7-configuration/config-advanced/feature-config.md
     - Analytics:
-      - Data Extraction: home/8-analytics/data-extraction.md
+      - Observer Data Extraction: home/8-analytics/data-extraction.md
     - Tools:
       - CLI: home/9-tools/cli.md
       - Kit Commands: home/9-tools/kit.md
