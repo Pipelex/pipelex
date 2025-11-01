@@ -30,7 +30,7 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
     @property
     @override
     def desc(self) -> str:
-        return f"Extraction:{self.inference_model.tag}"
+        return f"Extraction using {self.inference_model.desc}"
 
     def _check_can_perform_job(self, extract_job: ExtractJob):
         # This can be overridden by subclasses for specific checks
