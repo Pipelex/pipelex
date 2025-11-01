@@ -1,12 +1,15 @@
 import httpx
 from httpx import Response
 
+from pipelex.tools.misc.http_utils import get_user_agent
+
 
 async def fetch_file_from_url_httpx_async(
     url: str,
     request_timeout: int | None = None,
 ) -> bytes:
-    async with httpx.AsyncClient() as client:
+    user_agent = get_user_agent()
+    async with httpx.AsyncClient(headers={"User-Agent": user_agent}) as client:
         response: Response = await client.get(
             url,
             timeout=request_timeout,
@@ -21,7 +24,8 @@ def fetch_file_from_url_httpx(
     url: str,
     request_timeout: int | None = None,
 ) -> bytes:
-    with httpx.Client() as client:
+    user_agent = get_user_agent()
+    with httpx.Client(headers={"User-Agent": user_agent}) as client:
         response: Response = client.get(
             url,
             timeout=request_timeout,

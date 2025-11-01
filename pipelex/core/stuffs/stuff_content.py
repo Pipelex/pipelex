@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from kajson import kajson
 from typing_extensions import override
