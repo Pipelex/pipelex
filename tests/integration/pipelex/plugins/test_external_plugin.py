@@ -28,6 +28,11 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
     def is_gen_object_supported(self) -> bool:
         return True
 
+    @property
+    @override
+    def is_vision_supported(self) -> bool:
+        return False
+
     @override
     async def _gen_text(
         self,

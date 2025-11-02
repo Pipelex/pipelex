@@ -144,8 +144,22 @@ outputs = ["text"]
 costs = { input = 0.3, output = 0.5 }
 
 ################################################################################
-# OCR and IMAGE GENERATION MODELS
+# IMAGE GENERATION MODELS
 ################################################################################
 
-# We are still working in giving you acces to OCR and image generation models
+# We are still working in giving you acces to image generation models
 # and to the best models from Mistral through the Pipelex Inference backend.
+
+
+################################################################################
+# EXTRACTION MODELS
+################################################################################
+
+["extract-using-gemini-2.5-flash"]
+model_type = "text_extractor"
+model_id = "gemini-2.5-flash"
+sdk = "vlm"
+max_tokens = 131072
+inputs = ["image"]
+outputs = ["pages"]
+costs = { input = 0.4, output = 2.0 }

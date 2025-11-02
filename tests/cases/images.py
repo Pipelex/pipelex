@@ -22,7 +22,7 @@ class ImageTestCases:
     ]
 
     # URL collections
-    IMAGE_URLS: ClassVar[list[str]] = [
-        "https://www.w3.org/People/mimasa/test/imgformat/img/w3c_home.png",
-        "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
+    IMAGE_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, image_uri
+        ("Google Logo", "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png"),
+        ("W3C Logo", "https://www.w3.org/People/mimasa/test/imgformat/img/w3c_home.png"),
     ]

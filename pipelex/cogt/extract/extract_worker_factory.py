@@ -1,11 +1,16 @@
 import importlib.util
 
-from pipelex.cogt.exceptions import MissingDependencyError
+from pipelex import log
+from pipelex.cogt.exceptions import CogtError, MissingDependencyError
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+
+
+class ExtractWorkerFactoryError(CogtError):
+    pass
 
 
 class ExtractWorkerFactory:
@@ -15,6 +20,7 @@ class ExtractWorkerFactory:
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ExtractWorkerAbstract:
+        log.debug(inference_model, title=f"Making extract worker for {inference_model.desc}")
         plugin = Plugin.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
@@ -77,6 +83,25 @@ class ExtractWorkerFactory:
 
                 extract_worker = GoogleExtractWorker(
                     sdk_instance=sdk_instance,
+                    extra_config=backend.extra_config,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "vlm":
+                from pipelex.cogt.extract.vlm_extract_worker import VlmExtractWorker  # noqa: PLC0415
+                from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory  # noqa: PLC0415
+
+                if not inference_model.sub_inference_model:
+                    msg = "Sub inference model is required for VLM extraction"
+                    raise ExtractWorkerFactoryError(msg)
+
+                llm_worker = LLMWorkerFactory.make_llm_worker(
+                    inference_model=inference_model.sub_inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+
+                extract_worker = VlmExtractWorker(
+                    llm_worker=llm_worker,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

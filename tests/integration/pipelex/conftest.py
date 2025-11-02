@@ -221,7 +221,8 @@ def extract_handle(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(
     params=[
         # "mistral-ocr",
-        "extract-by-gemini-2.5-flash",
+        # "extract-by-gemini-2.5-flash",
+        "extract-using-gemini-2.5-flash",
     ],
 )
 def extract_handle_from_image(request: pytest.FixtureRequest) -> str:

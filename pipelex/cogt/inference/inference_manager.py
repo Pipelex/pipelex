@@ -141,8 +141,19 @@ class InferenceManager(InferenceManagerProtocol):
             msg = f"Found no Extract worker for '{extract_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_extract"
             raise InferenceManagerWorkerSetupError(msg)
 
-        inference_model = get_models_manager().get_inference_model(model_handle=extract_handle)
+        extract_inference_model: InferenceModelSpec
+        if extract_handle.startswith("extract-using-"):
+            llm_handle = extract_handle.removeprefix("extract-using-")
+            llm_worker = self.get_llm_worker(llm_handle=llm_handle)
+            if not llm_worker.is_vision_supported:
+                msg = f"LLM worker '{llm_handle}' does not support vision, cannot use for {extract_handle}"
+                raise InferenceManagerWorkerSetupError(msg)
+            llm_inference_model = get_models_manager().get_inference_model(model_handle=llm_handle)
+            extract_inference_model = get_models_manager().get_inference_model(model_handle=extract_handle)
+            extract_inference_model.sub_inference_model = llm_inference_model
+        else:
+            extract_inference_model = get_models_manager().get_inference_model(model_handle=extract_handle)
         return self._setup_one_extract_worker(
-            inference_model=inference_model,
+            inference_model=extract_inference_model,
             extract_handle=extract_handle,
         )

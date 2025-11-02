@@ -9,6 +9,7 @@ from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
+from tests.cases import ImageTestCases
 from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 
 
@@ -16,7 +17,7 @@ from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMVision:
-    @pytest.mark.parametrize(("topic", "image_uri"), LLMVisionTestCases.IMAGE_URLS)
+    @pytest.mark.parametrize(("topic", "image_uri"), LLMVisionTestCases.IMAGE_URLS + ImageTestCases.IMAGE_URLS)
     async def test_gen_text_from_vision_by_url(self, llm_handle_for_vision: str, topic: str, image_uri: str):
         prompt_image = PromptImageFactory.make_prompt_image(url=image_uri)
         llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
