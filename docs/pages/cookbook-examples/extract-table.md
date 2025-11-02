@@ -78,7 +78,7 @@ description = "Review an HTML table"
 inputs = { table_screenshot = "TableScreenshot", html_table = "HtmlTable" }
 output = "HtmlTable"
 prompt = """
-Your role is to correct an html_table to make sure that it matches the one in the provided image.
+Your role is to correct an html_table to make sure that it matches the one in the provided image: $table_screenshot
 
 @html_table
 

@@ -1,19 +1,32 @@
 # Changelog
 
+## [v0.14.3] - 2025-10-29
+
+### Added
+ - Image generation models via BlackBoxAI backend: `flux-pro`, `flux-pro/v1.1`, `flux-pro/v1.1-ultra` (Black Forest Labs), `fast-lightning-sdxl` (ByteDance), and `nano-banana` (Google). Implemented using new `openai_alt_img_gen` SDK worker with chat completion-style API.
+ - Language model: `claude-4.5-sonnet` (Anthropic) via BlackBoxAI backend.
+ - Routing profile: `all_blackboxai` profile routes all supported model requests to BlackBoxAI backend.
+
+### Changed
+ - Model aliases in `base_deck.toml`: `base-img-gen` → `flux-pro/v1.1-ultra`, `best-img-gen` → `nano-banana`, `llm_for_large_codebase` now includes `claude-4.5-sonnet`.
+ - Configuration file: `BLACKBOX_RULES.md` renamed to `.blackboxrules`.
+
+### Fixed
+ - Image generation schema: `ImgGenJobParams.seed` field now explicitly defined with `default=None`.
+ - CLI bundle validation: `pipelex validate` command now accepts bundle path (`.plx` file) which are in the package and already loaded and performs dry run on all pipes in the bundle.
+
+
 ## [v0.14.2] - 2025-10-29
 
 ### Chaged
-
 - Improved pipe builder.
 
 ### Added
-
 - CLI to generate inputs JSON.
 
 ## [v0.14.1] - 2025-10-27
 
 ### Added
-
 - Tutorial GIF on the README.md file.
 
 ## [v0.14.0] - 2025-10-27

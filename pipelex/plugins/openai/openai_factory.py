@@ -64,13 +64,13 @@ class OpenAIFactory:
             case OpenAISdkVariant.OPENAI:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
-                    api_key=backend.api_key,
+                    api_key=backend.api_key or "",
                     base_url=backend.endpoint,
                 )
             case OpenAISdkVariant.OPENAI_ALT_IMG_GEN:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
-                    api_key=backend.api_key,
+                    api_key=backend.api_key or "",
                     base_url=backend.endpoint,
                 )
 

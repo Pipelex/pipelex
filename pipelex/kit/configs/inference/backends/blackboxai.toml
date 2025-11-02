@@ -78,11 +78,17 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 15.00, output = 75.00 }
 
-[claude-sonnet-4]
+[claude-4-sonnet]
 model_id = "blackboxai/anthropic/claude-sonnet-4"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3.00, output = 15.00 }
+
+["claude-4.5-sonnet"]
+model_id = "blackboxai/anthropic/claude-sonnet-4.5"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.28, output = 1.10 }
 
 # --- Google Models ------------------------------------------------------------
 ["gemini-2.5-flash"]
