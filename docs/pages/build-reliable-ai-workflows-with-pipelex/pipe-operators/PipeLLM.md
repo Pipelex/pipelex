@@ -28,7 +28,7 @@ description = "Describe an image"
 inputs = { image = "Image" }
 output = "VisualDescription"
 prompt = """
-Describe the provided image in great detail.
+Describe the provided image in great detail: $image
 """
 ```
 
@@ -46,7 +46,7 @@ description = "Analyze wedding photo"
 inputs = { wedding_photo = "Photo" }
 output = "PhotoAnalysis"
 prompt = """
-Analyze this wedding photo and describe the key moments captured.
+Analyze this wedding photo and describe the key moments captured: $wedding_photo
 """
 ```
 
@@ -61,7 +61,7 @@ description = "Analyze the visual layout of a page"
 inputs = { "page_content.page_view" = "Image" }
 output = "LayoutAnalysis"
 prompt = """
-Analyze the visual layout and design elements of this page.
+Analyze the visual layout and design elements of this page: $page_content.page_view
 Focus on typography, spacing, and overall composition.
 """
 ```
@@ -86,7 +86,7 @@ inputs = {
 }
 output = "ImageComparison"
 prompt = """
-Compare these two images and describe their similarities and differences.
+Compare these two images and describe their similarities and differences: $first_image and $second_image
 """
 ```
 
@@ -106,7 +106,7 @@ output = "DocumentAnalysis"
 prompt = """
 Given this context: $context
 
-Analyze the document page shown in the image and explain how it relates to the provided context.
+Analyze the document page shown in the image and explain how it relates to the provided context: $document.page_view
 """
 ```
 
@@ -125,7 +125,7 @@ Analyze the document page shown in the image and explain how it relates to the p
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
 | `model_to_structure`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use for structuring after preliminary text generation.              | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Can be inline text or a reference to a template file (`"file:path/to/prompt.md"`).  | No       |
-| `prompt_template`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). **Note**: Do not use `@` or `$` for image variables.                 | No       |
+| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). Image variables should also be tagged with `$` or `@`.                 | No       |
 | `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
 
 ### Output Multiplicity
@@ -171,7 +171,7 @@ Write a four-line poem about pipes.
 
 ### Text-to-Text Example
 
-This pipe summarizes an input text, using a `prompt_template` to inject the input.
+This pipe summarizes an input text, using a `prompt` to inject the input.
 
 ```plx
 [pipe.summarize_text]
@@ -199,7 +199,7 @@ description = "Extract table data from an image"
 inputs = { image = "TableScreenshot" }
 output = "TableData"
 prompt = """
-Extract the table data from this image and format it as a structured table.
+Extract the table data from this image and format it as a structured table: $image
 """
 ```
 
