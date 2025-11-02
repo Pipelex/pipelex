@@ -45,8 +45,8 @@ class TestExtract:
         pretty_print(extract_output, title="OCR Output")
         assert extract_output.pages
 
-    @pytest.mark.parametrize("topic, url", ImageTestCases.IMAGE_URLS)
-    async def test_extract_image_url(self, extract_handle_from_image: str, topic: str, url: str):
+    @pytest.mark.parametrize(("topic", "url"), ImageTestCases.IMAGE_URLS)
+    async def test_extract_image_url(self, topic: str, url: str, extract_handle_from_image: str):
         extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
         extract_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(image_uri=url),
