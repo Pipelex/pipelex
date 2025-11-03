@@ -69,7 +69,7 @@ def do_show_backends(show_all: bool = False) -> None:
         else:
             backend_library = models_manager.inference_backend_library
 
-        routing_profile_library = models_manager.routing_profile_library
+        routing_profile = models_manager.routing_profile
     except Exception as exc:
         msg = f"Error accessing backend or routing configuration: {exc}"
         raise PipelexCLIError(msg) from exc
@@ -115,17 +115,15 @@ def do_show_backends(show_all: bool = False) -> None:
 
     # Display routing profile information
     try:
-        active_profile = routing_profile_library.active_profile
+        console.print(f"[bold cyan]Active Routing Profile:[/bold cyan] [green]{routing_profile.name}[/green]")
+        if routing_profile.description:
+            console.print(f"[dim]{routing_profile.description}[/dim]")
 
-        console.print(f"[bold cyan]Active Routing Profile:[/bold cyan] [green]{active_profile.name}[/green]")
-        if active_profile.description:
-            console.print(f"[dim]{active_profile.description}[/dim]")
-
-        if active_profile.default:
-            console.print(f"[bold]Default Backend:[/bold] [cyan]{active_profile.default}[/cyan]")
+        if routing_profile.default:
+            console.print(f"[bold]Default Backend:[/bold] [cyan]{routing_profile.default}[/cyan]")
 
         # Display routing rules
-        if active_profile.routes:
+        if routing_profile.routes:
             console.print("\n[bold]Routing Rules:[/bold]")
             routes_table = Table(
                 show_header=True,
@@ -137,7 +135,7 @@ def do_show_backends(show_all: bool = False) -> None:
             routes_table.add_column("→", style="dim", justify="center")
             routes_table.add_column("Target Backend", style="cyan")
 
-            for pattern, target_backend in sorted(active_profile.routes.items()):
+            for pattern, target_backend in sorted(routing_profile.routes.items()):
                 routes_table.add_row(pattern, "→", target_backend)
 
             console.print(routes_table)

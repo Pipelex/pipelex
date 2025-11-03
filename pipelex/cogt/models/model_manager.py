@@ -9,7 +9,8 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
-from pipelex.cogt.model_routing.routing_profile_library import RoutingProfileLibrary
+from pipelex.cogt.model_routing.routing_profile import RoutingProfile
+from pipelex.cogt.model_routing.routing_profile_factory import RoutingProfileFactory, RoutingProfileLibraryBlueprint
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
@@ -20,7 +21,7 @@ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 class ModelManager(ModelManagerAbstract):
     def __init__(self) -> None:
-        self.routing_profile_library = RoutingProfileLibrary.make_empty()
+        self._routing_profile: RoutingProfile | None = None
         self.inference_backend_library = InferenceBackendLibrary.make_empty()
         self.model_deck: ModelDeck | None = None
 
@@ -33,16 +34,70 @@ class ModelManager(ModelManagerAbstract):
 
     @override
     def teardown(self) -> None:
-        self.routing_profile_library.reset()
+        self._routing_profile = None
         self.inference_backend_library.reset()
 
     @override
     def setup(self) -> None:
         self.inference_backend_library.load()
         enabled_backends = self.inference_backend_library.all_enabled_backends()
-        self.routing_profile_library.load(enabled_backends=enabled_backends)
+        self.load_routing_profile(enabled_backends=enabled_backends)
         deck_blueprint = self.load_deck_blueprint()
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
+
+    @property
+    def routing_profile(self) -> RoutingProfile:
+        if self._routing_profile is None:
+            msg = "No active routing profile loaded"
+            raise RuntimeError(msg)
+        return self._routing_profile
+
+    def load_routing_profile(self, enabled_backends: list[str]) -> None:
+        """Load the active routing profile from the routing profile library from TOML file."""
+        routing_profile_library_path = get_config().cogt.inference_config.routing_profile_library_path
+
+        # Load the routing profile library from TOML file
+        try:
+            catalog_dict = load_toml_from_path(path=routing_profile_library_path)
+        except FileNotFoundError as not_found_exc:
+            msg = f"Could not find routing profile library at '{routing_profile_library_path}': {not_found_exc}"
+            raise ModelManagerError(msg) from not_found_exc
+
+        # Validate the routing profile library configuration
+        try:
+            routing_profile_library_blueprint = RoutingProfileLibraryBlueprint.model_validate(catalog_dict)
+        except ValidationError as exc:
+            valiation_error_msg = format_pydantic_validation_error(exc)
+            msg = f"Invalid routing profile library configuration in '{routing_profile_library_path}': {valiation_error_msg}"
+            raise ModelManagerError(msg) from exc
+
+        # Validate that the active profile exists
+        profile_names = ", ".join(list(routing_profile_library_blueprint.profiles.keys()))
+        active_profile_name = routing_profile_library_blueprint.active
+        if active_profile_name not in profile_names:
+            msg = f"Active profile '{active_profile_name}' not found in profile routing library. Available profiles: {profile_names}"
+            raise ModelManagerError(msg)
+
+        # Load all profiles
+        active_profile_blueprint = routing_profile_library_blueprint.profiles[active_profile_name]
+        active_profile = RoutingProfileFactory.make_routing_profile(
+            name=active_profile_name,
+            blueprint=active_profile_blueprint,
+        )
+        if active_profile.default and active_profile.default not in enabled_backends:
+            msg = f"Default backend '{active_profile.default}' for routing profile '{active_profile_name}' is not enabled"
+            # raise RoutingProfileLibraryError(msg)
+            log.error(msg)
+        seen_disabled_backends: set[str] = set()
+        for backend_name in active_profile.routes.values():
+            if backend_name not in enabled_backends and backend_name not in seen_disabled_backends:
+                msg = f"Backend '{backend_name}' for profile '{active_profile_name}' is not enabled"
+                # raise RoutingProfileLibraryError(msg)
+                log.warning(msg)
+                seen_disabled_backends.add(backend_name)
+        self._routing_profile = active_profile
+
+        log.debug(f"Loaded active routing profile: '{self._routing_profile}'")
 
     @classmethod
     def load_deck_blueprint(cls) -> ModelDeckBlueprint:
@@ -72,7 +127,7 @@ class ModelManager(ModelManagerAbstract):
         inference_models: dict[str, InferenceModelSpec] = {}
 
         for model_name, available_backends in all_models_and_possible_backends.items():
-            backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
+            backend_match_for_model = self.routing_profile.get_backend_match_for_model(
                 enabled_backends=enabled_backends,
                 model_name=model_name,
             )
