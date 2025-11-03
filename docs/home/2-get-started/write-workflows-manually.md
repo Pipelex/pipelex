@@ -64,7 +64,7 @@ python character.py
 
 ![Example of a generated character sheet](./images/character_sheet.png)
 
-As you might notice, this is plan text, and nothing is structured. Now we are going to see how to output a structured obejct instead of plain text.
+As you might notice, this is plain text, and nothing is structured. Now we are going to see how to output a structured object instead of plain text.
 
 ## Generate Structured Outputs
 
@@ -76,11 +76,11 @@ Define structures directly in your `.plx` file:
 
 ```plx
 [concept.Character]                                 # Declare the concept by giving it a name.
-description = "A character in a fiction story"      # Give it a description in natural languae.
+description = "A character in a fiction story"      # Give it a description in natural language.
 
 [concept.Character.structure]                       # Define the structure
 name = "The character's name"                       # First attribute: name, with the description in natural language "The character's name"
-age = { type = "integer", description = "The character's age", required = true } # Seconde attribute: age, that is mandatory.
+age = { type = "integer", description = "The character's age", required = true } # Second attribute: age, that is mandatory.
 gender = "The character's gender"                   # Third attribute: "gender"
 description = "A description of the character"      # Fourth attribute: "description"
 ```
@@ -218,7 +218,7 @@ Your task is to extract specific data from the following description.
 ```
 
 !!! tip "Template Syntax"
-    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `@` prefix for tagging a variable in the prompt. Learn more about prompting with Pipelex [here](../6-build-reliable-ai-workflows/TODO) 
+    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `@` prefix for tagging a variable in the prompt. Learn more about prompting with Pipelex in the [PipeLLM documentation](../6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md). 
 
 !!! tip "Template Variables"
     `@character.description` grabs the `character` stuff from the instance and uses its `description` attribute.
