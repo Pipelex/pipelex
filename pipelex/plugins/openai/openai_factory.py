@@ -48,7 +48,7 @@ class OpenAIFactory:
             msg = f"Plugin '{plugin}' is not supported by OpenAIFactory"
             raise OpenAIFactoryError(msg) from exc
 
-        # We have a workaround here
+        # We have a workaround here:
         # OpenAI can be used without any API key (for instance when pointing to local Ollama) but the SDK,
         # as it is, raises if there is not API key (api_key is None and there is not env var).
         # But it works fine with an empty string.
