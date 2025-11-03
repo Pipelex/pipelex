@@ -11,16 +11,31 @@ from pipelex.cogt.exceptions import (
     InferenceModelSpecError,
 )
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.cogt.model_backends.backend_factory import InferenceBackendBlueprint, InferenceBackendFactory
-from pipelex.cogt.model_backends.model_spec_factory import InferenceModelSpecBlueprint, InferenceModelSpecFactory
+from pipelex.cogt.model_backends.backend_factory import (
+    InferenceBackendBlueprint,
+    InferenceBackendFactory,
+)
+from pipelex.cogt.model_backends.model_spec_factory import (
+    InferenceModelSpecBlueprint,
+    InferenceModelSpecFactory,
+)
 from pipelex.config import get_config
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.environment import get_optional_env
 from pipelex.system.runtime import runtime_manager
-from pipelex.tools.misc.dict_utils import apply_to_strings_recursive, extract_vars_from_strings_recursive
+from pipelex.tools.misc.dict_utils import (
+    apply_to_strings_recursive,
+    extract_vars_from_strings_recursive,
+)
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path
-from pipelex.tools.secrets.secrets_utils import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError, substitute_vars
+from pipelex.tools.secrets.secrets_utils import (
+    UnknownVarPrefixError,
+    VarFallbackPatternError,
+    VarNotFoundError,
+    substitute_vars,
+)
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import Self
 
 if TYPE_CHECKING:
@@ -72,7 +87,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             msg = f"Could not find inference backend library at '{backends_library_path}': {file_not_found_exc}"
             raise InferenceBackendLibraryNotFoundError(msg) from file_not_found_exc
         except ValidationError as exc:
-            msg = f"Invalid inference backend library configuration in '{backends_library_path}': {exc}"
+            valiation_error_msg = format_pydantic_validation_error(exc)
+            msg = f"Invalid inference backend library configuration in '{backends_library_path}': {valiation_error_msg}"
             raise InferenceBackendLibraryValidationError(msg) from exc
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
@@ -262,3 +278,6 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
     def get_inference_backend(self, backend_name: str) -> InferenceBackend | None:
         return self.root.get(backend_name)
+
+    def all_enabled_backends(self) -> list[str]:
+        return [backend_name for backend_name, backend in self.root.items() if backend.enabled]

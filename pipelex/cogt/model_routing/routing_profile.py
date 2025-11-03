@@ -13,10 +13,11 @@ class RoutingProfile(ConfigModel):
     default: str | None = None
     routes: dict[str, str] = Field(default_factory=dict)  # Pattern -> Backend mapping
 
-    def get_backend_match_for_model(self, model_name: str) -> BackendMatchForModel | None:
+    def get_backend_match_for_model(self, enabled_backends: list[str], model_name: str) -> BackendMatchForModel | None:
         """Get the backend name for a given model name.
 
         Args:
+            enabled_backends: List of enabled backends
             model_name: Name of the model to route
 
         Returns:
@@ -24,7 +25,7 @@ class RoutingProfile(ConfigModel):
 
         """
         # Check exact matches first
-        if model_name in self.routes:
+        if (backend_name := self.routes.get(model_name)) and (backend_name in enabled_backends):
             return BackendMatchForModel(
                 model_name=model_name,
                 backend_name=self.routes[model_name],
@@ -35,6 +36,8 @@ class RoutingProfile(ConfigModel):
 
         # Check pattern matches
         for pattern, backend in self.routes.items():
+            if backend not in enabled_backends:
+                continue
             if matches_wildcard_pattern(model_name, pattern):
                 return BackendMatchForModel(
                     model_name=model_name,
@@ -45,7 +48,7 @@ class RoutingProfile(ConfigModel):
                 )
 
         # Return default backend
-        if self.default:
+        if self.default and self.default in enabled_backends:
             return BackendMatchForModel(
                 model_name=model_name,
                 backend_name=self.default,

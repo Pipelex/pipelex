@@ -71,10 +71,15 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
         log.verbose(f"Loaded routing profile library with active profile: '{self._active_config}'")
         log.verbose(f"Available profiles: {list(self.root.keys())}")
 
-    def get_backend_match_for_model_from_active_routing_profile(self, model_name: str) -> BackendMatchForModel | None:
+    def get_backend_match_for_model_from_active_routing_profile(
+        self,
+        enabled_backends: list[str],
+        model_name: str,
+    ) -> BackendMatchForModel | None:
         """Get the backend name for a given model.
 
         Args:
+            enabled_backends: List of enabled backends
             model_name: Name of the model to route
 
         Returns:
@@ -85,7 +90,7 @@ class RoutingProfileLibrary(RootModel[RoutingProfileLibraryRoot]):
 
         """
         profile = self.active_profile
-        return profile.get_backend_match_for_model(model_name)
+        return profile.get_backend_match_for_model(enabled_backends=enabled_backends, model_name=model_name)
 
     def list_routing_profile_names(self) -> list[str]:
         """Get a list of all available routing profile names."""

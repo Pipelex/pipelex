@@ -15,6 +15,7 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
 class ModelManager(ModelManagerAbstract):
@@ -61,7 +62,8 @@ class ModelManager(ModelManagerAbstract):
         try:
             return ModelDeckBlueprint.model_validate(full_deck_dict)
         except ValidationError as exc:
-            msg = f"Invalid Model Deck configuration in {deck_paths}: {exc}"
+            valiation_error_msg = format_pydantic_validation_error(exc)
+            msg = f"Invalid Model Deck configuration in {deck_paths}: {valiation_error_msg}"
             raise ModelDeckValidationError(msg) from exc
 
     def build_deck(self, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
@@ -69,7 +71,9 @@ class ModelManager(ModelManagerAbstract):
         inference_models: dict[str, InferenceModelSpec] = {}
 
         for model_name, available_backends in all_models_and_possible_backends.items():
+            enabled_backends = self.inference_backend_library.all_enabled_backends()
             backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
+                enabled_backends=enabled_backends,
                 model_name=model_name,
             )
             if backend_match_for_model is None:
