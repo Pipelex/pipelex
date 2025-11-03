@@ -38,10 +38,11 @@ class ModelManager(ModelManagerAbstract):
 
     @override
     def setup(self) -> None:
-        self.routing_profile_library.load()
         self.inference_backend_library.load()
+        enabled_backends = self.inference_backend_library.all_enabled_backends()
+        self.routing_profile_library.load(enabled_backends=enabled_backends)
         deck_blueprint = self.load_deck_blueprint()
-        self.model_deck = self.build_deck(model_deck_blueprint=deck_blueprint)
+        self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 
     @classmethod
     def load_deck_blueprint(cls) -> ModelDeckBlueprint:
@@ -66,12 +67,11 @@ class ModelManager(ModelManagerAbstract):
             msg = f"Invalid Model Deck configuration in {deck_paths}: {valiation_error_msg}"
             raise ModelDeckValidationError(msg) from exc
 
-    def build_deck(self, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
+    def build_deck(self, enabled_backends: list[str], model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
         inference_models: dict[str, InferenceModelSpec] = {}
 
         for model_name, available_backends in all_models_and_possible_backends.items():
-            enabled_backends = self.inference_backend_library.all_enabled_backends()
             backend_match_for_model = self.routing_profile_library.get_backend_match_for_model_from_active_routing_profile(
                 enabled_backends=enabled_backends,
                 model_name=model_name,
