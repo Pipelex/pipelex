@@ -53,7 +53,7 @@ from pipelex.system.environment import get_optional_env
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager import DO_NOT_TRACK_ENV_VAR_KEY, TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract, TelemetryManagerNoOp
 from pipelex.test_extras.registry_test_models import TestRegistryModels
@@ -257,11 +257,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 telemetry_config_toml = load_toml_from_path(path=config_path)
                 telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
 
-            if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
-                self.telemetry_manager = TelemetryManagerNoOp()
-                log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
-            else:
-                self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
+            match telemetry_config.telemetry_mode:
+                case TelemetryMode.OFF:
+                    self.telemetry_manager = TelemetryManagerNoOp()
+                    log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
+                case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
+                    if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
+                        self.telemetry_manager = TelemetryManagerNoOp()
+                        log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
+                    else:
+                        self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
         else:
             self.telemetry_manager = TelemetryManagerNoOp()
             log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")

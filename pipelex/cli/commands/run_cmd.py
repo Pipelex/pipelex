@@ -111,8 +111,6 @@ def run_cmd(
         raise typer.Exit(1)
 
     async def run_pipeline(pipe_code: str | None = None, bundle_path: str | None = None):
-        # Initialize Pipelex
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
         source_description: str
         if bundle_path:
             try:
@@ -195,6 +193,9 @@ def run_cmd(
             console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
             console.print_exception(show_locals=True)
             raise typer.Exit(1) from exc
+
+    # Initialize Pipelex BEFORE telemetry context to ensure proper setup
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
 
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
