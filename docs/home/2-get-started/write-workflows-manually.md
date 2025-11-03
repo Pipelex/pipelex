@@ -5,22 +5,21 @@ Ready to dive deeper? This section shows you how to manually create pipelines an
 !!! tip "Prefer Automated Workflow Generation?"
     If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate workflows from natural language descriptions. See the [Pipe Builder guide](./pipe-builder.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write workflows manually or understand the `.plx` language in depth.
 
-Let's build a **character generator** to understand the basics.
-
 ## Write Your First Pipeline
 
+Let's build a **character generator** to understand the basics.
 Create a `.plx` file anywhere in your project (we recommend a `pipelines` directory):
 
 `character.plx`
 ```plx
-domain = "characters"                         # Declare the domain of existance of your pipe
+domain = "characters"                    # domain of existance of your pipe
 
 [pipe]
-[pipe.create_character]                       # Declare the pipe and give it a code name
-type = "PipeLLM"                              # Specify the type: Here, PipeLLM can provide LLM/vLLM calls.
-description = "Creates a character."          # Give it a description in natural language
-output = "Text"                               # Specify the output of the pipe: Here its will be plain text.
-prompt = """                                  # write your prompt
+[pipe.create_character]                  # Declare the pipe and give it a code name
+type = "PipeLLM"                         # Specify the type: Here, PipeLLM can provide LLM/vLLM calls.
+description = "Creates a character."     # Give it a description in natural language
+output = "Text"                          # Specify the output of the pipe: Here its will be plain text.
+prompt = """                             # write your prompt
 You are a book writer. Your task is to create a character.
 Think of it and then output the character description.
 """

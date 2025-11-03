@@ -7,21 +7,22 @@ title: "Generate Workflows with Pipe Builder"
 ## Install
 
 ```bash
-pip install pipelex
-pipelex init
+% pip install pipelex
+% pipelex init
 ```
 
 To use AI models, you need API key(s):
-- The `PIPELEX_INFERENCE_API_KEY` key provides access to all the AI models. To get your key, join our Discord community: [https://go.pipelex.com/discord](https://go.pipelex.com/discord), then request your **free API key** (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
+
+- The `PIPELEX_INFERENCE_API_KEY` key provides access to all the AI models. To get your key, join our [Discord community](https://go.pipelex.com/discord), then request your **free API key** (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
 - You can also use other AI routing services like [BlackBox AI](https://docs.blackbox.ai/), or you can bring your own API keys (OpenAI, Anthropic, Google, Mistral, etc.), or run local AI (no key needed).
 See [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) for details. If you are using non-standard APIs, that's OK too, don't hesitate to join our [Discord](https://go.pipelex.com/discord) for guidance, Pipelex provides dependency injections for the API portals, [See here for more information](../10-advanced-customizations/plugin-injection.md)
 
-# Generate Workflows with Pipe Builder
+# Generate workflows with Pipe Builder
 
 The fastest way to create production-ready AI workflows is with the Pipe Builder. Just describe what you want, and Pipelex generates complete, validated pipelines.
 
 ```bash
-Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview
+% pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview"
 ```
 
 The pipe builder generates a complete production-ready script in our Pipelex language, saved as `.plx` file including domain definition, concepts, and the multiple _pipe_ steps to take to achieve the goal. It has also generated a file `ìnputs.json`, describing the form of the **mandatory** inputs for running the pipe.
@@ -35,7 +36,7 @@ The pipe builder generates a complete production-ready script in our Pipelex lan
 **Option 1: CLI**
 
 ```bash
-pipelex run results/cv_match.plx --inputs inputs.json
+% pipelex run results/cv_match.plx --inputs inputs.json
 ```
 
 The `--inputs` file should be a JSON dictionary where keys are input variable names and values are the input data. Learn more on how to provide the inputs of a pipe: [Executing Pipelines with Inputs](../../home/6-build-reliable-ai-workflows/executing-pipelines-with-inputs.md)
@@ -62,7 +63,7 @@ print(pipe_output.main_stuff)
 Now, thanks to our Pipelex language, you can easily edit the pipeline, even if you're not a coder. Better yet, you can get assisted in making changes with the help of your favorite AI coding assistant. To that end, we have prepared comprehensive rules meant for the most popular AI coding assistants. You can install those rules with one call:
 
 ```bash
-pipelex kit rules
+% pipelex kit rules
 ```
 
 This installs Pipelex rules for `Cursor`, `Claude Code`, `OpenAI Codex`, `GitHub Copilot`, `Windsurf`, and `Blackbox AI`.
