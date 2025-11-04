@@ -65,10 +65,6 @@ default = "fal"
 description = "Use Google GenAI backend for all its supported models"
 default = "google"
 
-[profiles.all_internal]
-description = "Use internal backend for all its supported models"
-default = "internal"
-
 [profiles.all_mistral]
 description = "Use Mistral backend for all its supported models"
 default = "mistral"

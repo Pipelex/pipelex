@@ -28,7 +28,7 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
-from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
 
 def update_backends_in_toml(toml_doc: Any, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
@@ -63,19 +63,14 @@ def get_selected_backend_keys(backends_toml_path: str) -> list[str]:
     if not path_exists(backends_toml_path):
         return selected_backends
 
-    try:
-        toml_doc = load_toml_with_tomlkit(backends_toml_path)
+    toml_doc = load_toml_from_path(backends_toml_path)
 
-        for backend_key in toml_doc:
-            if backend_key != "internal":
-                backend_section = toml_doc[backend_key]
-                if isinstance(backend_section, dict):
-                    if backend_section.get("enabled", False) is True:  # type: ignore[union-attr]
-                        selected_backends.append(backend_key)
-
-    except Exception:
-        # If we can't read the file, return empty list
-        return []
+    for backend_key in toml_doc:
+        if backend_key != "internal":
+            backend_section = toml_doc[backend_key]
+            if isinstance(backend_section, dict):
+                if backend_section.get("enabled", False) is True:  # pyright: ignore[reportUnknownMemberType]
+                    selected_backends.append(backend_key)
 
     return selected_backends
 
