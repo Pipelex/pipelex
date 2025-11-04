@@ -10,6 +10,7 @@ from tomlkit import table
 from pipelex.cli.commands.init_ui import (
     InitFocus,
     build_backend_selection_panel,
+    build_fallback_order_panel,
     build_initialization_panel,
     build_primary_backend_panel,
     build_telemetry_selection_panel,
@@ -19,6 +20,7 @@ from pipelex.cli.commands.init_ui import (
     get_backend_options_from_toml,
     get_currently_enabled_backends,
     prompt_backend_indices,
+    prompt_fallback_order,
     prompt_primary_backend,
     prompt_telemetry_mode,
 )
@@ -189,6 +191,23 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         console.print(build_primary_backend_panel(selected_backend_keys, backend_options))
         primary_backend = prompt_primary_backend(console, selected_backend_keys)
 
+        # Prompt for fallback order if there are 2+ remaining backends
+        remaining_backends = [b for b in selected_backend_keys if b != primary_backend]
+        fallback_order: list[str] | None = None
+
+        if len(remaining_backends) >= 2:
+            console.print()
+            console.print(build_fallback_order_panel(remaining_backends, backend_options))
+            # Get the ordered remaining backends from user (default keeps current order)
+            ordered_remaining = prompt_fallback_order(console, remaining_backends, backend_options)
+            fallback_order = [primary_backend, *ordered_remaining]
+        elif len(remaining_backends) == 1:
+            # Only one remaining backend - set fallback_order with primary first
+            fallback_order = [primary_backend, *remaining_backends]
+        else:
+            # Only primary backend selected - no fallback needed
+            fallback_order = None
+
         # Create or update custom_routing profile
         if "profiles" not in toml_doc:
             toml_doc["profiles"] = {}
@@ -201,6 +220,8 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         custom_routing_profile = table()
         custom_routing_profile["description"] = "Custom routing"
         custom_routing_profile["default"] = primary_backend
+        if fallback_order:
+            custom_routing_profile["fallback_order"] = fallback_order
         custom_routing_profile["routes"] = table()
         new_profiles["custom_routing"] = custom_routing_profile
 

@@ -107,8 +107,17 @@ class ModelManager(ModelManagerAbstract):
                     case BackendMatchingMethod.DEFAULT:
                         # We could not find the model spec, but it was a default match,
                         # so we can look for it in the other available backends
-                        # TODO: enable to set the order or priority of the available backends
-                        for available_backend in available_backends:
+                        # Use fallback_order if specified, then try remaining enabled backends
+                        if backend_match_for_model.fallback_order:
+                            # Try fallback_order first, then any enabled backends not in fallback_order
+                            backends_to_try = backend_match_for_model.fallback_order + [
+                                b for b in enabled_backends if b not in backend_match_for_model.fallback_order
+                            ]
+                        else:
+                            # No fallback_order specified, use all available_backends
+                            backends_to_try = available_backends
+
+                        for available_backend in backends_to_try:
                             if available_backend == matched_backend_name:
                                 # we've already checked the matched_backend_name and it didn't have the model spec, that's why we're here
                                 continue
@@ -120,11 +129,9 @@ class ModelManager(ModelManagerAbstract):
                             if model_spec is not None:
                                 break
                         if model_spec is None:
-                            msg = (
-                                f"Model spec '{model_name}' not found in any of the available backends '{available_backends}' "
-                                f"which was set as default in routing profile '{backend_match_for_model.routing_profile_name}'"
-                            )
-                            raise ModelManagerError(msg)
+                            # Model not available in any of the searched backends - skip it
+                            # Not all models need to be available in the configured backends
+                            continue
             inference_models[model_name] = model_spec
 
         return ModelDeck(

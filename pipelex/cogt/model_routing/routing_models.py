@@ -15,3 +15,4 @@ class BackendMatchForModel(BaseModel):
     routing_profile_name: str
     matching_method: BackendMatchingMethod
     matched_pattern: str | None
+    fallback_order: list[str] | None = None

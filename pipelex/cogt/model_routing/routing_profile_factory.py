@@ -10,6 +10,7 @@ class RoutingProfileBlueprint(ConfigModel):
     description: str
     default: str | None = None
     routes: dict[str, str] = Field(default_factory=dict)
+    fallback_order: list[str] | None = None
 
 
 class RoutingProfileLibraryBlueprint(ConfigModel):
@@ -43,4 +44,5 @@ class RoutingProfileFactory:
             description=blueprint.description,
             default=blueprint.default,
             routes=blueprint.routes,
+            fallback_order=blueprint.fallback_order,
         )
