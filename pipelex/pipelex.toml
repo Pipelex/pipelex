@@ -92,7 +92,10 @@ api_key_method = "env"
 ####################################################################################################
 
 [cogt]
+
+[cogt.model_deck_config]
 is_model_fallback_enabled = true
+missing_presets_reaction = "log"
 
 [cogt.llm_config]
 default_max_images = 100

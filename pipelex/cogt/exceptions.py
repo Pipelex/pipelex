@@ -62,6 +62,10 @@ class ModelDeckValidatonError(CogtError):
     pass
 
 
+class ModelDeckPresetValidatonError(ModelDeckValidatonError):
+    pass
+
+
 class ModelNotFoundError(CogtError):
     pass
 

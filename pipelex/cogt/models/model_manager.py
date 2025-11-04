@@ -137,6 +137,7 @@ class ModelManager(ModelManagerAbstract):
         return ModelDeck(
             inference_models=inference_models,
             aliases=model_deck_blueprint.aliases,
+            waterfalls=model_deck_blueprint.waterfalls,
             llm_presets=model_deck_blueprint.llm.presets,
             llm_choice_defaults=model_deck_blueprint.llm.choice_defaults,
             llm_choice_overrides=model_deck_blueprint.llm.choice_overrides,
@@ -144,7 +145,7 @@ class ModelManager(ModelManagerAbstract):
             extract_choice_default=model_deck_blueprint.extract.choice_default,
             img_gen_presets=model_deck_blueprint.img_gen.presets,
             img_gen_choice_default=model_deck_blueprint.img_gen.choice_default,
-            is_model_fallback_enabled=get_config().cogt.is_model_fallback_enabled,
+            model_deck_config=get_config().cogt.model_deck_config,
         )
 
     @override

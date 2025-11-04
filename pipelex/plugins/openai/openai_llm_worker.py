@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 import instructor
 import openai
 from instructor.exceptions import InstructorRetryException
-from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError
+from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError, omit
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
@@ -84,7 +84,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
                 temperature=temperature,
-                max_tokens=llm_job.job_params.max_tokens or None,
+                max_tokens=llm_job.job_params.max_tokens or omit,
                 seed=llm_job.job_params.seed,
                 messages=messages,
             )
@@ -97,6 +97,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg) from api_connection_error
         except BadRequestError as bad_request_error:
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
+            msg += f"\nResponse:\n{bad_request_error.response.text}"
             raise LLMCompletionError(msg) from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message

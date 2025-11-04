@@ -47,7 +47,7 @@ def load_active_routing_profile(routing_profile_library_path: str, enabled_backe
     seen_disabled_backends: set[str] = set()
     for backend_name in active_profile.routes.values():
         if backend_name not in enabled_backends and backend_name not in seen_disabled_backends:
-            msg = f"Backend '{backend_name}' for profile '{active_profile_name}' is not enabled"
+            msg = f"Backend '{backend_name}', required for profile '{active_profile_name}' is not enabled"
             raise RoutingProfileLibraryError(msg)
             seen_disabled_backends.add(backend_name)
     return active_profile

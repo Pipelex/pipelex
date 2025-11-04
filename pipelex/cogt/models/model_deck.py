@@ -1,8 +1,7 @@
-from typing import Union
-
 from pydantic import Field, field_validator, model_validator
 
 from pipelex import log
+from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.exceptions import (
     ExtractChoiceNotFoundError,
     ExtractHandleNotFoundError,
@@ -11,6 +10,7 @@ from pipelex.cogt.exceptions import (
     LLMChoiceNotFoundError,
     LLMHandleNotFoundError,
     LLMSettingsValidationError,
+    ModelDeckPresetValidatonError,
     ModelDeckValidatonError,
     ModelNotFoundError,
 )
@@ -26,11 +26,10 @@ from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
+from pipelex.system.runtime import ProblemReaction
 from pipelex.types import Self
 
 LLM_PRESET_DISABLED = "disabled"
-
-Waterfall = Union[str, list[str]]
 
 
 class LLMDeckBlueprint(ConfigModel):
@@ -53,7 +52,8 @@ class ImgGenDeckBlueprint(ConfigModel):
 
 
 class ModelDeckBlueprint(ConfigModel):
-    aliases: dict[str, Waterfall] = Field(default_factory=dict)
+    aliases: dict[str, str] = Field(default_factory=dict)
+    waterfalls: dict[str, list[str]] = Field(default_factory=dict)
 
     llm: LLMDeckBlueprint
     extract: ExtractDeckBlueprint
@@ -61,8 +61,10 @@ class ModelDeckBlueprint(ConfigModel):
 
 
 class ModelDeck(ConfigModel):
+    model_deck_config: ModelDeckConfig
     inference_models: dict[str, InferenceModelSpec] = Field(default_factory=dict)
-    aliases: dict[str, Waterfall] = Field(default_factory=dict)
+    aliases: dict[str, str] = Field(default_factory=dict)
+    waterfalls: dict[str, list[str]] = Field(default_factory=dict)
 
     llm_presets: dict[str, LLMSetting] = Field(default_factory=dict)
     llm_choice_defaults: LLMSettingChoicesDefaults
@@ -77,10 +79,13 @@ class ModelDeck(ConfigModel):
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
     img_gen_choice_default: ImgGenModelChoice
 
-    is_model_fallback_enabled: bool
-
     def is_model_handle_defined(self, model_handle: str) -> bool:
-        return model_handle in self.inference_models or model_handle in self.aliases
+        all_handles: set[str] = set()
+        all_handles.update(self.inference_models.keys())
+        all_handles.update(self.aliases.keys())
+        if self.model_deck_config.is_model_fallback_enabled:
+            all_handles.update(self.waterfalls.keys())
+        return model_handle in all_handles
 
     def check_llm_choice(
         self,
@@ -209,9 +214,39 @@ class ModelDeck(ConfigModel):
 
     def validate_registered_models(self):
         self.validate_inference_models()
-        self.validate_llm_presets()
-        self.validate_img_gen_presets()
-        self.validate_extract_presets()
+        try:
+            self.validate_llm_presets()
+        except LLMHandleNotFoundError as exc:
+            match self.model_deck_config.missing_presets_reaction:
+                case ProblemReaction.RAISE:
+                    msg = f"Failed to validate all LLM presets: {exc}"
+                    raise ModelDeckPresetValidatonError(msg) from exc
+                case ProblemReaction.LOG:
+                    log.warning(f"LLM preset not found: {exc}")
+                case ProblemReaction.NONE:
+                    pass
+        try:
+            self.validate_img_gen_presets()
+        except ImgGenHandleNotFoundError as exc:
+            match self.model_deck_config.missing_presets_reaction:
+                case ProblemReaction.RAISE:
+                    msg = f"Failed to validate all ImgGen presets: {exc}"
+                    raise ModelDeckPresetValidatonError(msg) from exc
+                case ProblemReaction.LOG:
+                    log.warning(f"ImgGen preset not found: {exc}")
+                case ProblemReaction.NONE:
+                    pass
+        try:
+            self.validate_extract_presets()
+        except ExtractHandleNotFoundError as exc:
+            match self.model_deck_config.missing_presets_reaction:
+                case ProblemReaction.RAISE:
+                    msg = f"Failed to validate all Extract presets: {exc}"
+                    raise ModelDeckPresetValidatonError(msg) from exc
+                case ProblemReaction.LOG:
+                    log.warning(f"Extract preset not found: {exc}")
+                case ProblemReaction.NONE:
+                    pass
 
     def validate_inference_models(self):
         for model_handle in self.inference_models:
@@ -220,30 +255,35 @@ class ModelDeck(ConfigModel):
     def get_optional_inference_model(self, model_handle: str) -> InferenceModelSpec | None:
         if inference_model := self.inference_models.get(model_handle):
             return inference_model
-        if redirection := self.aliases.get(model_handle):
-            log.verbose(f"Redirection for '{model_handle}': {redirection}")
-            if isinstance(redirection, str):
-                alias_list = [redirection]
-            else:
-                alias_list = redirection
-            for alias_index, alias in enumerate(alias_list):
-                if alias_index > 0 and not self.is_model_fallback_enabled:
-                    msg = f"Model handle '{model_handle}' is an alias which resolves to '{redirection}', but model fallback is disabled"
+        if alias := self.aliases.get(model_handle):
+            log.verbose(f"Alias for '{model_handle}': {alias}")
+            return self.get_optional_inference_model(model_handle=alias)
+        if fallback_list := self.waterfalls.get(model_handle):
+            log.verbose(f"Fallback list for '{model_handle}': {fallback_list}")
+            for fallback_index, fallback in enumerate(fallback_list):
+                if fallback_index > 0 and not self.model_deck_config.is_model_fallback_enabled:
+                    fallback_list_str = " → ".join(fallback_list)
+                    msg = (
+                        f"Model handle '{model_handle}' is a waterfall which resolves to •[ {fallback_list_str} ]•, but model fallbacks are disabled "
+                        f"so only the first item in the list, '{fallback_list[0]}', is acceptable but it was not found in the deck. "
+                        f"You must enable model fallback in your .pipelex/pipelex.toml file to permit the following fallbacks, "
+                        f"or enable a backend that supports '{fallback_list[0]}'. "
+                    )
                     raise ModelNotFoundError(msg)
-                if inference_model := self.get_optional_inference_model(model_handle=alias):
+                if inference_model := self.get_optional_inference_model(model_handle=fallback):
                     return inference_model
-        log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck, it could be an external plugin.")
+        log.verbose(f"Skipping model handle '{model_handle}' because it's not found in deck, it could be an external plugin.")
         return None
 
     def is_handle_defined(self, model_handle: str) -> bool:
-        return model_handle in self.inference_models or model_handle in self.aliases
+        return model_handle in self.inference_models or model_handle in self.aliases or model_handle in self.waterfalls
 
     def get_required_inference_model(self, model_handle: str) -> InferenceModelSpec:
         inference_model = self.get_optional_inference_model(model_handle=model_handle)
         if inference_model is None:
             msg = (
                 f"Model handle '{model_handle}' not found in deck. "
-                "Make sure its defined in the model decks '.pipelex/inference/deck/base_deck.toml' or '.pipelex/inference/deck/overrides.toml'. "
+                "Make sure it's defined in the model decks '.pipelex/inference/deck/base_deck.toml' or '.pipelex/inference/deck/overrides.toml'. "
                 "If the model handle is indeed in the deck, make sure the required backend for this model to run is enabled in "
                 "'.pipelex/inference/backends.toml' and that you have the necessary credentials."
                 "To find what backend is required for this model, look at the routing profile in .pipelex/inference/routing_profiles.toml. "

@@ -1,6 +1,8 @@
+
 from pipelex.cogt.exceptions import LLMConfigError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
+from pipelex.cogt.models.model_deck_config import ModelDeckConfig
 from pipelex.plugins.fal.fal_config import FalConfig
 from pipelex.system.configuration.config_model import ConfigModel
 
@@ -44,7 +46,7 @@ class LLMConfig(ConfigModel):
 
 
 class Cogt(ConfigModel):
+    model_deck_config: ModelDeckConfig
     llm_config: LLMConfig
     img_gen_config: ImgGenConfig
     extract_config: ExtractConfig
-    is_model_fallback_enabled: bool
