@@ -1,12 +1,12 @@
 # Routing profile library - Routes models to their backends
-# ================================================
+# ======================================================================
 # This file controls which backend serves which model.
 # Simply change the 'active' field to switch profiles,
 # or you can add your own custom profiles.
 #
 # Documentation: https://docs.pipelex.com
 # Support: https://go.pipelex.com/discord
-# ================================================
+# ======================================================================
 
 # Which profile to use (change this to switch routing)
 active = "pipelex_first"
@@ -21,9 +21,9 @@ active = "pipelex_first"
 # 3. The .pipelex/inference/backends.toml is already configured with api_key = "${PIPELEX_INFERENCE_API_KEY}"
 # which will get the key from the environment variable.
 
-# ============================================
+# ==================================================================
 # Routing Profiles
-# ============================================
+# ==================================================================
 
 [profiles.pipelex_first]
 description = "Use Pipelex Inference backend for all its supported models"
@@ -35,32 +35,79 @@ default = "pipelex_inference"
 "claude-*" = "pipelex_inference"
 "grok-*" = "pipelex_inference"
 "gemini-*" = "pipelex_inference"
-"*-sdxl" = "fal"
-"flux-*" = "fal"
+"*-sdxl" = "blackboxai"
+"flux-*" = "blackboxai"
 "nano-banana" = "blackboxai"
 "gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
-
-[profiles.all_blackboxai]
-description = "Use BlackBoxAI backend for all its supported models"
-default = "blackboxai"
-
-[profiles.all_bedrock]
-description = "Use Bedrock backend for all its supported models"
-default = "bedrock"
 
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
 default = "anthropic"
 
-[profiles.all_gemini]
-description = "Use Google GenAI backend for all its supported models"
-default = "google"
-
 [profiles.all_azure_openai]
 description = "Use Azure OpenAI backend for all its supported models"
 default = "azure_openai"
 
+[profiles.all_bedrock]
+description = "Use Bedrock backend for all its supported models"
+default = "bedrock"
+
+[profiles.all_blackboxai]
+description = "Use BlackBoxAI backend for all its supported models"
+default = "blackboxai"
+
+[profiles.all_fal]
+description = "Use FAL backend for all its supported models"
+default = "fal"
+
+[profiles.all_google]
+description = "Use Google GenAI backend for all its supported models"
+default = "google"
+
+[profiles.all_internal]
+description = "Use internal backend for all its supported models"
+default = "internal"
+
+[profiles.all_mistral]
+description = "Use Mistral backend for all its supported models"
+default = "mistral"
+
+[profiles.all_ollama]
+description = "Use Ollama backend for all its supported models"
+default = "ollama"
+
+[profiles.all_openai]
+description = "Use OpenAI backend for all its supported models"
+default = "openai"
+
+[profiles.all_vertexai]
+description = "Use Vertex AI backend for all its supported models"
+default = "vertexai"
+
+[profiles.all_xai]
+description = "Use xAI backend for all its supported models"
+default = "xai"
+
+# ==================================================================
+# Custom Profiles
+# ==================================================================
+# Add your own profiles below following the same pattern:
+#
+# [profiles.your_profile_name]
+# description = "What this profile does"
+# default = "backend-name"  # Where to route models by default
+# [profiles.your_profile_name.routes]
+# "model-pattern" = "backend-name"  # Specific routing rules
+#
+# Pattern matching supports:
+# - Exact names: "gpt-4o-mini"
+# - Wildcards: "claude-*" (matches all models starting with claude-)
+# - Partial wildcards: "*-sonnet" (matches all sonnet variants)
+
+# ==================================================================
+# Example of a custom routing profile with pattern matching
+# ==================================================================
 [profiles.custom_routing]
 description = "Custom routing"
 default = "pipelex_inference"
@@ -74,6 +121,10 @@ default = "pipelex_inference"
 "*-sdxl" = "fal"
 "flux-*" = "fal"
 "gpt-image-1" = "openai"
+
+# ==================================================================
+# Example of a custom routing profile with specific model matching
+# ==================================================================
 
 [profiles.to_test_various_backends]
 description = "Route models to various backends"
@@ -93,19 +144,3 @@ description = "Route models to various backends"
 
 "grok-3" = "pipelex_inference"
 "grok-3-mini" = "xai"
-
-# ============================================
-# Custom Profiles
-# ============================================
-# Add your own profiles below following the same pattern:
-#
-# [profiles.your_profile_name]
-# description = "What this profile does"
-# default = "backend-name"  # Where to route models by default
-# [profiles.your_profile_name.routes]
-# "model-pattern" = "backend-name"  # Specific routing rules
-#
-# Pattern matching supports:
-# - Exact names: "gpt-4o-mini"
-# - Wildcards: "claude-*" (matches all models starting with claude-)
-# - Partial wildcards: "*-sonnet" (matches all sonnet variants)
