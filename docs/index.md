@@ -36,12 +36,14 @@ Validate, test, and deploy AI workflows with the same confidence as traditional 
 ## Why Pipelex?
 
 Traditional AI applications often struggle with:
+
 - **Complexity**: One massive prompt trying to do everything
 - **Unpredictability**: Different results each time
 - **Maintenance**: Hard to debug and improve
 - **Collaboration**: Difficult for teams to work together
 
 Pipelex solves these problems by:
+
 - **Breaking down complexity** into focused, manageable steps
 - **Ensuring consistency** through structured validation
 - **Enabling iteration** with clear, editable workflows
