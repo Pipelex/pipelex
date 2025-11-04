@@ -1,4 +1,4 @@
-# Pipeline Creation using the Pipe Builder
+# Pipe Builder
 
 Pipelex provides powerful tools to automatically generate complete, working pipelines from natural language requirements. This feature leverages AI to translate your ideas into fully functional pipeline code, dramatically speeding up development.
 

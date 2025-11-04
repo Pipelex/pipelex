@@ -122,7 +122,7 @@ nav:
       - Design and Run Pipelines: home/6-build-reliable-ai-workflows/design_and_run_pipelines.md
       - Executing Pipelines with Inputs: home/6-build-reliable-ai-workflows/executing-pipelines-with-inputs.md
       - Understanding Multiplicity: home/6-build-reliable-ai-workflows/understanding-multiplicity.md
-      - Pipeline Creation: home/6-build-reliable-ai-workflows/pipeline-creation.md
+      - Pipe Builder: home/6-build-reliable-ai-workflows/pipe-builder.md
       - Pipe Operators:
         - Overview: home/6-build-reliable-ai-workflows/pipe-operators/index.md
         - PipeLLM: home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md
