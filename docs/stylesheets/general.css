@@ -1,5 +1,16 @@
 /* Custom styles for Pipelex documentation */
 
+/* ============================================================================
+   BRAND COLOR
+   ============================================================================ */
+
+:root {
+    --md-accent-fg-color: #45BF9F;
+    --md-primary-fg-color: #45BF9F;
+    --md-primary-fg-color--light: #6CD4B6;
+    --md-primary-fg-color--dark: #2E9A7F;
+}
+
 /* Equal width buttons */
 .equal-width {
     width: 100%;
@@ -14,25 +25,41 @@ pre code {
     overflow-wrap: break-word;
 }
 
-/* Make first-level section labels black (non-expandable sections like "Get Started", "Setup") */
-.md-nav--secondary > .md-nav__list > .md-nav__item > label.md-nav__link {
+/* PAGES: Light grey (but not top sections) */
+.md-nav--primary .md-nav__link:not(.md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link) {
+    color: rgba(0, 0, 0, 0.4) !important;
+}
+
+/* SECTIONS: Bold and dark */
+.md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link,
+.md-nav--primary > .md-nav__list > .md-nav__item > label {
     color: #000 !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
 }
 
-/* Keep nested expandable sections gray */
-.md-nav__link[for] {
-    color: rgba(0, 0, 0, 0.54) !important;
-    font-weight: 400 !important;
+/* SELECTED PAGE: Green with rounded background */
+.md-nav--primary .md-nav__link--active {
+    color: #45BF9F !important;
+    font-weight: 700 !important;
+    background-color: rgba(69, 191, 159, 0.12) !important;
+    border-radius: 8px !important;
+    padding: 6px !important;
 }
 
-/* Dark mode - first-level section labels */
-[data-md-color-scheme="slate"] .md-nav--secondary > .md-nav__list > .md-nav__item > label.md-nav__link {
+/* DARK MODE: Pages grey (but not top sections) */
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link:not(.md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link) {
+    color: rgba(255, 255, 255, 0.4) !important;
+}
+
+/* DARK MODE: Sections white */
+[data-md-color-scheme="slate"] .md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link,
+[data-md-color-scheme="slate"] .md-nav--primary > .md-nav__list > .md-nav__item > label {
     color: #fff !important;
-    font-weight: 600 !important;
 }
-/* Dark mode - keep nested expandable sections gray */
-[data-md-color-scheme="slate"] .md-nav__link[for] {
-    color: rgba(255, 255, 255, 0.54) !important;
-    font-weight: 400 !important;
+
+/* DARK MODE: Selected page green with background */
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link--active {
+    color: #45BF9F !important;
+    font-weight: 700 !important;
+    background-color: rgba(69, 191, 159, 0.12) !important;
 }

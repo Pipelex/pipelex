@@ -17,14 +17,12 @@ theme:
     - navigation.top
   palette:
   - scheme: default          # light
-    primary: teal
-    accent: deep purple
+    primary: custom
     toggle:
       icon: material/weather-night
       name: Switch to dark mode
   - scheme: slate            # dark
-    primary: teal
-    accent: purple
+    primary: custom
     toggle:
       icon: material/weather-sunny
       name: Switch to light mode
