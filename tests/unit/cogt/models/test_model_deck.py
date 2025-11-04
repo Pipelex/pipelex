@@ -37,6 +37,7 @@ class TestModelDeckGetOptionalInferenceModel:
             extract_choice_default="extract_text_from_visuals",
             img_gen_presets={},
             img_gen_choice_default="gen_image_basic",
+            is_model_fallback_enabled=True,
         )
 
     def test_direct_model_lookup_success(self):

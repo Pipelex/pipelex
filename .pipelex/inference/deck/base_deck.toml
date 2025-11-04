@@ -102,12 +102,11 @@ llm_to_analyze_large_codebase = { model = "base-claude", temperature = 0.1 }
 
 # Image skills
 llm_for_basic_vision = { model = "gpt-4o-mini", temperature = 0.1 }
+llm_for_img_to_text = { model = "base-claude", temperature = 0.1 }
+
 llm_to_write_img_gen_prompt = { model = "base-claude", temperature = 0.2 }
-llm_to_describe_img = { model = "base-claude", temperature = 0.5 }
-llm_for_visual_analysis = { model = "base-claude", temperature = 0.5 }
 llm_for_visual_design = { model = "base-claude", temperature = 0.5 }
 llm_to_design_fashion = { model = "base-claude", temperature = 0.7 }
-llm_for_img_to_text = { model = "base-claude", temperature = 0.1 }
 
 # Extraction skills
 llm_to_extract_diagram = { model = "base-claude", temperature = 0.5 }

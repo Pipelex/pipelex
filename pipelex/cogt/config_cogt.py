@@ -43,14 +43,8 @@ class LLMConfig(ConfigModel):
         return template
 
 
-class InferenceManagerConfig(ConfigModel):
-    is_auto_setup_preset_llm: bool
-    is_auto_setup_preset_img_gen: bool
-    is_auto_setup_preset_extract: bool
-
-
 class Cogt(ConfigModel):
-    inference_manager_config: InferenceManagerConfig
     llm_config: LLMConfig
     img_gen_config: ImgGenConfig
     extract_config: ExtractConfig
+    is_model_fallback_enabled: bool

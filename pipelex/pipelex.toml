@@ -92,11 +92,7 @@ api_key_method = "env"
 ####################################################################################################
 
 [cogt]
-
-[cogt.inference_manager_config]
-is_auto_setup_preset_llm = true
-is_auto_setup_preset_img_gen = true
-is_auto_setup_preset_extract = true
+is_model_fallback_enabled = true
 
 [cogt.llm_config]
 default_max_images = 100

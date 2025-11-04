@@ -77,6 +77,8 @@ class ModelDeck(ConfigModel):
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
     img_gen_choice_default: ImgGenModelChoice
 
+    is_model_fallback_enabled: bool
+
     def is_model_handle_defined(self, model_handle: str) -> bool:
         return model_handle in self.inference_models or model_handle in self.aliases
 
@@ -224,7 +226,10 @@ class ModelDeck(ConfigModel):
                 alias_list = [redirection]
             else:
                 alias_list = redirection
-            for alias in alias_list:
+            for alias_index, alias in enumerate(alias_list):
+                if alias_index > 0 and not self.is_model_fallback_enabled:
+                    msg = f"Model handle '{model_handle}' is an alias which resolves to '{redirection}', but model fallback is disabled"
+                    raise ModelNotFoundError(msg)
                 if inference_model := self.get_optional_inference_model(model_handle=alias):
                     return inference_model
         log.warning(f"Skipping model handle '{model_handle}' because it's not found in deck, it could be an external plugin.")

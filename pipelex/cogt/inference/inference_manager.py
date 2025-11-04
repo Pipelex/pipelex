@@ -1,7 +1,6 @@
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import InferenceManagerWorkerSetupError
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.extract.extract_worker_factory import ExtractWorkerFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -11,7 +10,6 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.config import get_config
 from pipelex.hub import get_models_manager, get_report_delegate
 
 
@@ -73,9 +71,6 @@ class InferenceManager(InferenceManagerProtocol):
     def get_llm_worker(self, llm_handle: str) -> LLMWorkerAbstract:
         if llm_worker := self.llm_workers.get(llm_handle):
             return llm_worker
-        if not get_config().cogt.inference_manager_config.is_auto_setup_preset_llm:
-            msg = f"No LLM worker for '{llm_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_llm"
-            raise InferenceManagerWorkerSetupError(msg)
 
         inference_model = get_models_manager().get_inference_model(model_handle=llm_handle)
         return self._setup_one_internal_llm_worker(
@@ -112,10 +107,6 @@ class InferenceManager(InferenceManagerProtocol):
     def get_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract:
         img_gen_worker = self.img_gen_workers.get(img_gen_handle)
         if img_gen_worker is None:
-            if not get_config().cogt.inference_manager_config.is_auto_setup_preset_img_gen:
-                msg = f"Found no ImgGen worker for '{img_gen_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_img_gen"
-                raise InferenceManagerWorkerSetupError(msg)
-
             img_gen_worker = self._setup_one_img_gen_worker(img_gen_handle=img_gen_handle)
         return img_gen_worker
 
@@ -139,9 +130,6 @@ class InferenceManager(InferenceManagerProtocol):
     def get_extract_worker(self, extract_handle: str) -> ExtractWorkerAbstract:
         if extract_worker := self.extract_workers.get(extract_handle):
             return extract_worker
-        if not get_config().cogt.inference_manager_config.is_auto_setup_preset_extract:
-            msg = f"Found no Extract worker for '{extract_handle}', set it up or enable cogt.inference_manager_config.is_auto_setup_preset_extract"
-            raise InferenceManagerWorkerSetupError(msg)
 
         inference_model = get_models_manager().get_inference_model(model_handle=extract_handle)
         return self._setup_one_extract_worker(
