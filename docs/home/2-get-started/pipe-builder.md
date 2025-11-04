@@ -91,7 +91,7 @@ Now that you know how to generate workflows with the Pipe Builder, explore these
 **Learn how to Write Workflows yourself**
 
 - [:material-pencil: Write Workflows Manually](./write-workflows-manually.md){ .md-button .md-button--primary }
-- [:material-book-code: Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md){ .md-button }
+- [:material-book-open-variant: Build Reliable AI Workflows](../6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md){ .md-button .md-button--primary }
 
 **Explore Examples:**
 
