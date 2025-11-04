@@ -7,6 +7,10 @@ from pipelex.cogt.models.model_deck import ModelDeck
 
 class ModelManagerAbstract(ABC):
     @abstractmethod
+    def validate_model_deck(self):
+        pass
+
+    @abstractmethod
     def teardown(self) -> None:
         pass
 

@@ -5,7 +5,9 @@ from pydantic import Field, field_validator, model_validator
 from pipelex import log
 from pipelex.cogt.exceptions import (
     ExtractChoiceNotFoundError,
+    ExtractHandleNotFoundError,
     ImgGenChoiceNotFoundError,
+    ImgGenHandleNotFoundError,
     LLMChoiceNotFoundError,
     LLMHandleNotFoundError,
     LLMSettingsValidationError,
@@ -75,14 +77,17 @@ class ModelDeck(ConfigModel):
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
     img_gen_choice_default: ImgGenModelChoice
 
-    def check_llm_setting(
+    def is_model_handle_defined(self, model_handle: str) -> bool:
+        return model_handle in self.inference_models or model_handle in self.aliases
+
+    def check_llm_choice(
         self,
-        llm_setting_or_preset_id: LLMModelChoice,
+        llm_choice: LLMModelChoice,
         is_disabled_allowed: bool = False,
     ):
-        if isinstance(llm_setting_or_preset_id, LLMSetting):
+        if isinstance(llm_choice, LLMSetting):
             return
-        preset_id: str = llm_setting_or_preset_id
+        preset_id: str = llm_choice
         if preset_id in self.llm_presets:
             return
         if preset_id == LLM_PRESET_DISABLED and is_disabled_allowed:
@@ -166,28 +171,49 @@ class ModelDeck(ConfigModel):
 
     @field_validator("llm_choice_overrides", mode="after")
     @classmethod
-    def validate_llm_choice_overrides(cls, value: LLMSettingChoices) -> LLMSettingChoices:
+    def validate_llm_choice_disabled_overrides(cls, value: LLMSettingChoices) -> LLMSettingChoices:
         if value.for_text == LLM_PRESET_DISABLED:
             value.for_text = None
         if value.for_object == LLM_PRESET_DISABLED:
             value.for_object = None
         return value
 
+    @model_validator(mode="after")
+    def validate_llm_choice_overrides(self) -> Self:
+        for llm_preset_id in self.llm_choice_overrides.list_choice_strings():
+            self.check_llm_choice(llm_choice=llm_preset_id)
+        return self
+
     def validate_llm_presets(self) -> Self:
         for llm_preset_id, llm_setting in self.llm_presets.items():
-            if llm_setting.model not in self.inference_models:
+            if not self.is_model_handle_defined(model_handle=llm_setting.model):
                 msg = f"llm_handle '{llm_setting.model}' for llm_preset '{llm_preset_id}' not found in deck"
                 raise LLMHandleNotFoundError(msg)
         return self
 
-    @model_validator(mode="after")
-    def validate_llm_setting_overrides(self) -> Self:
-        self._validate_llm_choices(llm_choices=self.llm_choice_overrides)
+    def validate_img_gen_presets(self) -> Self:
+        for img_gen_preset_id, img_gen_setting in self.img_gen_presets.items():
+            if not self.is_model_handle_defined(model_handle=img_gen_setting.model):
+                msg = f"img_gen_handle '{img_gen_setting.model}' for img_gen_preset '{img_gen_preset_id}' not found in deck"
+                raise ImgGenHandleNotFoundError(msg)
         return self
 
-    def _validate_llm_choices(self, llm_choices: LLMSettingChoices):
-        for llm_setting in llm_choices.list_choices():
-            self.check_llm_setting(llm_setting_or_preset_id=llm_setting)
+    def validate_extract_presets(self) -> Self:
+        for extract_preset_id, extract_setting in self.extract_presets.items():
+            if not self.is_model_handle_defined(model_handle=extract_setting.model):
+                msg = f"extract_handle '{extract_setting.model}' for extract_preset '{extract_preset_id}' not found in deck"
+                raise ExtractHandleNotFoundError(msg)
+        return self
+
+    def validate_registered_models(self):
+        self.validate_inference_models()
+        self.validate_llm_pr    esets()
+        self.validate_img_gen_presets()
+        self.validate_extract_presets()
+
+    def validate_inference_models(self):
+        for model_handle in self.inference_models:
+            self.get_required_inference_model(model_handle=model_handle)
 
     def get_optional_inference_model(self, model_handle: str) -> InferenceModelSpec | None:
         if inference_model := self.inference_models.get(model_handle):

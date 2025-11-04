@@ -34,8 +34,9 @@ class ModelManager(ModelManagerAbstract):
 
     @override
     def teardown(self) -> None:
-        self._routing_profile = None
+        self.model_deck = None
         self.inference_backend_library.reset()
+        self._routing_profile = None
 
     @override
     def setup(self) -> None:
@@ -44,6 +45,10 @@ class ModelManager(ModelManagerAbstract):
         self.load_routing_profile(enabled_backends=enabled_backends)
         deck_blueprint = self.load_deck_blueprint()
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
+
+    @override
+    def validate_model_deck(self):
+        self.get_model_deck().validate_registered_models()
 
     @property
     def routing_profile(self) -> RoutingProfile:
@@ -96,8 +101,6 @@ class ModelManager(ModelManagerAbstract):
                 log.warning(msg)
                 seen_disabled_backends.add(backend_name)
         self._routing_profile = active_profile
-
-        log.debug(f"Loaded active routing profile: '{self._routing_profile}'")
 
     @classmethod
     def load_deck_blueprint(cls) -> ModelDeckBlueprint:
