@@ -69,7 +69,8 @@ markdown_extensions:
   - attr_list
   - md_in_html
   - pymdownx.blocks.caption
-  - pymdownx.highlight
+  - pymdownx.highlight:
+      use_pygments: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -81,7 +82,7 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
-
+  
 nav:
   - Home:
     - What is Pipelex?: index.md
@@ -168,9 +169,11 @@ nav:
       - Template Provider: home/10-advanced-customizations/template-provider-injection.md
       - Observer Provider: home/10-advanced-customizations/observer-provider-injection.md
       - Content Generator: home/10-advanced-customizations/content-generator-injection.md
+      - Plugin Injection: home/10-advanced-customizations/plugin-injection.md
       - Pipe Router: home/10-advanced-customizations/pipe-router-injection.md
   - API Reference: https://pipelex.github.io/pipelex-api/
-  - n8n Node: https://pipelex.github.io/n8n-nodes-pipelex/
+  - Integrations:
+    - n8n Node: https://pipelex.github.io/n8n-nodes-pipelex/
   - Contribute:
     - Contributing: contributing.md
     - Code of Conduct: CODE_OF_CONDUCT.md
