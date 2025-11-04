@@ -25,7 +25,7 @@ Think of it and then output the character description.
 """
 ```
 
-This pipeline is a simple LLM call without any input, with the provided prompt and will output a `TextContent` object. See more about native concepts [here](../../home/6-build-reliable-ai-workflows/define_your_concepts.md)
+This pipeline is a simple LLM call without any input, with the provided prompt and will output a `TextContent` object. See more about native concepts [here](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md)
 
 ### Run Your First Pipelex Script
 
@@ -68,7 +68,7 @@ As you might notice, this is plain text, and nothing is structured. Now we are g
 
 ## Generate Structured Outputs
 
-Let's create a rigorously structured `Character` object instead of plain text. We need to create the concept `Character`. The concept names MUST be in PascalCase. [Learn more about defining concepts](../6-build-reliable-ai-workflows/define_your_concepts.md)
+Let's create a rigorously structured `Character` object instead of plain text. We need to create the concept `Character`. The concept names MUST be in PascalCase. [Learn more about defining concepts](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md)
 
 ### Option 1: Define the Structure in your `.plx` file
 
@@ -140,7 +140,7 @@ class Character(StructuredContent):
 !!! tip "Keep Structure Files Clean"
     Keep your `StructuredContent` classes in dedicated files with minimal module-level code. Pipelex imports these modules during auto-discovery, so any module-level code will be executed.
 
-Learn more in [Structuring Concepts](../../home/6-build-reliable-ai-workflows/structuring-concepts.md).
+Learn more in [Inline Structures](../6-build-reliable-ai-workflows/concepts/inline-structures.md) or [Python StructuredContent Classes](../6-build-reliable-ai-workflows/concepts/python-classes.md).
 
 ### Use your Structured Concept in Your Pipe
 

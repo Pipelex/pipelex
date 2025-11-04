@@ -42,7 +42,7 @@ class ConceptStructureSpec(StructuredContent):
         the_field_name: Field name. Must be snake_case.
         description: Natural language description of the field's purpose and usage.
         type: The field's data type.
-        required: Whether the field is mandatory. Defaults to True unless explicitly set to False.
+        required: Whether the field is mandatory. Defaults to False unless explicitly set to True.
         default_value: Default value for the field. Must match the specified type, and for choice
                       fields must be one of the valid choices. When provided, type must be specified
                       (unless choices are provided).
@@ -58,7 +58,7 @@ class ConceptStructureSpec(StructuredContent):
     the_field_name: str = Field(description="Field name. Must be snake_case.")
     description: str
     type: ConceptStructureSpecFieldType = Field(description="The type of the field.")
-    required: bool | None = None
+    required: bool | None = False
     default_value: Any | None = None
 
     @field_validator("type", mode="before")

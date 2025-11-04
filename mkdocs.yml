@@ -113,8 +113,12 @@ nav:
       - Telemetry: home/5-setup/telemetry.md
     - Build Reliable AI Workflows:
       - Kick off a Pipeline Project: home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md
-      - Define Your Concepts: home/6-build-reliable-ai-workflows/define_your_concepts.md
-      - Structuring Concepts: home/6-build-reliable-ai-workflows/structuring-concepts.md
+      - Concepts:
+        - Define Your Concepts: home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md
+        - Inline structures: home/6-build-reliable-ai-workflows/concepts/inline-structures.md
+        - Python classes: home/6-build-reliable-ai-workflows/concepts/python-classes.md
+        - Native Concepts: home/6-build-reliable-ai-workflows/concepts/native-concepts.md
+        - Refining Concepts: home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
       - Design and Run Pipelines: home/6-build-reliable-ai-workflows/design_and_run_pipelines.md
       - Executing Pipelines with Inputs: home/6-build-reliable-ai-workflows/executing-pipelines-with-inputs.md
       - Understanding Multiplicity: home/6-build-reliable-ai-workflows/understanding-multiplicity.md
