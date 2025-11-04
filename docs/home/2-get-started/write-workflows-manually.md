@@ -25,7 +25,7 @@ Think of it and then output the character description.
 """
 ```
 
-This pipeline is a simple LLM call without any input, with the provided prompt and will output a `TextContent` object. See more about native concepts [here](./home/native-concepts)
+This pipeline is a simple LLM call without any input, with the provided prompt and will output a `TextContent` object. See more about native concepts [here](../../home/6-build-reliable-ai-workflows/define_your_concepts.md)
 
 ### Run Your First Pipelex Script
 
