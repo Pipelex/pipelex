@@ -85,10 +85,6 @@ extra_css:
   - stylesheets/mermaid.css
   - stylesheets/general.css
 
-extra_javascript:
-  - js/sections.js
-
-
 nav:
   - Home:
     - What is Pipelex?: index.md
