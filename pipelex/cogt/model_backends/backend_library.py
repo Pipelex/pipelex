@@ -1,3 +1,4 @@
+from functools import partial
 from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import Field, RootModel, ValidationError
@@ -19,7 +20,6 @@ from pipelex.cogt.model_backends.model_spec_factory import (
     InferenceModelSpecBlueprint,
     InferenceModelSpecFactory,
 )
-from pipelex.config import get_config
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.environment import get_optional_env
 from pipelex.system.runtime import runtime_manager
@@ -29,6 +29,7 @@ from pipelex.tools.misc.dict_utils import (
 )
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import (
     UnknownVarPrefixError,
     VarFallbackPatternError,
@@ -79,8 +80,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def make_empty(cls) -> Self:
         return cls(root={})
 
-    def load(self, include_disabled: bool = False):
-        backends_library_path = get_config().cogt.inference_config.backends_library_path
+    def load(self, secrets_provider: SecretsProviderAbstract, backends_library_path: str, backends_dir_path: str, include_disabled: bool = False):
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
         except FileNotFoundError as file_not_found_exc:
@@ -90,6 +90,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             valiation_error_msg = format_pydantic_validation_error(exc)
             msg = f"Invalid inference backend library configuration in '{backends_library_path}': {valiation_error_msg}"
             raise InferenceBackendLibraryValidationError(msg) from exc
+
+        # Create a partial function with the secrets provider bound
+        substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider)
+
         for backend_name, backend_dict in backends_dict.items():
             # We'll split the read settings into standard fields and extra config
             standard_fields = InferenceBackendBlueprint.model_fields.keys()
@@ -101,7 +105,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             if runtime_manager.is_ci_testing and backend_name == "vertexai":
                 continue
             try:
-                inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars)
+                inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars_with_provider)
             except VarFallbackPatternError as var_fallback_pattern_exc:
                 msg = f"Variable substitution failed due to a pattern error in file '{backends_library_path}':\n{var_fallback_pattern_exc}"
                 key_name = "unknown"
@@ -139,13 +143,11 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     extra_config[key] = inference_backend_blueprint_dict.pop(key)
             backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
 
-            path_to_model_specs_toml = get_config().cogt.inference_config.model_specs_path(backend_name=backend_name)
+            path_to_model_specs_toml = f"{backends_dir_path}/{backend_name}.toml"
             try:
-                model_specs_dict_raw = load_toml_from_path(
-                    path=path_to_model_specs_toml,
-                )
+                model_specs_dict_raw = load_toml_from_path(path=path_to_model_specs_toml)
                 try:
-                    model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, substitute_vars)
+                    model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, substitute_vars_with_provider)
                 except (VarNotFoundError, UnknownVarPrefixError) as exc:
                     msg = f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}"
                     raise InferenceModelSpecError(msg) from exc

@@ -207,7 +207,7 @@ class ModelDeck(ConfigModel):
 
     def validate_registered_models(self):
         self.validate_inference_models()
-        self.validate_llm_pr    esets()
+        self.validate_llm_presets()
         self.validate_img_gen_presets()
         self.validate_extract_presets()
 

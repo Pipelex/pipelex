@@ -24,7 +24,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config import PipelexConfig, get_config
+from pipelex.config import ConfigPaths, PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
@@ -71,10 +71,10 @@ PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
-        config_dir_path: str = "./pipelex",
+        config_dir_path: str | None = None,
         config_cls: type[ConfigRoot] | None = None,
     ) -> None:
-        self.config_dir_path = config_dir_path
+        self.config_dir_path = config_dir_path or ConfigPaths.DEFAULT_CONFIG_DIR_PATH
         self.pipelex_hub = PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
 
@@ -170,7 +170,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.class_registry = class_registry or ClassRegistry()
         self.pipelex_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
-        self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
+        secrets_provider = secrets_provider or EnvSecretsProvider()
+        self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
         # cogt
@@ -180,7 +181,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
 
         try:
-            self.models_manager.setup()
+            self.models_manager.setup(secrets_provider=secrets_provider)
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
             msg = self._get_config_not_found_error_msg("routing profile library")
             raise PipelexSetupError(msg) from routing_not_found_exc

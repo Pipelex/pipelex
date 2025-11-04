@@ -12,8 +12,9 @@ from rich.table import Table
 from pipelex import pretty_print
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
+from pipelex.config import ConfigPaths
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_secrets_provider, get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
@@ -60,12 +61,18 @@ def do_show_pipe(pipe_code: str) -> None:
 def do_show_backends(show_all: bool = False) -> None:
     """Display all backends and the active routing profile."""
     try:
+        secrets_provider = get_secrets_provider()
         models_manager = cast("ModelManager", get_models_manager())
 
         # Load backends with or without disabled ones based on show_all flag
         if show_all:
             backend_library = InferenceBackendLibrary()
-            backend_library.load(include_disabled=True)
+            backend_library.load(
+                secrets_provider=secrets_provider,
+                backends_library_path=ConfigPaths.BACKENDS_FILE_PATH,
+                backends_dir_path=ConfigPaths.BACKENDS_DIR_PATH,
+                include_disabled=True,
+            )
         else:
             backend_library = models_manager.inference_backend_library
 

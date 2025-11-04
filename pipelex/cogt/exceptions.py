@@ -149,9 +149,7 @@ class ImgGenGeneratedTypeError(ImgGenGenerationError):
 class MissingDependencyError(CogtError):
     """Raised when a required dependency is not installed."""
 
-    def __init__(
-        self, dependency_name: str, extra_name: str, message: str | None = None
-    ):
+    def __init__(self, dependency_name: str, extra_name: str, message: str | None = None):
         self.dependency_name = dependency_name
         self.extra_name = extra_name
         error_msg = f"Required dependency '{dependency_name}' is not installed."
