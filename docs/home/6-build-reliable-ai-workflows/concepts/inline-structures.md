@@ -68,9 +68,7 @@ String values. Use for any text content.
 
 ```plx
 [concept.Person.structure]
-name = "Full name"
 email = { type = "text", description = "Email address" }
-bio = { type = "text", description = "Biography", default_value = "" }
 ```
 
 !!! tip "Simple Syntax Shorthand"
@@ -80,6 +78,7 @@ bio = { type = "text", description = "Biography", default_value = "" }
     - **description**: The string you provided
     
     This is a shorthand for the most common case: text fields.
+    This will put the field as optional by default, and not required.
 
 ### integer
 

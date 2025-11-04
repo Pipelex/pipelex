@@ -65,18 +65,9 @@ PaymentTerms = "Conditions under which payment is to be made"
 LineItem = "An individual item or service listed in a financial document"
 ```
 
-## How to Structure Your Concepts
+## Get Started with Inline Structures
 
-Once you've defined your concepts semantically, you may need to add structure if they have specific fields. Pipelex offers two approaches for adding structure:
-
-| Approach | Best For | Advantages | Limitations |
-|----------|----------|------------|-------------|
-| **Inline Structure** | Most use cases, prototyping | Fast, single-file, no boilerplate | No custom validation or methods |
-| **Python Class** | Complex validation, computed properties | Full Pydantic power, IDE support | More files, more code |
-
-### Inline Structures
-
-Define structured concepts directly in your `.plx` files. This is the **recommended approach** for most use cases:
+To add structure to your concepts, the simplest approach is using **inline structures** directly in your `.plx` files:
 
 ```plx
 [concept.Invoice]
@@ -84,94 +75,39 @@ description = "A commercial document issued by a seller to a buyer"
 
 [concept.Invoice.structure]
 invoice_number = "The unique invoice identifier"
-total_amount = { type = "number", description = "Total invoice amount" }
+issue_date = { type = "date", description = "The date the invoice was issued" }
+total_amount = { type = "number", description = "The total invoice amount" }
+vendor_name = "The name of the vendor"
 ```
 
-Behind the scenes, Pipelex generates a complete Pydantic model with validation. Learn more in [Inline Structures](inline-structures.md).
+This automatically generates a fully-typed Pydantic model with validation—no Python code needed!
 
-### Python StructuredContent Classes
+**For complete details on inline structures, field types, and all features, see [Inline Structures](inline-structures.md).**
 
-Create explicit Python classes when you need custom validation, computed properties, or advanced features:
+### Alternative: Python Classes
 
-```python
-from pipelex.core.stuffs.structured_content import StructuredContent
-from pydantic import Field
+For advanced features like custom validation, computed properties, or reusable business logic, you can create explicit Python classes.
 
-class Invoice(StructuredContent):
-    invoice_number: str
-    total_amount: float = Field(ge=0, description="Total invoice amount")
-```
+**Learn more in [Python StructuredContent Classes](python-classes.md).**
 
-Python classes are automatically discovered and registered. Learn more in [Python StructuredContent Classes](python-classes.md).
+## Refining Concepts
 
-### Choosing an Approach
-
-- **Start with inline structures** for rapid prototyping and simple data models
-- **Upgrade to Python classes** when you need custom validation, computed properties, or reusable business logic
-- Both approaches provide full type safety and validation
-
-For detailed guidance on implementation, field types, validation, and migration between approaches, see:
-- [Inline Structures](inline-structures.md) - Complete guide to inline structure syntax
-- [Python StructuredContent Classes](python-classes.md) - Advanced features with Python
-
-## Concept Refinement
-
-Sometimes you need to create more specific versions of existing concepts. For example, an `Invoice` is a specific kind of `PDF`, and a `ProductPhoto` is a specific kind of `Image`. Pipelex lets you express these relationships through refinement.
-
-### Quick Example
+You can create more specific versions of existing concepts through refinement. For example, an `Invoice` is a specific kind of `PDF`:
 
 ```plx
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
 refines = "PDF"
-
-[concept.ProductPhoto]
-description = "A photograph of a product for marketing purposes"
-refines = "Image"
 ```
 
-Refined concepts inherit the structure of their base concept while adding semantic specificity.
+The refined concept inherits the structure of the base concept while adding semantic specificity.
 
-!!! warning "Current Limitation"
-    You can **only refine native concepts** (Text, Image, PDF, TextAndImages, Number, Page, Dynamic) for now. Support for refining custom concepts will be added in future releases.
-
-**For complete details on refinement, including syntax, type compatibility, best practices, and limitations, see [Refining Concepts](refining-concepts.md).**
+**For complete details on refinement, see [Refining Concepts](refining-concepts.md).**
 
 ## Native Concepts
 
-Pipelex includes several built-in native concepts that cover common data types in AI workflows: `Text`, `Image`, `PDF`, `TextAndImages`, `Number`, `Page`, `Dynamic`, `LlmPrompt`, and `Anything`.
+Pipelex includes several built-in native concepts that cover common data types: `Text`, `Image`, `PDF`, `TextAndImages`, `Number`, `Page`, `Dynamic`, and `Anything`.
 
-These concepts come with predefined structures and are automatically available in all pipelines—no setup required. You can use them directly or refine them to create more specific concepts.
+These concepts are automatically available in all pipelines—no setup required. You can use them directly in your pipes or refine them to create more specific concepts.
 
-### Quick Example
-
-```plx
-[pipe.analyze_document]
-type = "PipeLLM"
-description = "Analyze a PDF document"
-inputs = { document = "PDF" }
-output = "Text"
-prompt = "Analyze this document and provide a summary"
-```
-
-### Refining Native Concepts
-
-Create more specific concepts by refining native ones:
-
-```plx
-[concept.Invoice]
-description = "A commercial document issued by a seller to a buyer"
-refines = "PDF"
-
-[concept.ProductPhoto]
-description = "A photograph of a product for marketing purposes"
-refines = "Image"
-```
-
-Your refined concept inherits the structure of the native concept while adding semantic specificity.
-
-**For complete details on all native concepts, their structures, and advanced usage, see [Native Concepts](native-concepts.md).**
-
-## Summary
-
-With well-defined concepts—both in natural language and with appropriate structure—your pipelines gain clarity, reliability, and maintainability. Understanding concepts is foundational to building effective AI workflows.
+**For complete details on all native concepts and their structures, see [Native Concepts](native-concepts.md).**
