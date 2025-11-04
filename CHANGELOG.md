@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Updated the api documentation.
+- Updated the routing profiles.
+
 ## [v0.14.3] - 2025-10-29
 
 ### Added
