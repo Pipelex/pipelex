@@ -187,7 +187,13 @@ class ModelDeck(ConfigModel):
     def validate_llm_presets(self) -> Self:
         for llm_preset_id, llm_setting in self.llm_presets.items():
             if not self.is_model_handle_defined(model_handle=llm_setting.model):
-                msg = f"llm_handle '{llm_setting.model}' for llm_preset '{llm_preset_id}' not found in deck"
+                msg = (
+                    f"llm_handle '{llm_setting.model}' for llm_preset '{llm_preset_id}' not found in deck. "
+                    f"The enabled backends are {set([model.backend_name for model in self.inference_models.values()])}. "
+                    f"And the llm_handle '{llm_setting.model}' is not found in any of the enabled backends. Here are the solutions:\n "
+                    "1 - Add it to your enabled backends if possible\n "
+                    "2 - Enable a backend that supports this llm_handle "
+                )
                 raise LLMHandleNotFoundError(msg)
         return self
 
