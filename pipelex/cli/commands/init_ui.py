@@ -106,6 +106,7 @@ class InitFocus(StrEnum):
     ALL = "all"
     CONFIG = "config"
     INFERENCE = "inference"
+    ROUTING = "routing"
     TELEMETRY = "telemetry"
 
 
@@ -337,6 +338,7 @@ def display_already_configured_message(focus: InitFocus, console: Console, confi
     # Mapping of focus to (subject, action_verb)
     focus_messages = {
         InitFocus.INFERENCE: ("Inference backends", "inference backends"),
+        InitFocus.ROUTING: ("Routing profile", "routing profile"),
         InitFocus.TELEMETRY: ("Telemetry preferences", "telemetry preferences"),
         InitFocus.CONFIG: ("Configuration files", "configuration"),
     }
@@ -367,7 +369,10 @@ def display_already_configured_message(focus: InitFocus, console: Console, confi
     if focus in focus_messages:
         subject, action_verb = focus_messages[focus]
         console.print()
-        console.print(f"[green]✓[/green] {subject} are already configured!")
+        if focus == InitFocus.ROUTING:
+            console.print(f"[green]✓[/green] {subject} is already configured!")
+        else:
+            console.print(f"[green]✓[/green] {subject} are already configured!")
         console.print()
         console.print(f"[dim]Configuration file:[/dim] [cyan]{config_path}[/cyan]")
         console.print()
@@ -377,12 +382,13 @@ def display_already_configured_message(focus: InitFocus, console: Console, confi
     return False
 
 
-def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_telemetry: bool, reset: bool) -> Panel:
+def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_routing: bool, needs_telemetry: bool, reset: bool) -> Panel:
     """Build the initialization confirmation panel.
 
     Args:
         needs_config: Whether config initialization is needed.
         needs_inference: Whether inference setup is needed.
+        needs_routing: Whether routing setup is needed.
         needs_telemetry: Whether telemetry setup is needed.
         reset: Whether this is a reset operation.
 
@@ -396,6 +402,8 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
         if needs_inference:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] inference backends")
+        if needs_routing:
+            message_parts.append("• [yellow]Reset and reconfigure[/yellow] routing profile")
         if needs_telemetry:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] telemetry preferences")
     else:
@@ -403,11 +411,13 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
             message_parts.append("• Create required configuration files in [cyan].pipelex/[/cyan]")
         if needs_inference:
             message_parts.append("• Ask you to choose your inference backends")
+        if needs_routing:
+            message_parts.append("• Ask you to configure your routing profile")
         if needs_telemetry:
             message_parts.append("• Ask you to choose your telemetry preferences")
 
     # Determine title based on what's being initialized
-    num_items = sum([needs_config, needs_inference, needs_telemetry])
+    num_items = sum([needs_config, needs_inference, needs_routing, needs_telemetry])
     if reset:
         if num_items > 1:
             title_text = "[bold yellow]Resetting Configuration[/bold yellow]"
@@ -415,6 +425,8 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
             title_text = "[bold yellow]Resetting Configuration Files[/bold yellow]"
         elif needs_inference:
             title_text = "[bold yellow]Resetting Inference Backends[/bold yellow]"
+        elif needs_routing:
+            title_text = "[bold yellow]Resetting Routing Profile[/bold yellow]"
         else:
             title_text = "[bold yellow]Resetting Telemetry[/bold yellow]"
     elif num_items > 1:
@@ -423,6 +435,8 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
         title_text = "[bold cyan]Configuration Setup[/bold cyan]"
     elif needs_inference:
         title_text = "[bold cyan]Inference Backend Setup[/bold cyan]"
+    elif needs_routing:
+        title_text = "[bold cyan]Routing Profile Setup[/bold cyan]"
     else:
         title_text = "[bold cyan]Telemetry Setup[/bold cyan]"
 
@@ -435,3 +449,95 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
         border_style=border_color,
         padding=(1, 2),
     )
+
+
+def build_primary_backend_panel(backend_keys: list[str], backend_options: list[tuple[str, str]]) -> Panel:
+    """Build a panel for selecting a primary backend from enabled backends.
+
+    Args:
+        backend_keys: List of enabled backend keys.
+        backend_options: List of all backend options to get display names.
+
+    Returns:
+        A Panel containing the primary backend selection interface.
+    """
+    # Create a mapping of backend_key to display_name
+    backend_key_to_name = dict(backend_options)
+
+    table = Table(show_header=False, box=None, padding=(0, 2))
+    table.add_column(style="bold cyan", justify="right", width=4)
+    table.add_column(style="bold", width=30)
+
+    for idx, backend_key in enumerate(backend_keys, start=1):
+        display_name = backend_key_to_name.get(backend_key, snake_to_capitalize_first_letter(backend_key))
+        table.add_row(f"[{idx}]", display_name)
+
+    description = Text(
+        "Multiple backends are enabled. Select which backend should be your primary/default.\n"
+        "The primary backend will be used by default for models that match multiple backends.",
+        style="dim",
+    )
+
+    return Panel(
+        Group(description, Text(""), table),
+        title="[bold yellow]Primary Backend Selection[/bold yellow]",
+        border_style="yellow",
+        padding=(1, 2),
+    )
+
+
+def prompt_primary_backend(console: Console, backend_keys: list[str]) -> str:
+    """Prompt user to select a primary backend from enabled backends.
+
+    Args:
+        console: Rich Console instance for user interaction.
+        backend_keys: List of enabled backend keys.
+
+    Returns:
+        The selected backend key.
+    """
+    # Default to first backend
+    default_str = "1"
+
+    selected_backend: str | None = None
+    while selected_backend is None:
+        choice_str = Prompt.ask("[bold]Enter your choice[/bold]", default=default_str, console=console)
+        choice_input = choice_str.strip()
+
+        # Parse input - handle empty (use default)
+        if not choice_input:
+            selected_backend = backend_keys[0]
+            break
+
+        try:
+            # Parse as 1-based index from user input
+            user_index = int(choice_input)
+
+            # Validate index is in range (1-based)
+            if user_index < 1 or user_index > len(backend_keys):
+                max_idx = len(backend_keys)
+                console.print(f"[red]Invalid choice: {user_index}.[/red] Please enter a number between 1 and {max_idx}.\n")
+                continue
+
+            # Convert to 0-based index and get backend key
+            selected_backend = backend_keys[user_index - 1]
+            break
+
+        except ValueError:
+            console.print(f"[red]Invalid input: '{choice_str}'.[/red] Please enter a number.\n")
+
+    return selected_backend
+
+
+def display_routing_profile_result(console: Console, profile_name: str, created: bool = False) -> None:
+    """Display confirmation of routing profile configuration.
+
+    Args:
+        console: Rich Console instance for output.
+        profile_name: Name of the routing profile that was set.
+        created: Whether the profile was newly created.
+    """
+    if created:
+        console.print(f"\n[green]✓[/green] Created and set routing profile to: [bold cyan]{profile_name}[/bold cyan]")
+    else:
+        console.print(f"\n[green]✓[/green] Routing profile set to: [bold cyan]{profile_name}[/bold cyan]")
