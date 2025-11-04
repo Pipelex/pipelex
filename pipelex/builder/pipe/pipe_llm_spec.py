@@ -14,15 +14,14 @@ if TYPE_CHECKING:
 
 class LLMSkill(StrEnum):
     LLM_TO_RETRIEVE = "llm_to_retrieve"
-    LLM_TO_ANSWER_EASY_QUESTIONS = "llm_to_answer_easy_questions"
-    LLM_TO_ANSWER_HARD_QUESTIONS = "llm_to_answer_hard_questions"
-    LLM_TO_WRITE_QUESTIONS = "llm_to_write_questions"
-    LLM_FOR_BASIC_VISION = "llm_for_basic_vision"
-    LLM_FOR_VISUAL_ANALYSIS = "llm_for_visual_analysis"
+
+    LLM_TO_ANSWER_QUESTIONS_CHEAP = "llm_to_answer_questions_cheap"
+    LLM_TO_ANSWER_QUESTIONS = "llm_to_answer_questions"
+
+    LLM_FOR_WRITING_CHEAP = "llm_for_writing_cheap"
+    LLM_FOR_IMG_TO_TEXT_CHEAP = "llm_for_img_to_text_cheap"
     LLM_FOR_VISUAL_DESIGN = "llm_for_visual_design"
     LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
-    LLM_TO_REASON_ON_DIAGRAM = "llm_to_reason_on_diagram"
-    LLM_TO_ANALYZE_DATA = "llm_to_analyze_data"
     LLM_TO_CODE = "llm_to_code"
     LLM_TO_ANALYZE_LARGE_CODEBASE = "llm_to_analyze_large_codebase"
 

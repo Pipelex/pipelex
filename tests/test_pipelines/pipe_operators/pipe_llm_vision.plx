@@ -25,7 +25,7 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { imageA = "Image", imageB = "Image" }
 output = "BasicDescription"
-model = "llm_to_extract_diagram"
+model = "llm_for_diagram_to_text"
 prompt = """
 Describe what you see in $imageA only.
 Completely ignore $imageB.
@@ -36,7 +36,7 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { imageA = "Image", imageB = "Image" }
 output = "BasicDescription"
-model = "llm_to_extract_diagram"
+model = "llm_for_diagram_to_text"
 prompt = """
 Describe what you see in $imageB only.
 Completely ignore $imageA.
@@ -48,7 +48,7 @@ type = "PipeLLM"
 description = "Provide detailed analysis of the image"
 inputs = { image = "Photo" }
 output = "VisionAnalysis"
-model = "llm_to_extract_diagram"
+model = "llm_for_diagram_to_text"
 system_prompt = "You are an expert image analyst. Provide detailed, accurate descriptions."
 prompt = """
 Analyze this image and describe what's the main topic etc.
