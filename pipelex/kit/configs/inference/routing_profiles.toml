@@ -108,11 +108,11 @@ default = "xai"
 # ==================================================================
 # Example of a custom routing profile with pattern matching
 # ==================================================================
-[profiles.custom_routing]
-description = "Custom routing"
+[profiles.example_routing_using_patterns]
+description = "Example routing profile using patterns"
 default = "pipelex_inference"
 
-[profiles.custom_routing.routes]
+[profiles.example_routing_using_patterns.routes]
 # Pattern matching: "model-pattern" = "backend-name"
 "gpt-*" = "azure_openai"
 "claude-*" = "bedrock"
@@ -126,10 +126,10 @@ default = "pipelex_inference"
 # Example of a custom routing profile with specific model matching
 # ==================================================================
 
-[profiles.to_test_various_backends]
-description = "Route models to various backends"
+[profiles.example_routing_using_specific_models]
+description = "Example routing profile using specific models"
 
-[profiles.to_test_various_backends.routes]
+[profiles.example_routing_using_specific_models.routes]
 "gpt-5-nano" = "pipelex_inference"
 "gpt-4o-mini" = "blackboxai"
 "gpt-5-mini" = "openai"
