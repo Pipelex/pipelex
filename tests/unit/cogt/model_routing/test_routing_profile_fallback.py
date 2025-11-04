@@ -1,6 +1,4 @@
-import pytest
 
-from pipelex.cogt.exceptions import RoutingProfileValidationError
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 
@@ -72,8 +70,8 @@ class TestRoutingProfileFallbackOrder:
         assert result.backend_name == "openai"
         assert result.fallback_order == ["anthropic", "google"]
 
-    def test_error_raised_for_nonexistent_backend_in_fallback_order(self):
-        """Test that RoutingProfileValidationError is raised when fallback_order contains backend not in enabled_backends."""
+    def test_nonexistent_backend_in_fallback_order_is_filtered_out(self):
+        """Test that nonexistent backends in fallback_order are silently filtered out."""
         # Arrange
         routing_profile = RoutingProfile(
             name="test_profile",
@@ -81,17 +79,19 @@ class TestRoutingProfileFallbackOrder:
         )
         enabled_backends = ["openai", "google"]
 
-        # Act & Assert
-        with pytest.raises(RoutingProfileValidationError) as exc_info:
-            routing_profile.get_backend_match_for_model(
-                enabled_backends=enabled_backends,
-                model_name="test-model",
-            )
-        assert "nonexistent_backend" in str(exc_info.value)
-        assert "Enabled backends" in str(exc_info.value)
+        # Act
+        result = routing_profile.get_backend_match_for_model(
+            enabled_backends=enabled_backends,
+            model_name="test-model",
+        )
 
-    def test_error_raised_for_disabled_backend_in_fallback_order(self):
-        """Test that RoutingProfileValidationError is raised when fallback_order contains disabled backend."""
+        # Assert - nonexistent_backend should be filtered out
+        assert result is not None
+        assert result.backend_name == "openai"  # First enabled backend
+        assert result.fallback_order == ["openai", "google"]  # Only enabled backends
+
+    def test_disabled_backend_in_fallback_order_is_filtered_out(self):
+        """Test that disabled backends in fallback_order are silently filtered out."""
         # Arrange
         routing_profile = RoutingProfile(
             name="test_profile",
@@ -99,13 +99,16 @@ class TestRoutingProfileFallbackOrder:
         )
         enabled_backends = ["openai", "google"]  # anthropic is disabled
 
-        # Act & Assert
-        with pytest.raises(RoutingProfileValidationError) as exc_info:
-            routing_profile.get_backend_match_for_model(
-                enabled_backends=enabled_backends,
-                model_name="test-model",
-            )
-        assert "anthropic" in str(exc_info.value)
+        # Act
+        result = routing_profile.get_backend_match_for_model(
+            enabled_backends=enabled_backends,
+            model_name="test-model",
+        )
+
+        # Assert - anthropic should be filtered out
+        assert result is not None
+        assert result.backend_name == "openai"
+        assert result.fallback_order == ["openai", "google"]  # Only enabled backends
 
     def test_current_behavior_preserved_when_neither_default_nor_fallback_order_set(self):
         """Test that None is returned when neither default nor fallback_order is set."""
@@ -227,8 +230,8 @@ class TestRoutingProfileFallbackOrder:
         assert result.backend_name == "openai"  # First from fallback_order
         assert result.fallback_order == ["openai", "anthropic"]
 
-    def test_validation_error_message_includes_details(self):
-        """Test that validation error message includes helpful details."""
+    def test_fallback_order_filters_disabled_backends(self):
+        """Test that disabled backends are filtered out from fallback_order."""
         # Arrange
         routing_profile = RoutingProfile(
             name="test_profile",
@@ -236,17 +239,16 @@ class TestRoutingProfileFallbackOrder:
         )
         enabled_backends = ["backend1"]
 
-        # Act & Assert
-        with pytest.raises(RoutingProfileValidationError) as exc_info:
-            routing_profile.get_backend_match_for_model(
-                enabled_backends=enabled_backends,
-                model_name="test-model",
-            )
-        error_message = str(exc_info.value)
-        assert "backend2" in error_message
-        assert "backend3" in error_message
-        assert "fallback_order" in error_message
-        assert "Enabled backends" in error_message
+        # Act
+        result = routing_profile.get_backend_match_for_model(
+            enabled_backends=enabled_backends,
+            model_name="test-model",
+        )
+
+        # Assert - only enabled backends should remain
+        assert result is not None
+        assert result.backend_name == "backend1"
+        assert result.fallback_order == ["backend1"]  # backend2 and backend3 filtered out
 
     def test_fallback_order_preserved_in_result(self):
         """Test that the exact fallback_order list is preserved in the result."""

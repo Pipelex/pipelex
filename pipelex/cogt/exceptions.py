@@ -175,7 +175,7 @@ class RoutingProfileLibraryNotFoundError(CogtError):
     pass
 
 
-class RoutingProfileValidationError(CogtError):
+class RoutingProfileBlueprintValueError(CogtError, ValueError):
     pass
 
 
@@ -223,7 +223,7 @@ class InferenceBackendLibraryError(CogtError):
     pass
 
 
-class RoutingProfileError(CogtError):
+class RoutingProfileDisabledBackendError(CogtError):
     pass
 
 
