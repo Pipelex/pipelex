@@ -16,7 +16,7 @@ pre code { white-space: pre-wrap !important; word-wrap: break-word; overflow-wra
 
 /* 1) Baseline: non-active links = light grey (declare ONCE) */
 .md-nav--primary .md-nav__link:not(.md-nav__link--active) {
-  color: rgba(0, 0, 0, 0.4) !important;
+  color: rgba(0, 0, 0, 0.6) !important;
 }
 [data-md-color-scheme="slate"] .md-nav--primary .md-nav__link:not(.md-nav__link--active) {
   color: rgba(255, 255, 255, 0.4) !important;
@@ -43,16 +43,27 @@ pre code { white-space: pre-wrap !important; word-wrap: break-word; overflow-wra
   color: #fff !important;
   font-weight: 700 !important;
 }
+/* Constant, small pill padding on ALL items (links + labels) */
+.md-nav--primary .md-nav__link,
+.md-nav--primary label.md-nav__link {
+  padding: 6px 10px;      /* tighter than before */
+  margin: 0px 0px;
+  border-radius: 10px;   /* softer, not huge */
+  box-sizing: border-box;
+  transition: background-color 120ms ease, color 120ms ease; /* color only, no layout props */
+}
 
-/* 3) Active link highlight (any depth) */
+/* Hover: color only (no padding/radius changes) */
+.md-nav--primary a.md-nav__link:not(.md-nav__link--active):hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+[data-md-color-scheme="default"] .md-nav--primary a.md-nav__link:not(.md-nav__link--active):hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Active: color only (no padding/radius changes) */
 .md-nav--primary .md-nav__link--active {
   color: #45BF9F !important;
   font-weight: 700 !important;
-  background-color: rgba(69, 191, 159, 0.12) !important;
-  border-radius: 8px !important;
-  padding: 6px !important;
-}
-[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link--active {
-  color: #45BF9F !important;
   background-color: rgba(69, 191, 159, 0.12) !important;
 }
