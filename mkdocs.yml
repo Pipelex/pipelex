@@ -81,6 +81,14 @@ markdown_extensions:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   
+extra_css:
+  - stylesheets/mermaid.css
+  - stylesheets/general.css
+
+extra_javascript:
+  - js/sections.js
+
+
 nav:
   - Home:
     - What is Pipelex?: index.md
@@ -181,8 +189,3 @@ nav:
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
   - Changelog: changelog.md
-
-extra_css:
-  - stylesheets/mermaid.css
-  - stylesheets/general.css
-  
