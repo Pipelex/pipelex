@@ -48,6 +48,12 @@ class OpenAIFactory:
             msg = f"Plugin '{plugin}' is not supported by OpenAIFactory"
             raise OpenAIFactoryError(msg) from exc
 
+        # We have a workaround here:
+        # OpenAI can be used without any API key (for instance when pointing to local Ollama) but the SDK,
+        # as it is, raises if there is not API key (api_key is None and there is not env var).
+        # But it works fine with an empty string.
+        api_key = backend.api_key or ""
+
         the_client: openai.AsyncOpenAI
         match sdk_variant:
             case OpenAISdkVariant.AZURE_OPENAI:
@@ -57,20 +63,19 @@ class OpenAIFactory:
                     raise OpenAIFactoryError(msg)
                 the_client = openai.AsyncAzureOpenAI(
                     azure_endpoint=backend.endpoint,
-                    api_key=backend.api_key,
+                    api_key=api_key,
                     api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
                 )
-
             case OpenAISdkVariant.OPENAI:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
-                    api_key=backend.api_key,
+                    api_key=api_key,
                     base_url=backend.endpoint,
                 )
             case OpenAISdkVariant.OPENAI_ALT_IMG_GEN:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
-                    api_key=backend.api_key,
+                    api_key=api_key,
                     base_url=backend.endpoint,
                 )
 

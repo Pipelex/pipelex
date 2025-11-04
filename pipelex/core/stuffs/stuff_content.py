@@ -1,11 +1,11 @@
 from abc import ABC
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from kajson import kajson
 from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
-from pipelex.tools.misc.json_utils import remove_none_values_from_dict
+from pipelex.tools.misc.json_utils import remove_none_values
 from pipelex.tools.misc.pretty import pretty_print
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
@@ -55,6 +55,5 @@ class StuffContent(ABC, CustomBaseModel):
         return kajson.dumps(self.smart_dump(), indent=4)
 
     def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:  # noqa: ARG002
-        the_dict: dict[str, Any] = cast("dict[str, Any]", self.smart_dump())
-        the_dict = remove_none_values_from_dict(data=the_dict)
-        pretty_print(the_dict, title=title)
+        json_content = remove_none_values(json_content=self.smart_dump())
+        pretty_print(json_content, title=title)
