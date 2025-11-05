@@ -15,6 +15,7 @@ theme:
     - navigation.tabs.sticky
     - navigation.sections
     - navigation.top
+    - content.code.copy
   palette:
   - scheme: default          # light
     primary: custom
@@ -121,23 +122,29 @@ nav:
         - Python classes: home/6-build-reliable-ai-workflows/concepts/python-classes.md
         - Native Concepts: home/6-build-reliable-ai-workflows/concepts/native-concepts.md
         - Refining Concepts: home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
-      - Design and Run Pipelines: home/6-build-reliable-ai-workflows/design_and_run_pipelines.md
+      - Design and Run Pipelines: home/6-build-reliable-ai-workflows/pipes/index.md
       - Executing Pipelines with Inputs: home/6-build-reliable-ai-workflows/executing-pipelines-with-inputs.md
       - Understanding Multiplicity: home/6-build-reliable-ai-workflows/understanding-multiplicity.md
       - Pipe Builder: home/6-build-reliable-ai-workflows/pipe-builder.md
+      - Pipes:
+        - Overview: home/6-build-reliable-ai-workflows/pipes/index.md
+        - Executing Pipelines: home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md
+        - Working Memory: home/6-build-reliable-ai-workflows/pipes/working-memory.md
+        - Pipe Output: home/6-build-reliable-ai-workflows/pipes/pipe-output.md
+        - Pipelex Bundle Specification: home/6-build-reliable-ai-workflows/pipes/pipelex-bundle-specification.md
       - Pipe Operators:
-        - Overview: home/6-build-reliable-ai-workflows/pipe-operators/index.md
-        - PipeLLM: home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md
-        - PipeExtract: home/6-build-reliable-ai-workflows/pipe-operators/PipeExtract.md
-        - PipeImgGen: home/6-build-reliable-ai-workflows/pipe-operators/PipeImgGen.md
-        - PipeCompose: home/6-build-reliable-ai-workflows/pipe-operators/PipeCompose.md
-        - PipeFunc: home/6-build-reliable-ai-workflows/pipe-operators/PipeFunc.md
+        - Overview: home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md
+        - PipeLLM: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md
+        - PipeExtract: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeExtract.md
+        - PipeImgGen: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeImgGen.md
+        - PipeCompose: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeCompose.md
+        - PipeFunc: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc.md
       - Pipe Controllers:
-        - Overview: home/6-build-reliable-ai-workflows/pipe-controllers/index.md
-        - PipeSequence: home/6-build-reliable-ai-workflows/pipe-controllers/PipeSequence.md
-        - PipeParallel: home/6-build-reliable-ai-workflows/pipe-controllers/PipeParallel.md
-        - PipeBatch: home/6-build-reliable-ai-workflows/pipe-controllers/PipeBatch.md
-        - PipeCondition: home/6-build-reliable-ai-workflows/pipe-controllers/PipeCondition.md
+        - Overview: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md
+        - PipeSequence: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeSequence.md
+        - PipeParallel: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeParallel.md
+        - PipeBatch: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeBatch.md
+        - PipeCondition: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeCondition.md
       - Optimize Cost & Quality: home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md
       - LLM Structured Generation: home/6-build-reliable-ai-workflows/llm-structured-generation-config.md
       - LLM Prompting Style: home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md

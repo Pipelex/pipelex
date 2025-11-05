@@ -218,12 +218,12 @@ Your task is to extract specific data from the following description.
 ```
 
 !!! tip "Template Syntax"
-    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `@` prefix for tagging a variable in the prompt. Learn more about prompting with Pipelex in the [PipeLLM documentation](../6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md). 
+    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `@` prefix for tagging a variable in the prompt. Learn more about prompting with Pipelex in the [PipeLLM documentation](../6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md). 
 
 !!! tip "Template Variables"
     `@character.description` grabs the `character` stuff from the instance and uses its `description` attribute.
 
-Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md).
+Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md).
 
 #### Execute from Python
 
@@ -326,7 +326,7 @@ Now that you understand the basics, explore more:
 **Learn More about the PipeLLM:**
 
 - [LLM Configuration: play with the models](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md) - Optimize cost and quality
-- [Full configuration of the PipeLLM](../../home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md)
+- [Full configuration of the PipeLLM](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md)
 
 **Learn more about Pipelex (domains, project structure, best practices...)**
 
@@ -335,8 +335,8 @@ Now that you understand the basics, explore more:
 
 **Learn More about the other pipes** 
 
-- [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
-- [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
+- [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
+- [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
 
 **Explore Tools:**
 

@@ -359,10 +359,8 @@ inputs={
 
 ## Related Documentation
 
-- [Design and Run Pipelines](design_and_run_pipelines.md) - Learn about pipeline execution basics
+- [Design and Run Pipelines](pipes/index.md) - Learn about pipeline execution basics
 - [Define Your Concepts](concepts/define_your_concepts.md) - Understand concepts and their role
 - [Inline Structures](concepts/inline-structures.md) - Create structured data types with inline syntax
 - [Python StructuredContent Classes](concepts/python-classes.md) - Advanced structured data with Python
-- [Cookbook Examples](../../home/4-cookbook-examples/index.md) - See real-world input patterns
-
-
+- [Cookbook Examples](../4-cookbook-examples/index.md) - See real-world input patterns

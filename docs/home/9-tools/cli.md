@@ -372,7 +372,7 @@ The output JSON contains the complete working memory after pipeline execution, i
 **Related Documentation:**
 
 - [Executing Pipelines with Inputs](../../home/6-build-reliable-ai-workflows/executing-pipelines-with-inputs.md)
-- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/design_and_run_pipelines.md)
+- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/pipes/index.md)
 
 ## Build Commands
 
@@ -460,4 +460,4 @@ For complete documentation including all options and examples, see [Kit Commands
 - [Pipe Builder](pipe-builder.md) - Generate pipelines from natural language
 - [Kit Commands](kit.md) - Agent rules and migration management
 - [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) - Set up LLM backends
-- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/design_and_run_pipelines.md) - Pipeline development guide
+- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/pipes/index.md) - Pipeline development guide
