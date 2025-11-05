@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from pipelex import log
 from pipelex.cogt.config_cogt import ModelDeckConfig
@@ -67,6 +67,9 @@ class ModelDeck(ConfigModel):
     inference_models: dict[str, InferenceModelSpec] = Field(default_factory=dict)
     aliases: dict[str, str] = Field(default_factory=dict)
     waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+
+    # Track which model_handle fallback warnings have been logged to avoid duplicates
+    _logged_fallback_warnings: set[str] = PrivateAttr(default_factory=set)
 
     llm_presets: dict[str, LLMSetting] = Field(default_factory=dict)
     llm_choice_defaults: LLMSettingChoicesDefaults
@@ -312,24 +315,30 @@ class ModelDeck(ConfigModel):
                     raise ModelNotFoundError(message=msg, model_handle=model_handle)
                 if inference_model := self.get_optional_inference_model(model_handle=fallback):
                     if fallback_index > 0:
-                        # Waterfall success: we explain what happened in the logs
-                        msg = (
-                            f"Inference model fallback: '{ideal_model_handle}' was not found in deck, so it was replaced by '{fallback}'. "
-                            f"As a consequence, the results of the workflow may not have the expected quality, and the workflow might fail due to "
-                            f"feature limitations such as context window size, etc. Consider getting access to '{ideal_model_handle}'."
-                        )
-                        enabled_backends = {model.backend_name for model in self.inference_models.values()}
-                        if "pipelex_inference" not in enabled_backends and self._is_model_available_in_backend(
-                            model_handle=ideal_model_handle, backend_name="pipelex_inference"
-                        ):
-                            msg += (
-                                f" Note that many high quality models such as '{ideal_model_handle}' are available from the Pipelex Inference "
-                                f"platform and you can get free credits to try them out, please see our docs for more details about setting up "
-                                f"Pipelex Inference or other inference backends:\n{URLs.backend_provider_docs}"
+                        # Only log if we haven't logged for this model_handle before
+                        if model_handle not in self._logged_fallback_warnings:
+                            # Waterfall success: we explain what happened in the logs
+                            msg = (
+                                f"Inference model fallback: '{ideal_model_handle}' was not found in deck, "
+                                f"so it was replaced by '{fallback}'. "
+                                f"As a consequence, the results of the workflow may not have the expected quality, "
+                                f"and the workflow might fail due to feature limitations such as context window size, etc. "
+                                f"Consider getting access to '{ideal_model_handle}'."
                             )
-                        else:
-                            msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
-                        log.info(msg)
+                            enabled_backends = {model.backend_name for model in self.inference_models.values()}
+                            if "pipelex_inference" not in enabled_backends and self._is_model_available_in_backend(
+                                model_handle=ideal_model_handle, backend_name="pipelex_inference"
+                            ):
+                                msg += (
+                                    f" Note that many high quality models such as '{ideal_model_handle}' are available from the Pipelex Inference "
+                                    f"platform and you can get free credits to try them out, please see our docs for more details about setting up "
+                                    f"Pipelex Inference or other inference backends:\n{URLs.backend_provider_docs}"
+                                )
+                            else:
+                                msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
+                            log.info(msg)
+                            # Mark this warning as logged for this model_handle
+                            self._logged_fallback_warnings.add(model_handle)
                     return inference_model
             msg = f"Model handle '{model_handle}' is a waterfall but none of the fallback models were found in the model deck"
             raise ModelWaterfallError(message=msg, model_handle=model_handle, fallback_list=fallback_list)
