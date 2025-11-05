@@ -14,6 +14,12 @@ pre code { white-space: pre-wrap !important; word-wrap: break-word; overflow-wra
 
 /* --- Sidebar nav --- */
 
+/* Ensure all link and label elements have no shadow */
+.md-nav__link,
+label.md-nav__link {
+  box-shadow: none !important;
+}
+
 /* 1) Baseline: non-active links = light grey (declare ONCE) */
 .md-nav--primary .md-nav__link:not(.md-nav__link--active) {
   color: rgba(0, 0, 0, 0.6) !important;
