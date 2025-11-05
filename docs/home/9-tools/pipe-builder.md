@@ -191,7 +191,7 @@ After generating a pipeline:
 
 For more information on pipeline structure and customization, see:
 
-- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/design_and_run_pipelines.md)
-- [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipe-operators/index.md)
-- [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipe-controllers/index.md)
+- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/pipes/index.md)
+- [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md)
+- [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md)
 

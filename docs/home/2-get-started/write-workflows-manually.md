@@ -25,7 +25,7 @@ Think of it and then output the character description.
 """
 ```
 
-This pipeline is a simple LLM call without any input, with the provided prompt and will output a `TextContent` object. See more about native concepts [here](../../home/6-build-reliable-ai-workflows/define_your_concepts.md)
+This pipeline is a simple LLM call without any input, with the provided prompt and will output a `TextContent` object. See more about native concepts [here](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md)
 
 ### Run Your First Pipelex Script
 
@@ -68,7 +68,7 @@ As you might notice, this is plain text, and nothing is structured. Now we are g
 
 ## Generate Structured Outputs
 
-Let's create a rigorously structured `Character` object instead of plain text. We need to create the concept `Character`. The concept names MUST be in PascalCase. [Learn more about defining concepts](../6-build-reliable-ai-workflows/define_your_concepts.md)
+Let's create a rigorously structured `Character` object instead of plain text. We need to create the concept `Character`. The concept names MUST be in PascalCase. [Learn more about defining concepts](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md)
 
 ### Option 1: Define the Structure in your `.plx` file
 
@@ -140,7 +140,7 @@ class Character(StructuredContent):
 !!! tip "Keep Structure Files Clean"
     Keep your `StructuredContent` classes in dedicated files with minimal module-level code. Pipelex imports these modules during auto-discovery, so any module-level code will be executed.
 
-Learn more in [Structuring Concepts](../../home/6-build-reliable-ai-workflows/structuring-concepts.md).
+Learn more in [Inline Structures](../6-build-reliable-ai-workflows/concepts/inline-structures.md) or [Python StructuredContent Classes](../6-build-reliable-ai-workflows/concepts/python-classes.md).
 
 ### Use your Structured Concept in Your Pipe
 
@@ -218,12 +218,12 @@ Your task is to extract specific data from the following description.
 ```
 
 !!! tip "Template Syntax"
-    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `@` prefix for tagging a variable in the prompt. Learn more about prompting with Pipelex in the [PipeLLM documentation](../6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md). 
+    Our template syntax is based on [Jinja2](https://jinja.palletsprojects.com/en/stable/). Use `@` prefix for tagging a variable in the prompt. Learn more about prompting with Pipelex in the [PipeLLM documentation](../6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md). 
 
 !!! tip "Template Variables"
     `@character.description` grabs the `character` stuff from the instance and uses its `description` attribute.
 
-Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md).
+Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md).
 
 #### Execute from Python
 
@@ -326,7 +326,7 @@ Now that you understand the basics, explore more:
 **Learn More about the PipeLLM:**
 
 - [LLM Configuration: play with the models](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md) - Optimize cost and quality
-- [Full configuration of the PipeLLM](../../home/6-build-reliable-ai-workflows/pipe-operators/PipeLLM.md)
+- [Full configuration of the PipeLLM](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md)
 
 **Learn more about Pipelex (domains, project structure, best practices...)**
 
@@ -335,8 +335,8 @@ Now that you understand the basics, explore more:
 
 **Learn More about the other pipes** 
 
-- [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
-- [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
+- [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md) - PipeLLM, PipeExtract, PipeCompose, and more
+- [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md) - PipeSequence, PipeParallel, PipeBatch, PipeCondition
 
 **Explore Tools:**
 
