@@ -1,5 +1,3 @@
-"""Integration tests for init command backend customization."""
-
 from __future__ import annotations
 
 import shutil
@@ -36,8 +34,6 @@ def get_backend_indices(backends_toml_path: str, backend_names: list[str]) -> li
 
 
 class TestBackendCustomization:
-    """Integration tests for backend customization during initialization."""
-
     def test_customize_backends_config_with_default_selection(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test backend customization with default selection (pipelex_inference)."""
         # Setup directories with actual backends.toml
