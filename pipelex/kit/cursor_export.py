@@ -7,7 +7,7 @@ import typer
 import yaml
 
 from pipelex.kit.index_models import KitIndex
-from pipelex.kit.paths import get_agents_dir
+from pipelex.kit.paths import get_kit_agents_dir
 
 
 def _iter_agent_files(agents_dir: Traversable) -> Iterable[tuple[str, str]]:
@@ -52,7 +52,7 @@ def export_cursor_rules(repo_root: Path, idx: KitIndex, dry_run: bool = False) -
         idx: Kit index configuration
         dry_run: If True, only print what would be done
     """
-    agents_dir = get_agents_dir()
+    agents_dir = get_kit_agents_dir()
     out_dir = repo_root / ".cursor" / "rules"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -76,7 +76,7 @@ def remove_cursor_rules(repo_root: Path, dry_run: bool = False) -> None:
         repo_root: Repository root directory
         dry_run: If True, only print what would be done
     """
-    agents_dir = get_agents_dir()
+    agents_dir = get_kit_agents_dir()
     out_dir = repo_root / ".cursor" / "rules"
 
     if not out_dir.exists():

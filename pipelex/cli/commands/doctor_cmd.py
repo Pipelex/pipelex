@@ -12,7 +12,9 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.text import Text
 
-from pipelex.cli.commands.init_cmd import InitFocus, init_cmd, init_config
+from pipelex.cli.commands.init.command import init_cmd
+from pipelex.cli.commands.init.config_files import init_config
+from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import PipelexConfig

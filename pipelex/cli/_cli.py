@@ -8,7 +8,8 @@ from typing_extensions import override
 
 from pipelex.cli.commands.build_cmd import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
-from pipelex.cli.commands.init_cmd import InitFocus, init_cmd
+from pipelex.cli.commands.init.command import init_cmd
+from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
