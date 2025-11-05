@@ -69,7 +69,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
 
 ### Organizing Related Concepts
 
-Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [Kick off a Pipelex Workflow Project](../kick-off-a-pipelex-workflow-project.md#what-are-domains).
+Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [Understanding Domains](../domain.md).
 
 ```plx
 # finance.plx

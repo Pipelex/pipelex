@@ -1,10 +1,10 @@
 # Working Memory
 
-The **Working Memory** is the mechanism that enables data flow between pipes in your pipeline. It acts as a temporary storage space that exists for the duration of a single pipeline run.
+The **Working Memory** is the mechanism that enables data flow between pipes in your pipeline. It acts as a **temporary** storage space that exists for the duration of a single pipeline run.
 
 ## How Data Flows Between Pipes
 
-When you compose pipes together (especially in sequences), you need a way to pass data from one pipe to another. This is where the Working Memory comes in.
+When you compose pipes together with [PipeControllers](./pipe-controllers/index.md), you need a way to pass data from one pipe to another. This is where the Working Memory comes in.
 
 Consider our marketing pipeline example from the [Designing Pipelines](index.md) guide:
 
@@ -23,7 +23,7 @@ steps = [
 How does data get from `generate_tagline` to `extract_keywords_from_tagline`? This is handled by the Working Memory:
 
 1.  When a pipe in a sequence executes, its output is given a name using the `result` key (e.g., `result = "tagline"`).
-2.  This named result is placed into the Working Memory.
+2.  This named result is placed into the Working Memory as a `Stuff`.
 3.  Subsequent pipes can then reference this data by its name in their `inputs` field (e.g., `inputs = { tagline = "Tagline" }`).
 
 This mechanism allows you to chain pipes together, creating a flow of information through your pipeline.
