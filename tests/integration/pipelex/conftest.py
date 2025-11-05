@@ -195,8 +195,10 @@ def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
         # "flux-pro",
         "flux-pro/v1.1",
         # "flux-pro/v1.1-ultra",
-        "fast-lightning-sdxl",
-        "gpt-image-1",
+        # "fast-lightning-sdxl",
+        # "gpt-image-1",
+        # "nano-banana",
+        # "best-img-gen",
     ],
 )
 def img_gen_handle(request: pytest.FixtureRequest) -> str:

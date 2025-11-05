@@ -18,11 +18,11 @@
 
 [aliases]
 base-claude = "claude-4.5-sonnet"
-base-gpt = "gpt-5"
+base-gpt = "gpt-4o"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
 
-best-gpt = "gpt-5"
+best-gpt = "gpt-4o"
 best-claude = "claude-4.1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-medium"
@@ -40,14 +40,14 @@ smart_llm = [
     "claude-4.5-sonnet",
     "claude-4.1-opus",
     "claude-4-sonnet",
-    "gpt-5",
     "gemini-2.5-pro",
+    "gpt-5",
 ]
 llm_for_large_codebase = ["gemini-2.5-pro", "claude-4.5-sonnet", "gpt-5"]
 
 # Image generation aliases
-base-img-gen = "flux-pro/v1.1"
-best-img-gen = "flux-pro/v1.1-ultra"
+base-img-gen = "flux-pro/v1.1-ultra"
+best-img-gen = "nano-banana"
 fast-img-gen = "fast-lightning-sdxl"
 
 ####################################################################################################

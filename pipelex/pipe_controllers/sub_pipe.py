@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeInputError
+from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -49,7 +49,16 @@ class SubPipe(BaseModel):
                     message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_list_stuff_name, concept_code=None
                 ) from exc
 
-            item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
+            try:
+                item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
+            except PipeInputNotFoundError as exc:
+                msg = (
+                    f"Batch input item named '{batch_params.input_item_stuff_name}' from '{calling_pipe_code}' is not "
+                    f"in SubPipe '{self.pipe_code}' input requirements: {sub_pipe.inputs}"
+                )
+                raise PipeInputError(
+                    message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_item_stuff_name, concept_code=None
+                ) from exc
             pipe_batch_blueprint = PipeBatchBlueprint(
                 description=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
@@ -57,7 +66,7 @@ class SubPipe(BaseModel):
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
-                    batch_params.input_item_stuff_name: item_stuff_requirement.concept.concept_string,
+                    batch_params.input_list_stuff_name: item_stuff_requirement.concept.concept_string,
                 },
             )
 
@@ -84,7 +93,7 @@ class SubPipe(BaseModel):
         else:
             # Case 3: Normal processing
             required_variables = sub_pipe.required_variables()
-            required_stuff_names = {rv for rv in required_variables if not rv.startswith("_")}
+            required_stuff_names = {req_var for req_var in required_variables if not req_var.startswith("_")}
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:

@@ -29,14 +29,19 @@ active = "pipelex_first"
 description = "Use Pipelex Inference backend for all its supported models"
 default = "pipelex_inference"
 
+[profiles.all_blackboxai]
+description = "Use BlackBoxAI backend for all its supported models"
+default = "blackboxai"
+
 [profiles.pipelex_first.routes]
 # Pattern matching: "model-pattern" = "backend-name"
 "gpt-*" = "pipelex_inference"
 "claude-*" = "pipelex_inference"
 "grok-*" = "pipelex_inference"
 "gemini-*" = "pipelex_inference"
-"*-sdxl" = "fal"
-"flux-*" = "fal"
+"*-sdxl" = "blackboxai"
+"flux-*" = "blackboxai"
+"nano-banana" = "blackboxai"
 "gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
 

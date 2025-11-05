@@ -46,7 +46,7 @@ class ImgGenJobParams(BaseModel):
     safety_tolerance: int | None = Field(default=None, ge=1, le=6)
     is_raw: bool
     output_format: OutputFormat = Field(strict=False)
-    seed: int | None = Field(None, ge=0)
+    seed: int | None = Field(default=None, ge=0)
 
 
 class ImgGenJobParamsDefaults(ConfigModel):

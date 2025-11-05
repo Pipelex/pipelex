@@ -17,14 +17,15 @@ class PipeSignature(StructuredContent):
     It defines the inputs, outputs, and the purpose of the pipe without implementation details.
 
     Multiplicity Notation:
-        Use bracket notation to specify how many items are produced, but only for the outputs:
+        Use bracket notation to specify multiplicity for both inputs and outputs:
         - No brackets: single item (default)
         - []: variable-length list
         - [N]: exactly N items (where N is a positive integer)
 
     Examples:
-        - output = "Text[]" - produces multiple text items
-        - output = "Image[3]" - produces exactly 3 images
+        - output = "Text" - one text items
+        - output = "Text[]" - multiple text items
+        - output = "Image[3]" - exactly 3 images
     """
 
     code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.")

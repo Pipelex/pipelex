@@ -73,7 +73,7 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
     def get_required_input_requirement(self, variable_name: str) -> InputRequirement:
         requirement = self.root.get(variable_name)
         if not requirement:
-            msg = f"Variable '{variable_name}' not found in input spec"
+            msg = f"Variable '{variable_name}' not found the input requirements"
             raise PipeInputNotFoundError(msg)
         return requirement
 

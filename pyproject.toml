@@ -1,12 +1,12 @@
 [project]
 name = "pipelex"
-version = "0.14.1"
+version = "0.14.3"
 description = "The open standard for repeatable AI workflows. Write business logic, not API calls."
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
 license = "MIT"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -328,6 +328,8 @@ ignore = [
     "S102", # Use of `exec` detected
     "S106", # Possible hardcoded password assigned to argument: "secret"
     "S105", # Possible hardcoded password assigned to: "child_secret"
+
+    "S311", # Cryptographically weak pseudo-random number generator
 
     "TD002", # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
     "TD003", # Missing issue link for this TODO

@@ -23,6 +23,10 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
+    def get_loaded_plx_paths(self) -> list[str]:
+        pass
+
+    @abstractmethod
     def load_libraries(self, library_dirs: list[Path] | None = None, library_file_paths: list[Path] | None = None) -> None:
         pass
 

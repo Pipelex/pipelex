@@ -35,10 +35,15 @@ default = "pipelex_inference"
 "claude-*" = "pipelex_inference"
 "grok-*" = "pipelex_inference"
 "gemini-*" = "pipelex_inference"
-"*-sdxl" = "fal"
-"flux-*" = "fal"
+"*-sdxl" = "blackboxai"
+"flux-*" = "blackboxai"
+"nano-banana" = "blackboxai"
 "gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
+
+[profiles.all_blackboxai]
+description = "Use BlackBoxAI backend for all its supported models"
+default = "blackboxai"
 
 [profiles.all_bedrock]
 description = "Use Bedrock backend for all its supported models"
