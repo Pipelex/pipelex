@@ -69,7 +69,7 @@ class ModelDeck(ConfigModel):
     waterfalls: dict[str, list[str]] = Field(default_factory=dict)
 
     # Track which model_handle fallback warnings have been logged to avoid duplicates
-    _logged_fallback_warnings: set[str] = PrivateAttr(default_factory=set)
+    _logged_fallback_warnings: set[str] = PrivateAttr(default_factory=set[str])
 
     llm_presets: dict[str, LLMSetting] = Field(default_factory=dict)
     llm_choice_defaults: LLMSettingChoicesDefaults
