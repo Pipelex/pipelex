@@ -41,21 +41,30 @@ The pipe builder generates a complete production-ready script in our Pipelex lan
 pipelex run results/cv_match.plx --inputs inputs.json
 ```
 
-The `--inputs` file should be a JSON dictionary where keys are input variable names and values are the input data. Learn more on how to provide the inputs of a pipe: [Executing Pipelines with Inputs](../../home/6-build-reliable-ai-workflows/executing-pipelines-with-inputs.md)
+The `--inputs` file should be a JSON dictionary where keys are input variable names and values are the input data. Learn more on how to provide the inputs of a pipe: [Providing Inputs to Pipelines](../../home/6-build-reliable-ai-workflows/pipes/provide-inputs.md)
 
 **Option 2: Python**
 
 This requires having the `.plx` file or your pipe inside the directory where the Python file is located.
 
 ```python
+import json
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipelex import Pipelex
-import json
 
+# Initialize Pipelex
 Pipelex.make()
+
+# Load the inputs from the JSON file
 with open("inputs.json", "r", encoding="utf-8") as json_file:
     inputs = json.load(json_file)
-pipe_output = await execute_pipeline(pipe_code="analyze_cv_and_prepare_interview", inputs=inputs)
+
+# Execute the pipeline
+pipe_output = await execute_pipeline(
+    pipe_code="analyze_cv_and_prepare_interview",
+    inputs=inputs
+)
+
 print(pipe_output.main_stuff)
 
 ```

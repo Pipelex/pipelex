@@ -150,7 +150,7 @@ output = "Headline[3]"
 ```
 
 !!! info "Learn More About Multiplicity"
-    For a comprehensive guide on output multiplicity, input multiplicity, and the philosophy behind how Pipelex handles single items versus collections, see [Understanding Multiplicity](../../understanding-multiplicity.md).
+    For a comprehensive guide on output multiplicity, input multiplicity, and the philosophy behind how Pipelex handles single items versus collections, see [Understanding Multiplicity](../understanding-multiplicity.md).
 
 ## Examples
 

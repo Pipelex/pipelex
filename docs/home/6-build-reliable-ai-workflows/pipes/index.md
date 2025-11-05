@@ -8,14 +8,33 @@ This guide provides an overview of how to design your pipelines.
 
 A pipeline is composed of pipes. There are two fundamental types of pipes you will use to build your workflows:
 
-*   **[Pipe Operators](../pipes/pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
-*   **[Pipe Controllers](../pipes/pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your workflow, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
+*   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
+*   **[Pipe Controllers](./pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your workflow, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
 
 ## Designing a Pipeline: Composition in PLX
 
 The most common way to design a pipeline is by defining and composing pipes in a `.plx` configuration file. This provides a clear, declarative way to see the structure of your workflow.
 
 Each pipe, whether it's an operator or a controller, is defined in its own `[pipe.<pipe_code>]` table. The `<pipe_code>` becomes the unique identifier for that pipe.
+
+!!! important "Pipe Code Naming Convention"
+    Pipe codes **MUST** be in `snake_case` (lowercase with underscores). Use descriptive names that clearly indicate what the pipe does.
+    
+    **Valid pipe codes:**
+    ```plx
+    ✅ [pipe.generate_tagline]
+    ✅ [pipe.extract_invoice]
+    ✅ [pipe.validate_and_process]
+    ✅ [pipe.send_email]
+    ```
+    
+    **Invalid pipe codes:**
+    ```plx
+    ❌ [pipe.GenerateTagline]     # PascalCase not allowed
+    ❌ [pipe.generateTagline]      # camelCase not allowed
+    ❌ [pipe.generate-tagline]     # Hyphens not allowed
+    ❌ [pipe.GENERATE_TAGLINE]     # All caps not allowed
+    ```
 
 Let's look at a simple example. Imagine we want a workflow that:
 1.  Takes a product description.
@@ -59,7 +78,7 @@ The output concept is very important. Indeed, the output of your pipe will be co
 Every pipe defines a **contract** through its `inputs` and `output` fields. This contract is fundamental to how Pipelex ensures reliability in your workflows:
 
 *   **`inputs`**: This dictionary defines the **mandatory and necessary** data that must be present in the [Working Memory](working-memory.md) before the pipe can execute. Each key in the dictionary becomes a variable name that you can reference in your pipe's logic (e.g., in prompts), and each value specifies the concept type that the data must conform to. If any required input is missing or doesn't match the expected concept, the pipeline will fail a clear error message.
-You can specify multiple inputs by using a list of concepts. For example, `inputs = { description = "ProductDescription", keywords = "Keyword[]" }` will require a `ProductDescription` and a list of `Keyword`s. (See more about [Understanding Multiplicity](../understanding-multiplicity.md) for details.)
+You can specify multiple inputs by using a list of concepts. For example, `inputs = { description = "ProductDescription", keywords = "Keyword[]" }` will require a `ProductDescription` and a list of `Keyword`s. (See more about [Understanding Multiplicity](./understanding-multiplicity.md) for details.)
 
 *   **`output`**: This field declares what the pipe will produce. The output will always be an instance of the specified concept. The structure and type of the output depend on the concept definition (See more about concepts [here](../concepts/native-concepts.md)).
     *   You can specify **multiple outputs** using bracket notation (e.g., `Keyword[]` for a variable list, or `Image[3]` for exactly 3 images)
@@ -119,12 +138,12 @@ steps = [
 ```
 
 !!! note "Multiple Outputs"
-    The `[]` bracket notation in `output = "Keyword[]"` allows the LLM to generate as many keywords as it finds relevant. For a comprehensive guide on controlling how many items pipes produce or accept, see [Understanding Multiplicity](../understanding-multiplicity.md).
+    The `[]` bracket notation in `output = "Keyword[]"` allows the LLM to generate as many keywords as it finds relevant. For a comprehensive guide on controlling how many items pipes produce or accept, see [Understanding Multiplicity](./understanding-multiplicity.md).
 
 
 This defines a two-step pipeline. The `PipeSequence` controller `description_to_tagline` takes a `ProductDescription` as input and outputs a `Tagline`. The first step is `generate_tagline` which generates a `Tagline` from the `ProductDescription`. The second step is `extract_keywords_from_tagline` which extracts keywords from the `Tagline`.
 
-See here all the different operators, see [Pipe Operators](../pipes/pipe-operators/index.md).
-See here all the different controllers, see [Pipe Controllers](../pipes/pipe-controllers/index.md).
+See here all the different operators, see [Pipe Operators](./pipe-operators/index.md).
+See here all the different controllers, see [Pipe Controllers](./pipe-controllers/index.md).
 
 See more about the possibilities in designing your pipelines in the [Pipelex Bundle Specification](./pipelex-bundle-specification.md).

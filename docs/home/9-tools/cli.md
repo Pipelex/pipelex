@@ -371,7 +371,8 @@ The output JSON contains the complete working memory after pipeline execution, i
 
 **Related Documentation:**
 
-- [Executing Pipelines with Inputs](../../home/6-build-reliable-ai-workflows/executing-pipelines-with-inputs.md)
+- [Executing Pipelines](../../home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md)
+- [Providing Inputs to Pipelines](../../home/6-build-reliable-ai-workflows/pipes/provide-inputs.md)
 - [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/pipes/index.md)
 
 ## Build Commands

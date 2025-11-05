@@ -17,6 +17,25 @@ Employee = "A person employed by an organization"
 ProductReview = "A customer's evaluation of a product or service"
 ```
 
+!!! important "Concept Naming Convention"
+    Concept names **MUST** be in `PascalCase` (also known as UpperCamelCase). Each word starts with a capital letter, with no underscores or hyphens.
+    
+    **Valid concept names:**
+    ```plx
+    ✅ Invoice
+    ✅ ProductReview
+    ✅ CustomerFeedback
+    ✅ InvoiceLineItem
+    ```
+    
+    **Invalid concept names:**
+    ```plx
+    ❌ invoice           # Not PascalCase
+    ❌ product_review    # snake_case not allowed
+    ❌ Product-Review    # Hyphens not allowed
+    ❌ productReview     # camelCase not allowed (must start with capital)
+    ```
+
 Those concepts will be Text-based by default. If you want to use sutrctured output, you need to create a Python class for the concept, or declare the structure directly in the concept definition. 
 
 **Key principles for concept definitions:**
