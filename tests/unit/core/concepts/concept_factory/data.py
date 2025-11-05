@@ -64,7 +64,6 @@ class TestCases:
         ("my_domain", "Dynamic", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Dynamic")),
         ("my_domain", "TextAndImages", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="TextAndImages")),
         ("my_domain", "Number", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Number")),
-        ("my_domain", "LlmPrompt", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="LlmPrompt")),
         ("my_domain", "Page", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Page")),
         ("my_domain", "Anything", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Anything")),
     ]

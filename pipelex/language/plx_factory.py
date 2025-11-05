@@ -281,10 +281,13 @@ class PlxFactory:
                             )
                             raise TypeError(msg)
                         log.verbose(f"Structure for '{concept_key}' is a mapping: {structure_field_value}")
+                        # Filter out "required" key if its value is False
+                        structure_field_value = cast("Mapping[str, Any]", structure_field_value)
+                        filtered_value = {key: value for key, value in structure_field_value.items() if not (key == "required" and not value)}
                         structure_table_obj.add(
                             structure_field_key,
                             cls.convert_dicts_to_inline_tables(
-                                value=structure_field_value, field_ordering=cls._plx_config().concepts.structure_field_ordering
+                                value=filtered_value, field_ordering=cls._plx_config().concepts.structure_field_ordering
                             ),
                         )
                     concept_table_obj.add("structure", structure_table_obj)

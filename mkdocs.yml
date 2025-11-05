@@ -1,11 +1,9 @@
-site_name: Pipelex Docs
+site_name: Pipelex Documentation
 site_url: https://docs.pipelex.com/
 site_description: "Official documentation for Pipelex, a framework and language for building deterministic, repeatable AI workflows and knowledge pipelines."
 docs_dir: docs
 repo_url: "https://github.com/Pipelex/pipelex"
 repo_name: "Pipelex on GitHub"
-watch: [README.md, CONTRIBUTING.md, CHANGELOG.md, MANIFESTO.md, LICENSE]
-
 theme:
   name: material
   custom_dir: docs/overrides
@@ -17,16 +15,15 @@ theme:
     - navigation.tabs.sticky
     - navigation.sections
     - navigation.top
+    - content.code.copy
   palette:
   - scheme: default          # light
-    primary: teal
-    accent: deep purple
+    primary: custom
     toggle:
       icon: material/weather-night
       name: Switch to dark mode
   - scheme: slate            # dark
-    primary: teal
-    accent: purple
+    primary: custom
     toggle:
       icon: material/weather-sunny
       name: Switch to light mode
@@ -71,7 +68,8 @@ markdown_extensions:
   - attr_list
   - md_in_html
   - pymdownx.blocks.caption
-  - pymdownx.highlight
+  - pymdownx.highlight:
+      use_pygments: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -83,102 +81,113 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
-
-nav:
-  - Home:
-    - Welcome: index.md
-    - Writing Workflows: pages/writing-workflows/index.md
-    - Setup:
-      - Configure AI Providers: pages/setup/configure-ai-providers.md
-      - Project Organization: pages/setup/project-organization.md
-      - Telemetry: pages/setup/telemetry.md
-    - Understand Pipelex:
-      - The Knowledge Pipeline Manifesto: manifesto.md
-      - The Pipelex Paradigm: pages/pipelex-paradigm-for-repeatable-ai-workflows/index.md
-    - Cookbook Examples:
-      - Overview: pages/cookbook-examples/index.md
-      - Hello World: pages/cookbook-examples/hello-world.md
-      - Document Processing:
-        - Simple OCR: pages/cookbook-examples/simple-ocr.md
-        - Generic Document Extraction: pages/cookbook-examples/extract-generic.md
-        - Invoice Extractor: pages/cookbook-examples/invoice-extractor.md
-        - Proof of Purchase Extraction: pages/cookbook-examples/extract-proof-of-purchase.md
-      - Graphical Extraction:
-        - Gantt Chart Extraction: pages/cookbook-examples/extract-gantt.md
-        - Table Extraction from Image: pages/cookbook-examples/extract-table.md
-        - DPE Extraction: pages/cookbook-examples/extract-dpe.md
-      - Text Generation:
-        - Screenplay Generator (wip): pages/cookbook-examples/write-screenplay.md
-        - Tweet Optimizer (wip): pages/cookbook-examples/write-tweet.md
-    - Build Reliable AI Workflows:
-      - Kick off a Pipeline Project: pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project.md
-      - Define Your Concepts: pages/build-reliable-ai-workflows-with-pipelex/define_your_concepts.md
-      - Structuring Concepts: pages/build-reliable-ai-workflows-with-pipelex/structuring-concepts.md
-      - Design and Run Pipelines: pages/build-reliable-ai-workflows-with-pipelex/design_and_run_pipelines.md
-      - Executing Pipelines with Inputs: pages/build-reliable-ai-workflows-with-pipelex/executing-pipelines-with-inputs.md
-      - Understanding Multiplicity: pages/build-reliable-ai-workflows-with-pipelex/understanding-multiplicity.md
-      - Pipeline Creation: pages/build-reliable-ai-workflows-with-pipelex/pipeline-creation.md
-      - Pipe Operators:
-        - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/index.md
-        - PipeLLM: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeLLM.md
-        - PipeExtract: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeExtract.md
-        - PipeImgGen: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeImgGen.md
-        - PipeCompose: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeCompose.md
-        - PipeFunc: pages/build-reliable-ai-workflows-with-pipelex/pipe-operators/PipeFunc.md
-      - Pipe Controllers:
-        - Overview: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/index.md
-        - PipeSequence: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeSequence.md
-        - PipeParallel: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeParallel.md
-        - PipeBatch: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeBatch.md
-        - PipeCondition: pages/build-reliable-ai-workflows-with-pipelex/pipe-controllers/PipeCondition.md
-      - Optimize Cost & Quality: pages/build-reliable-ai-workflows-with-pipelex/configure-ai-llm-to-optimize-workflows.md
-      - LLM Structured Generation: pages/build-reliable-ai-workflows-with-pipelex/llm-structured-generation-config.md
-      - LLM Prompting Style: pages/build-reliable-ai-workflows-with-pipelex/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
-      - LLM Providers & Models: pages/configuration/config-technical/inference-backend-config.md
-  - Observer:
-    - Data Extraction: pages/observer/data-extraction.md
-  - API Reference:
-    - API Guide: pages/api/index.md
-  - n8n Node: https://pipelex.github.io/n8n-nodes-pipelex/
-  - Configuration:
-    - Overview: pages/configuration/index.md
-    - Pipeline Validation Configuration:
-      - Dry Run: pages/configuration/config-pipeline-validation/dry-run-config.md
-      - Static Validation: pages/configuration/config-pipeline-validation/static-validation-config.md
-    - Practical Configuration:
-      - Logging: pages/configuration/config-practical/logging-config.md
-      - Pipe Run: pages/configuration/config-practical/pipe-run-config.md
-      - Reporting: pages/configuration/config-practical/reporting-config.md
-      - Telemetry: pages/configuration/config-practical/telemetry-config.md
-      - Tracker: pages/configuration/config-practical/tracker-config.md
-    - Technical Configuration:
-      - AWS: pages/configuration/config-technical/aws-config.md
-      - Cogt: pages/configuration/config-technical/cogt-config.md
-      - Inference Backend: pages/configuration/config-technical/inference-backend-config.md
-      - Library: pages/configuration/config-technical/library-config.md
-      - Feature: pages/configuration/config-advanced/feature-config.md
-  - Development:
-    - Changelog: changelog.md
-    - Tools:
-      - CLI: pages/tools/cli.md
-      - Kit Commands: pages/tools/kit.md
-      - Pipe Builder: pages/tools/pipe-builder.md
-      - Logging: pages/tools/logging.md
-    - Advanced Customizations:
-      - Overview: pages/advanced-customization/index.md
-      - Secrets Provider: pages/advanced-customization/secrets-provider-injection.md
-      - Reporting Delegate: pages/advanced-customization/reporting-delegate-injection.md
-      - Pipeline Tracker: pages/advanced-customization/pipeline-tracker-injection.md
-      - Storage Provider: pages/advanced-customization/storage-provider-injection.md
-      - Template Provider: pages/advanced-customization/template-provider-injection.md
-      - Observer Provider: pages/advanced-customization/observer-provider-injection.md
-      - Content Generator: pages/advanced-customization/content-generator-injection.md
-      - Pipe Router: pages/advanced-customization/pipe-router-injection.md
-    - License: license.md
-    - Contributing: contributing.md
-    - Code of Conduct: CODE_OF_CONDUCT.md
-
+  
 extra_css:
   - stylesheets/mermaid.css
   - stylesheets/general.css
-  
+
+nav:
+  - Home:
+    - What is Pipelex?: index.md
+    - Get Started:
+      - The Pipe Builder: home/2-get-started/pipe-builder.md
+      - Write Workflows Manually: home/2-get-started/write-workflows-manually.md
+    - Understand Pipelex:
+      - The Knowledge Pipeline Manifesto: home/3-understand-pipelex/manifesto.md
+      - The Pipelex Paradigm: home/3-understand-pipelex/pipelex-paradigm/index.md
+    - Cookbook Examples:
+      - Overview: home/4-cookbook-examples/index.md
+      - Hello World: home/4-cookbook-examples/hello-world.md
+      - Document Processing:
+        - Simple OCR: home/4-cookbook-examples/simple-ocr.md
+        - Generic Document Extraction: home/4-cookbook-examples/extract-generic.md
+        - Invoice Extractor: home/4-cookbook-examples/invoice-extractor.md
+        - Proof of Purchase Extraction: home/4-cookbook-examples/extract-proof-of-purchase.md
+      - Graphical Extraction:
+        - Gantt Chart Extraction: home/4-cookbook-examples/extract-gantt.md
+        - Table Extraction from Image: home/4-cookbook-examples/extract-table.md
+        - DPE Extraction: home/4-cookbook-examples/extract-dpe.md
+      - Text Generation:
+        - Screenplay Generator (wip): home/4-cookbook-examples/write-screenplay.md
+        - Tweet Optimizer (wip): home/4-cookbook-examples/write-tweet.md
+    - Setup:
+      - Configure AI Providers: home/5-setup/configure-ai-providers.md
+      - Project Organization: home/5-setup/project-organization.md
+      - Telemetry: home/5-setup/telemetry.md
+    - Build Reliable AI Workflows:
+      - Kick off a Pipeline Project: home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md
+      - Pipe Builder: home/6-build-reliable-ai-workflows/pipe-builder.md
+      - Pipelex Bundle Specification: home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md
+      - Domain: home/6-build-reliable-ai-workflows/domain.md
+      - Concepts:
+        - Define Your Concepts: home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md
+        - Inline structures: home/6-build-reliable-ai-workflows/concepts/inline-structures.md
+        - Python classes: home/6-build-reliable-ai-workflows/concepts/python-classes.md
+        - Native Concepts: home/6-build-reliable-ai-workflows/concepts/native-concepts.md
+        - Refining Concepts: home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
+      - Design and Run Pipelines:
+        - Overview: home/6-build-reliable-ai-workflows/pipes/index.md
+        - Executing Pipelines: home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md
+        - Providing Inputs to Pipelines: home/6-build-reliable-ai-workflows/pipes/provide-inputs.md
+        - Working Memory: home/6-build-reliable-ai-workflows/pipes/working-memory.md
+        - Pipe Output: home/6-build-reliable-ai-workflows/pipes/pipe-output.md
+        - Understanding Multiplicity: home/6-build-reliable-ai-workflows/pipes/understanding-multiplicity.md
+        - Pipe Operators:
+          - Overview: home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md
+          - PipeLLM: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md
+          - PipeExtract: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeExtract.md
+          - PipeImgGen: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeImgGen.md
+          - PipeCompose: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeCompose.md
+          - PipeFunc: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc.md
+        - Pipe Controllers:
+          - Overview: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md
+          - PipeSequence: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeSequence.md
+          - PipeParallel: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeParallel.md
+          - PipeBatch: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeBatch.md
+          - PipeCondition: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeCondition.md
+      - Optimize Cost & Quality: home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md
+      - LLM Structured Generation: home/6-build-reliable-ai-workflows/llm-structured-generation-config.md
+      - LLM Prompting Style: home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+    - Configuration:
+      - Overview: home/7-configuration/index.md
+      - Pipeline Validation Configuration:
+        - Dry Run: home/7-configuration/config-pipeline-validation/dry-run-config.md
+        - Static Validation: home/7-configuration/config-pipeline-validation/static-validation-config.md
+      - Practical Configuration:
+        - Logging: home/7-configuration/config-practical/logging-config.md
+        - Pipe Run: home/7-configuration/config-practical/pipe-run-config.md
+        - Reporting: home/7-configuration/config-practical/reporting-config.md
+        - Telemetry: home/7-configuration/config-practical/telemetry-config.md
+        - Tracker: home/7-configuration/config-practical/tracker-config.md
+      - Technical Configuration:
+        - AWS: home/7-configuration/config-technical/aws-config.md
+        - Cogt: home/7-configuration/config-technical/cogt-config.md
+        - LLM Providers & Models: home/7-configuration/config-technical/inference-backend-config.md
+        - Library: home/7-configuration/config-technical/library-config.md
+        - Feature: home/7-configuration/config-advanced/feature-config.md
+    - Analytics:
+      - Observer Data Extraction: home/8-analytics/data-extraction.md
+    - Tools:
+      - CLI: home/9-tools/cli.md
+      - Kit Commands: home/9-tools/kit.md
+      - Pipe Builder: home/9-tools/pipe-builder.md
+      - Logging: home/9-tools/logging.md
+    - Advanced Customizations:
+      - Overview: home/10-advanced-customizations/index.md
+      - Secrets Provider: home/10-advanced-customizations/secrets-provider-injection.md
+      - Reporting Delegate: home/10-advanced-customizations/reporting-delegate-injection.md
+      - Pipeline Tracker: home/10-advanced-customizations/pipeline-tracker-injection.md
+      - Storage Provider: home/10-advanced-customizations/storage-provider-injection.md
+      - Template Provider: home/10-advanced-customizations/template-provider-injection.md
+      - Observer Provider: home/10-advanced-customizations/observer-provider-injection.md
+      - Content Generator: home/10-advanced-customizations/content-generator-injection.md
+      - Plugin Injection: home/10-advanced-customizations/plugin-injection.md
+      - Pipe Router: home/10-advanced-customizations/pipe-router-injection.md
+  - API: https://pipelex.github.io/pipelex-api/
+  - MCP: https://pipelex.github.io/pipelex-mcp/
+  - n8n: https://pipelex.github.io/n8n-nodes-pipelex/
+  - Contribute:
+    - Contributing: contributing.md
+    - Code of Conduct: CODE_OF_CONDUCT.md
+    - License: license.md
+  - Changelog: changelog.md
