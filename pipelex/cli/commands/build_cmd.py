@@ -11,7 +11,8 @@ from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
 from pipelex.builder.builder_errors import PipeBuilderError, PipelexBundleError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
-from pipelex.exceptions import PipeInputError, PipelineExecutionError
+from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_error, handle_model_choice_error
+from pipelex.exceptions import PipeInputError, PipelineExecutionError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
@@ -148,6 +149,13 @@ def build_pipe_cmd(
             typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
             get_report_delegate().generate_report()
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
     finally:
         pipelex_instance.teardown()
 
@@ -295,6 +303,13 @@ def prepare_runner_cmd(
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
 
             asyncio.run(prepare_runner(pipe_code=pipe_code, bundle_path=bundle_path))
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
     finally:
         pipelex_instance.teardown()
 
@@ -434,6 +449,13 @@ def generate_inputs_cmd(
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_INPUTS}")
 
             asyncio.run(generate_inputs(pipe_code=pipe_code, bundle_path=bundle_path))
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
     finally:
         pipelex_instance.teardown()
 
@@ -501,6 +523,13 @@ def build_one_shot_cmd(
             typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
             get_report_delegate().generate_report()
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
     finally:
         pipelex_instance.teardown()
 
@@ -597,5 +626,12 @@ def build_partial_cmd(
             typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
             get_report_delegate().generate_report()
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
     finally:
         pipelex_instance.teardown()

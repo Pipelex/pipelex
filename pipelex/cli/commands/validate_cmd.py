@@ -14,15 +14,15 @@ from rich.traceback import Traceback
 from pipelex import log, pretty_print
 from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
+from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_error, handle_model_choice_error
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.exceptions import LibraryLoadingError, PipeInputError, PipeOperatorModelChoiceError
+from pipelex.exceptions import LibraryLoadingError, PipeInputError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -47,20 +47,10 @@ def do_validate_all_libraries_and_dry_run() -> None:
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
             asyncio.run(dry_run_pipes(pipes=pipes, raise_on_failure=True))
             log.info("Setup sequence passed OK, config and pipelines are validated.")
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     except PipeOperatorModelChoiceError as exc:
-        console = Console(stderr=True)
-        console.print("\n[bold red]❌ Validation failed because of a Model Choice Error[/bold red]\n")
-        console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{exc.pipe_code}'[/yellow] [dim]({exc.pipe_type})[/dim]")
-        console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{exc.model_type}'[/yellow]")
-        console.print(f"[bold cyan]Model Choice:[/bold cyan] [yellow]'{exc.model_choice}'[/yellow]")
-        console.print(f"\n[bold red]Error:[/bold red]        {exc.message}\n")
-        console.print(
-            f"[bold green]💡 Tip:[/bold green] Check your model configuration in [cyan].pipelex/inference/[/cyan] "
-            f"or specify a different model in the [yellow]'{exc.pipe_code}'[/yellow] pipe."
-        )
-        console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
-        console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-        raise typer.Exit(1) from exc
+        handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
     finally:
         pipelex_instance.teardown()
 
@@ -212,19 +202,9 @@ def validate_cmd(
 
             asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path))
     except PipeOperatorModelChoiceError as exc:
-        console = Console(stderr=True)
-        console.print("\n[bold red]❌ Validation failed because of a Model Choice Error[/bold red]\n")
-        console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{exc.pipe_code}'[/yellow] [dim]({exc.pipe_type})[/dim]")
-        console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{exc.model_type}'[/yellow]")
-        console.print(f"[bold cyan]Model Choice:[/bold cyan] [yellow]'{exc.model_choice}'[/yellow]")
-        console.print(f"\n[bold red]Error:[/bold red]        {exc.message}\n")
-        console.print(
-            f"[bold green]💡 Tip:[/bold green] Check your model configuration in [cyan].pipelex/inference/[/cyan] "
-            f"or specify a different model in the [yellow]'{exc.pipe_code}'[/yellow] pipe."
-        )
-        console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
-        console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-        raise typer.Exit(1) from exc
+        handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     finally:
         pipelex_instance.teardown()
 
