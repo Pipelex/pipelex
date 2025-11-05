@@ -150,7 +150,6 @@ nav:
       - LLM Prompting Style: home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
     - Configuration:
       - Overview: home/7-configuration/index.md
-      - LLM Providers & Models: home/7-configuration/config-technical/inference-backend-config.md
       - Pipeline Validation Configuration:
         - Dry Run: home/7-configuration/config-pipeline-validation/dry-run-config.md
         - Static Validation: home/7-configuration/config-pipeline-validation/static-validation-config.md
@@ -163,7 +162,7 @@ nav:
       - Technical Configuration:
         - AWS: home/7-configuration/config-technical/aws-config.md
         - Cogt: home/7-configuration/config-technical/cogt-config.md
-        - Inference Backend: home/7-configuration/config-technical/inference-backend-config.md
+        - LLM Providers & Models: home/7-configuration/config-technical/inference-backend-config.md
         - Library: home/7-configuration/config-technical/library-config.md
         - Feature: home/7-configuration/config-advanced/feature-config.md
     - Analytics:
