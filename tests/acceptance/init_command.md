@@ -36,11 +36,11 @@ Before each test scenario, ensure:
 
 - [ ] Run: `pipelex init`
 - [ ] Confirm initialization
-- [ ] Select backends: `6,7,8` (openai, anthropic, mistral)
+- [ ] Note the displayed backend numbers, then select 3 backends (e.g., openai, anthropic, mistral) using their indices
 - [ ] Verify confirmation shows 3 backends configured
 - [ ] Verify "Setting up routing for multiple backends" message
 - [ ] Verify primary backend selection panel is displayed
-- [ ] Select primary backend (e.g., `1` for openai)
+- [ ] Select primary backend (e.g., `1` for the first in your selection)
 - [ ] Verify fallback order panel is displayed
 - [ ] Press Enter to keep default order or enter custom order (e.g., `2,1`)
 - [ ] Verify "custom_routing" profile is created and set as active
@@ -102,7 +102,7 @@ Before each test scenario, ensure:
 - [ ] Ensure `.pipelex/` exists (run `pipelex init config` first)
 - [ ] Run: `pipelex init inference`
 - [ ] Verify backend selection panel is displayed
-- [ ] Select backends (e.g., `6,7`)
+- [ ] Note the displayed backend numbers, then select 2 backends (e.g., openai, anthropic) using their indices
 - [ ] Verify backends are enabled in backends.toml
 - [ ] Verify routing is configured automatically
 - [ ] Verify NO telemetry prompt appears
@@ -277,7 +277,7 @@ Before each test scenario, ensure:
 **Test Case 8.3: Space-separated backend indices**
 
 - [ ] Run: `pipelex init`
-- [ ] Enter backends as `6 7 8` (space-separated)
+- [ ] Note the displayed backend numbers, then enter 3 backend indices with spaces (e.g., for openai, anthropic, mistral)
 - [ ] Verify backends are parsed correctly
 - [ ] Verify all selected backends are enabled
 
@@ -333,8 +333,8 @@ Before each test scenario, ensure:
 **Test Case 9.2: Single non-pipelex backend**
 
 - [ ] Run: `pipelex init`
-- [ ] Select only backend `6` (openai)
-- [ ] Verify routing is set to "all_openai"
+- [ ] Note the displayed backend numbers, then select only one backend (e.g., openai) using its index
+- [ ] Verify routing is set to "all_{backend_key}" (e.g., "all_openai")
 - [ ] Verify profile is created if it doesn't exist
 - [ ] Verify NO primary/fallback prompts
 
