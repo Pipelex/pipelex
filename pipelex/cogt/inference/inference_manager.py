@@ -9,7 +9,6 @@ from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerPr
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_models_manager, get_report_delegate
 
 
@@ -57,9 +56,9 @@ class InferenceManager(InferenceManagerProtocol):
 
     def _setup_one_internal_llm_worker(
         self,
-        inference_model: InferenceModelSpec,
         llm_handle: str,
     ) -> LLMWorkerInternalAbstract:
+        inference_model = get_models_manager().get_inference_model(model_handle=llm_handle)
         llm_worker = LLMWorkerFactory.make_llm_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
@@ -69,14 +68,10 @@ class InferenceManager(InferenceManagerProtocol):
 
     @override
     def get_llm_worker(self, llm_handle: str) -> LLMWorkerAbstract:
-        if llm_worker := self.llm_workers.get(llm_handle):
-            return llm_worker
-
-        inference_model = get_models_manager().get_inference_model(model_handle=llm_handle)
-        return self._setup_one_internal_llm_worker(
-            inference_model=inference_model,
-            llm_handle=llm_handle,
-        )
+        llm_worker = self.llm_workers.get(llm_handle)
+        if llm_worker is None:
+            llm_worker = self._setup_one_internal_llm_worker(llm_handle=llm_handle)
+        return llm_worker
 
     @override
     def set_llm_worker_from_external_plugin(
@@ -116,9 +111,9 @@ class InferenceManager(InferenceManagerProtocol):
 
     def _setup_one_extract_worker(
         self,
-        inference_model: InferenceModelSpec,
         extract_handle: str,
     ) -> ExtractWorkerAbstract:
+        inference_model = get_models_manager().get_inference_model(model_handle=extract_handle)
         extract_worker = self.extract_worker_factory.make_extract_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
@@ -128,11 +123,7 @@ class InferenceManager(InferenceManagerProtocol):
 
     @override
     def get_extract_worker(self, extract_handle: str) -> ExtractWorkerAbstract:
-        if extract_worker := self.extract_workers.get(extract_handle):
-            return extract_worker
-
-        inference_model = get_models_manager().get_inference_model(model_handle=extract_handle)
-        return self._setup_one_extract_worker(
-            inference_model=inference_model,
-            extract_handle=extract_handle,
-        )
+        extract_worker = self.extract_workers.get(extract_handle)
+        if extract_worker is None:
+            extract_worker = self._setup_one_extract_worker(extract_handle=extract_handle)
+        return extract_worker

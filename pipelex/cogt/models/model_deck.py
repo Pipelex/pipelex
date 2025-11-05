@@ -13,6 +13,7 @@ from pipelex.cogt.exceptions import (
     ModelDeckPresetValidatonError,
     ModelDeckValidatonError,
     ModelNotFoundError,
+    ModelWaterfallError,
 )
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
@@ -27,7 +28,9 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
+from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
 from pipelex.types import Self
+from pipelex.urls import URLs
 
 LLM_PRESET_DISABLED = "disabled"
 
@@ -259,6 +262,32 @@ class ModelDeck(ConfigModel):
         for model_handle in self.inference_models:
             self.get_required_inference_model(model_handle=model_handle)
 
+    def _is_model_available_in_backend(self, model_handle: str, backend_name: str) -> bool | None:
+        """Check if a model is available from a specific backend.
+
+        This is a low-level check that reads the backend TOML file directly,
+        so it works even if the backend is disabled. Best-effort: returns False
+        if the file can't be read or parsed.
+
+        Args:
+            model_handle: The model handle/name to check for
+            backend_name: The backend name (e.g., 'pipelex_inference')
+
+        Returns:
+            True if the model is defined in the backend's TOML file, False otherwise
+        """
+        backend_file_path = f".pipelex/inference/backends/{backend_name}.toml"
+        try:
+            backend_toml = load_toml_from_path_if_exists(backend_file_path)
+            if backend_toml is None:
+                return None
+            # Check if model_handle exists as a top-level key (section) in the TOML
+            # Exclude special sections like 'defaults'
+            return model_handle in backend_toml and model_handle != "defaults"
+        except Exception:
+            # Best-effort: if anything goes wrong, just return None
+            return None
+
     def get_optional_inference_model(self, model_handle: str) -> InferenceModelSpec | None:
         if inference_model := self.inference_models.get(model_handle):
             return inference_model
@@ -266,19 +295,45 @@ class ModelDeck(ConfigModel):
             log.verbose(f"Alias for '{model_handle}': {alias}")
             return self.get_optional_inference_model(model_handle=alias)
         if fallback_list := self.waterfalls.get(model_handle):
+            if not fallback_list:
+                msg = f"Model handle '{model_handle}' is a waterfall but has no fallback list. This is not allowed."
+                raise ModelNotFoundError(message=msg, model_handle=model_handle)
+            ideal_model_handle = fallback_list[0]
             log.verbose(f"Fallback list for '{model_handle}': {fallback_list}")
             for fallback_index, fallback in enumerate(fallback_list):
                 if fallback_index > 0 and not self.model_deck_config.is_model_fallback_enabled:
+                    # Waterfall disabled, so we raise an error
                     fallback_list_str = " → ".join(fallback_list)
                     msg = (
                         f"Model handle '{model_handle}' is a waterfall which resolves to •[ {fallback_list_str} ]•, but model fallbacks are disabled "
-                        f"so only the first item in the list, '{fallback_list[0]}', is acceptable but it was not found in the deck. "
+                        f"so only the first item in the list, '{ideal_model_handle}', is acceptable but it was not found in the deck. "
                         f"You must enable model fallback in your .pipelex/pipelex.toml file to permit the following fallbacks, "
-                        f"or enable a backend that supports '{fallback_list[0]}'. "
+                        f"or enable a backend that supports '{ideal_model_handle}'. "
                     )
-                    raise ModelNotFoundError(msg)
+                    raise ModelNotFoundError(message=msg, model_handle=model_handle)
                 if inference_model := self.get_optional_inference_model(model_handle=fallback):
+                    if fallback_index > 0:
+                        # Waterfall success: we explain what happened in the logs
+                        msg = (
+                            f"Inference model fallback: '{ideal_model_handle}' was not found in deck, so it was replaced by '{fallback}'. "
+                            f"As a consequence, the results of the workflow may not have the expected quality, and the workflow might fail due to "
+                            f"feature limitations such as context window size, etc. Consider getting access to '{ideal_model_handle}'."
+                        )
+                        enabled_backends = {model.backend_name for model in self.inference_models.values()}
+                        if "pipelex_inference" not in enabled_backends and self._is_model_available_in_backend(
+                            model_handle=ideal_model_handle, backend_name="pipelex_inference"
+                        ):
+                            msg += (
+                                f" Note that many high quality models such as '{ideal_model_handle}' are available from the Pipelex Inference "
+                                f"platform and you can get free credits to try them out, please see our docs for more details about setting up "
+                                f"Pipelex Inference or other inference backends:\n{URLs.backend_provider_docs}"
+                            )
+                        else:
+                            msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
+                        log.info(msg)
                     return inference_model
+            msg = f"Model handle '{model_handle}' is a waterfall but none of the fallback models were found in the model deck"
+            raise ModelWaterfallError(message=msg, model_handle=model_handle, fallback_list=fallback_list)
         log.verbose(f"Skipping model handle '{model_handle}' because it's not found in deck, it could be an external plugin.")
         return None
 
@@ -298,7 +353,7 @@ class ModelDeck(ConfigModel):
                 "https://docs.pipelex.com/pages/configuration/config-technical/inference-backend-config/"
             )
 
-            raise ModelNotFoundError(msg)
+            raise ModelNotFoundError(message=msg, model_handle=model_handle)
         if model_handle not in self.inference_models:
             log.verbose(f"Model handle '{model_handle}' is an alias which resolves to '{inference_model.name}'")
         return inference_model

@@ -232,18 +232,21 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MODELS}")
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        with new_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MODELS}")
 
-        asyncio.run(
-            ModelLister.list_models(
-                backend_name=backend_name,
-                flat=flat,
+            asyncio.run(
+                ModelLister.list_models(
+                    backend_name=backend_name,
+                    flat=flat,
+                )
             )
-        )
+    finally:
+        pipelex_instance.teardown()
 
 
 @show_app.command("backends", help="Display backend configurations and active routing profile")

@@ -82,7 +82,7 @@ def build_pipe_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
@@ -136,17 +136,20 @@ def build_pipe_cmd(
             except Exception as exc:
                 typer.secho(f"⚠️  Warning: Could not generate input JSON: {exc}", fg=typer.colors.YELLOW)
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
+    try:
+        with new_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
-        start_time = time.time()
-        asyncio.run(run_pipeline())
-        end_time = time.time()
-        typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
+            start_time = time.time()
+            asyncio.run(run_pipeline())
+            end_time = time.time()
+            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
-        get_report_delegate().generate_report()
+            get_report_delegate().generate_report()
+    finally:
+        pipelex_instance.teardown()
 
 
 @build_app.command(SUB_COMMAND_RUNNER, help="Build the Python code to run a pipe with the necessary inputs")
@@ -229,9 +232,6 @@ def prepare_runner_cmd(
         raise typer.Exit(1)
 
     async def prepare_runner(pipe_code: str | None = None, bundle_path: str | None = None):
-        # Initialize Pipelex
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
-
         if bundle_path:
             try:
                 bundle_blueprint = await load_and_validate_bundle(bundle_path)
@@ -287,12 +287,16 @@ def prepare_runner_cmd(
             typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        with new_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
 
-        asyncio.run(prepare_runner(pipe_code=pipe_code, bundle_path=bundle_path))
+            asyncio.run(prepare_runner(pipe_code=pipe_code, bundle_path=bundle_path))
+    finally:
+        pipelex_instance.teardown()
 
 
 @build_app.command(SUB_COMMAND_INPUTS, help="Generate example input JSON for a pipe")
@@ -371,9 +375,6 @@ def generate_inputs_cmd(
         raise typer.Exit(1)
 
     async def generate_inputs(pipe_code: str | None = None, bundle_path: str | None = None):
-        # Initialize Pipelex
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
-
         if bundle_path:
             try:
                 bundle_blueprint = await load_and_validate_bundle(bundle_path)
@@ -425,12 +426,16 @@ def generate_inputs_cmd(
             typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_INPUTS}")
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        with new_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_INPUTS}")
 
-        asyncio.run(generate_inputs(pipe_code=pipe_code, bundle_path=bundle_path))
+            asyncio.run(generate_inputs(pipe_code=pipe_code, bundle_path=bundle_path))
+    finally:
+        pipelex_instance.teardown()
 
 
 @build_app.command(SUB_COMMAND_ONE_SHOT_PIPE, help="Developer utility for contributors: deliver pipeline in one shot, without validation loop")
@@ -452,7 +457,7 @@ def build_one_shot_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
@@ -484,17 +489,20 @@ def build_one_shot_cmd(
         save_text_to_path(text=plx_content, path=output_path)
         typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_ONE_SHOT_PIPE}")
+    try:
+        with new_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_ONE_SHOT_PIPE}")
 
-        start_time = time.time()
-        asyncio.run(run_pipeline())
-        end_time = time.time()
-        typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
+            start_time = time.time()
+            asyncio.run(run_pipeline())
+            end_time = time.time()
+            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
-        get_report_delegate().generate_report()
+            get_report_delegate().generate_report()
+    finally:
+        pipelex_instance.teardown()
 
 
 @build_app.command(
@@ -527,7 +535,7 @@ def build_partial_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
@@ -577,14 +585,17 @@ def build_partial_cmd(
         else:
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PARTIAL_PIPE}")
+    try:
+        with new_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PARTIAL_PIPE}")
 
-        start_time = time.time()
-        asyncio.run(run_pipeline())
-        end_time = time.time()
-        typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
+            start_time = time.time()
+            asyncio.run(run_pipeline())
+            end_time = time.time()
+            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
-        get_report_delegate().generate_report()
+            get_report_delegate().generate_report()
+    finally:
+        pipelex_instance.teardown()

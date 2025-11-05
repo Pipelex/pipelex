@@ -183,15 +183,18 @@ def validate_cmd(
         present_validation_error(details_provider=library_loading_error)
         raise typer.Exit(1) from library_loading_error
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        if bundle_path:
-            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} bundle")
-        else:
-            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} pipe")
+    try:
+        with new_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            if bundle_path:
+                tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} bundle")
+            else:
+                tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} pipe")
 
-        asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path))
+            asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path))
+    finally:
+        pipelex_instance.teardown()
 
 
 def present_validation_error(details_provider: ValidationErrorDetailsProtocol):

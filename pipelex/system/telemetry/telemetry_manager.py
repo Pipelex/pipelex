@@ -102,7 +102,14 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def teardown(self):
-        pass
+        if self.posthog:
+            try:
+                # PostHog client has a shutdown method to flush pending events
+                # and close background threads
+                self.posthog.shutdown()
+            except Exception as exc:
+                # Suppress any shutdown errors to avoid cascading failures
+                log.debug(f"Error during PostHog shutdown: {exc}")
 
     @override
     def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):

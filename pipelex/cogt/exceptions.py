@@ -67,7 +67,16 @@ class ModelDeckPresetValidatonError(ModelDeckValidatonError):
 
 
 class ModelNotFoundError(CogtError):
-    pass
+    def __init__(self, message: str, model_handle: str):
+        self.model_handle = model_handle
+        super().__init__(message)
+
+
+class ModelWaterfallError(ModelNotFoundError):
+    def __init__(self, message: str, model_handle: str, fallback_list: list[str]):
+        self.model_handle = model_handle
+        self.fallback_list = fallback_list
+        super().__init__(message=message, model_handle=model_handle)
 
 
 class LLMHandleNotFoundError(CogtError):
