@@ -146,4 +146,4 @@ This defines a two-step pipeline. The `PipeSequence` controller `description_to_
 See here all the different operators, see [Pipe Operators](./pipe-operators/index.md).
 See here all the different controllers, see [Pipe Controllers](./pipe-controllers/index.md).
 
-See more about the possibilities in designing your pipelines in the [Pipelex Bundle Specification](./pipelex-bundle-specification.md).
+See more about the possibilities in designing your pipelines in the [Pipelex Bundle Specification](../pipelex-bundle-specification.md).

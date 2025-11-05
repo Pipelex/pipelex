@@ -117,20 +117,20 @@ nav:
     - Build Reliable AI Workflows:
       - Kick off a Pipeline Project: home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md
       - Pipe Builder: home/6-build-reliable-ai-workflows/pipe-builder.md
+      - Pipelex Bundle Specification: home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md
+      - Domain: home/6-build-reliable-ai-workflows/domain.md
       - Concepts:
         - Define Your Concepts: home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md
         - Inline structures: home/6-build-reliable-ai-workflows/concepts/inline-structures.md
         - Python classes: home/6-build-reliable-ai-workflows/concepts/python-classes.md
         - Native Concepts: home/6-build-reliable-ai-workflows/concepts/native-concepts.md
         - Refining Concepts: home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
-      - Domain: home/6-build-reliable-ai-workflows/domain.md
       - Design and Run Pipelines:
         - Overview: home/6-build-reliable-ai-workflows/pipes/index.md
         - Executing Pipelines: home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md
         - Providing Inputs to Pipelines: home/6-build-reliable-ai-workflows/pipes/provide-inputs.md
         - Working Memory: home/6-build-reliable-ai-workflows/pipes/working-memory.md
         - Pipe Output: home/6-build-reliable-ai-workflows/pipes/pipe-output.md
-        - Pipelex Bundle Specification: home/6-build-reliable-ai-workflows/pipes/pipelex-bundle-specification.md
         - Understanding Multiplicity: home/6-build-reliable-ai-workflows/pipes/understanding-multiplicity.md
         - Pipe Operators:
           - Overview: home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md

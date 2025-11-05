@@ -87,7 +87,7 @@ pipe_output = await execute_pipeline(
 ```
 
 !!! note "Using the pipe code"
-    If your `plx_content` contains a `main_pipe` property (See more about the [Pipelex Bundle Specification](./pipelex-bundle-specification.md)), there is no need to provide the `pipe_code` parameter, the pipe that will be executed will be the one defined by `main_pipe` property. However if it doesn't, you must to provide the `pipe_code` parameter.
+    If your `plx_content` contains a `main_pipe` property (See more about the [Pipelex Bundle Specification](../pipelex-bundle-specification.md)), there is no need to provide the `pipe_code` parameter, the pipe that will be executed will be the one defined by `main_pipe` property. However if it doesn't, you must to provide the `pipe_code` parameter.
 
     If you provide the `pipe_code` and your `plx_content` does contain a `main_pipe` property, the pipe_code will be the one to be executed.
 

@@ -170,7 +170,7 @@ Individual pipes can override the domain system prompt by defining their own `sy
 
 ## Related Documentation
 
-- [Pipelex Bundle Specification](pipes/pipelex-bundle-specification.md) - How domains are declared in bundles
-- [Kick off a Pipelex Workflow Project](kick-off-a-pipelex-workflow-project.md) - Getting started
-- [Define Your Concepts](concepts/define_your_concepts.md) - Creating concepts within domains
-- [Designing Pipelines](pipes/index.md) - Building pipes within domains
+- [Pipelex Bundle Specification](./pipelex-bundle-specification.md) - How domains are declared in bundles
+- [Kick off a Pipelex Workflow Project](./kick-off-a-pipelex-workflow-project.md) - Getting started
+- [Define Your Concepts](./concepts/define_your_concepts.md) - Creating concepts within domains
+- [Designing Pipelines](./pipes/index.md) - Building pipes within domains

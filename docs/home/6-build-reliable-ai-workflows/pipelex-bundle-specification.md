@@ -69,7 +69,7 @@ main_pipe = "extract_and_validate_invoice"
 - They prevent naming conflicts when multiple bundles define concepts with the same name
 - They enable organized, modular pipeline architecture
 
-Learn more about domains in [Understanding Domains](../domain.md).
+Learn more about domains in [Understanding Domains](./domain.md).
 
 **About `system_prompt`:**
 
@@ -104,11 +104,11 @@ main_pipe = "extract_and_validate_invoice"
 - If no `main_pipe` is specified, you must explicitly provide the `pipe_code` when executing
 - The `main_pipe` value must reference a pipe defined in the same bundle
 
-See more about executing pipes in [Executing Pipelines](./executing-pipelines.md).
+See more about executing pipes in [Executing Pipelines](./pipes/executing-pipelines.md).
 
 ### 3. Concept Definitions (OPTIONAL)
 
-Concepts define the knowledge structures in your domain. While optional, most bundles define at least a few concepts (See more about concepts in [Define Your Concepts](../concepts/define_your_concepts.md)):
+Concepts define the knowledge structures in your domain. While optional, most bundles define at least a few concepts (See more about concepts in [Define Your Concepts](./concepts/define_your_concepts.md)):
 
 ```plx
 [concept]
@@ -144,7 +144,7 @@ description = "Extract text and images from an invoice PDF"
 inputs = { document = "PDF" }
 output = "Page"
 ```
-See more about designing pipes in [Designing Pipelines](./index.md).
+See more about designing pipes in [Designing Pipelines](./pipes/index.md).
 
 ## Referencing Concepts: When to Use Domain Prefixes
 
@@ -237,8 +237,8 @@ prompt = "..."
 
 ## Related Documentation
 
-- [Understanding Domains](../domain.md) - Deep dive into domain organization
-- [Designing Pipelines](index.md) - Learn how to design and compose pipes
-- [Define Your Concepts](../concepts/define_your_concepts.md) - Complete guide to concept definitions
-- [Kick off a Pipelex Workflow Project](../kick-off-a-pipelex-workflow-project.md) - Start a new project
+- [Understanding Domains](./domain.md) - Deep dive into domain organization
+- [Designing Pipelines](./pipes/index.md) - Learn how to design and compose pipes
+- [Define Your Concepts](./concepts/define_your_concepts.md) - Complete guide to concept definitions
+- [Kick off a Pipelex Workflow Project](./kick-off-a-pipelex-workflow-project.md) - Start a new project
 

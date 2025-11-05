@@ -38,7 +38,7 @@ This creates a simple Q&A pipeline with:
 The `domain` property is the most important part of your pipeline file. It groups all your concepts and pipes into a single, easy to read bundle.
 
 !!! info "Learn More About Domains"
-    Domains are a core concept in Pipelex that organize your pipelines, concepts, and pipes into semantic namespaces. For a comprehensive guide on domains, see [Understanding Domains](domain.md).
+    Domains are a core concept in Pipelex that organize your pipelines, concepts, and pipes into semantic namespaces. For a comprehensive guide on domains, see [Understanding Domains](./domain.md).
 
 See more about designing pipes in [Designing Pipelines](./pipes/index.md).
 See more about concepts in [Define Your Concepts](./concepts/define_your_concepts.md)
@@ -53,7 +53,7 @@ Consistent naming makes your pipeline code discoverable and maintainable:
 - Match the domain name when possible: domain "legal" → `legal.plx`
 - For multi-word domains, use underscores: domain "customer_service" → `customer_service.plx`
 
-See more about pipelex bundle specification in [Pipelex Bundle Specification](./pipes/pipelex-bundle-specification.md)
+See more about pipelex bundle specification in [Pipelex Bundle Specification](./pipelex-bundle-specification.md)
 
 ### Python Model Files
 - It is recommended to name structure files with a `_struct.py` suffix: `legal.plx` → `legal_struct.py`
