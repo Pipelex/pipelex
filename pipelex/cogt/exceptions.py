@@ -1,3 +1,7 @@
+from pipelex.cogt.extract.extract_setting import ExtractModelChoice
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
+from pipelex.cogt.llm.llm_setting import LLMModelChoice
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.system.exceptions import FatalError, RootException
 from pipelex.types import StrEnum
 
@@ -38,16 +42,11 @@ class LLMWorkerError(CogtError):
     pass
 
 
-class LLMChoiceNotFoundError(CogtError):
-    pass
-
-
-class ExtractChoiceNotFoundError(CogtError):
-    pass
-
-
-class ImgGenChoiceNotFoundError(CogtError):
-    pass
+class ModelChoiceNotFoundError(CogtError):
+    def __init__(self, message: str, model_type: ModelType, model_choice: LLMModelChoice | ExtractModelChoice | ImgGenModelChoice):
+        self.model_type = model_type
+        self.model_choice = model_choice
+        super().__init__(message=message)
 
 
 class LLMSettingsValidationError(CogtError):

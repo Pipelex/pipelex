@@ -9,7 +9,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import PipeOperatorModelError
+from pipelex.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -77,7 +77,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                         output_name=output_name,
                     )
         except ModelWaterfallError as model_waterfall_error:
-            raise PipeOperatorModelError(
+            raise PipeOperatorModelAvailabilityError(
                 message=model_waterfall_error.message,
                 run_mode=pipe_run_params.run_mode,
                 pipe_type=self.class_name,
@@ -87,7 +87,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                 fallback_list=model_waterfall_error.fallback_list,
             ) from model_waterfall_error
         except ModelNotFoundError as model_not_found_error:
-            raise PipeOperatorModelError(
+            raise PipeOperatorModelAvailabilityError(
                 message=model_not_found_error.message,
                 run_mode=pipe_run_params.run_mode,
                 pipe_type=self.class_name,

@@ -12,7 +12,7 @@ from rich.console import Console
 from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_and_validate_bundle
 from pipelex.builder.builder_errors import PipelexBundleError
-from pipelex.exceptions import PipeInputError, PipelineExecutionError, PipeOperatorModelError
+from pipelex.exceptions import PipeInputError, PipelineExecutionError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.system.runtime import IntegrationMode
@@ -197,9 +197,24 @@ def run_cmd(
             tag(name=EventProperty.CLI_COMMAND, value=COMMAND)
             asyncio.run(run_pipeline(pipe_code=pipe_code, bundle_path=bundle_path))
 
-    except PipeOperatorModelError as exc:
+    except PipeOperatorModelChoiceError as exc:
         console = Console(stderr=True)
-        console.print("\n[bold red]❌ Model Configuration Error[/bold red]\n")
+        console.print("\n[bold red]❌ Pipe run failed because of a model choice would not be interpreted correctly[/bold red]\n")
+        console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{exc.pipe_code}'[/yellow] [dim]({exc.pipe_type})[/dim]")
+        console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{exc.model_type}'[/yellow]")
+        console.print(f"[bold cyan]Model Choice:[/bold cyan] [yellow]'{exc.model_choice}'[/yellow]")
+        console.print(f"\n[bold red]Error:[/bold red]        {exc.message}\n")
+        console.print(
+            f"[bold green]💡 Tip:[/bold green] Check your model configuration in [cyan].pipelex/inference/[/cyan] "
+            f"or specify a different model in the [yellow]'{exc.pipe_code}'[/yellow] pipe."
+        )
+        console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
+        console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+        raise typer.Exit(1) from exc
+
+    except PipeOperatorModelAvailabilityError as exc:
+        console = Console(stderr=True)
+        console.print("\n[bold red]❌ Pipe run failed because a model wasn't available[/bold red]\n")
         console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{exc.pipe_code}'[/yellow] [dim]({exc.pipe_type})[/dim]")
         console.print(f"[bold cyan]Model:[/bold cyan]        [yellow]'{exc.model_handle}'[/yellow]")
         if exc.fallback_list:

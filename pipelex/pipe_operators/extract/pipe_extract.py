@@ -61,7 +61,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         return self
 
     @override
-    def validate_with_libraries(self):
+    def _validate_with_libraries(self):
         self._validate_inputs()
         if self.extract_choice:
             check_extract_choice_with_deck(extract_choice=self.extract_choice)

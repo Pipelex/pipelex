@@ -168,7 +168,7 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
                         raise extraneous_input_var_error
 
     @override
-    def validate_with_libraries(self):
+    def _validate_with_libraries(self):
         """Perform full validation after all libraries are loaded.
         This is called after all pipes and concepts are available.
         """

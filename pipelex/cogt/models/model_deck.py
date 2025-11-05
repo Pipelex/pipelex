@@ -3,13 +3,11 @@ from pydantic import Field, field_validator, model_validator
 from pipelex import log
 from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.exceptions import (
-    ExtractChoiceNotFoundError,
     ExtractHandleNotFoundError,
-    ImgGenChoiceNotFoundError,
     ImgGenHandleNotFoundError,
-    LLMChoiceNotFoundError,
     LLMHandleNotFoundError,
     LLMSettingsValidationError,
+    ModelChoiceNotFoundError,
     ModelDeckPresetValidatonError,
     ModelDeckValidatonError,
     ModelNotFoundError,
@@ -25,6 +23,7 @@ from pipelex.cogt.llm.llm_setting import (
 )
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
@@ -103,7 +102,7 @@ class ModelDeck(ConfigModel):
         if preset_id == LLM_PRESET_DISABLED and is_disabled_allowed:
             return
         msg = f"llm preset id '{preset_id}' not found in deck"
-        raise LLMChoiceNotFoundError(msg)
+        raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.LLM, model_choice=llm_choice)
 
     def get_llm_setting(self, llm_choice: LLMModelChoice) -> LLMSetting:
         if isinstance(llm_choice, LLMSetting):
@@ -114,7 +113,7 @@ class ModelDeck(ConfigModel):
         if self.is_handle_defined(model_handle=llm_choice):
             return LLMSetting(model=llm_choice, temperature=0.7, max_tokens=None)
         msg = f"LLM choice '{llm_choice}' not found in deck"
-        raise LLMChoiceNotFoundError(msg)
+        raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.LLM, model_choice=llm_choice)
 
     def get_extract_setting(self, extract_choice: ExtractModelChoice) -> ExtractSetting:
         if isinstance(extract_choice, ExtractSetting):
@@ -125,7 +124,7 @@ class ModelDeck(ConfigModel):
         if self.is_handle_defined(model_handle=extract_choice):
             return ExtractSetting(model=extract_choice)
         msg = f"Extract choice '{extract_choice}' not found in deck"
-        raise ExtractChoiceNotFoundError(msg)
+        raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.TEXT_EXTRACTOR, model_choice=extract_choice)
 
     def get_img_gen_setting(self, img_gen_choice: ImgGenModelChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
@@ -136,7 +135,7 @@ class ModelDeck(ConfigModel):
         if self.is_handle_defined(model_handle=img_gen_choice):
             return ImgGenSetting(model=img_gen_choice)
         msg = f"Image generation choice '{img_gen_choice}' not found in deck"
-        raise ImgGenChoiceNotFoundError(msg)
+        raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.IMG_GEN, model_choice=img_gen_choice)
 
     @classmethod
     def final_validate(cls, deck: Self):

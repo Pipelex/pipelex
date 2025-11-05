@@ -98,7 +98,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         return self
 
     @override
-    def validate_with_libraries(self):
+    def _validate_with_libraries(self):
         self._validate_inputs()
         if self.img_gen:
             check_img_gen_choice_with_deck(img_gen_choice=self.img_gen)

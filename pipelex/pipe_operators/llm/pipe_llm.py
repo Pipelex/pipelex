@@ -80,7 +80,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return self
 
     @override
-    def validate_with_libraries(self):
+    def _validate_with_libraries(self):
         self.validate_inputs()
         self.llm_prompt_spec.validate_with_libraries()
         if self.llm_choices:

@@ -50,7 +50,7 @@ class PipeBatch(PipeController):
         return self
 
     @override
-    def validate_with_libraries(self):
+    def _validate_with_libraries(self):
         self._validate_required_variables()
 
     def _validate_required_variables(self) -> Self:
