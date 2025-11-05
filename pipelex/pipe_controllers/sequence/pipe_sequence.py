@@ -6,11 +6,11 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import StaticValidationError,StaticValidationErrorType
-from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
+from pipelex.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel

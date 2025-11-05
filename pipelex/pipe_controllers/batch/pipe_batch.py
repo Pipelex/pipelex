@@ -8,7 +8,6 @@ from typing_extensions import override
 from pipelex.config import get_config
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError, PipeRunInputsError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput

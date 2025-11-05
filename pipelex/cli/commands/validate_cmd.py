@@ -16,8 +16,8 @@ from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeInputError
-from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
+from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
