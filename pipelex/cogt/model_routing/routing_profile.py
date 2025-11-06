@@ -58,11 +58,6 @@ class RoutingProfile(ConfigModel):
         # Validate fallback_order if set
         validated_fallback_order: list[str] | None = None
         if self.fallback_order:
-            # invalid_backends = [backend for backend in self.fallback_order if backend not in enabled_backends]
-            # if invalid_backends:
-            #     msg = f"Backends {invalid_backends} in fallback_order are not enabled. Enabled backends: {enabled_backends}"
-            #     raise RoutingProfileDisabledBackendError(msg)
-            # validated_fallback_order = self.fallback_order
             validated_fallback_order = [backend for backend in self.fallback_order if backend in enabled_backends]
 
         # Determine primary backend for DEFAULT matching

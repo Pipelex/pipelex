@@ -97,7 +97,6 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg) from api_connection_error
         except BadRequestError as bad_request_error:
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
-            msg += f"\nResponse:\n{bad_request_error.response.text}"
             raise LLMCompletionError(msg) from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message

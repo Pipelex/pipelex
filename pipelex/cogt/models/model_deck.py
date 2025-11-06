@@ -297,9 +297,6 @@ class ModelDeck(ConfigModel):
             log.verbose(f"Alias for '{model_handle}': {alias}")
             return self.get_optional_inference_model(model_handle=alias)
         if fallback_list := self.waterfalls.get(model_handle):
-            if not fallback_list:
-                msg = f"Model handle '{model_handle}' is a waterfall but has no fallback list. This is not allowed."
-                raise ModelNotFoundError(message=msg, model_handle=model_handle)
             ideal_model_handle = fallback_list[0]
             log.verbose(f"Fallback list for '{model_handle}': {fallback_list}")
             for fallback_index, fallback in enumerate(fallback_list):
@@ -307,7 +304,8 @@ class ModelDeck(ConfigModel):
                     # Waterfall disabled, so we raise an error
                     fallback_list_str = " → ".join(fallback_list)
                     msg = (
-                        f"Model handle '{model_handle}' is a waterfall which resolves to •[ {fallback_list_str} ]•, but model fallbacks are disabled "
+                        f"Model handle '{model_handle}' is a waterfall (i.e. a list of models to try in order), which resolves to "
+                        f"•[ {fallback_list_str} ]•, but model fallbacks are disabled "
                         f"so only the first item in the list, '{ideal_model_handle}', is acceptable but it was not found in the deck. "
                         f"You must enable model fallback in your .pipelex/pipelex.toml file to permit the following fallbacks, "
                         f"or enable a backend that supports '{ideal_model_handle}'. "
@@ -340,7 +338,10 @@ class ModelDeck(ConfigModel):
                             # Mark this warning as logged for this model_handle
                             self._logged_fallback_warnings.add(model_handle)
                     return inference_model
-            msg = f"Model handle '{model_handle}' is a waterfall but none of the fallback models were found in the model deck"
+            msg = (
+                f"Model handle '{model_handle}' is a waterfall (i.e. a list of models to try in order) "
+                "but none of the fallback models were found in the model deck"
+            )
             raise ModelWaterfallError(message=msg, model_handle=model_handle, fallback_list=fallback_list)
         log.verbose(f"Skipping model handle '{model_handle}' because it's not found in deck, it could be an external plugin.")
         return None
