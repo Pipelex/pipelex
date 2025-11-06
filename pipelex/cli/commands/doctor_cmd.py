@@ -12,13 +12,16 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.text import Text
 
+from pipelex import log
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.model_manager import ModelManager
-from pipelex.config import PipelexConfig
+from pipelex.config import PipelexConfig, get_config
 from pipelex.core.validation import report_validation_error
+from pipelex.exceptions import PipelexConfigError
+from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
@@ -322,8 +325,23 @@ def check_models() -> tuple[bool, str]:
     Returns:
         Tuple of (is_healthy, message)
     """
+    pipelex_hub = PipelexHub()
+    set_pipelex_hub(pipelex_hub)
+
+    # tools
+    try:
+        pipelex_hub.setup_config(config_cls=PipelexConfig)
+    except ValidationError as validation_error:
+        validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+        msg = f"Could not setup config because of: {validation_error_msg}"
+        raise PipelexConfigError(msg) from validation_error
+
+    log.configure(log_config=get_config().pipelex.log_config)
+
     models_manager = ModelManager()
     secrets_provider = EnvSecretsProvider()
+    models_manager.setup(secrets_provider=secrets_provider)
+    models_manager.validate_model_deck()
     try:
         models_manager.setup(secrets_provider=secrets_provider)
         models_manager.validate_model_deck()

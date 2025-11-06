@@ -96,8 +96,8 @@ class PipelexHub:
         # Args:
         #     config (Config): The configuration instance to set.
         """
-        config = config_manager.load_config()
-        self.set_config(config=config_cls.model_validate(config))
+        config_dict = config_manager.load_config()
+        self.set_config(config=config_cls.model_validate(config_dict))
 
     def set_config(self, config: ConfigRoot):
         if self._config is not None:
