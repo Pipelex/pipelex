@@ -13,6 +13,7 @@ from pipelex.exceptions import (
     PipeLoadingError,
 )
 from pipelex.hub import get_library_manager
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipe_run.dry_run import dry_run_pipes
 
 
@@ -48,14 +49,14 @@ async def validate_plx(plx_content: str, remove_after_validation: bool = True) -
         converter = PipelexInterpreter(file_content=plx_content)
         blueprint = converter.make_pipelex_bundle_blueprint()
 
-        pipes = library_manager.load_from_blueprint(blueprint=blueprint)
+        pipes = library_manager.load_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[blueprint])
 
         for pipe in pipes:
             pipe.validate_with_libraries()
             await dry_run_pipes(pipes=[pipe], raise_on_failure=True)
 
         if remove_after_validation:
-            library_manager.remove_from_blueprint(blueprint=blueprint)
+            library_manager.remove_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[blueprint])
         return blueprint, pipes
     except (
         PipelexConfigurationError,
@@ -69,7 +70,7 @@ async def validate_plx(plx_content: str, remove_after_validation: bool = True) -
     ):
         if blueprint is not None:
             try:
-                library_manager.remove_from_blueprint(blueprint=blueprint)
+                library_manager.remove_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[blueprint])
             except Exception as cleanup_error:
                 log.error(f"Error during cleanup after validation failure: {cleanup_error}")
 

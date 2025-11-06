@@ -8,3 +8,4 @@ class SpecialLibraryId(StrEnum):
     """
 
     UNTITLED = "untitled"
+    BUILDER = "builder"

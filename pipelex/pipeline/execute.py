@@ -159,7 +159,7 @@ async def execute_pipeline(
         ) from exc
     finally:
         if plx_content and blueprint is not None:
-            get_library_manager().remove_from_blueprint(blueprint=blueprint)
+            get_library_manager().remove_from_blueprints(library_id=pipeline_run_id, blueprints=[blueprint])
     properties = {
         EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
         EventProperty.PIPE_TYPE: pipe.pipe_type,

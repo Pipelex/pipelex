@@ -127,4 +127,3 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 }
 
             pretty_print(table)
-        return len(pipes)

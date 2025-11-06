@@ -69,7 +69,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
     log.dev(f"Loading bundle blueprint for domain '{bundle_spec.domain}' into library manager")
     library_manager = get_library_manager()
     try:
-        library_manager.load_from_blueprint(blueprint=bundle_blueprint)
+        library_manager.load_from_blueprints(library_id=SpecialLibraryId.BUILDER, blueprints=[bundle_blueprint])
         log.dev(f"Successfully loaded bundle with {len(bundle_spec.pipe)} pipes")
     except StaticValidationError as static_validation_error:
         static_validation_error_data = StaticValidationErrorData(
@@ -166,7 +166,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
     finally:
         # Clean up by removing the bundle from library manager
         log.dev("Cleaning up: removing bundle from library manager")
-        library_manager.remove_from_blueprint(blueprint=bundle_blueprint)
+        library_manager.remove_from_blueprints(library_id=SpecialLibraryId.BUILDER, blueprints=[bundle_blueprint])
 
     log.dev(f"✅ Input consistency fix completed: fixed {fixed_count} PipeController pipe(s)")
     return bundle_spec

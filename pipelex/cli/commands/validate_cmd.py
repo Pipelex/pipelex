@@ -34,13 +34,12 @@ COMMAND = "validate"
 
 def do_validate_all_libraries_and_dry_run() -> None:
     """Validate libraries and dry-run all pipes."""
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    Pipelex.make(integration_mode=IntegrationMode.CLI)
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
 
-        pipelex_instance.validate_libraries()
         pipes = get_pipes()
         get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
         asyncio.run(dry_run_pipes(pipes=pipes, raise_on_failure=True))
@@ -165,7 +164,6 @@ def validate_cmd(
             get_telemetry_manager().track_event(
                 EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: get_required_pipe(pipe_code=pipe_code).type}
             )
-            pipelex_instance.validate_libraries()
             await dry_run_pipe(
                 get_required_pipe(pipe_code=pipe_code),
                 raise_on_failure=True,
@@ -177,7 +175,7 @@ def validate_cmd(
 
     # Initialize Pipelex
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except LibraryLoadingError as library_loading_error:
         typer.secho(f"Failed to validate: {library_loading_error}", fg=typer.colors.RED, err=True)
         present_validation_error(details_provider=library_loading_error)

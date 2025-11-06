@@ -1,8 +1,6 @@
 from pathlib import Path
-from typing import ClassVar
 
-from pydantic import ValidationError
-from typing_extensions import override
+from pydantic import BaseModel, ValidationError
 
 from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -28,7 +26,6 @@ from pipelex.exceptions import (
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_ids import SpecialLibraryId
-from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
     get_pipelex_package_dir_for_imports,
     get_pipelex_plx_files_from_dirs,
@@ -54,13 +51,7 @@ class LibraryComponent(StrEnum):
                 return PipeLibraryError
 
 
-class LibraryManager(LibraryManagerAbstract):
-    allowed_root_attributes: ClassVar[list[str]] = [
-        "domain",
-        "description",
-        "system_prompt",
-    ]
-
+class LibraryManager(BaseModel):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
@@ -69,31 +60,26 @@ class LibraryManager(LibraryManagerAbstract):
     # Manager lifecycle
     ############################################################
 
-    @override
     def setup(self) -> None:
         self._libraries.clear()
         # Create and initialize UNTITLED library with base PLX files
         self.open_library(library_id=SpecialLibraryId.UNTITLED)
 
-    @override
     def teardown(self) -> None:
         for library in self._libraries.values():
             library.teardown()
         self._libraries.clear()
 
-    @override
     def reset(self) -> None:
         self.teardown()
         self.setup()
 
-    @override
     def create_library(self, library_id: str):
         if library_id in self._libraries:
             msg = f"Library '{library_id}' already exists"
             raise LibraryError(msg)
         self._libraries[library_id] = LibraryFactory.make_empty()
 
-    @override
     def open_library(self, library_id: str) -> None:
         """Open a new library with the given library_id.
 
@@ -118,14 +104,12 @@ class LibraryManager(LibraryManagerAbstract):
     # Public library accessors
     ############################################################
 
-    @override
     def set_library(self, library_id: str, library: Library) -> None:
         if library_id not in self._libraries:
             msg = f"Library '{library_id}' does not exist"
             raise LibraryError(msg)
         self._libraries[library_id] = library
 
-    @override
     def get_library(self, library_id: str | None = None) -> Library:
         """Get the Library object for a specific library_id."""
         if library_id is None:
@@ -139,7 +123,6 @@ class LibraryManager(LibraryManagerAbstract):
     # Private methods
     ############################################################
 
-    @override
     def load_libraries(
         self,
         library_id: str | None = None,
@@ -239,7 +222,6 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    @override
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
@@ -386,7 +368,16 @@ class LibraryManager(LibraryManagerAbstract):
             ]
             library.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)
 
-    @override
+    def _remove_concepts_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+        library = self.get_library(library_id=library_id)
+        if blueprint.concept is not None:
+            concept_codes_to_remove = [
+                ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
+                for concept_code in blueprint.concept
+            ]
+            library.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)
+
     def remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
         for blueprint in blueprints:
             self._remove_pipes_from_blueprint(library_id=library_id, blueprint=blueprint)
+            self._remove_concepts_from_blueprint(library_id=library_id, blueprint=blueprint)

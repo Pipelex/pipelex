@@ -29,7 +29,6 @@ from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
-from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.observer.local_observer import LocalObserver
 from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverProtocol
@@ -92,10 +91,6 @@ class Pipelex(metaclass=MetaSingleton):
         # cogt
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
-
-        # pipelex libraries
-        self.library_manager = LibraryFactory.make_empty()
-        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         self.reporting_delegate: ReportingProtocol | None = None
         self.telemetry_manager: TelemetryManagerAbstract | None = None
@@ -282,7 +277,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             self.pipeline_tracker.teardown()
         if self.telemetry_manager:
             self.telemetry_manager.teardown()
-        self.library_manager.teardown()
 
         # cogt
         self.inference_manager.teardown()
