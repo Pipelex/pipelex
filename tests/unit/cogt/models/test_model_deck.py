@@ -128,7 +128,7 @@ class TestModelDeckGetOptionalInferenceModel:
         # Act & Assert
         with pytest.raises(
             ModelWaterfallError,
-            match=r"Model handle 'dummy-model-handle' is a waterfall (i.e. a list of models to try in order) but none of the fallback models",
+            match=r"is a waterfall.*but none of the fallback models were found",
         ):
             model_deck.get_optional_inference_model("dummy-model-handle")
 
