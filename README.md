@@ -46,7 +46,7 @@ pipelex init
 To use AI models, you need an API key:
 
 - **Free Pipelex API Key**: Join our [Discord community](https://go.pipelex.com/discord) and request your **free API key** (no credit card required) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
-- **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral)
+- **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral
 - **Local AI**: Ollama, vLLM, LM Studio, llama.cpp... any endpoint based on the OpenAI API or not, as you can plug-in your own non-standard APIs.
 
 See [Configure AI Providers](https://docs.pipelex.com/pages/setup/configure-ai-providers/) for details.

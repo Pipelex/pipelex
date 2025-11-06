@@ -114,13 +114,6 @@ class ConceptFactory:
                     description="A number",
                     structure_class_name=structure_class_name,
                 )
-            case NativeConceptCode.LLM_PROMPT:
-                return Concept(
-                    code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
-                    description="A prompt for an LLM",
-                    structure_class_name=NativeConceptCode.TEXT.structure_class_name,
-                )
             case NativeConceptCode.IMG_GEN_PROMPT:
                 return Concept(
                     code=native_concept_code,
