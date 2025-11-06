@@ -29,7 +29,6 @@ from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
-from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.observer.local_observer import LocalObserver
 from pipelex.observer.multi_observer import MultiObserver
@@ -275,7 +274,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # print("jdqojsoqjio", self.library_manager)
         # self.library_manager.load_libraries()
         pass
-    
+
     def teardown(self):
         # pipelex
         self.pipeline_manager.teardown()

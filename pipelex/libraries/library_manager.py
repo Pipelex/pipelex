@@ -5,7 +5,6 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.builder.validation_error_data import PipeDefinitionErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
