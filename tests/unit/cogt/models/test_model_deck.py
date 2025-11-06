@@ -1,6 +1,7 @@
 import pytest
 
 from pipelex.cogt.config_cogt import ModelDeckConfig
+from pipelex.cogt.exceptions import ModelWaterfallError
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -92,12 +93,12 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
             inference_models={"gpt-4": model_spec},
-            fallbacks={"best-model": ["gpt-4", "claude-3"]},
+            fallbacks={"dummy-model-handle": ["gpt-4", "claude-3"]},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
@@ -107,12 +108,12 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
             inference_models={"claude-3": model_spec},
-            fallbacks={"best-model": ["nonexistent-model", "claude-3"]},
+            fallbacks={"dummy-model-handle": ["nonexistent-model", "claude-3"]},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
@@ -120,23 +121,26 @@ class TestModelDeckGetOptionalInferenceModel:
     def test_list_alias_resolution_none_found(self):
         # Arrange
         model_deck = self._create_test_model_deck(
-            fallbacks={"best-model": ["nonexistent-1", "nonexistent-2"]},
+            fallbacks={"dummy-model-handle": ["nonexistent-1", "nonexistent-2"]},
             is_model_fallback_enabled=True,
         )
 
-        # Act
-        result = model_deck.get_optional_inference_model("best-model")
-
-        # Assert
-        assert result is None
+        # Act & Assert
+        with pytest.raises(
+            ModelWaterfallError,
+            match=r"Model handle 'dummy-model-handle' is a waterfall but none of the fallback models were found in the model deck",
+        ):
+            model_deck.get_optional_inference_model("dummy-model-handle")
 
     def test_recursive_alias_resolution_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
-        model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-model": "best-gpt", "best-gpt": "gpt-4"})
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4": model_spec}, aliases={"dummy-model-handle": "best-gpt", "best-gpt": "gpt-4"}
+        )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
@@ -147,12 +151,12 @@ class TestModelDeckGetOptionalInferenceModel:
         model_deck = self._create_test_model_deck(
             inference_models={"gpt-4": model_spec},
             aliases={"best-gpt": "gpt-4"},
-            fallbacks={"best-model": ["nonexistent", "best-gpt"]},
+            fallbacks={"dummy-model-handle": ["nonexistent", "best-gpt"]},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
@@ -192,12 +196,12 @@ class TestModelDeckGetOptionalInferenceModel:
         model_deck = self._create_test_model_deck(
             inference_models={"claude-3": model_spec},
             aliases={"premium-claude": "claude-3"},
-            fallbacks={"best-model": ["premium-gpt", "premium-claude"], "premium-gpt": ["gpt-4-turbo", "gpt-4"]},
+            fallbacks={"dummy-model-handle": ["premium-gpt", "premium-claude"]},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec

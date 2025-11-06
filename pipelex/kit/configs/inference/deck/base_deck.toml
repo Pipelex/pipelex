@@ -34,16 +34,16 @@ best-img-gen = "flux-pro/v1.1-ultra"
 fast-img-gen = "fast-lightning-sdxl"
 
 ####################################################################################################
-# Fallbacks
+# Waterfalls
 ####################################################################################################
 
-[fallbacks]
+[waterfalls]
 smart_llm = [
     "claude-4.5-sonnet",
     "claude-4.1-opus",
     "claude-4-sonnet",
     "gemini-2.5-pro",
-    "gpt-5",
+    "gpt-4o",            # we're using gpt-4o here rather than gpt-5 until we'll handle reasoning parameters
     "grok-3",
 ]
 smart_llm_with_vision = [
@@ -51,20 +51,20 @@ smart_llm_with_vision = [
     "claude-4.1-opus",
     "claude-4-sonnet",
     "gemini-2.5-pro",
-    "gpt-5",
+    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
     "grok-3",
 ]
 smart_llm_for_structured = [
     "claude-4.5-sonnet",
     "claude-4.1-opus",
     "claude-4-sonnet",
-    "gpt-5",
+    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
 ]
 
 llm_for_large_codebase = [
     "gemini-2.5-pro",
     "claude-4.5-sonnet",
-    "gpt-5",
+    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
     "gemini-2.5-flash",
     "grok-3",
 ]
@@ -101,7 +101,7 @@ llm_to_answer_questions = { model = "base-claude", temperature = 0.3 }
 llm_to_retrieve = { model = "base-claude", temperature = 0.1 }
 
 # Engineering skills
-llm_to_engineer = { model = "smart_llm", temperature = 0.2 }
+llm_to_engineer = { model = "smart_llm_for_structured", temperature = 0.2 }
 llm_to_code = { model = "base-claude", temperature = 0.1 }
 llm_to_analyze_large_codebase = { model = "base-claude", temperature = 0.1 }
 
@@ -118,17 +118,17 @@ llm_to_prompt_img_gen_cheap = { model = "gpt-4o-mini", temperature = 0.5 }
 # LLM Presets — For Testing ---------------------------------------------------------------------
 
 llm_for_testing_gen_text = { model = "cheap_llm", temperature = 0.5 }
-llm_for_testing_gen_object = { model = "base_llm_for_object", temperature = 0.5 }
+llm_for_testing_gen_object = { model = "cheap_llm_for_structured", temperature = 0.5 }
 llm_for_testing_vision = { model = "cheap_llm_for_vision", temperature = 0.5 }
-llm_for_testing_vision_structured = { model = "cheap-gpt", temperature = 0.5 }
+llm_for_testing_vision_structured = { model = "cheap_llm_for_vision", temperature = 0.5 }
 
 ####################################################################################################
 # LLM Choices
 ####################################################################################################
 
 [llm.choice_defaults]
-for_text = "cheap_llm_for_text"
-for_object = "cheap_llm_for_object"
+for_text = "cheap_llm"
+for_object = "cheap_llm_for_structured"
 
 ####################################################################################################
 # Extract Presets

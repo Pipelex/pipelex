@@ -1,4 +1,0 @@
-[waterfalls]
-
-# test-waterfall = ["mistral-medium", "mistral-large", "gpt-4o-mini"]
-test-waterfall = ["mistral-medium", "mistral-large"]
