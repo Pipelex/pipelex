@@ -42,3 +42,6 @@ class PipelexBundleError(PipelexException):
         self.concept_definition_errors = concept_definition_errors
         self.pipe_definition_errors = pipe_definition_errors
         super().__init__(message)
+
+    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
+        return self.concept_definition_errors or []

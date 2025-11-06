@@ -37,6 +37,9 @@ class LibraryLoadingError(LibraryError):
             pipe_definition_errors=self.pipe_definition_errors,
         )
 
+    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
+        return self.concept_definition_errors or []
+
 
 class DomainLibraryError(LibraryError):
     pass
