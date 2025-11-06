@@ -106,7 +106,7 @@ class TestPipelexApiClient:
             client = PipelexClient()
             pipeline_reponse = await client.execute_pipeline(
                 pipe_code=example.pipe_code,
-                working_memory=memory,
+                inputs=memory,
             )
 
             pretty_print(pipeline_reponse, title="PIPELINE RESPONSE")

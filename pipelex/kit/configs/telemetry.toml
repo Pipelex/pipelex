@@ -1,0 +1,21 @@
+####################################################################################################
+# Pipelex Telemetry Configuration
+####################################################################################################
+#
+# This file controls telemetry settings for Pipelex usage analytics.
+# Telemetry helps us improve Pipelex by understanding how it's used.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+telemetry_mode = "off"                                               # Values: "off" | "anonymous" | "identified"
+host = "https://eu.i.posthog.com"
+project_api_key = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
+respect_dnt = true
+redact = ["prompt", "system_prompt", "response", "file_path", "url"]
+geoip_enabled = true
+dry_mode_enabled = false
+verbose_enabled = false
+user_id = ""

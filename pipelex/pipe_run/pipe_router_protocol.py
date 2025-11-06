@@ -1,22 +1,23 @@
 from typing import Protocol
 
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
+from pipelex.exceptions import DryRunMissingInputsError, PipeRouterError, PipeRunError
+from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
 from pipelex.pipe_run.pipe_job import PipeJob
 
 
 class PipeRouterProtocol(Protocol):
-    observer_provider: ObserverProtocol
+    observer: ObserverProtocol
 
     async def _before_run(
         self,
         pipe_job: PipeJob,
     ) -> None:
         payload: PayloadType = {
-            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
-            "pipe_job": pipe_job,
+            PayloadKey.PIPELINE_RUN_ID: pipe_job.job_metadata.pipeline_run_id,
+            PayloadKey.PIPE_JOB: pipe_job,
         }
-        await self.observer_provider.observe_before_run(payload)
+        await self.observer.observe_before_run(payload)
 
     async def _after_successful_run(
         self,
@@ -24,11 +25,11 @@ class PipeRouterProtocol(Protocol):
         pipe_output: PipeOutput,
     ) -> None:
         payload: PayloadType = {
-            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
-            "pipe_job": pipe_job,
-            "pipe_output": pipe_output,
+            PayloadKey.PIPELINE_RUN_ID: pipe_job.job_metadata.pipeline_run_id,
+            PayloadKey.PIPE_JOB: pipe_job,
+            PayloadKey.PIPE_OUTPUT: pipe_output,
         }
-        await self.observer_provider.observe_after_successful_run(payload)
+        await self.observer.observe_after_successful_run(payload)
 
     async def _after_failing_run(
         self,
@@ -36,11 +37,11 @@ class PipeRouterProtocol(Protocol):
         error: Exception,
     ) -> None:
         payload: PayloadType = {
-            "pipeline_run_id": pipe_job.job_metadata.pipeline_run_id,
-            "pipe_job": pipe_job,
-            "error": error,
+            PayloadKey.PIPELINE_RUN_ID: pipe_job.job_metadata.pipeline_run_id,
+            PayloadKey.PIPE_JOB: pipe_job,
+            PayloadKey.ERROR: error,
         }
-        await self.observer_provider.observe_after_failing_run(payload)
+        await self.observer.observe_after_failing_run(payload)
 
     async def run(
         self,
@@ -50,9 +51,25 @@ class PipeRouterProtocol(Protocol):
 
         try:
             pipe_output = await self._run_pipe_job(pipe_job)
-        except Exception as exc:
+        except DryRunMissingInputsError as exc:
             await self._after_failing_run(pipe_job, exc)
-            raise
+            raise PipeRouterError(
+                message=exc.message,
+                run_mode=pipe_job.pipe_run_params.run_mode,
+                pipe_code=pipe_job.pipe.code,
+                output_name=pipe_job.output_name,
+                pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+                missing_inputs=exc.missing_inputs,
+            ) from exc
+        except PipeRunError as exc:
+            await self._after_failing_run(pipe_job, exc)
+            raise PipeRouterError(
+                message=exc.message,
+                run_mode=pipe_job.pipe_run_params.run_mode,
+                pipe_code=pipe_job.pipe.code,
+                output_name=pipe_job.output_name,
+                pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+            ) from exc
 
         await self._after_successful_run(pipe_job, pipe_output)
 

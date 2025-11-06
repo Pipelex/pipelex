@@ -10,7 +10,6 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -52,8 +51,8 @@ class TestPipeBatchSimple:
             description="Simple batch processing test",
             branch_pipe_code="uppercase_transformer",  # This exists in the PLX file
             inputs={
-                "text_list": InputRequirementBlueprint(concept=concept_1.concept_string),
-                "text_item": InputRequirementBlueprint(concept=concept_2.concept_string),
+                "text_list": concept_1.concept_string,
+                "text_item": concept_2.concept_string,
             },
             output=concept_2.concept_string,
             input_list_name="text_list",

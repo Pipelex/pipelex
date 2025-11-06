@@ -23,7 +23,7 @@
             "args": [
                 "-s",
                 "-vv",
-                "-k test_boot"
+                "-k test_discord_newsletter_dry_run_working_memory"
             ],
             "console": "integratedTerminal"
         },
@@ -41,16 +41,29 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug Validate Pipe",
+            "name": "Debug validate pipe",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "validate",
-                "pipe",
                 "describe_image",
                 "-c",
                 "pipelex/libraries",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug run pipe",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "run",
+                "results/test_1.plx",
+                "--inputs",
+                "results/inputs_2.json",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

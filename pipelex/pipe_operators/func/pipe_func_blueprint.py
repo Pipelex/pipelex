@@ -9,3 +9,5 @@ class PipeFuncBlueprint(PipeBlueprint):
     type: Literal["PipeFunc"] = "PipeFunc"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     function_name: str = Field(description="The name of the function to call.")
+
+    # TODO: validate function_name

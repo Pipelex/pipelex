@@ -5,6 +5,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import Field
 
+from pipelex.builder.validation_error_data import SyntaxErrorData
 from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.exceptions import ConceptStructureGeneratorError, PipelexException
@@ -54,8 +55,14 @@ class StructureGenerator:
             the_class = self.validate_generated_code(
                 python_code=generated_code, expected_class_name=class_name, required_base_class=StructuredContent
             )
-        except (ConceptStructureValidationError, SyntaxError, ValueError, ImportError, Exception) as exc:
-            msg = f"Error validating generated code: {exc}"
+        except SyntaxError as syntax_error:
+            msg = f"Error validating generated code: {syntax_error}"
+            syntax_error_data = SyntaxErrorData.from_syntax_error(syntax_error)
+            raise ConceptStructureGeneratorError(
+                msg, structure_class_python_code=generated_code, syntax_error_data=syntax_error_data
+            ) from syntax_error
+        except (ConceptStructureValidationError, ValueError, ImportError, Exception) as exc:
+            msg = f"Error validating generated code: {exc}\nGenerated code:\n```python\n{generated_code}\n```"
             raise ConceptStructureGeneratorError(msg, structure_class_python_code=generated_code) from exc
 
         return generated_code, the_class
@@ -83,10 +90,42 @@ class StructureGenerator:
     # Private methods
     ############################################################
 
+    def _escape_string_for_python(self, value: str) -> str:
+        """Escape a string value for safe inclusion in generated Python code.
+
+        This method ensures that strings containing special characters like quotes,
+        backslashes, newlines, etc. are properly escaped when inserted into generated
+        Python source code.
+
+        Args:
+            value: The string to escape
+
+        Returns:
+            A properly escaped string representation suitable for Python code with double quotes
+        """
+        # Use repr() which handles all escaping correctly (backslashes, newlines, quotes, etc.)
+        # repr() returns a string with surrounding quotes included
+        escaped = repr(value)
+
+        # If repr used single quotes, convert to double quotes
+        # This is for consistency with existing code expectations
+        if escaped.startswith("'") and escaped.endswith("'") and not escaped.startswith("'''"):
+            # Single-line string with single quotes
+            # Remove the single quotes and re-add as double quotes
+            inner = escaped[1:-1]
+            # Unescape single quotes that repr escaped (since we're switching to double quotes)
+            inner = inner.replace("\\'", "'")
+            # Escape any double quotes
+            inner = inner.replace('"', '\\"')
+            return f'"{inner}"'
+
+        # If repr already used double quotes (because the string contains single quotes), return as is
+        return escaped
+
     def _format_default_value(self, value: Any) -> str:
         """Format default value for Python code, ensuring strings use double quotes."""
         if isinstance(value, str):
-            return f'"{value}"'
+            return self._escape_string_for_python(value)
         return repr(value)
 
     def _generate_class_source_code_from_blueprint(self, class_name: str, structure_blueprint: dict[str, ConceptStructureBlueprint]) -> str:
@@ -140,7 +179,7 @@ class StructureGenerator:
             python_type = f"Optional[{python_type}]"
 
         # Generate Field parameters
-        field_params = [f'description="{field_blueprint.description}"']
+        field_params = [f"description={self._escape_string_for_python(field_blueprint.description)}"]
 
         if field_blueprint.required:
             if field_blueprint.default_value is not None:
@@ -244,7 +283,7 @@ class StructureGenerator:
             python_type = f"Optional[{python_type}]"
 
         # Generate Field parameters
-        field_params = [f'description="{description}"']
+        field_params = [f"description={self._escape_string_for_python(description)}"]
 
         if required:
             if default_value is not None:

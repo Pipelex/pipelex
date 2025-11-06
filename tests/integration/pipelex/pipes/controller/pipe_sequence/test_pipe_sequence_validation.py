@@ -1,5 +1,4 @@
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.hub import get_concept_library
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
@@ -29,7 +28,7 @@ class TestPipeSequenceValidation:
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Test sequence for validation",
-            inputs={"text": InputRequirementBlueprint(concept=concept_1.concept_string)},
+            inputs={"text": concept_1.concept_string},
             output=concept_2.concept_string,
             steps=[SubPipeBlueprint(pipe="test_pipe_1", result="intermediate_result")],
         )
@@ -68,7 +67,7 @@ class TestPipeSequenceValidation:
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Test sequence with multiple steps",
-            inputs={"initial_input": InputRequirementBlueprint(concept=concept_1.concept_string)},
+            inputs={"initial_input": concept_1.concept_string},
             output=concept_2.concept_string,
             steps=[SubPipeBlueprint(pipe="step_1", result="intermediate"), SubPipeBlueprint(pipe="step_2", result="final_output")],
         )

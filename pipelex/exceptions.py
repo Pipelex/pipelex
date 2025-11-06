@@ -1,9 +1,24 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from click import ClickException
 from typing_extensions import override
 
+from pipelex.builder.validation_error_data import (
+    ConceptDefinitionErrorData,
+    LibraryLoadingErrorData,
+    PipeDefinitionErrorData,
+    StaticValidationErrorType,
+    SyntaxErrorData,
+)
+from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
 from pipelex.system.exceptions import RootException
 from pipelex.tools.misc.context_provider_abstract import ContextProviderException
-from pipelex.types import StrEnum
+
+if TYPE_CHECKING:
+    from pipelex.cogt.templating.template_category import TemplateCategory
+    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
 class PipelexException(RootException):
@@ -12,13 +27,6 @@ class PipelexException(RootException):
 
 class PipelexUnexpectedError(PipelexException):
     pass
-
-
-class StaticValidationErrorType(StrEnum):
-    MISSING_INPUT_VARIABLE = "missing_input_variable"
-    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
-    INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
-    TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
 
 
 class StaticValidationError(Exception):
@@ -89,7 +97,10 @@ class WorkingMemoryStuffAttributeNotFoundError(WorkingMemoryVariableError):
 
 
 class WorkingMemoryStuffNotFoundError(WorkingMemoryVariableError):
-    pass
+    def __init__(self, message: str, variable_name: str, pipe_code: str | None = None, concept_code: str | None = None):
+        super().__init__(message, variable_name)
+        self.pipe_code = pipe_code
+        self.concept_code = concept_code
 
 
 class PipelexCLIError(PipelexException, ClickException):
@@ -116,8 +127,29 @@ class LibraryError(PipelexException):
     pass
 
 
-class LibraryLoadingError(LibraryError):
-    pass
+class LibraryLoadingError(LibraryError, ValidationErrorDetailsProtocol):
+    """Error raised when loading library components fails."""
+
+    def __init__(
+        self,
+        message: str,
+        concept_definition_errors: list[ConceptDefinitionErrorData] | None = None,
+        pipe_definition_errors: list[PipeDefinitionErrorData] | None = None,
+    ):
+        self.concept_definition_errors = concept_definition_errors
+        self.pipe_definition_errors = pipe_definition_errors
+        super().__init__(message)
+
+    @override
+    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
+        return self.concept_definition_errors or []
+
+    def as_structured_content(self) -> LibraryLoadingErrorData:
+        return LibraryLoadingErrorData(
+            message=str(self),
+            concept_definition_errors=self.concept_definition_errors,
+            pipe_definition_errors=self.pipe_definition_errors,
+        )
 
 
 class DomainLibraryError(LibraryError):
@@ -160,52 +192,49 @@ class ConceptDefinitionError(PipelexException):
         concept_code: str,
         description: str,
         structure_class_python_code: str | None = None,
+        structure_class_syntax_error_data: SyntaxErrorData | None = None,
         source: str | None = None,
     ):
         self.domain_code = domain_code
         self.concept_code = concept_code
         self.description = description
         self.structure_class_python_code = structure_class_python_code
+        self.structure_class_syntax_error_data = structure_class_syntax_error_data
         self.source = source
         super().__init__(message)
+
+    def as_structured_content(self) -> ConceptDefinitionErrorData:
+        return ConceptDefinitionErrorData(
+            message=str(self),
+            domain_code=self.domain_code,
+            concept_code=self.concept_code,
+            description=self.description,
+            structure_class_python_code=self.structure_class_python_code,
+            structure_class_syntax_error_data=self.structure_class_syntax_error_data,
+            source=self.source,
+        )
 
 
 class ConceptStructureGeneratorError(PipelexException):
-    def __init__(self, message: str, structure_class_python_code: str | None = None):
+    def __init__(self, message: str, structure_class_python_code: str | None = None, syntax_error_data: SyntaxErrorData | None = None):
         self.structure_class_python_code = structure_class_python_code
+        self.syntax_error_data = syntax_error_data
         super().__init__(message)
 
 
-# TODO: add details from all cases raising this error
-class PipeDefinitionError(PipelexException):
-    def __init__(
-        self,
-        message: str,
-        domain_code: str | None = None,
-        pipe_code: str | None = None,
-        description: str | None = None,
-        source: str | None = None,
-    ):
-        self.domain_code = domain_code
+class PipeInputError(PipelexException):
+    def __init__(self, message: str, pipe_code: str, variable_name: str, concept_code: str | None = None):
         self.pipe_code = pipe_code
-        self.description = description
-        self.source = source
-        message = message + " • " + self.pipe_details()
+        self.variable_name = variable_name
+        self.concept_code = concept_code
         super().__init__(message)
 
-    def pipe_details(self) -> str:
-        if not self.domain_code and not self.pipe_code and not self.description and not self.source:
-            return "No pipe details provided"
-        details = "Pipe details:"
-        if self.domain_code:
-            details += f" • domain='{self.domain_code}'"
-        if self.pipe_code:
-            details += f" • pipe='{self.pipe_code}'"
-        if self.description:
-            details += f" • description='{self.description}'"
-        if self.source:
-            details += f" • source='{self.source}'"
-        return details
+
+class PipeRunInputsError(PipelexException):
+    def __init__(self, message: str, pipe_code: str, missing_inputs: dict[str, str]):
+        self.pipe_code = pipe_code
+        self.missing_inputs = missing_inputs
+        super().__init__(message)
 
 
 class DomainLoadingError(LibraryLoadingError):
@@ -228,7 +257,7 @@ class ConceptLoadingError(LibraryLoadingError):
 
 
 class PipeLoadingError(LibraryLoadingError):
-    def __init__(self, message: str, pipe_definition_error: PipeDefinitionError, pipe_code: str, description: str, source: str | None = None):
+    def __init__(self, message: str, pipe_definition_error: PipeDefinitionErrorData, pipe_code: str, description: str, source: str | None = None):
         self.pipe_definition_error = pipe_definition_error
         self.pipe_code = pipe_code
         self.description = description
@@ -236,12 +265,15 @@ class PipeLoadingError(LibraryLoadingError):
         super().__init__(message)
 
 
-class UnexpectedPipeDefinitionError(PipeDefinitionError):
-    pass
-
-
 class StuffError(PipelexException):
     pass
+
+
+class StuffContentTypeError(StuffError):
+    def __init__(self, message: str, expected_type: str, actual_type: str):
+        self.expected_type = expected_type
+        self.actual_type = actual_type
+        super().__init__(message)
 
 
 class StuffContentValidationError(StuffError):
@@ -254,25 +286,82 @@ class StuffContentValidationError(StuffError):
         super().__init__(f"Failed to validate content from {original_type} to {target_type}: {validation_error}")
 
 
-class PipeExecutionError(PipelexException):
+class PipeRunError(PipelexException):
     pass
 
 
-class PipeRunError(PipeExecutionError):
-    pass
-
-
-class PipeStackOverflowError(PipeExecutionError):
-    pass
-
-
-# TODO: create variants of DryRunError for each type of Pipe
-class DryRunError(PipeExecutionError):
+class DryRunError(PipeRunError):
     """Raised when a dry run fails due to missing inputs or other validation issues."""
 
-    def __init__(self, message: str, missing_inputs: list[str] | None = None, pipe_code: str | None = None):
-        self.missing_inputs = missing_inputs or []
+    def __init__(self, message: str, pipe_type: str, pipe_code: str | None = None):
+        self.pipe_type = pipe_type
         self.pipe_code = pipe_code
+        super().__init__(message)
+
+
+class DryRunMissingInputsError(DryRunError):
+    """Raised when a dry run fails due to missing inputs or other validation issues."""
+
+    def __init__(self, message: str, pipe_type: str, pipe_code: str, missing_inputs: list[str] | None = None):
+        self.missing_inputs = missing_inputs or []
+        super().__init__(message, pipe_type, pipe_code)
+
+
+class DryRunMissingPipesError(DryRunError):
+    """Raised when a dry run fails due to missing pipes or other validation issues."""
+
+    def __init__(self, message: str, pipe_type: str, pipe_code: str, missing_pipes: list[str] | None = None):
+        self.missing_pipes = missing_pipes or []
+        super().__init__(message, pipe_type, pipe_code)
+
+
+class DryRunTemplatingError(DryRunError):
+    """Raised when a dry run fails due to templating issues."""
+
+    def __init__(self, message: str, pipe_type: str, pipe_code: str, template_category: TemplateCategory, template: str):
+        self.template_category = template_category
+        self.template = template
+        super().__init__(message, pipe_type, pipe_code)
+
+
+class PipeStackOverflowError(PipeRunError):
+    def __init__(self, message: str, limit: int, pipe_stack: list[str]):
+        self.limit = limit
+        self.pipe_stack = pipe_stack
+        super().__init__(message)
+
+
+class PipeRouterError(PipelexException):
+    def __init__(
+        self,
+        message: str,
+        run_mode: PipeRunMode,
+        pipe_code: str,
+        output_name: str | None,
+        pipe_stack: list[str],
+        missing_inputs: list[str] | None = None,
+    ):
+        self.run_mode = run_mode
+        self.pipe_code = pipe_code
+        self.output_name = output_name
+        self.pipe_stack = pipe_stack
+        self.missing_inputs = missing_inputs
+        super().__init__(message)
+
+
+class PipelineExecutionError(PipelexException):
+    def __init__(
+        self,
+        message: str,
+        run_mode: PipeRunMode,
+        pipe_code: str,
+        output_name: str | None,
+        pipe_stack: list[str],
+    ):
+        self.run_mode = run_mode
+        self.pipe_code = pipe_code
+        self.output_name = output_name
+        self.pipe_stack = pipe_stack
         super().__init__(message)
 
 
@@ -286,6 +375,17 @@ class PipeConditionError(PipelexException):
 
 class StructureClassError(PipelexException):
     pass
+
+
+class PipeControllerError(PipelexException):
+    pass
+
+
+class PipeControllerOutputConceptMismatchError(PipeControllerError):
+    def __init__(self, message: str, tested_concept: str, wanted_concept: str):
+        self.tested_concept = tested_concept
+        self.wanted_concept = wanted_concept
+        super().__init__(message)
 
 
 class PipeRunParamsError(PipelexException):
@@ -316,11 +416,11 @@ class JobHistoryError(PipelexException):
     pass
 
 
-class PipeInputError(PipelexException):
+class StuffArtefactError(PipelexException):
     pass
 
 
-class StuffArtefactError(PipelexException):
+class StuffArtefactReservedFieldError(StuffArtefactError):
     pass
 
 
@@ -361,4 +461,8 @@ class StartPipelineError(Exception):
 
 
 class PipelineInputError(Exception):
+    pass
+
+
+class PipeExecutionError(PipelexException):
     pass

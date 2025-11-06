@@ -98,7 +98,7 @@ class TestStuffFactoryImplicitMemory:
         expected_stuff: Stuff,
     ):
         log.info(f"Testing case: {test_name}")
-        log.debug(f"setup_test_concept: {setup_test_concept}")
+        log.verbose(f"setup_test_concept: {setup_test_concept}")
 
         result = StuffFactory.make_stuff_from_stuff_content_or_data(
             name=stuff_name,
@@ -132,7 +132,7 @@ class TestStuffFactoryImplicitMemoryWithSearchDomains:
         expected_stuff: Stuff,
     ):
         log.info(f"Testing search domain case: {test_name}")
-        log.debug(f"setup_test_concept: {setup_test_concept}")
+        log.verbose(f"setup_test_concept: {setup_test_concept}")
         result = StuffFactory.make_stuff_from_stuff_content_or_data(
             name=stuff_name,
             code=stuff_code,
@@ -168,7 +168,7 @@ class TestStuffFactoryImplicitMemoryErrors:
         error_match: str,
     ):
         log.info(f"Testing error case: {test_name}")
-        log.debug(f"setup_test_concept: {setup_test_concept}")
+        log.verbose(f"setup_test_concept: {setup_test_concept}")
 
         with pytest.raises(expected_exception, match=error_match):
             StuffFactory.make_stuff_from_stuff_content_or_data(

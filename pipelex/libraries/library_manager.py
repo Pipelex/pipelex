@@ -5,6 +5,7 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.builder.validation_error_data import PipeDefinitionErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -12,6 +13,7 @@ from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -22,7 +24,6 @@ from pipelex.exceptions import (
     DomainDefinitionError,
     LibraryError,
     LibraryLoadingError,
-    PipeDefinitionError,
     PipeLibraryError,
 )
 from pipelex.libraries.library import Library
@@ -217,7 +218,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Then try filesystem-based scanning if package is accessible (for completeness)
         pipelex_pkg_dir = get_pipelex_package_dir_for_imports()
         if pipelex_pkg_dir:
-            log.debug(f"Additionally scanning pipelex package filesystem: {pipelex_pkg_dir}")
+            log.verbose(f"Additionally scanning pipelex package filesystem: {pipelex_pkg_dir}")
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=str(pipelex_pkg_dir),
                 base_class_names=[StructuredContent.__name__],

@@ -2,23 +2,22 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.exceptions import PipeInputError, WorkingMemoryStuffNotFoundError
-from pipelex.hub import get_pipe_router, get_pipeline_tracker, get_required_pipe
+from pipelex.exceptions import PipeInputError, PipeInputNotFoundError, WorkingMemoryStuffNotFoundError
+from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
-from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeOutputMultiplicity, PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class SubPipe(BaseModel):
     pipe_code: str
     output_name: str | None = None
-    output_multiplicity: PipeOutputMultiplicity | None = None
+    output_multiplicity: VariableMultiplicity | None = None
     batch_params: BatchParams | None = None
     concept_codes_from_the_same_domain: list[str] | None = None
 
@@ -45,9 +44,20 @@ class SubPipe(BaseModel):
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 )
-                raise PipeInputError(msg) from exc
+                raise PipeInputError(
+                    message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_list_stuff_name, concept_code=None
+                ) from exc
 
-            item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
+            try:
+                item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
+            except PipeInputNotFoundError as exc:
+                msg = (
+                    f"Batch input item named '{batch_params.input_item_stuff_name}' from '{calling_pipe_code}' is not "
+                    f"in SubPipe '{self.pipe_code}' input requirements: {sub_pipe.inputs}"
+                )
+                raise PipeInputError(
+                    message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_item_stuff_name, concept_code=None
+                ) from exc
             pipe_batch_blueprint = PipeBatchBlueprint(
                 description=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
@@ -55,9 +65,7 @@ class SubPipe(BaseModel):
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
-                    batch_params.input_item_stuff_name: InputRequirementBlueprint(
-                        concept=item_stuff_requirement.concept.concept_string,
-                    ),
+                    batch_params.input_list_stuff_name: item_stuff_requirement.concept.concept_string,
                 },
             )
 
@@ -67,85 +75,46 @@ class SubPipe(BaseModel):
                 blueprint=pipe_batch_blueprint,
                 concept_codes_from_the_same_domain=self.concept_codes_from_the_same_domain,
             )
-            # This is the only line that changes between run and dry_run
-            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
-                sub_pipe_run_params.run_mode = PipeRunMode.DRY
-                pipe_output = await pipe_batch.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
-                )
-            else:
-                sub_pipe_run_params.run_mode = PipeRunMode.LIVE
-                pipe_output = await pipe_batch.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
-                )
+            pipe_output = await pipe_batch.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=self.output_name,
+            )
         # Case 2: Condition processing
         elif isinstance(sub_pipe, PipeCondition):
-            # This is the only line that changes between run and dry_run
-            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
-                sub_pipe_run_params.run_mode = PipeRunMode.DRY
-                pipe_output = await sub_pipe.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
-                )
-            else:
-                sub_pipe_run_params.run_mode = PipeRunMode.LIVE
-                pipe_output = await get_pipe_router().run(
-                    pipe_job=PipeJobFactory.make_pipe_job(
-                        pipe=get_required_pipe(pipe_code=self.pipe_code),
-                        job_metadata=job_metadata,
-                        working_memory=working_memory,
-                        output_name=self.output_name,
-                        pipe_run_params=sub_pipe_run_params,
-                    ),
-                )
+            pipe_output = await sub_pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=self.output_name,
+            )
         else:
             # Case 3: Normal processing
             required_variables = sub_pipe.required_variables()
-            required_stuff_names = {rv for rv in required_variables if not rv.startswith("_")}
+            required_stuff_names = {req_var for req_var in required_variables if not req_var.startswith("_")}
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:
-                sub_pipe_path = [*sub_pipe_run_params.pipe_layers, self.pipe_code]
+                sub_pipe_path = [*sub_pipe_run_params.pipe_stack, self.pipe_code]
                 sub_pipe_path_str = ".".join(sub_pipe_path)
                 error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
                 msg = f"Some required stuff(s) not found: {error_details}"
-                raise PipeInputError(msg) from exc
+                raise PipeInputError(message=msg, pipe_code=self.pipe_code, variable_name=exc.variable_name, concept_code=None) from exc
             log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
-            # This is the only line that changes between run and dry_run
-
-            if sub_pipe_run_params.run_mode == PipeRunMode.DRY:
-                pipe_output = await sub_pipe.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
-                )
-            else:
-                sub_pipe_run_params.run_mode = PipeRunMode.LIVE
-                pipe_output = await get_pipe_router().run(
-                    pipe_job=PipeJobFactory.make_pipe_job(
-                        pipe=get_required_pipe(pipe_code=self.pipe_code),
-                        job_metadata=job_metadata,
-                        working_memory=working_memory,
-                        output_name=self.output_name,
-                        pipe_run_params=sub_pipe_run_params,
-                    ),
-                )
-            new_output_stuff = pipe_output.main_stuff
-            for stuff in required_stuffs:
-                get_pipeline_tracker().add_pipe_step(
-                    from_stuff=stuff,
-                    to_stuff=new_output_stuff,
-                    pipe_code=self.pipe_code,
-                    pipe_layer=sub_pipe_run_params.pipe_layers,
-                    comment="SubPipe on required_stuff",
-                )
+            pipe_output = await sub_pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=sub_pipe_run_params,
+                output_name=self.output_name,
+            )
+            if new_output_stuff := pipe_output.working_memory.get_optional_main_stuff():
+                for stuff in required_stuffs:
+                    get_pipeline_tracker().add_pipe_step(
+                        from_stuff=stuff,
+                        to_stuff=new_output_stuff,
+                        pipe_code=self.pipe_code,
+                        pipe_layer=sub_pipe_run_params.pipe_layers,
+                        comment="SubPipe on required_stuff",
+                    )
         return pipe_output

@@ -34,7 +34,7 @@ class ImgGenWorkerFactory:
                 except ImportError as exc:
                     lib_name = "fal-client"
                     lib_extra_name = "fal"
-                    msg = "The fal-client SDK is required to use FAL models (generation of images)."
+                    msg = "The fal-client SDK is required in order to use FAL models (generation of images)."
                     raise MissingDependencyError(
                         lib_name,
                         lib_extra_name,
@@ -66,6 +66,23 @@ class ImgGenWorkerFactory:
                 )
 
                 img_gen_worker = OpenAIImgGenWorker(
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "openai_alt_img_gen":
+                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_img_gen_alt_worker import OpenAIImgGenAlternativeWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=OpenAIFactory.make_openai_client(
+                        plugin=plugin,
+                        backend=backend,
+                    ),
+                )
+
+                img_gen_worker = OpenAIImgGenAlternativeWorker(
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

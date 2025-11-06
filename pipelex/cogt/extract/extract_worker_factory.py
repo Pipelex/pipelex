@@ -23,7 +23,7 @@ class ExtractWorkerFactory:
                 if importlib.util.find_spec("mistralai") is None:
                     lib_name = "mistralai"
                     lib_extra_name = "mistral"
-                    msg = "The mistralai SDK is required to use Mistral OCR models through the mistralai client."
+                    msg = "The mistralai SDK is required in order to use Mistral OCR models through the mistralai client."
                     raise MissingDependencyError(
                         lib_name,
                         lib_extra_name,

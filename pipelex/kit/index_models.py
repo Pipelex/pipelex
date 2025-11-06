@@ -22,7 +22,6 @@ class Target(ConfigModel):
     """Configuration for a single-file merge target."""
 
     path: str = Field(description="Path to the target file relative to repo root")
-    strategy: str = Field(description="Merge strategy (currently only 'merge' supported)")
     marker_begin: str = Field(description="Beginning marker for content insertion")
     marker_end: str = Field(description="Ending marker for content insertion")
     heading_1: str | None = Field(default=None, description="Main title (H1) to add when inserting into empty file or file with no H1 headings")

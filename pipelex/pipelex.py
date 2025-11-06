@@ -1,5 +1,5 @@
-from importlib.metadata import metadata
-from typing import cast
+import os
+from typing import Any, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -30,15 +30,12 @@ from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
+from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.observer.local_observer import LocalObserver
+from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
-from pipelex.pipeline.activity.activity_manager import ActivityManager
-from pipelex.pipeline.activity.activity_manager_protocol import (
-    ActivityManagerNoOp,
-    ActivityManagerProtocol,
-)
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.track.pipeline_tracker import PipelineTracker
 from pipelex.pipeline.track.pipeline_tracker_protocol import (
@@ -48,37 +45,35 @@ from pipelex.pipeline.track.pipeline_tracker_protocol import (
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.environment import get_optional_env
 from pipelex.system.registries.func_registry import func_registry
-from pipelex.system.runtime import runtime_manager
+from pipelex.system.runtime import IntegrationMode, runtime_manager
+from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
+from pipelex.system.telemetry.telemetry_manager import DO_NOT_TRACK_ENV_VAR_KEY, TelemetryManager
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract, TelemetryManagerNoOp
 from pipelex.test_extras.registry_test_models import TestRegistryModels
+from pipelex.tools.misc.package_utils import get_package_info
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.types import Self
 from pipelex.urls import URLs
 
-PACKAGE_NAME = __name__.split(".", maxsplit=1)[0]
-PACKAGE_VERSION = metadata(PACKAGE_NAME)["Version"]
+PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
 
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
         config_dir_path: str = "./pipelex",
-        # Dependency injection
-        pipelex_hub: PipelexHub | None = None,
         config_cls: type[ConfigRoot] | None = None,
-        class_registry: ClassRegistryAbstract | None = None,
-        models_manager: ModelManagerAbstract | None = None,
-        inference_manager: InferenceManager | None = None,
-        pipeline_manager: PipelineManager | None = None,
-        pipeline_tracker: PipelineTracker | None = None,
-        activity_manager: ActivityManagerProtocol | None = None,
-        reporting_delegate: ReportingProtocol | None = None,
     ) -> None:
         self.config_dir_path = config_dir_path
-        self.pipelex_hub = pipelex_hub or PipelexHub()
+        self.pipelex_hub = PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
 
         # tools
@@ -90,56 +85,25 @@ class Pipelex(metaclass=MetaSingleton):
             raise PipelexConfigError(msg) from validation_error
 
         log.configure(log_config=get_config().pipelex.log_config)
-        log.debug("Logs are configured")
+        log.verbose("Logs are configured")
 
         # tools
-        self.class_registry = class_registry or ClassRegistry()
-        self.pipelex_hub.set_class_registry(self.class_registry)
-        self.kajson_manager = KajsonManager(class_registry=self.class_registry)
+        self.class_registry: ClassRegistryAbstract | None = None
 
         # cogt
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
 
-        self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
-        self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
-
-        self.inference_manager = inference_manager or InferenceManager()
-        self.pipelex_hub.set_inference_manager(self.inference_manager)
-
-        self.reporting_delegate: ReportingProtocol
-        if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager()
-        else:
-            self.reporting_delegate = ReportingNoOp()
-        self.pipelex_hub.set_report_delegate(self.reporting_delegate)
-
         # pipelex libraries
-        self.library_manager = LibraryManager()
+        self.library_manager = LibraryFactory.make_empty()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
-        # pipelex pipeline
-        self.pipeline_tracker: PipelineTrackerProtocol
-        if pipeline_tracker:
-            self.pipeline_tracker = pipeline_tracker
-        elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
-            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
-        else:
-            self.pipeline_tracker = PipelineTrackerNoOp()
-        self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
-        self.pipeline_manager = pipeline_manager or PipelineManager()
-        self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
+        self.reporting_delegate: ReportingProtocol | None = None
+        self.telemetry_manager: TelemetryManagerAbstract | None = None
+        # pipeline
+        self.pipeline_tracker: PipelineTrackerProtocol | None = None
 
-        self.activity_manager: ActivityManagerProtocol
-        if activity_manager:
-            self.activity_manager = activity_manager
-        elif get_config().pipelex.feature_config.is_activity_tracking_enabled:
-            self.activity_manager = ActivityManager()
-        else:
-            self.activity_manager = ActivityManagerNoOp()
-        self.pipelex_hub.set_activity_manager(activity_manager=self.activity_manager)
-
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
     @staticmethod
     def _get_config_not_found_error_msg(component_name: str) -> str:
@@ -169,17 +133,39 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     def setup(
         self,
+        integration_mode: IntegrationMode,
+        class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
-        pipe_router: PipeRouterProtocol | None = None,
         storage_provider: StorageProviderAbstract | None = None,
-        observer_provider: ObserverProtocol | None = None,
+        models_manager: ModelManagerAbstract | None = None,
+        inference_manager: InferenceManager | None = None,
+        content_generator: ContentGeneratorProtocol | None = None,
+        pipeline_manager: PipelineManager | None = None,
+        pipeline_tracker: PipelineTracker | None = None,
+        pipe_router: PipeRouterProtocol | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
+        force_enable_telemetry: bool = False,
+        telemetry_config: TelemetryConfig | None = None,
+        telemetry_manager: TelemetryManagerAbstract | None = None,
+        observers: dict[str, ObserverProtocol] | None = None,
+        **kwargs: Any,
     ):
+        if kwargs:
+            msg = f"The base setup method does not support any additional arguments: {kwargs}"
+            raise PipelexSetupError(msg)
         # tools
+        self.class_registry = class_registry or ClassRegistry()
+        self.pipelex_hub.set_class_registry(self.class_registry)
+        self.kajson_manager = KajsonManager(class_registry=self.class_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
+
         # cogt
         self.plugin_manager.setup()
+
+        self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
+        self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
+
         try:
             self.models_manager.setup()
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
@@ -224,62 +210,148 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 )
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
+
+        self.inference_manager = inference_manager or InferenceManager()
+        self.pipelex_hub.set_inference_manager(self.inference_manager)
+
+        # reporting
+        if get_config().pipelex.feature_config.is_reporting_enabled:
+            self.reporting_delegate = reporting_delegate or ReportingManager()
+        else:
+            self.reporting_delegate = ReportingNoOp()
+        self.pipelex_hub.set_report_delegate(self.reporting_delegate)
         self.reporting_delegate.setup()
+
+        # pipeline
+        if pipeline_tracker:
+            self.pipeline_tracker = pipeline_tracker
+        elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
+            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
+        else:
+            self.pipeline_tracker = PipelineTrackerNoOp()
+        self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
+        self.pipeline_manager = pipeline_manager or PipelineManager()
+        self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
+
         self.class_registry.register_classes(CoreRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
-            log.debug("Registering test models for unit testing")
+            log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
-        self.activity_manager.setup()
 
-        observer_provider = observer_provider or LocalObserver()
-        self.pipelex_hub.set_observer_provider(observer_provider=observer_provider)
+        if integration_mode.allows_telemetry() or force_enable_telemetry:
+            if not telemetry_config:
+                config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
+                telemetry_config_toml = load_toml_from_path(path=config_path)
+                telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer_provider=observer_provider))
+            if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
+                self.telemetry_manager = TelemetryManagerNoOp()
+                log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
+            else:
+                self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
+        else:
+            self.telemetry_manager = TelemetryManagerNoOp()
+            log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
+
+        self.telemetry_manager.setup(integration_mode=integration_mode)
+
+        self.pipelex_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
+        if not observers:
+            local_observer = LocalObserver()
+            observer_telemetry = ObserverTelemetry(telemetry_manager=self.telemetry_manager)
+            observers = {"local": local_observer, "telemetry": observer_telemetry}
+        multi_observer = MultiObserver(observers=observers)
+        self.pipelex_hub.set_observer(observer=multi_observer)
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
 
         # pipeline
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     def setup_libraries(self):
-        self.library_manager.setup()
-        print("jdqojsoqjio", self.library_manager)
-        self.library_manager.load_libraries()
-
+        # self.library_manager.setup()
+        # print("jdqojsoqjio", self.library_manager)
+        # self.library_manager.load_libraries()
+        pass
+    
     def teardown(self):
         # pipelex
         self.pipeline_manager.teardown()
-        self.pipeline_tracker.teardown()
+        if self.pipeline_tracker:
+            self.pipeline_tracker.teardown()
+        if self.telemetry_manager:
+            self.telemetry_manager.teardown()
         self.library_manager.teardown()
-        self.activity_manager.teardown()
 
         # cogt
         self.inference_manager.teardown()
-        self.reporting_delegate.teardown()
+        if self.reporting_delegate:
+            self.reporting_delegate.teardown()
         self.plugin_manager.teardown()
 
         # tools
         self.kajson_manager.teardown()
-        self.class_registry.teardown()
+        if self.class_registry:
+            self.class_registry.teardown()
         func_registry.teardown()
 
-        log.debug(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         self.pipelex_hub.reset_config()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:
             del MetaSingleton.instances[self.__class__]
 
-    # TODO: add kwargs to make() so that subclasses can employ specific parameters
     @classmethod
-    def make(cls) -> Self:
-        """Create and initialize a Pipelex instance.
+    def make(
+        cls,
+        integration_mode: IntegrationMode = IntegrationMode.PYTHON,
+        class_registry: ClassRegistryAbstract | None = None,
+        secrets_provider: SecretsProviderAbstract | None = None,
+        storage_provider: StorageProviderAbstract | None = None,
+        models_manager: ModelManagerAbstract | None = None,
+        inference_manager: InferenceManager | None = None,
+        content_generator: ContentGeneratorProtocol | None = None,
+        pipeline_manager: PipelineManager | None = None,
+        pipeline_tracker: PipelineTracker | None = None,
+        pipe_router: PipeRouterProtocol | None = None,
+        reporting_delegate: ReportingProtocol | None = None,
+        force_enable_telemetry: bool = False,
+        telemetry_config: TelemetryConfig | None = None,
+        telemetry_manager: TelemetryManagerAbstract | None = None,
+        observers: dict[str, ObserverProtocol] | None = None,
+        **kwargs: Any,
+    ) -> Self:
+        """Create and initialize a Pipelex singleton instance.
+
+        All parameters are optional dependency injections. If None, default implementations
+        are used during setup. This enables customization of core components like secrets
+        management, storage, model routing, and pipeline execution.
+
+        Args:
+            integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
+            class_registry: Custom class registry for dynamic loading
+            secrets_provider: Custom secrets/credentials provider
+            storage_provider: Custom storage backend
+            models_manager: Custom model configuration manager
+            inference_manager: Custom inference routing manager
+            content_generator: Custom content generation implementation
+            pipeline_manager: Custom pipeline management
+            pipeline_tracker: Custom pipeline tracking/logging
+            pipe_router: Custom pipe routing logic
+            reporting_delegate: Custom reporting handler
+            force_enable_telemetry: Force enable telemetry even if the integration mode does not allow it
+            telemetry_config: Custom telemetry configuration
+            telemetry_manager: Custom telemetry manager
+            observers: Custom observers for pipeline events
+            **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
 
         Returns:
             Initialized Pipelex instance.
 
         Raises:
-            if setup fails
+            PipelexSetupError: If Pipelex is already initialized or setup fails
 
         """
         if cls.get_optional_instance() is not None:
@@ -287,8 +359,26 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(msg)
 
         pipelex_instance = cls()
-        pipelex_instance.setup()
+        pipelex_instance.setup(
+            integration_mode=integration_mode,
+            class_registry=class_registry,
+            secrets_provider=secrets_provider,
+            storage_provider=storage_provider,
+            models_manager=models_manager,
+            inference_manager=inference_manager,
+            content_generator=content_generator,
+            pipeline_manager=pipeline_manager,
+            pipeline_tracker=pipeline_tracker,
+            pipe_router=pipe_router,
+            reporting_delegate=reporting_delegate,
+            force_enable_telemetry=force_enable_telemetry,
+            telemetry_config=telemetry_config,
+            telemetry_manager=telemetry_manager,
+            observers=observers,
+            **kwargs,
+        )
         pipelex_instance.setup_libraries()
+        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 
     @classmethod

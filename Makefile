@@ -100,6 +100,9 @@ make c                        - Shorthand -> check
 make cc                       - Shorthand -> cleanderived check
 make li                       - Shorthand -> lock install
 
+make test-count              - Count the number of tests
+make check-test-badge        - Check if the test count matches the badge value
+
 endef
 export HELP
 
@@ -455,7 +458,7 @@ check-TODOs: env
 
 docs: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
-	$(VENV_MKDOCS) serve --watch docs
+	$(VENV_MKDOCS) serve -a 127.0.0.1:8000 -f $(CURDIR)/mkdocs.yml --watch $(CURDIR)/docs -s
 
 docs-check: env
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")

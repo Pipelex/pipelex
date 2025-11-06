@@ -1,16 +1,14 @@
-from typing import Any
-
 import pytest
 from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import PipeOutputMultiplicity, PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.activity.activity_handler import ActivityHandlerForResultFiles
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeTestCases
 
@@ -26,15 +24,13 @@ class TestPipeRunningVariants:
         self,
         pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
-        pipe_result_handler: tuple[str, ActivityHandlerForResultFiles],
-        save_working_memory: Any,
         topic: str,
         stuff: Stuff,
         pipe_code: str,
     ):
         log.verbose(stuff, title=f"{topic}: start from '{stuff.stuff_name}', run pipe '{pipe_code}'")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
-        pipe_output = await get_pipe_router().run(
+        _ = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -43,17 +39,11 @@ class TestPipeRunningVariants:
             ),
         )
 
-        # Save stuff context
-        result_dir_path, _ = pipe_result_handler
-        await save_working_memory(pipe_output, result_dir_path)
-
     @pytest.mark.parametrize(("topic", "pipe_code"), PipeTestCases.NO_INPUT)
     async def test_pipe_no_input(
         self,
         pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
-        pipe_result_handler: tuple[str, ActivityHandlerForResultFiles],
-        save_working_memory: Any,
         topic: str,
         pipe_code: str,
     ):
@@ -67,10 +57,6 @@ class TestPipeRunningVariants:
             ),
         )
 
-        # Save stuff context
-        result_dir_path, _ = pipe_result_handler
-        await save_working_memory(pipe_output, result_dir_path)
-
         stuff = pipe_output.main_stuff
         pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
         pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
@@ -81,11 +67,9 @@ class TestPipeRunningVariants:
         self,
         pipe_run_mode: PipeRunMode,
         request: FixtureRequest,
-        pipe_result_handler: tuple[str, ActivityHandlerForResultFiles],
-        save_working_memory: Any,
         topic: str,
         pipe_code: str,
-        output_multiplicity: PipeOutputMultiplicity | None,
+        output_multiplicity: VariableMultiplicity | None,
     ):
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output = await get_pipe_router().run(
@@ -99,10 +83,6 @@ class TestPipeRunningVariants:
                 working_memory=WorkingMemoryFactory.make_empty(),
             ),
         )
-
-        # Save stuff context
-        result_dir_path, _ = pipe_result_handler
-        await save_working_memory(pipe_output, result_dir_path)
 
         stuff = pipe_output.main_stuff
         pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")

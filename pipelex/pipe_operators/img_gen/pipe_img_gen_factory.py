@@ -3,6 +3,7 @@ from typing_extensions import override
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
@@ -18,9 +19,16 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         blueprint: PipeImgGenBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeImgGen:
+        # Parse output for multiplicity (may have brackets like "Image[]" or "Image[3]")
+        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
+
+        # Convert bracket notation to output_multiplicity (default to 1 if no brackets)
+        final_multiplicity = output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, int) else 1
+
+        # Use concept without brackets for output concept resolution
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
-            concept_string_or_code=blueprint.output,
+            concept_string_or_code=output_parse_result.concept,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return PipeImgGen(
@@ -38,7 +46,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
                     concept_code=output_domain_and_code.concept_code,
                 ),
             ),
-            output_multiplicity=blueprint.nb_output or 1,
+            output_multiplicity=final_multiplicity,
             img_gen_prompt=blueprint.img_gen_prompt,
             img_gen_prompt_var_name=blueprint.img_gen_prompt_var_name,
             img_gen=blueprint.model,

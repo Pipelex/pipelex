@@ -2,7 +2,16 @@ from typing import Any, Protocol
 
 from typing_extensions import override
 
+from pipelex.types import StrEnum
+
 PayloadType = dict[str, Any]
+
+
+class PayloadKey(StrEnum):
+    PIPELINE_RUN_ID = "pipeline_run_id"
+    PIPE_JOB = "pipe_job"
+    PIPE_OUTPUT = "pipe_output"
+    ERROR = "error"
 
 
 class ObserverProtocol(Protocol):

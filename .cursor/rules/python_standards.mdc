@@ -40,7 +40,7 @@ This document outlines the core coding standards, best practices, and quality co
     - Both have a title arg which is handy when logging/printing objects:
 
     ```python
-    log.debug("Hello, world!", title="Your first Pipelex log")
+    log.verbose("Hello, world!", title="Your first Pipelex log")
     pretty_print(output_object, title="Your first Pipelex output")
     ```
     - Both handle formatting json using Rich, pretty_print makes it prettier.

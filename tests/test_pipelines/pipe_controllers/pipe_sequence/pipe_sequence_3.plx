@@ -26,11 +26,10 @@ steps = [
 type = "PipeLLM"
 description = "Generate exactly 5 creative ideas for a topic"
 inputs = { topic = "CreativeTopic" }
-output = "CreativeIdea"
-nb_output = 5
+output = "CreativeIdea[5]"
 model = "llm_for_creative_writing"
 prompt = """
-Generate $_nb_output creative and innovative ideas for the following topic:
+Generate 5 creative and innovative ideas for the following topic:
 
 @topic
 
@@ -46,8 +45,7 @@ Ideas:
 type = "PipeLLM"
 description = "Brainstorm variable number of concepts"
 inputs = { topic = "CreativeTopic" }
-output = "CreativeIdea"
-multiple_output = true
+output = "CreativeIdea[]"
 model = "llm_for_creative_writing"
 prompt = """
 Brainstorm creative concepts related to this topic. Generate as many good ideas as come to mind:

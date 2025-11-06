@@ -23,13 +23,14 @@ from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
-from pipelex.pipeline.activity.activity_manager_protocol import ActivityManagerProtocol
+from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -48,6 +49,8 @@ class PipelexHub:
         self._secrets_provider: SecretsProviderAbstract | None = None
         self._class_registry: ClassRegistryAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
+        self._telemetry_manager: TelemetryManagerAbstract | None = None
+
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
         self._plugin_manager: PluginManager | None = None
@@ -65,8 +68,7 @@ class PipelexHub:
         # pipeline
         self._pipeline_tracker: PipelineTrackerProtocol | None = None
         self._pipeline_manager: PipelineManagerAbstract | None = None
-        self._activity_manager: ActivityManagerProtocol | None = None
-        self._observer_provider: ObserverProtocol | None = None
+        self._observer: ObserverProtocol | None = None
 
     ############################################################
     # Class methods for singleton management
@@ -118,6 +120,9 @@ class PipelexHub:
     def set_class_registry(self, class_registry: ClassRegistryAbstract):
         self._class_registry = class_registry
 
+    def set_telemetry_manager(self, telemetry_manager: TelemetryManagerAbstract):
+        self._telemetry_manager = telemetry_manager
+
     # cogt
 
     def set_models_manager(self, models_manager: ModelManagerAbstract):
@@ -155,14 +160,11 @@ class PipelexHub:
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
 
-    def set_activity_manager(self, activity_manager: ActivityManagerProtocol):
-        self._activity_manager = activity_manager
-
     def set_library_manager(self, library_manager: LibraryManagerAbstract):
         self._library_manager = library_manager
 
-    def set_observer_provider(self, observer_provider: ObserverProtocol):
-        self._observer_provider = observer_provider
+    def set_observer(self, observer: ObserverProtocol):
+        self._observer = observer
 
     ############################################################
     # Getters
@@ -204,6 +206,12 @@ class PipelexHub:
             msg = "StorageProvider is not initialized"
             raise RuntimeError(msg)
         return self._storage_provider
+
+    def get_telemetry_manager(self) -> TelemetryManagerAbstract:
+        if self._telemetry_manager is None:
+            msg = "TelemetryManager is not initialized"
+            raise RuntimeError(msg)
+        return self._telemetry_manager
 
     # cogt
 
@@ -275,23 +283,17 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._pipeline_manager
 
-    def get_activity_manager(self) -> ActivityManagerProtocol:
-        if self._activity_manager is None:
-            msg = "Activity manager is not set. You must initialize Pipelex first."
-            raise RuntimeError(msg)
-        return self._activity_manager
-
     def get_required_library_manager(self) -> LibraryManagerAbstract:
         if self._library_manager is None:
             msg = "Library manager is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
         return self._library_manager
 
-    def get_observer_provider(self) -> ObserverProtocol:
-        if self._observer_provider is None:
+    def get_observer(self) -> ObserverProtocol:
+        if self._observer is None:
             msg = "Observer is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
-        return self._observer_provider
+        return self._observer
 
 
 # Shorthand functions for accessing the singleton
@@ -324,6 +326,10 @@ def get_storage_provider() -> StorageProviderAbstract:
 
 def get_class_registry() -> ClassRegistryAbstract:
     return get_pipelex_hub().get_required_class_registry()
+
+
+def get_telemetry_manager() -> TelemetryManagerAbstract:
+    return get_pipelex_hub().get_telemetry_manager()
 
 
 # cogt
@@ -422,16 +428,16 @@ def get_pipeline_manager() -> PipelineManagerAbstract:
     return get_pipelex_hub().get_required_pipeline_manager()
 
 
-def get_activity_manager() -> ActivityManagerProtocol:
-    return get_pipelex_hub().get_activity_manager()
+def get_pipeline(pipeline_run_id: str) -> Pipeline:
+    return get_pipeline_manager().get_pipeline(pipeline_run_id=pipeline_run_id)
 
 
 def get_library_manager() -> LibraryManagerAbstract:
     return get_pipelex_hub().get_required_library_manager()
 
 
-def get_observer_provider() -> ObserverProtocol:
-    return get_pipelex_hub().get_observer_provider()
+def get_observer() -> ObserverProtocol:
+    return get_pipelex_hub().get_observer()
 
 
 def get_native_concept(native_concept: NativeConceptCode) -> Concept:

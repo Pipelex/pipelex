@@ -21,6 +21,9 @@
 # - Feature flags for tracking and reporting
 # - Observer and reporting output directories
 #
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
 ####################################################################################################
 
 [pipelex.scan_config]
@@ -63,7 +66,6 @@ observer_dir = "results/observer"
 [pipelex.feature_config]
 # WIP/Experimental feature flags
 is_pipeline_tracking_enabled = false
-is_activity_tracking_enabled = false
 is_reporting_enabled = true
 
 [pipelex.reporting_config]

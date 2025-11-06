@@ -13,6 +13,7 @@ from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.image_content import ImageContent
@@ -22,7 +23,6 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import (
-    PipeDefinitionError,
     StaticValidationError,
     StaticValidationErrorType,
 )
@@ -33,7 +33,8 @@ from pipelex.hub import (
     get_native_concept,
 )
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.types import Self
@@ -116,7 +117,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         # We have confirmed right above that we have exactly one input
         # get input_name, requirement from single item in inputs
         input_name, requirement = self.inputs.items[0]
-        log.debug(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
+        log.verbose(f"Validating input '{input_name}' with concept code '{requirement.concept.code}'")
         if concept_library.is_compatible(
             tested_concept=requirement.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
@@ -199,21 +200,21 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         # Build the output stuff, which is a list of page contents
         page_view_contents: list[ImageContent] = []
         if self.should_include_page_views:
-            log.debug(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
+            log.verbose(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
             if pdf_uri:
                 page_view_contents.extend(
                     ImageContent.make_from_extracted_image(extracted_image=page.page_view) for page in extract_output.pages.values() if page.page_view
                 )
-                log.debug(f"page_view_contents: {page_view_contents}")
+                log.verbose(f"page_view_contents: {page_view_contents}")
                 needs_to_generate_page_views: bool
                 if len(page_view_contents) == 0:
-                    log.debug("No page views found in the OCR output")
+                    log.verbose("No page views found in the OCR output")
                     needs_to_generate_page_views = True
                 elif len(page_view_contents) < len(extract_output.pages):
                     log.warning(f"Only {len(page_view_contents)} page found in the OCR output, but {len(extract_output.pages)} pages")
                     needs_to_generate_page_views = True
                 else:
-                    log.debug("All page views found in the OCR output")
+                    log.verbose("All page views found in the OCR output")
                     needs_to_generate_page_views = False
 
                 if needs_to_generate_page_views:
@@ -225,7 +226,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         page_contents: list[PageContent] = []
         for page_index, page in extract_output.pages.items():
             images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
-            log.debug(f"images: {images}, page_view_contents: {page_view_contents}, index: {page_index}")
+            log.verbose(f"images: {images}, page_view_contents: {page_view_contents}, index: {page_index}")
             page_view = page_view_contents[page_index - 1] if self.should_include_page_views else None
             page_contents.append(
                 PageContent(
@@ -263,7 +264,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeExtractOutput:
-        log.debug(f"PipeExtract: dry run operator pipe: {self.code}")
+        log.verbose(f"PipeExtract: dry run operator pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
             msg = f"Running pipe '{self.code}' (PipeExtract) _dry_run_operator_pipe() in non-dry mode is not allowed."
             raise PipeDefinitionError(msg)

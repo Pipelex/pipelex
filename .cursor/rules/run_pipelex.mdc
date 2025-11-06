@@ -6,6 +6,21 @@ globs:
 ---
 # Guide to execute a pipeline and write example code
 
+## Prerequisites: Virtual Environment
+
+**CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST activate the appropriate Python virtual environment. Without proper venv activation, these commands will not work.
+
+For standard installations, the virtual environment is named `.venv`. Always check this first:
+
+```bash
+# Activate the virtual environment (standard installation)
+source .venv/bin/activate  # On macOS/Linux
+# or
+.venv\Scripts\activate  # On Windows
+```
+
+If your installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
+
 ## Example to execute a pipeline with text output
 
 ```python
@@ -55,7 +70,7 @@ async def extract_gantt(image_url: str) -> GanttChart:
     # Run the pipe
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
-        input_memory={
+        inputs={
             "gantt_chart_image": {
                 "concept": "gantt.GanttImage",
                 "content": ImageContent(url=image_url),
@@ -94,7 +109,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 # If you assign a string, by default it will be considered as a TextContent.
     pipe_output = await execute_pipeline(
         pipe_code="master_advisory_orchestrator",
-        input_memory={
+        inputs={
             "user_input": problem_description,
         },
     )
@@ -104,7 +119,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 # the system knows what content it corresponds to:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_dpe",
-        input_memory={
+        inputs={
             "document": PDFContent(url=pdf_url),
         },
     )
@@ -113,7 +128,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 # Because ImageContent is a native concept, we can use it directly as a value:
     pipe_output = await execute_pipeline(
         pipe_code="fashion_variation_pipeline",
-        input_memory={
+        inputs={
             "fashion_photo": ImageContent(url=image_url),
         },
     )
@@ -123,7 +138,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
 # so we must provide it using a dict with the concept and the content:
     pipe_output = await execute_pipeline(
         pipe_code="extract_gantt_by_steps",
-        input_memory={
+        inputs={
             "gantt_chart_image": {
                 "concept": "gantt.GanttImage",
                 "content": ImageContent(url=image_url),
@@ -135,7 +150,7 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
     pipe_output = await execute_pipeline(
         pipe_code="retrieve_then_answer",
         dynamic_output_concept_code="contracts.Fees",
-        input_memory={
+        inputs={
             "text": load_text_from_path(path=text_path),
             "question": {
                 "concept": "answer.Question",

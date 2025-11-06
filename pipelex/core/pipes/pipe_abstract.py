@@ -24,6 +24,10 @@ class PipeAbstract(ABC, BaseModel):
     inputs: InputRequirements = Field(default_factory=InputRequirements)
     output: Concept
 
+    @property
+    def pipe_type(self) -> str:
+        return self.__class__.__name__
+
     @field_validator("code", mode="before")
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:
@@ -57,7 +61,7 @@ class PipeAbstract(ABC, BaseModel):
                           If None, starts recursion detection with an empty set.
 
         Returns:
-            PipeInput containing all needed inputs for this pipe
+            InputRequirements containing all needed inputs for this pipe
 
         """
 
@@ -91,7 +95,7 @@ class PipeAbstract(ABC, BaseModel):
         limit = pipe_run_params.pipe_stack_limit
         if len(pipe_stack) > limit:
             msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}"
-            raise PipeStackOverflowError(msg)
+            raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=pipe_stack)
 
 
 PipeAbstractType = type[PipeAbstract]

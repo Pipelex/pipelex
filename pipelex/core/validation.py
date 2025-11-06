@@ -13,7 +13,7 @@ def report_validation_error(category: str, validation_error: ValidationError) ->
     migration_reports: list[str] = []
 
     # Build field-to-renamings mapping for missing fields
-    log.debug(validation_error_analysis.missing_fields, title="Missing fields")
+    log.verbose(validation_error_analysis.missing_fields, title="Missing fields")
     missing_field_renamings: dict[tuple[tuple[str, str], ...], list[str]] = {}
     for missing_field in validation_error_analysis.missing_fields:
         text = missing_field.split(".")[-1]
@@ -25,7 +25,7 @@ def report_validation_error(category: str, validation_error: ValidationError) ->
             missing_field_renamings[renamings_key].append(missing_field)
 
     # Build field-to-renamings mapping for extra fields
-    log.debug(validation_error_analysis.extra_fields, title="Extra fields")
+    log.verbose(validation_error_analysis.extra_fields, title="Extra fields")
     extra_field_renamings: dict[tuple[tuple[str, str], ...], list[str]] = {}
     for extra_field in validation_error_analysis.extra_fields:
         # Extract field path before the colon (extra fields include ": value")

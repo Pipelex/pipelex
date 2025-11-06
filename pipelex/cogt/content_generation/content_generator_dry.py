@@ -42,7 +42,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_prompt_for_text: LLMPrompt,
     ) -> str:
         func_name = "make_llm_text"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         prompt_truncated = llm_prompt_for_text.desc(truncate_text_length=self._text_gen_truncate_length)
         return f"DRY RUN: {func_name} • llm_setting={llm_setting_main.desc()} • prompt={prompt_truncated}"
 
@@ -55,9 +55,6 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
-        func_name = "make_object_direct"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
-
         class ObjectFactory(ModelFactory[object_class]):  # type: ignore[valid-type]
             __model__ = object_class
             __check_model__ = True
@@ -82,7 +79,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_prompt_factory_for_object: LLMPromptFactoryAbstract | None = None,
     ) -> BaseModelTypeVar:
         func_name = "make_text_then_object"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
 
         return await self.make_object_direct(
             job_metadata=job_metadata,
@@ -102,7 +99,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         nb_items: int | None = None,
     ) -> list[BaseModelTypeVar]:
         func_name = "make_object_list_direct"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
         return [
             await self.make_object_direct(
@@ -127,7 +124,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         nb_items: int | None = None,
     ) -> list[BaseModelTypeVar]:
         func_name = "make_text_then_object_list"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         return await self.make_object_list_direct(
             job_metadata=job_metadata,
             object_class=object_class,
@@ -147,7 +144,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> GeneratedImage:
         func_name = "make_single_image"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
         image_url = image_urls[0]
         return GeneratedImage(
@@ -168,7 +165,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> list[GeneratedImage]:
         func_name = "make_image_list"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
         return [
             GeneratedImage(
@@ -189,7 +186,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> str:
         check_jinja2_parsing(template_source=template, template_category=template_category or TemplateCategory.BASIC)
         func_name = "make_templated_text"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         jinja2_truncated = template[: self._text_gen_truncate_length]
         return (
             f"DRY RUN: {func_name} • context={context} • "
@@ -206,7 +203,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         extract_job_config: ExtractJobConfig | None = None,
     ) -> ExtractOutput:
         func_name = "make_extract_pages"
-        log.dev(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         if extract_input.image_uri:
             image_as_page = Page(
                 text="DRY RUN: OCR text",

@@ -7,8 +7,8 @@ from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 
 
 class PipeRouter(PipeRouterProtocol):
-    def __init__(self, observer_provider: ObserverProtocol | None = None):
-        self.observer_provider = observer_provider or ObserverNoOp()
+    def __init__(self, observer: ObserverProtocol | None = None):
+        self.observer = observer or ObserverNoOp()
 
     @override
     async def _run_pipe_job(

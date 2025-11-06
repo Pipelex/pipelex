@@ -47,7 +47,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
 
         if structure_method:
             instructor_mode = structure_method.as_instructor_mode()
-            log.debug(f"Mistral structure mode: {structure_method} --> {instructor_mode}")
+            log.verbose(f"Mistral structure mode: {structure_method} --> {instructor_mode}")
             self.instructor_for_objects = instructor.from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
             self.instructor_for_objects = instructor.from_mistral(client=sdk_instance, use_async=True)

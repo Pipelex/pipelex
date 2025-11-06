@@ -130,7 +130,7 @@ class AnthropicFactory:
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
         if prepped_user_images is not None:
-            log.debug(prepped_user_images)
+            log.verbose(prepped_user_images)
             images_block_params: list[ImageBlockParam] = []
             for prepped_image in prepped_user_images:
                 image_block_param_in_loop: ImageBlockParam

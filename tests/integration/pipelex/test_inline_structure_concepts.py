@@ -239,3 +239,55 @@ not a registered subclass of StuffContent",
         assert product.name == "Widget"
         assert person.age == 30
         assert product.age == 365
+
+    def test_inline_structure_with_quoted_descriptions(self):
+        """Test that inline structures with quotes in descriptions work end-to-end."""
+        # Real-world example: field descriptions containing quoted examples
+        inline_structure: dict[str, str | ConceptStructureBlueprint] = {
+            "animal_type": ConceptStructureBlueprint(
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                description='The species or type of animal (e.g., "fox", "penguin", "octopus")',
+                required=True,
+            ),
+            "owner_name": ConceptStructureBlueprint(
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                description="The owner's full name with apostrophe",
+                required=False,
+            ),
+            "habitat": ConceptStructureBlueprint(
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                description='Natural habitat like "forest", "ocean", or "desert"',
+                required=False,
+            ),
+        }
+
+        # Create concept blueprint with inline structure
+        blueprint = ConceptBlueprint(description="Information about an animal", structure=inline_structure)
+
+        # Create concept from blueprint
+        concept = ConceptFactory.make_from_blueprint(
+            domain="test_domain",
+            concept_code="AnimalInfo",
+            blueprint=blueprint,
+            concept_codes_from_the_same_domain=["AnimalInfo"],
+        )
+
+        # Verify concept properties
+        assert concept.domain == "test_domain"
+        assert concept.code == "AnimalInfo"
+        assert concept.structure_class_name == "AnimalInfo"
+
+        # Verify the generated class is registered and accessible
+        assert get_class_registry().has_class("AnimalInfo")
+        generated_class = get_class_registry().get_required_subclass("AnimalInfo", StructuredContent)
+
+        # Test instantiation with quoted data
+        instance = generated_class(
+            animal_type="fox",  # pyright: ignore[reportCallIssue]
+            owner_name="John's Pet Store",  # pyright: ignore[reportCallIssue]
+            habitat="forest",  # pyright: ignore[reportCallIssue]
+        )
+
+        assert instance.animal_type == "fox"  # type: ignore[attr-defined] # pyright: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
+        assert instance.owner_name == "John's Pet Store"  # type: ignore[attr-defined] # pyright: ignore[reportUnknownMemberType,reportAttributeAccessIssue]
+        assert instance.habitat == "forest"  # type: ignore[attr-defined] # pyright: ignore[reportUnknownMemberType,reportAttributeAccessIssue]

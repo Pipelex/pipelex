@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.exceptions import PipelexCLIError
 from pipelex.hub import get_models_manager
-from pipelex.pipelex import Pipelex
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.aws.aws_config import AwsCredentialsError
@@ -39,8 +38,6 @@ class ModelLister:
             backend_name: Name of the backend to list models for
             flat: Whether to output in flat CSV format
         """
-        Pipelex.make()
-
         try:
             backend = get_models_manager().get_required_inference_backend(backend_name)
         except Exception as exc:
@@ -85,7 +82,7 @@ class ModelLister:
                             lib_name = "anthropic"
                             lib_extra_name = "anthropic"
                             msg = (
-                                "The anthropic SDK is required to use Anthropic models via the anthropic client. "
+                                "The anthropic SDK is required in order to use Anthropic models via the anthropic client. "
                                 "However, you can use Anthropic models through bedrock directly "
                                 "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
                             )
@@ -116,7 +113,7 @@ class ModelLister:
                             lib_name = "mistralai"
                             lib_extra_name = "mistral"
                             msg = (
-                                "The mistralai SDK is required to use Mistral models through the mistralai client. "
+                                "The mistralai SDK is required in order to use Mistral models through the mistralai client. "
                                 "However, you can use Mistral models through bedrock directly "
                                 "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
                             )
@@ -225,7 +222,7 @@ class ModelLister:
             lib_name = "anthropic"
             lib_extra_name = "anthropic"
             msg = (
-                "The anthropic SDK is required to use Anthropic models via the anthropic client. "
+                "The anthropic SDK is required in order to use Anthropic models via the anthropic client. "
                 "However, you can use Anthropic models through bedrock directly "
                 "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
             )
@@ -279,7 +276,7 @@ class ModelLister:
             lib_name = "mistralai"
             lib_extra_name = "mistral"
             msg = (
-                "The mistralai SDK is required to use Mistral models through the mistralai client. "
+                "The mistralai SDK is required in order to use Mistral models through the mistralai client. "
                 "However, you can use Mistral models through bedrock directly "
                 "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
             )

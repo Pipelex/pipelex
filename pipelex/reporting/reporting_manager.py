@@ -85,7 +85,7 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):
-        log.debug(f"Inference job '{inference_job.job_metadata.unit_job_id}' completed in {inference_job.job_metadata.duration:.2f} seconds")
+        log.verbose(f"Inference job '{inference_job.job_metadata.unit_job_id}' completed in {inference_job.job_metadata.duration:.2f} seconds")
         if not isinstance(inference_job, LLMJob):
             # ReportingManager does not support reporting for other types of inference jobs yet
             # TODO: add support for other types of inference jobs

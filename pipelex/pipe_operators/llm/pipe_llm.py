@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
@@ -18,15 +19,17 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import (
-    PipeDefinitionError,
+    PipeRunError,
     StaticValidationError,
     StaticValidationErrorType,
 )
@@ -42,7 +45,6 @@ from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import (
-    PipeOutputMultiplicity,
     PipeRunParamKey,
     PipeRunParams,
     output_multiplicity_to_apply,
@@ -61,7 +63,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     llm_prompt_spec: LLMPromptBlueprint
     llm_choices: LLMSettingChoices | None = None
     structuring_method: StructuringMethod | None = None
-    output_multiplicity: PipeOutputMultiplicity | None = None
+    output_multiplicity: VariableMultiplicity | None = None
 
     @model_validator(mode="after")
     def _validate_inputs(self) -> Self:
@@ -175,7 +177,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         llm_config = get_config().cogt.llm_config
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
-        log.debug(f"PipeLLM pipe_code = {self.code}")
         output_concept = self.output
         if self.output.code == SpecialDomain.NATIVE + "." + NativeConceptCode.DYNAMIC:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
@@ -255,27 +256,32 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 output_structure_prompt=None,
                 extra_params=llm_prompt_run_params.params,
             )
-            generated_text: str = await content_generator.make_llm_text(
-                job_metadata=job_metadata,
-                llm_prompt_for_text=llm_prompt_1_for_text,
-                llm_setting_main=llm_setting_main,
-            )
+            try:
+                generated_text: str = await content_generator.make_llm_text(
+                    job_metadata=job_metadata,
+                    llm_prompt_for_text=llm_prompt_1_for_text,
+                    llm_setting_main=llm_setting_main,
+                )
+            except LLMCompletionError as exc:
+                location = self._format_error_location(pipe_run_params=pipe_run_params)
+                msg = f"Error generating text with LLM {location}: {exc}"
+                raise PipeRunError(msg) from exc
 
             the_content = TextContent(
                 text=generated_text,
             )
         else:
             if is_multiple_output:
-                log.debug(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
+                log.verbose(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
             else:
-                log.debug(f"PipeLLM generating a single object output, class name: '{output_concept.structure_class_name}'")
+                log.verbose(f"PipeLLM generating a single object output, class name: '{output_concept.structure_class_name}'")
 
             # TODO: we need a better solution for structuring_method (text then object), meanwhile,
             # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
             llm_prompt_2_factory: LLMPromptFactoryAbstract | None
             if self.structuring_method:
                 structuring_method = cast("StructuringMethod", self.structuring_method)
-                log.debug(f"PipeLLM pipe_code is '{self.code}' and structuring_method is '{structuring_method}'")
+                log.verbose(f"PipeLLM pipe_code is '{self.code}' and structuring_method is '{structuring_method}'")
                 match structuring_method:
                     case StructuringMethod.DIRECT:
                         llm_prompt_2_factory = None
@@ -283,9 +289,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         log.verbose(f"Creating llm_prompt_2_factory for pipe {self.code} with structuring_method {structuring_method}")
                         llm_prompt_2_factory = LLMPromptTemplate.make_for_structuring_from_preliminary_text()
             elif get_config().pipelex.structure_config.is_default_text_then_structure:
-                log.debug(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
+                log.verbose(f"PipeLLM pipe_code is '{self.code}' and is_default_text_then_structure")
                 llm_prompt_2_factory = LLMPromptTemplate.make_for_structuring_from_preliminary_text()
-                log.debug(llm_prompt_2_factory, title="llm_prompt_2_factory")
+                log.verbose(llm_prompt_2_factory, title="llm_prompt_2_factory")
             else:
                 llm_prompt_2_factory = None
 
@@ -303,6 +309,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             )
             the_content = await self._llm_gen_object_stuff_content(
                 job_metadata=job_metadata,
+                pipe_run_params=pipe_run_params,
                 is_multiple_output=is_multiple_output,
                 fixed_nb_output=fixed_nb_output,
                 output_class_name=output_concept.structure_class_name,
@@ -332,6 +339,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     async def _llm_gen_object_stuff_content(
         self,
         job_metadata: JobMetadata,
+        pipe_run_params: PipeRunParams,
         is_multiple_output: bool,
         fixed_nb_output: int | None,
         output_class_name: str,
@@ -351,34 +359,43 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 task_desc = f"{self.__class__.__name__}_gen_{fixed_nb_output}x{content_class.__class__.__name__}"
             else:
                 task_desc = f"{self.__class__.__name__}_gen_list_{content_class.__class__.__name__}"
-            log.dev(task_desc)
+            log.verbose(task_desc)
             generated_objects: list[StuffContent]
             if llm_prompt_2_factory is not None:
                 # We're generating a list of objects using preliminary text
                 method_desc = "text_then_object"
-                log.dev(f"{task_desc} by {method_desc}")
+                log.verbose(f"{task_desc} by {method_desc}")
                 log.verbose(f"llm_prompt_2_factory: {llm_prompt_2_factory}")
-
-                generated_objects = await content_generator.make_text_then_object_list(
-                    job_metadata=job_metadata,
-                    object_class=content_class,
-                    llm_prompt_for_text=llm_prompt_1,
-                    llm_setting_main=llm_setting_main,
-                    llm_prompt_factory_for_object_list=llm_prompt_2_factory,
-                    llm_setting_for_object_list=llm_setting_for_object,
-                    nb_items=fixed_nb_output,
-                )
+                try:
+                    generated_objects = await content_generator.make_text_then_object_list(
+                        job_metadata=job_metadata,
+                        object_class=content_class,
+                        llm_prompt_for_text=llm_prompt_1,
+                        llm_setting_main=llm_setting_main,
+                        llm_prompt_factory_for_object_list=llm_prompt_2_factory,
+                        llm_setting_for_object_list=llm_setting_for_object,
+                        nb_items=fixed_nb_output,
+                    )
+                except LLMCompletionError as exc:
+                    location = self._format_error_location(pipe_run_params=pipe_run_params)
+                    msg = f"Error generating list of objects with text then object {location}: {exc}"
+                    raise PipeRunError(msg) from exc
             else:
                 # We're generating a list of objects directly
                 method_desc = "object_direct"
-                log.dev(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
-                generated_objects = await content_generator.make_object_list_direct(
-                    job_metadata=job_metadata,
-                    object_class=content_class,
-                    llm_prompt_for_object_list=llm_prompt_1,
-                    llm_setting_for_object_list=llm_setting_for_object,
-                    nb_items=fixed_nb_output,
-                )
+                log.verbose(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
+                try:
+                    generated_objects = await content_generator.make_object_list_direct(
+                        job_metadata=job_metadata,
+                        object_class=content_class,
+                        llm_prompt_for_object_list=llm_prompt_1,
+                        llm_setting_for_object_list=llm_setting_for_object,
+                        nb_items=fixed_nb_output,
+                    )
+                except LLMCompletionError as exc:
+                    location = self._format_error_location(pipe_run_params=pipe_run_params)
+                    msg = f"Error generating list of objects with direct method {location}: {exc}"
+                    raise PipeRunError(msg) from exc
 
             the_content = ListContent(items=generated_objects)
         else:
@@ -390,27 +407,40 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 method_desc = "text_then_object"
                 log.verbose(f"{task_desc} by {method_desc}")
                 log.verbose(f"llm_prompt_2_factory: {llm_prompt_2_factory}")
-                generated_object = await content_generator.make_text_then_object(
-                    job_metadata=job_metadata,
-                    object_class=content_class,
-                    llm_prompt_for_text=llm_prompt_1,
-                    llm_setting_main=llm_setting_main,
-                    llm_prompt_factory_for_object=llm_prompt_2_factory,
-                    llm_setting_for_object=llm_setting_for_object,
-                )
+                try:
+                    generated_object = await content_generator.make_text_then_object(
+                        job_metadata=job_metadata,
+                        object_class=content_class,
+                        llm_prompt_for_text=llm_prompt_1,
+                        llm_setting_main=llm_setting_main,
+                        llm_prompt_factory_for_object=llm_prompt_2_factory,
+                        llm_setting_for_object=llm_setting_for_object,
+                    )
+                except LLMCompletionError as exc:
+                    location = self._format_error_location(pipe_run_params=pipe_run_params)
+                    msg = f"Error generating single object with text then object {location}: {exc}"
+                    raise PipeRunError(msg) from exc
             else:
                 # We're generating a single object directly
                 method_desc = "object_direct"
                 log.verbose(f"{task_desc} by {method_desc}, content_class={content_class.__name__}")
-                generated_object = await content_generator.make_object_direct(
-                    job_metadata=job_metadata,
-                    object_class=content_class,
-                    llm_prompt_for_object=llm_prompt_1,
-                    llm_setting_for_object=llm_setting_for_object,
-                )
+                try:
+                    generated_object = await content_generator.make_object_direct(
+                        job_metadata=job_metadata,
+                        object_class=content_class,
+                        llm_prompt_for_object=llm_prompt_1,
+                        llm_setting_for_object=llm_setting_for_object,
+                    )
+                except LLMCompletionError as exc:
+                    location = self._format_error_location(pipe_run_params=pipe_run_params)
+                    msg = f"Error generating single object with direct method {location}: {exc}"
+                    raise PipeRunError(msg) from exc
             the_content = generated_object
 
         return the_content
+
+    def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
+        return f"in pipe '{pipe_run_params.pipe_stack_str}'"
 
     @override
     async def _dry_run_operator_pipe(
@@ -433,8 +463,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
         concept = get_required_concept(concept_string=concept_string)
         output_class = get_class_registry().get_class(concept.structure_class_name)
-        log.debug(f"get_output_structure_prompt for {concept_string} with {is_with_preliminary_text=}")
-        log.debug(f"output_class: {output_class}")
         if not output_class:
             return None
 

@@ -24,8 +24,7 @@ steps = [
 type = "PipeLLM"
 description = "Extract individual reviews from document"
 inputs = { document = "Document" }
-output = "CustomerReview"
-multiple_output = true
+output = "CustomerReview[]"
 model = "llm_for_testing_gen_text"
 prompt = """
 Extract each individual customer review from this document as separate items:

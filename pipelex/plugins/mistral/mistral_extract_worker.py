@@ -90,7 +90,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             msg = "Captioning is not implemented for Mistral OCR."
             raise ExtractCapabilityError(msg)
         if should_include_page_views:
-            log.debug("Page views are not implemented for Mistral OCR.")
+            log.verbose("Page views are not implemented for Mistral OCR.")
             # TODO: use a model capability flag to check possibility before asking for it
             # it it's asked and not available, raise
             # the caller will be responsible to get the page views using other solution if needed

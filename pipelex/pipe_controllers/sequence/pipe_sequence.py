@@ -10,14 +10,16 @@ from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.exceptions import (
+    PipeControllerOutputConceptMismatchError,
+    PipeInputError,
+    PipeInputNotFoundError,
     PipeRunParamsError,
     StaticValidationError,
     StaticValidationErrorType,
 )
-from pipelex.hub import get_required_pipe
+from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
-from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -55,11 +57,21 @@ class PipeSequence(PipeController):
 
             if sequential_sub_pipe.batch_params:
                 if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
+                    try:
+                        requirement = sub_pipe_needed_inputs.get_required_input_requirement(
+                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
+                        )
+                    except PipeInputNotFoundError as exc:
+                        msg = (
+                            f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
+                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
+                        )
+                        raise PipeInputError(
+                            message=msg, pipe_code=self.code, variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name, concept_code=None
+                        ) from exc
                     needed_inputs.add_requirement(
                         variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
-                        concept=sub_pipe_needed_inputs.get_required_input_requirement(
-                            variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name,
-                        ).concept,
+                        concept=requirement.concept,
                         multiplicity=True,
                     )
                     for input_name, requirement in sub_pipe_needed_inputs.items:
@@ -85,13 +97,15 @@ class PipeSequence(PipeController):
         The output of the pipe sequence should match the output of the last step.
         """
         last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
-        if self.output.concept_string != last_step_output_pipe.output.concept_string:
-            msg = (
-                f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                f"not matching the output concept code '{last_step_output_pipe.output.concept_string}' "
-                f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}'",
+        concept_of_last_step = last_step_output_pipe.output
+        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+            msg = f"""PipeSequence concept mismatch:
+the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
+of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
+"""
+            raise PipeControllerOutputConceptMismatchError(
+                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
             )
-            raise PipeSequenceError(msg)
 
     @model_validator(mode="after")
     def validate_inputs(self) -> Self:
@@ -135,7 +149,7 @@ class PipeSequence(PipeController):
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
-                log.debug(f"the_needed_inputs.required_names: {the_needed_inputs.required_names}")
+                log.verbose(f"the_needed_inputs.required_names: {the_needed_inputs.required_names}")
                 extraneous_input_var_error = StaticValidationError(
                     error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
                     domain=self.domain,
@@ -207,13 +221,16 @@ class PipeSequence(PipeController):
             msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
             raise PipeRunParamsError(msg)
         # Verify the output of this pipe is matching the output of the last step.
-        concept_string_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output.concept_string
-        if self.output.concept_string != concept_string_of_last_step:
-            msg = (
-                f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                f"not matching the output concept code '{concept_string_of_last_step}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'"
+        concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output
+        # if self.output.concept_string != concept_string_of_last_step:
+        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+            msg = f"""PipeSequence concept mismatch:
+the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
+of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
+"""
+            raise PipeControllerOutputConceptMismatchError(
+                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
             )
-            raise ValueError(msg)
         return await self._run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,

@@ -76,7 +76,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     assert pipe_output.main_stuff.concept.domain == "customer_feedback"
 
     # Log the working memory for debugging
-    log.debug("Final working memory after pipeline execution:")
+    log.verbose("Final working memory after pipeline execution:")
     pipe_output.working_memory.pretty_print_summary()
 
     # Verify final product rating

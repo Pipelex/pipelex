@@ -9,7 +9,7 @@ HtmlNewsletter = "The final newsletter content in html format with organized cha
 [pipe.write_discord_newsletter]
 type = "PipeSequence"
 description = "Create a newsletter from Discord articles by summarizing channels and organizing content"
-inputs = { discord_channel_updates = "DiscordChannelUpdate" }
+inputs = { discord_channel_updates = "DiscordChannelUpdate[]" }
 output = "HtmlNewsletter"
 steps = [
    { pipe = "summarize_discord_channel_update", batch_over = "discord_channel_updates", batch_as = "discord_channel_update", result = "channel_summaries" },

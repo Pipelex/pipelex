@@ -77,13 +77,13 @@ def detect_file_type_from_base64(b64: str | bytes) -> FileType:
     """
     # Normalise to bytes holding only the Base-64 alphabet
     if isinstance(b64, bytes):
-        log.debug(f"b64 is already bytes: {b64[:100]!r}")
+        log.verbose(f"b64 is already bytes: {b64[:100]!r}")
         b64_bytes = b64
     else:  # str  →  handle optional data-URL header
-        log.debug(f"b64 is a string: {b64[:100]!r}")
+        log.verbose(f"b64 is a string: {b64[:100]!r}")
         if b64.lstrip().startswith("data:") and "," in b64:
             b64 = b64.split(",", 1)[1]
-        log.debug(f"b64 after split: {b64[:100]!r}")
+        log.verbose(f"b64 after split: {b64[:100]!r}")
         b64_bytes = b64.encode("ascii")  # Base-64 is pure ASCII
 
     try:

@@ -7,9 +7,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirement_blueprint import InputRequirementBlueprint
 from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
-from pipelex.exceptions import DryRunError
+from pipelex.exceptions import DryRunMissingInputsError, PipeRunInputsError
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -27,7 +26,7 @@ class TestPipeConditionSimple:
         # Create a PipeCondition directly in Python that requires an input
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Test condition that should fail",
-            inputs={"user_category": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
+            inputs={"user_category": "test_pipe_condition.CategoryInput"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             expression_template="{{ user_category.category }}",
             outcomes={"small": "process_small", "medium": "process_medium", "large": "process_large"},
@@ -43,7 +42,7 @@ class TestPipeConditionSimple:
         # Test with empty working memory - should FAIL
         empty_working_memory = WorkingMemoryFactory.make_empty()
 
-        with pytest.raises(DryRunError) as exc_info:
+        with pytest.raises(PipeRunInputsError) as exc_info:
             await pipe_condition.run_pipe(
                 job_metadata=JobMetadata(job_name="test_direct_condition_fail"),
                 working_memory=empty_working_memory,
@@ -54,14 +53,14 @@ class TestPipeConditionSimple:
         error = exc_info.value
         assert error.pipe_code == "test_condition_fail"
         assert "user_category" in error.missing_inputs
-        assert "missing required inputs" in str(error)
+        assert "Missing required inputs" in str(error)
 
     async def test_direct_pipe_condition_should_succeed(self):
         """Test a PipeCondition created directly in code that should SUCCEED dry run."""
         # Create a PipeCondition directly in Python
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Test condition that should succeed",
-            inputs={"user_status": InputRequirementBlueprint(concept="test_pipe_condition.CategoryInput")},
+            inputs={"user_status": "test_pipe_condition.CategoryInput"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             expression_template="{{ user_status.category }}",
             outcomes={"active": "process_small", "inactive": "process_medium", "pending": "process_large"},
@@ -103,7 +102,7 @@ class TestPipeConditionSimple:
             print("✅ Direct PipeCondition SUCCEEDED completely!")
             pretty_print(pipe_output)
 
-        except DryRunError as exc:
+        except DryRunMissingInputsError as exc:
             msg_exc = str(exc)
             # If it fails, it should NOT be due to missing inputs
             assert "missing required inputs" not in str(msg_exc)

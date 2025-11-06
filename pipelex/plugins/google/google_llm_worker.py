@@ -43,7 +43,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         self.genai_async_client = genai_client.aio
         if structure_method:
             instructor_mode = structure_method.as_instructor_mode()
-            log.debug(f"Google structure mode: {structure_method} --> {instructor_mode}")
+            log.verbose(f"Google structure mode: {structure_method} --> {instructor_mode}")
             self.instructor_for_objects = instructor.from_genai(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
             self.instructor_for_objects = instructor.from_genai(client=sdk_instance, use_async=True)

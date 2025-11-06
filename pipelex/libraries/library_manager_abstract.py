@@ -39,16 +39,15 @@ class LibraryManagerAbstract(ABC):
         """Get the Library object for a specific library_id."""
 
     @abstractmethod
-    def load_libraries(
-        self,
-        library_id: str | None = None,
-        library_dirs: list[Path] | None = None,
-        library_file_paths: list[Path] | None = None,
-    ) -> None:
+    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         pass
 
     @abstractmethod
-    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def get_loaded_plx_paths(self) -> list[str]:
+        pass
+
+    @abstractmethod
+    def load_libraries(self, library_id: str, library_dirs: list[Path] | None = None, library_file_paths: list[Path] | None = None) -> None:
         pass
 
     @abstractmethod

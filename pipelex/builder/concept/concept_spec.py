@@ -1,9 +1,11 @@
+import re
 from datetime import datetime
 from typing import Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
+from typing_extensions import override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptBlueprintError,
@@ -14,9 +16,8 @@ from pipelex.core.concepts.concept_blueprint import (
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringOrConceptCodeError
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
-from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.system.registries.func_registry import pipe_func
+from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
 from pipelex.types import Self, StrEnum
 
@@ -41,7 +42,7 @@ class ConceptStructureSpec(StructuredContent):
         the_field_name: Field name. Must be snake_case.
         description: Natural language description of the field's purpose and usage.
         type: The field's data type.
-        required: Whether the field is mandatory. Defaults to True unless explicitly set to False.
+        required: Whether the field is mandatory. Defaults to False unless explicitly set to True.
         default_value: Default value for the field. Must match the specified type, and for choice
                       fields must be one of the valid choices. When provided, type must be specified
                       (unless choices are provided).
@@ -57,7 +58,7 @@ class ConceptStructureSpec(StructuredContent):
     the_field_name: str = Field(description="Field name. Must be snake_case.")
     description: str
     type: ConceptStructureSpecFieldType = Field(description="The type of the field.")
-    required: bool | None = None
+    required: bool | None = False
     default_value: Any | None = None
 
     @field_validator("type", mode="before")
@@ -223,21 +224,31 @@ class ConceptSpec(StructuredContent):
 
     @classmethod
     def validate_concept_string_or_code(cls, concept_string_or_code: str) -> None:
-        if concept_string_or_code.count(".") > 1:
+        # Strip multiplicity brackets if present (e.g., 'Text[]' or 'Text[2]' -> 'Text')
+
+        multiplicity_pattern = r"^(.+?)(?:\[\d*\])?$"
+        match = re.match(multiplicity_pattern, concept_string_or_code)
+        if not match:
+            msg = f"Invalid concept string format: '{concept_string_or_code}'"
+            raise ConceptStringOrConceptCodeError(msg)
+
+        concept_without_multiplicity = match.group(1)
+
+        if concept_without_multiplicity.count(".") > 1:
             msg = (
-                f"concept_string_or_code '{concept_string_or_code}' is invalid. "
+                f"concept_string_or_code '{concept_without_multiplicity}' is invalid. "
                 "It should either contain a domain in snake_case and a concept code in PascalCase separated by one dot, "
                 "or be a concept code in PascalCase."
             )
             raise ConceptStringOrConceptCodeError(msg)
 
-        if concept_string_or_code.count(".") == 1:
-            domain, concept_code = concept_string_or_code.split(".")
+        if concept_without_multiplicity.count(".") == 1:
+            domain, concept_code = concept_without_multiplicity.split(".")
             # Validate domain code
             DomainBlueprint.validate_domain_code(code=domain)
             cls._post_validate_concept_code(concept_code=concept_code)
         else:
-            cls._post_validate_concept_code(concept_code=concept_string_or_code)
+            cls._post_validate_concept_code(concept_code=concept_without_multiplicity)
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""
@@ -250,26 +261,23 @@ class ConceptSpec(StructuredContent):
 
         return ConceptBlueprint(description=self.description, structure=converted_structure, refines=self.refines)
 
+    @override
+    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
+        the_dict: dict[str, Any] = self.smart_dump()
+        the_dict = remove_none_values_from_dict(data=the_dict)
+        if number:
+            title = f"Concept #{number}: {self.the_concept_code}"
+        else:
+            title = f"Concept: {self.the_concept_code}"
+        if self.refines:
+            title += f" • Refines {self.refines}"
+            the_dict.pop("refines")
 
-@pipe_func()
-async def create_concept_spec(working_memory: WorkingMemory) -> ConceptSpec:
-    concept_spec_draft = working_memory.get_stuff_as(name="concept_spec_draft", content_type=ConceptSpecDraft)
-    concept_spec_structures_stuff = working_memory.get_stuff_as_list(name="concept_spec_structures", item_type=ConceptStructureSpec)
-
-    structure_dict: dict[str, ConceptStructureSpec] = {}
-    for structure_item in concept_spec_structures_stuff.items:
-        structure_spec = ConceptStructureSpec(
-            the_field_name=structure_item.the_field_name,
-            description=structure_item.description,
-            type=structure_item.type,
-            required=structure_item.required,
-            default_value=structure_item.default_value,
-        )
-        structure_dict[structure_item.the_field_name] = structure_spec
-
-    return ConceptSpec(
-        the_concept_code=concept_spec_draft.the_concept_code,
-        description=concept_spec_draft.description,
-        structure=structure_dict,
-        refines=concept_spec_draft.refines,
-    )
+        description = self.description
+        the_dict.pop("the_concept_code")
+        the_dict.pop("description")
+        if self.structure:
+            structure = the_dict.pop("structure")
+            pretty_print(structure, title=title, subtitle=description)
+        else:
+            pretty_print(description, title=title)

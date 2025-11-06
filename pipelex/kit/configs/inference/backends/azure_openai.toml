@@ -11,6 +11,9 @@
 # - Headers with dots must be quoted (e.g., ["gpt-4.1"])
 # - Model costs are in USD per million tokens (input/output)
 #
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
 ################################################################################
 
 ################################################################################
@@ -96,3 +99,8 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 
+[gpt-5]
+model_id = "gpt-5-2025-08-07"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }

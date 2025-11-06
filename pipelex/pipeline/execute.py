@@ -1,33 +1,44 @@
+from typing import TYPE_CHECKING
+
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.exceptions import PipeExecutionError, PipelineExecutionError, PipeRouterError
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
+    get_telemetry_manager,
 )
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
-    PipeOutputMultiplicity,
-    PipeRunMode,
+    VariableMultiplicity,
 )
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.pipeline.validate_plx import validate_plx
 from pipelex.system.environment import get_optional_env
+from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
+
+if TYPE_CHECKING:
+    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+    from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 
 async def execute_pipeline(
-    pipe_code: str,
+    pipe_code: str | None = None,
+    plx_content: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
-    search_domains: list[str] | None = None,
     output_name: str | None = None,
-    output_multiplicity: PipeOutputMultiplicity | None = None,
+    output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
+    search_domains: list[str] | None = None,
 ) -> PipeOutput:
     """Execute a pipeline and wait for its completion.
 
@@ -38,9 +49,11 @@ async def execute_pipeline(
     Parameters
     ----------
     pipe_code:
-        The code of the pipe to execute.
+        The code identifying the pipeline to execute.
+    plx_content:
+        Content of the pipeline bundle to execute.
     inputs:
-        Optional pipeline inputs or working memory to pass to the pipe.
+        Inputs passed to the pipeline.
     output_name:
         Name of the output slot to write to.
     output_multiplicity:
@@ -61,8 +74,30 @@ async def execute_pipeline(
         A tuple containing the pipe output and the pipeline run ID.
 
     """
+    if not plx_content and not pipe_code:
+        msg = "Either pipe_code or plx_content must be provided to the API execute_pipeline."
+        raise ValueError(msg)
+
+    pipe: PipeAbstract | None = None
+    blueprint: PipelexBundleBlueprint | None = None
+
+    if plx_content:
+        blueprint, _ = await validate_plx(plx_content=plx_content, remove_after_validation=False)
+
+        if pipe_code:
+            pipe = get_required_pipe(pipe_code=pipe_code)
+        elif blueprint.main_pipe:
+            pipe = get_required_pipe(pipe_code=blueprint.main_pipe)
+        else:
+            msg = "No pipe code or main pipe in the PLX content provided to the API execute_pipeline."
+            raise PipeExecutionError(message=msg)
+    elif pipe_code:
+        pipe = get_required_pipe(pipe_code=pipe_code)
+    else:
+        msg = "Either provide pipe_code or plx_content to the API execute_pipeline. 'pipe_code' must be provided when 'plx_content' is None"
+        raise PipeExecutionError(message=msg)
+
     search_domains = search_domains or []
-    pipe = get_required_pipe(pipe_code=pipe_code)
     if pipe.domain not in search_domains:
         search_domains.insert(0, pipe.domain)
 
@@ -89,7 +124,7 @@ async def execute_pipeline(
     get_library_manager().open_library(library_id=pipeline_run_id)
 
     job_metadata = JobMetadata(
-        pipeline_run_id=pipeline_run_id,
+        pipeline_run_id=pipeline.pipeline_run_id,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(
@@ -106,4 +141,29 @@ async def execute_pipeline(
         output_name=output_name,
     )
 
-    return await get_pipe_router().run(pipe_job)
+    properties = {
+        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+        EventProperty.PIPE_TYPE: pipe.pipe_type,
+    }
+    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
+
+    try:
+        pipe_output = await get_pipe_router().run(pipe_job)
+    except PipeRouterError as exc:
+        raise PipelineExecutionError(
+            message=exc.message,
+            run_mode=pipe_job.pipe_run_params.run_mode,
+            pipe_code=pipe_job.pipe.code,
+            output_name=pipe_job.output_name,
+            pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+        ) from exc
+    finally:
+        if plx_content and blueprint is not None:
+            get_library_manager().remove_from_blueprint(blueprint=blueprint)
+    properties = {
+        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+        EventProperty.PIPE_TYPE: pipe.pipe_type,
+        EventProperty.PIPELINE_EXECUTE_OUTCOME: Outcome.SUCCESS,
+    }
+    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
+    return pipe_output

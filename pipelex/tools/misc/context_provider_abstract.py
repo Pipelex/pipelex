@@ -5,9 +5,9 @@ from pipelex.system.exceptions import ToolException
 
 
 class ContextProviderException(ToolException):
-    def __init__(self, variable_name: str, message: str, *args: object, **kwargs: object) -> None:
+    def __init__(self, message: str, variable_name: str):
+        super().__init__(message=message)
         self.variable_name = variable_name
-        super().__init__(message, *args, **kwargs)
 
 
 class ContextProviderAbstract(ABC):
@@ -16,7 +16,7 @@ class ContextProviderAbstract(ABC):
     """
 
     @abstractmethod
-    def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None) -> Any:
+    def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
         pass
 
     @abstractmethod

@@ -11,6 +11,9 @@
 # - Headers with dots must be quoted (e.g., ["grok-3"])
 # - Model costs are in USD per million tokens (input/output)
 #
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
 ################################################################################
 
 ################################################################################

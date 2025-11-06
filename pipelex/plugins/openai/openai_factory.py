@@ -28,6 +28,7 @@ class OpenAIFactoryError(CogtError):
 class OpenAISdkVariant(StrEnum):
     AZURE_OPENAI = "azure_openai"
     OPENAI = "openai"
+    OPENAI_ALT_IMG_GEN = "openai_alt_img_gen"
 
 
 class AzureExtraField(StrEnum):
@@ -47,23 +48,34 @@ class OpenAIFactory:
             msg = f"Plugin '{plugin}' is not supported by OpenAIFactory"
             raise OpenAIFactoryError(msg) from exc
 
+        # We have a workaround here:
+        # OpenAI can be used without any API key (for instance when pointing to local Ollama) but the SDK,
+        # as it is, raises if there is not API key (api_key is None and there is not env var).
+        # But it works fine with an empty string.
+        api_key = backend.api_key or ""
+
         the_client: openai.AsyncOpenAI
         match sdk_variant:
             case OpenAISdkVariant.AZURE_OPENAI:
-                log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 if backend.endpoint is None:
                     msg = "Azure OpenAI endpoint is not set"
                     raise OpenAIFactoryError(msg)
                 the_client = openai.AsyncAzureOpenAI(
                     azure_endpoint=backend.endpoint,
-                    api_key=backend.api_key,
+                    api_key=api_key,
                     api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
                 )
-
             case OpenAISdkVariant.OPENAI:
-                log.debug(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
-                    api_key=backend.api_key,
+                    api_key=api_key,
+                    base_url=backend.endpoint,
+                )
+            case OpenAISdkVariant.OPENAI_ALT_IMG_GEN:
+                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+                the_client = openai.AsyncOpenAI(
+                    api_key=api_key,
                     base_url=backend.endpoint,
                 )
 
@@ -132,7 +144,7 @@ class OpenAIFactory:
     @staticmethod
     def make_logit_bias(nb_items: int, weight: int = 100) -> dict[str, int]:
         logit_bias = {str(item): weight for item in range(15, 15 + nb_items + 1)}
-        log.debug(f"logit_bias: {logit_bias}")
+        log.verbose(f"logit_bias: {logit_bias}")
         return logit_bias
 
     @staticmethod
