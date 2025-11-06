@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from pipelex.builder.validation_error_data import SyntaxErrorData
+from pipelex.core.exceptions import SyntaxErrorData
 from pipelex.exceptions import PipelexException
 
 

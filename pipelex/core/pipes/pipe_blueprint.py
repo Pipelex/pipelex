@@ -3,7 +3,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from pipelex.core.concepts.exceptions import ConceptStringError
-from pipelex.core.concepts.validation import validate_concept_string
+from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.tools.misc.string_utils import is_snake_case
@@ -132,7 +132,7 @@ class PipeBlueprint(BaseModel):
         # Strip multiplicity brackets before validating
         output_parse_result = parse_concept_with_multiplicity(output)
         try:
-            validate_concept_string(concept_string=output_parse_result.concept)
+            validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
         except ConceptStringError as exc:
             msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
             raise PipeBlueprintValueError(msg) from exc

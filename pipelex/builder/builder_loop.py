@@ -77,7 +77,6 @@ class BuilderLoop:
             pipelex_bundle_spec = fix_inputs_consistency(bundle_spec=pipelex_bundle_spec)
         except PipelexBundleError as bundle_error:
             # Let the error fall through to the existing error handling
-            pretty_print(bundle_error.as_structured_content(), title="Pipelex Bundle Error (during input fix)")
             pipelex_bundle_spec = self._fix_bundle_error(
                 bundle_error=bundle_error,
                 pipelex_bundle_spec=pipelex_bundle_spec,
@@ -97,7 +96,6 @@ class BuilderLoop:
         try:
             await validate_bundle_spec(bundle_spec=pipelex_bundle_spec)
         except PipelexBundleError as bundle_error:
-            pretty_print(bundle_error.as_structured_content(), title="Pipelex Bundle Error")
             pipelex_bundle_spec = self._fix_bundle_error(
                 bundle_error=bundle_error,
                 pipelex_bundle_spec=pipelex_bundle_spec,

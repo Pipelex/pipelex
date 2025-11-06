@@ -27,6 +27,11 @@ class TestCases:
             ),
             f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         ),
+        (
+            "without_domain",
+            ConceptBlueprint(description="A concept that refines a concept without domain", refines=NativeConceptCode.TEXT),
+            f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+        ),
     ]
 
     # Test cases for make_domain_and_concept_code_from_concept_string_or_concept_code method

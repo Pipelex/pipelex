@@ -187,12 +187,34 @@ class ConceptFactory:
 
     @classmethod
     def make_refine(cls, refine: str) -> str:
+        """Validate and normalize a refine string.
+
+        If the refine is a native concept code without domain (e.g., 'Text'),
+        it will be normalized to include the native domain prefix (e.g., 'native.Text').
+
+        Args:
+            refine: The refine string to validate and normalize
+
+        Returns:
+            The normalized refine string with domain prefix
+
+        Raises:
+            ConceptFactoryError: If the refine is invalid
+
+        """
         try:
             validate_refine(refine=refine)
         except ConceptRefineError as exc:
             msg = f"Could not validate refine '{refine}': {exc}"
             raise ConceptFactoryError(msg) from exc
-        return refine
+
+        # Normalize the refine string (adds native domain if missing)
+        normalized_refine = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
+        if normalized_refine is None:
+            msg = f"Could not normalize refine '{refine}' to a native concept string"
+            raise ConceptFactoryError(msg)
+
+        return normalized_refine
 
     @classmethod
     def make_from_blueprint_or_description(

@@ -32,6 +32,12 @@ def is_concept_string_or_code_valid(concept_string_or_code: str) -> bool:
         return is_concept_code_valid(concept_code=concept_string_or_code)
 
 
+def validate_concept_string_or_code(concept_string_or_code: str) -> None:
+    if not is_concept_string_or_code_valid(concept_string_or_code=concept_string_or_code):
+        msg = f"Concept string or code '{concept_string_or_code}' is not a valid concept string or code."
+        raise ConceptStringError(msg)
+
+
 def validate_concept_string(concept_string: str) -> None:
     if not is_concept_string_valid(concept_string=concept_string):
         msg = (

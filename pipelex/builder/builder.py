@@ -135,33 +135,6 @@ def reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec: PipelexBundleSpec, f
     return pipelex_bundle_spec
 
 
-async def reconstruct_bundle_with_all_fixes(working_memory: WorkingMemory) -> PipelexBundleSpec:
-    pipelex_bundle_spec = working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
-    if fixed_pipes := working_memory.get_optional_stuff(name="fixed_pipes"):
-        fixed_pipes_list = cast("ListContent[PipeSpecUnion]", fixed_pipes.content)
-
-        if not pipelex_bundle_spec.pipe:
-            msg = "No pipes section found in bundle spec"
-            raise PipeBuilderError(msg)
-
-        for fixed_pipe_blueprint in fixed_pipes_list.items:
-            pipe_code = fixed_pipe_blueprint.pipe_code
-            pipelex_bundle_spec.pipe[pipe_code] = fixed_pipe_blueprint
-
-    if fixed_concepts := working_memory.get_optional_stuff(name="fixed_concepts"):
-        fixed_concepts_list = cast("ListContent[ConceptSpec]", fixed_concepts.content)
-
-        if not pipelex_bundle_spec.concept:
-            msg = "No concepts section found in bundle spec"
-            raise PipeBuilderError(msg)
-
-        for fixed_concept_blueprint in fixed_concepts_list.items:
-            concept_code = fixed_concept_blueprint.the_concept_code
-            pipelex_bundle_spec.concept[concept_code] = fixed_concept_blueprint
-
-    return pipelex_bundle_spec
-
-
 async def load_and_validate_bundle(bundle_path: str) -> PipelexBundleBlueprint:
     """Load a bundle file and extract its main_pipe.
 

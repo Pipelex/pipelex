@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from typing_extensions import override
 
 from pipelex.system.exceptions import RootException
-
-if TYPE_CHECKING:
-    from pipelex.builder.validation_error_data import StaticValidationErrorType
+from pipelex.types import StrEnum
 
 
 class PipelexException(RootException):
@@ -67,3 +63,10 @@ class PipelexConfigError(PipelexException):
 
 class PipelexSetupError(PipelexException):
     pass
+
+
+class StaticValidationErrorType(StrEnum):
+    MISSING_INPUT_VARIABLE = "missing_input_variable"
+    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
+    INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
+    TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
