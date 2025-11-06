@@ -43,6 +43,10 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
+    def remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> list[PipeAbstract]:
+        pass
+
+    @abstractmethod
     def get_loaded_plx_paths(self) -> list[str]:
         pass
 

@@ -18,6 +18,7 @@ from pipelex.core.domains.domain import Domain
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
+from pipelex.libraries.library import Library
 from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
@@ -160,7 +161,7 @@ class PipelexHub:
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
 
-    def set_library_manager(self, library_manager: LibraryManagerAbstract):
+    def set_library_manager(self, library_manager: Library):
         self._library_manager = library_manager
 
     def set_observer(self, observer: ObserverProtocol):
