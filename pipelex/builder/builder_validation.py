@@ -1,17 +1,15 @@
 from pipelex import log
 from pipelex.builder.builder_errors import (
     ConceptSpecError,
-    DomainFailure,
     PipeFailure,
-    PipeInputErrorData,
-    PipelexBundleError,
     PipelexBundleUnexpectedError,
     PipeSpecError,
-    StaticValidationErrorData,
     ValidateDryRunError,
 )
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
+from pipelex.builder.validation_error_data import PipeInputErrorData, StaticValidationErrorData
+from pipelex.core.bundles.exceptions import DomainFailure, PipelexBundleError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
 from pipelex.core.pipes.exceptions import PipeDefinitionErrorData, PipeInputError

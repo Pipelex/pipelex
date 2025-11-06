@@ -1,28 +1,34 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated
 
+import click
+import typer
 from posthog import new_context, tag
 from rich.console import Console
-from pathlib import Path
 from rich.syntax import Syntax
 from rich.traceback import Traceback
-from typing import Annotated
-import traceback
-from pipelex.pipe_run.dry_run import dry_run_pipe
-import typer
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
-import click
+from typing_extensions import Protocol
+
+from pipelex import log, pretty_print
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
-from pipelex import log
-from pipelex.hub import get_library_manager, get_pipes, get_telemetry_manager, get_required_pipe
+from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.pipes.exceptions import PipeInputError
+from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
-from pipelex.pipe_run.dry_run import dry_run_pipes
+from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
+
+if TYPE_CHECKING:
+    from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
+    from pipelex.core.pipes.pipe_abstract import PipeAbstract
+
 
 console = Console()
 
@@ -189,6 +195,10 @@ def validate_cmd(
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} pipe")
 
         asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path))
+
+
+class ValidationErrorDetailsProtocol(Protocol):
+    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]: ...
 
 
 def present_validation_error(details_provider: ValidationErrorDetailsProtocol):

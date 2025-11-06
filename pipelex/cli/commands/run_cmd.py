@@ -11,7 +11,7 @@ from rich.console import Console
 
 from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_and_validate_bundle
-from pipelex.builder.builder_errors import PipelexBundleError
+from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError

@@ -8,9 +8,10 @@ from posthog import new_context, tag
 
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
-from pipelex.builder.builder_errors import PipeBuilderError, PipelexBundleError
+from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
+from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
