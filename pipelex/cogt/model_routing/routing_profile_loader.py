@@ -1,5 +1,6 @@
 from pydantic import ValidationError
 
+from pipelex import log
 from pipelex.cogt.exceptions import ModelManagerError, RoutingProfileLibraryError
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_factory import RoutingProfileFactory, RoutingProfileLibraryBlueprint
@@ -41,13 +42,20 @@ def load_active_routing_profile(routing_profile_library_path: str, enabled_backe
         msg = (
             f"Default backend '{active_profile.default}' set for routing profile '{active_profile_name}' is not enabled. "
             f"You must either enable backend '{active_profile.default}' or set a different default backend for profile '{active_profile_name}', "
-            "or choose a different routing profile."
+            "or select a different routing profile."
         )
         raise RoutingProfileLibraryError(msg)
+
+    # Raise error for routes that use disabled backends
+    for backend_name in active_profile.routes.values():
+        if backend_name not in enabled_backends:
+            msg = f"Backend '{backend_name}', required for profile '{active_profile_name}' is not enabled"
+            raise RoutingProfileLibraryError(msg)
+
     seen_disabled_backends: set[str] = set()
     for backend_name in active_profile.routes.values():
         if backend_name not in enabled_backends and backend_name not in seen_disabled_backends:
             msg = f"Backend '{backend_name}', required for profile '{active_profile_name}' is not enabled"
-            raise RoutingProfileLibraryError(msg)
+            log.info(msg)
             seen_disabled_backends.add(backend_name)
     return active_profile
