@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptStringError
-from pipelex.core.concepts.validation import validate_concept_string
+from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.pipes.input_requirements import InputRequirement, InputRequirements
 from pipelex.exceptions import PipelexException
 from pipelex.hub import get_required_concept
@@ -79,7 +79,7 @@ class InputRequirementsFactory:
 
         # Validate and resolve concept string with domain
         try:
-            validate_concept_string(concept_string=concept_string_or_code)
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
         except ConceptStringError as exc:
             msg = f"Invalid concept string '{concept_string_or_code}' when trying to make an 'InputRequirement' from string: {exc}"
             raise InputRequirementsFactoryError(msg) from exc

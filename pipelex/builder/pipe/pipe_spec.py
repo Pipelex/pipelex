@@ -5,10 +5,10 @@ from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
-from pipelex.core.concepts.validation import validate_concept_string
+from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
@@ -78,7 +78,7 @@ class PipeSpec(StructuredContent):
     def validate_output(cls, output: str) -> str:
         # Extract concept without multiplicity for validation
         parse_result = parse_concept_with_multiplicity(output)
-        validate_concept_string(concept_string=parse_result.concept)
+        validate_concept_string_or_code(concept_string_or_code=parse_result.concept)
         return output  # Return original with brackets intact
 
     @field_validator("inputs", mode="after")
@@ -88,7 +88,7 @@ class PipeSpec(StructuredContent):
             return None
 
         # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-        multiplicity_pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+        multiplicity_pattern = MUTLIPLICITY_PATTERN
 
         for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
@@ -106,7 +106,7 @@ class PipeSpec(StructuredContent):
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
-            validate_concept_string(concept_string=concept_string_or_code)
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
 
         return inputs
 

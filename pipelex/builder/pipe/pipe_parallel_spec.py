@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_exceptions import PipeParallelSpecError
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
-from pipelex.core.concepts.validation import validate_concept_string
+from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.types import Self
 
@@ -36,7 +36,7 @@ class PipeParallelSpec(PipeSpec):
     @classmethod
     def validate_combined_output(cls, combined_output: str) -> str:
         if combined_output:
-            validate_concept_string(concept_string=combined_output)
+            validate_concept_string_or_code(concept_string_or_code=combined_output)
         return combined_output
 
     @model_validator(mode="after")
