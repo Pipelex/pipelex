@@ -9,6 +9,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
@@ -16,7 +17,6 @@ from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.exceptions import PipeConditionError
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails

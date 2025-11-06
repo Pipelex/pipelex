@@ -13,6 +13,7 @@ from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError, UnexpectedPipeDefinitionError
@@ -25,7 +26,6 @@ from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError

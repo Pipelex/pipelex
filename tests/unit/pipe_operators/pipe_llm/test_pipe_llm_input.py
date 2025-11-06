@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex import log
-from pipelex.exceptions import StaticValidationError
+from pipelex.core.exceptions import StaticValidationError
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from tests.unit.pipe_operators.pipe_llm.data import PipeLLMInputTestCases

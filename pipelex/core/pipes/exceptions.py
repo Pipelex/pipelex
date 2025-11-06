@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 
 from pipelex.exceptions import PipelexException
+from pipelex.types import StrEnum
 
 
 class PipeBlueprintValueError(ValueError):
@@ -36,3 +37,10 @@ class PipeDefinitionErrorData(BaseModel):
     pipe_code: str | None = Field(None, description="The pipe code")
     description: str | None = Field(None, description="Description of the pipe")
     source: str | None = Field(None, description="Source of the error")
+
+
+class StaticValidationErrorType(StrEnum):
+    MISSING_INPUT_VARIABLE = "missing_input_variable"
+    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
+    INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
+    TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"

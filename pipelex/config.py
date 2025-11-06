@@ -6,7 +6,8 @@ from pydantic import Field, field_validator
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.exceptions import PipelexConfigError, StaticValidationErrorType
+from pipelex.core.pipes.exceptions import StaticValidationErrorType
+from pipelex.exceptions import PipelexConfigError
 from pipelex.hub import get_required_config
 from pipelex.language.plx_config import PlxConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig

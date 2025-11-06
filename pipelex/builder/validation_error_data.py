@@ -10,8 +10,8 @@ from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.exceptions import StaticValidationErrorType
 
 # ============================================================================
 # BaseModel (StructuredContent) versions of error information

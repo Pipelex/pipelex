@@ -15,8 +15,8 @@ from pipelex.builder.builder_validation import fix_inputs_consistency, validate_
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
+from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.exceptions import StaticValidationErrorType
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.exceptions import PipelineExecutionError
