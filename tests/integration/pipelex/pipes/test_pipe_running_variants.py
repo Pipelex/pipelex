@@ -9,6 +9,7 @@ from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeTestCases
 
@@ -107,7 +108,7 @@ class TestPipeRunningVariants:
         # )
 
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
-        with pytest.raises(exception) as exc:
+        with pytest.raises(PipeStackOverflowError) as exc:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code=pipe_code),

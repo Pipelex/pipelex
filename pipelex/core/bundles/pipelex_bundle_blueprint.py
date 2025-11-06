@@ -49,7 +49,7 @@ class PipelexBundleBlueprint(BaseModel):
         try:
             validate_domain_code(code=domain)
         except DomainCodeError as exc:
-            msg = f"Error when trying to validate the pipelex bundle at source '{cls.source}': {exc}"
+            msg = f"Error when trying to validate the pipelex bundle at domain '{domain}': {exc}"
             raise PipelexBundleBlueprintValueError(msg) from exc
         return domain
 

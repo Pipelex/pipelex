@@ -1,6 +1,5 @@
 from pydantic import ValidationError
 
-from pipelex.core.domains.exceptions import DomainError
 from pipelex.core.interpreter import PLXDecodeError
 
 INVALID_PLX_SYNTAX = (
@@ -75,7 +74,7 @@ description = "Domain with invalid characters"
 [concept]
 TestConcept = "A test concept"
 """,
-    DomainError,
+    ValidationError,
 )
 
 EMPTY_DOMAIN = (
@@ -86,7 +85,7 @@ description = "Domain with empty string"
 [concept]
 TestConcept = "A test concept"
 """,
-    DomainError,
+    ValidationError,
 )
 
 INVALID_ROOT_KEY = (

@@ -4,10 +4,9 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError
+from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.domains.exceptions import DomainError
 
 
 class TestConcept:
@@ -170,18 +169,14 @@ class TestConcept:
         valid_concept_code = "ConceptCode"
         valid_concept_string = f"{valid_domain}.{valid_concept_code}"
         # Valid cases - should not raise exceptions
-        with pytest.raises(ConceptStringError):
-            validate_concept_string(valid_concept_string)
-        with pytest.raises(ConceptStringError):
-            validate_concept_string(f"snake_case_domain.{valid_concept_code}")
-        with pytest.raises(ConceptStringError):
-            validate_concept_string(f"domain_123.{valid_concept_code}")
-        with pytest.raises(ConceptStringError):
-            validate_concept_string(f"{valid_domain}.TEXT")
-        with pytest.raises(ConceptStringError):
-            validate_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}")
+        validate_concept_string(valid_concept_string)
+        validate_concept_string(f"domain_123.{valid_concept_code}")
+        validate_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}")
+        validate_concept_string(f"{valid_domain}.UPPERCASE")
 
         # Invalid cases - should raise ConceptCodeError
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"snake_case_domaiN.{valid_concept_code}")
 
         # Multiple dots
         with pytest.raises(ConceptStringError):
@@ -191,29 +186,29 @@ class TestConcept:
             validate_concept_string(f"a.b.c.{valid_concept_code}")
 
         # Invalid domain (not snake_case)
-        with pytest.raises(DomainError):
+        with pytest.raises(ConceptStringError):
             validate_concept_string(f"InvalidDomain.{valid_concept_code}")
 
-        with pytest.raises(DomainError):
+        with pytest.raises(ConceptStringError):
             validate_concept_string(f"domain-name.{valid_concept_code}")
 
-        with pytest.raises(DomainError):
+        with pytest.raises(ConceptStringError):
             validate_concept_string(f"Domain_Name.{valid_concept_code}")
 
-        with pytest.raises(DomainError):
+        with pytest.raises(ConceptStringError):
             validate_concept_string(f"123domain.{valid_concept_code}")
 
         # Invalid concept code (not PascalCase)
-        with pytest.raises(ConceptCodeError):
+        with pytest.raises(ConceptStringError):
             validate_concept_string(f"{valid_domain}.invalidText")
 
-        with pytest.raises(ConceptCodeError):
+        with pytest.raises(ConceptStringError):
             validate_concept_string(f"{valid_domain}.text")
 
-        with pytest.raises(ConceptCodeError):
+        with pytest.raises(ConceptStringError):
             validate_concept_string(f"{valid_domain}.Text_Name")
 
-        with pytest.raises(ConceptCodeError):
+        with pytest.raises(ConceptStringError):
             validate_concept_string(f"{valid_domain}.text-name")
 
         # Invalid native concept
