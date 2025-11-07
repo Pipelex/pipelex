@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import click
 import typer
-from posthog import new_context, tag
+from posthog import tag
 
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
@@ -13,7 +13,7 @@ from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
 from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_error, handle_model_choice_error
 from pipelex.exceptions import PipeInputError, PipelineExecutionError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
-from pipelex.hub import get_report_delegate, get_required_pipe
+from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.execute import execute_pipeline
@@ -138,7 +138,7 @@ def build_pipe_cmd(
                 typer.secho(f"⚠️  Warning: Could not generate input JSON: {exc}", fg=typer.colors.YELLOW)
 
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
@@ -297,7 +297,7 @@ def prepare_runner_cmd(
 
     pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
@@ -443,7 +443,7 @@ def generate_inputs_cmd(
 
     pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_INPUTS}")
@@ -512,7 +512,7 @@ def build_one_shot_cmd(
         typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_ONE_SHOT_PIPE}")
@@ -615,7 +615,7 @@ def build_partial_cmd(
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
 
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PARTIAL_PIPE}")

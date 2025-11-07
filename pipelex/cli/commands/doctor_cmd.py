@@ -340,8 +340,6 @@ def check_models() -> tuple[bool, str]:
 
     models_manager = ModelManager()
     secrets_provider = EnvSecretsProvider()
-    models_manager.setup(secrets_provider=secrets_provider)
-    models_manager.validate_model_deck()
     try:
         models_manager.setup(secrets_provider=secrets_provider)
         models_manager.validate_model_deck()

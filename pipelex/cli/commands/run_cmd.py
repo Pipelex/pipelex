@@ -6,7 +6,7 @@ from typing import Annotated
 
 import click
 import typer
-from posthog import new_context, tag
+from posthog import tag
 from rich.console import Console
 
 from pipelex import log, pretty_print_md
@@ -14,6 +14,7 @@ from pipelex.builder.builder import load_and_validate_bundle
 from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_error, handle_model_choice_error
 from pipelex.exceptions import PipeInputError, PipelineExecutionError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
+from pipelex.hub import get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.system.runtime import IntegrationMode
@@ -191,7 +192,7 @@ def run_cmd(
     pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
 
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=COMMAND)

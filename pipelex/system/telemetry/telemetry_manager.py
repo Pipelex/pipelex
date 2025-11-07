@@ -1,4 +1,5 @@
-from typing import Any, Callable
+from contextlib import contextmanager
+from typing import Any, Callable, Generator
 
 import posthog
 from posthog import Posthog, new_context, tag
@@ -157,3 +158,10 @@ class TelemetryManager(TelemetryManagerAbstract):
         else:
             self.posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
             log.verbose(f"Tracked identified event '{event_name}' with properties: {properties}")
+
+    @override
+    @contextmanager
+    def telemetry_context(self) -> Generator[None, None, None]:
+        """Context manager that uses PostHog's new_context when telemetry is enabled."""
+        with new_context():
+            yield

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import click
 import typer
-from posthog import new_context, tag
+from posthog import tag
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.traceback import Traceback
@@ -37,7 +37,7 @@ def do_validate_all_libraries_and_dry_run() -> None:
     """Validate libraries and dry-run all pipes."""
     pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
@@ -192,7 +192,7 @@ def validate_cmd(
         raise typer.Exit(1) from library_loading_error
 
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             if bundle_path:

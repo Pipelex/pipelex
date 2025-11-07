@@ -4,7 +4,7 @@ import asyncio
 from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
-from posthog import new_context, tag
+from posthog import tag
 from rich import box
 from rich.console import Console
 from rich.table import Table
@@ -187,7 +187,7 @@ def list_pipes_cmd() -> None:
     """
     Pipelex.make(integration_mode=IntegrationMode.CLI)
 
-    with new_context():
+    with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPES}")
@@ -207,7 +207,7 @@ def show_pipe_cmd(
     """
     Pipelex.make(integration_mode=IntegrationMode.CLI)
 
-    with new_context():
+    with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
@@ -234,7 +234,7 @@ def show_models_cmd(
     """
     pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     try:
-        with new_context():
+        with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MODELS}")
@@ -262,7 +262,7 @@ def show_backends_cmd(
         pipelex show backends --all
     """
     Pipelex.make(integration_mode=IntegrationMode.CLI)
-    with new_context():
+    with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_BACKENDS}")
