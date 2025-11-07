@@ -24,6 +24,18 @@ class ErrorContext(StrEnum):
     VALIDATION = "Pipe validation"
     BUILD = "Pipe build"
 
+    # Pre-validation contexts (for Pipelex.make() errors)
+    VALIDATION_BEFORE_SHOW_PIPES = "Pre-validation (show pipes)"
+    VALIDATION_BEFORE_SHOW_PIPE = "Pre-validation (show pipe)"
+    VALIDATION_BEFORE_SHOW_MODELS = "Pre-validation (show models)"
+    VALIDATION_BEFORE_SHOW_BACKENDS = "Pre-validation (show backends)"
+    VALIDATION_BEFORE_PIPE_RUN = "Pre-validation (pipe run)"
+    VALIDATION_BEFORE_BUILD_PIPE = "Pre-validation (build pipe)"
+    VALIDATION_BEFORE_BUILD_RUNNER = "Pre-validation (build runner)"
+    VALIDATION_BEFORE_BUILD_INPUTS = "Pre-validation (build inputs)"
+    VALIDATION_BEFORE_BUILD_ONE_SHOT = "Pre-validation (build one-shot)"
+    VALIDATION_BEFORE_BUILD_PARTIAL = "Pre-validation (build partial)"
+
 
 def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorContext) -> NoReturn:
     """Handle and display PipeOperatorModelChoiceError with formatted output.

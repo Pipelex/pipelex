@@ -11,8 +11,21 @@ from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
 from pipelex.builder.builder_errors import PipeBuilderError, PipelexBundleError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
-from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_error, handle_model_choice_error
-from pipelex.exceptions import PipeInputError, PipelineExecutionError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
+from pipelex.cli.error_handlers import (
+    ErrorContext,
+    handle_model_availability_error,
+    handle_model_choice_error,
+    handle_model_deck_preset_error,
+    handle_validation_error,
+)
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.exceptions import (
+    LibraryLoadingError,
+    PipeInputError,
+    PipelineExecutionError,
+    PipeOperatorModelAvailabilityError,
+    PipeOperatorModelChoiceError,
+)
 from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
@@ -83,7 +96,13 @@ def build_pipe_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
+
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
@@ -295,7 +314,13 @@ def prepare_runner_cmd(
             typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_RUNNER)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_RUNNER)
+
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -441,7 +466,13 @@ def generate_inputs_cmd(
             typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
+
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -479,7 +510,13 @@ def build_one_shot_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
+
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
@@ -564,7 +601,13 @@ def build_partial_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
+
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():

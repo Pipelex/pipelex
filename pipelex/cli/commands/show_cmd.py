@@ -10,10 +10,16 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
+from pipelex.cli.error_handlers import (
+    ErrorContext,
+    handle_model_deck_preset_error,
+    handle_validation_error,
+)
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.config import ConfigPaths
-from pipelex.exceptions import PipelexCLIError, PipelexConfigError
+from pipelex.exceptions import LibraryLoadingError, PipelexCLIError, PipelexConfigError
 from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_secrets_provider, get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
@@ -185,7 +191,12 @@ def list_pipes_cmd() -> None:
     This includes pipes from your project's .plx files and any
     pipes from imported packages.
     """
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
 
     with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -205,7 +216,12 @@ def show_pipe_cmd(
     Example:
         pipelex show pipe hello_world
     """
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
 
     with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -232,7 +248,13 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
+
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -261,7 +283,13 @@ def show_backends_cmd(
         pipelex show backends
         pipelex show backends --all
     """
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
+
     with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())

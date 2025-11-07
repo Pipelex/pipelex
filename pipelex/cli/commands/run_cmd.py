@@ -12,8 +12,21 @@ from rich.console import Console
 from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_and_validate_bundle
 from pipelex.builder.builder_errors import PipelexBundleError
-from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_error, handle_model_choice_error
-from pipelex.exceptions import PipeInputError, PipelineExecutionError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
+from pipelex.cli.error_handlers import (
+    ErrorContext,
+    handle_model_availability_error,
+    handle_model_choice_error,
+    handle_model_deck_preset_error,
+    handle_validation_error,
+)
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.exceptions import (
+    LibraryLoadingError,
+    PipeInputError,
+    PipelineExecutionError,
+    PipeOperatorModelAvailabilityError,
+    PipeOperatorModelChoiceError,
+)
 from pipelex.hub import get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execute import execute_pipeline
@@ -189,7 +202,12 @@ def run_cmd(
         typer.secho("✅ Pipeline execution completed successfully", fg=typer.colors.GREEN)
 
     # Initialize Pipelex BEFORE telemetry context to ensure proper setup
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
 
     try:
         with get_telemetry_manager().telemetry_context():
