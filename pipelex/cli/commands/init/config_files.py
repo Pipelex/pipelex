@@ -12,7 +12,7 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 
 
 def init_config(reset: bool = False, dry_run: bool = False) -> int:
-    """Initialize pipelex configuration in the .pipelex directory. Does not install telemetry, just the main config dans inference backends.
+    """Initialize pipelex configuration in the .pipelex directory. Does not install telemetry, just the main config and inference backends.
 
     Args:
         reset: Whether to overwrite existing files.
