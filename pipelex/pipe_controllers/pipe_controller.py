@@ -33,6 +33,15 @@ class PipeController(PipeAbstract):
                 message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
             )
 
+    @abstractmethod
+    def pipe_dependencies(self) -> set[str]:
+        """Return the pipes that are dependencies of the pipe.
+        - PipeBatch: The pipe that is being batched
+        - PipeCondition: The pipes in the outcome_map
+        - PipeSequence: The pipes in the steps
+        """
+        return set()
+
     @override
     async def run_pipe(
         self,

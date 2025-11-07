@@ -137,6 +137,7 @@ class PipeRunParams(BaseModel):
     dynamic_output_concept_code: str | None = None
     batch_params: BatchParams | None = None
     params: dict[str, Any] = Field(default_factory=dict)
+    library_id: str
 
     pipe_stack_limit: int
     pipe_stack: list[str] = Field(default_factory=list)

@@ -14,6 +14,7 @@ from pipelex.builder.runner_code import generate_input_memory_json_string, gener
 from pipelex.exceptions import PipeInputError, PipelineExecutionError
 from pipelex.hub import get_report_delegate, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.system.runtime import IntegrationMode
@@ -127,7 +128,7 @@ def build_pipe_cmd(
             try:
                 # Load the bundle from the file we just saved to register the pipe
                 _ = await load_and_validate_bundle(output_path)
-                pipe = get_required_pipe(pipe_code=main_pipe_code)
+                pipe = get_required_pipe(pipe_code=main_pipe_code, library_id=SpecialLibraryId.BUILDER)
                 inputs_json_str = generate_input_memory_json_string(pipe.inputs, indent=2)
                 inputs_json_path = "results/inputs.json"
                 ensure_directory_for_file_path(file_path=inputs_json_path)
@@ -259,7 +260,7 @@ def prepare_runner_cmd(
 
         # Get the pipe
         try:
-            pipe = get_required_pipe(pipe_code=pipe_code)
+            pipe = get_required_pipe(pipe_code=pipe_code, library_id=SpecialLibraryId.BUILDER)
         except Exception as exc:
             typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
@@ -401,7 +402,7 @@ def generate_inputs_cmd(
 
         # Get the pipe
         try:
-            pipe = get_required_pipe(pipe_code=pipe_code)
+            pipe = get_required_pipe(pipe_code=pipe_code, library_id=SpecialLibraryId.BUILDER)
         except Exception as exc:
             typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc

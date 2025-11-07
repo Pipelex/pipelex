@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
+from pipelex.types import Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -34,12 +35,40 @@ class PipeAbstract(ABC, BaseModel):
         PipeBlueprint.validate_pipe_code_syntax(pipe_code=code)
         return code
 
-    @abstractmethod
-    def validate_output(self):
-        """Validate the output for the pipe."""
+    @model_validator(mode="after")
+    def validate_pipe(self) -> Self:
+        self.validate_input_static()
+        self.validate_output_static()
+        return self
 
-    def validate_with_libraries(self):
+    @abstractmethod
+    def validate_input_with_library(self, library_id: str):
+        """Validate the inputs for the pipe with the library."""
+        pass
+
+    @abstractmethod
+    def valdiate_input_static(self):
+        """Validate the inputs for the pipe."""
+        pass
+
+    @abstractmethod
+    def validate_output_with_library(self, library_id: str):
+        """Validate the output for the pipe with the library."""
+
+    @abstractmethod
+    def validate_output_static(self):
+        """Validate the output for the pipe."""
+        pass
+
+    def validate_input_static(self):
+        """Validate the inputs for the pipe."""
+        self.validate_input_static()
+        self.validate_output_static()
+
+    def validate_with_libraries(self, library_id: str):
         """Validate the pipe with the libraries, after the static validation"""
+        self.validate_input_with_library(library_id=library_id)
+        self.validate_output_with_library(library_id=library_id)
 
     @abstractmethod
     def required_variables(self) -> set[str]:
@@ -64,14 +93,6 @@ class PipeAbstract(ABC, BaseModel):
             InputRequirements containing all needed inputs for this pipe
 
         """
-
-    def pipe_dependencies(self) -> set[str]:
-        """Return the pipes that are dependencies of the pipe.
-        - PipeBatch: The pipe that is being batched
-        - PipeCondition: The pipes in the outcome_map
-        - PipeSequence: The pipes in the steps
-        """
-        return set()
 
     def concept_dependencies(self) -> list[Concept]:
         required_concepts: list[Concept] = [self.output]

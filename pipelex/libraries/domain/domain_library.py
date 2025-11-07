@@ -26,7 +26,15 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
 
     @classmethod
     def make_empty(cls) -> Self:
-        return cls(root={})
+        return cls(root=DomainLibraryRoot())
+
+    @override
+    def get_domain(self, domain: str) -> Domain:
+        the_domain = self.root.get(domain)
+        if not the_domain:
+            msg = f"Domain '{domain}' not found. Check for typos and make sure it is declared in a pipeline library."
+            raise DomainLibraryError(msg)
+        return the_domain
 
     def add_domain(self, domain: Domain):
         domain_code = domain.code

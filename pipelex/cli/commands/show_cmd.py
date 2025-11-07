@@ -13,7 +13,8 @@ from pipelex import pretty_print
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_library_manager, get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
@@ -42,17 +43,17 @@ def do_show_config() -> None:
 
 def do_list_pipes() -> None:
     """List all available pipes."""
-    try:
-        nb_pipes = get_pipe_library().pretty_list_pipes()
-        get_telemetry_manager().track_event(EventName.PIPES_LIST, properties={EventProperty.NB_PIPES: nb_pipes})
-    except Exception as exc:
-        msg = f"Failed to list pipes: {exc}"
-        raise PipelexCLIError(msg) from exc
+    # try:
+    nb_pipes = get_pipe_library(library_id=SpecialLibraryId.UNTITLED).pretty_list_pipes()
+    get_telemetry_manager().track_event(EventName.PIPES_LIST, properties={EventProperty.NB_PIPES: nb_pipes})
+    # except Exception as exc:
+    #     msg = f"Failed to list pipes: {exc}"
+    #     raise PipelexCLIError(msg) from exc
 
 
-def do_show_pipe(pipe_code: str) -> None:
+def do_show_pipe(pipe_code: str, library_id: str) -> None:
     """Show a single pipe definition from the library."""
-    pipe = get_required_pipe(pipe_code=pipe_code)
+    pipe = get_required_pipe(pipe_code=pipe_code, library_id=library_id)
     get_telemetry_manager().track_event(EventName.PIPE_SHOW, properties={EventProperty.PIPE_TYPE: pipe.type})
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 
@@ -193,6 +194,7 @@ def list_pipes_cmd() -> None:
 @show_app.command("pipe", help="Display the detailed definition of a specific pipe")
 def show_pipe_cmd(
     pipe_code: Annotated[str, typer.Argument(help="Pipeline code to show definition for (e.g., 'my_domain.my_pipe')")],
+    library_id: Annotated[str, typer.Option("--library", "-l", help="Library to use for the pipe")] = SpecialLibraryId.UNTITLED,
 ) -> None:
     """Show the complete definition of a pipe including its inputs, outputs,
     prompt, and all configuration settings.
@@ -202,12 +204,16 @@ def show_pipe_cmd(
     """
     Pipelex.make(integration_mode=IntegrationMode.CLI)
 
+    library_manager = get_library_manager()
+    library_manager.create_library(library_id=library_id)
+    library_manager.load_libraries(library_id=library_id, load_user_dirs=False, load_pipelex_dirs=False)
+
     with new_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
-        do_show_pipe(pipe_code=pipe_code)
+        do_show_pipe(pipe_code=pipe_code, library_id=library_id)
 
 
 @show_app.command("models", help="List available AI models from a specific backend provider")

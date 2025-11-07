@@ -25,10 +25,11 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         domain: str,
         pipe_code: str,
         blueprint: PipeLLMBlueprint,
+        library_id: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeLLM:
         system_prompt = blueprint.system_prompt
-        if not system_prompt and (domain_obj := get_optional_domain(domain=domain)):
+        if not system_prompt and (domain_obj := get_optional_domain(domain=domain, library_id=library_id)):
             system_prompt = domain_obj.system_prompt
 
         system_prompt_jinja2_blueprint: TemplateBlueprint | None = None
@@ -74,6 +75,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                         domain=domain_and_code.domain,
                         concept_code=domain_and_code.concept_code,
                     ),
+                    library_id=library_id,
                 )
 
                 if Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptCode.IMAGE), strict=True):
@@ -123,6 +125,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             ),
             output=get_required_concept(
                 concept_string=ConceptFactory.make_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code),
+                library_id=library_id,
             ),
             llm_prompt_spec=llm_prompt_spec,
             llm_choices=llm_choices,

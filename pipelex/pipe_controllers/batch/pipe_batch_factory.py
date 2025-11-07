@@ -18,6 +18,7 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
         domain: str,
         pipe_code: str,
         blueprint: PipeBatchBlueprint,
+        library_id: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeBatch:
         # Parse output to strip multiplicity brackets
@@ -35,6 +36,7 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
             inputs=InputRequirementsFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
+                library_id=library_id,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_required_concept(
@@ -42,6 +44,7 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
                     domain=output_domain_and_code.domain,
                     concept_code=output_domain_and_code.concept_code,
                 ),
+                library_id=library_id,
             ),
             branch_pipe_code=blueprint.branch_pipe_code,
             batch_params=BatchParams.make_batch_params(

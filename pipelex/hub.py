@@ -239,7 +239,7 @@ class PipelexHub:
 
     # pipelex
 
-    def get_required_domain_library(self, library_id: str | None = None) -> DomainLibraryAbstract:
+    def get_required_domain_library(self, library_id: str) -> DomainLibraryAbstract:
         if self._library_manager is not None:
             return self._library_manager.get_library(library_id=library_id).domain_library
         if self._domain_library is None:
@@ -247,7 +247,7 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._domain_library
 
-    def get_required_concept_library(self, library_id: str | None = None) -> ConceptLibraryAbstract:
+    def get_required_concept_library(self, library_id: str) -> ConceptLibraryAbstract:
         if self._library_manager is not None:
             return self._library_manager.get_library(library_id=library_id).concept_library
         if self._concept_library is None:
@@ -255,7 +255,7 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._concept_library
 
-    def get_required_pipe_library(self, library_id: str | None = None) -> PipeLibraryAbstract:
+    def get_required_pipe_library(self, library_id: str) -> PipeLibraryAbstract:
         if self._library_manager is not None:
             return self._library_manager.get_library(library_id=library_id).pipe_library
         if self._pipe_library is None:
@@ -287,7 +287,10 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._library_manager
 
-    def get_library(self, library_id: str | None = None) -> Library:
+    def set_library_manager(self, library_manager: LibraryManagerAbstract):
+        self._library_manager = library_manager
+
+    def get_library(self, library_id: str) -> Library:
         if self._library_manager is not None:
             return self._library_manager.get_library(library_id=library_id)
         msg = "Library with library_id '{library_id}' is not initialized"
@@ -382,36 +385,36 @@ def get_secret(secret_id: str) -> str:
     return get_secrets_provider().get_secret(secret_id=secret_id)
 
 
-def get_required_domain(domain: str, library_id: str | None = None) -> Domain:
+def get_required_domain(domain: str, library_id: str) -> Domain:
     return get_pipelex_hub().get_required_domain_library(library_id=library_id).get_required_domain(domain=domain)
 
 
-def get_optional_domain(domain: str, library_id: str | None = None) -> Domain | None:
+def get_optional_domain(domain: str, library_id: str) -> Domain | None:
     return get_pipelex_hub().get_required_domain_library(library_id=library_id).get_domain(domain=domain)
 
 
-def get_pipe_library(library_id: str | None = None) -> PipeLibraryAbstract:
+def get_pipe_library(library_id: str) -> PipeLibraryAbstract:
     return get_pipelex_hub().get_required_pipe_library(library_id=library_id)
 
 
-def get_pipes(library_id: str | None = None) -> list[PipeAbstract]:
+def get_pipes(library_id: str) -> list[PipeAbstract]:
     return get_pipelex_hub().get_required_pipe_library(library_id=library_id).get_pipes()
 
 
-def get_required_pipe(pipe_code: str, library_id: str | None = None) -> PipeAbstract:
+def get_required_pipe(pipe_code: str, library_id: str) -> PipeAbstract:
     return get_pipelex_hub().get_required_pipe_library(library_id=library_id).get_required_pipe(pipe_code=pipe_code)
 
 
-def get_optional_pipe(pipe_code: str, library_id: str | None = None) -> PipeAbstract | None:
+def get_optional_pipe(pipe_code: str, library_id: str) -> PipeAbstract | None:
     return get_pipelex_hub().get_required_pipe_library(library_id=library_id).get_optional_pipe(pipe_code=pipe_code)
 
 
-def get_concept_library(library_id: str | None = None) -> ConceptLibraryAbstract:
-    return get_pipelex_hub().get_required_concept_library(library_id=library_id)
+def get_concept_library(library_id: str) -> ConceptLibraryAbstract:
+    return get_pipelex_hub().get_library(library_id=library_id).concept_library
 
 
-def get_required_concept(concept_string: str, library_id: str | None = None) -> Concept:
-    return get_pipelex_hub().get_required_concept_library(library_id=library_id).get_required_concept(concept_string=concept_string)
+def get_required_concept(concept_string: str, library_id: str) -> Concept:
+    return get_pipelex_hub().get_library(library_id=library_id).concept_library.get_required_concept(concept_string=concept_string)
 
 
 def get_pipe_router() -> PipeRouterProtocol:
@@ -434,7 +437,7 @@ def get_library_manager() -> LibraryManagerAbstract:
     return get_pipelex_hub().get_library_manager()
 
 
-def get_library(library_id: str | None = None) -> Library:
+def get_library(library_id: str) -> Library:
     return get_pipelex_hub().get_library(library_id=library_id)
 
 

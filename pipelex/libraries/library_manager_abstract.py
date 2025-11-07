@@ -35,7 +35,7 @@ class LibraryManagerAbstract(ABC):
         """Open a new library with the given library_id."""
 
     @abstractmethod
-    def get_library(self, library_id: str | None = None) -> "Library":
+    def get_library(self, library_id: str) -> "Library":
         """Get the Library object for a specific library_id."""
 
     @abstractmethod
@@ -43,7 +43,11 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> list[PipeAbstract]:
+    def remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+        pass
+
+    @abstractmethod
+    def remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
         pass
 
     @abstractmethod
@@ -51,9 +55,12 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def load_libraries(self, library_id: str, library_dirs: list[Path] | None = None, library_file_paths: list[Path] | None = None) -> None:
-        pass
-
-    @abstractmethod
-    def remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
+    def load_libraries(
+        self,
+        library_id: str,
+        library_dirs: list[Path] | None = None,
+        library_file_paths: list[Path] | None = None,
+        load_user_dirs: bool = True,
+        load_pipelex_dirs: bool = True,
+    ) -> None:
         pass

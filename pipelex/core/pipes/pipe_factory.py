@@ -20,6 +20,7 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
         domain: str,
         pipe_code: str,
         blueprint: PipeBlueprintType,
+        library_id: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeType: ...
 
@@ -32,6 +33,7 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
         domain: str,
         pipe_code: str,
         blueprint: PipeBlueprint,
+        library_id: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeAbstract:
         # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix
@@ -52,6 +54,7 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
             domain=domain,
             pipe_code=pipe_code,
             blueprint=blueprint,
+            library_id=library_id,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return pipe_from_blueprint

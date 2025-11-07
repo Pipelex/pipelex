@@ -131,7 +131,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
                 log.dev(f"  Checking inputs for {pipe_spec.type} pipe '{pipe_code}'")
 
                 # Get the loaded pipe instance
-                pipe = get_required_pipe(pipe_code=pipe_code)
+                pipe = get_required_pipe(pipe_code=pipe_code, library_id=SpecialLibraryId.BUILDER)
 
                 # Get the actual needed inputs
                 needed_inputs = pipe.needed_inputs()

@@ -16,12 +16,13 @@ ConceptLibraryRoot = dict[str, Concept]
 class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     root: ConceptLibraryRoot = Field(default_factory=dict)
 
-    @model_validator(mode="before")
+    @model_validator(mode="after")
     def validation_static(self):
         for concept in self.root.values():
             if concept.refines and concept.refines not in self.root:
                 msg = f"Concept '{concept.code}' refines '{concept.refines}' but no concept with the code '{concept.refines}' exists"
                 raise ConceptLibraryError(msg)
+        return self
 
     @override
     def setup(self):

@@ -16,12 +16,21 @@ PipeLibraryRoot = dict[str, PipeAbstract]
 
 class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     @override
+    def setup(self):
+        pass
+
+    @override
     def teardown(self):
         self.root = {}
 
+    @override
+    def reset(self):
+        self.teardown()
+        self.setup()
+
     @classmethod
     def make_empty(cls) -> Self:
-        library = cls(root={})
+        library = cls(root=PipeLibraryRoot())
         library.setup()
         return library
 

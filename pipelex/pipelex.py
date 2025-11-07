@@ -29,6 +29,8 @@ from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
+from pipelex.libraries.library_manager import LibraryManager
+from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.local_observer import LocalObserver
 from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverProtocol
@@ -96,6 +98,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.telemetry_manager: TelemetryManagerAbstract | None = None
         # pipeline
         self.pipeline_tracker: PipelineTrackerProtocol | None = None
+        self.library_manager: LibraryManagerAbstract | None = None
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
@@ -142,6 +145,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
+        library_manager: LibraryManagerAbstract | None = None,
         **kwargs: Any,
     ):
         if kwargs:
@@ -153,6 +157,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
         self.pipelex_hub.set_storage_provider(storage_provider)
+
+        self.library_manager = library_manager or LibraryManager()
+        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         # cogt
         self.plugin_manager.setup()
@@ -208,6 +215,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
+        self.library_manager = library_manager or LibraryManager()
+        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
+
         # reporting
         if get_config().pipelex.feature_config.is_reporting_enabled:
             self.reporting_delegate = reporting_delegate or ReportingManager()
@@ -258,17 +268,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_observer(observer=multi_observer)
         self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
 
-        # pipeline
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
-
-    def setup_libraries(self):
-        # self.library_manager.setup()
-        # print("jdqojsoqjio", self.library_manager)
-        # self.library_manager.load_libraries()
-        pass
 
     def teardown(self):
         # pipelex
@@ -370,7 +373,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             observers=observers,
             **kwargs,
         )
-        pipelex_instance.setup_libraries()
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 

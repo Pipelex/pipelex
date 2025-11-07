@@ -18,6 +18,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         domain: str,
         pipe_code: str,
         blueprint: PipeExtractBlueprint,
+        library_id: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeExtract:
         # Parse output to strip multiplicity brackets
@@ -38,10 +39,12 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
                     domain=output_domain_and_code.domain,
                     concept_code=output_domain_and_code.concept_code,
                 ),
+                library_id=library_id,
             ),
             inputs=InputRequirementsFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
+                library_id=library_id,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             extract_choice=blueprint.model,
