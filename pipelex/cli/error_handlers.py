@@ -11,6 +11,7 @@ from rich.console import Console
 from pipelex.urls import URLs
 
 if TYPE_CHECKING:
+    from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
     from pipelex.exceptions import PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 
 
@@ -67,5 +68,38 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
         f"or specify a different model in the [yellow]'{exc.pipe_code}'[/yellow] pipe."
     )
     console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: ErrorContext) -> None:
+    """Handle and display ModelDeckPresetValidatonError with formatted output.
+
+    Args:
+        exc: The model deck preset validation error exception
+        context: Context for the error message
+    """
+    console = Console(stderr=True)
+    console.print(f"\n[bold red]❌ {context} failed due to model deck preset validation error[/bold red]\n")
+    console.print(f"[bold cyan]Preset ID:[/bold cyan]    [yellow]'{exc.preset_id}'[/yellow]")
+    console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{exc.model_type}'[/yellow]")
+    console.print(f"[bold cyan]Model Handle:[/bold cyan] [yellow]'{exc.model_handle}'[/yellow]")
+    if exc.enabled_backends:
+        backends_str = ", ".join([f"[yellow]{b}[/yellow]" for b in sorted(exc.enabled_backends)])
+        console.print(f"[bold cyan]Enabled Backends:[/bold cyan] {backends_str}")
+    console.print(f"\n[bold red]Error:[/bold red]        {exc.message}\n")
+    backends_str = ", ".join([f"[yellow]{b}[/yellow]" for b in sorted(exc.enabled_backends)])
+    console.print(
+        f"[bold green]💡 Tip:[/bold green] The preset [yellow]'{exc.preset_id}'[/yellow] references model handle "
+        f"[yellow]'{exc.model_handle}'[/yellow] which is not available in any enabled backend.\n"
+        f"The enabled backends are: {backends_str}."
+    )
+    console.print(
+        "[bold]Possible solutions:[/bold]\n"
+        "  1. Update the preset to use a different model\n"
+        f"  2. Configure model '{exc.model_handle}' in one of your enabled backends\n"
+        f"  3. Enable a backend that supports [yellow]'{exc.model_handle}'[/yellow]"
+    )
+    console.print(f"\n[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

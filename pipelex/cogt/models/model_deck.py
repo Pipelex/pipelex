@@ -104,7 +104,7 @@ class ModelDeck(ConfigModel):
             return
         if preset_id == LLM_PRESET_DISABLED and is_disabled_allowed:
             return
-        msg = f"llm preset id '{preset_id}' not found in deck"
+        msg = f"LLM preset '{preset_id}' was not found in the model deck"
         raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.LLM, model_choice=llm_choice)
 
     def get_llm_setting(self, llm_choice: LLMModelChoice) -> LLMSetting:
@@ -115,7 +115,7 @@ class ModelDeck(ConfigModel):
             return llm_preset
         if self.is_handle_defined(model_handle=llm_choice):
             return LLMSetting(model=llm_choice, temperature=0.7, max_tokens=None)
-        msg = f"LLM choice '{llm_choice}' not found in deck"
+        msg = f"LLM choice '{llm_choice}' was not found in the model deck"
         raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.LLM, model_choice=llm_choice)
 
     def get_extract_setting(self, extract_choice: ExtractModelChoice) -> ExtractSetting:
@@ -126,7 +126,7 @@ class ModelDeck(ConfigModel):
             return extract_preset
         if self.is_handle_defined(model_handle=extract_choice):
             return ExtractSetting(model=extract_choice)
-        msg = f"Extract choice '{extract_choice}' not found in deck"
+        msg = f"Extract choice '{extract_choice}' was not found in the model deck"
         raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.TEXT_EXTRACTOR, model_choice=extract_choice)
 
     def get_img_gen_setting(self, img_gen_choice: ImgGenModelChoice) -> ImgGenSetting:
@@ -137,7 +137,7 @@ class ModelDeck(ConfigModel):
             return img_gen_preset
         if self.is_handle_defined(model_handle=img_gen_choice):
             return ImgGenSetting(model=img_gen_choice)
-        msg = f"Image generation choice '{img_gen_choice}' not found in deck"
+        msg = f"Image generation choice '{img_gen_choice}' was not found in the model deck"
         raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.IMG_GEN, model_choice=img_gen_choice)
 
     @classmethod
@@ -200,28 +200,35 @@ class ModelDeck(ConfigModel):
         for llm_preset_id, llm_setting in self.llm_presets.items():
             if not self.is_model_handle_defined(model_handle=llm_setting.model):
                 enabled_backends = {model.backend_name for model in self.inference_models.values()}
-                msg = (
-                    f"llm_handle '{llm_setting.model}' for llm_preset '{llm_preset_id}' not found in deck. "
-                    f"The enabled backends are {enabled_backends}. "
-                    f"And the llm_handle '{llm_setting.model}' is not found in any of the enabled backends. Here are the solutions:\n"
-                    f"1 - Configure '{llm_setting.model}' for one of your enabled backends if possible\n"
-                    "2 - Enable a backend that supports this llm_handle "
+                msg = f"LLM handle '{llm_setting.model}' for llm preset '{llm_preset_id}' was not found in the model deck"
+                raise LLMHandleNotFoundError(
+                    message=msg,
+                    preset_id=llm_preset_id,
+                    model_handle=llm_setting.model,
+                    enabled_backends=enabled_backends,
                 )
-                raise LLMHandleNotFoundError(msg)
         return self
 
     def validate_img_gen_presets(self) -> Self:
         for img_gen_preset_id, img_gen_setting in self.img_gen_presets.items():
             if not self.is_model_handle_defined(model_handle=img_gen_setting.model):
-                msg = f"img_gen_handle '{img_gen_setting.model}' for img_gen_preset '{img_gen_preset_id}' not found in deck"
-                raise ImgGenHandleNotFoundError(msg)
+                msg = f"Image generation handle '{img_gen_setting.model}' for preset '{img_gen_preset_id}' was not found in the model deck"
+                raise ImgGenHandleNotFoundError(
+                    message=msg,
+                    preset_id=img_gen_preset_id,
+                    model_handle=img_gen_setting.model,
+                )
         return self
 
     def validate_extract_presets(self) -> Self:
         for extract_preset_id, extract_setting in self.extract_presets.items():
             if not self.is_model_handle_defined(model_handle=extract_setting.model):
-                msg = f"extract_handle '{extract_setting.model}' for extract_preset '{extract_preset_id}' not found in deck"
-                raise ExtractHandleNotFoundError(msg)
+                msg = f"Extract handle '{extract_setting.model}' for extract preset '{extract_preset_id}' was not found in the model deck"
+                raise ExtractHandleNotFoundError(
+                    message=msg,
+                    preset_id=extract_preset_id,
+                    model_handle=extract_setting.model,
+                )
         return self
 
     def validate_registered_models(self):
@@ -232,9 +239,15 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all LLM presets: {exc}"
-                    raise ModelDeckPresetValidatonError(msg) from exc
+                    raise ModelDeckPresetValidatonError(
+                        message=msg,
+                        model_type=ModelType.LLM,
+                        preset_id=exc.preset_id,
+                        model_handle=exc.model_handle,
+                        enabled_backends=exc.enabled_backends,
+                    ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"LLM preset not found: {exc}")
+                    log.warning(f"LLM handle not found: {exc}")
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -243,9 +256,14 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all ImgGen presets: {exc}"
-                    raise ModelDeckPresetValidatonError(msg) from exc
+                    raise ModelDeckPresetValidatonError(
+                        message=msg,
+                        model_type=ModelType.IMG_GEN,
+                        preset_id=exc.preset_id,
+                        model_handle=exc.model_handle,
+                    ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"ImgGen preset not found: {exc}")
+                    log.warning(f"ImgGen handle not found: {exc}")
                 case ProblemReaction.NONE:
                     pass
         try:
@@ -254,9 +272,14 @@ class ModelDeck(ConfigModel):
             match self.model_deck_config.missing_presets_reaction:
                 case ProblemReaction.RAISE:
                     msg = f"Failed to validate all Extract presets: {exc}"
-                    raise ModelDeckPresetValidatonError(msg) from exc
+                    raise ModelDeckPresetValidatonError(
+                        message=msg,
+                        model_type=ModelType.TEXT_EXTRACTOR,
+                        preset_id=exc.preset_id,
+                        model_handle=exc.model_handle,
+                    ) from exc
                 case ProblemReaction.LOG:
-                    log.warning(f"Extract preset not found: {exc}")
+                    log.warning(f"Extract handle not found: {exc}")
                 case ProblemReaction.NONE:
                     pass
 
@@ -317,7 +340,7 @@ class ModelDeck(ConfigModel):
                         if model_handle not in self._logged_fallback_warnings:
                             # Waterfall success: we explain what happened in the logs
                             msg = (
-                                f"Inference model fallback: '{ideal_model_handle}' was not found in deck, "
+                                f"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, "
                                 f"so it was replaced by '{fallback}'. "
                                 f"As a consequence, the results of the workflow may not have the expected quality, "
                                 f"and the workflow might fail due to feature limitations such as context window size, etc. "
@@ -343,7 +366,7 @@ class ModelDeck(ConfigModel):
                 "but none of the fallback models were found in the model deck"
             )
             raise ModelWaterfallError(message=msg, model_handle=model_handle, fallback_list=fallback_list)
-        log.verbose(f"Skipping model handle '{model_handle}' because it's not found in deck, it could be an external plugin.")
+        log.verbose(f"Skipping model handle '{model_handle}' because it's was not found in the model deck, it could be an external plugin.")
         return None
 
     def is_handle_defined(self, model_handle: str) -> bool:
@@ -353,8 +376,8 @@ class ModelDeck(ConfigModel):
         inference_model = self.get_optional_inference_model(model_handle=model_handle)
         if inference_model is None:
             msg = (
-                f"Model handle '{model_handle}' not found in deck. "
-                "Make sure it's defined in the model decks '.pipelex/inference/deck/base_deck.toml' or '.pipelex/inference/deck/overrides.toml'. "
+                f"Model handle '{model_handle}' was not found in the model deck. "
+                "Make sure it's defined in ond of the model decks '.pipelex/inference/deck/*.toml'. "
                 "If the model handle is indeed in the deck, make sure the required backend for this model to run is enabled in "
                 "'.pipelex/inference/backends.toml' and that you have the necessary credentials."
                 "To find what backend is required for this model, look at the routing profile in .pipelex/inference/routing_profiles.toml. "

@@ -14,7 +14,8 @@ from rich.traceback import Traceback
 from pipelex import log, pretty_print
 from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
-from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_error, handle_model_choice_error
+from pipelex.cli.error_handlers import ErrorContext, handle_model_availability_error, handle_model_choice_error, handle_model_deck_preset_error
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.exceptions import LibraryLoadingError, PipeInputError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
@@ -35,7 +36,16 @@ COMMAND = "validate"
 
 def do_validate_all_libraries_and_dry_run() -> None:
     """Validate libraries and dry-run all pipes."""
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        typer.secho(f"Failed to validate: {library_loading_error}", fg=typer.colors.RED, err=True)
+        present_validation_error(details_provider=library_loading_error)
+        raise typer.Exit(1) from library_loading_error
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION)
+        return
+
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -184,12 +194,16 @@ def validate_cmd(
             raise typer.Exit(1)
 
     # Initialize Pipelex
+    pipelex_instance: Pipelex
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     except LibraryLoadingError as library_loading_error:
         typer.secho(f"Failed to validate: {library_loading_error}", fg=typer.colors.RED, err=True)
         present_validation_error(details_provider=library_loading_error)
         raise typer.Exit(1) from library_loading_error
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION)
+        return
 
     try:
         with get_telemetry_manager().telemetry_context():

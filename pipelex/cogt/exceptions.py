@@ -62,7 +62,19 @@ class ModelDeckValidatonError(CogtError):
 
 
 class ModelDeckPresetValidatonError(ModelDeckValidatonError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        model_type: ModelType,
+        preset_id: str,
+        model_handle: str,
+        enabled_backends: set[str] | None = None,
+    ):
+        self.model_type = model_type
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        self.enabled_backends = enabled_backends or set()
+        super().__init__(message)
 
 
 class ModelNotFoundError(CogtError):
@@ -79,15 +91,25 @@ class ModelWaterfallError(ModelNotFoundError):
 
 
 class LLMHandleNotFoundError(CogtError):
-    pass
+    def __init__(self, message: str, preset_id: str, model_handle: str, enabled_backends: set[str] | None = None):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        self.enabled_backends = enabled_backends or set()
+        super().__init__(message)
 
 
 class ImgGenHandleNotFoundError(CogtError):
-    pass
+    def __init__(self, message: str, preset_id: str, model_handle: str):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        super().__init__(message)
 
 
 class ExtractHandleNotFoundError(CogtError):
-    pass
+    def __init__(self, message: str, preset_id: str, model_handle: str):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        super().__init__(message)
 
 
 class LLMModelPlatformError(ValueError, CogtError):
