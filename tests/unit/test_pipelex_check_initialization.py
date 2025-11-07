@@ -2,20 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
-
 if TYPE_CHECKING:
     from pathlib import Path
 
     from pytest_mock import MockerFixture
 
 from pipelex.config import ConfigPaths
-from pipelex.exceptions import PipelexSetupError
-from pipelex.pipelex import Pipelex
+from pipelex.system.configuration.config_check import check_is_initialized
 
 
 class TestPipelexCheckInitialization:
-    """Test the Pipelex.check_is_initialized classmethod."""
+    """Test the check_is_initialized function from config_check module."""
 
     def test_check_is_initialized_returns_true_when_all_files_exist(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test that check_is_initialized returns True when all required files exist."""
@@ -32,7 +29,7 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
         # Test
-        result = Pipelex.check_is_initialized()
+        result = check_is_initialized()
 
         # Verify
         assert result is True
@@ -51,7 +48,7 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
         # Test
-        result = Pipelex.check_is_initialized(print_warning_if_not=False)
+        result = check_is_initialized(print_warning_if_not=False)
 
         # Verify
         assert result is False
@@ -70,7 +67,7 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
         # Test
-        result = Pipelex.check_is_initialized(print_warning_if_not=False)
+        result = check_is_initialized(print_warning_if_not=False)
 
         # Verify
         assert result is False
@@ -88,13 +85,13 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
         # Test
-        result = Pipelex.check_is_initialized(print_warning_if_not=False)
+        result = check_is_initialized(print_warning_if_not=False)
 
         # Verify
         assert result is False
 
-    def test_check_is_initialized_raises_when_not_initialized_and_raise_if_not_true(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that check_is_initialized raises PipelexSetupError when raise_if_not is True and not initialized."""
+    def test_check_is_initialized_prints_warning_when_not_initialized(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that check_is_initialized prints warning and returns False when not initialized and print_warning_if_not is True."""
         # Setup test directories - no files exist
         config_dir = tmp_path / ".pipelex" / "inference"
         config_dir.mkdir(parents=True)
@@ -105,17 +102,18 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
-        # Test and verify exception is raised
-        with pytest.raises(PipelexSetupError) as exc_info:
-            Pipelex.check_is_initialized(print_warning_if_not=True)
+        # Mock console.print to suppress output during test
+        mock_console_print = mocker.patch("pipelex.system.configuration.config_check.Console.print")
 
-        # Verify error message contents (no longer lists file paths)
-        error_msg = str(exc_info.value)
-        assert "Pipelex is not initialized" in error_msg
-        assert "pipelex init" in error_msg
+        # Test - should print warning and return False
+        result = check_is_initialized(print_warning_if_not=True)
 
-    def test_check_is_initialized_does_not_raise_when_initialized_and_raise_if_not_true(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that check_is_initialized does not raise when initialized even with raise_if_not=True."""
+        # Verify
+        assert result is False
+        assert mock_console_print.called
+
+    def test_check_is_initialized_returns_true_when_initialized_with_print_warning(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that check_is_initialized returns True when initialized with print_warning_if_not=True."""
         # Setup test directories - all files exist
         config_dir = tmp_path / ".pipelex" / "inference"
         config_dir.mkdir(parents=True)
@@ -128,14 +126,14 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
-        # Test - should not raise
-        result = Pipelex.check_is_initialized(print_warning_if_not=True)
+        # Test
+        result = check_is_initialized(print_warning_if_not=True)
 
         # Verify
         assert result is True
 
-    def test_check_is_initialized_raises_with_only_backends_missing(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test error message when only backends file is missing."""
+    def test_check_is_initialized_returns_false_with_only_backends_missing(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that check_is_initialized returns False when only backends file is missing."""
         # Setup test directories - only routing file exists
         config_dir = tmp_path / ".pipelex" / "inference"
         config_dir.mkdir(parents=True)
@@ -147,17 +145,17 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
-        # Test and verify exception is raised
-        with pytest.raises(PipelexSetupError) as exc_info:
-            Pipelex.check_is_initialized(print_warning_if_not=True)
+        # Mock console.print to suppress output during test
+        mocker.patch("pipelex.system.configuration.config_check.Console.print")
 
-        # Verify error message contents (no longer lists file paths)
-        error_msg = str(exc_info.value)
-        assert "Pipelex is not initialized" in error_msg
-        assert "pipelex init" in error_msg
+        # Test
+        result = check_is_initialized(print_warning_if_not=True)
 
-    def test_check_is_initialized_raises_with_only_routing_missing(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test error message when only routing file is missing."""
+        # Verify
+        assert result is False
+
+    def test_check_is_initialized_returns_false_with_only_routing_missing(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that check_is_initialized returns False when only routing file is missing."""
         # Setup test directories - only backends file exists
         config_dir = tmp_path / ".pipelex" / "inference"
         config_dir.mkdir(parents=True)
@@ -169,11 +167,11 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
-        # Test and verify exception is raised
-        with pytest.raises(PipelexSetupError) as exc_info:
-            Pipelex.check_is_initialized(print_warning_if_not=True)
+        # Mock console.print to suppress output during test
+        mocker.patch("pipelex.system.configuration.config_check.Console.print")
 
-        # Verify error message contents (no longer lists file paths)
-        error_msg = str(exc_info.value)
-        assert "Pipelex is not initialized" in error_msg
-        assert "pipelex init" in error_msg
+        # Test
+        result = check_is_initialized(print_warning_if_not=True)
+
+        # Verify
+        assert result is False
