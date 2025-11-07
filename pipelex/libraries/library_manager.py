@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -26,6 +27,7 @@ from pipelex.exceptions import (
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_ids import SpecialLibraryId
+from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
     get_pipelex_package_dir_for_imports,
     get_pipelex_plx_files_from_dirs,
@@ -51,35 +53,40 @@ class LibraryComponent(StrEnum):
                 return PipeLibraryError
 
 
-class LibraryManager(BaseModel):
+class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
+        self.loaded_plx_paths: list[str] = []
 
     ############################################################
     # Manager lifecycle
     ############################################################
-
+    @override
     def setup(self) -> None:
         self._libraries.clear()
         # Create and initialize UNTITLED library with base PLX files
         self.open_library(library_id=SpecialLibraryId.UNTITLED)
 
+    @override
     def teardown(self) -> None:
         for library in self._libraries.values():
             library.teardown()
         self._libraries.clear()
 
+    @override
     def reset(self) -> None:
         self.teardown()
         self.setup()
 
+    @override
     def create_library(self, library_id: str):
         if library_id in self._libraries:
             msg = f"Library '{library_id}' already exists"
             raise LibraryError(msg)
         self._libraries[library_id] = LibraryFactory.make_empty()
 
+    @override
     def open_library(self, library_id: str) -> None:
         """Open a new library with the given library_id.
 
@@ -98,18 +105,20 @@ class LibraryManager(BaseModel):
             Path("pipelex/builder/pipe/pipe_design.plx"),
             Path("pipelex/builder/concept/concept.plx"),
         ]
-        self._load_plx_files_into_library(library_id=library_id, plx_file_paths=base_plx_paths)
+        self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=base_plx_paths)
 
     ############################################################
     # Public library accessors
     ############################################################
 
+    @override
     def set_library(self, library_id: str, library: Library) -> None:
         if library_id not in self._libraries:
             msg = f"Library '{library_id}' does not exist"
             raise LibraryError(msg)
         self._libraries[library_id] = library
 
+    @override
     def get_library(self, library_id: str | None = None) -> Library:
         """Get the Library object for a specific library_id."""
         if library_id is None:
@@ -123,6 +132,7 @@ class LibraryManager(BaseModel):
     # Private methods
     ############################################################
 
+    @override
     def load_libraries(
         self,
         library_id: str | None = None,
@@ -216,12 +226,13 @@ class LibraryManager(BaseModel):
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
         # Load PLX files into the specific library
-        self._load_plx_files_into_library(library_id=library_id, plx_file_paths=valid_plx_paths)
+        self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
 
     ############################################################
     # Private helper methods
     ############################################################
 
+    @override
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
@@ -268,7 +279,7 @@ class LibraryManager(BaseModel):
             ),
         )
 
-    def _load_plx_files_into_library(self, library_id: str, plx_file_paths: list[Path]) -> None:
+    def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> None:
         """Load PLX files into a specific library.
 
         This method:
@@ -277,10 +288,10 @@ class LibraryManager(BaseModel):
 
         Args:
             library_id: The ID of the library to load into
-            plx_file_paths: List of PLX file paths to load
+            valid_plx_paths: List of PLX file paths to load
         """
         blueprints: list[PipelexBundleBlueprint] = []
-        for plx_file_path in plx_file_paths:
+        for plx_file_path in valid_plx_paths:
             try:
                 blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
             except FileNotFoundError as file_not_found_error:
@@ -295,6 +306,8 @@ class LibraryManager(BaseModel):
                 raise LibraryLoadingError(msg) from validation_error
             blueprint.source = str(plx_file_path)
             blueprints.append(blueprint)
+
+        self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
 
         # Load all blueprints into the library
         try:
@@ -377,7 +390,12 @@ class LibraryManager(BaseModel):
             ]
             library.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)
 
+    @override
     def remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
         for blueprint in blueprints:
             self._remove_pipes_from_blueprint(library_id=library_id, blueprint=blueprint)
             self._remove_concepts_from_blueprint(library_id=library_id, blueprint=blueprint)
+
+    @override
+    def get_loaded_plx_paths(self) -> list[str]:
+        return self.loaded_plx_paths

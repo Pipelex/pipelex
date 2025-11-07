@@ -18,6 +18,7 @@ from pipelex.core.domains.domain import Domain
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
+from pipelex.libraries.library import Library
 from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
@@ -59,11 +60,11 @@ class PipelexHub:
         self._content_generator: ContentGeneratorProtocol | None = None
 
         # pipelex
+        self._library_manager: LibraryManagerAbstract | None = None
         self._domain_library: DomainLibraryAbstract | None = None
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
-        self._library_manager: LibraryManagerAbstract | None = None
 
         # pipeline
         self._pipeline_tracker: PipelineTrackerProtocol | None = None
@@ -280,17 +281,17 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._pipeline_manager
 
-    def get_required_library_manager(self) -> LibraryManagerAbstract:
+    def get_library_manager(self) -> LibraryManagerAbstract:
         if self._library_manager is None:
-            msg = "Library manager is not set. You must initialize Pipelex first."
+            msg = "LibraryManager is not initialized"
             raise RuntimeError(msg)
         return self._library_manager
 
-    def get_observer(self) -> ObserverProtocol:
-        if self._observer is None:
-            msg = "Observer is not set. You must initialize Pipelex first."
-            raise RuntimeError(msg)
-        return self._observer
+    def get_library(self, library_id: str | None = None) -> Library:
+        if self._library_manager is not None:
+            return self._library_manager.get_library(library_id=library_id)
+        msg = "Library with library_id '{library_id}' is not initialized"
+        raise RuntimeError(msg)
 
 
 # Shorthand functions for accessing the singleton
@@ -430,11 +431,11 @@ def get_pipeline(pipeline_run_id: str) -> Pipeline:
 
 
 def get_library_manager() -> LibraryManagerAbstract:
-    return get_pipelex_hub().get_required_library_manager()
+    return get_pipelex_hub().get_library_manager()
 
 
-def get_observer() -> ObserverProtocol:
-    return get_pipelex_hub().get_observer()
+def get_library(library_id: str | None = None) -> Library:
+    return get_pipelex_hub().get_library(library_id=library_id)
 
 
 def get_native_concept(native_concept: NativeConceptCode) -> Concept:
