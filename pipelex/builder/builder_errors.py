@@ -20,7 +20,7 @@ from pipelex.builder.validation_error_data import (
     StaticValidationErrorData,
 )
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
+from pipelex.core.validation_errors import PipelexValidationExceptionAbstract
 from pipelex.exceptions import PipelexException
 from pipelex.types import Self
 
@@ -72,7 +72,7 @@ class ValidateDryRunError(Exception):
     """Raised when validating the dry run of a pipe."""
 
 
-class PipelexBundleError(PipelexException, ValidationErrorDetailsProtocol):
+class PipelexBundleError(PipelexException, PipelexValidationExceptionAbstract):
     """Main bundle error that aggregates multiple types of errors."""
 
     def __init__(

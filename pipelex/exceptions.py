@@ -12,7 +12,7 @@ from pipelex.builder.validation_error_data import (
     StaticValidationErrorType,
     SyntaxErrorData,
 )
-from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
+from pipelex.core.validation_errors import PipelexValidationExceptionAbstract
 from pipelex.system.exceptions import RootException
 from pipelex.tools.misc.context_provider_abstract import ContextProviderException
 
@@ -131,7 +131,7 @@ class LibraryError(PipelexException):
     pass
 
 
-class LibraryLoadingError(LibraryError, ValidationErrorDetailsProtocol):
+class LibraryLoadingError(LibraryError, PipelexValidationExceptionAbstract):
     """Error raised when loading library components fails."""
 
     def __init__(
