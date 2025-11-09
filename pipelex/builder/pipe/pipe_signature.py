@@ -78,8 +78,15 @@ class PipeSignature(StructuredContent):
         pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{pipe_type}[/bold magenta] ({self.pipe_category.value})\n"))
         pipe_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
 
-        # Create inputs table if there are inputs
-        if self.inputs:
+        # Create inputs section
+        if not self.inputs:
+            pipe_group.renderables.append(Text.from_markup("\nNo inputs"))
+        elif len(self.inputs) == 1:
+            # Single input: display as a simple line of text
+            input_name, concept_spec = next(iter(self.inputs.items()))
+            pipe_group.renderables.append(Text.from_markup(f"\nInput: [cyan]{input_name}[/cyan] ([bold green]{concept_spec}[/bold green])"))
+        else:
+            # Multiple inputs: display as a table
             inputs_table = Table(title="Inputs", show_header=False, show_edge=True, show_lines=True, border_style=None)
             inputs_table.add_column("Variable Name", style="cyan")
             inputs_table.add_column("Concept", style="bold green")
@@ -93,6 +100,6 @@ class PipeSignature(StructuredContent):
 
         # Show dependencies if any
         if self.pipe_dependencies:
-            pipe_group.renderables.append(Text.from_markup(f"\nDependencies: [blue]{', '.join(self.pipe_dependencies)}[/blue]"))
+            pipe_group.renderables.append(Text.from_markup(f"\nDependencies: [red]{', '.join(self.pipe_dependencies)}[/red]"))
 
         return pipe_group

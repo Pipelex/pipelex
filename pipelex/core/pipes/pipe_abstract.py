@@ -118,7 +118,8 @@ class PipeAbstract(ABC, BaseModel):
         indent = "   " * indent_level
         if indent_level > 0:
             indent = f"{indent}[yellow]↳[/yellow] "
-        pipe_type_label = f"[magenta]{self.pipe_type}:[/magenta]"
+        # pipe_type_label = f"[magenta]{self.pipe_type}:[/magenta]"
+        pipe_type_label = f"[white]{self.pipe_type}:[/white]"
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
                 pass
