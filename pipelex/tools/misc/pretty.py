@@ -18,12 +18,14 @@ TEXT_COLOR = TerminalColor.WHITE
 TITLE_COLOR = TerminalColor.CYAN
 BORDER_COLOR = TerminalColor.YELLOW
 
+PRETTY_WIDTH_MIN = 125
+
 PrettyPrintable = Markdown | Text | JSON | Table | Group
 
 
 def pretty_width(width: int | None = None) -> int:
     terminal_width = shutil.get_terminal_size().columns
-    return width or min(max(100, int(terminal_width / 2)), terminal_width)
+    return width or min(max(PRETTY_WIDTH_MIN, int(terminal_width / 2)), terminal_width)
 
 
 def pretty_print(

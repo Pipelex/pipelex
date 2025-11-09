@@ -20,7 +20,7 @@ class LLMSkill(StrEnum):
 
     LLM_FOR_WRITING_CHEAP = "llm_for_writing_cheap"
     LLM_FOR_IMG_TO_TEXT_CHEAP = "llm_for_img_to_text_cheap"
-    LLM_FOR_VISUAL_DESIGN = "llm_for_visual_design"
+    LLM_FOR_VISUAL_DESIGN = "cheap_llm_for_creativity"
     LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
     LLM_TO_CODE = "llm_to_code"
     LLM_TO_ANALYZE_LARGE_CODEBASE = "llm_to_analyze_large_codebase"

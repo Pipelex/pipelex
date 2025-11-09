@@ -275,7 +275,7 @@ class ConceptSpec(StructuredContent):
         concept_group.renderables.append(Text(f"\nDescription: {self.description}\n", style="italic"))
         if self.structure:
             structure_table = Table(title=title, show_header=True, show_edge=True, show_lines=True, border_style=None)
-            structure_table.add_column("Field Name", style="cyan")
+            structure_table.add_column("Field", style="cyan")
             structure_table.add_column("Description", style="white")
             structure_table.add_column("Type", style="white")
             structure_table.add_column("Required", style="white")
