@@ -2,6 +2,7 @@ import shutil
 from typing import Any, ClassVar
 
 from rich import print as rich_print
+from rich.json import JSON
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.pretty import Pretty
@@ -82,6 +83,8 @@ class PrettyPrinter:
             return
         elif isinstance(content, Markdown):
             print("\n")
+        elif isinstance(content, dict):
+            content = JSON.from_data(content, indent=4)
         else:
             content = Pretty(content)
         panel = Panel(
