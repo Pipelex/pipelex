@@ -269,10 +269,10 @@ class ConceptSpec(StructuredContent):
         concept_group = Group()
         if title:
             concept_group.renderables.append(Text(title, style="bold"))
-        concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.the_concept_code}[/green]\n", style="bold"))
+        concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.the_concept_code}[/green]", style="bold"))
         if self.refines:
             concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
-        concept_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
+        concept_group.renderables.append(Text(f"\nDescription: {self.description}\n", style="italic"))
         if self.structure:
             structure_table = Table(title=title, show_header=True, show_edge=True, show_lines=True, border_style=None)
             structure_table.add_column("Field Name", style="cyan")

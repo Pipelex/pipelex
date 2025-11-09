@@ -75,12 +75,12 @@ class PipeSignature(StructuredContent):
             pipe_group.renderables.append(Text(title, style="bold"))
         pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{self.code}[/red]\n", style="bold"))
         pipe_type = self.type.value if isinstance(self.type, AllowedPipeTypes) else str(self.type)
-        pipe_group.renderables.append(Text.from_markup(f"Type: [magenta]{pipe_type}[/magenta] ({self.pipe_category.value})\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{pipe_type}[/bold magenta] ({self.pipe_category.value})\n"))
         pipe_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
 
         # Create inputs table if there are inputs
         if self.inputs:
-            inputs_table = Table(title="Inputs", show_header=True, show_edge=True, show_lines=True, border_style=None)
+            inputs_table = Table(title="Inputs", show_header=False, show_edge=True, show_lines=True, border_style=None)
             inputs_table.add_column("Variable Name", style="cyan")
             inputs_table.add_column("Concept", style="bold green")
             for input_name, concept_spec in self.inputs.items():
@@ -88,7 +88,8 @@ class PipeSignature(StructuredContent):
             pipe_group.renderables.append(inputs_table)
 
         # Show output and result
-        pipe_group.renderables.append(Text.from_markup(f"\nOutput: [yellow]{self.output}[/yellow] → Result: [cyan]{self.result}[/cyan]"))
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput concept: [bold green]{self.output}[/bold green]"))
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput name: [cyan]{self.result}[/cyan]"))
 
         # Show dependencies if any
         if self.pipe_dependencies:

@@ -43,15 +43,18 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         )
         job_metadata.update(updated_metadata=updated_metadata)
 
+        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
+        log.info(pipe_run_info)
         try:
             match pipe_run_params.run_mode:
                 case PipeRunMode.LIVE:
-                    if self.class_name not in ["PipeCompose", "PipeLLMPrompt"]:
-                        name = f"Running [cyan]{self.class_name}[/cyan]"
-                        indent_level = len(pipe_run_params.pipe_stack) - 1
-                        indent = "   " * indent_level
-                        label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name} → [green]{self.code}[/green]"
-                        log.info(f"{label} → [red]{self.output.code}[/red]")
+                    # indent_level = len(pipe_run_params.pipe_stack) - 1
+                    # indent = "   " * indent_level
+                    # name = f"[magenta]{self.class_name}[/magenta]"
+                    # label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name} → [red]{self.code}[/red]"
+                    # pipe_run_info = f"{label} → [bold green]{self.output.code}[/bold green]"
+                    # pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
+                    # log.info(pipe_run_info)
                     pipe_output = await self._run_operator_pipe(
                         job_metadata=job_metadata,
                         working_memory=working_memory,
@@ -60,20 +63,19 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                     )
                     main_stuff = pipe_output.main_stuff
                     output_concept_code = self.output.code
-                    output_concept_with_multiplicity: str
+                    output_concept_with_multiplicity = f"[green]{output_concept_code}[/green]"
                     if main_stuff.is_list:
                         list_content: ListContent[StuffContent] = main_stuff.as_list_content()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
                         nb_items = len(list_content.items)
-                        output_concept_with_multiplicity = f"{output_concept_code}[] ({nb_items} items)"
-                    else:
-                        output_concept_with_multiplicity = output_concept_code
-                    main_stuff.pretty_print_stuff(title=f"Output of pipe [red]{self.code}[/red]: [green]{output_concept_with_multiplicity}[/green]")
+                        output_concept_with_multiplicity = f" ({nb_items} items)"
+                    title = f"Output of pipe [red]{self.code}[/red]: {output_concept_with_multiplicity}"
+                    main_stuff.pretty_print_stuff(title=title)
                 case PipeRunMode.DRY:
-                    name = f"Dry run [cyan]{self.class_name}[/cyan]"
-                    indent_level = len(pipe_run_params.pipe_stack) - 1
-                    indent = "   " * indent_level
-                    label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name}: [green]{self.code}[/green]"
-                    log.info(f"{label} → [red]{self.output.code}[/red]")
+                    # name = f"Dry run [cyan]{self.class_name}[/cyan]"
+                    # indent_level = len(pipe_run_params.pipe_stack) - 1
+                    # indent = "   " * indent_level
+                    # label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name}: [green]{self.code}[/green]"
+                    # log.info(f"{label} → [red]{self.output.code}[/red]")
                     pipe_output = await self._dry_run_operator_pipe(
                         job_metadata=job_metadata,
                         working_memory=working_memory,

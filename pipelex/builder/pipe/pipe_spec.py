@@ -147,7 +147,7 @@ class PipeSpec(StructuredContent):
 
         # Create inputs table if there are inputs
         if self.inputs:
-            inputs_table = Table(title="Inputs", show_header=True, show_edge=True, show_lines=True, border_style=None)
+            inputs_table = Table(title="Inputs", show_header=False, show_edge=True, show_lines=True, border_style=None)
             inputs_table.add_column("Variable Name", style="cyan")
             inputs_table.add_column("Concept", style="bold green")
             for input_name, concept_spec in self.inputs.items():
@@ -155,6 +155,6 @@ class PipeSpec(StructuredContent):
             pipe_group.renderables.append(inputs_table)
 
         # Show output
-        pipe_group.renderables.append(Text.from_markup(f"\nOutput: [green]{self.output}[/green]"))
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput: [bold green]{self.output}[/bold green]"))
 
         return pipe_group
