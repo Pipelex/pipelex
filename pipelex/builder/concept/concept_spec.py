@@ -2,10 +2,13 @@ import re
 from datetime import datetime
 from typing import Any
 
+import rich
 from pydantic import ConfigDict, Field, field_validator, model_validator
+from rich.markdown import Markdown
+from rich.text import Text
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log, pretty_print, pretty_print_md
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptBlueprintError,
@@ -278,6 +281,7 @@ class ConceptSpec(StructuredContent):
         the_dict.pop("description")
         if self.structure:
             structure = the_dict.pop("structure")
-            pretty_print(structure, title=title, subtitle=description)
+            pretty_print(structure, title=title, inner_title=description)
         else:
-            pretty_print(description, title=title)
+            md_content = Markdown(description)
+            pretty_print(md_content, title=title)

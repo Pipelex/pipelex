@@ -56,14 +56,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                         pipe_run_params=pipe_run_params,
                         output_name=output_name,
                     )
-                    if isinstance(pipe_output.main_stuff.content, TextContent):
-                        print()
-                        pretty_print_md(pipe_output.main_stuff_as_str, title=f"PipeOutput of pipe {self.code}")
-                        print()
-                    else:
-                        print()
-                        pipe_output.main_stuff.pretty_print_stuff(title=f"PipeOutput of pipe {self.code}: {self.output.code}")
-                        print()
+                    pipe_output.main_stuff.pretty_print_stuff(title=f"Output of pipe [red]{self.code}[/red]: [green]{self.output.code}[/green]")
                 case PipeRunMode.DRY:
                     name = f"Dry run [cyan]{self.class_name}[/cyan]"
                     indent_level = len(pipe_run_params.pipe_stack) - 1

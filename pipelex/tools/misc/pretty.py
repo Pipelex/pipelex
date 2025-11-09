@@ -2,6 +2,7 @@ import shutil
 from typing import Any, ClassVar
 
 from rich import print as rich_print
+from rich.console import Group
 from rich.json import JSON
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -22,19 +23,24 @@ def pretty_print(
     content: str | Any,
     title: TextType | None = None,
     subtitle: TextType | None = None,
+    inner_title: str | None = None,
     border_style: StyleType | None = None,
+    width: int | None = None,
 ):
-    PrettyPrinter.pretty_print(content=content, title=title, subtitle=subtitle, border_style=border_style)
+    PrettyPrinter.pretty_print(content=content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
 
 
 def pretty_print_md(
     content: str,
     title: TextType | None = None,
     subtitle: TextType | None = None,
+    inner_title: str | None = None,
     border_style: StyleType | None = None,
+    width: int | None = None,
 ):
+    width = width or max(100, int(shutil.get_terminal_size().columns / 2))
     md_content = Markdown(content)
-    PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, border_style=border_style)
+    PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
 
 
 class PrettyPrintMode(StrEnum):
@@ -51,13 +57,22 @@ class PrettyPrinter:
         content: str | Any,
         title: TextType | None = None,
         subtitle: TextType | None = None,
+        inner_title: str | None = None,
         border_style: StyleType | None = None,
+        width: int | None = None,
     ):
         match cls.mode:
             case PrettyPrintMode.RICH:
-                cls.pretty_print_using_rich(content=content, title=title, subtitle=subtitle, border_style=border_style)
+                cls.pretty_print_using_rich(
+                    content=content,
+                    title=title,
+                    subtitle=subtitle,
+                    inner_title=inner_title,
+                    border_style=border_style,
+                    width=width,
+                )
             case PrettyPrintMode.POOR:
-                cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle)
+                cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle, inner_title=inner_title)
 
     @classmethod
     def pretty_print_using_rich(
@@ -65,7 +80,9 @@ class PrettyPrinter:
         content: str | Any,
         title: TextType | None = None,
         subtitle: TextType | None = None,
+        inner_title: str | None = None,
         border_style: StyleType | None = None,
+        width: int | None = None,
     ):
         if isinstance(content, str):
             if content.startswith(("http://", "https://")):
@@ -83,8 +100,16 @@ class PrettyPrinter:
             return
         elif isinstance(content, Markdown):
             print("\n")
+        elif isinstance(content, (JSON, Group)):
+            pass
         elif isinstance(content, dict):
-            content = JSON.from_data(content, indent=4)
+            # content = JSON.from_data(content, indent=4)
+            json_content = JSON.from_data(content, indent=4)
+            if inner_title:
+                inner_title_text = Text(str(inner_title), style="dim")
+                content = Group(inner_title_text, json_content)
+            else:
+                content = json_content
         else:
             content = Pretty(content)
         panel = Panel(
@@ -94,8 +119,10 @@ class PrettyPrinter:
             expand=False,
             title_align="left",
             subtitle_align="right",
-            padding=(0, 1),
+            padding=(1, 1),
             border_style=border_style or "",
+            highlight=True,
+            width=width,
         )
         rich_print(panel)
 
@@ -105,13 +132,16 @@ class PrettyPrinter:
         content: str | Any,
         title: TextType | None = None,
         subtitle: TextType | None = None,
+        inner_title: str | None = None,
     ):
         if isinstance(content, str) and content.startswith(("http://", "https://")):
             cls.pretty_print_url_without_rich(content=content, title=title, subtitle=subtitle)
             return
         title = title or ""
         if subtitle:
-            title += f" ({subtitle})"
+            title += f"\n{subtitle}"
+        if inner_title:
+            title += f"\n{inner_title}"
         terminal_width = shutil.get_terminal_size().columns
         content_str = f"{content}"
         max_content_width = terminal_width - len(title) - 8  # Accounting for frame and padding

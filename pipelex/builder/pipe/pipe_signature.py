@@ -2,13 +2,15 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
+from rich.console import Group
+from rich.table import Table
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 
 
 class PipeSignature(StructuredContent):
@@ -68,17 +70,52 @@ class PipeSignature(StructuredContent):
 
     @override
     def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
-        the_dict: dict[str, Any] = self.smart_dump()
-        the_dict = remove_none_values_from_dict(data=the_dict)
+        # Build title
         if number:
-            title = f"Pipe signature #{number}: {self.code}"
+            main_title = f"Pipe Signature #{number}: {self.code}"
         else:
-            title = f"Pipe signature: {self.code}"
-        title += f" • {self.type} -> {self.result}"
-        subtitle = self.description
-        the_dict.pop("code")
-        the_dict.pop("description")
-        the_dict.pop("type")
-        the_dict.pop("pipe_category")
-        the_dict.pop("result")
-        pretty_print(the_dict, title=title, subtitle=subtitle)
+            main_title = f"Pipe Signature: {self.code}"
+
+        # Build subtitle with type and result
+        pipe_type = self.type.value if isinstance(self.type, AllowedPipeTypes) else str(self.type)
+        subtitle = f"{pipe_type} → {self.result} : {self.output}"
+
+        # Create content sections
+        sections: list[Any] = []
+
+        # Description
+        sections.append(Text(self.description, style="italic"))
+        sections.append(Text(""))  # Empty line
+
+        # Inputs table
+        if self.inputs:
+            inputs_table = Table(show_header=True, header_style="bold cyan", box=None, padding=(0, 1))
+            inputs_table.add_column("Input Variable", style="yellow")
+            inputs_table.add_column("Concept", style="green")
+
+            for var_name, concept_code in self.inputs.items():
+                inputs_table.add_row(var_name, concept_code)
+
+            sections.append(Text("Inputs:", style="bold"))
+            sections.append(inputs_table)
+            sections.append(Text(""))  # Empty line
+
+        # Output info
+        output_text = Text()
+        output_text.append("Output: ", style="bold")
+        output_text.append(f"{self.output}", style="green")
+        output_text.append(" → ", style="dim")
+        output_text.append(f"{self.result}", style="yellow")
+        sections.append(output_text)
+
+        # Dependencies
+        if self.pipe_dependencies:
+            sections.append(Text(""))  # Empty line
+            deps_text = Text()
+            deps_text.append("Dependencies: ", style="bold")
+            deps_text.append(", ".join(self.pipe_dependencies), style="blue")
+            sections.append(deps_text)
+
+        # Group all sections and print
+        content = Group(*sections)
+        pretty_print(content, title=main_title, subtitle=subtitle, border_style="blue")
