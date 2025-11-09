@@ -23,9 +23,12 @@ PRETTY_WIDTH_MIN = 125
 PrettyPrintable = Markdown | Text | JSON | Table | Group
 
 
-def pretty_width(width: int | None = None) -> int:
+def pretty_width(width: int | None = None, factor: float | None = None) -> int:
     terminal_width = shutil.get_terminal_size().columns
-    return width or min(max(PRETTY_WIDTH_MIN, int(terminal_width / 2)), terminal_width)
+    absolute_width = width or min(max(PRETTY_WIDTH_MIN, int(terminal_width / 2)), terminal_width)
+    if factor:
+        return int(absolute_width * factor)
+    return absolute_width
 
 
 def pretty_print(

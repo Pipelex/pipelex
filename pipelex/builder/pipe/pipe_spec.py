@@ -140,10 +140,10 @@ class PipeSpec(StructuredContent):
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))
-        pipe_group.renderables.append(Text.from_markup(f"Pipe: [bold red]{self.pipe_code}[/bold red]\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Name: [bold red]{self.pipe_code}[/bold red]\n"))
         pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{self.type}[/bold magenta] ({self.pipe_category})\n"))
         if self.description:
-            pipe_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
+            pipe_group.renderables.append(Text.from_markup(f"Description: [italic]{self.description}[/italic]\n"))
 
         # Create inputs section
         if not self.inputs:
@@ -154,7 +154,15 @@ class PipeSpec(StructuredContent):
             pipe_group.renderables.append(Text.from_markup(f"\nInput: [cyan]{input_name}[/cyan] ([bold green]{concept_spec}[/bold green])"))
         else:
             # Multiple inputs: display as a table
-            inputs_table = Table(title="Inputs", show_header=False, show_edge=True, show_lines=True, border_style=None)
+            inputs_table = Table(
+                title="Inputs:",
+                title_justify="left",
+                title_style="not italic",
+                show_header=False,
+                show_edge=True,
+                show_lines=True,
+                border_style="dim",
+            )
             inputs_table.add_column("Variable Name", style="cyan")
             inputs_table.add_column("Concept", style="bold green")
             for input_name, concept_spec in self.inputs.items():

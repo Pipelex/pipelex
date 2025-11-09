@@ -83,7 +83,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
     @override
     def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
-        table = Table(title=title, show_header=False, show_edge=False, show_lines=True, border_style="white", width=pretty_width())
+        table = Table(title=title, show_header=False, show_edge=False, show_lines=True, border_style="white", width=pretty_width(factor=0.8))
         table.add_column("No.", style="yellow", justify="center", width=6)
         table.add_column("Content", style="white")
 

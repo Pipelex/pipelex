@@ -272,9 +272,17 @@ class ConceptSpec(StructuredContent):
         concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.the_concept_code}[/green]", style="bold"))
         if self.refines:
             concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
-        concept_group.renderables.append(Text(f"\nDescription: {self.description}\n", style="italic"))
+        concept_group.renderables.append(Text.from_markup(f"\nDescription: [italic]{self.description}[/italic]\n"))
         if self.structure:
-            structure_table = Table(title=title, show_header=True, show_edge=True, show_lines=True, border_style=None)
+            structure_table = Table(
+                title="Structure:",
+                title_style="not italic",
+                title_justify="left",
+                show_header=True,
+                show_edge=True,
+                show_lines=True,
+                border_style="dim",
+            )
             structure_table.add_column("Field", style="cyan")
             structure_table.add_column("Description", style="white")
             structure_table.add_column("Type", style="white")

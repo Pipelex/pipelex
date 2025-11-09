@@ -133,7 +133,7 @@ class PipelexBundleSpec(StructuredContent):
             bundle_group.renderables.append(Text(title, style="bold"))
         bundle_group.renderables.append(Text.from_markup(f"Domain: [yellow]{self.domain}[/yellow]\n", style="bold"))
         if self.description:
-            bundle_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
+            bundle_group.renderables.append(Text.from_markup(f"Description: [italic]{self.description}[/italic]\n"))
         bundle_group.renderables.append(Text.from_markup(f"Main Pipe: [red]{self.main_pipe}[/red]\n"))
         if self.system_prompt:
             bundle_group.renderables.append(Text(f"System Prompt: {self.system_prompt}\n", style="dim"))
@@ -141,7 +141,9 @@ class PipelexBundleSpec(StructuredContent):
         # Concepts table
         if self.concept:
             bundle_group.renderables.append(Text("\n"))
-            concepts_table = Table(title="Concepts", show_header=False, show_edge=True, show_lines=True, border_style="green")
+            concepts_table = Table(
+                title="Concepts", title_style="bold green", show_header=False, show_edge=True, show_lines=True, border_style="green"
+            )
             concepts_table.add_column("Concept", style="white")
 
             for concept_code, concept_spec_or_name in self.concept.items():
@@ -157,7 +159,7 @@ class PipelexBundleSpec(StructuredContent):
         # Pipes table
         if self.pipe:
             bundle_group.renderables.append(Text("\n"))
-            pipes_table = Table(title="Pipes", show_header=False, show_edge=True, show_lines=True, border_style="red")
+            pipes_table = Table(title="Pipes", title_style="bold red", show_header=False, show_edge=True, show_lines=True, border_style="red")
             pipes_table.add_column("Pipe", style="white")
 
             for pipe_spec in self.pipe.values():
