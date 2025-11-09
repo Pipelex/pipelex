@@ -7,13 +7,12 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
 

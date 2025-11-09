@@ -83,8 +83,8 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
     @override
     def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
-        table = Table(title=title, show_header=True, show_edge=True, show_lines=True, border_style="blue", width=pretty_width())
-        table.add_column("No.", style="cyan", justify="center", width=6)
+        table = Table(title=title, show_header=False, show_edge=False, show_lines=True, border_style="white", width=pretty_width())
+        table.add_column("No.", style="yellow", justify="center", width=6)
         table.add_column("Content", style="white")
 
         for item_index, item in enumerate(self.items):

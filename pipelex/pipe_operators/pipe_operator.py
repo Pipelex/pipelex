@@ -1,19 +1,21 @@
 from abc import abstractmethod
-from typing import Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar
 
 from typing_extensions import override
 
-from pipelex import log, pretty_print_md
+from pipelex import log
 from pipelex.cogt.exceptions import ModelNotFoundError, ModelWaterfallError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.list_content import ListContent
+    from pipelex.core.stuffs.stuff_content import StuffContent
 PipeOperatorOutputType = TypeVar("PipeOperatorOutputType", bound=PipeOutput)
 
 
@@ -56,7 +58,16 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                         pipe_run_params=pipe_run_params,
                         output_name=output_name,
                     )
-                    pipe_output.main_stuff.pretty_print_stuff(title=f"Output of pipe [red]{self.code}[/red]: [green]{self.output.code}[/green]")
+                    main_stuff = pipe_output.main_stuff
+                    output_concept_code = self.output.code
+                    output_concept_with_multiplicity: str
+                    if main_stuff.is_list:
+                        list_content: ListContent[StuffContent] = main_stuff.as_list_content()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+                        nb_items = len(list_content.items)
+                        output_concept_with_multiplicity = f"{output_concept_code}[] ({nb_items} items)"
+                    else:
+                        output_concept_with_multiplicity = output_concept_code
+                    main_stuff.pretty_print_stuff(title=f"Output of pipe [red]{self.code}[/red]: [green]{output_concept_with_multiplicity}[/green]")
                 case PipeRunMode.DRY:
                     name = f"Dry run [cyan]{self.class_name}[/cyan]"
                     indent_level = len(pipe_run_params.pipe_stack) - 1

@@ -7,7 +7,6 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex import pretty_print
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.core.stuffs.structured_content import StructuredContent

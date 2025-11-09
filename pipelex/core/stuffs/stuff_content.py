@@ -1,7 +1,6 @@
 from abc import ABC
 from typing import Any, TypeVar
 
-import rich
 from kajson import kajson
 from rich.json import JSON
 from typing_extensions import override

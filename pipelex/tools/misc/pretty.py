@@ -91,33 +91,31 @@ class PrettyPrinter:
         border_style: StyleType | None = None,
         width: int | None = None,
     ):
-        if isinstance(content, Table):
-            rich_print()
-            rich_print(content)
-            rich_print()
-            if subtitle:
-                rich_print(f"\n[dim]{subtitle}[/]")
-            return
+        # if isinstance(content, Table):
+        #     rich_print()
+        #     rich_print(content)
+        #     rich_print()
+        #     if subtitle:
+        #         rich_print(f"\n[dim]{subtitle}[/]")
+        #     return
 
         if isinstance(content, str):
             if content.startswith(("http://", "https://")):
                 content = Text(content, style="link " + content, no_wrap=True)
             else:
                 content = Text(str(content))  # Treat all other strings as plain text
-        elif isinstance(content, Markdown):
-            print("\n")
-        elif isinstance(content, (JSON, Group)):
+        # elif isinstance(content, Markdown):
+        #     print("\n")
+        elif isinstance(content, (Pretty, JSON, Table, Markdown, Group)):
             pass
         elif isinstance(content, dict):
-            # content = JSON.from_data(content, indent=4)
-            json_content = JSON.from_data(content, indent=4)
-            if inner_title:
-                inner_title_text = Text(str(inner_title), style="dim")
-                content = Group(inner_title_text, json_content)
-            else:
-                content = json_content
+            content = JSON.from_data(content, indent=4)
         else:
             content = Pretty(content)
+
+        if inner_title:
+            inner_title_text = Text(str(inner_title), style="dim")
+            content = Group(inner_title_text, content)
         rich_print()
         panel = Panel(
             content,
