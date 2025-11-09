@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
-from pipelex.tools.misc.pretty import PrettyPrintable, pretty_print
+from pipelex.tools.misc.pretty import PrettyPrintable, pretty_width
 
 
 class ListContent(StuffContent, Generic[StuffContentType]):
@@ -83,7 +83,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
     @override
     def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
-        table = Table(title=title, show_header=True, show_edge=True, show_lines=True, border_style="blue")
+        table = Table(title=title, show_header=True, show_edge=True, show_lines=True, border_style="blue", width=pretty_width())
         table.add_column("No.", style="cyan", justify="center", width=6)
         table.add_column("Content", style="white")
 

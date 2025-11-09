@@ -21,6 +21,11 @@ BORDER_COLOR = TerminalColor.YELLOW
 PrettyPrintable = Markdown | Text | JSON | Table | Group
 
 
+def pretty_width(width: int | None = None) -> int:
+    terminal_width = shutil.get_terminal_size().columns
+    return width or min(max(100, int(terminal_width / 2)), terminal_width)
+
+
 def pretty_print(
     content: str | Any,
     title: TextType | None = None,
@@ -40,7 +45,7 @@ def pretty_print_md(
     border_style: StyleType | None = None,
     width: int | None = None,
 ):
-    width = width or max(100, int(shutil.get_terminal_size().columns / 2))
+    width = width or pretty_width()
     md_content = Markdown(content)
     PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
 
@@ -86,17 +91,19 @@ class PrettyPrinter:
         border_style: StyleType | None = None,
         width: int | None = None,
     ):
+        if isinstance(content, Table):
+            rich_print()
+            rich_print(content)
+            rich_print()
+            if subtitle:
+                rich_print(f"\n[dim]{subtitle}[/]")
+            return
+
         if isinstance(content, str):
             if content.startswith(("http://", "https://")):
                 content = Text(content, style="link " + content, no_wrap=True)
             else:
                 content = Text(str(content))  # Treat all other strings as plain text
-        elif isinstance(content, Table):
-            rich_print(content)
-            rich_print("\n")
-            if subtitle:
-                rich_print(f"\n[dim]{subtitle}[/]")
-            return
         elif isinstance(content, Markdown):
             print("\n")
         elif isinstance(content, (JSON, Group)):
@@ -111,6 +118,7 @@ class PrettyPrinter:
                 content = json_content
         else:
             content = Pretty(content)
+        rich_print()
         panel = Panel(
             content,
             title=title,
@@ -124,6 +132,7 @@ class PrettyPrinter:
             width=width,
         )
         rich_print(panel)
+        rich_print()
 
     @classmethod
     def pretty_print_without_rich(

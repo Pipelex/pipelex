@@ -141,8 +141,8 @@ class PipeSpec(StructuredContent):
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))
-        pipe_group.renderables.append(Text.from_markup(f"Pipe: [green]{self.pipe_code}[/green]\n", style="bold"))
-        pipe_group.renderables.append(Text.from_markup(f"Type: [magenta]{self.type}[/magenta] ({self.pipe_category})\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Pipe: [bold red]{self.pipe_code}[/bold red]\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{self.type}[/bold magenta] ({self.pipe_category})\n"))
         if self.description:
             pipe_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
 
@@ -150,12 +150,12 @@ class PipeSpec(StructuredContent):
         if self.inputs:
             inputs_table = Table(title="Inputs", show_header=True, show_edge=True, show_lines=True, border_style=None)
             inputs_table.add_column("Variable Name", style="cyan")
-            inputs_table.add_column("Concept", style="white")
+            inputs_table.add_column("Concept", style="bold green")
             for input_name, concept_spec in self.inputs.items():
                 inputs_table.add_row(input_name, concept_spec)
             pipe_group.renderables.append(inputs_table)
 
         # Show output
-        pipe_group.renderables.append(Text.from_markup(f"\nOutput: [yellow]{self.output}[/yellow]"))
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput: [green]{self.output}[/green]"))
 
         return pipe_group

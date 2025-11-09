@@ -11,6 +11,7 @@ from pipelex import pretty_print
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeSignature(StructuredContent):
@@ -69,53 +70,29 @@ class PipeSignature(StructuredContent):
         return AllowedPipeTypes(type_value)
 
     @override
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
-        # Build title
-        if number:
-            main_title = f"Pipe Signature #{number}: {self.code}"
-        else:
-            main_title = f"Pipe Signature: {self.code}"
-
-        # Build subtitle with type and result
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        pipe_group = Group()
+        if title:
+            pipe_group.renderables.append(Text(title, style="bold"))
+        pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{self.code}[/red]\n", style="bold"))
         pipe_type = self.type.value if isinstance(self.type, AllowedPipeTypes) else str(self.type)
-        subtitle = f"{pipe_type} → {self.result} : {self.output}"
+        pipe_group.renderables.append(Text.from_markup(f"Type: [magenta]{pipe_type}[/magenta] ({self.pipe_category.value})\n"))
+        pipe_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
 
-        # Create content sections
-        sections: list[Any] = []
-
-        # Description
-        sections.append(Text(self.description, style="italic"))
-        sections.append(Text(""))  # Empty line
-
-        # Inputs table
+        # Create inputs table if there are inputs
         if self.inputs:
-            inputs_table = Table(show_header=True, header_style="bold cyan", box=None, padding=(0, 1))
-            inputs_table.add_column("Input Variable", style="yellow")
-            inputs_table.add_column("Concept", style="green")
+            inputs_table = Table(title="Inputs", show_header=True, show_edge=True, show_lines=True, border_style=None)
+            inputs_table.add_column("Variable Name", style="cyan")
+            inputs_table.add_column("Concept", style="bold green")
+            for input_name, concept_spec in self.inputs.items():
+                inputs_table.add_row(input_name, concept_spec)
+            pipe_group.renderables.append(inputs_table)
 
-            for var_name, concept_code in self.inputs.items():
-                inputs_table.add_row(var_name, concept_code)
+        # Show output and result
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput: [yellow]{self.output}[/yellow] → Result: [cyan]{self.result}[/cyan]"))
 
-            sections.append(Text("Inputs:", style="bold"))
-            sections.append(inputs_table)
-            sections.append(Text(""))  # Empty line
-
-        # Output info
-        output_text = Text()
-        output_text.append("Output: ", style="bold")
-        output_text.append(f"{self.output}", style="green")
-        output_text.append(" → ", style="dim")
-        output_text.append(f"{self.result}", style="yellow")
-        sections.append(output_text)
-
-        # Dependencies
+        # Show dependencies if any
         if self.pipe_dependencies:
-            sections.append(Text(""))  # Empty line
-            deps_text = Text()
-            deps_text.append("Dependencies: ", style="bold")
-            deps_text.append(", ".join(self.pipe_dependencies), style="blue")
-            sections.append(deps_text)
+            pipe_group.renderables.append(Text.from_markup(f"\nDependencies: [blue]{', '.join(self.pipe_dependencies)}[/blue]"))
 
-        # Group all sections and print
-        content = Group(*sections)
-        pretty_print(content, title=main_title, subtitle=subtitle, border_style="blue")
+        return pipe_group

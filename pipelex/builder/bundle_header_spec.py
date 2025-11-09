@@ -18,9 +18,9 @@ class BundleHeaderSpec(StructuredContent):
         bundle_group = Group()
         if title:
             bundle_group.renderables.append(Text(title, style="bold"))
-        bundle_group.renderables.append(Text.from_markup(f"Domain: [green]{self.domain}[/green]\n", style="bold"))
+        bundle_group.renderables.append(Text.from_markup(f"Domain: [yellow]{self.domain}[/yellow]\n", style="bold"))
         bundle_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
-        bundle_group.renderables.append(Text.from_markup(f"Main Pipe: [cyan]{self.main_pipe}[/cyan]\n"))
+        bundle_group.renderables.append(Text.from_markup(f"Main Pipe: [red]{self.main_pipe}[/red]\n"))
         if self.system_prompt:
             bundle_group.renderables.append(Text(f"System Prompt: {self.system_prompt}", style="dim"))
 

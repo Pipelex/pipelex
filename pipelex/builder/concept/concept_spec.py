@@ -274,6 +274,8 @@ class ConceptSpec(StructuredContent):
         if title:
             concept_group.renderables.append(Text(title, style="bold"))
         concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.the_concept_code}[/green]\n", style="bold"))
+        if self.refines:
+            concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
         concept_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
         if self.structure:
             structure_table = Table(title=title, show_header=True, show_edge=True, show_lines=True, border_style=None)
@@ -286,7 +288,5 @@ class ConceptSpec(StructuredContent):
                 required_text = "Yes" if field_spec.required else "No"
                 structure_table.add_row(field_name, field_spec.description, field_spec.type.value, required_text, field_spec.default_value)
             concept_group.renderables.append(structure_table)
-        elif self.refines:
-            concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
 
         return concept_group
