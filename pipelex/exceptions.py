@@ -111,6 +111,14 @@ class PipelexCLIError(PipelexException, ClickException):
     """Raised when there's an error in CLI usage or operation."""
 
 
+class VirtualEnvironmentError(PipelexCLIError):
+    """Raised when the CLI is run outside the required virtual environment."""
+
+
+class ReadinessCheckError(PipelexCLIError):
+    """Raised when readiness checks fail (missing dependencies or dev mode without venv)."""
+
+
 class PipelexConfigError(PipelexException):
     pass
 
