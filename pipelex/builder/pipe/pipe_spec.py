@@ -2,6 +2,9 @@ import re
 from typing import Any
 
 from pydantic import Field, field_validator
+from rich.console import Group
+from rich.table import Table
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log, pretty_print
@@ -11,6 +14,7 @@ from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipe
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
 
 
@@ -133,17 +137,25 @@ class PipeSpec(StructuredContent):
         )
 
     @override
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
-        the_dict: dict[str, Any] = self.smart_dump()
-        the_dict = remove_none_values_from_dict(data=the_dict)
-        if number:
-            title = f"Pipe #{number}: {self.pipe_code}"
-        else:
-            title = f"Pipe: {self.pipe_code}"
-        title += f" • {self.type}"
-        subtitle = self.description
-        the_dict.pop("pipe_code")
-        the_dict.pop("description")
-        the_dict.pop("type")
-        the_dict.pop("pipe_category")
-        pretty_print(the_dict, title=title, subtitle=subtitle)
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        pipe_group = Group()
+        if title:
+            pipe_group.renderables.append(Text(title, style="bold"))
+        pipe_group.renderables.append(Text.from_markup(f"Pipe: [green]{self.pipe_code}[/green]\n", style="bold"))
+        pipe_group.renderables.append(Text.from_markup(f"Type: [magenta]{self.type}[/magenta] ({self.pipe_category})\n"))
+        if self.description:
+            pipe_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
+
+        # Create inputs table if there are inputs
+        if self.inputs:
+            inputs_table = Table(title="Inputs", show_header=True, show_edge=True, show_lines=True, border_style=None)
+            inputs_table.add_column("Variable Name", style="cyan")
+            inputs_table.add_column("Concept", style="white")
+            for input_name, concept_spec in self.inputs.items():
+                inputs_table.add_row(input_name, concept_spec)
+            pipe_group.renderables.append(inputs_table)
+
+        # Show output
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput: [yellow]{self.output}[/yellow]"))
+
+        return pipe_group

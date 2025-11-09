@@ -18,6 +18,8 @@ TEXT_COLOR = TerminalColor.WHITE
 TITLE_COLOR = TerminalColor.CYAN
 BORDER_COLOR = TerminalColor.YELLOW
 
+PrettyPrintable = Markdown | Text | JSON | Table | Group
+
 
 def pretty_print(
     content: str | Any,
@@ -90,9 +92,6 @@ class PrettyPrinter:
             else:
                 content = Text(str(content))  # Treat all other strings as plain text
         elif isinstance(content, Table):
-            # For tables, print directly without a panel
-            if title:
-                rich_print(f"\n[bold blue]{title}[/]\n")
             rich_print(content)
             rich_print("\n")
             if subtitle:

@@ -2,9 +2,12 @@ import re
 from datetime import datetime
 from typing import Any
 
-import rich
 from pydantic import ConfigDict, Field, field_validator, model_validator
+from rich.console import Group
 from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.pretty import Pretty
+from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
@@ -21,6 +24,7 @@ from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringOrCo
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
 from pipelex.types import Self, StrEnum
 
@@ -265,23 +269,24 @@ class ConceptSpec(StructuredContent):
         return ConceptBlueprint(description=self.description, structure=converted_structure, refines=self.refines)
 
     @override
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
-        the_dict: dict[str, Any] = self.smart_dump()
-        the_dict = remove_none_values_from_dict(data=the_dict)
-        if number:
-            title = f"Concept #{number}: {self.the_concept_code}"
-        else:
-            title = f"Concept: {self.the_concept_code}"
-        if self.refines:
-            title += f" • Refines {self.refines}"
-            the_dict.pop("refines")
-
-        description = self.description
-        the_dict.pop("the_concept_code")
-        the_dict.pop("description")
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        concept_group = Group()
+        if title:
+            concept_group.renderables.append(Text(title, style="bold"))
+        concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.the_concept_code}[/green]\n", style="bold"))
+        concept_group.renderables.append(Text(f"Description: {self.description}\n", style="italic"))
         if self.structure:
-            structure = the_dict.pop("structure")
-            pretty_print(structure, title=title, inner_title=description)
-        else:
-            md_content = Markdown(description)
-            pretty_print(md_content, title=title)
+            structure_table = Table(title=title, show_header=True, show_edge=True, show_lines=True, border_style=None)
+            structure_table.add_column("Field Name", style="cyan")
+            structure_table.add_column("Description", style="white")
+            structure_table.add_column("Type", style="white")
+            structure_table.add_column("Required", style="white")
+            structure_table.add_column("Default Value", style="white")
+            for field_name, field_spec in self.structure.items():
+                required_text = "Yes" if field_spec.required else "No"
+                structure_table.add_row(field_name, field_spec.description, field_spec.type.value, required_text, field_spec.default_value)
+            concept_group.renderables.append(structure_table)
+        elif self.refines:
+            concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
+
+        return concept_group
