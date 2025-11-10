@@ -37,19 +37,11 @@ class PipeBatch(PipeController):
         return {self.branch_pipe_code}
 
     @override
-    def validate_output(self):
+    def validate_input_static(self):
         pass
 
-    @model_validator(mode="after")
-    def validate_required_variables(self) -> Self:
-        # Skip for now
-        return self
-
     @override
-    def _validate_with_libraries(self):
-        self._validate_required_variables()
-
-    def _validate_required_variables(self) -> Self:
+    def validate_input_with_library(self, library_id: str):
         # Now check that the required variables ARE in the inputs of the pipe
         required_variables = self.required_variables()
         for variable_name in required_variables:
@@ -61,7 +53,13 @@ class PipeBatch(PipeController):
                     f"of PipeBatch '{self.code}', is not listed in its inputs"
                 )
                 raise PipeInputError(message=msg, pipe_code=self.code, variable_name=variable_name, concept_code=None)
-        return self
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self, library_id: str):
+        pass
 
     @override
     def required_variables(self) -> set[str]:

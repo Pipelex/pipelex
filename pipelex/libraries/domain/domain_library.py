@@ -10,9 +10,6 @@ DomainLibraryRoot = dict[str, Domain]
 
 
 class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
-    def validate_with_libraries(self):
-        pass
-
     def setup(self):
         pass
 

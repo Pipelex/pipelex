@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, final
-
+from pipelex import log
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
@@ -9,10 +9,12 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
+from pipelex.core.pipes.exceptions import PipeRunInputsError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
 
@@ -49,7 +51,7 @@ class PipeAbstract(ABC, BaseModel):
         """Validate the inputs for the pipe with the library."""
 
     @abstractmethod
-    def valdiate_input_static(self):
+    def validate_input_static(self):
         """Validate the inputs for the pipe."""
 
     @abstractmethod
@@ -59,11 +61,6 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     def validate_output_static(self):
         """Validate the output for the pipe."""
-
-    def validate_input_static(self):
-        """Validate the inputs for the pipe."""
-        self.validate_input_static()
-        self.validate_output_static()
 
     @final
     def validate_with_libraries(self, library_id: str):
@@ -79,9 +76,6 @@ class PipeAbstract(ABC, BaseModel):
                 model_type=exc.model_type,
                 model_choice=exc.model_choice,
             ) from exc
-
-    def _validate_with_libraries(self):
-        """Validate the pipe with the libraries, after the static validation"""
 
     @abstractmethod
     def required_variables(self) -> set[str]:
@@ -107,22 +101,6 @@ class PipeAbstract(ABC, BaseModel):
 
         """
 
-    def concept_dependencies(self) -> list[Concept]:
-        required_concepts: list[Concept] = [self.output]
-        required_concepts.extend(self.inputs.concepts)
-        required_concepts.append(self.output)
-        return required_concepts
-
-    @abstractmethod
-    async def run_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-        print_intermediate_outputs: bool | None = False,
-    ) -> PipeOutput:
-        pass
 
     def monitor_pipe_stack(self, pipe_run_params: PipeRunParams):
         pipe_stack = pipe_run_params.pipe_stack
@@ -146,6 +124,55 @@ class PipeAbstract(ABC, BaseModel):
         concept_code_label = f"[bold green]{self.output.code}[/bold green]"
         arrow = "[yellow]→[/yellow]"
         return f"{indent}{pipe_type_label} {pipe_code_label} {arrow} {concept_code_label}"
+
+    @abstractmethod
+    async def _run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        pass
+
+    @final
+    async def run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
+        self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
+
+        updated_metadata = JobMetadata(
+            pipe_job_ids=[self.code],
+        )
+        job_metadata.update(updated_metadata=updated_metadata)
+
+        # check we have the required inputs in the working memory
+        missing_inputs: dict[str, str] = {}
+        for required_stuff_name, requirement in self.needed_inputs().items:
+            try:
+                working_memory.get_stuff(required_stuff_name)
+            except WorkingMemoryStuffNotFoundError as exc:
+                variable_name: str = exc.variable_name or required_stuff_name
+                missing_inputs[variable_name] = exc.concept_code or requirement.concept.code
+        if missing_inputs:
+            raise PipeRunInputsError(
+                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
+            )
+
+        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
+        log.info(pipe_run_info)
+        
+        pipe_output = await self._run_pipe(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
+
+        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
+        return pipe_output
+
+
 
 
 PipeAbstractType = type[PipeAbstract]

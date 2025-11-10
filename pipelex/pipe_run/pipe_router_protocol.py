@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Protocol
 
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -43,7 +44,7 @@ class PipeRouterProtocol(Protocol):
             PayloadKey.ERROR: error,
         }
         await self.observer.observe_after_failing_run(payload)
-
+    
     async def run(
         self,
         pipe_job: PipeJob,
@@ -76,6 +77,7 @@ class PipeRouterProtocol(Protocol):
 
         return pipe_output
 
+    @abstractmethod
     async def _run_pipe_job(
         self,
         pipe_job: PipeJob,

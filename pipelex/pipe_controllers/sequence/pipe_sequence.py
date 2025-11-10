@@ -1,12 +1,13 @@
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
@@ -19,7 +20,6 @@ from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import Self
 
 
 class PipeSequence(PipeController):
@@ -36,36 +36,6 @@ class PipeSequence(PipeController):
 
     @override
     def validate_input_with_library(self, library_id: str):
-        pass
-
-    @override
-    def validate_output_static(self):
-        pass
-
-    @override
-    def validate_output_with_library(self, library_id: str):
-        """Validate the output for the pipe sequence.
-        The output of the pipe sequence should match the output of the last step.
-        """
-        last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code, library_id=library_id)
-        concept_of_last_step = last_step_output_pipe.output
-        if not get_concept_library(library_id=library_id).is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
-            msg = f"""PipeSequence concept mismatch:
-the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
-of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
-"""
-            raise PipeControllerOutputConceptMismatchError(
-                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
-            )
-
-    @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
-        if len(self.sequential_sub_pipes) == 0:
-            msg = f"Pipe'{self.code}'(PipeSequence) must have at least 1 step"
-            raise ValueError(msg)
-        return self
-
-    def _validate_inputs(self):
         """Validate that the inputs declared for this PipeSequence match what is actually needed."""
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -113,6 +83,34 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
                         raise extraneous_input_var_error
 
     @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self, library_id: str):
+        """Validate the output for the pipe sequence.
+        The output of the pipe sequence should match the output of the last step.
+        """
+        last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code, library_id=library_id)
+        concept_of_last_step = last_step_output_pipe.output
+        if not get_concept_library(library_id=library_id).is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+            msg = f"""PipeSequence concept mismatch:
+the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
+of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
+"""
+            raise PipeControllerOutputConceptMismatchError(
+                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
+            )
+
+    @field_validator("sequential_sub_pipes", mode="before")
+    @classmethod
+    def validate_steps(cls, sequential_sub_pipes: list[SubPipe]) -> list[SubPipe]:
+        if len(sequential_sub_pipes) == 0:
+            msg = f"Pipe'{cls.code}'(PipeSequence) must have at least 1 step"
+            raise PipeDefinitionError(message=msg, domain_code=cls.domain, pipe_code=cls.code, description=cls.description)
+        return sequential_sub_pipes
+
+    @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         if visited_pipes is None:
             visited_pipes = set()
@@ -128,7 +126,7 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
         generated_outputs: set[str] = set()
 
         for sequential_sub_pipe in self.sequential_sub_pipes:
-            sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code, library_id=library_id)
+            sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
             # Use the centralized recursion detection
             sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes_with_current)
 

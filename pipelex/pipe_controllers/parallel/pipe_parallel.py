@@ -103,7 +103,7 @@ class PipeParallel(PipeController):
         return needed_inputs
 
     @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
+    def validate_fields_add_each_output_and_combined_output(self) -> Self:
         # Validate that either add_each_output or combined_output is set
         if not self.add_each_output and not self.combined_output:
             msg = f"PipeParallel'{self.code}'requires either add_each_output or combined_output to be set"
@@ -112,10 +112,11 @@ class PipeParallel(PipeController):
         return self
 
     @override
-    def validate_output(self):
+    def validate_input_static(self):
         pass
 
-    def _validate_inputs(self):
+    @override
+    def validate_input_with_library(self, library_id: str):
         """Validate that the inputs declared for this PipeParallel match what is actually needed."""
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -158,11 +159,12 @@ class PipeParallel(PipeController):
                         raise extraneous_input_var_error
 
     @override
-    def _validate_with_libraries(self):
-        """Perform full validation after all libraries are loaded.
-        This is called after all pipes and concepts are available.
-        """
-        self._validate_inputs()
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self, library_id: str):
+        pass
 
     @override
     def pipe_dependencies(self) -> set[str]:

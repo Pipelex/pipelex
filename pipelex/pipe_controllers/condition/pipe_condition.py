@@ -1,7 +1,7 @@
 from typing import Literal
 
 import shortuuid
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log
@@ -49,33 +49,15 @@ class PipeCondition(PipeController):
             codes.add(self.default_outcome)
         return codes - set(SpecialOutcome.value_list())
 
-    #########################################################################################
-    # Validation
-    #########################################################################################
-    @override
-    def validate_output(self):
-        """Validate the output for the pipe condition.
-        The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
-        """
-        for pipe_code in self.mapped_pipe_codes:
-            pipe = get_required_pipe(pipe_code=pipe_code)
-            if self.output.concept_string not in (
-                pipe.output.concept_string,
-                NativeConceptCode.DYNAMIC.concept_string,
-                NativeConceptCode.ANYTHING.concept_string,
-            ):
-                msg = (
-                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                    f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"
-                )
-                raise PipeConditionError(msg)
-
-    @model_validator(mode="after")
-    def validate_expression(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
-            msg = "PipeCondition should have exactly one of expression_template or expression"
+    @property
+    def applied_expression_template(self) -> str:
+        if self.expression_template:
+            return self.expression_template
+        elif self.expression:
+            return "{{ " + self.expression + " }}"
+        else:
+            msg = "No expression or expression_template provided"
             raise PipeDefinitionError(message=msg, domain_code=self.domain, pipe_code=self.code, description=self.description)
-        return self
 
     def _make_pipe_condition_details(self, evaluated_expression: str, chosen_pipe_code: str) -> PipeConditionDetails:
         return PipeConditionDetails(
@@ -87,19 +69,50 @@ class PipeCondition(PipeController):
             chosen_pipe_code=chosen_pipe_code,
         )
 
-    @property
-    def applied_expression_template(self) -> str:
-        if self.expression_template:
-            return self.expression_template
-        elif self.expression:
-            return "{{ " + self.expression + " }}"
-        else:
-            msg = "No expression or expression_template provided"
-            raise PipeDefinitionError(message=msg, domain_code=self.domain, pipe_code=self.code, description=self.description)
+    async def _evaluate_expression(
+        self,
+        working_memory: WorkingMemory,
+    ) -> str:
+        """Evaluate the conditional expression and select the appropriate pipe.
 
-    #########################################################################################
-    # Inputs
-    #########################################################################################
+        Args:
+            working_memory: The working memory context for evaluation
+
+        Returns:
+            The evaluated expression
+
+        Raises:
+            PipeConditionError: If expression evaluation fails or no matching pipe is found
+        """
+        content_generator = get_content_generator()
+
+        # Evaluate the expression using templating
+        evaluated_expression = await content_generator.make_templated_text(
+            context=working_memory.generate_context(),
+            template=self.applied_expression_template,
+            template_category=TemplateCategory.EXPRESSION,
+        )
+
+        # Validate the evaluated expression
+        if not evaluated_expression or evaluated_expression == "None":
+            error_msg = f"Conditional expression returned no result in pipe {self.code}:"
+            error_msg += f"\n\nExpression: {self.applied_expression_template}"
+            raise PipeConditionError(error_msg)
+        log.verbose(f"evaluated_expression: '{evaluated_expression}'")
+
+        # Add alias if configured
+        log.verbose(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
+        if self.add_alias_from_expression_to:
+            working_memory.add_alias(
+                alias=evaluated_expression,
+                target=self.add_alias_from_expression_to,
+            )
+
+        return evaluated_expression
+
+    @override
+    def pipe_dependencies(self) -> set[str]:
+        return self.mapped_pipe_codes
 
     @override
     def required_variables(self) -> set[str]:
@@ -115,13 +128,6 @@ class PipeCondition(PipeController):
         for pipe_code in self.pipe_dependencies():
             required_variables.update(get_required_pipe(pipe_code=pipe_code).required_variables())
         return required_variables
-
-    def _validate_required_variables(self) -> Self:
-        for required_variable_name in self.required_variables():
-            if required_variable_name not in self.inputs.variables:
-                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}"
-                raise PipeDefinitionError(message=msg, domain_code=self.domain, pipe_code=self.code, description=self.description)
-        return self
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
@@ -166,16 +172,34 @@ class PipeCondition(PipeController):
         return needed_inputs
 
     @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
-        if not self.outcome_map:
-            msg = f"Pipe'{self.code}'(PipeCondition) must have at least one mapping in outcomes"
+    def validate_expression_and_expression_template(self) -> Self:
+        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
+            msg = "PipeCondition should have exactly one of expression_template or expression"
             raise PipeDefinitionError(message=msg, domain_code=self.domain, pipe_code=self.code, description=self.description)
-
-        # Skip validation during model creation - it will be done in validate_with_libraries()
         return self
 
-    def _validate_inputs(self):
+    @field_validator("outcome_map", mode="before")
+    @classmethod
+    def validate_outcome_map(cls, outcome_map: ConditionOutcomeMap) -> ConditionOutcomeMap:
+        if not outcome_map:
+            msg = f"Pipe'{cls.code}'(PipeCondition) must have at least one mapping in outcomes"
+            raise PipeDefinitionError(message=msg, domain_code=cls.domain, pipe_code=cls.code, description=cls.description)
+        return outcome_map
+
+    @override
+    def validate_input_static(self):
+        pass
+
+    @override
+    def validate_input_with_library(self, library_id: str):
         """Validate that the inputs declared for this PipeCondition match what is actually needed."""
+        # First validate required variables are in the inputs
+        for required_variable_name in self.required_variables():
+            if required_variable_name not in self.inputs.variables:
+                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}"
+                raise PipeDefinitionError(message=msg, domain_code=self.domain, pipe_code=self.code, description=self.description)
+
+        # Then validate that all inputs are actually needed
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -217,57 +241,26 @@ class PipeCondition(PipeController):
                         raise extraneous_input_var_error
 
     @override
-    def _validate_with_libraries(self):
-        """Perform full validation after all libraries are loaded.
-        This is called after all pipes and concepts are available.
-        """
-        self._validate_inputs()
-        self._validate_required_variables()
+    def validate_output_static(self):
+        pass
 
     @override
-    def pipe_dependencies(self) -> set[str]:
-        return self.mapped_pipe_codes
-
-    async def _evaluate_expression(
-        self,
-        working_memory: WorkingMemory,
-    ) -> str:
-        """Evaluate the conditional expression and select the appropriate pipe.
-
-        Args:
-            working_memory: The working memory context for evaluation
-
-        Returns:
-            The evaluated expression
-
-        Raises:
-            PipeConditionError: If expression evaluation fails or no matching pipe is found
+    def validate_output_with_library(self, library_id: str):
+        """Validate the output for the pipe condition.
+        The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
         """
-        content_generator = get_content_generator()
-
-        # Evaluate the expression using templating
-        evaluated_expression = await content_generator.make_templated_text(
-            context=working_memory.generate_context(),
-            template=self.applied_expression_template,
-            template_category=TemplateCategory.EXPRESSION,
-        )
-
-        # Validate the evaluated expression
-        if not evaluated_expression or evaluated_expression == "None":
-            error_msg = f"Conditional expression returned no result in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.applied_expression_template}"
-            raise PipeConditionError(error_msg)
-        log.verbose(f"evaluated_expression: '{evaluated_expression}'")
-
-        # Add alias if configured
-        log.verbose(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
-        if self.add_alias_from_expression_to:
-            working_memory.add_alias(
-                alias=evaluated_expression,
-                target=self.add_alias_from_expression_to,
-            )
-
-        return evaluated_expression
+        for pipe_code in self.mapped_pipe_codes:
+            pipe = get_required_pipe(pipe_code=pipe_code)
+            if self.output.concept_string not in (
+                pipe.output.concept_string,
+                NativeConceptCode.DYNAMIC.concept_string,
+                NativeConceptCode.ANYTHING.concept_string,
+            ):
+                msg = (
+                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
+                    f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"
+                )
+                raise PipeConditionError(msg)
 
     @override
     async def _run_controller_pipe(

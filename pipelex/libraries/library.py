@@ -9,6 +9,7 @@ from pipelex.exceptions import (
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.domain.domain_library import DomainLibrary
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
+from pipelex.pipe_controllers.pipe_controller import PipeController
 
 
 class Library(BaseModel):
@@ -45,19 +46,27 @@ class Library(BaseModel):
         for pipe in self.pipe_library.root.values():
             try:
                 # Validate concept dependencies exit
-                for concept in pipe.concept_dependencies():
+                for concept in [pipe.output, *pipe.inputs.concepts]:
                     try:
                         self.concept_library.get_required_concept(concept_string=concept.concept_string)
                     except ConceptError as concept_error:
                         msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
                         raise PipeLibraryError(msg) from concept_error
 
-                # Validate pipe dependencies exit
-                for pipe_code in pipe.pipe_dependencies():
-                    self.pipe_library.get_required_pipe(pipe_code=pipe_code)
+                # Validate pipe dependencies exit for pipe controllers
+                if isinstance(pipe, PipeController):
+                    for pipe_code in pipe.pipe_dependencies():
+                        self.pipe_library.get_required_pipe(pipe_code=pipe_code)
 
             except (ConceptLibraryConceptNotFoundError, PipeLibraryPipeNotFoundError) as not_found_error:
                 msg = f"Missing dependency for pipe '{pipe.code}': {not_found_error}"
                 raise PipeLibraryError(msg) from not_found_error
+
         for pipe in self.pipe_library.root.values():
             pipe.validate_with_libraries()
+
+    def validate_concept_library_with_libraries(self) -> None:
+        pass
+
+    def validate_domain_library_with_libraries(self) -> None:
+        pass
