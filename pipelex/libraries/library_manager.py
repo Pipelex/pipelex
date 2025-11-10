@@ -340,14 +340,14 @@ class LibraryManager(LibraryManagerAbstract):
             try:
                 blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
             except FileNotFoundError as file_not_found_error:
-                msg = f"Could not find PLX blueprint at '{plx_file_path}'"
+                msg = f"Could not find PLX bundle at '{plx_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
             except PipeDefinitionError as pipe_def_error:
-                msg = f"Could not load PLX blueprint from '{plx_file_path}': {pipe_def_error}"
+                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {pipe_def_error}"
                 raise LibraryLoadingError(msg) from pipe_def_error
             except ValidationError as validation_error:
                 validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-                msg = f"Could not load PLX blueprint from '{plx_file_path}' because of: {validation_error_msg}"
+                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             blueprint.source = str(plx_file_path)
             blueprints.append(blueprint)

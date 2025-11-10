@@ -818,7 +818,7 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
+llm_to_engineer = { model = "base-claude", temperature = 1 }
 llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 
@@ -1145,7 +1145,7 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
+llm_to_engineer = { model = "base-claude", temperature = 1 }
 llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 

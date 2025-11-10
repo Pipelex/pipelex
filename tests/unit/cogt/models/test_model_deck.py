@@ -1,10 +1,13 @@
 import pytest
 
+from pipelex.cogt.config_cogt import ModelDeckConfig
+from pipelex.cogt.exceptions import ModelWaterfallError
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.system.runtime import ProblemReaction
 
 
 class TestModelDeckGetOptionalInferenceModel:
@@ -23,11 +26,14 @@ class TestModelDeckGetOptionalInferenceModel:
     def _create_test_model_deck(
         self,
         inference_models: dict[str, InferenceModelSpec] | None = None,
-        aliases: dict[str, str | list[str]] | None = None,
+        aliases: dict[str, str] | None = None,
+        fallbacks: dict[str, list[str]] | None = None,
+        is_model_fallback_enabled: bool = False,
     ) -> ModelDeck:
         return ModelDeck(
             inference_models=inference_models or {},
             aliases=aliases or {},
+            waterfalls=fallbacks or {},
             llm_presets={},
             llm_choice_defaults=LLMSettingChoicesDefaults(
                 for_text=LLMSetting(model="default_text", temperature=0.7, max_tokens=1000),
@@ -37,6 +43,7 @@ class TestModelDeckGetOptionalInferenceModel:
             extract_choice_default="extract_text_from_visuals",
             img_gen_presets={},
             img_gen_choice_default="gen_image_basic",
+            model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
         )
 
     def test_direct_model_lookup_success(self):
@@ -84,10 +91,14 @@ class TestModelDeckGetOptionalInferenceModel:
     def test_list_alias_resolution_first_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
-        model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-model": ["gpt-4", "claude-3"]})
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4": model_spec},
+            fallbacks={"dummy-model-handle": ["gpt-4", "claude-3"]},
+            is_model_fallback_enabled=True,
+        )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
@@ -97,32 +108,39 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
             inference_models={"claude-3": model_spec},
-            aliases={"best-model": ["nonexistent-model", "claude-3"]},
+            fallbacks={"dummy-model-handle": ["nonexistent-model", "claude-3"]},
+            is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
 
     def test_list_alias_resolution_none_found(self):
         # Arrange
-        model_deck = self._create_test_model_deck(aliases={"best-model": ["nonexistent-1", "nonexistent-2"]})
+        model_deck = self._create_test_model_deck(
+            fallbacks={"dummy-model-handle": ["nonexistent-1", "nonexistent-2"]},
+            is_model_fallback_enabled=True,
+        )
 
-        # Act
-        result = model_deck.get_optional_inference_model("best-model")
-
-        # Assert
-        assert result is None
+        # Act & Assert
+        with pytest.raises(
+            ModelWaterfallError,
+            match=r"is a waterfall.*but none of the fallback models were found",
+        ):
+            model_deck.get_optional_inference_model("dummy-model-handle")
 
     def test_recursive_alias_resolution_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
-        model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-model": "best-gpt", "best-gpt": "gpt-4"})
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4": model_spec}, aliases={"dummy-model-handle": "best-gpt", "best-gpt": "gpt-4"}
+        )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
@@ -132,18 +150,23 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
             inference_models={"gpt-4": model_spec},
-            aliases={"best-model": ["nonexistent", "best-gpt"], "best-gpt": "gpt-4"},
+            aliases={"best-gpt": "gpt-4"},
+            fallbacks={"dummy-model-handle": ["nonexistent", "best-gpt"]},
+            is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
 
     def test_empty_alias_list(self):
         # Arrange
-        model_deck = self._create_test_model_deck(aliases={"empty-alias": []})
+        model_deck = self._create_test_model_deck(
+            fallbacks={"empty-alias": []},
+            is_model_fallback_enabled=True,
+        )
 
         # Act
         result = model_deck.get_optional_inference_model("empty-alias")
@@ -172,11 +195,13 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
             inference_models={"claude-3": model_spec},
-            aliases={"best-model": ["premium-gpt", "premium-claude"], "premium-gpt": ["gpt-4-turbo", "gpt-4"], "premium-claude": "claude-3"},
+            aliases={"premium-claude": "claude-3"},
+            fallbacks={"dummy-model-handle": ["premium-gpt", "premium-claude"]},
+            is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("best-model")
+        result = model_deck.get_optional_inference_model("dummy-model-handle")
 
         # Assert
         assert result == model_spec
@@ -189,9 +214,12 @@ class TestModelDeckGetOptionalInferenceModel:
             inference_models={"gpt-4": model_spec1, "claude-3": model_spec2},
             aliases={
                 "ai-model": "best-gpt",  # string alias
-                "best-gpt": ["gpt-4-turbo", "gpt-4"],  # list alias
-                "backup-model": ["claude-4", "claude-3"],  # list alias
             },
+            fallbacks={
+                "best-gpt": ["gpt-4-turbo", "gpt-4"],  # list fallback
+                "backup-model": ["claude-4", "claude-3"],  # list fallback
+            },
+            is_model_fallback_enabled=True,
         )
 
         # Act

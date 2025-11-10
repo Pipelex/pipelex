@@ -89,3 +89,11 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+
+["claude-4.5-haiku"]
+model_id = "claude-haiku-4-5-20251001"
+max_tokens = 64000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 1.0, output = 5.0 }

@@ -12,10 +12,16 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.text import Text
 
-from pipelex.cli.commands.init_cmd import InitFocus, init_cmd, init_config
+from pipelex import log
+from pipelex.cli.commands.init.command import init_cmd
+from pipelex.cli.commands.init.config_files import init_config
+from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
-from pipelex.config import PipelexConfig
+from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.config import PipelexConfig, get_config
 from pipelex.core.validation import report_validation_error
+from pipelex.exceptions import PipelexConfigError
+from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
@@ -23,6 +29,7 @@ from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -166,6 +173,8 @@ def display_health_report(
     backends_healthy: bool,
     backends_message: str,
     backend_reports: dict[str, BackendCredentialsReport],
+    models_healthy: bool,
+    models_message: str,
 ) -> None:
     """Display a comprehensive health report.
 
@@ -179,8 +188,10 @@ def display_health_report(
         backends_healthy: Whether backends check passed
         backends_message: Message about backends status
         backend_reports: Dict of backend credential reports
+        models_healthy: Whether models check passed
+        models_message: Message about models status
     """
-    all_healthy = config_healthy and telemetry_healthy and backends_healthy
+    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
 
     # Overall status panel
     if all_healthy:
@@ -236,6 +247,14 @@ def display_health_report(
                     console.print(f"    [red]✗[/red] Missing: {', '.join(backend_report.missing_vars)}")
                 if backend_report.placeholder_vars:
                     console.print(f"    [yellow]⚠[/yellow] Placeholders: {', '.join(backend_report.placeholder_vars)}")
+    console.print()
+
+    # Models section
+    console.print("[bold]Models[/bold]")
+    if models_healthy:
+        console.print(f"  [green]✓[/green] {models_message}")
+    else:
+        console.print(f"  [red]✗[/red] {models_message}")
     console.print()
 
     # Recommended actions
@@ -300,6 +319,35 @@ def display_health_report(
             console.print()
 
 
+def check_models() -> tuple[bool, str]:
+    """Check if models are valid.
+
+    Returns:
+        Tuple of (is_healthy, message)
+    """
+    pipelex_hub = PipelexHub()
+    set_pipelex_hub(pipelex_hub)
+
+    # tools
+    try:
+        pipelex_hub.setup_config(config_cls=PipelexConfig)
+    except ValidationError as validation_error:
+        validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
+        msg = f"Could not setup config because of: {validation_error_msg}"
+        raise PipelexConfigError(msg) from validation_error
+
+    log.configure(log_config=get_config().pipelex.log_config)
+
+    models_manager = ModelManager()
+    secrets_provider = EnvSecretsProvider()
+    try:
+        models_manager.setup(secrets_provider=secrets_provider)
+        models_manager.validate_model_deck()
+    except Exception as exc:
+        return False, f"Error checking models: {exc}"
+    return True, "Models are valid"
+
+
 def doctor_cmd(
     fix: bool = False,
 ) -> None:
@@ -309,134 +357,9 @@ def doctor_cmd(
         fix: If True, offer to fix detected issues interactively
     """
     console = Console()
-
+    do_doctor_cmd(console=console, fix=fix)
     try:
-        # Run health checks
-        config_healthy, config_missing_count, config_message = check_config_files()
-        telemetry_healthy, telemetry_message = check_telemetry_config()
-        backends_healthy, backend_reports, backends_message = check_backend_credentials()
-
-        # Display report
-        display_health_report(
-            console=console,
-            config_healthy=config_healthy,
-            config_message=config_message,
-            config_missing_count=config_missing_count,
-            telemetry_healthy=telemetry_healthy,
-            telemetry_message=telemetry_message,
-            backends_healthy=backends_healthy,
-            backends_message=backends_message,
-            backend_reports=backend_reports,
-        )
-
-        all_healthy = config_healthy and telemetry_healthy and backends_healthy
-
-        # Exit code: 0 if healthy, 1 if issues found
-        if all_healthy:
-            sys.exit(0)
-
-        # Determine what can be auto-fixed
-        can_fix_config = not config_healthy and config_missing_count > 0
-        can_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
-        has_auto_fixable_issues = can_fix_config or can_fix_telemetry
-
-        # Determine what requires manual fixes
-        has_config_validation_error = not config_healthy and config_missing_count == 0
-        has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
-        has_backend_credential_issues = not backends_healthy and backend_reports
-
-        # If --fix flag is provided, offer to fix auto-fixable issues
-        if fix and has_auto_fixable_issues:
-            console.print("[bold yellow]Interactive Fix Mode[/bold yellow]")
-            console.print()
-
-            # Fix missing config files
-            if can_fix_config:
-                if Confirm.ask(f"[bold]Install {config_missing_count} missing configuration file(s)?[/bold]", default=True):
-                    try:
-                        console.print()
-                        init_cmd(focus=InitFocus.CONFIG, reset=False, skip_confirmation=True)
-                        console.print("[green]✓[/green] Configuration files installed")
-                    except Exception as exc:
-                        console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
-                    console.print()
-
-            # Fix missing telemetry config
-            if can_fix_telemetry:
-                if Confirm.ask("[bold]Configure telemetry preferences?[/bold]", default=True):
-                    try:
-                        console.print()
-                        init_cmd(focus=InitFocus.TELEMETRY, reset=False, skip_confirmation=True)
-                        console.print("[green]✓[/green] Telemetry configured")
-                    except Exception as exc:
-                        console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
-                    console.print()
-
-        # Handle issues that can't be auto-fixed
-        if has_config_validation_error or has_telemetry_validation_error or has_backend_credential_issues:
-            console.print("[bold yellow]Manual Fixes Required[/bold yellow]")
-            console.print()
-
-            # Config validation errors
-            if has_config_validation_error:
-                console.print("[bold]Configuration validation error:[/bold]")
-                console.print(f"  {config_message}")
-                console.print()
-                console.print("You can fix this manually by editing [cyan].pipelex/pipelex.toml[/cyan]")
-                console.print("or run [cyan]pipelex init config --reset[/cyan] to regenerate from template.")
-                console.print()
-
-            # Telemetry validation errors
-            if has_telemetry_validation_error:
-                console.print("[bold]Telemetry validation error:[/bold]")
-                console.print(f"  {telemetry_message}")
-                console.print()
-                console.print("You can fix this manually by editing [cyan].pipelex/telemetry.toml[/cyan]")
-                console.print("or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate from template.")
-                console.print()
-
-            # Backend credentials
-            if has_backend_credential_issues:
-                all_missing_vars: set[str] = set()
-                for backend_report in backend_reports.values():
-                    if not backend_report.all_credentials_valid:
-                        all_missing_vars.update(backend_report.missing_vars)
-
-                if all_missing_vars:
-                    console.print("[bold]Backend credentials:[/bold]")
-                    console.print()
-                    console.print("Set the following environment variables:")
-                    console.print()
-
-                    # Show .env file syntax first
-                    console.print("[dim]# In your .env file:[/dim]")
-                    for var_name in sorted(all_missing_vars):
-                        console.print(f"{var_name}=[yellow]your_value_here[/yellow]")
-                    console.print()
-
-                    # Show shell syntax for different platforms
-                    console.print("[dim]# Or in your shell:[/dim]")
-                    console.print()
-
-                    # Linux/MacOS
-                    console.print("[dim]# Linux/MacOS[/dim]")
-                    for var_name in sorted(all_missing_vars):
-                        console.print(f"export {var_name}=[yellow]your_value_here[/yellow]")
-                    console.print()
-
-                    # Windows PowerShell
-                    console.print("[dim]# Windows PowerShell[/dim]")
-                    for var_name in sorted(all_missing_vars):
-                        console.print(f'$env:{var_name}="[yellow]your_value_here[/yellow]"')
-                    console.print()
-
-                    # Windows CMD
-                    console.print("[dim]# Windows CMD[/dim]")
-                    for var_name in sorted(all_missing_vars):
-                        console.print(f"set {var_name}=[yellow]your_value_here[/yellow]")
-                    console.print()
-
-        sys.exit(1)
+        do_doctor_cmd(console=console, fix=fix)
 
     except Exception as exc:
         # Handle unexpected errors gracefully without printing traces
@@ -448,3 +371,144 @@ def doctor_cmd(
         console.print("  [cyan]https://go.pipelex.com/discord[/cyan] - Discord Community")
         console.print()
         sys.exit(1)
+
+
+def do_doctor_cmd(
+    console: Console,
+    fix: bool = False,
+) -> None:
+    """Check Pipelex configuration health and suggest fixes.
+
+    Args:
+        console: Rich Console instance for output
+        fix: If True, offer to fix detected issues interactively
+    """
+    # Run health checks
+    config_healthy, config_missing_count, config_message = check_config_files()
+    telemetry_healthy, telemetry_message = check_telemetry_config()
+    backends_healthy, backend_reports, backends_message = check_backend_credentials()
+    models_healthy, models_message = check_models()
+
+    # Display report
+    display_health_report(
+        console=console,
+        config_healthy=config_healthy,
+        config_message=config_message,
+        config_missing_count=config_missing_count,
+        telemetry_healthy=telemetry_healthy,
+        telemetry_message=telemetry_message,
+        backends_healthy=backends_healthy,
+        backends_message=backends_message,
+        backend_reports=backend_reports,
+        models_healthy=models_healthy,
+        models_message=models_message,
+    )
+
+    all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
+
+    # Exit code: 0 if healthy, 1 if issues found
+    if all_healthy:
+        sys.exit(0)
+
+    # Determine what can be auto-fixed
+    can_fix_config = not config_healthy and config_missing_count > 0
+    can_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
+    has_auto_fixable_issues = can_fix_config or can_fix_telemetry
+
+    # Determine what requires manual fixes
+    has_config_validation_error = not config_healthy and config_missing_count == 0
+    has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
+    has_backend_credential_issues = not backends_healthy and backend_reports
+
+    # If --fix flag is provided, offer to fix auto-fixable issues
+    if fix and has_auto_fixable_issues:
+        console.print("[bold yellow]Interactive Fix Mode[/bold yellow]")
+        console.print()
+
+        # Fix missing config files
+        if can_fix_config:
+            if Confirm.ask(f"[bold]Install {config_missing_count} missing configuration file(s)?[/bold]", default=True):
+                try:
+                    console.print()
+                    init_cmd(focus=InitFocus.CONFIG, reset=False, skip_confirmation=True)
+                    console.print("[green]✓[/green] Configuration files installed")
+                except Exception as exc:
+                    console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
+                console.print()
+
+        # Fix missing telemetry config
+        if can_fix_telemetry:
+            if Confirm.ask("[bold]Configure telemetry preferences?[/bold]", default=True):
+                try:
+                    console.print()
+                    init_cmd(focus=InitFocus.TELEMETRY, reset=False, skip_confirmation=True)
+                    console.print("[green]✓[/green] Telemetry configured")
+                except Exception as exc:
+                    console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
+                console.print()
+
+    # Handle issues that can't be auto-fixed
+    if has_config_validation_error or has_telemetry_validation_error or has_backend_credential_issues:
+        console.print("[bold yellow]Manual Fixes Required[/bold yellow]")
+        console.print()
+
+        # Config validation errors
+        if has_config_validation_error:
+            console.print("[bold]Configuration validation error:[/bold]")
+            console.print(f"  {config_message}")
+            console.print()
+            console.print("You can fix this manually by editing [cyan].pipelex/pipelex.toml[/cyan]")
+            console.print("or run [cyan]pipelex init config --reset[/cyan] to regenerate from template.")
+            console.print()
+
+        # Telemetry validation errors
+        if has_telemetry_validation_error:
+            console.print("[bold]Telemetry validation error:[/bold]")
+            console.print(f"  {telemetry_message}")
+            console.print()
+            console.print("You can fix this manually by editing [cyan].pipelex/telemetry.toml[/cyan]")
+            console.print("or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate from template.")
+            console.print()
+
+        # Backend credentials
+        if has_backend_credential_issues:
+            all_missing_vars: set[str] = set()
+            for backend_report in backend_reports.values():
+                if not backend_report.all_credentials_valid:
+                    all_missing_vars.update(backend_report.missing_vars)
+
+            if all_missing_vars:
+                console.print("[bold]Backend credentials:[/bold]")
+                console.print()
+                console.print("Set the following environment variables:")
+                console.print()
+
+                # Show .env file syntax first
+                console.print("[dim]# In your .env file:[/dim]")
+                for var_name in sorted(all_missing_vars):
+                    console.print(f"{var_name}=[yellow]your_value_here[/yellow]")
+                console.print()
+
+                # Show shell syntax for different platforms
+                console.print("[dim]# Or in your shell:[/dim]")
+                console.print()
+
+                # Linux/MacOS
+                console.print("[dim]# Linux/MacOS[/dim]")
+                for var_name in sorted(all_missing_vars):
+                    console.print(f"export {var_name}=[yellow]your_value_here[/yellow]")
+                console.print()
+
+                # Windows PowerShell
+                console.print("[dim]# Windows PowerShell[/dim]")
+                for var_name in sorted(all_missing_vars):
+                    console.print(f'$env:{var_name}="[yellow]your_value_here[/yellow]"')
+                console.print()
+
+                # Windows CMD
+                console.print("[dim]# Windows CMD[/dim]")
+                for var_name in sorted(all_missing_vars):
+                    console.print(f"set {var_name}=[yellow]your_value_here[/yellow]")
+                console.print()
+
+    sys.exit(1)

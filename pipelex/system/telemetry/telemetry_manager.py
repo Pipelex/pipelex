@@ -1,4 +1,5 @@
-from typing import Any, Callable
+from contextlib import contextmanager
+from typing import Any, Callable, Generator
 
 import posthog
 from posthog import Posthog, new_context, tag
@@ -23,7 +24,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         self.telemetry_config = telemetry_config
 
         # Create PostHog client
-        self.posthog = Posthog(
+        self.posthog_client = Posthog(
             project_api_key=self.telemetry_config.project_api_key,
             host=self.telemetry_config.host,
             disable_geoip=not self.telemetry_config.geoip_enabled,
@@ -32,13 +33,13 @@ class TelemetryManager(TelemetryManagerAbstract):
         )
 
         # Store original capture_exception method
-        self._original_capture_exception: Callable[..., Any] = self.posthog.capture_exception
+        self._original_capture_exception: Callable[..., Any] = self.posthog_client.capture_exception
 
         # Wrap capture_exception to sanitize before sending
         self._wrap_capture_exception()
 
         posthog.privacy_mode = True
-        posthog.default_client = self.posthog
+        posthog.default_client = self.posthog_client
 
     def _handle_transmission_error(self, error: Exception | None, _items: list[dict[str, Any]]) -> None:
         """Handle errors that occur during telemetry transmission.
@@ -82,7 +83,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 return self._original_capture_exception(exception, **kwargs)
 
         # Replace the method
-        self.posthog.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
+        self.posthog_client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
     @override
     def setup(self, integration_mode: IntegrationMode):
@@ -92,7 +93,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 tag(name=EventProperty.INTEGRATION, value=integration_mode)
                 tag(name=EventProperty.PIPELEX_VERSION, value=package_version)
                 tag(name=EventProperty.SETTING, value=Setting.TELEMETRY_MODE)
-            self.posthog.capture(
+            self.posthog_client.capture(
                 EventName.TELEMETRY_JUST_ENABLED,
                 properties={
                     EventProperty.TELEMETRY_MODE: telemetry_mode,
@@ -102,7 +103,14 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def teardown(self):
-        pass
+        if self.posthog_client:
+            try:
+                # PostHog client has a shutdown method to flush pending events
+                # and close background threads
+                self.posthog_client.shutdown()
+            except Exception as exc:
+                # Suppress any shutdown errors to avoid cascading failures
+                log.debug(f"Error during PostHog shutdown: {exc}")
 
     @override
     def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):
@@ -127,7 +135,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 log.verbose(f"Telemetry is off, skipping event '{event_name}'")
 
     def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
-        if not self.posthog:
+        if not self.posthog_client:
             return
         if self.telemetry_config.dry_mode_enabled:
             if properties:
@@ -136,11 +144,11 @@ class TelemetryManager(TelemetryManagerAbstract):
                 log.debug(f"Tracking anonymous event '{event_name}'. No properties.")
         else:
             properties["$process_person_profile"] = False
-            self.posthog.capture(event_name, properties=properties)
+            self.posthog_client.capture(event_name, properties=properties)
             log.verbose(f"Tracked anonymous event '{event_name}' with properties: {properties}")
 
     def _track_identified_event(self, event_name: str, properties: dict[str, Any], user_id: str):
-        if not self.posthog:
+        if not self.posthog_client:
             return
         if self.telemetry_config.dry_mode_enabled:
             if properties:
@@ -148,5 +156,12 @@ class TelemetryManager(TelemetryManagerAbstract):
             else:
                 log.debug(f"Tracking identified event '{event_name}'. No properties.")
         else:
-            self.posthog.capture(event_name, distinct_id=user_id, properties=properties)
+            self.posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
             log.verbose(f"Tracked identified event '{event_name}' with properties: {properties}")
+
+    @override
+    @contextmanager
+    def telemetry_context(self) -> Generator[None, None, None]:
+        """Context manager that uses PostHog's new_context when telemetry is enabled."""
+        with new_context():
+            yield

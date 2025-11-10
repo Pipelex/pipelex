@@ -1,5 +1,3 @@
-"""Integration tests for init command backend customization."""
-
 from __future__ import annotations
 
 import shutil
@@ -9,14 +7,33 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cli.commands.init_cmd import customize_backends_config, init_config
-from pipelex.kit.paths import get_configs_dir
+from pipelex.cli.commands.init.backends import customize_backends_config
+from pipelex.cli.commands.init.config_files import init_config
+from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
 
 
-class TestBackendCustomization:
-    """Integration tests for backend customization during initialization."""
+def get_backend_indices(backends_toml_path: str, backend_names: list[str]) -> list[int]:
+    """Get 1-based indices for given backend names from backends.toml.
 
+    Args:
+        backends_toml_path: Path to backends.toml file.
+        backend_names: List of backend keys to find indices for.
+
+    Returns:
+        List of 1-based indices corresponding to the backend names.
+    """
+    toml_doc = load_toml_with_tomlkit(backends_toml_path)
+    backend_list: list[str] = [key for key in toml_doc if key != "internal"]
+    indices: list[int] = []
+    for name in backend_names:
+        if name in backend_list:
+            # 1-based index for user input
+            indices.append(backend_list.index(name) + 1)
+    return indices
+
+
+class TestBackendCustomization:
     def test_customize_backends_config_with_default_selection(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test backend customization with default selection (pipelex_inference)."""
         # Setup directories with actual backends.toml
@@ -24,18 +41,18 @@ class TestBackendCustomization:
         inference_dir.mkdir(parents=True)
 
         # Copy actual backends.toml from kit
-        actual_backends = Path(str(get_configs_dir())) / "inference" / "backends.toml"
+        actual_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
         test_backends = inference_dir / "backends.toml"
         shutil.copy2(actual_backends, test_backends)
 
         # Mock config_manager and user input
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
-        mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
+        mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         # Mock Console and Prompt to simulate user selecting default [1]
-        mocker.patch("pipelex.cli.commands.init_cmd.Console")
-        mocker.patch("pipelex.cli.commands.init_ui.Prompt.ask", return_value="1")
+        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value="1")
 
         # Execute
         customize_backends_config()
@@ -61,18 +78,23 @@ class TestBackendCustomization:
         inference_dir = tmp_path / ".pipelex" / "inference"
         inference_dir.mkdir(parents=True)
 
-        actual_backends = Path(str(get_configs_dir())) / "inference" / "backends.toml"
+        actual_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
         test_backends = inference_dir / "backends.toml"
         shutil.copy2(actual_backends, test_backends)
+
+        # Dynamically get indices for the backends we want to test
+        backend_names = ["openai", "anthropic", "mistral"]
+        indices = get_backend_indices(str(actual_backends), backend_names)
+        indices_str = ",".join(str(i) for i in indices)
 
         # Mock config_manager
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
-        mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
+        mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        # Mock user input: select [6,7,8] (openai, anthropic, mistral) in 1-based indexing
-        mocker.patch("pipelex.cli.commands.init_cmd.Console")
-        mocker.patch("pipelex.cli.commands.init_ui.Prompt.ask", return_value="6,7,8")
+        # Mock user input with dynamically determined indices
+        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value=indices_str)
 
         # Execute
         customize_backends_config()
@@ -99,17 +121,22 @@ class TestBackendCustomization:
         inference_dir = tmp_path / ".pipelex" / "inference"
         inference_dir.mkdir(parents=True)
 
-        actual_backends = Path(str(get_configs_dir())) / "inference" / "backends.toml"
+        actual_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
         test_backends = inference_dir / "backends.toml"
         shutil.copy2(actual_backends, test_backends)
 
+        # Dynamically get indices for the backends we want to test
+        backend_names = ["pipelex_inference", "openai", "fal"]
+        indices = get_backend_indices(str(actual_backends), backend_names)
+        indices_str = " ".join(str(i) for i in indices)
+
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
-        mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
+        mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        # Mock user input with spaces: "1 6 12" in 1-based indexing
-        mocker.patch("pipelex.cli.commands.init_cmd.Console")
-        mocker.patch("pipelex.cli.commands.init_ui.Prompt.ask", return_value="1 6 12")
+        # Mock user input with spaces and dynamically determined indices
+        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value=indices_str)
 
         # Execute
         customize_backends_config()
@@ -136,7 +163,7 @@ class TestBackendCustomization:
         inference_dir = kit_configs_dir / "inference"
         inference_dir.mkdir()
 
-        actual_backends = Path(str(get_configs_dir())) / "inference" / "backends.toml"
+        actual_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
         shutil.copy2(actual_backends, inference_dir / "backends.toml")
 
         # Setup target directory
@@ -144,10 +171,10 @@ class TestBackendCustomization:
         target_dir.mkdir()
 
         # Mock config_manager
-        mocker.patch("pipelex.cli.commands.init_cmd.get_configs_dir", return_value=str(kit_configs_dir))
+        mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=str(kit_configs_dir))
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(target_dir)
-        mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
+        mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
         mocker.patch("typer.echo")
 
         # Execute init_config
@@ -176,9 +203,9 @@ class TestBackendCustomization:
 
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(config_dir)
-        mocker.patch("pipelex.cli.commands.init_cmd.config_manager", mock_config_manager)
+        mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        mock_console = mocker.patch("pipelex.cli.commands.init_cmd.Console")
+        mock_console = mocker.patch("pipelex.cli.commands.init.backends.Console")
 
         # Execute - should not raise exception
         customize_backends_config()

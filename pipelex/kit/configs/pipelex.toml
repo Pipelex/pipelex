@@ -49,6 +49,13 @@ default_log_level = "INFO"
 [pipelex.log_config.package_log_levels]
 pipelex = "INFO"
 
+[cogt]
+[cogt.model_deck_config]
+# Uncomment to disable model fallback: it will raise errors instead of using secondary model options
+# is_model_fallback_enabled = false
+# Uncomment to change the reaction to missing presets: "raise" (default), "log" or "none"
+# missing_presets_reaction = "raise"
+
 [cogt.llm_config]
 # Uncomment any of these to enable dumping the inputs or outputs of text-genration with an LLM
 # is_dump_text_prompts_enabled = true

@@ -4,18 +4,21 @@ from typing import TYPE_CHECKING, Annotated
 
 import click
 import typer
-from posthog import new_context, tag
+from posthog import tag
 
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
 from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.hub import get_report_delegate, get_required_pipe
+from pipelex.cli.error_handlers import handle_validation_error, handle_model_deck_preset_error, ErrorContext
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
+from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.system.runtime import IntegrationMode
@@ -84,7 +87,13 @@ def build_pipe_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
+
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
@@ -138,17 +147,27 @@ def build_pipe_cmd(
             except Exception as exc:
                 typer.secho(f"⚠️  Warning: Could not generate input JSON: {exc}", fg=typer.colors.YELLOW)
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
-        start_time = time.time()
-        asyncio.run(run_pipeline())
-        end_time = time.time()
-        typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
+            start_time = time.time()
+            asyncio.run(run_pipeline())
+            end_time = time.time()
+            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
-        get_report_delegate().generate_report()
+            get_report_delegate().generate_report()
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
+    finally:
+        pipelex_instance.teardown()
 
 
 @build_app.command(SUB_COMMAND_RUNNER, help="Build the Python code to run a pipe with the necessary inputs")
@@ -231,9 +250,6 @@ def prepare_runner_cmd(
         raise typer.Exit(1)
 
     async def prepare_runner(pipe_code: str | None = None, bundle_path: str | None = None):
-        # Initialize Pipelex
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
-
         if bundle_path:
             try:
                 bundle_blueprint = await load_and_validate_bundle(bundle_path)
@@ -289,12 +305,29 @@ def prepare_runner_cmd(
             typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_RUNNER)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_RUNNER)
 
-        asyncio.run(prepare_runner(pipe_code=pipe_code, bundle_path=bundle_path))
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
+
+            asyncio.run(prepare_runner(pipe_code=pipe_code, bundle_path=bundle_path))
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
+    finally:
+        pipelex_instance.teardown()
 
 
 @build_app.command(SUB_COMMAND_INPUTS, help="Generate example input JSON for a pipe")
@@ -373,9 +406,6 @@ def generate_inputs_cmd(
         raise typer.Exit(1)
 
     async def generate_inputs(pipe_code: str | None = None, bundle_path: str | None = None):
-        # Initialize Pipelex
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
-
         if bundle_path:
             try:
                 bundle_blueprint = await load_and_validate_bundle(bundle_path)
@@ -427,12 +457,29 @@ def generate_inputs_cmd(
             typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_INPUTS}")
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
 
-        asyncio.run(generate_inputs(pipe_code=pipe_code, bundle_path=bundle_path))
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_INPUTS}")
+
+            asyncio.run(generate_inputs(pipe_code=pipe_code, bundle_path=bundle_path))
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
+    finally:
+        pipelex_instance.teardown()
 
 
 @build_app.command(SUB_COMMAND_ONE_SHOT_PIPE, help="Developer utility for contributors: deliver pipeline in one shot, without validation loop")
@@ -454,7 +501,13 @@ def build_one_shot_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
+
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
@@ -486,17 +539,27 @@ def build_one_shot_cmd(
         save_text_to_path(text=plx_content, path=output_path)
         typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_ONE_SHOT_PIPE}")
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_ONE_SHOT_PIPE}")
 
-        start_time = time.time()
-        asyncio.run(run_pipeline())
-        end_time = time.time()
-        typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
+            start_time = time.time()
+            asyncio.run(run_pipeline())
+            end_time = time.time()
+            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
-        get_report_delegate().generate_report()
+            get_report_delegate().generate_report()
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
+    finally:
+        pipelex_instance.teardown()
 
 
 @build_app.command(
@@ -529,7 +592,13 @@ def build_partial_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
+
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
@@ -579,14 +648,24 @@ def build_partial_cmd(
         else:
             typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PARTIAL_PIPE}")
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PARTIAL_PIPE}")
 
-        start_time = time.time()
-        asyncio.run(run_pipeline())
-        end_time = time.time()
-        typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
+            start_time = time.time()
+            asyncio.run(run_pipeline())
+            end_time = time.time()
+            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
 
-        get_report_delegate().generate_report()
+            get_report_delegate().generate_report()
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.BUILD)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.BUILD)
+
+    finally:
+        pipelex_instance.teardown()

@@ -77,7 +77,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         pass
 
     @override
-    def validate_with_libraries(self):
+    def _validate_with_libraries(self):
         pass
 
     @override

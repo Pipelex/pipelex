@@ -16,7 +16,7 @@ type = "PipeLLM"
 description = "Analyze a question to determine whether it's straightforward or tricky"
 inputs = { question = "Question" }
 output = "QuestionAnalysis"
-model = "llm_for_complex_reasoning"
+model = "llm_to_engineer"
 prompt = """
 Here is a question for an LLM:
 @question
@@ -32,7 +32,7 @@ type = "PipeLLM"
 description = "Answer knowingly after analyzing a question"
 inputs = { question = "Question", question_analysis = "QuestionAnalysis" }
 output = "ThoughtfulAnswer"
-model = "llm_for_complex_reasoning"
+model = "llm_to_engineer"
 prompt = """
 A question was asked:
 @question

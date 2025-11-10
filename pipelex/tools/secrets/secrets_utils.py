@@ -1,9 +1,9 @@
 import re
 
-from pipelex.hub import get_secrets_provider
 from pipelex.system.environment import EnvVarNotFoundError, get_optional_env, get_required_env
 from pipelex.system.exceptions import ToolException
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
+from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.types import StrEnum
 
 
@@ -32,7 +32,7 @@ class VarPrefix(StrEnum):
     SECRET = "secret"
 
 
-def substitute_vars(content: str) -> str:
+def substitute_vars(content: str, secrets_provider: SecretsProviderAbstract) -> str:
     """Substitute variable placeholders with values from environment variables or secrets.
 
     Supports the following placeholder formats:
@@ -43,6 +43,7 @@ def substitute_vars(content: str) -> str:
 
     Args:
         content: Text content with variable placeholders
+        secrets_provider: The secrets provider to use for secret lookups
 
     Returns:
         Content with variables substituted
@@ -57,7 +58,7 @@ def substitute_vars(content: str) -> str:
 
         # Check if it's a fallback pattern (contains |)
         if "|" in var_spec:
-            return _handle_fallback_pattern(var_spec)
+            return _handle_fallback_pattern(var_spec, secrets_provider)
 
         # Check if it has a prefix (env: or secret:)
         if ":" in var_spec:
@@ -77,10 +78,10 @@ def substitute_vars(content: str) -> str:
                 case VarPrefix.ENV:
                     return _get_env_var(var_name)
                 case VarPrefix.SECRET:
-                    return _get_secret(var_name)
+                    return _get_secret(var_name, secrets_provider)
         else:
             # Default behavior: use secrets provider
-            return _get_secret(var_spec)
+            return _get_secret(var_spec, secrets_provider)
 
     # Pattern matches ${VAR_NAME} or ${prefix:VAR_NAME} or ${env:VAR|secret:VAR}
     # Restrict to not match across newlines, quotes, or nested braces
@@ -88,7 +89,7 @@ def substitute_vars(content: str) -> str:
     return re.sub(pattern, replace_var, content)
 
 
-def _handle_fallback_pattern(var_spec: str) -> str:
+def _handle_fallback_pattern(var_spec: str, secrets_provider: SecretsProviderAbstract) -> str:
     """Handle fallback pattern like 'env:VAR|secret:VAR'."""
     parts = [part.strip() for part in var_spec.split("|")]
 
@@ -113,13 +114,13 @@ def _handle_fallback_pattern(var_spec: str) -> str:
                         return value
                 case VarPrefix.SECRET:
                     try:
-                        return get_secrets_provider().get_secret(secret_id=var_name)
+                        return secrets_provider.get_secret(secret_id=var_name)
                     except SecretNotFoundError:
                         continue  # Try next option
         else:
             # No prefix, try as secret
             try:
-                return get_secrets_provider().get_secret(secret_id=part)
+                return secrets_provider.get_secret(secret_id=part)
             except SecretNotFoundError:
                 continue  # Try next option
     msg = f"Could not get variable from fallback pattern: {var_spec}"
@@ -135,10 +136,10 @@ def _get_env_var(var_name: str) -> str:
         raise VarNotFoundError(message=msg, var_name=var_name) from exc
 
 
-def _get_secret(secret_name: str) -> str:
+def _get_secret(secret_name: str, secrets_provider: SecretsProviderAbstract) -> str:
     """Get secret, raising VarNotFoundError if not found."""
     try:
-        return get_secrets_provider().get_secret(secret_id=secret_name)
+        return secrets_provider.get_secret(secret_id=secret_name)
     except SecretNotFoundError as exc:
         msg = f"Could not get variable '{secret_name}': {exc!s}"
         raise VarNotFoundError(message=msg, var_name=secret_name) from exc

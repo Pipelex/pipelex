@@ -11,7 +11,7 @@ Get **free credits** for testing and development with a single API key that work
 **Benefits:**
 
 - No credit card required
-- Access to OpenAI, Anthropic, Google, Mistral, and more
+- Access to OpenAI, Anthropic Claude, Google Gemini, and xAI Grok
 - Perfect for development and testing
 - Single API key for all models
 

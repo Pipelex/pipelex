@@ -54,7 +54,7 @@ class PipeLLMTestCases:
             inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
-            llm_skill=LLMSkill.LLM_FOR_BASIC_VISION,
+            llm_skill=LLMSkill.LLM_FOR_IMG_TO_TEXT_CHEAP,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -63,7 +63,7 @@ class PipeLLMTestCases:
             inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
-            model=LLMSkill.LLM_FOR_BASIC_VISION,
+            model=LLMSkill.LLM_FOR_IMG_TO_TEXT_CHEAP,
         ),
     )
 
@@ -75,13 +75,13 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm_skill=LLMSkill.LLM_TO_WRITE_QUESTIONS,
+            llm_skill=LLMSkill.LLM_FOR_WRITING_CHEAP,
         ),
         PipeLLMBlueprint(
             source=None,
             type="PipeLLM",
             description="Generate with preset",
-            model=LLMSkill.LLM_TO_WRITE_QUESTIONS,
+            model=LLMSkill.LLM_FOR_WRITING_CHEAP,
             output="Text",
             prompt="Generate text",
         ),
@@ -95,13 +95,13 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm_skill=LLMSkill.LLM_TO_ANSWER_EASY_QUESTIONS,
+            llm_skill=LLMSkill.LLM_TO_ANSWER_QUESTIONS_CHEAP,
         ),
         PipeLLMBlueprint(
             source=None,
             type="PipeLLM",
             description="Generate with settings",
-            model=LLMSkill.LLM_TO_ANSWER_EASY_QUESTIONS,
+            model=LLMSkill.LLM_TO_ANSWER_QUESTIONS_CHEAP,
             output="Text",
             prompt="Generate text",
         ),
@@ -116,7 +116,7 @@ class PipeLLMTestCases:
             output="Analysis",
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
-            llm_skill=LLMSkill.LLM_TO_ANALYZE_DATA,
+            llm_skill=LLMSkill.LLM_TO_ANSWER_QUESTIONS,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -126,7 +126,7 @@ class PipeLLMTestCases:
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
             output="Analysis",
-            model=LLMSkill.LLM_TO_ANALYZE_DATA,
+            model=LLMSkill.LLM_TO_ANSWER_QUESTIONS,
         ),
     )
 
@@ -138,7 +138,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[]",
             prompt="Generate items",
-            llm_skill=LLMSkill.LLM_TO_ANSWER_EASY_QUESTIONS,
+            llm_skill=LLMSkill.LLM_FOR_WRITING_CHEAP,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -146,7 +146,7 @@ class PipeLLMTestCases:
             description="Generate multiple items",
             output="Item[]",
             prompt="Generate items",
-            model=LLMSkill.LLM_TO_ANSWER_EASY_QUESTIONS,
+            model=LLMSkill.LLM_FOR_WRITING_CHEAP,
         ),
     )
 
@@ -158,7 +158,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[5]",
             prompt="Generate items",
-            llm_skill=LLMSkill.LLM_TO_ANSWER_EASY_QUESTIONS,
+            llm_skill=LLMSkill.LLM_FOR_WRITING_CHEAP,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -166,7 +166,7 @@ class PipeLLMTestCases:
             description="Generate exactly 5 items",
             output="Item[5]",
             prompt="Generate items",
-            model=LLMSkill.LLM_TO_ANSWER_EASY_QUESTIONS,
+            model=LLMSkill.LLM_FOR_WRITING_CHEAP,
         ),
     )
 

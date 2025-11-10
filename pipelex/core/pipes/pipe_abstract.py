@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.input_requirements import InputRequirements
@@ -38,7 +39,21 @@ class PipeAbstract(ABC, BaseModel):
     def validate_output(self):
         """Validate the output for the pipe."""
 
+    @final
     def validate_with_libraries(self):
+        """Validate the pipe with the libraries, after the static validation"""
+        try:
+            self._validate_with_libraries()
+        except ModelChoiceNotFoundError as exc:
+            raise PipeOperatorModelChoiceError(
+                message=exc.message,
+                pipe_type=self.pipe_type,
+                pipe_code=self.code,
+                model_type=exc.model_type,
+                model_choice=exc.model_choice,
+            ) from exc
+
+    def _validate_with_libraries(self):
         """Validate the pipe with the libraries, after the static validation"""
 
     @abstractmethod

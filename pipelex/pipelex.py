@@ -18,13 +18,13 @@ from pipelex.cogt.exceptions import (
     InferenceBackendLibraryValidationError,
     ModelDeckNotFoundError,
     ModelDeckValidationError,
+    RoutingProfileDisabledBackendError,
     RoutingProfileLibraryNotFoundError,
-    RoutingProfileValidationError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config import PipelexConfig, get_config
+from pipelex.config import ConfigPaths, PipelexConfig, get_config
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
@@ -53,7 +53,7 @@ from pipelex.system.environment import get_optional_env
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager import DO_NOT_TRACK_ENV_VAR_KEY, TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract, TelemetryManagerNoOp
 from pipelex.test_extras.registry_test_models import TestRegistryModels
@@ -71,10 +71,10 @@ PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
-        config_dir_path: str = "./pipelex",
+        config_dir_path: str | None = None,
         config_cls: type[ConfigRoot] | None = None,
     ) -> None:
-        self.config_dir_path = config_dir_path
+        self.config_dir_path = config_dir_path or ConfigPaths.DEFAULT_CONFIG_DIR_PATH
         self.pipelex_hub = PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
 
@@ -119,7 +119,7 @@ class Pipelex(metaclass=MetaSingleton):
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
     @staticmethod
-    def _get_config_not_found_error_msg(component_name: str) -> str:
+    def _get_config_file_not_found_error_msg(component_name: str) -> str:
         """Generate error message for missing config files."""
         return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
 
@@ -129,10 +129,10 @@ class Pipelex(metaclass=MetaSingleton):
         msg = ""
         cause_exc = validation_exc.__cause__
         if cause_exc is None:
-            msg += f"\nUnxpexted cause:{cause_exc}"
+            msg += f"\nUnexpexted error:{cause_exc}"
             raise PipelexSetupError(msg) from cause_exc
         if not isinstance(cause_exc, ValidationError):
-            msg += f"\nUnxpexted cause:{cause_exc}"
+            msg += f"\nUnexpexted cause:{cause_exc}"
             raise PipelexSetupError(msg) from cause_exc
         report = report_validation_error(category="config", validation_error=cause_exc)
         return f"""{msg}
@@ -170,7 +170,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.class_registry = class_registry or ClassRegistry()
         self.pipelex_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
-        self.pipelex_hub.set_secrets_provider(secrets_provider or EnvSecretsProvider())
+        secrets_provider = secrets_provider or EnvSecretsProvider()
+        self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
         # cogt
@@ -180,19 +181,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
 
         try:
-            self.models_manager.setup()
+            self.models_manager.setup(secrets_provider=secrets_provider)
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
-            msg = self._get_config_not_found_error_msg("routing profile library")
+            msg = self._get_config_file_not_found_error_msg("routing profile library")
             raise PipelexSetupError(msg) from routing_not_found_exc
         except InferenceBackendLibraryNotFoundError as backend_not_found_exc:
-            msg = self._get_config_not_found_error_msg("inference backend library")
+            msg = self._get_config_file_not_found_error_msg("inference backend library")
             raise PipelexSetupError(msg) from backend_not_found_exc
         except ModelDeckNotFoundError as deck_not_found_exc:
-            msg = self._get_config_not_found_error_msg("model deck")
+            msg = self._get_config_file_not_found_error_msg("model deck")
             raise PipelexSetupError(msg) from deck_not_found_exc
-        except RoutingProfileValidationError as routing_validation_exc:
-            msg = self._get_validation_error_msg("routing profile library", routing_validation_exc)
-            raise PipelexSetupError(msg) from routing_validation_exc
+        except RoutingProfileDisabledBackendError as routing_profile_exc:
+            msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
+            raise PipelexSetupError(msg) from routing_profile_exc
+
         except InferenceBackendLibraryValidationError as backend_validation_exc:
             msg = self._get_validation_error_msg("inference backend library", backend_validation_exc)
             raise PipelexSetupError(msg) from backend_validation_exc
@@ -200,6 +202,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = self._get_validation_error_msg("model deck", deck_validation_exc)
             msg += "\n\nIf you added your own config files to the model deck then you'll have to change them manually."
             raise PipelexSetupError(msg) from deck_validation_exc
+
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
@@ -257,11 +260,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 telemetry_config_toml = load_toml_from_path(path=config_path)
                 telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
 
-            if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
-                self.telemetry_manager = TelemetryManagerNoOp()
-                log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
-            else:
-                self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
+            match telemetry_config.telemetry_mode:
+                case TelemetryMode.OFF:
+                    self.telemetry_manager = TelemetryManagerNoOp()
+                    log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
+                case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
+                    if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
+                        self.telemetry_manager = TelemetryManagerNoOp()
+                        log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
+                    else:
+                        self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
         else:
             self.telemetry_manager = TelemetryManagerNoOp()
             log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
@@ -399,6 +407,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             **kwargs,
         )
         pipelex_instance.setup_libraries()
+        pipelex_instance.models_manager.validate_model_deck()
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 

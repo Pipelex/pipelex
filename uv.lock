@@ -1661,7 +1661,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.14.3"
+version = "0.15.2"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1764,7 +1764,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = "==1.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
     { name = "networkx", specifier = ">=3.4.2" },
-    { name = "openai", specifier = ">=1.60.1" },
+    { name = "openai", specifier = ">=1.108.1" },
     { name = "pillow", specifier = ">=11.2.1" },
     { name = "polyfactory", specifier = ">=2.21.0" },
     { name = "posthog", specifier = ">=6.7.0" },

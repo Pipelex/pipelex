@@ -93,13 +93,9 @@ api_key_method = "env"
 
 [cogt]
 
-[cogt.inference_config]
-inference_config_path = ".pipelex/inference"
-
-[cogt.inference_manager_config]
-is_auto_setup_preset_llm = true
-is_auto_setup_preset_img_gen = true
-is_auto_setup_preset_extract = true
+[cogt.model_deck_config]
+is_model_fallback_enabled = true
+missing_presets_reaction = "log"
 
 [cogt.llm_config]
 default_max_images = 100

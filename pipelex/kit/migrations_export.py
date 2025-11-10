@@ -2,7 +2,7 @@ from pathlib import Path
 
 import typer
 
-from pipelex.kit.paths import get_migrations_dir
+from pipelex.kit.paths import get_kit_migrations_dir
 
 
 def export_migration_instructions(repo_root: Path, dry_run: bool = False) -> None:
@@ -12,7 +12,7 @@ def export_migration_instructions(repo_root: Path, dry_run: bool = False) -> Non
         repo_root: Repository root directory
         dry_run: If True, only print what would be done
     """
-    migrations_dir = get_migrations_dir()
+    migrations_dir = get_kit_migrations_dir()
     out_dir = repo_root / ".pipelex" / "migrations"
     out_dir.mkdir(parents=True, exist_ok=True)
 

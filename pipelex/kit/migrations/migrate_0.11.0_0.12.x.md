@@ -682,13 +682,13 @@ default_outcome = "fail"
 **Before (.pipelex/inference/deck/base_deck.toml):**
 ```toml
 [presets.llm]
-llm_for_complex_reasoning = { llm_handle = "claude-3-5-sonnet", temperature = 1 }
+llm_to_engineer = { llm_handle = "claude-3-5-sonnet", temperature = 1 }
 ```
 
 **After:**
 ```toml
 [presets.llm]
-llm_for_complex_reasoning = { model = "claude-3-5-sonnet", temperature = 1 }
+llm_to_engineer = { model = "claude-3-5-sonnet", temperature = 1 }
 ```
 
 ### Image generation presets

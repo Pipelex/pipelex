@@ -100,13 +100,28 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
             """Parallel execution using ThreadPoolExecutor"""
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            return loop.run_until_complete(dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
+            try:
+                return loop.run_until_complete(dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
+            finally:
+                loop.close()
 
         with ThreadPoolExecutor() as executor:
             futures = [asyncio.get_running_loop().run_in_executor(executor, functools.partial(run_pipe_in_thread, pipe)) for pipe in pipes]
             for future in asyncio.as_completed(futures):
-                output = await future
-                results[output.pipe_code] = output
+                try:
+                    output = await future
+                    results[output.pipe_code] = output
+                except Exception as exc:
+                    # If raise_on_failure is True, re-raise the first exception encountered
+                    # Otherwise, this shouldn't happen as dry_run_pipe should return a DryRunOutput
+                    if raise_on_failure:
+                        # Cancel remaining futures
+                        for f in futures:
+                            if not f.done():
+                                f.cancel()
+                        raise
+                    # This path shouldn't normally be reached, but handle it gracefully
+                    log.error(f"Unexpected exception in dry run: {exc}")
     else:
         for pipe in pipes:
             results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)

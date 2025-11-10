@@ -6,6 +6,7 @@ from rich.table import Table
 from pipelex import pretty_print
 from pipelex.plugins.mistral.mistral_llms import mistral_list_available_models
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
+from tests.integration.pipelex.plugins.conftest import is_backend_available
 
 REQUIRED_ENV_VARS = ["MISTRAL_API_KEY"]
 
@@ -17,6 +18,8 @@ class TestMistral:
     # pytest -k test_mistral_list_models -s -vv
     # make t VERBOSE=2 TEST=test_mistral_list_models
     def test_mistral_list_models(self, pytestconfig: pytest.Config):
+        if not is_backend_available("mistral"):
+            pytest.skip("Backend 'mistral' is not available or enabled")
         if not all_env_vars_are_set(keys=REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
         if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
@@ -49,6 +52,8 @@ class TestMistral:
     # pytest -k test_mistral_list_model_ids -s -vv
     # make t VERBOSE=2 TEST=test_mistral_list_model_ids
     def test_mistral_list_model_ids(self, pytestconfig: pytest.Config):
+        if not is_backend_available("mistral"):
+            pytest.skip("Backend 'mistral' is not available or enabled")
         if not all_env_vars_are_set(keys=REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
         if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
