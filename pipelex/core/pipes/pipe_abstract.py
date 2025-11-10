@@ -113,5 +113,21 @@ class PipeAbstract(ABC, BaseModel):
             msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}"
             raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=pipe_stack)
 
+    def _format_pipe_run_info(self, pipe_run_params: PipeRunParams) -> str:
+        indent_level = len(pipe_run_params.pipe_stack) - 1
+        indent = "   " * indent_level
+        if indent_level > 0:
+            indent = f"{indent}[yellow]↳[/yellow] "
+        pipe_type_label = f"[white]{self.pipe_type}:[/white]"
+        match pipe_run_params.run_mode:
+            case PipeRunMode.LIVE:
+                pass
+            case PipeRunMode.DRY:
+                pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
+        pipe_code_label = f"[red]{self.code}[/red]"
+        concept_code_label = f"[bold green]{self.output.code}[/bold green]"
+        arrow = "[yellow]→[/yellow]"
+        return f"{indent}{pipe_type_label} {pipe_code_label} {arrow} {concept_code_label}"
+
 
 PipeAbstractType = type[PipeAbstract]

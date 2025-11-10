@@ -2,11 +2,16 @@ from typing import Literal
 
 from pydantic import Field
 from pydantic.json_schema import SkipJsonSchema
+from rich.console import Group
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeConditionSpec(PipeSpec):
@@ -25,6 +30,52 @@ class PipeConditionSpec(PipeSpec):
     jinja2_expression_template: str = Field(description="Jinja2 expression to evaluate.")
     outcomes: dict[str, str] = Field(..., description="Mapping `dict[str, str]` of condition to outcomes.")
     default_outcome: str | SpecialOutcome = Field(description="The fallback outcome if the expression result does not match any key in outcome map.")
+
+    @override
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        # Get base pipe information from parent
+        base_group = super().rendered_for_rich(title=title, number=number)
+
+        # Create a group combining base info with condition-specific details
+        condition_group = Group()
+        condition_group.renderables.append(base_group)
+
+        # Add expression template in a panel
+        condition_group.renderables.append(Text())  # Blank line
+        expression_panel = Panel(
+            self.jinja2_expression_template,
+            title="Expression Template",
+            title_align="left",
+            border_style="yellow",
+            padding=(0, 1),
+        )
+        condition_group.renderables.append(expression_panel)
+
+        # Add outcomes as a table
+        condition_group.renderables.append(Text())  # Blank line
+        outcomes_table = Table(
+            title="Outcomes:",
+            title_justify="left",
+            title_style="not italic",
+            show_header=True,
+            header_style="dim",
+            show_edge=True,
+            show_lines=True,
+            border_style="dim",
+        )
+        outcomes_table.add_column("Condition", style="yellow")
+        outcomes_table.add_column("Pipe", style="cyan")
+
+        for condition, pipe in self.outcomes.items():
+            outcomes_table.add_row(condition, pipe)
+
+        condition_group.renderables.append(outcomes_table)
+
+        # Add default outcome
+        condition_group.renderables.append(Text())  # Blank line
+        condition_group.renderables.append(Text.from_markup(f"Default Outcome: [bold red]{self.default_outcome}[/bold red]"))
+
+        return condition_group
 
     @override
     def to_blueprint(self) -> PipeConditionBlueprint:

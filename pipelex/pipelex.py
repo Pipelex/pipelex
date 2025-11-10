@@ -53,9 +53,19 @@ from pipelex.system.environment import get_optional_env
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig, TelemetryMode
-from pipelex.system.telemetry.telemetry_manager import DO_NOT_TRACK_ENV_VAR_KEY, TelemetryManager
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract, TelemetryManagerNoOp
+from pipelex.system.telemetry.telemetry_config import (
+    TELEMETRY_CONFIG_FILE_NAME,
+    TelemetryConfig,
+    TelemetryMode,
+)
+from pipelex.system.telemetry.telemetry_manager import (
+    DO_NOT_TRACK_ENV_VAR_KEY,
+    TelemetryManager,
+)
+from pipelex.system.telemetry.telemetry_manager_abstract import (
+    TelemetryManagerAbstract,
+    TelemetryManagerNoOp,
+)
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -207,15 +217,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
             error_msg: str
-            if secrets_provider:
+            if isinstance(secrets_provider, EnvSecretsProvider):
                 error_msg = (
-                    f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},"
-                    f"\ncheck that secret '{var_name}' is available from your secrets provider."
+                    f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},\n"
+                    f"you need to add '{var_name}' to your environment variables or to your .env file."
                 )
             else:
                 error_msg = (
                     f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},\n"
-                    f"you need to add '{var_name}' to your environment variables or to your .env file."
+                    f"check that secret '{var_name}' is available from your secrets provider."
                 )
             if credentials_exc.backend_name == "pipelex_inference":
                 error_msg += (

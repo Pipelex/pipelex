@@ -123,6 +123,12 @@ class ScanConfig(ConfigModel):
         return frozenset(value)
 
 
+class BuilderConfig(ConfigModel):
+    default_output_dir: str
+    default_bundle_file_name: str
+    default_directory_base_name: str
+
+
 class Pipelex(ConfigModel):
     feature_config: FeatureConfig
     log_config: LogConfig
@@ -139,6 +145,7 @@ class Pipelex(ConfigModel):
     reporting_config: ReportingConfig
     observer_config: ObserverConfig
     scan_config: ScanConfig
+    builder_config: BuilderConfig
 
 
 class MigrationConfig(ConfigModel):

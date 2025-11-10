@@ -43,6 +43,11 @@ excluded_dirs = [
     "results",
 ]
 
+[pipelex.builder_config]
+default_output_dir = "results"
+default_bundle_file_name = "bundle"
+default_directory_base_name = "pipeline"
+
 [pipelex.log_config]
 default_log_level = "INFO"
 

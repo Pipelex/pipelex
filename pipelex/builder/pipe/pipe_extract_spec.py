@@ -2,11 +2,14 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
+from rich.console import Group
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_exceptions import PipeExtractSpecError
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -58,6 +61,29 @@ class PipeExtractSpec(PipeSpec):
             msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
             raise PipeExtractSpecError(msg)
         return inputs_value
+
+    @override
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        # Get base pipe information from parent
+        base_group = super().rendered_for_rich(title=title, number=number)
+
+        # Create a group combining base info with extract-specific details
+        extract_group = Group()
+        extract_group.renderables.append(base_group)
+
+        # Add extract specific information
+        extract_group.renderables.append(Text())  # Blank line
+        extract_group.renderables.append(Text.from_markup(f"Extract Skill: [bold yellow]{self.extract_skill}[/bold yellow]"))
+
+        # Add optional extraction settings if they are set
+        if self.page_images is not None:
+            extract_group.renderables.append(Text.from_markup(f"Include Page Images: [bold magenta]{self.page_images}[/bold magenta]"))
+        if self.page_image_captions is not None:
+            extract_group.renderables.append(Text.from_markup(f"Generate Image Captions: [bold magenta]{self.page_image_captions}[/bold magenta]"))
+        if self.page_views is not None:
+            extract_group.renderables.append(Text.from_markup(f"Include Page Views: [bold magenta]{self.page_views}[/bold magenta]"))
+
+        return extract_group
 
     @override
     def to_blueprint(self) -> PipeExtractBlueprint:

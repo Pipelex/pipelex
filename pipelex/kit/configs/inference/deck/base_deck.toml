@@ -60,7 +60,7 @@ smart_llm_for_structured = [
     "claude-4-sonnet",
     "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
 ]
-
+llm_for_creativity = ["claude-4.1-opus", "gemini-2.5-pro", "gpt-4o"]
 llm_for_large_codebase = [
     "gemini-2.5-pro",
     "claude-4.5-sonnet",
@@ -81,6 +81,12 @@ cheap_llm_for_vision = [
     "claude-3-haiku",
 ]
 cheap_llm_for_structured = ["gpt-4o-mini", "mistral-small", "claude-3-haiku"]
+cheap_llm_for_creativity = [
+    "gemini-2.5-flash",
+    "grok-3-mini",
+    "gpt-4o-mini",
+    "claude-4.5-haiku",
+]
 
 ####################################################################################################
 # LLM Presets

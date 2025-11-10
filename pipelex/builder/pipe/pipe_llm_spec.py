@@ -2,10 +2,14 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
+from rich.console import Group
+from rich.panel import Panel
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -20,7 +24,7 @@ class LLMSkill(StrEnum):
 
     LLM_FOR_WRITING_CHEAP = "llm_for_writing_cheap"
     LLM_FOR_IMG_TO_TEXT_CHEAP = "llm_for_img_to_text_cheap"
-    LLM_FOR_VISUAL_DESIGN = "llm_for_visual_design"
+    LLM_FOR_VISUAL_DESIGN = "cheap_llm_for_creativity"
     LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
     LLM_TO_CODE = "llm_to_code"
     LLM_TO_ANALYZE_LARGE_CODEBASE = "llm_to_analyze_large_codebase"
@@ -67,6 +71,45 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
     @classmethod
     def validate_llm(cls, llm_value: str) -> LLMSkill:
         return LLMSkill(llm_value)
+
+    @override
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        # Get base pipe information from parent
+        base_group = super().rendered_for_rich(title=title, number=number)
+
+        # Create a group combining base info with LLM-specific details
+        llm_group = Group()
+        llm_group.renderables.append(base_group)
+
+        # Add LLM-specific information
+        llm_group.renderables.append(Text())  # Blank line
+        llm_group.renderables.append(Text.from_markup(f"LLM Skill: [bold yellow]{self.llm_skill}[/bold yellow]"))
+
+        # Add system prompt if present
+        if self.system_prompt:
+            system_prompt_panel = Panel(
+                self.system_prompt,
+                title="System Prompt",
+                title_align="left",
+                border_style="blue",
+                padding=(0, 1),
+            )
+            llm_group.renderables.append(Text())  # Blank line
+            llm_group.renderables.append(system_prompt_panel)
+
+        # Add prompt if present
+        if self.prompt:
+            prompt_panel = Panel(
+                self.prompt,
+                title="Prompt",
+                title_align="left",
+                border_style="green",
+                padding=(0, 1),
+            )
+            llm_group.renderables.append(Text())  # Blank line
+            llm_group.renderables.append(prompt_panel)
+
+        return llm_group
 
     @override
     def to_blueprint(self) -> PipeLLMBlueprint:
