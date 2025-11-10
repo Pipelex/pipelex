@@ -5,7 +5,7 @@ import shutil
 
 import typer
 
-from pipelex.exceptions import PipelexCLIError
+from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME

@@ -1,19 +1,13 @@
-"""Helper functions for handling and displaying CLI errors."""
-
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, NoReturn
+from typing import NoReturn
 
 import typer
 from rich.console import Console
 from rich.syntax import Syntax
 
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.exceptions import PipelexValidationExceptionAbstract, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
-
-if TYPE_CHECKING:
-    from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-    from pipelex.exceptions import PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 
 
 class ErrorContext(StrEnum):

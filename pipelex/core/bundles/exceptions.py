@@ -1,4 +1,4 @@
-from typing_extensions import Self
+from typing_extensions import Self, override
 
 from pipelex.builder.validation_error_data import (
     ConceptFailure,
@@ -9,7 +9,7 @@ from pipelex.builder.validation_error_data import (
 )
 from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
 from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions import PipelexException, PipelexValidationExceptionAbstract
 
 
 class PipelexBundleBlueprintError(PipelexException):
@@ -20,7 +20,7 @@ class PipelexBundleBlueprintValueError(ValueError):
     pass
 
 
-class PipelexBundleError(PipelexException):
+class PipelexBundleError(PipelexValidationExceptionAbstract):
     """Main bundle error that aggregates multiple types of errors."""
 
     def __init__(
@@ -43,5 +43,6 @@ class PipelexBundleError(PipelexException):
         self.pipe_definition_errors = pipe_definition_errors
         super().__init__(message)
 
+    @override
     def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
         return self.concept_definition_errors or []

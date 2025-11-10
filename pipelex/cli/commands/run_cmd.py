@@ -13,15 +13,15 @@ from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_and_validate_bundle
 from pipelex.cli.error_handlers import (
     ErrorContext,
+    handle_model_availability_error,
+    handle_model_choice_error,
     handle_model_deck_preset_error,
     handle_validation_error,
-    handle_model_choice_error,
-    handle_model_availability_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.exceptions import PipeOperatorModelChoiceError, PipeOperatorModelAvailabilityError
 from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError
+from pipelex.exceptions import PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 from pipelex.hub import get_telemetry_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipelex import Pipelex
