@@ -320,6 +320,7 @@ ignore = [
 
     "RUF001", # String contains ambiguous `′` (PRIME). Did you mean ``` (GRAVE ACCENT)?
     "RUF003", # Comment contains ambiguous `’` (RIGHT SINGLE QUOTATION MARK). Did you mean ``` (GRAVE ACCENT)?
+    "RUF022", # Checks for __all__ definitions that are not ordered according to an "isort-style" sort.
 
     "SIM105", # Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
     "SIM108", # Use ternary operator `description = func.__doc__.strip().split("\n")[0] if func.__doc__ else func.__name__` instead of `if`-`else`-block

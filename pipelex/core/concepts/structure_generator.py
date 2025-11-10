@@ -6,14 +6,8 @@ from typing import Any, Literal, Optional
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import ConceptStructureGeneratorError
-from pipelex.core.exceptions import SyntaxErrorData
+from pipelex.core.concepts.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.exceptions.common import PipelexException
-
-
-class ConceptStructureValidationError(PipelexException):
-    pass
 
 
 class StructureGenerator:

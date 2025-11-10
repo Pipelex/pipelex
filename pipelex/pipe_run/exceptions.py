@@ -10,6 +10,10 @@ class BatchParamsError(PipelexException):
     pass
 
 
+class PipeRunError(PipelexException):
+    pass
+
+
 class PipeRouterError(PipelexException):
     def __init__(
         self,
@@ -26,7 +30,3 @@ class PipeRouterError(PipelexException):
         self.pipe_stack = pipe_stack
         self.missing_inputs = missing_inputs
         super().__init__(message)
-
-
-class PipeRunError(PipelexException):
-    pass

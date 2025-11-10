@@ -1,11 +1,7 @@
 from pipelex.exceptions.common import PipelexException
 
 
-class DomainError(PipelexException):
-    pass
-
-
-class DomainCodeError(DomainError):
+class DomainCodeError(PipelexException):
     pass
 
 

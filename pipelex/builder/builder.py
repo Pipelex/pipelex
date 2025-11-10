@@ -11,6 +11,7 @@ from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -23,7 +24,6 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
-from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory

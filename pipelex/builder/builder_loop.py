@@ -12,8 +12,8 @@ from pipelex.builder.builder_errors import (
     PipelexBundleUnexpectedError,
 )
 from pipelex.builder.builder_validation import fix_inputs_consistency, validate_bundle_spec
+from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.client.protocol import PipelineInputs
-from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories

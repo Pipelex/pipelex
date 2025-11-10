@@ -18,6 +18,10 @@ class ConceptStructureBlueprintValueError(ValueError):
     pass
 
 
+class ConceptStructureValidationError(PipelexException):
+    pass
+
+
 class ConceptFactoryError(PipelexException):
     pass
 

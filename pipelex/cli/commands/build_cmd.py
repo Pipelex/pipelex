@@ -11,6 +11,7 @@ from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -21,7 +22,6 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.config import get_config
-from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory

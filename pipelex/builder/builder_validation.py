@@ -7,21 +7,23 @@ from pipelex.builder.builder_errors import (
     ValidateDryRunError,
 )
 from pipelex.builder.bundle_spec import PipelexBundleSpec
+from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.validation_error_data import DomainFailure, PipeInputErrorData, StaticValidationErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.exceptions import (
+from pipelex.core.concepts.exceptions import (
     ConceptDefinitionErrorData,
+)
+from pipelex.core.exceptions import StaticValidationError
+from pipelex.core.pipes.exceptions import PipeInputError
+from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
+from pipelex.hub import get_library_manager, get_required_pipe
+from pipelex.libraries.exceptions import (
     ConceptLoadingError,
     DomainLoadingError,
     PipeDefinitionErrorData,
-    PipeInputError,
-    PipelexBundleError,
     PipeLoadingError,
-    StaticValidationError,
 )
-from pipelex.hub import get_library_manager, get_required_pipe
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 
 
