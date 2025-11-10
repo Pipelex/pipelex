@@ -44,7 +44,7 @@ class PipeRouterProtocol(Protocol):
             PayloadKey.ERROR: error,
         }
         await self.observer.observe_after_failing_run(payload)
-    
+
     async def run(
         self,
         pipe_job: PipeJob,

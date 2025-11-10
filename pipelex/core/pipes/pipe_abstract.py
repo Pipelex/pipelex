@@ -1,20 +1,20 @@
 from abc import ABC, abstractmethod
 from typing import Any, final
-from pipelex import log
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from pipelex import log
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunInputsError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
-from pipelex.core.pipes.exceptions import PipeRunInputsError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
 
@@ -101,7 +101,6 @@ class PipeAbstract(ABC, BaseModel):
 
         """
 
-
     def monitor_pipe_stack(self, pipe_run_params: PipeRunParams):
         pipe_stack = pipe_run_params.pipe_stack
         limit = pipe_run_params.pipe_stack_limit
@@ -166,13 +165,13 @@ class PipeAbstract(ABC, BaseModel):
 
         pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
         log.info(pipe_run_info)
-        
-        pipe_output = await self._run_pipe(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
+
+        pipe_output = await self._run_pipe(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
         return pipe_output
-
-
 
 
 PipeAbstractType = type[PipeAbstract]

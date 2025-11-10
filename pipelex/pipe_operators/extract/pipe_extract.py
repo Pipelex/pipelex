@@ -1,6 +1,5 @@
 from typing import Literal
 
-from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex import log
@@ -34,7 +33,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
-from pipelex.types import Self
 
 
 class PipeExtractOutput(PipeOutput):
@@ -52,28 +50,21 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     image_stuff_name: str | None = None
     pdf_stuff_name: str | None = None
 
-    @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
-        self._validate_inputs()
-        return self
-
     @override
-    def _validate_with_libraries(self):
-        self._validate_inputs()
-        if self.extract_choice:
-            check_extract_choice_with_deck(extract_choice=self.extract_choice)
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+        return self.inputs
 
     @override
     def required_variables(self) -> set[str]:
         return set(self.inputs.required_names)
 
     @override
-    def validate_output(self):
-        if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
-            msg = f"PipeExtract output should be a Page concept, but is {self.output.concept_string}"
-            raise PipeDefinitionError(msg)
+    def validate_input_static(self):
+        if self.extract_choice:
+            check_extract_choice_with_deck(extract_choice=self.extract_choice)
 
-    def _validate_inputs(self):
+    @override
+    def validate_input_with_library(self, library_id: str):
         concept_library = get_concept_library()
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -145,8 +136,14 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
                     raise inadequate_input_concept_error
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
-        return self.inputs
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self, library_id: str):
+        if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
+            msg = f"PipeExtract output should be a Page concept, but is {self.output.concept_string}"
+            raise PipeDefinitionError(msg)
 
     @override
     async def _run_operator_pipe(

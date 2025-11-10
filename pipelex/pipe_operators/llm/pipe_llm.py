@@ -63,11 +63,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     output_multiplicity: VariableMultiplicity | None = None
 
     @model_validator(mode="after")
-    def _validate_inputs(self) -> Self:
-        self.validate_inputs()
-        return self
-
-    @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
         if self.structuring_method is not None and self.output.structure_class_name == NativeConceptCode.TEXT:
             msg = (
@@ -78,39 +73,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return self
 
     @override
-    def _validate_with_libraries(self):
-        self.validate_inputs()
+    def validate_input_static(self):
         if self.llm_choices:
             for llm_choice in self.llm_choices.list_choice_strings():
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
     @override
-    def validate_output(self, pipeline_run_id: str | None = None):
-        if get_concept_library().is_compatible(
-            tested_concept=self.output,
-            wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
-        ):
-            msg = (
-                f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
-                f"pipe '{self.code}' the output is '{self.output.concept_string}'"
-            )
-            raise PipeDefinitionError(msg)
-
-    @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
-        """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
-        needed_inputs = InputRequirementsFactory.make_empty()
-
-        for input_name, requirement in self.inputs.items:
-            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
-        return needed_inputs
-
-    @override
-    def required_variables(self) -> set[str]:
-        """Required variables are the variables that are used in the current prompt template or system prompt"""
-        return {variable_name for variable_name in self.llm_prompt_spec.required_variables() if not variable_name.startswith("_")}
-
-    def validate_inputs(self):
+    def validate_input_with_library(self, library_id: str):
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -161,6 +130,36 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         log.error(extraneous_input_var_error.desc())
                     case StaticValidationReaction.RAISE:
                         raise extraneous_input_var_error
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self, library_id: str):
+        if get_concept_library().is_compatible(
+            tested_concept=self.output,
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
+        ):
+            msg = (
+                f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
+                f"pipe '{self.code}' the output is '{self.output.concept_string}'"
+            )
+            raise PipeDefinitionError(msg)
+
+    @override
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+        """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
+        needed_inputs = InputRequirementsFactory.make_empty()
+
+        for input_name, requirement in self.inputs.items:
+            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
+        return needed_inputs
+
+    @override
+    def required_variables(self) -> set[str]:
+        """Required variables are the variables that are used in the current prompt template or system prompt"""
+        return {variable_name for variable_name in self.llm_prompt_spec.required_variables() if not variable_name.startswith("_")}
 
     @override
     async def _run_operator_pipe(

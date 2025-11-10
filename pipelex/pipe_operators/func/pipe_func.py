@@ -30,6 +30,14 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     type: Literal["PipeFunc"] = "PipeFunc"
     function_name: str
 
+    @override
+    def required_variables(self) -> set[str]:
+        return set()
+
+    @override
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+        return self.inputs
+
     @field_validator("function_name", mode="before")
     @classmethod
     def validate_function_name(cls, function_name: str) -> str:
@@ -49,15 +57,19 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         return function_name
 
     @override
-    def required_variables(self) -> set[str]:
-        return set()
+    def validate_input_static(self):
+        pass
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
-        return self.inputs
+    def validate_input_with_library(self, library_id: str):
+        pass
 
     @override
-    def validate_output(self):
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self, library_id: str):
         pass
 
     @override

@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Generic, Literal, TypeVar, final
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ModelNotFoundError, ModelWaterfallError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -18,6 +17,7 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
 
 PipeOperatorOutputType = TypeVar("PipeOperatorOutputType", bound=PipeOutput)
+
 
 class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     pipe_category: Literal["PipeOperator"] = "PipeOperator"

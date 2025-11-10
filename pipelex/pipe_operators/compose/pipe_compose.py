@@ -49,44 +49,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     category: TemplateCategory = TemplateCategory.BASIC
     extra_context: dict[str, Any] | None = None
 
-    @model_validator(mode="after")
-    def validate_template(self) -> Self:
-        try:
-            check_jinja2_parsing(template_source=self.template, template_category=self.category)
-        except Jinja2TemplateSyntaxError as exc:
-            msg = f"Could not parse template for PipeCompose '{self.code}: {exc}"
-            raise PipeDefinitionError(msg) from exc
-        return self
-
-    @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
-        self._validate_required_variables()
-        return self
-
-    def _validate_required_variables(self) -> Self:
-        """This method checks that all required variables are in the inputs"""
-        required_variables = self.required_variables()
-        for required_variable_name in required_variables:
-            if required_variable_name not in self.inputs.variables:
-                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}"
-                raise PipeDefinitionError(msg)
-        return self
-
-    @override
-    def validate_output(self):
-        pass
-
-    @override
-    def _validate_with_libraries(self):
-        pass
-
-    @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
-        needed_inputs = InputRequirementsFactory.make_empty()
-        for input_name, requirement in self.inputs.root.items():
-            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
-        return needed_inputs
-
     @property
     def desc(self) -> str:
         return f"Jinja2 included template, prompting style {self.templating_style}"
@@ -102,6 +64,42 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             for variable_name in required_variables
             if not variable_name.startswith("_") and variable_name not in ("preliminary_text", "place_holder")
         }
+
+    @override
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+        needed_inputs = InputRequirementsFactory.make_empty()
+        for input_name, requirement in self.inputs.root.items():
+            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
+        return needed_inputs
+
+    @model_validator(mode="after")
+    def validate_template(self) -> Self:
+        try:
+            check_jinja2_parsing(template_source=self.template, template_category=self.category)
+        except Jinja2TemplateSyntaxError as exc:
+            msg = f"Could not parse template for PipeCompose '{self.code}: {exc}"
+            raise PipeDefinitionError(msg) from exc
+        return self
+
+    @override
+    def validate_input_static(self):
+        pass
+
+    @override
+    def validate_input_with_library(self, library_id: str):
+        required_variables = self.required_variables()
+        for required_variable_name in required_variables:
+            if required_variable_name not in self.inputs.variables:
+                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}"
+                raise PipeDefinitionError(msg)
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self, library_id: str):
+        pass
 
     @override
     async def _run_operator_pipe(

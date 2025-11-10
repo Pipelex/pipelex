@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex import log
@@ -33,7 +33,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
@@ -81,38 +80,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     output_format: OutputFormat | None = Field(default=None, strict=False)
     output_multiplicity: VariableMultiplicity
 
-    @field_validator("img_gen_prompt_var_name")
-    @classmethod
-    def validate_input_var_name_not_provided_as_attribute(cls, value: str | None) -> str | None:
-        if value is not None:
-            msg = "img_gen_prompt_var_name must be None before input validation"
-            raise PipeDefinitionError(msg)
-        return value
-
-    @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
-        self._validate_inputs()
-        return self
-
-    @override
-    def _validate_with_libraries(self):
-        self._validate_inputs()
-        if self.img_gen:
-            check_img_gen_choice_with_deck(img_gen_choice=self.img_gen)
-
-    @override
-    def validate_output(self):
-        if not get_concept_library().is_compatible(
-            tested_concept=self.output,
-            wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
-            strict=True,
-        ):
-            msg = (
-                f"The output of a ImgGen pipe must be compatible with the Image concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
-            )
-            raise PipeDefinitionError(msg)
-
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         needed_inputs = InputRequirementsFactory.make_empty()
@@ -134,7 +101,21 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             return {self.img_gen_prompt_var_name}
         return {DEFAULT_PROMPT_VAR_NAME}
 
-    def _validate_inputs(self):
+    @field_validator("img_gen_prompt_var_name")
+    @classmethod
+    def validate_input_var_name_not_provided_as_attribute(cls, value: str | None) -> str | None:
+        if value is not None:
+            msg = "img_gen_prompt_var_name must be None before input validation"
+            raise PipeDefinitionError(msg)
+        return value
+
+    @override
+    def validate_input_static(self):
+        if self.img_gen:
+            check_img_gen_choice_with_deck(img_gen_choice=self.img_gen)
+
+    @override
+    def validate_input_with_library(self, library_id: str):
         concept_library = get_concept_library()
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -202,6 +183,23 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                     log.error(inadequate_input_concept_error.desc())
                 case StaticValidationReaction.RAISE:
                     raise inadequate_input_concept_error
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self, library_id: str):
+        if not get_concept_library().is_compatible(
+            tested_concept=self.output,
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
+            strict=True,
+        ):
+            msg = (
+                f"The output of a ImgGen pipe must be compatible with the Image concept. "
+                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
+            )
+            raise PipeDefinitionError(msg)
 
     @override
     async def _run_operator_pipe(

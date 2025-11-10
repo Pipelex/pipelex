@@ -2,7 +2,6 @@ import asyncio
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import shortuuid
-from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex.config import get_config
@@ -17,7 +16,6 @@ from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -53,6 +51,7 @@ class PipeBatch(PipeController):
                     f"of PipeBatch '{self.code}', is not listed in its inputs"
                 )
                 raise PipeInputError(message=msg, pipe_code=self.code, variable_name=variable_name, concept_code=None)
+
     @override
     def validate_output_static(self):
         pass
