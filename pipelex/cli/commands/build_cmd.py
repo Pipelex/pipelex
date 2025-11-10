@@ -20,6 +20,7 @@ from pipelex.cli.error_handlers import (
     handle_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.config import get_config
 from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.exceptions import PipeOperatorModelChoiceError
