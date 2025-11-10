@@ -94,46 +94,6 @@ def verify_telemetry_config(telemetry_config_path: str, expected_mode: str) -> N
     assert toml_doc["telemetry_mode"] == expected_mode, f"Expected telemetry_mode '{expected_mode}', got '{toml_doc['telemetry_mode']}'"
 
 
-def setup_pipelex_dir(tmp_path: Path, copy_configs: bool = True, copy_backends: bool = True, copy_routing: bool = True) -> Path:
-    """Set up a test .pipelex directory structure.
-
-    Args:
-        tmp_path: Pytest temporary path fixture.
-        copy_configs: Whether to copy config files from kit.
-        copy_backends: Whether to copy backends.toml.
-        copy_routing: Whether to copy routing_profiles.toml.
-
-    Returns:
-        Path to created .pipelex directory.
-    """
-    pipelex_dir = tmp_path / ".pipelex"
-    pipelex_dir.mkdir(exist_ok=True)
-
-    inference_dir = pipelex_dir / "inference"
-    inference_dir.mkdir(exist_ok=True)
-
-    kit_configs_dir = Path(str(get_kit_configs_dir()))
-
-    if copy_configs:
-        # Copy main pipelex.toml
-        if (kit_configs_dir / "pipelex.toml").exists():
-            shutil.copy2(kit_configs_dir / "pipelex.toml", pipelex_dir / "pipelex.toml")
-
-    if copy_backends:
-        # Copy backends.toml
-        backends_source = kit_configs_dir / "inference" / "backends.toml"
-        if backends_source.exists():
-            shutil.copy2(backends_source, inference_dir / "backends.toml")
-
-    if copy_routing:
-        # Copy routing_profiles.toml
-        routing_source = kit_configs_dir / "inference" / "routing_profiles.toml"
-        if routing_source.exists():
-            shutil.copy2(routing_source, inference_dir / "routing_profiles.toml")
-
-    return pipelex_dir
-
-
 class MockedInitEnvironment:
     """Encapsulates all mocking setup for init command testing.
 
@@ -175,22 +135,46 @@ class MockedInitEnvironment:
         """Set up .pipelex directory with config files from kit.
 
         Args:
-            include_backends: Whether to include backends.toml.
+            include_backends: Whether to include backends.toml and backends/ subdirectory.
             include_routing: Whether to include routing_profiles.toml.
             include_telemetry: Whether to include telemetry.toml.
+
+        Raises:
+            FileNotFoundError: If any required kit config files are missing (raised by shutil.copy2).
         """
-        setup_pipelex_dir(
-            self.tmp_path,
-            copy_configs=True,
-            copy_backends=include_backends,
-            copy_routing=include_routing,
-        )
+        # Create directory structure
+        self.pipelex_dir.mkdir(exist_ok=True)
+        self.inference_dir.mkdir(exist_ok=True)
+
+        kit_configs_dir = Path(str(get_kit_configs_dir()))
+
+        # Always copy main pipelex.toml (needed for init_config checks)
+        shutil.copy2(kit_configs_dir / "pipelex.toml", self.pipelex_dir / "pipelex.toml")
+
+        # Always copy deck/ subdirectory (needed for init_config checks)
+        kit_deck_dir = kit_configs_dir / "inference" / "deck"
+        target_deck_dir = self.inference_dir / "deck"
+        target_deck_dir.mkdir(exist_ok=True)
+        for deck_file in kit_deck_dir.glob("*.toml"):
+            shutil.copy2(deck_file, target_deck_dir / deck_file.name)
+
+        if include_backends:
+            # Copy backends.toml
+            shutil.copy2(kit_configs_dir / "inference" / "backends.toml", self.inference_dir / "backends.toml")
+
+            # Copy backends/ subdirectory (needed for init_config checks)
+            kit_backends_dir = kit_configs_dir / "inference" / "backends"
+            target_backends_dir = self.inference_dir / "backends"
+            target_backends_dir.mkdir(exist_ok=True)
+            for backend_file in kit_backends_dir.glob("*.toml"):
+                shutil.copy2(backend_file, target_backends_dir / backend_file.name)
+
+        if include_routing:
+            # Copy routing_profiles.toml
+            shutil.copy2(kit_configs_dir / "inference" / "routing_profiles.toml", self.inference_dir / "routing_profiles.toml")
 
         if include_telemetry:
-            kit_configs_dir = Path(str(get_kit_configs_dir()))
-            telemetry_source = kit_configs_dir / "telemetry.toml"
-            if telemetry_source.exists():
-                shutil.copy2(telemetry_source, self.pipelex_dir / "telemetry.toml")
+            shutil.copy2(kit_configs_dir / "telemetry.toml", self.pipelex_dir / "telemetry.toml")
 
     def mock_config_manager_paths(self) -> None:
         """Mock config_manager to use tmp_path."""
