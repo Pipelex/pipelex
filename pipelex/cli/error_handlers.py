@@ -13,7 +13,6 @@ from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-    from pipelex.core.validation_errors import PipelexValidationExceptionAbstract
     from pipelex.exceptions import PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 
 
