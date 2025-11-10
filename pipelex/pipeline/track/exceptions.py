@@ -1,4 +1,4 @@
-from pipelex.exceptions.common import PipelexException
+from pipelex.base_exceptions import PipelexException
 
 
 class JobHistoryError(PipelexException):

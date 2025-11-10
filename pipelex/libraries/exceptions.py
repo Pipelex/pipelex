@@ -1,9 +1,9 @@
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexException
 from pipelex.core.concepts.exceptions import ConceptDefinitionError, ConceptDefinitionErrorData, PipelexValidationExceptionAbstract
 from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
-from pipelex.exceptions.common import PipelexException
 
 
 class LibraryError(PipelexException):

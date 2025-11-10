@@ -1,7 +1,7 @@
 import logging
 from typing import ClassVar
 
-from pipelex.exceptions.common import RootException
+from pipelex.base_exceptions import RootException
 from pipelex.types import StrEnum
 
 

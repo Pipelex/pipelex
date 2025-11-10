@@ -5,13 +5,13 @@ from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_code, validate_concept_string
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.exceptions.common import PipelexUnexpectedError
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field
 from pipelex.types import StrEnum

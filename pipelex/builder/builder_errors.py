@@ -1,9 +1,9 @@
+from pipelex.base_exceptions import PipelexException
 from pipelex.builder.validation_error_data import (
     ConceptFailure,
     PipeFailure,
 )
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.exceptions.common import PipelexException
 from pipelex.types import Self
 
 

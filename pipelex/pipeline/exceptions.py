@@ -1,5 +1,5 @@
+from pipelex.base_exceptions import PipelexException
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.exceptions.common import PipelexException
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 

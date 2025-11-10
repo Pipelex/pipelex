@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexException
 from pipelex.core.pipes.exceptions import StaticValidationErrorType
-from pipelex.exceptions.common import PipelexException
 
 
 class PipelexConfigurationError(PipelexException):

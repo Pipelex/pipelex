@@ -1,11 +1,11 @@
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexException
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.exceptions.common import PipelexException
 from pipelex.types import StrEnum
 
 

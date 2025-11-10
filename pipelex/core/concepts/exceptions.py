@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel, Field
 
+from pipelex.base_exceptions import PipelexException
 from pipelex.core.exceptions import SyntaxErrorData
-from pipelex.exceptions.common import PipelexException
 
 
 class ConceptError(PipelexException):
