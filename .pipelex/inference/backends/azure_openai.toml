@@ -80,6 +80,12 @@ inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
 
+[o3]
+model_id = "o3-2025-04-16"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
 # --- GPT-5 Series -------------------------------------------------------------
 [gpt-5-mini]
 model_id = "gpt-5-mini-2025-08-07"

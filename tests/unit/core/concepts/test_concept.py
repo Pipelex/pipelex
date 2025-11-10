@@ -4,63 +4,15 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError
+from pipelex.core.concepts.exceptions import ConceptStringError
+from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.domains.exceptions import DomainError
 
 
 class TestConcept:
     """Test Concept class."""
 
-    def test_is_native_concept_code(self):
-        """Test is_native_concept_code method."""
-        assert ConceptBlueprint.is_native_concept_code(NativeConceptCode.TEXT) is True
-        assert ConceptBlueprint.is_native_concept_code(NativeConceptCode.IMAGE) is True
-        assert ConceptBlueprint.is_native_concept_code(NativeConceptCode.PDF) is True
-        assert ConceptBlueprint.is_native_concept_code(NativeConceptCode.TEXT_AND_IMAGES) is True
-        assert ConceptBlueprint.is_native_concept_code(NativeConceptCode.NUMBER) is True
-        assert ConceptBlueprint.is_native_concept_code(NativeConceptCode.ANYTHING) is True
-        assert ConceptBlueprint.is_native_concept_code(NativeConceptCode.DYNAMIC) is True
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"{SpecialDomain.NATIVE}.{NativeConceptCode.NUMBER}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"not_native.{NativeConceptCode.TEXT}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"not_native.{NativeConceptCode.IMAGE}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"not_native.{NativeConceptCode.PDF}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"not_native.{NativeConceptCode.TEXT_AND_IMAGES}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"not_native.{NativeConceptCode.NUMBER}")
-
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code(f"not_native.{NativeConceptCode.DYNAMIC}")
-
-        assert ConceptBlueprint.is_native_concept_code("RandomConcept") is False
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.is_native_concept_code("text")
-
     def test_get_validated_native_concept_string(self):
-        """Test is_native_concept_code method."""
         assert NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.TEXT) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
         assert NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.IMAGE) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}"
         assert NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.PDF) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}"
@@ -217,50 +169,51 @@ class TestConcept:
         valid_concept_code = "ConceptCode"
         valid_concept_string = f"{valid_domain}.{valid_concept_code}"
         # Valid cases - should not raise exceptions
-        assert ConceptBlueprint.validate_concept_string(valid_concept_string) is None
-        assert ConceptBlueprint.validate_concept_string(f"snake_case_domain.{valid_concept_code}") is None
-        assert ConceptBlueprint.validate_concept_string(f"domain_123.{valid_concept_code}") is None
-        assert ConceptBlueprint.validate_concept_string(f"{valid_domain}.TEXT") is None
-        assert ConceptBlueprint.validate_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}") is None
+        validate_concept_string(valid_concept_string)
+        validate_concept_string(f"domain_123.{valid_concept_code}")
+        validate_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}")
+        validate_concept_string(f"{valid_domain}.UPPERCASE")
 
         # Invalid cases - should raise ConceptCodeError
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"snake_case_domaiN.{valid_concept_code}")
 
         # Multiple dots
         with pytest.raises(ConceptStringError):
-            ConceptBlueprint.validate_concept_string(f"domain.sub.{valid_concept_code}")
+            validate_concept_string(f"domain.sub.{valid_concept_code}")
 
         with pytest.raises(ConceptStringError):
-            ConceptBlueprint.validate_concept_string(f"a.b.c.{valid_concept_code}")
+            validate_concept_string(f"a.b.c.{valid_concept_code}")
 
         # Invalid domain (not snake_case)
-        with pytest.raises(DomainError):
-            ConceptBlueprint.validate_concept_string(f"InvalidDomain.{valid_concept_code}")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"InvalidDomain.{valid_concept_code}")
 
-        with pytest.raises(DomainError):
-            ConceptBlueprint.validate_concept_string(f"domain-name.{valid_concept_code}")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"domain-name.{valid_concept_code}")
 
-        with pytest.raises(DomainError):
-            ConceptBlueprint.validate_concept_string(f"Domain_Name.{valid_concept_code}")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"Domain_Name.{valid_concept_code}")
 
-        with pytest.raises(DomainError):
-            ConceptBlueprint.validate_concept_string(f"123domain.{valid_concept_code}")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"123domain.{valid_concept_code}")
 
         # Invalid concept code (not PascalCase)
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.validate_concept_string(f"{valid_domain}.invalidText")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"{valid_domain}.invalidText")
 
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.validate_concept_string(f"{valid_domain}.text")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"{valid_domain}.text")
 
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.validate_concept_string(f"{valid_domain}.Text_Name")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"{valid_domain}.Text_Name")
 
-        with pytest.raises(ConceptCodeError):
-            ConceptBlueprint.validate_concept_string(f"{valid_domain}.text-name")
+        with pytest.raises(ConceptStringError):
+            validate_concept_string(f"{valid_domain}.text-name")
 
         # Invalid native concept
         with pytest.raises(ConceptStringError):
-            ConceptBlueprint.validate_concept_string(f"{SpecialDomain.NATIVE}.InvalidNativeConcept")
+            validate_concept_string(f"{SpecialDomain.NATIVE}.InvalidNativeConcept")
 
     def test_are_concept_compatible(self):
         concept1 = ConceptFactory.make_from_blueprint(

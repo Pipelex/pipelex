@@ -7,7 +7,7 @@ generated Python code.
 
 import ast
 
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.structure_generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
 

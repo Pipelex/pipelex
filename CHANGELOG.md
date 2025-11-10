@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased - 
+
+### Refactor
+
+- Organized all exceptions specific folders.
+- Added Value error to blueprints.
+- Removed usedless exceptions.
+
+## [v0.15.3] - 2025-11-07
+
+### Fixed
+- Fixed weird import issues with `posthog` and `StrEnum`
+
+## [v0.15.2] - 2025-11-07
+
+### Fixed
+- Fixed resetting routing profile when calling with `--reset` flag in `pipelex init`
+
+## [v0.15.1] - 2025-11-07
+
+### Fixed
+- Bumped OpenAI dependency to `>=1.108.1` to support their breaking change: "change optional parameter type from `NotGiven` to `Omit`"
+- `get_selected_backend_keys()` now correctly considers backends enabled by default (like before v0.15.0)
+
+## [v0.15.0] - 2025-11-07
+
+**Highlights:** This release dramatically simplifies onboarding with interactive CLI setup, comprehensive documentation relaunch, and intelligent model fallbacks, making Pipelex more accessible and resilient than ever.
+
+### Added
+ - Model Waterfalls: Define prioritized model lists in `base_deck.toml` (e.g., `smart_llm = ["gpt-4o", "claude-4.5-sonnet", "grok-3"]`). Pipelex automatically falls back to the next model if the preferred one is unavailable.
+ - Advanced Routing Profiles: New capabilities in `routing_profiles.toml`: `fallback_order` (Global fallback sequence specifying which backends to try if a model isn't found) and `optional_routes` (Routes that activate only when their target backend is enabled)
+ - New Models: Anthropic `claude-4.5-haiku` (Pipelex Inference, Anthropic, and Bedrock backends) and Azure OpenAI `o3`
+ - Comprehensive Documentation Relaunch: Complete restructure under `/home/` with new "Get Started" guides for `pipelex build` and manual workflows, plus in-depth sections on Domains, Bundles, Concepts, and Pipe lifecycle.
+ - Enhanced CLI: `pipelex init` now interactively guides backend selection and automatically configures routing profiles, including primary backend and fallback order. Added `pipelex init routing` focus.
+ - Enhanced CLI: Improved error reporting across all commands (`build`, `validate`, `run`, `show`) with clear, actionable feedback for configuration errors, missing models, and invalid presets.
+ - Enhanced CLI: `pipelex doctor` now validates model deck configuration.
+ - New Routing Profiles: Full suite of `all_*` profiles (e.g., `all_openai`, `all_anthropic`, `all_google`) to route all requests to a single provider.
+
+### Changed
+ - BREAKING: for inline concept structures, the fields are now optional by default: the `required` property defaults to `false`. Explicitly set `required = true` to make fields mandatory, which we discourage as it increases risks of hallucinations.
+ - LLM Presets Overhaul: Rationalized and renamed default presets in `base_deck.toml`. Single-model aliases replaced with waterfall aliases. Key renames: `llm_for_complex_reasoning` → `llm_to_engineer`, `llm_to_answer_hard_questions` → `llm_to_answer_questions`, `llm_to_write_questions` → `llm_for_writing_cheap`. Removed redundant older presets.
+ - Stricter Configuration Validation: Pipelex validates model deck on startup and raises errors if presets reference unavailable models.
+
+### Fixed
+ - Local OpenAI-Compatible Endpoints: OpenAI plugin now handles empty API keys, enabling seamless integration with local servers like Ollama.
+
+### Removed
+ - Old Documentation Structure: Previous `/pages/` directory documentation removed in favor of new structure.
+
 ## [v0.14.3] - 2025-10-29
 
 ### Added

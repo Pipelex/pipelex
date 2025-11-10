@@ -5,6 +5,7 @@ from pipelex.hub import get_models_manager
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
+from tests.integration.pipelex.plugins.conftest import is_backend_available
 
 
 # make t VERBOSE=2 TEST=TestOpenAI
@@ -18,6 +19,8 @@ class TestOpenAI:
         pytestconfig: pytest.Config,
         plugin_for_openai: Plugin,
     ):
+        if not is_backend_available(plugin_for_openai.backend):
+            pytest.skip(f"Backend '{plugin_for_openai.backend}' is not available or enabled")
         match plugin_for_openai.backend:
             case "openai":
                 required_env_vars = ["OPENAI_API_KEY"]

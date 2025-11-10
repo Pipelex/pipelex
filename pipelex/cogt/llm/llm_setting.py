@@ -48,7 +48,7 @@ class LLMSettingChoices(ConfigModel):
     for_text: LLMModelChoice | None
     for_object: LLMModelChoice | None
 
-    def list_choices(self) -> set[str]:
+    def list_choice_strings(self) -> set[str]:
         return {c for c in (self.for_text, self.for_object) if isinstance(c, str)}
 
     @classmethod

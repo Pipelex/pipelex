@@ -4,7 +4,6 @@ from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import PipeExecutionError, PipelineExecutionError, PipeRouterError
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,
@@ -13,6 +12,7 @@ from pipelex.hub import (
     get_required_pipe,
     get_telemetry_manager,
 )
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import (
@@ -20,6 +20,7 @@ from pipelex.pipe_run.pipe_run_params import (
     VariableMultiplicity,
 )
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.validate_plx import validate_plx
 from pipelex.system.environment import get_optional_env

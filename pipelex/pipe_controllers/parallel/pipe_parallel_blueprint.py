@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import field_validator, model_validator
 from typing_extensions import override
 
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.validation import is_concept_string_or_code_valid
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
@@ -27,7 +27,9 @@ class PipeParallelBlueprint(PipeBlueprint):
     @classmethod
     def validate_combined_output(cls, combined_output: str) -> str:
         if combined_output:
-            ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=combined_output)
+            if not is_concept_string_or_code_valid(concept_string_or_code=combined_output):
+                msg = f"Combined output '{combined_output}' is not a valid concept string or code"
+                raise PipeDefinitionError(message=msg)
         return combined_output
 
     @model_validator(mode="after")

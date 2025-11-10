@@ -12,10 +12,10 @@ from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedI
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import PipeStackOverflowError
 from pipelex.hub import get_class_registry
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import StrEnum
 
@@ -66,7 +66,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
 
         error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
         return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
-    log.info(f"✅ Pipe '{pipe.code}' dry run completed successfully")
+    log.dev(f"✅ Pipe '{pipe.code}' dry run completed successfully")
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
@@ -100,13 +100,28 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
             """Parallel execution using ThreadPoolExecutor"""
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            return loop.run_until_complete(dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
+            try:
+                return loop.run_until_complete(dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
+            finally:
+                loop.close()
 
         with ThreadPoolExecutor() as executor:
             futures = [asyncio.get_running_loop().run_in_executor(executor, functools.partial(run_pipe_in_thread, pipe)) for pipe in pipes]
             for future in asyncio.as_completed(futures):
-                output = await future
-                results[output.pipe_code] = output
+                try:
+                    output = await future
+                    results[output.pipe_code] = output
+                except Exception as exc:
+                    # If raise_on_failure is True, re-raise the first exception encountered
+                    # Otherwise, this shouldn't happen as dry_run_pipe should return a DryRunOutput
+                    if raise_on_failure:
+                        # Cancel remaining futures
+                        for f in futures:
+                            if not f.done():
+                                f.cancel()
+                        raise
+                    # This path shouldn't normally be reached, but handle it gracefully
+                    log.error(f"Unexpected exception in dry run: {exc}")
     else:
         for pipe in pipes:
             results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
@@ -122,7 +137,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
 
     unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
 
-    log.info(
+    log.dev(
         f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, "
         f"{len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
     )

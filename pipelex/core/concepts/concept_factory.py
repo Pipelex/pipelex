@@ -2,16 +2,20 @@ from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_blueprint import (
-    ConceptBlueprint,
-    ConceptStructureBlueprint,
-    ConceptStructureBlueprintFieldType,
-)
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.exceptions import (
+    ConceptDefinitionError,
+    ConceptFactoryError,
+    ConceptRefineError,
+    ConceptStructureGeneratorError,
+    StructureClassError,
+)
 from pipelex.core.concepts.structure_generator import StructureGenerator
+from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid, validate_refine
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import ConceptCodeError, ConceptDefinitionError, ConceptRefineError, ConceptStructureGeneratorError, StructureClassError
 
 
 class DomainAndConceptCode(BaseModel):
@@ -50,7 +54,9 @@ class ConceptFactory:
 
     @classmethod
     def make_implicit_concept(cls, concept_string: str) -> Concept:
-        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        if not is_concept_string_valid(concept_string=concept_string):
+            msg = f"Concept string '{concept_string}' is not a valid concept string"
+            raise ConceptFactoryError(msg)
         return Concept(
             code=concept_string.split(".")[1],
             domain=SpecialDomain.IMPLICIT,
@@ -181,11 +187,34 @@ class ConceptFactory:
 
     @classmethod
     def make_refine(cls, refine: str) -> str:
-        if native_concept_string := NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine):
-            return native_concept_string
-        else:
-            msg = f"Refine '{refine}' is not a native concept and we currently can only refine native concepts"
-            raise ConceptRefineError(msg)
+        """Validate and normalize a refine string.
+
+        If the refine is a native concept code without domain (e.g., 'Text'),
+        it will be normalized to include the native domain prefix (e.g., 'native.Text').
+
+        Args:
+            refine: The refine string to validate and normalize
+
+        Returns:
+            The normalized refine string with domain prefix
+
+        Raises:
+            ConceptFactoryError: If the refine is invalid
+
+        """
+        try:
+            validate_refine(refine=refine)
+        except ConceptRefineError as exc:
+            msg = f"Could not validate refine '{refine}': {exc}"
+            raise ConceptFactoryError(msg) from exc
+
+        # Normalize the refine string (adds native domain if missing)
+        normalized_refine = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
+        if normalized_refine is None:
+            msg = f"Could not normalize refine '{refine}' to a native concept string"
+            raise ConceptFactoryError(msg)
+
+        return normalized_refine
 
     @classmethod
     def make_from_blueprint_or_description(
@@ -215,13 +244,9 @@ class ConceptFactory:
         blueprint: ConceptBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> Concept:
-        try:
-            ConceptBlueprint.validate_concept_code(concept_code=concept_code)
-        except ConceptCodeError as exc:
-            msg = f"Could not validate concept code '{concept_code}' in domain '{domain}': {exc}"
-            raise ConceptDefinitionError(
-                message=msg, domain_code=domain, concept_code=concept_code, description=blueprint.description, source=blueprint.source
-            ) from exc
+        if not is_concept_code_valid(concept_code=concept_code):
+            msg = f"Concept code '{concept_code}' is not a valid concept code"
+            raise ConceptFactoryError(msg)
         structure_class_name: str
         current_refine: str | None = None
 
@@ -267,6 +292,7 @@ class ConceptFactory:
         # Handle refines definition
         elif blueprint.refines:
             # If we have refines, validate that there is not already a structure related to this concept code in the class registry
+            # TODO: This test should NOT BE HERE, but in the `validate_with_libraries`.
             if Concept.is_valid_structure_class(structure_class_name=concept_code):
                 msg = (
                     f"Concept '{concept_code}' in domain '{domain}' has refines but also has a structure class registered. "

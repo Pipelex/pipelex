@@ -1,8 +1,8 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.structure_generator import ConceptStructureValidationError, StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
 

@@ -3,13 +3,13 @@ from typing import Any
 import httpx
 from typing_extensions import override
 
+from pipelex.client.exceptions import ClientAuthenticationError
 from pipelex.client.pipeline_request_factory import PipelineRequestFactory
 from pipelex.client.pipeline_response_factory import PipelineResponseFactory
 from pipelex.client.protocol import PipelexProtocol, PipelineInputs, PipelineRequest, PipelineRequestError, PipelineResponse
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.exceptions import ClientAuthenticationError
 from pipelex.system.environment import get_required_env
 
 

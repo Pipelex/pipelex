@@ -45,12 +45,12 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
     error_msg = "Validation error(s):"
 
     # Collect different types of validation errors
-    missing_fields = [f"{'.'.join(map(str, err['loc']))}" for err in exc.errors() if err["type"] == "missing"]
-    extra_fields = [f"{'.'.join(map(str, err['loc']))}: {err['input']}" for err in exc.errors() if err["type"] == "extra_forbidden"]
-    type_errors = [f"{'.'.join(map(str, err['loc']))}: expected {err['type']}" for err in exc.errors() if err["type"] == "type_error"]
-    value_errors = [f"{'.'.join(map(str, err['loc']))}: {err['msg']}" for err in exc.errors() if err["type"] == "value_error"]
+    missing_fields = [f"'{'.'.join(map(str, err['loc']))}'" for err in exc.errors() if err["type"] == "missing"]
+    extra_fields = [f"'{'.'.join(map(str, err['loc']))}'" for err in exc.errors() if err["type"] == "extra_forbidden"]
+    type_errors = [f"'{'.'.join(map(str, err['loc']))}': expected {err['type']}" for err in exc.errors() if err["type"] == "type_error"]
+    value_errors = [f"'{'.'.join(map(str, err['loc']))}': {err['msg']}" for err in exc.errors() if err["type"] == "value_error"]
     enum_errors = [
-        f"{'.'.join(map(str, err['loc']))}: invalid enum value '{err.get('input', 'unknown')}'" for err in exc.errors() if err["type"] == "enum"
+        f"'{'.'.join(map(str, err['loc']))}': invalid enum value '{err.get('input', 'unknown')}'" for err in exc.errors() if err["type"] == "enum"
     ]
     union_tag_errors: list[str] = []
     for err in exc.errors():
@@ -58,7 +58,7 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
             field_path = ".".join(map(str, err["loc"]))
             # Extract discriminator field name from context
             discriminator = err.get("ctx", {}).get("discriminator", "type")
-            union_tag_errors.append(f"{field_path}: missing required discriminator field '{discriminator}'")
+            union_tag_errors.append(f"'{field_path}': missing required discriminator field '{discriminator}'")
 
     model_type_errors: list[str] = []
     for err in exc.errors():
@@ -68,23 +68,23 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
             expected_type = err.get("ctx", {}).get("class_name", "unknown model type")
             actual_input = err.get("input", "unknown")
             actual_type = type(actual_input).__name__ if actual_input != "unknown" else "unknown"
-            model_type_errors.append(f"{field_path}: expected {expected_type}, got {actual_type}")
+            model_type_errors.append(f"'{field_path}': expected {expected_type}, got {actual_type}")
 
     # Add each type of error to the message if present
     if missing_fields:
-        error_msg += f"\n\nMissing required fields: {missing_fields}"
+        error_msg += f"\n\nMissing required fields: {', '.join(missing_fields)}"
     if extra_fields:
-        error_msg += f"\n\nExtra forbidden fields: {extra_fields}"
+        error_msg += f"\n\nExtra forbidden fields: {', '.join(extra_fields)}"
     if type_errors:
-        error_msg += f"\n\nType errors: {type_errors}"
+        error_msg += f"\n\nType errors: {', '.join(type_errors)}"
     if value_errors:
-        error_msg += f"\n\nValue errors: {value_errors}"
+        error_msg += f"\n\nValue errors: {', '.join(value_errors)}"
     if enum_errors:
-        error_msg += f"\n\nEnum errors: {enum_errors}"
+        error_msg += f"\n\nEnum errors: {', '.join(enum_errors)}"
     if union_tag_errors:
-        error_msg += f"\n\nUnion discriminator errors: {union_tag_errors}"
+        error_msg += f"\n\nUnion discriminator errors: {', '.join(union_tag_errors)}"
     if model_type_errors:
-        error_msg += f"\n\nModel type errors: {model_type_errors}"
+        error_msg += f"\n\nModel type errors: {', '.join(model_type_errors)}"
 
     # If none of the specific error types were found, add the raw error messages
     if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, union_tag_errors, model_type_errors]):

@@ -4,17 +4,26 @@ import asyncio
 from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
-from posthog import new_context, tag
+from posthog import tag
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
+from pipelex.base_exceptions import PipelexConfigError
+from pipelex.cli.error_handlers import (
+    ErrorContext,
+    handle_model_deck_preset_error,
+    handle_validation_error,
+)
+from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
-from pipelex.exceptions import PipelexCLIError, PipelexConfigError
-from pipelex.hub import get_library_manager, get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_library_manager, get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager, get_secrets_provider
 from pipelex.libraries.library_ids import SpecialLibraryId
+from pipelex.config import ConfigPaths
+from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
@@ -61,16 +70,22 @@ def do_show_pipe(pipe_code: str, library_id: str) -> None:
 def do_show_backends(show_all: bool = False) -> None:
     """Display all backends and the active routing profile."""
     try:
+        secrets_provider = get_secrets_provider()
         models_manager = cast("ModelManager", get_models_manager())
 
         # Load backends with or without disabled ones based on show_all flag
         if show_all:
             backend_library = InferenceBackendLibrary()
-            backend_library.load(include_disabled=True)
+            backend_library.load(
+                secrets_provider=secrets_provider,
+                backends_library_path=ConfigPaths.BACKENDS_FILE_PATH,
+                backends_dir_path=ConfigPaths.BACKENDS_DIR_PATH,
+                include_disabled=True,
+            )
         else:
             backend_library = models_manager.inference_backend_library
 
-        routing_profile_library = models_manager.routing_profile_library
+        routing_profile = models_manager.routing_profile
     except Exception as exc:
         msg = f"Error accessing backend or routing configuration: {exc}"
         raise PipelexCLIError(msg) from exc
@@ -116,17 +131,15 @@ def do_show_backends(show_all: bool = False) -> None:
 
     # Display routing profile information
     try:
-        active_profile = routing_profile_library.active_profile
+        console.print(f"[bold cyan]Active Routing Profile:[/bold cyan] [green]{routing_profile.name}[/green]")
+        if routing_profile.description:
+            console.print(f"[dim]{routing_profile.description}[/dim]")
 
-        console.print(f"[bold cyan]Active Routing Profile:[/bold cyan] [green]{active_profile.name}[/green]")
-        if active_profile.description:
-            console.print(f"[dim]{active_profile.description}[/dim]")
-
-        if active_profile.default:
-            console.print(f"[bold]Default Backend:[/bold] [cyan]{active_profile.default}[/cyan]")
+        if routing_profile.default:
+            console.print(f"[bold]Default Backend:[/bold] [cyan]{routing_profile.default}[/cyan]")
 
         # Display routing rules
-        if active_profile.routes:
+        if routing_profile.routes:
             console.print("\n[bold]Routing Rules:[/bold]")
             routes_table = Table(
                 show_header=True,
@@ -138,7 +151,7 @@ def do_show_backends(show_all: bool = False) -> None:
             routes_table.add_column("→", style="dim", justify="center")
             routes_table.add_column("Target Backend", style="cyan")
 
-            for pattern, target_backend in sorted(active_profile.routes.items()):
+            for pattern, target_backend in sorted(routing_profile.routes.items()):
                 routes_table.add_row(pattern, "→", target_backend)
 
             console.print(routes_table)
@@ -181,9 +194,14 @@ def list_pipes_cmd() -> None:
     This includes pipes from your project's .plx files and any
     pipes from imported packages.
     """
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
 
-    with new_context():
+    with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPES}")
@@ -202,13 +220,18 @@ def show_pipe_cmd(
     Example:
         pipelex show pipe hello_world
     """
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
+    try:
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
 
     library_manager = get_library_manager()
     library_manager.create_library(library_id=library_id)
     library_manager.load_libraries(library_id=library_id, load_user_dirs=False, load_pipelex_dirs=False)
 
-    with new_context():
+    with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
@@ -233,18 +256,27 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MODELS}")
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
 
-        asyncio.run(
-            ModelLister.list_models(
-                backend_name=backend_name,
-                flat=flat,
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MODELS}")
+
+            asyncio.run(
+                ModelLister.list_models(
+                    backend_name=backend_name,
+                    flat=flat,
+                )
             )
-        )
+    finally:
+        pipelex_instance.teardown()
 
 
 @show_app.command("backends", help="Display backend configurations and active routing profile")
@@ -259,8 +291,14 @@ def show_backends_cmd(
         pipelex show backends
         pipelex show backends --all
     """
-    Pipelex.make(integration_mode=IntegrationMode.CLI)
-    with new_context():
+    try:
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
+
+    with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
         tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_BACKENDS}")

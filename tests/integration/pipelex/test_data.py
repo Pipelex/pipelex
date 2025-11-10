@@ -10,7 +10,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import PipeRouterError
+from pipelex.pipe_run.exceptions import PipeRouterError
 from tests.cases import ImageTestCases, PDFTestCases
 
 

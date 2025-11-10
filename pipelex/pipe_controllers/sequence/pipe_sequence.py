@@ -5,22 +5,18 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import StaticValidationReaction, get_config
+from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import (
-    PipeControllerOutputConceptMismatchError,
-    PipeInputError,
-    PipeInputNotFoundError,
-    PipeRunParamsError,
-    StaticValidationError,
-    StaticValidationErrorType,
-)
 from pipelex.hub import get_concept_library, get_required_pipe
+from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
+from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
@@ -172,6 +168,7 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
             if sequential_sub_pipe.output_name:
                 generated_outputs.add(sequential_sub_pipe.output_name)
         return needed_inputs
+
 
     @override
     def pipe_dependencies(self) -> set[str]:

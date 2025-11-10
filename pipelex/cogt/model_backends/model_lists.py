@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from openai.types import Model
 
     from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.exceptions import PipelexCLIError
+from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.hub import get_models_manager
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
@@ -42,6 +42,7 @@ class ModelLister:
             backend = get_models_manager().get_required_inference_backend(backend_name)
         except Exception as exc:
             msg = f"Backend '{backend_name}' not found: {exc}"
+            # TODO: This should not raise this error in here.
             raise PipelexCLIError(msg) from exc
 
         console = Console()
@@ -49,6 +50,7 @@ class ModelLister:
         # Determine which SDKs are used in this backend
         if not backend.model_specs:
             msg = f"Backend '{backend_name}' has no model specifications"
+            # TODO: This should not raise this error in here.
             raise PipelexCLIError(msg)
 
         # Group models by SDK

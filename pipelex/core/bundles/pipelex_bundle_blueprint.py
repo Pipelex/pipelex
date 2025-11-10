@@ -2,9 +2,10 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from pipelex.builder.builder_errors import PipelexBundleError
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValueError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.domains.exceptions import DomainCodeError
+from pipelex.core.domains.validation import validate_domain_code
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -45,14 +46,18 @@ class PipelexBundleBlueprint(BaseModel):
     @field_validator("domain", mode="before")
     @classmethod
     def validate_domain_syntax(cls, domain: str) -> str:
-        DomainBlueprint.validate_domain_code(code=domain)
+        try:
+            validate_domain_code(code=domain)
+        except DomainCodeError as exc:
+            msg = f"Error when trying to validate the pipelex bundle at domain '{domain}': {exc}"
+            raise PipelexBundleBlueprintValueError(msg) from exc
         return domain
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":
         if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
-            msg = f"Main pipe '{self.main_pipe}' could not be found in bundle spec"
-            raise PipelexBundleError(message=msg)
+            msg = f"Main pipe '{self.main_pipe}' could not be found in pipelex bundle at source '{self.source}' and domain '{self.domain}'"
+            raise PipelexBundleBlueprintValueError(msg)
         return self
 
     @property

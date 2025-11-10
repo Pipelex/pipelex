@@ -10,8 +10,8 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.exceptions import JobHistoryError
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
+from pipelex.pipeline.track.exceptions import JobHistoryError
 from pipelex.pipeline.track.flow_chart import PipelineFlowChart
 from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.pipeline.track.tracker_config import TrackerConfig

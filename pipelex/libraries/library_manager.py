@@ -9,16 +9,22 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
+from pipelex.libraries.concept.concept_library import ConceptLibrary
+from pipelex.core.concepts.exceptions import ConceptDefinitionError
+from pipelex.core.domains.domain import Domain
+from pipelex.libraries.domain.domain_library import DomainLibrary
+from pipelex.core.domains.exceptions import DomainDefinitionError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
-from pipelex.exceptions import (
-    ConceptDefinitionError,
+from pipelex.libraries.exceptions import (
     ConceptLibraryError,
-    DomainDefinitionError,
+    ConceptLoadingError,
+    DomainLoadingError,
     LibraryError,
     LibraryLoadingError,
     PipeLibraryError,
@@ -305,14 +311,14 @@ class LibraryManager(LibraryManagerAbstract):
                 blueprint = PipelexInterpreter(file_path=plx_file_path).make_pipelex_bundle_blueprint()
                 blueprint.source = str(plx_file_path)
             except FileNotFoundError as file_not_found_error:
-                msg = f"Could not find PLX blueprint at '{plx_file_path}'"
+                msg = f"Could not find PLX bundle at '{plx_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
             except PipeDefinitionError as pipe_def_error:
-                msg = f"Could not load PLX blueprint from '{plx_file_path}': {pipe_def_error}"
+                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {pipe_def_error}"
                 raise LibraryLoadingError(msg) from pipe_def_error
             except ValidationError as validation_error:
                 validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-                msg = f"Could not load PLX blueprint from '{plx_file_path}' because of: {validation_error_msg}"
+                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {validation_error_msg}"
                 raise LibraryLoadingError(msg) from validation_error
             blueprints.append(blueprint)
 

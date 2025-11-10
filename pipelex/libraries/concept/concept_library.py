@@ -2,12 +2,15 @@ from pydantic import Field, RootModel, model_validator
 from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
+from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
+from pipelex.exceptions import ConceptLibraryError
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.hub import get_class_registry
 from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
@@ -84,7 +87,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         """
         if Concept.is_implicit_concept(concept_string=concept_string):
             return ConceptFactory.make_implicit_concept(concept_string=concept_string)
-        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        if not is_concept_string_valid(concept_string=concept_string):
+            msg = f"Concept string '{concept_string}' is not a valid concept string"
+            raise ConceptLibraryError(msg)
         the_concept = self.get_optional_concept(concept_string=concept_string)
         if not the_concept:
             msg = f"Concept '{concept_string}' not found in the library"

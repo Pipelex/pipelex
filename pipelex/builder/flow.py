@@ -1,8 +1,8 @@
 from pydantic import ConfigDict, Field, model_validator
 
+from pipelex.base_exceptions import PipelexException
 from pipelex.builder.pipe.pipe_signature import PipeSignature
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.exceptions import PipelexException
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint

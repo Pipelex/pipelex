@@ -7,6 +7,7 @@ from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import save_base_64_str_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from tests.conftest import TEST_OUTPUTS_DIR
+from tests.integration.pipelex.plugins.conftest import is_backend_available
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
 
@@ -16,6 +17,8 @@ from tests.integration.pipelex.test_data import ImageGenTestCases
 class TestImgGenByOpenAIGpt:
     @pytest.mark.parametrize(("topic", "image_desc"), ImageGenTestCases.IMAGE_DESC)
     async def test_gpt_image_generation(self, topic: str, image_desc: str):
+        if not is_backend_available("openai"):
+            pytest.skip("Backend 'openai' is not available or enabled")
         backend = get_models_manager().get_required_inference_backend("openai")
         client = OpenAIFactory.make_openai_client(
             Plugin(sdk="openai", backend="openai"),

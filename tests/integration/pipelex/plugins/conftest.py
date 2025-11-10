@@ -1,5 +1,17 @@
 import pytest
 
+from pipelex.cogt.exceptions import ModelManagerError
+from pipelex.hub import get_models_manager
+
+
+def is_backend_available(backend_name: str) -> bool:
+    """Check if an inference backend is available/enabled."""
+    try:
+        get_models_manager().get_required_inference_backend(backend_name)
+        return True
+    except ModelManagerError:
+        return False
+
 
 @pytest.fixture(params=["anthropic", "mistral", "meta", "amazon"])
 def bedrock_provider(request: pytest.FixtureRequest) -> str:

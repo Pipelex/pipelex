@@ -92,8 +92,6 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
 
-# anthropic.claude-sonnet-4-5-20250929-v1:0,Anthropic,arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0,
-
 ["claude-4.5-sonnet"]
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
@@ -102,3 +100,12 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+
+["claude-4.5-haiku"]
+sdk = "bedrock_anthropic"
+model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 1.0, output = 5.0 }

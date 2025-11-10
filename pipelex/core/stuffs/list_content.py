@@ -1,10 +1,12 @@
 from typing import Any, Generic
 
 from json2html import json2html
+from rich.table import Table
 from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
+from pipelex.tools.misc.pretty import PrettyPrintable, pretty_width
 
 
 class ListContent(StuffContent, Generic[StuffContentType]):
@@ -80,12 +82,14 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return rendered
 
     @override
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        table = Table(title=title, show_header=False, show_edge=False, show_lines=True, border_style="white", width=pretty_width(factor=0.8))
+        table.add_column("No.", style="yellow", justify="center", width=6)
+        table.add_column("Content", style="white")
+
         for item_index, item in enumerate(self.items):
-            item_number = item_index + 1
-            if title:
-                item_title = f"{title} • Item #{item_number}"
-            else:
-                item_title = f"Item #{item_index + 1}"
-            item.pretty_print_content(title=item_title, number=item_number)
-            print()
+            item_number = str(item_index + 1)
+            item_content = item.rendered_for_rich()
+            table.add_row(item_number, item_content)
+
+        return table

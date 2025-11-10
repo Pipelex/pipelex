@@ -15,9 +15,9 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import DryRunMissingInputsError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipeline.exceptions import DryRunMissingInputsError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 

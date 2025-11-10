@@ -47,9 +47,7 @@
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "validate",
-                "describe_image",
-                "-c",
-                "pipelex/libraries",
+                "temp/bundle.plx",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

@@ -4,9 +4,9 @@ from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFou
 from kajson.kajson_manager import KajsonManager
 from typing_extensions import override, runtime_checkable
 
+from pipelex.core.pipes.exceptions import PipeFactoryError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.exceptions import PipeFactoryError
 
 PipeBlueprintType = TypeVar("PipeBlueprintType", bound="PipeBlueprint", contravariant=True)
 PipeType = TypeVar("PipeType", bound="PipeAbstract", covariant=True)

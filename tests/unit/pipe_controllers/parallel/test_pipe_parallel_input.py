@@ -3,8 +3,8 @@ from typing import Any
 import pytest
 
 from pipelex import log
+from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.exceptions import StaticValidationError
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from tests.unit.pipe_controllers.parallel.data import PipeParallelInputTestCases

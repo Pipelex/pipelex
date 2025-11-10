@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex import log
-from pipelex.exceptions import StaticValidationError
+from pipelex.core.exceptions import StaticValidationError
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
 from tests.unit.pipe_operators.pipe_extract.data import PipeExtractInputTestCases

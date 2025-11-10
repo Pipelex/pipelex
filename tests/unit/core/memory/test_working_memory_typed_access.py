@@ -6,6 +6,7 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.memory.exceptions import WorkingMemoryStuffAttributeNotFoundError, WorkingMemoryTypeError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.image_content import ImageContent
@@ -13,7 +14,6 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import WorkingMemoryStuffAttributeNotFoundError, WorkingMemoryTypeError
 from tests.unit.core.memory.conftest import TestWorkingMemoryData
 
 

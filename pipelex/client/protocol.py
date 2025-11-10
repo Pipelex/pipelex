@@ -5,12 +5,12 @@ from pydantic import BaseModel, model_validator
 from pydantic.functional_validators import SkipValidation
 from typing_extensions import Annotated, runtime_checkable
 
+from pipelex.base_exceptions import PipelexException
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import DictPipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff import DictStuff
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.exceptions import PipelexException
 from pipelex.types import StrEnum
 
 # StuffContentOrData represents all possible formats for pipeline inputs input:
