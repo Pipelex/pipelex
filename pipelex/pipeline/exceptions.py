@@ -58,7 +58,7 @@ class DryRunTemplatingError(DryRunError):
         super().__init__(message, pipe_type, pipe_code)
 
 
-class PipeStackOverflowError(PipeRunError):
+class PipeStackOverflowError(PipelexException):
     def __init__(self, message: str, limit: int, pipe_stack: list[str]):
         self.limit = limit
         self.pipe_stack = pipe_stack
