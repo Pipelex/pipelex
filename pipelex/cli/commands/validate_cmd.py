@@ -15,6 +15,7 @@ from pipelex.builder.builder_errors import PipelexBundleNoFixForError
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
 from pipelex.cli.error_handlers import (
     handle_validation_error,
+    handle_model_availability_error,
     ErrorContext,
     handle_model_choice_error,
     handle_model_deck_preset_error,
@@ -24,7 +25,7 @@ from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeInputError
-from pipelex.exceptions import PipeOperatorModelChoiceError
+from pipelex.exceptions import PipeOperatorModelChoiceError, PipeOperatorModelAvailabilityError
 from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
