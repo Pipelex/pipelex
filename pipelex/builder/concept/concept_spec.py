@@ -274,23 +274,32 @@ class ConceptSpec(StructuredContent):
             concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
         concept_group.renderables.append(Text.from_markup(f"\nDescription: [italic]{self.description}[/italic]\n"))
         if self.structure:
+            # Check if any field has a default value
+            has_default_values = any(field_spec.default_value is not None for field_spec in self.structure.values())
+
             structure_table = Table(
                 title="Structure:",
                 title_style="not italic",
                 title_justify="left",
                 show_header=True,
+                header_style="dim",
                 show_edge=True,
                 show_lines=True,
                 border_style="dim",
             )
-            structure_table.add_column("Field", style="cyan")
-            structure_table.add_column("Description", style="white")
+            structure_table.add_column("Field", style="blue")
+            structure_table.add_column("Description", style="white italic")
             structure_table.add_column("Type", style="white")
             structure_table.add_column("Required", style="white")
-            structure_table.add_column("Default Value", style="white")
+            if has_default_values:
+                structure_table.add_column("Default Value", style="white")
+
             for field_name, field_spec in self.structure.items():
                 required_text = "Yes" if field_spec.required else "No"
-                structure_table.add_row(field_name, field_spec.description, field_spec.type.value, required_text, field_spec.default_value)
+                row_data = [field_name, field_spec.description, field_spec.type.value, required_text]
+                if has_default_values:
+                    row_data.append(str(field_spec.default_value) if field_spec.default_value is not None else "")
+                structure_table.add_row(*row_data)
             concept_group.renderables.append(structure_table)
 
         return concept_group

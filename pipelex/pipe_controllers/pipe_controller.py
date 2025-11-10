@@ -57,13 +57,6 @@ class PipeController(PipeAbstract):
         log.info(pipe_run_info)
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
-                # indent_level = len(pipe_run_params.pipe_stack) - 1
-                # indent = "   " * indent_level
-                # label = (
-                #     f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} Running
-                # [blue]{self.class_name}[/blue] → [green]{self.code}[/green]"
-                # )
-                # log.info(f"{label} → [red]{self.output.code}[/red]")
                 pipe_output = await self._run_controller_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
@@ -71,11 +64,6 @@ class PipeController(PipeAbstract):
                     output_name=output_name,
                 )
             case PipeRunMode.DRY:
-                # name = f"Dry running [blue]{self.class_name}[/blue]"
-                # indent_level = len(pipe_run_params.pipe_stack) - 1
-                # indent = "   " * indent_level
-                # label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name}: [green]{self.code}[/green]"
-                # log.info(f"{label} → [red]{self.output.code}[/red]")
                 pipe_output = await self._dry_run_controller_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
