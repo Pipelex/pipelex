@@ -1,12 +1,9 @@
-from abc import ABC, abstractmethod
-
 from typing_extensions import override
 
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
 from pipelex.system.exceptions import RootException
 
 
@@ -59,9 +56,3 @@ class PipeOperatorModelChoiceError(PipelexException):
     @override
     def __str__(self) -> str:
         return self.desc()
-
-
-class PipelexValidationExceptionAbstract(PipelexException, ABC):
-    @abstractmethod
-    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
-        pass

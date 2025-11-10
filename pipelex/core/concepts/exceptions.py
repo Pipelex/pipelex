@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 from pydantic import BaseModel, Field
 
 from pipelex.core.exceptions import SyntaxErrorData
@@ -88,3 +90,9 @@ class ConceptStructureGeneratorError(PipelexException):
         self.structure_class_python_code = structure_class_python_code
         self.syntax_error_data = syntax_error_data
         super().__init__(message)
+
+
+class PipelexValidationExceptionAbstract(PipelexException, ABC):
+    @abstractmethod
+    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
+        pass
