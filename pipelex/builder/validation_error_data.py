@@ -69,16 +69,3 @@ class PipeFailure(StructuredContent):
         | PipeSequenceSpec
     ) = Field(description="The failing pipe spec with pipe code")
     error_message: str = Field(description="The error message for this pipe")
-
-
-# class PipelexBundleErrorData(StructuredContent):
-#     """Structured data for PipelexBundleError."""
-
-#     message: str = Field(description="The main error message")
-#     static_validation_error: StaticValidationErrorData | None = Field(None, description="Static validation error if present")
-#     domain_failures: list[DomainFailure] | None = Field(None, description="List of domain failures")
-#     pipe_input_errors: list[PipeInputErrorData] | None = Field(None, description="List of pipe input errors")
-#     pipe_failures: list[PipeFailure] | None = Field(None, description="List of pipe failures")
-#     concept_failures: list[ConceptFailure] | None = Field(None, description="List of concept failures")
-#     concept_definition_errors: list[ConceptDefinitionErrorData] | None = Field(None, description="List of concept definition errors")
-#     pipe_definition_errors: list[PipeDefinitionErrorData] | None = Field(None, description="List of pipe definition errors")
