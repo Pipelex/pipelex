@@ -20,7 +20,7 @@ from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.config import ConfigPaths
-from pipelex.exceptions import PipelexConfigError
+from pipelex.exceptions.common import PipelexConfigError
 from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_secrets_provider, get_telemetry_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipelex import Pipelex

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pydantic import BaseModel, Field
 
 from pipelex.core.exceptions import SyntaxErrorData
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 
 
 class ConceptError(PipelexException):

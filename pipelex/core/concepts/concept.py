@@ -11,7 +11,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.exceptions import PipelexUnexpectedError
+from pipelex.exceptions.common import PipelexUnexpectedError
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field
 from pipelex.types import StrEnum

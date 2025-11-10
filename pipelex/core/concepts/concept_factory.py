@@ -5,17 +5,11 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import (
-    ConceptDefinitionError,
-    ConceptFactoryError,
-    ConceptRefineError,
-    ConceptStructureGeneratorError,
-    StructureClassError,
-)
 from pipelex.core.concepts.structure_generator import StructureGenerator
 from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid, validate_refine
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.exceptions import ConceptDefinitionError, ConceptFactoryError, ConceptRefineError, ConceptStructureGeneratorError, StructureClassError
 
 
 class DomainAndConceptCode(BaseModel):

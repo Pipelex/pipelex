@@ -20,7 +20,7 @@ from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.validation import report_validation_error
-from pipelex.exceptions import PipelexConfigError
+from pipelex.exceptions.common import PipelexConfigError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import get_optional_env

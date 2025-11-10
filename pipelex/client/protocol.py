@@ -10,7 +10,7 @@ from pipelex.core.pipes.pipe_output import DictPipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff import DictStuff
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 from pipelex.types import StrEnum
 
 # StuffContentOrData represents all possible formats for pipeline inputs input:

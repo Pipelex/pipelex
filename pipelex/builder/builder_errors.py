@@ -3,7 +3,7 @@ from pipelex.builder.validation_error_data import (
     PipeFailure,
 )
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 from pipelex.types import Self
 
 

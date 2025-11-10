@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.exceptions import ConceptStructureGeneratorError
 from pipelex.core.exceptions import SyntaxErrorData
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 
 
 class ConceptStructureValidationError(PipelexException):

@@ -30,7 +30,7 @@ from pipelex.core.domains.domain_library import DomainLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
-from pipelex.exceptions import PipelexConfigError, PipelexSetupError
+from pipelex.exceptions.common import PipelexConfigError, PipelexSetupError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from pipelex.observer.local_observer import LocalObserver

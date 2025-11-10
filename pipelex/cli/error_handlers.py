@@ -6,7 +6,7 @@ from rich.syntax import Syntax
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.concepts.exceptions import PipelexValidationExceptionAbstract
-from pipelex.exceptions import PipeOperatorModelChoiceError
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs

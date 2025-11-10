@@ -2,14 +2,10 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.core.pipes.exceptions import StaticValidationErrorType
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 
 
-class PipelexInterpreterError(PipelexException):
-    """Base exception class for PipelexInterpreter errors."""
-
-
-class PipelexConfigurationError(PipelexInterpreterError):
+class PipelexConfigurationError(PipelexException):
     """Raised when there are configuration issues with the PipelexInterpreter."""
 
 

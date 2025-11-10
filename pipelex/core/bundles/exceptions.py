@@ -9,11 +9,6 @@ from pipelex.builder.validation_error_data import (
 )
 from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData, PipelexValidationExceptionAbstract
 from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
-from pipelex.exceptions import PipelexException
-
-
-class PipelexBundleBlueprintError(PipelexException):
-    pass
 
 
 class PipelexBundleBlueprintValueError(ValueError):

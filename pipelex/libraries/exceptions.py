@@ -3,7 +3,7 @@ from typing_extensions import override
 
 from pipelex.core.concepts.exceptions import ConceptDefinitionError, ConceptDefinitionErrorData, PipelexValidationExceptionAbstract
 from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 
 
 class LibraryError(PipelexException):

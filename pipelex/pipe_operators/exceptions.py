@@ -1,4 +1,4 @@
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 

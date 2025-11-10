@@ -1,6 +1,6 @@
 from click import ClickException
 
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 
 
 class PipelexCLIError(PipelexException, ClickException):

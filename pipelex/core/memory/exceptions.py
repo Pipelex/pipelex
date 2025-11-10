@@ -1,4 +1,4 @@
-from pipelex.exceptions import PipelexException
+from pipelex.exceptions.common import PipelexException
 from pipelex.tools.misc.context_provider_abstract import ContextProviderException
 
 
