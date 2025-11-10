@@ -9,13 +9,7 @@ import typer
 from posthog import tag
 from rich.console import Console
 from rich.traceback import Traceback
-from typing_extensions import Protocol
 
-from pipelex import log, pretty_print
-from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
-from pipelex.core.bundles.exceptions import PipelexBundleError
-from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex import log
 from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
@@ -27,7 +21,9 @@ from pipelex.cli.error_handlers import (
     handle_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.exceptions import LibraryLoadingError, PipeInputError, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
 from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
@@ -38,12 +34,7 @@ from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
-    from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
-<<<<<<< HEAD
-
-=======
->>>>>>> dev
 
 console = Console()
 

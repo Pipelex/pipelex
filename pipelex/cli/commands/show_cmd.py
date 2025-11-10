@@ -10,16 +10,12 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
-from pipelex.cli.exceptions import PipelexCLIError
-from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
-from pipelex.cogt.model_backends.model_lists import ModelLister
-from pipelex.exceptions import PipelexConfigError
-from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_deck_preset_error,
     handle_validation_error,
 )
+from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister

@@ -10,9 +10,8 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-
-from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cli.commands.init.config_files import init_config
+from pipelex.cli.exceptions import PipelexCLIError
 
 
 class TestInitCmd:

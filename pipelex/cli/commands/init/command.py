@@ -7,9 +7,6 @@ import typer
 from rich.console import Console
 from rich.prompt import Confirm
 
-
-from pipelex.cli.exceptions import PipelexCLIError
-
 from pipelex.cli.commands.init.backends import customize_backends_config, get_selected_backend_keys
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.routing import customize_routing_profile
