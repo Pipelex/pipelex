@@ -63,7 +63,7 @@ def app_callback(ctx: typer.Context) -> None:
 ░██         ░██░███   ░██ ░██        ░██ ░██         ░██  ░██
 ░██         ░██░██░█████   ░███████  ░██  ░███████  ░██    ░██
                ░██
-               ░██                                     v{package_version}
+               ░██                                     v[cyan]{package_version}[/cyan]
 """
     )
     # Skip checks if no command is being run (e.g., just --help) or if running init/doctor command

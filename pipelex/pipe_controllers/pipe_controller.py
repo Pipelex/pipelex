@@ -54,7 +54,9 @@ class PipeController(PipeAbstract):
         self._validate_inputs_in_memory(working_memory=working_memory)
 
         pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
-        log.info(pipe_run_info)
+        # log.info(pipe_run_info)
+        if pipe_run_params.run_mode == PipeRunMode.LIVE:
+            log.info(pipe_run_info)
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
                 pipe_output = await self._run_controller_pipe(

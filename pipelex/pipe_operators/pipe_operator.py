@@ -44,7 +44,9 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         job_metadata.update(updated_metadata=updated_metadata)
 
         pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
-        log.info(pipe_run_info)
+        # log.info(pipe_run_info)
+        if pipe_run_params.run_mode == PipeRunMode.LIVE:
+            log.info(pipe_run_info)
         try:
             match pipe_run_params.run_mode:
                 case PipeRunMode.LIVE:

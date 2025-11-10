@@ -272,7 +272,7 @@ class ConceptSpec(StructuredContent):
         concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.the_concept_code}[/green]", style="bold"))
         if self.refines:
             concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
-        concept_group.renderables.append(Text.from_markup(f"\nDescription: [italic]{self.description}[/italic]\n"))
+        concept_group.renderables.append(Text.from_markup(f"\nDescription: [yellow italic]{self.description}[/yellow italic]\n"))
         if self.structure:
             # Check if any field has a default value
             has_default_values = any(field_spec.default_value is not None for field_spec in self.structure.values())

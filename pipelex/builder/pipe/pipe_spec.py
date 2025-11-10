@@ -143,7 +143,7 @@ class PipeSpec(StructuredContent):
         pipe_group.renderables.append(Text.from_markup(f"Pipe: [bold red]{self.pipe_code}[/bold red]\n"))
         pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{self.type}[/bold magenta] ({self.pipe_category})\n"))
         if self.description:
-            pipe_group.renderables.append(Text.from_markup(f"Description: [italic]{self.description}[/italic]\n"))
+            pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{self.description}[/yellow italic]\n"))
 
         # Create inputs section
         if not self.inputs:
