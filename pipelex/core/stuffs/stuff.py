@@ -194,10 +194,8 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         return self.content_as(MermaidContent)
 
     def pretty_print_stuff(self, title: str | None = None) -> None:
-        title = title or f"[cyan]{self.stuff_name}[/cyan] ([green]{self.concept.code}[/green])"
+        title = title or f"[cyan]{self.stuff_name}[/cyan] ([bold green]{self.concept.code}[/bold green])"
         self.content.pretty_print_content(title=title)
-        # content_rendered = self.content.rendered_for_rich()
-        # pretty_print(self.rendered_for_rich(), title=title, width=pretty_width())
 
 
 class DictStuff(CustomBaseModel):
