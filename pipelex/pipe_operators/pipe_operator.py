@@ -1,19 +1,21 @@
 from abc import abstractmethod
-from typing import Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar
 
 from typing_extensions import override
 
-from pipelex import log, pretty_print_md
+from pipelex import log
 from pipelex.cogt.exceptions import ModelNotFoundError, ModelWaterfallError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.list_content import ListContent
+    from pipelex.core.stuffs.stuff_content import StuffContent
 PipeOperatorOutputType = TypeVar("PipeOperatorOutputType", bound=PipeOutput)
 
 
@@ -41,35 +43,27 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         )
         job_metadata.update(updated_metadata=updated_metadata)
 
+        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
+        log.info(pipe_run_info)
         try:
             match pipe_run_params.run_mode:
                 case PipeRunMode.LIVE:
-                    if self.class_name not in ["PipeCompose", "PipeLLMPrompt"]:
-                        name = f"Running [cyan]{self.class_name}[/cyan]"
-                        indent_level = len(pipe_run_params.pipe_stack) - 1
-                        indent = "   " * indent_level
-                        label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name} → [green]{self.code}[/green]"
-                        log.info(f"{label} → [red]{self.output.code}[/red]")
                     pipe_output = await self._run_operator_pipe(
                         job_metadata=job_metadata,
                         working_memory=working_memory,
                         pipe_run_params=pipe_run_params,
                         output_name=output_name,
                     )
-                    if isinstance(pipe_output.main_stuff.content, TextContent):
-                        print()
-                        pretty_print_md(pipe_output.main_stuff_as_str, title=f"PipeOutput of pipe {self.code}")
-                        print()
-                    else:
-                        print()
-                        pipe_output.main_stuff.pretty_print_stuff(title=f"PipeOutput of pipe {self.code}: {self.output.code}")
-                        print()
+                    main_stuff = pipe_output.main_stuff
+                    output_concept_code = self.output.code
+                    output_concept_with_multiplicity = f"[bold green]{output_concept_code}[/bold green]"
+                    if main_stuff.is_list:
+                        list_content: ListContent[StuffContent] = main_stuff.as_list_content()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+                        nb_items = len(list_content.items)
+                        output_concept_with_multiplicity = f" ({nb_items} items)"
+                    title = f"Output of pipe [red]{self.code}[/red]: {output_concept_with_multiplicity}"
+                    main_stuff.pretty_print_stuff(title=title)
                 case PipeRunMode.DRY:
-                    name = f"Dry run [cyan]{self.class_name}[/cyan]"
-                    indent_level = len(pipe_run_params.pipe_stack) - 1
-                    indent = "   " * indent_level
-                    label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name}: [green]{self.code}[/green]"
-                    log.info(f"{label} → [red]{self.output.code}[/red]")
                     pipe_output = await self._dry_run_operator_pipe(
                         job_metadata=job_metadata,
                         working_memory=working_memory,

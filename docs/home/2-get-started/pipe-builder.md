@@ -27,11 +27,14 @@ The fastest way to create production-ready AI workflows is with the Pipe Builder
 pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview"
 ```
 
-The pipe builder generates a complete production-ready script in our Pipelex language, saved as a `.plx` file including domain definition, concepts, and the multiple _pipe_ steps to take to achieve the goal. It has also generated a file `inputs.json`, describing the form of the **mandatory** inputs for running the pipe.
+The pipe builder generates three files in a numbered directory (e.g., `results/pipeline_01/`):
+
+1. **`bundle.plx`** - Complete production-ready script in our Pipelex language with domain definition, concepts, and pipe steps
+2. **`inputs.json`** - Template describing the **mandatory** inputs for running the pipe
+3. **`run_{pipe_code}.py`** - Ready-to-run Python script that you can customize and execute
 
 !!! tip "Pipe Builder Requirements"
     For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BlackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key, otherwise, you can also create the workflows yourself, following our [documentation guide](./write-workflows-manually.md).
-
 
 ## Run your pipeline
 

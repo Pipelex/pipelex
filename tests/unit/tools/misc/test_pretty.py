@@ -42,9 +42,13 @@ class TestPrettyPrint:
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
         expected_output = textwrap.dedent("""\
+
             ╭─ title ─────────╮
+            │                 │
             │ Optional[float] │
+            │                 │
             ╰─────────────────╯
+
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
@@ -56,9 +60,13 @@ class TestPrettyPrint:
         output = remove_ansi_escape_codes(captured.out)
 
         expected_output = textwrap.dedent("""\
+
             ╭─ title ──────────────────────────────────────────────╮
+            │                                                      │
             │ SomethingBeforeBracketsAnd[SomethingBetweenBrackets] │
+            │                                                      │
             ╰──────────────────────────────────────────────────────╯
+
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
@@ -70,9 +78,13 @@ class TestPrettyPrint:
         output = remove_ansi_escape_codes(captured.out)
 
         expected_output = textwrap.dedent("""\
+
             ╭─ title ─────────────╮
+            │                     │
             │ List[Optional[int]] │
+            │                     │
             ╰─────────────────────╯
+
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
@@ -84,9 +96,13 @@ class TestPrettyPrint:
         output = remove_ansi_escape_codes(captured.out)
 
         expected_output = textwrap.dedent("""\
+
             ╭─ title ───────────────────────────────╮
+            │                                       │
             │ Union[str, List[int], Dict[str, Any]] │
+            │                                       │
             ╰───────────────────────────────────────╯
+
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
@@ -98,9 +114,13 @@ class TestPrettyPrint:
         output = remove_ansi_escape_codes(captured.out)
 
         expected_output = textwrap.dedent("""\
+
             ╭─ title ─────────────────────╮
+            │                             │
             │ @decorator[*args, **kwargs] │
+            │                             │
             ╰─────────────────────────────╯
+
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
@@ -112,9 +132,13 @@ class TestPrettyPrint:
         output = remove_ansi_escape_codes(captured.out)
 
         expected_output = textwrap.dedent("""\
+
             ╭─ title ─╮
+            │         │
             │ List[]  │
+            │         │
             ╰─────────╯
+
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
@@ -126,9 +150,13 @@ class TestPrettyPrint:
         output = remove_ansi_escape_codes(captured.out)
 
         expected_output = textwrap.dedent("""\
+
             ╭─ title ───────────╮
+            │                   │
             │ Unmatched[bracket │
+            │                   │
             ╰───────────────────╯
+
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
@@ -140,9 +168,13 @@ class TestPrettyPrint:
         output = remove_ansi_escape_codes(captured.out)
 
         expected_output = textwrap.dedent("""\
+
             ╭─ title ────────────╮
+            │                    │
             │ 🐍Python[版本3.11] │
+            │                    │
             ╰────────────────────╯
+
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"
@@ -218,10 +250,11 @@ class TestPrettyPrintInSandbox:
         output = remove_ansi_escape_codes(captured.out)
 
         expected_output = textwrap.dedent("""\
-            ╭────────────────────╮
-            │ title (subtitle):  │
-            │ None               │
-            ╰────────────────────╯
+            ╭────────────╮
+            │ title:     │
+            │ subtitle:  │
+            │ None       │
+            ╰────────────╯
         """)
 
         assert output == expected_output, f"Output did not match expected:\n{output}"

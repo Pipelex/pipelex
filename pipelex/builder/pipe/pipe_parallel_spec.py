@@ -1,6 +1,9 @@
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
+from rich.console import Group
+from rich.table import Table
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.concept.concept_spec import ConceptSpec
@@ -8,6 +11,7 @@ from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_exceptions import PipeParallelSpecError
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import Self
 
 
@@ -52,6 +56,44 @@ class PipeParallelSpec(PipeSpec):
                 description=self.description,
             )
         return self
+
+    @override
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        # Get base pipe information from parent
+        base_group = super().rendered_for_rich(title=title, number=number)
+
+        # Create a group combining base info with parallel-specific details
+        parallel_group = Group()
+        parallel_group.renderables.append(base_group)
+
+        # Add parallel configuration
+        parallel_group.renderables.append(Text())  # Blank line
+        parallel_group.renderables.append(Text.from_markup(f"Add Each Output: [bold yellow]{self.add_each_output}[/bold yellow]"))
+        if self.combined_output:
+            parallel_group.renderables.append(Text.from_markup(f"Combined Output: [bold green]{self.combined_output}[/bold green]"))
+
+        # Add parallel branches as a table
+        parallel_group.renderables.append(Text())  # Blank line
+        parallels_table = Table(
+            title="Parallel Branches:",
+            title_justify="left",
+            title_style="not italic",
+            show_header=True,
+            header_style="dim",
+            show_edge=True,
+            show_lines=True,
+            border_style="dim",
+        )
+        parallels_table.add_column("Branch", style="dim", width=6, justify="right")
+        parallels_table.add_column("Pipe", style="red")
+        parallels_table.add_column("Result name", style="cyan")
+
+        for idx, parallel in enumerate(self.parallels, start=1):
+            parallels_table.add_row(str(idx), parallel.pipe_code, parallel.result)
+
+        parallel_group.renderables.append(parallels_table)
+
+        return parallel_group
 
     @override
     def to_blueprint(self) -> PipeParallelBlueprint:

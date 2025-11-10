@@ -3,9 +3,12 @@ from datetime import datetime
 from typing import Any
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
+from rich.console import Group
+from rich.table import Table
+from rich.text import Text
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptBlueprintError,
@@ -17,7 +20,7 @@ from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringOrConceptCodeError
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.misc.json_utils import remove_none_values_from_dict
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
 from pipelex.types import Self, StrEnum
 
@@ -262,22 +265,41 @@ class ConceptSpec(StructuredContent):
         return ConceptBlueprint(description=self.description, structure=converted_structure, refines=self.refines)
 
     @override
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
-        the_dict: dict[str, Any] = self.smart_dump()
-        the_dict = remove_none_values_from_dict(data=the_dict)
-        if number:
-            title = f"Concept #{number}: {self.the_concept_code}"
-        else:
-            title = f"Concept: {self.the_concept_code}"
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        concept_group = Group()
+        if title:
+            concept_group.renderables.append(Text(title, style="bold"))
+        concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.the_concept_code}[/green]", style="bold"))
         if self.refines:
-            title += f" • Refines {self.refines}"
-            the_dict.pop("refines")
-
-        description = self.description
-        the_dict.pop("the_concept_code")
-        the_dict.pop("description")
+            concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
+        concept_group.renderables.append(Text.from_markup(f"\nDescription: [italic]{self.description}[/italic]\n"))
         if self.structure:
-            structure = the_dict.pop("structure")
-            pretty_print(structure, title=title, subtitle=description)
-        else:
-            pretty_print(description, title=title)
+            # Check if any field has a default value
+            has_default_values = any(field_spec.default_value is not None for field_spec in self.structure.values())
+
+            structure_table = Table(
+                title="Structure:",
+                title_style="not italic",
+                title_justify="left",
+                show_header=True,
+                header_style="dim",
+                show_edge=True,
+                show_lines=True,
+                border_style="dim",
+            )
+            structure_table.add_column("Field", style="blue")
+            structure_table.add_column("Description", style="white italic")
+            structure_table.add_column("Type", style="white")
+            structure_table.add_column("Required", style="white")
+            if has_default_values:
+                structure_table.add_column("Default Value", style="white")
+
+            for field_name, field_spec in self.structure.items():
+                required_text = "Yes" if field_spec.required else "No"
+                row_data = [field_name, field_spec.description, field_spec.type.value, required_text]
+                if has_default_values:
+                    row_data.append(str(field_spec.default_value) if field_spec.default_value is not None else "")
+                structure_table.add_row(*row_data)
+            concept_group.renderables.append(structure_table)
+
+        return concept_group

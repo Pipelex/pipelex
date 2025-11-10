@@ -43,7 +43,6 @@ class BuilderLoop:
             console = Console(stderr=True)
             console.print_exception()
             raise PipeBuilderError(message=msg) from exc
-        pretty_print(pipe_output, title="Pipe Output")
 
         if is_save_working_memory_enabled:
             working_memory_path = get_incremental_file_path(
@@ -58,7 +57,6 @@ class BuilderLoop:
         except WorkingMemoryStuffNotFoundError as exc:
             msg = f"Builder loop: Failed to get pipelex bundle spec: {exc}."
             raise PipeBuilderError(message=msg, working_memory=pipe_output.working_memory) from exc
-        pretty_print(pipelex_bundle_spec, title="Pipelex Bundle Spec • 1st iteration")
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
 
         if is_save_first_iteration_enabled:

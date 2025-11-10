@@ -2,11 +2,15 @@ from typing import Literal
 
 from pydantic import Field
 from pydantic.json_schema import SkipJsonSchema
+from rich.console import Group
+from rich.table import Table
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeSequenceSpec(PipeSpec):
@@ -20,6 +24,38 @@ class PipeSequenceSpec(PipeSpec):
     steps: list[SubPipeSpec] = Field(
         description=("List of SubPipeSpec instances to execute sequentially. Each step runs after the previous one completes.")
     )
+
+    @override
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        # Get base pipe information from parent
+        base_group = super().rendered_for_rich(title=title, number=number)
+
+        # Create a group combining base info with sequence-specific details
+        sequence_group = Group()
+        sequence_group.renderables.append(base_group)
+
+        # Add sequence steps as a table
+        sequence_group.renderables.append(Text())  # Blank line
+        steps_table = Table(
+            title="Sequence Steps:",
+            title_justify="left",
+            title_style="not italic",
+            show_header=True,
+            header_style="dim",
+            show_edge=True,
+            show_lines=True,
+            border_style="dim",
+        )
+        steps_table.add_column("Step", style="dim", width=4, justify="right")
+        steps_table.add_column("Pipe", style="red")
+        steps_table.add_column("Result name", style="cyan")
+
+        for idx, step in enumerate(self.steps, start=1):
+            steps_table.add_row(str(idx), step.pipe_code, step.result)
+
+        sequence_group.renderables.append(steps_table)
+
+        return sequence_group
 
     @override
     def to_blueprint(self) -> PipeSequenceBlueprint:

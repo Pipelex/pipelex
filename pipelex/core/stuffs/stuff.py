@@ -194,7 +194,7 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         return self.content_as(MermaidContent)
 
     def pretty_print_stuff(self, title: str | None = None) -> None:
-        title = title or f"{self.stuff_name} ({self.concept.code})"
+        title = title or f"[cyan]{self.stuff_name}[/cyan] ([bold green]{self.concept.code}[/bold green])"
         self.content.pretty_print_content(title=title)
 
 

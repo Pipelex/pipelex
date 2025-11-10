@@ -2,13 +2,15 @@ from typing import Any
 
 from pydantic import Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
+from rich.console import Group
+from rich.table import Table
+from rich.text import Text
 from typing_extensions import override
 
-from pipelex import pretty_print
 from pipelex.core.pipes.exceptions import PipeBlueprintError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.misc.json_utils import remove_none_values_from_dict
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeSignature(StructuredContent):
@@ -67,18 +69,45 @@ class PipeSignature(StructuredContent):
         return AllowedPipeTypes(type_value)
 
     @override
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
-        the_dict: dict[str, Any] = self.smart_dump()
-        the_dict = remove_none_values_from_dict(data=the_dict)
-        if number:
-            title = f"Pipe signature #{number}: {self.code}"
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        pipe_group = Group()
+        if title:
+            pipe_group.renderables.append(Text(title, style="bold"))
+        pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{self.code}[/red]\n", style="bold"))
+        pipe_type = self.type.value if isinstance(self.type, AllowedPipeTypes) else str(self.type)
+        pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{pipe_type}[/bold magenta] ({self.pipe_category.value})\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Description: [italic]{self.description}[/italic]\n"))
+
+        # Create inputs section
+        if not self.inputs:
+            pipe_group.renderables.append(Text.from_markup("\nNo inputs"))
+        elif len(self.inputs) == 1:
+            # Single input: display as a simple line of text
+            input_name, concept_spec = next(iter(self.inputs.items()))
+            pipe_group.renderables.append(Text.from_markup(f"\nInput: [cyan]{input_name}[/cyan] ([bold green]{concept_spec}[/bold green])"))
         else:
-            title = f"Pipe signature: {self.code}"
-        title += f" • {self.type} -> {self.result}"
-        subtitle = self.description
-        the_dict.pop("code")
-        the_dict.pop("description")
-        the_dict.pop("type")
-        the_dict.pop("pipe_category")
-        the_dict.pop("result")
-        pretty_print(the_dict, title=title, subtitle=subtitle)
+            # Multiple inputs: display as a table
+            inputs_table = Table(
+                title="Inputs:",
+                title_justify="left",
+                title_style="not italic",
+                show_header=False,
+                show_edge=True,
+                show_lines=True,
+                border_style="dim",
+            )
+            inputs_table.add_column("Variable Name", style="cyan")
+            inputs_table.add_column("Concept", style="bold green")
+            for input_name, concept_spec in self.inputs.items():
+                inputs_table.add_row(input_name, concept_spec)
+            pipe_group.renderables.append(inputs_table)
+
+        # Show output and result
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput concept: [bold green]{self.output}[/bold green]"))
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput name: [cyan]{self.result}[/cyan]"))
+
+        # Show dependencies if any
+        if self.pipe_dependencies:
+            pipe_group.renderables.append(Text.from_markup(f"\nDependencies: [red]{', '.join(self.pipe_dependencies)}[/red]"))
+
+        return pipe_group
