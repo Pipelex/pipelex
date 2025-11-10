@@ -21,9 +21,10 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError
-from pipelex.exceptions import PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
+from pipelex.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_telemetry_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline

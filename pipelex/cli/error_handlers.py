@@ -5,7 +5,8 @@ from rich.console import Console
 from rich.syntax import Syntax
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.exceptions import PipelexValidationExceptionAbstract, PipeOperatorModelAvailabilityError, PipeOperatorModelChoiceError
+from pipelex.exceptions import PipelexValidationExceptionAbstract, PipeOperatorModelChoiceError
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
 

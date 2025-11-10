@@ -7,7 +7,6 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
-from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.system.exceptions import RootException
 
 
@@ -60,26 +59,6 @@ class PipeOperatorModelChoiceError(PipelexException):
     @override
     def __str__(self) -> str:
         return self.desc()
-
-
-class PipeOperatorModelAvailabilityError(PipelexException):
-    def __init__(
-        self,
-        message: str,
-        run_mode: PipeRunMode,
-        pipe_type: str,
-        pipe_code: str,
-        pipe_stack: list[str],
-        model_handle: str,
-        fallback_list: list[str] | None = None,
-    ):
-        self.run_mode = run_mode
-        self.pipe_type = pipe_type
-        self.pipe_code = pipe_code
-        self.pipe_stack = pipe_stack
-        self.model_handle = model_handle
-        self.fallback_list = fallback_list
-        super().__init__(message)
 
 
 class PipelexValidationExceptionAbstract(PipelexException, ABC):
