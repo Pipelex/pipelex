@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, Generator
 
 import posthog
-from posthog import Posthog, new_context, tag
+from posthog import Posthog, new_context, tag  # type: ignore[attr-defined]
 from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 

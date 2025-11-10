@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.15.3] - 2025-11-07
+
+### Fixed
+- Fixed weird import issues with `posthog` and `StrEnum`
+
 ## [v0.15.2] - 2025-11-07
 
 ### Fixed

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
 from typing import TYPE_CHECKING, NoReturn
 
 import typer
 from rich.console import Console
 from rich.syntax import Syntax
 
+from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 if TYPE_CHECKING:
