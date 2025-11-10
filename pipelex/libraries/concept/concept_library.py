@@ -5,12 +5,10 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
-from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid
+from pipelex.core.concepts.validation import is_concept_string_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.exceptions import ConceptLibraryError
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
-from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.hub import get_class_registry
 from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
@@ -107,17 +105,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     def get_native_concepts(self) -> list[Concept]:
         """Create all native concepts from the hardcoded data"""
         return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptCode.values_list()]
-
-    @override
-    def search_for_concept_in_domains(self, concept_code: str, search_domains: list[str]) -> Concept | None:
-        ConceptBlueprint.validate_concept_code(concept_code=concept_code)
-        for domain in search_domains:
-            if found_concept := self.get_required_concept(
-                concept_string=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_code),
-            ):
-                return found_concept
-
-        return None
 
     @override
     def get_required_concept_from_concept_string_or_code(self, concept_string_or_code: str, search_domains: list[str] | None = None) -> Concept:

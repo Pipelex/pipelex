@@ -25,8 +25,8 @@ from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
-from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError

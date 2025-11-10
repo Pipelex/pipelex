@@ -169,7 +169,6 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
                 generated_outputs.add(sequential_sub_pipe.output_name)
         return needed_inputs
 
-
     @override
     def pipe_dependencies(self) -> set[str]:
         return {sub_pipe.pipe_code for sub_pipe in self.sequential_sub_pipes}
@@ -221,7 +220,9 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
         # Verify the output of this pipe is matching the output of the last step.
         concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code, library_id=pipe_run_params.library_id).output
         # if self.output.concept_string != concept_string_of_last_step:
-        if not get_concept_library(library_id=pipe_run_params.library_id).is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+        if not get_concept_library(library_id=pipe_run_params.library_id).is_compatible(
+            tested_concept=concept_of_last_step, wanted_concept=self.output
+        ):
             msg = f"""PipeSequence concept mismatch:
 the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
 of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.

@@ -25,10 +25,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config import PipelexConfig, get_config, ConfigPaths
-from pipelex.libraries.concept.concept_library import ConceptLibrary
-from pipelex.libraries.domain.domain_library import DomainLibrary
-from pipelex.libraries.pipe.pipe_library import PipeLibrary
+from pipelex.config import ConfigPaths, PipelexConfig, get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import PipelexHub, set_pipelex_hub

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Any, final
-from pipelex.types import Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -15,6 +14,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.types import Self
 
 
 class PipeAbstract(ABC, BaseModel):
@@ -47,12 +47,10 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     def validate_input_with_library(self, library_id: str):
         """Validate the inputs for the pipe with the library."""
-        pass
 
     @abstractmethod
     def valdiate_input_static(self):
         """Validate the inputs for the pipe."""
-        pass
 
     @abstractmethod
     def validate_output_with_library(self, library_id: str):
@@ -61,7 +59,6 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     def validate_output_static(self):
         """Validate the output for the pipe."""
-        pass
 
     def validate_input_static(self):
         """Validate the inputs for the pipe."""

@@ -20,10 +20,10 @@ from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
-from pipelex.hub import get_library_manager, get_models_manager, get_pipe_library, get_required_pipe, get_telemetry_manager, get_secrets_provider
-from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.config import ConfigPaths
+from pipelex.hub import get_library_manager, get_models_manager, get_pipe_library, get_required_pipe, get_secrets_provider, get_telemetry_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode

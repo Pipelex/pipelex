@@ -6,9 +6,8 @@ from pipelex.core.exceptions import PipelexConfigurationError
 from pipelex.core.interpreter import PipelexInterpreter, PLXDecodeError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager
-from pipelex.libraries.library_ids import SpecialLibraryId
-
 from pipelex.libraries.exceptions import ConceptLoadingError, DomainLoadingError, PipeLibraryError, PipeLoadingError
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipe_run.dry_run import DryRunError, dry_run_pipes
 
 
