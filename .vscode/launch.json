@@ -59,9 +59,9 @@
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
-                "results/test_1.plx",
+                "results/pipeline_01/bundle.plx",
                 "--inputs",
-                "results/inputs_2.json",
+                "results/pipeline_01/inputs.json",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
