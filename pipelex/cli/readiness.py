@@ -67,54 +67,12 @@ def _is_development_install() -> bool:
     return False
 
 
-def _check_critical_dependencies() -> tuple[bool, list[str]]:
-    """Check if critical Pipelex dependencies are available.
-
-    Returns:
-        Tuple of (all_available, list_of_missing_dependencies)
-    """
-    critical_dependencies = ["pydantic", "typer", "openai", "httpx", "instructor"]
-    missing: list[str] = []
-
-    for module_name in critical_dependencies:
-        try:
-            __import__(module_name)
-        except ImportError:
-            missing.append(module_name)
-
-    return len(missing) == 0, missing
-
-
 def check_readiness() -> None:
-    """Check system readiness: critical dependencies and virtual environment for dev installs.
-
-    This function performs two critical checks:
-    1. Verifies that critical dependencies are importable
-    2. For development installs, enforces virtual environment activation
+    """For development installs, enforces virtual environment activation
 
     Raises:
-        ReadinessCheckError: If critical dependencies are missing or dev install without venv
+        ReadinessCheckError: if development install without virtual environment
     """
-    # First check critical dependencies
-    deps_ok, missing_deps = _check_critical_dependencies()
-
-    if not deps_ok:
-        # Use Rich for formatted output (Rich is always available at this point)
-        console = Console(stderr=True)
-        console.print("\n[bold red]❌ Critical Dependencies Missing[/bold red]\n")
-        console.print("[yellow]The following required packages are not installed:[/yellow]")
-        for dep in missing_deps:
-            console.print(f"  • [red]{dep}[/red]")
-        console.print()
-        console.print("[bold green]To install Pipelex with required dependencies:[/bold green]")
-        console.print("  [cyan]pip install pipelex[/cyan]\n")
-        console.print("[bold green]If you're developing Pipelex:[/bold green]")
-        console.print("  [cyan]pip install -e .[/cyan]")
-        console.print("  [cyan]make install[/cyan]  [dim]# On macOS/Linux[/dim]\n")
-
-        msg = f"Missing critical dependencies: {', '.join(missing_deps)}"
-        raise ReadinessCheckError(msg)
-
     # Then check virtual environment requirement for development installs
     if _is_development_install() and not _is_in_virtual_environment():
         console = Console(stderr=True)
