@@ -9,7 +9,7 @@ from pathlib import Path
 from rich.console import Console
 
 import pipelex
-from pipelex.exceptions import ReadinessCheckError
+from pipelex.cli.exceptions import ReadinessCheckError
 
 
 def _is_in_virtual_environment() -> bool:
