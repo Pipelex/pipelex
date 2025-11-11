@@ -21,24 +21,39 @@ This command runs a validation/fix loop to ensure the generated pipeline is corr
 
 **What Gets Generated:**
 
-The build command creates two essential files:
+By default, the build command creates a numbered directory with three files:
 
-1. **`.plx` file** - Your complete pipeline definition with concepts and pipes
-2. **`inputs.json` template** - A pre-filled template showing the inputs your pipeline expects
+1. **`bundle.plx`** - Your complete pipeline definition with domain, concepts, and pipes
+2. **`inputs.json`** - A pre-filled template showing the inputs your pipeline expects
+3. **`run_{pipe_code}.py`** - A ready-to-run Python script you can customize and execute
 
 After generation, you can fill in the `inputs.json` template with your actual data and run the pipeline. For detailed guidance on preparing and formatting inputs, see [Providing Inputs to Pipelines](./pipes/provide-inputs.md).
 
-**Example:**
+**Examples:**
 
 ```bash
+# Default: creates results/pipeline_01/ with all three files
+pipelex build pipe "Take a photo as input, and render the opposite of the photo"
+
+# Custom name: creates results/photo_inverter_01/ with all three files
 pipelex build pipe "Take a photo as input, and render the opposite of the photo" \
-  -o results/photo_inverter.plx
+  -o photo_inverter
+
+# Single file only: creates results/photo_inverter_01.plx
+pipelex build pipe "Take a photo as input, and render the opposite of the photo" \
+  -o photo_inverter --no-extras
+
+# Custom directory: creates custom_dir/pipeline_01/
+pipelex build pipe "Take a photo as input, and render the opposite of the photo" \
+  --output-dir custom_dir
 ```
 
 **Options:**
 
-- `--output, -o`: Output path for generated PLX file
-- `--no-output`: Skip saving the pipeline to file
+- `-o, --output-name`: Base name for the generated file or directory (without extension)
+- `--output-dir`: Directory where files will be generated (default: `results`)
+- `--no-extras`: Skip generating `inputs.json` and runner, only generate the `.plx` bundle
+- `--no-output`: Build the pipeline but don't save any files
 
 ## Quick Start Example
 

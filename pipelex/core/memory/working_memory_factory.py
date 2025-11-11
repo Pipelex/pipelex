@@ -6,8 +6,10 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.client.protocol import PipelineInputs
-from pipelex.core.concepts.concept import ConceptBlueprint, SpecialDomain
+from pipelex.core.concepts.concept import SpecialDomain
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.validation import validate_concept_string
+from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.image_content import ImageContent
@@ -17,7 +19,6 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import WorkingMemoryFactoryError
 from pipelex.hub import get_required_concept
 
 
@@ -29,7 +30,7 @@ class WorkingMemoryFactory(BaseModel):
         concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT,
         name: str | None = "text",
     ) -> WorkingMemory:
-        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_required_concept(concept_string=concept_string),
@@ -46,7 +47,7 @@ class WorkingMemoryFactory(BaseModel):
         name: str | None = "image",
     ) -> WorkingMemory:
         # TODO: validate that the concept is compatible with an image concept
-        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        validate_concept_string(concept_string=concept_string)
         stuff = StuffFactory.make_stuff(
             concept=get_required_concept(concept_string=concept_string),
             content=ImageContent(url=image_url),
@@ -61,7 +62,7 @@ class WorkingMemoryFactory(BaseModel):
         concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptCode.PDF,
         name: str | None = "pdf",
     ) -> WorkingMemory:
-        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        validate_concept_string(concept_string=concept_string)
         return cls.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_required_concept(concept_string=concept_string),

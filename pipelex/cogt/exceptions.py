@@ -2,7 +2,7 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.system.exceptions import FatalError, RootException
+from pipelex.system.exceptions import RootException
 from pipelex.types import StrEnum
 
 
@@ -18,10 +18,6 @@ class ImageContentError(CogtError):
     pass
 
 
-class InferenceManagerWorkerSetupError(CogtError, FatalError):
-    pass
-
-
 class CostRegistryError(CogtError):
     pass
 
@@ -31,14 +27,6 @@ class ReportingManagerError(CogtError):
 
 
 class SdkTypeError(CogtError):
-    pass
-
-
-class SdkRegistryError(CogtError):
-    pass
-
-
-class LLMWorkerError(CogtError):
     pass
 
 
@@ -112,14 +100,6 @@ class ExtractHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
-class LLMModelPlatformError(ValueError, CogtError):
-    pass
-
-
-class LLMModelDefinitionError(CogtError):
-    pass
-
-
 class LLMModelNotFoundError(CogtError):
     pass
 
@@ -140,10 +120,6 @@ class LLMPromptSpecError(CogtError):
     pass
 
 
-class LLMPromptFactoryError(CogtError):
-    pass
-
-
 class LLMPromptTemplateInputsError(CogtError):
     pass
 
@@ -153,10 +129,6 @@ class LLMPromptParameterError(CogtError):
 
 
 class PromptImageFactoryError(CogtError):
-    pass
-
-
-class PromptImageDefinitionError(CogtError):
     pass
 
 
@@ -193,10 +165,6 @@ class MissingDependencyError(CogtError):
         super().__init__(error_msg)
 
 
-class MissingPluginError(CogtError):
-    pass
-
-
 class ExtractCapabilityError(CogtError):
     pass
 
@@ -214,10 +182,6 @@ class RoutingProfileLibraryError(CogtError):
 
 
 class InferenceModelSpecError(CogtError):
-    pass
-
-
-class InferenceBackendError(CogtError):
     pass
 
 

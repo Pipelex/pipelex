@@ -3,10 +3,11 @@ from typing import cast
 import shortuuid
 from pydantic import Field, field_validator
 
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.exceptions import PipelexConfigError, StaticValidationErrorType
+from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.hub import get_required_config
 from pipelex.language.plx_config import PlxConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
@@ -122,6 +123,12 @@ class ScanConfig(ConfigModel):
         return frozenset(value)
 
 
+class BuilderConfig(ConfigModel):
+    default_output_dir: str
+    default_bundle_file_name: str
+    default_directory_base_name: str
+
+
 class Pipelex(ConfigModel):
     feature_config: FeatureConfig
     log_config: LogConfig
@@ -138,6 +145,7 @@ class Pipelex(ConfigModel):
     reporting_config: ReportingConfig
     observer_config: ObserverConfig
     scan_config: ScanConfig
+    builder_config: BuilderConfig
 
 
 class MigrationConfig(ConfigModel):

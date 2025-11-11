@@ -4,14 +4,15 @@ from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
+from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.exceptions import ConceptLibraryConceptNotFoundError, ConceptLibraryError
 from pipelex.hub import get_class_registry
+from pipelex.libraries.exceptions import ConceptLibraryError
 from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
@@ -85,7 +86,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         """
         if Concept.is_implicit_concept(concept_string=concept_string):
             return ConceptFactory.make_implicit_concept(concept_string=concept_string)
-        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        if not is_concept_string_valid(concept_string=concept_string):
+            msg = f"Concept string '{concept_string}' is not a valid concept string"
+            raise ConceptLibraryError(msg)
         the_concept = self.get_optional_concept(concept_string=concept_string)
         if not the_concept:
             msg = f"Concept '{concept_string}' not found in the library"
@@ -158,7 +161,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def search_for_concept_in_domains(self, concept_code: str, search_domains: list[str]) -> Concept | None:
-        ConceptBlueprint.validate_concept_code(concept_code=concept_code)
+        if not is_concept_code_valid(concept_code=concept_code):
+            msg = f"Concept code '{concept_code}' is not a valid concept code"
+            raise ConceptLibraryError(msg)
         for domain in search_domains:
             if found_concept := self.get_required_concept(
                 concept_string=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_code),

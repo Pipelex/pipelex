@@ -1,2 +1,2 @@
-class PipelexBundleBlueprintError(Exception):
+class PipelexBundleBlueprintValueError(ValueError):
     pass

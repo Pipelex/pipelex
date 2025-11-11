@@ -1,8 +1,8 @@
 import pytest
 
 from pipelex import log
+from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.exceptions import StaticValidationError
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
 from tests.unit.pipe_operators.pipe_img_gen.data import PipeImgGenInputTestCases

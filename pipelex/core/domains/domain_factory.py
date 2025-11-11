@@ -2,7 +2,7 @@ from pydantic import ValidationError
 
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
-from pipelex.exceptions import DomainDefinitionError
+from pipelex.core.domains.exceptions import DomainDefinitionError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 

@@ -12,6 +12,7 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSett
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
@@ -22,10 +23,6 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import (
-    StaticValidationError,
-    StaticValidationErrorType,
-)
 from pipelex.hub import (
     get_concept_library,
     get_content_generator,

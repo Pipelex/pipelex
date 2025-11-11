@@ -11,7 +11,7 @@ from rich.console import Console
 
 from pipelex import log, pretty_print_md
 from pipelex.builder.builder import load_and_validate_bundle
-from pipelex.builder.builder_errors import PipelexBundleError
+from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -20,15 +20,12 @@ from pipelex.cli.error_handlers import (
     handle_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.exceptions import (
-    LibraryLoadingError,
-    PipeInputError,
-    PipelineExecutionError,
-    PipeOperatorModelAvailabilityError,
-    PipeOperatorModelChoiceError,
-)
+from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_telemetry_manager
+from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty

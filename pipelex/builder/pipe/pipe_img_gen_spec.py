@@ -1,10 +1,13 @@
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
+from rich.console import Group
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -41,6 +44,21 @@ class PipeImgGenSpec(PipeSpec):
             return None
         else:
             return ImgGenSkill(img_gen_skill_value)
+
+    @override
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        # Get base pipe information from parent
+        base_group = super().rendered_for_rich(title=title, number=number)
+
+        # Create a group combining base info with img_gen-specific details
+        img_gen_group = Group()
+        img_gen_group.renderables.append(base_group)
+
+        # Add image generation specific information
+        img_gen_group.renderables.append(Text())  # Blank line
+        img_gen_group.renderables.append(Text.from_markup(f"Image Generation Skill: [bold yellow]{self.img_gen_skill}[/bold yellow]"))
+
+        return img_gen_group
 
     @override
     def to_blueprint(self) -> PipeImgGenBlueprint:

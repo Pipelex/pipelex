@@ -6,10 +6,11 @@ from rich.table import Table
 from typing_extensions import override
 
 from pipelex import pretty_print
+from pipelex.core.concepts.exceptions import ConceptError, ConceptLibraryConceptNotFoundError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
-from pipelex.exceptions import ConceptError, ConceptLibraryConceptNotFoundError, PipeLibraryError, PipeLibraryPipeNotFoundError
 from pipelex.hub import get_concept_library
+from pipelex.libraries.exceptions import PipeLibraryError, PipeLibraryPipeNotFoundError
 from pipelex.types import Self
 
 PipeLibraryRoot = dict[str, PipeAbstract]

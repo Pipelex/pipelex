@@ -3,9 +3,7 @@ from pathlib import Path
 from pydantic import BaseModel, model_validator
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import (
-    PipelexConfigurationError,
-)
+from pipelex.core.exceptions import PipelexConfigurationError
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
 from pipelex.types import Self
 

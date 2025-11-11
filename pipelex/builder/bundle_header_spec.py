@@ -1,6 +1,10 @@
 from pydantic import Field
+from rich.console import Group
+from rich.text import Text
+from typing_extensions import override
 
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class BundleHeaderSpec(StructuredContent):
@@ -8,3 +12,16 @@ class BundleHeaderSpec(StructuredContent):
     description: str = Field(description="Definition of the domain of the knowledge work.")
     system_prompt: str | None = Field(description="System prompt for the domain.")
     main_pipe: str = Field(description="The main pipe of the domain.")
+
+    @override
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+        bundle_group = Group()
+        if title:
+            bundle_group.renderables.append(Text(title, style="bold"))
+        bundle_group.renderables.append(Text.from_markup(f"Domain: [yellow]{self.domain}[/yellow]\n", style="bold"))
+        bundle_group.renderables.append(Text.from_markup(f"Description: [italic]{self.description}[/italic]\n"))
+        bundle_group.renderables.append(Text.from_markup(f"Main Pipe: [red]{self.main_pipe}[/red]\n"))
+        if self.system_prompt:
+            bundle_group.renderables.append(Text(f"System Prompt: {self.system_prompt}", style="dim"))
+
+        return bundle_group

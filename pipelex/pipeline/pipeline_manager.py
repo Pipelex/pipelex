@@ -1,12 +1,16 @@
 from pydantic import Field, RootModel
 from typing_extensions import override
 
-from pipelex.exceptions import PipelineManagerNotFoundError
+from pipelex.base_exceptions import PipelexException
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 
 PipelineManagerRoot = dict[str, Pipeline]
+
+
+class PipelineManagerNotFoundError(PipelexException):
+    pass
 
 
 class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
