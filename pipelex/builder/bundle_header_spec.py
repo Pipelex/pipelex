@@ -14,7 +14,7 @@ class BundleHeaderSpec(StructuredContent):
     main_pipe: str = Field(description="The main pipe of the domain.")
 
     @override
-    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         bundle_group = Group()
         if title:
             bundle_group.renderables.append(Text(title, style="bold"))

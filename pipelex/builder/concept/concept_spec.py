@@ -265,7 +265,7 @@ class ConceptSpec(StructuredContent):
         return ConceptBlueprint(description=self.description, structure=converted_structure, refines=self.refines)
 
     @override
-    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         concept_group = Group()
         if title:
             concept_group.renderables.append(Text(title, style="bold"))

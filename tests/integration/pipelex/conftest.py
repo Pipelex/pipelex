@@ -20,7 +20,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     params=[
         # "o1",
         # "gpt-4o",
-        # "gpt-4o-mini",
+        "gpt-4o-mini",
         # "gpt-4-5-preview",
         # "o1-mini",
         # "o3-mini",
@@ -49,7 +49,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gpt-5-chat",
         # "claude-4.5-sonnet",
         # "claude-4.1-opus",
-        "claude-4.5-haiku",
+        # "claude-4.5-haiku",
         # "claude-4.5-sonnet",
         # "grok-3",
         # "grok-3-mini",

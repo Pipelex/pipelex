@@ -55,9 +55,15 @@ class StuffContent(ABC, CustomBaseModel):
     def rendered_json(self) -> str:
         return kajson.dumps(self.smart_dump(), indent=4)
 
-    def rendered_for_rich(self) -> PrettyPrintable:
+    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:  # noqa: ARG002
+        """Render content for Rich display.
+
+        Args:
+            title: Optional title for the rendering
+            depth: Current nesting depth (used to prevent infinite recursion)
+        """
         json_content = remove_none_values(json_content=self.smart_dump())
         return JSON.from_data(json_content, indent=4)
 
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:  # noqa: ARG002
+    def pretty_print_content(self, title: str | None = None) -> None:
         pretty_print(self.rendered_for_rich(), title=title, width=pretty_width())

@@ -21,8 +21,14 @@ TITLE_COLOR = TerminalColor.CYAN
 BORDER_COLOR = TerminalColor.YELLOW
 
 PRETTY_WIDTH_MIN = 125
+MAX_RENDER_DEPTH = 6
 
-PrettyPrintable = Markdown | Text | JSON | Table | Group
+PrettyPrintable = Markdown | Text | JSON | Table | Group | Syntax | Pretty
+
+
+class PrettyPrintMode(StrEnum):
+    RICH = "rich"
+    POOR = "poor"
 
 
 def pretty_width(width: int | None = None, factor: float | None = None) -> int:
@@ -57,9 +63,51 @@ def pretty_print_md(
     PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
 
 
-class PrettyPrintMode(StrEnum):
-    RICH = "rich"
-    POOR = "poor"
+def make_pretty(value: Any, depth: int = 0) -> PrettyPrintable:
+    pretty: PrettyPrintable
+    # Format the value
+    if isinstance(value, PrettyPrintable):
+        pretty = value
+    elif isinstance(value, dict):
+        # For dicts, use JSON rendering
+        try:
+            pretty = JSON.from_data(value, indent=4)
+        except TypeError:
+            json_string = kajson.dumps(value, indent=4)
+            pretty = Syntax(json_string, "json", theme="monokai")
+    elif isinstance(value, list):
+        # For lists, build a table without headers
+        list_table = Table(
+            show_header=False,
+            show_edge=False,
+            show_lines=True,
+            border_style="dim",
+            padding=(0, 1),
+        )
+        list_table.add_column("No.", style="yellow", justify="center", width=4)
+        list_table.add_column("Item", style="white")
+
+        for idx, item in enumerate(value, start=1):  # type: ignore[arg-type]
+            pretty_item = make_pretty(item, depth=depth + 1)
+            list_table.add_row(str(idx), pretty_item)
+
+        pretty = list_table
+    elif isinstance(value, str):
+        # Handle URLs specially, otherwise use Markdown
+        if value.startswith(("http://", "https://")):
+            pretty = Text(value, style="link " + value, no_wrap=True)
+        else:
+            pretty = Markdown(value)
+    elif isinstance(value, (int, float, bool)):
+        # For primitive types, convert to string
+        pretty = Text(str(value))
+    elif hasattr(value, "rendered_for_rich"):
+        pretty = value.rendered_for_rich(depth=depth)
+    else:
+        # For other types, use Pretty
+        pretty = Pretty(value)
+
+    return pretty
 
 
 class PrettyPrinter:
@@ -103,7 +151,7 @@ class PrettyPrinter:
                 content = Text(content, style="link " + content, no_wrap=True)
             else:
                 content = Text(str(content))  # Treat all other strings as plain text
-        elif isinstance(content, (Pretty, JSON, Table, Markdown, Group)):
+        elif isinstance(content, (PrettyPrintable)):
             pass
         elif isinstance(content, dict):
             try:

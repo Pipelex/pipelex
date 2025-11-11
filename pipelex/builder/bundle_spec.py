@@ -125,7 +125,7 @@ class PipelexBundleSpec(StructuredContent):
         )
 
     @override
-    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         bundle_group = Group()
 
         # Bundle header info

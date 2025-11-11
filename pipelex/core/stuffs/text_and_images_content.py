@@ -1,12 +1,9 @@
-from textwrap import wrap
-
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -42,7 +39,7 @@ class TextAndImagesContent(StuffContent):
         return rendered
 
     @override
-    def rendered_for_rich(self) -> PrettyPrintable:
+    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # If neither text nor images are present
         if not self.text and not self.images:
             return Text("(empty)", style="dim italic")
