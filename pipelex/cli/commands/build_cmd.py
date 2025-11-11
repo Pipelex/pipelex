@@ -214,7 +214,7 @@ def build_pipe_cmd(
                     console = Console()
                     console.print("\n📋 [cyan]To run your pipeline:[/cyan]")
                     console.print(f"   [cyan]• Execute the runner:[/cyan] python {runner_path}")
-                    console.print(f"   [cyan]• Or use CLI:[/cyan] pipelex run {main_pipe_code} --inputs {inputs_json_path}\n")
+                    console.print(f"   [cyan]• Or use CLI:[/cyan] pipelex run {plx_file_path} --inputs {inputs_json_path}\n")
 
                 except Exception as exc:
                     typer.secho(f"⚠️  Warning: Could not generate extras: {exc}", fg=typer.colors.YELLOW)
