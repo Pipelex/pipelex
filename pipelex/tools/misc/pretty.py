@@ -20,7 +20,7 @@ TEXT_COLOR = TerminalColor.WHITE
 TITLE_COLOR = TerminalColor.CYAN
 BORDER_COLOR = TerminalColor.YELLOW
 
-PRETTY_WIDTH_MIN = 125
+PRETTY_WIDTH_MIN: int = 125
 MAX_RENDER_DEPTH = 6
 
 PrettyPrintable = Markdown | Text | JSON | Table | Group | Syntax | Pretty
@@ -98,12 +98,16 @@ class PrettyPrinter:
         rich_print("", panel, "", sep="\n")
 
     @classmethod
-    def pretty_width(cls, width: int | None = None, factor: float | None = None) -> int:
+    def pretty_width(cls, width: int | None = None, depth: int | None = None) -> int:
         terminal_width = shutil.get_terminal_size().columns
-        absolute_width = width or min(max(PRETTY_WIDTH_MIN, int(terminal_width / 2)), terminal_width)
-        if factor:
-            return int(absolute_width * factor)
-        return absolute_width
+        absolute_width = width or min(max(PRETTY_WIDTH_MIN, terminal_width // 2), terminal_width)
+        if depth is not None:
+            # Calculate adaptive width factor based on depth to prevent excessive narrowing
+            # Factor decreases slowly: depth 0->1.0, depth 1->0.9, depth 2->0.8, etc., min 0.5
+            width_factor = max(0.5, 1.0 - (depth * 0.1))
+            return int(absolute_width * width_factor)
+        else:
+            return absolute_width
 
     @classmethod
     def make_pretty_panel(
@@ -171,11 +175,12 @@ class PrettyPrinter:
 
             pretty = list_table
         elif isinstance(value, str):
-            # Handle URLs specially, otherwise use Markdown
+            # Handle URLs specially, otherwise use Text for simple strings
             if value.startswith(("http://", "https://")):
                 pretty = Text(value, style="link " + value, no_wrap=True)
             else:
-                pretty = Markdown(value)
+                # Use Text instead of Markdown to allow proper auto-sizing
+                pretty = Text(value)
         elif isinstance(value, (int, float, bool)):
             # For primitive types, convert to string
             pretty = Text(str(value))

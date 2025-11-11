@@ -89,17 +89,13 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         if depth >= MAX_RENDER_DEPTH:
             return Pretty(self)
 
-        # Calculate adaptive width factor based on depth to prevent excessive narrowing
-        # Factor decreases slowly: depth 0->1.0, depth 1->0.9, depth 2->0.8, etc., min 0.5
-        width_factor = max(0.5, 1.0 - (depth * 0.1))
-
         table = Table(
             title=title,
             show_header=False,
             show_edge=False,
             show_lines=True,
             border_style="white",
-            width=PrettyPrinter.pretty_width(factor=width_factor),
+            width=PrettyPrinter.pretty_width(depth=depth),
         )
         table.add_column("No.", style="yellow", justify="center", width=6)
         table.add_column("Content", style="white")
