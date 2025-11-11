@@ -231,6 +231,7 @@ def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(
     params=[
         "extract_text_from_visuals",
+        "extract_text_from_pdf",
     ],
 )
 def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
