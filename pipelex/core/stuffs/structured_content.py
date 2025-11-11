@@ -1,3 +1,5 @@
+from typing import Any
+
 from json2html import json2html
 from rich.markdown import Markdown
 from rich.table import Table
@@ -49,6 +51,40 @@ class StructuredContent(StuffContent):
         table.add_column("Attribute", style="cyan", justify="left")
         table.add_column("Value", style="white")
 
+        def _make_pretty(value: Any) -> PrettyPrintable:
+            pretty: PrettyPrintable
+            # Format the value
+            if isinstance(value, StuffContent):
+                # If it's a StuffContent, use its rendered_for_rich method
+                pretty = value.rendered_for_rich()
+            elif isinstance(value, list):
+                # For lists, build a table without headers
+                list_table = Table(
+                    show_header=False,
+                    show_edge=False,
+                    show_lines=True,
+                    border_style="dim",
+                    padding=(0, 1),
+                )
+                list_table.add_column("No.", style="yellow", justify="center", width=4)
+                list_table.add_column("Item", style="white")
+
+                for idx, item in enumerate(value, start=1):  # type: ignore[arg-type]
+                    pretty_item = _make_pretty(item)
+                    list_table.add_row(str(idx), pretty_item)
+
+                pretty = list_table
+            elif isinstance(value, str):
+                pretty = Markdown(value)
+            elif isinstance(value, (int, float, bool)):
+                # For primitive types, convert to string
+                pretty = Text(str(value))
+            else:
+                # For other types, use string representation
+                pretty = Text(f"{value}")
+
+            return pretty
+
         # Get all fields from the model
         for field_name, field_value in self:
             # Skip None values and empty lists
@@ -57,22 +93,7 @@ class StructuredContent(StuffContent):
             if isinstance(field_value, list) and len(field_value) == 0:  # type: ignore[arg-type]
                 continue
 
-            # Format the value
-            if isinstance(field_value, StuffContent):
-                # If it's a StuffContent, use its rendered_for_rich method
-                value_content = field_value.rendered_for_rich()
-            # elif isinstance(field_value, list):
-            #     # For lists, show a simple representation
-            #     value_content = Text(f"[{len(field_value)} items]", style="dim")  # type: ignore[arg-type]
-            elif isinstance(field_value, str):
-                value_content = Markdown(field_value)
-            elif isinstance(field_value, (int, float, bool)):
-                # For primitive types, convert to string
-                value_content = Text(str(field_value))
-            else:
-                # For other types, use string representation
-                value_content = Text(f"{field_value}", style="dim")
-
-            table.add_row(field_name, value_content)
+            pretty = _make_pretty(value=field_value)
+            table.add_row(field_name, pretty)
 
         return table
