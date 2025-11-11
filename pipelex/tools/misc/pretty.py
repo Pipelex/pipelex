@@ -31,14 +31,6 @@ class PrettyPrintMode(StrEnum):
     POOR = "poor"
 
 
-def pretty_width(width: int | None = None, factor: float | None = None) -> int:
-    terminal_width = shutil.get_terminal_size().columns
-    absolute_width = width or min(max(PRETTY_WIDTH_MIN, int(terminal_width / 2)), terminal_width)
-    if factor:
-        return int(absolute_width * factor)
-    return absolute_width
-
-
 def pretty_print(
     content: str | Any,
     title: TextType | None = None,
@@ -58,60 +50,9 @@ def pretty_print_md(
     border_style: StyleType | None = None,
     width: int | None = None,
 ):
-    width = width or pretty_width()
+    width = width or PrettyPrinter.pretty_width()
     md_content = Markdown(content)
     PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
-
-
-def make_pretty(value: Any, inner_title: str | None = None, depth: int = 0) -> PrettyPrintable:
-    pretty: PrettyPrintable
-    # Format the value
-    if isinstance(value, PrettyPrintable):
-        pretty = value
-    elif isinstance(value, dict):
-        # For dicts, use JSON rendering
-        try:
-            pretty = JSON.from_data(value, indent=4)
-        except TypeError:
-            json_string = kajson.dumps(value, indent=4)
-            pretty = Syntax(json_string, "json", theme="monokai")
-    elif isinstance(value, list):
-        # For lists, build a table without headers
-        list_table = Table(
-            show_header=False,
-            show_edge=False,
-            show_lines=True,
-            border_style="dim",
-            padding=(0, 1),
-        )
-        list_table.add_column("No.", style="yellow", justify="center", width=4)
-        list_table.add_column("Item", style="white")
-
-        for idx, item in enumerate(value, start=1):  # type: ignore[arg-type]
-            pretty_item = make_pretty(item, depth=depth + 1)
-            list_table.add_row(str(idx), pretty_item)
-
-        pretty = list_table
-    elif isinstance(value, str):
-        # Handle URLs specially, otherwise use Markdown
-        if value.startswith(("http://", "https://")):
-            pretty = Text(value, style="link " + value, no_wrap=True)
-        else:
-            pretty = Markdown(value)
-    elif isinstance(value, (int, float, bool)):
-        # For primitive types, convert to string
-        pretty = Text(str(value))
-    elif hasattr(value, "rendered_pretty"):
-        pretty = value.rendered_pretty(depth=depth)
-    else:
-        # For other types, use Pretty
-        pretty = Pretty(value)
-
-    if inner_title:
-        inner_title_text = Text(str(inner_title), style="dim")
-        pretty = Group(inner_title_text, pretty)
-
-    return pretty
 
 
 class PrettyPrinter:
@@ -150,10 +91,43 @@ class PrettyPrinter:
         border_style: StyleType | None = None,
         width: int | None = None,
     ):
-        pretty = make_pretty(content, inner_title=inner_title, depth=0)
+        panel = cls.make_pretty_panel(
+            content=content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width
+        )
 
-        rich_print()
-        panel = Panel(
+        rich_print("", panel, "", sep="\n")
+
+    @classmethod
+    def pretty_width(cls, width: int | None = None, factor: float | None = None) -> int:
+        terminal_width = shutil.get_terminal_size().columns
+        absolute_width = width or min(max(PRETTY_WIDTH_MIN, int(terminal_width / 2)), terminal_width)
+        if factor:
+            return int(absolute_width * factor)
+        return absolute_width
+
+    @classmethod
+    def make_pretty_panel(
+        cls,
+        content: str | Any,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
+        inner_title: str | None = None,
+        border_style: StyleType | None = None,
+        width: int | None = None,
+    ) -> Panel:
+        pretty = cls.make_pretty(content, inner_title=inner_title, depth=0)
+        return cls.wrap_in_panel(pretty=pretty, title=title, subtitle=subtitle, border_style=border_style, width=width)
+
+    @classmethod
+    def wrap_in_panel(
+        cls,
+        pretty: PrettyPrintable,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
+        border_style: StyleType | None = None,
+        width: int | None = None,
+    ) -> Panel:
+        return Panel(
             pretty,
             title=title,
             subtitle=subtitle,
@@ -165,8 +139,57 @@ class PrettyPrinter:
             highlight=True,
             width=width,
         )
-        rich_print(panel)
-        rich_print()
+
+    @classmethod
+    def make_pretty(cls, value: Any, inner_title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        pretty: PrettyPrintable
+        # Format the value
+        if isinstance(value, PrettyPrintable):
+            pretty = value
+        elif isinstance(value, dict):
+            # For dicts, use JSON rendering
+            try:
+                pretty = JSON.from_data(value, indent=4)
+            except TypeError:
+                json_string = kajson.dumps(value, indent=4)
+                pretty = Syntax(json_string, "json", theme="monokai")
+        elif isinstance(value, list):
+            # For lists, build a table without headers
+            list_table = Table(
+                show_header=False,
+                show_edge=False,
+                show_lines=True,
+                border_style="dim",
+                padding=(0, 1),
+            )
+            list_table.add_column("No.", style="yellow", justify="center", width=4)
+            list_table.add_column("Item", style="white")
+
+            for idx, item in enumerate(value, start=1):  # type: ignore[arg-type]
+                pretty_item = cls.make_pretty(item, inner_title=None, depth=depth + 1)
+                list_table.add_row(str(idx), pretty_item)
+
+            pretty = list_table
+        elif isinstance(value, str):
+            # Handle URLs specially, otherwise use Markdown
+            if value.startswith(("http://", "https://")):
+                pretty = Text(value, style="link " + value, no_wrap=True)
+            else:
+                pretty = Markdown(value)
+        elif isinstance(value, (int, float, bool)):
+            # For primitive types, convert to string
+            pretty = Text(str(value))
+        elif hasattr(value, "rendered_pretty"):
+            pretty = value.rendered_pretty(depth=depth)
+        else:
+            # For other types, use Pretty
+            pretty = Pretty(value)
+
+        if inner_title:
+            inner_title_text = Text(str(inner_title), style="dim")
+            pretty = Group(inner_title_text, pretty)
+
+        return pretty
 
     @classmethod
     def pretty_print_without_rich(

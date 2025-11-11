@@ -5,7 +5,7 @@ from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
-from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, make_pretty, pretty_width
+from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, PrettyPrinter
 from pipelex.tools.typing.pydantic_utils import clean_model_to_dict
 
 
@@ -52,7 +52,7 @@ class StructuredContent(StuffContent):
             show_edge=False,
             show_lines=True,
             border_style="white",
-            width=pretty_width(factor=width_factor),
+            width=PrettyPrinter.pretty_width(factor=width_factor),
         )
         table.add_column("Attribute", style="cyan", justify="left")
         table.add_column("Value", style="white")
@@ -65,7 +65,7 @@ class StructuredContent(StuffContent):
             if isinstance(field_value, list) and len(field_value) == 0:  # type: ignore[arg-type]
                 continue
 
-            pretty = make_pretty(value=field_value, depth=depth + 1)
+            pretty = PrettyPrinter.make_pretty(value=field_value, depth=depth + 1)
             table.add_row(field_name, pretty)
 
         return table

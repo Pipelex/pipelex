@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.tools.misc.json_utils import remove_none_values
-from pipelex.tools.misc.pretty import PrettyPrintable, pretty_print, pretty_width
+from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, pretty_print
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
@@ -67,5 +67,5 @@ class StuffContent(ABC, CustomBaseModel):
 
     def pretty_print_content(self, title: str | None = None) -> None:
         pretty = self.rendered_pretty()
-        width = pretty_width()
+        width = PrettyPrinter.pretty_width()
         pretty_print(pretty, title=title, width=width)

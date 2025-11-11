@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
-from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, pretty_width
+from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, PrettyPrinter
 
 
 class ListContent(StuffContent, Generic[StuffContentType]):
@@ -99,7 +99,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
             show_edge=False,
             show_lines=True,
             border_style="white",
-            width=pretty_width(factor=width_factor),
+            width=PrettyPrinter.pretty_width(factor=width_factor),
         )
         table.add_column("No.", style="yellow", justify="center", width=6)
         table.add_column("Content", style="white")

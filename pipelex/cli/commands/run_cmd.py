@@ -9,7 +9,7 @@ import typer
 from posthog import tag
 from rich.console import Console
 
-from pipelex import log, pretty_print_md
+from pipelex import log
 from pipelex.builder.builder import load_and_validate_bundle
 from pipelex.builder.builder_errors import PipelexBundleError
 from pipelex.cli.error_handlers import (
