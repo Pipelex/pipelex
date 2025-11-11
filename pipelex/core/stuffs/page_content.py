@@ -1,4 +1,5 @@
 from rich.console import Group
+from rich.markdown import Markdown
 from rich.text import Text
 from typing_extensions import override
 
@@ -14,7 +15,7 @@ class PageContent(StructuredContent):
     page_view: ImageContent | None = None
 
     @override
-    def rendered_for_rich(self) -> PrettyPrintable:
+    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
         # If there's no page_view, just return the text_and_images rendering
         if self.page_view is None:
             return self.text_and_images.rendered_for_rich()
@@ -25,13 +26,10 @@ class PageContent(StructuredContent):
         # Add the text and images content
         group.renderables.append(self.text_and_images.rendered_for_rich())
 
-        # Add spacing
-        group.renderables.append(Text())
-
         # Add the page view section
-        group.renderables.append(Text("Page View:", style="bold cyan"))
-        page_view_info = f"  {self.page_view.url}"
-        group.renderables.append(Text(page_view_info, style="dim"))
+        group.renderables.append(Text("\nPage View:", style="bold cyan"))
+        url_markdown = Markdown(f"[{self.page_view.url}…]({self.page_view.url})")
+        group.renderables.append(url_markdown)
 
         return group
 

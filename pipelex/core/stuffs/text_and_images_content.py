@@ -1,8 +1,12 @@
+from textwrap import wrap
+
 from rich.console import Group
 from rich.markdown import Markdown
+from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -39,39 +43,51 @@ class TextAndImagesContent(StuffContent):
 
     @override
     def rendered_for_rich(self) -> PrettyPrintable:
-        has_text = self.text is not None
-        has_images = self.images is not None and len(self.images) > 0
-
-        # If only text is present, render as Markdown
-        if has_text and not has_images:
-            assert self.text is not None
-            return Markdown(self.text.text)
-
         # If neither text nor images are present
-        if not has_text and not has_images:
+        if not self.text and not self.images:
             return Text("(empty)", style="dim italic")
 
-        # If we have images or both text and images, create a group
+        # If only text is present, render as Markdown
+        if self.text and not self.images:
+            return Markdown(self.text.text)
+
         group = Group()
 
         # Add text section if present
-        if has_text:
-            assert self.text is not None
+        if self.text:
             group.renderables.append(Text("Text:", style="bold cyan"))
             group.renderables.append(Markdown(self.text.text))
-            if has_images:
+            if self.images:
                 group.renderables.append(Text())  # Add spacing
 
         # Add images section if present
-        if has_images:
-            assert self.images is not None
-            image_count = len(self.images)
-            group.renderables.append(Text(f"Images ({image_count}):", style="bold cyan"))
-            for idx, image in enumerate(self.images, start=1):
-                image_info = f"  {idx}. {image.url}"
-                if image.caption:
-                    image_info += f" - {image.caption}"
-                group.renderables.append(Text(image_info, style="dim"))
+        if self.images:
+            # Check if any image has a caption (for table column headers)
+            has_captions = any(image.caption for image in self.images)
+
+            table = Table(
+                title=f"Images ({len(self.images)}):",
+                title_style="bold cyan",
+                title_justify="left",
+                show_header=True,
+                header_style="dim",
+                border_style="dim",
+            )
+            table.add_column("Index")
+            table.add_column("URL", width=36)
+            if has_captions:
+                table.add_column("Caption", style="yellow italic")
+
+            for idx, image in enumerate(self.images):
+                index_text = Text.from_markup(f"[dim]img-[/dim][yellow]{idx}[/yellow]")
+                display_url = f"{image.url[:35]}…" if len(image.url) > 36 else image.url
+                url_markdown = Markdown(f"[{display_url}]({image.url})")
+                if has_captions:
+                    table.add_row(index_text, url_markdown, image.caption or "/")
+                else:
+                    table.add_row(index_text, url_markdown)
+
+            group.renderables.append(table)
 
         return group
 
