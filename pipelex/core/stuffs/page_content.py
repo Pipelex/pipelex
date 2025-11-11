@@ -15,16 +15,16 @@ class PageContent(StructuredContent):
     page_view: ImageContent | None = None
 
     @override
-    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # If there's no page_view, just return the text_and_images rendering
         if self.page_view is None:
-            return self.text_and_images.rendered_for_rich(depth=depth)
+            return self.text_and_images.rendered_pretty(depth=depth)
 
         # If there's a page_view, create a group with both
         group = Group()
 
         # Add the text and images content
-        group.renderables.append(self.text_and_images.rendered_for_rich(depth=depth))
+        group.renderables.append(self.text_and_images.rendered_pretty(depth=depth))
 
         # Add the page view section
         group.renderables.append(Text("\nPage View:", style="bold cyan"))

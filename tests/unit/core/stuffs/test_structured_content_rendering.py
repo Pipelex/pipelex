@@ -46,12 +46,12 @@ class SomeBaseModel(BaseModel):
 
 
 class TestStructuredContentRendering:
-    """Test StructuredContent.rendered_for_rich()"""
+    """Test StructuredContent.rendered_pretty()"""
 
     def test_simple_structured_content(self, capsys: CaptureFixture[str]):
         """Test rendering simple structured content."""
         data = SimpleData(name="test", value=42)
-        pretty_print(data.rendered_for_rich(title="Simple Data"))
+        pretty_print(data.rendered_pretty(title="Simple Data"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -66,7 +66,7 @@ class TestStructuredContentRendering:
     def test_nested_structured_content(self, capsys: CaptureFixture[str]):
         """Test rendering nested structured content."""
         data = NestedData(label="outer", simple=SimpleData(name="inner", value=123))
-        pretty_print(data.rendered_for_rich(title="Nested Data"))
+        pretty_print(data.rendered_pretty(title="Nested Data"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -88,7 +88,7 @@ class TestStructuredContentRendering:
         for level in range(excessive_depth - 1, 0, -1):
             current = DeeplyNestedData(level=level, nested=current)
 
-        pretty_print(current.rendered_for_rich(title="Deep Structure"))
+        pretty_print(current.rendered_pretty(title="Deep Structure"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -109,7 +109,7 @@ class TestStructuredContentRendering:
     def test_structured_content_with_none_values(self, capsys: CaptureFixture[str]):
         """Test that None values are skipped in rendering."""
         data = DeeplyNestedData(level=1, nested=None)
-        pretty_print(data.rendered_for_rich(title="With None"))
+        pretty_print(data.rendered_pretty(title="With None"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -128,7 +128,7 @@ class TestStructuredContentRendering:
             items: list[str]
 
         data = DataWithList(name="test", items=["apple", "banana", "cherry"])
-        pretty_print(data.rendered_for_rich(title="With List"))
+        pretty_print(data.rendered_pretty(title="With List"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)

@@ -15,13 +15,13 @@ def remove_ansi_escape_codes(text: str) -> str:
 
 
 class TestTextAndImagesContentRendering:
-    """Test TextAndImagesContent.rendered_for_rich()"""
+    """Test TextAndImagesContent.rendered_pretty()"""
 
     def test_text_only(self, capsys: CaptureFixture[str]):
         """Test rendering text without images."""
         content = TextAndImagesContent(text=TextContent(text="Hello world"), images=None)
-        # Note: title is passed to pretty_print, not rendered_for_rich for TextAndImagesContent
-        pretty_print(content.rendered_for_rich())
+        # Note: title is passed to pretty_print, not rendered_pretty for TextAndImagesContent
+        pretty_print(content.rendered_pretty())
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -37,7 +37,7 @@ class TestTextAndImagesContentRendering:
                 ImageContent(url="https://example.com/image2.png", caption="Second image"),
             ],
         )
-        pretty_print(content.rendered_for_rich())
+        pretty_print(content.rendered_pretty())
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -54,7 +54,7 @@ class TestTextAndImagesContentRendering:
             text=None,
             images=[ImageContent(url="https://example.com/photo.jpg")],
         )
-        pretty_print(content.rendered_for_rich())
+        pretty_print(content.rendered_pretty())
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -64,7 +64,7 @@ class TestTextAndImagesContentRendering:
     def test_empty_text_and_images(self, capsys: CaptureFixture[str]):
         """Test rendering empty text and images."""
         content = TextAndImagesContent(text=None, images=None)
-        pretty_print(content.rendered_for_rich())
+        pretty_print(content.rendered_pretty())
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)

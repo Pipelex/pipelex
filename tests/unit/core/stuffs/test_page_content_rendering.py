@@ -16,7 +16,7 @@ def remove_ansi_escape_codes(text: str) -> str:
 
 
 class TestPageContentRendering:
-    """Test PageContent.rendered_for_rich()"""
+    """Test PageContent.rendered_pretty()"""
 
     def test_page_content_without_view(self, capsys: CaptureFixture[str]):
         """Test rendering page content without page view."""
@@ -27,7 +27,7 @@ class TestPageContentRendering:
             ),
             page_view=None,
         )
-        pretty_print(page.rendered_for_rich(title="Page"))
+        pretty_print(page.rendered_pretty(title="Page"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -44,7 +44,7 @@ class TestPageContentRendering:
             ),
             page_view=ImageContent(url="https://example.com/page_screenshot.png"),
         )
-        pretty_print(page.rendered_for_rich())
+        pretty_print(page.rendered_pretty())
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)

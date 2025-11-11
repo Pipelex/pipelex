@@ -69,7 +69,7 @@ class PipeSignature(StructuredContent):
         return AllowedPipeTypes(type_value)
 
     @override
-    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))

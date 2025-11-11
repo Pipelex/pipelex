@@ -36,7 +36,7 @@ class StructuredContent(StuffContent):
         return convert_to_markdown(data=dict_dump, level=level, is_pretty=is_pretty)
 
     @override
-    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # Check if we've exceeded maximum depth - fall back to Pretty rendering
         # Pretty shows the Python object structure beautifully, just like when calling pretty_print(stuff)
         if depth >= MAX_RENDER_DEPTH:

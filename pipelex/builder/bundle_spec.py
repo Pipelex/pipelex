@@ -125,7 +125,7 @@ class PipelexBundleSpec(StructuredContent):
         )
 
     @override
-    def rendered_for_rich(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         bundle_group = Group()
 
         # Bundle header info
@@ -148,7 +148,7 @@ class PipelexBundleSpec(StructuredContent):
 
             for concept_code, concept_spec_or_name in self.concept.items():
                 if isinstance(concept_spec_or_name, ConceptSpec):
-                    concept_rendered = concept_spec_or_name.rendered_for_rich()
+                    concept_rendered = concept_spec_or_name.rendered_pretty()
                     concepts_table.add_row(concept_rendered)
                 else:
                     # Simple string concept reference
@@ -163,7 +163,7 @@ class PipelexBundleSpec(StructuredContent):
             pipes_table.add_column("Pipe", style="white")
 
             for pipe_spec in self.pipe.values():
-                pipe_rendered = pipe_spec.rendered_for_rich()
+                pipe_rendered = pipe_spec.rendered_pretty()
                 pipes_table.add_row(pipe_rendered)
 
             bundle_group.renderables.append(pipes_table)

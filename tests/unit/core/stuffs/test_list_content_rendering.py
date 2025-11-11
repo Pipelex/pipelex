@@ -32,7 +32,7 @@ class DeeplyNestedData(StructuredContent):
 
 
 class TestListContentRendering:
-    """Test ListContent.rendered_for_rich()"""
+    """Test ListContent.rendered_pretty()"""
 
     def test_simple_list_content(self, capsys: CaptureFixture[str]):
         """Test rendering simple list of text content."""
@@ -43,7 +43,7 @@ class TestListContentRendering:
                 TextContent(text="Third item"),
             ]
         )
-        pretty_print(text_list.rendered_for_rich(title="Text List"))
+        pretty_print(text_list.rendered_pretty(title="Text List"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -66,7 +66,7 @@ class TestListContentRendering:
                 SimpleData(name="gamma", value=3),
             ]
         )
-        pretty_print(data_list.rendered_for_rich(title="Data List"))
+        pretty_print(data_list.rendered_pretty(title="Data List"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -82,7 +82,7 @@ class TestListContentRendering:
     def test_empty_list_content(self, capsys: CaptureFixture[str]):
         """Test rendering empty list."""
         empty_list = ListContent[TextContent](items=[])
-        pretty_print(empty_list.rendered_for_rich(title="Empty List"))
+        pretty_print(empty_list.rendered_pretty(title="Empty List"))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -99,7 +99,7 @@ class TestListContentRendering:
 
         # Put it in a list and render at a depth that will trigger fallback
         deep_list = ListContent[DeeplyNestedData](items=[current])
-        pretty_print(deep_list.rendered_for_rich(title="Deep List", depth=MAX_RENDER_DEPTH - 1))
+        pretty_print(deep_list.rendered_pretty(title="Deep List", depth=MAX_RENDER_DEPTH - 1))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)

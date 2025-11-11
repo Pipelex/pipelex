@@ -101,8 +101,8 @@ def make_pretty(value: Any, depth: int = 0) -> PrettyPrintable:
     elif isinstance(value, (int, float, bool)):
         # For primitive types, convert to string
         pretty = Text(str(value))
-    elif hasattr(value, "rendered_for_rich"):
-        pretty = value.rendered_for_rich(depth=depth)
+    elif hasattr(value, "rendered_pretty"):
+        pretty = value.rendered_pretty(depth=depth)
     else:
         # For other types, use Pretty
         pretty = Pretty(value)

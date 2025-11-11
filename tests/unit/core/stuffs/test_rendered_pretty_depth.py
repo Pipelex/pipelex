@@ -45,11 +45,11 @@ class TestDepthParameterPropagation:
         nested = NestedData(label="level1", simple=SimpleData(name="level2", value=42))
 
         # Call with explicit depth
-        result = nested.rendered_for_rich(depth=0)
+        result = nested.rendered_pretty(depth=0)
         assert result is not None
 
         # Call at max depth - should fall back to Pretty/JSON
-        result_at_max = nested.rendered_for_rich(depth=MAX_RENDER_DEPTH)
+        result_at_max = nested.rendered_pretty(depth=MAX_RENDER_DEPTH)
         assert result_at_max is not None
 
     def test_depth_at_limit_triggers_fallback(self, capsys: CaptureFixture[str]):
@@ -57,7 +57,7 @@ class TestDepthParameterPropagation:
         data = SimpleData(name="test", value=42)
 
         # Render at exactly MAX_RENDER_DEPTH
-        pretty_print(data.rendered_for_rich(depth=MAX_RENDER_DEPTH))
+        pretty_print(data.rendered_pretty(depth=MAX_RENDER_DEPTH))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -78,8 +78,8 @@ class TestAdaptiveWidthFactorRendering:
         level1 = DeeplyNestedData(level=1, nested=level2)
 
         # Render at different depths - just verify no crashes
-        result_depth0 = level1.rendered_for_rich(depth=0)
-        result_depth3 = level1.rendered_for_rich(depth=3)
+        result_depth0 = level1.rendered_pretty(depth=0)
+        result_depth3 = level1.rendered_pretty(depth=3)
 
         assert result_depth0 is not None
         assert result_depth3 is not None
@@ -93,7 +93,7 @@ class TestTitleParameter:
         data = SimpleData(name="test", value=42)
         custom_title = "Custom Title for Data"
 
-        pretty_print(data.rendered_for_rich(title=custom_title))
+        pretty_print(data.rendered_pretty(title=custom_title))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -104,7 +104,7 @@ class TestTitleParameter:
         """Test rendering without title."""
         data = SimpleData(name="test", value=42)
 
-        pretty_print(data.rendered_for_rich(title=None))
+        pretty_print(data.rendered_pretty(title=None))
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
