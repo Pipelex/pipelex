@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased - 
+
+### Refactor
+
+- Organized all exceptions specific folders.
+- Added Value error to blueprints.
+- Removed usedless exceptions.
+
 ## [v0.15.3] - 2025-11-07
 
 ### Fixed

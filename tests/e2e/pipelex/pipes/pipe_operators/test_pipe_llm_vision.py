@@ -53,8 +53,8 @@ class TestPipeLLMVision:
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
             inputs={
-                "imageA": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
-                "imageB": ImageContent(url=LLMVisionTestCases.PATH_IMG_JPEG_3),
+                "image_a": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
+                "image_b": ImageContent(url=LLMVisionTestCases.PATH_IMG_JPEG_3),
             },
         )
 

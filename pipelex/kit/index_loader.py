@@ -1,6 +1,6 @@
 from pydantic import ValidationError
 
-from pipelex.exceptions import PipelexException
+from pipelex.base_exceptions import PipelexException
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.paths import get_kit_root
 from pipelex.tools.misc.toml_utils import load_toml_from_path

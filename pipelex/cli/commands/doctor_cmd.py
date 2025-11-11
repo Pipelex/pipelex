@@ -13,6 +13,7 @@ from rich.prompt import Confirm
 from rich.text import Text
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
@@ -20,7 +21,6 @@ from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.validation import report_validation_error
-from pipelex.exceptions import PipelexConfigError
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import get_optional_env

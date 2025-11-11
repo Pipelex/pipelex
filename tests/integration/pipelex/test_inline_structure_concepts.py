@@ -5,11 +5,11 @@ import pytest
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
-    ConceptStructureBlueprintFieldType,
 )
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.exceptions import StructureClassError
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.exceptions import StructureClassError
 from pipelex.hub import get_class_registry
 
 

@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 
 VariableMultiplicity = bool | int
 
+MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+
 
 class VariableMultiplicityResolution(BaseModel):
     """Result of resolving output multiplicity settings between base and override values."""

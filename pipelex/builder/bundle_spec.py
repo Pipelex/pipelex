@@ -9,15 +9,16 @@ from pipelex.builder.builder_errors import (
     ConceptSpecError,
     PipeBuilderError,
     PipeFailure,
-    PipelexBundleError,
     PipeSpecError,
 )
 from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.exceptions import PipelexBundleError, PipelexBundleSpecValueError
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.domains.exceptions import DomainCodeError
+from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -67,7 +68,11 @@ class PipelexBundleSpec(StructuredContent):
     @field_validator("domain", mode="before")
     @classmethod
     def validate_domain_syntax(cls, domain: str) -> str:
-        DomainBlueprint.validate_domain_code(code=domain)
+        try:
+            validate_domain_code(code=domain)
+        except DomainCodeError as exc:
+            msg = f"Error when trying to validate pipelex bundle spec: domain '{domain}' is not a valid domain code: {exc}"
+            raise PipelexBundleSpecValueError(msg) from exc
         return domain
 
     @model_validator(mode="after")

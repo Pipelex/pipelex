@@ -1,36 +1,30 @@
 from pipelex import log
 from pipelex.builder.builder_errors import (
-    ConceptDefinitionErrorData,
     ConceptSpecError,
-    DomainFailure,
-    PipeDefinitionErrorData,
     PipeFailure,
-    PipeInputErrorData,
-    PipelexBundleError,
     PipelexBundleUnexpectedError,
     PipeSpecError,
-    StaticValidationErrorData,
     ValidateDryRunError,
 )
 from pipelex.builder.bundle_spec import PipelexBundleSpec
+from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
+from pipelex.builder.validation_error_data import DomainFailure, PipeInputErrorData, StaticValidationErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.concepts.exceptions import (
+    ConceptDefinitionErrorData,
+)
+from pipelex.core.exceptions import StaticValidationError
+from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.exceptions import (
+from pipelex.hub import get_library_manager, get_required_pipe
+from pipelex.libraries.exceptions import (
     ConceptLoadingError,
     DomainLoadingError,
-    PipeInputError,
+    PipeDefinitionErrorData,
     PipeLoadingError,
-    StaticValidationError,
 )
-from pipelex.hub import get_library_manager, get_required_pipe
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
-
-
-async def validate_bundle_spec_from_memory(working_memory: WorkingMemory):
-    pipelex_bundle_spec = working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
-    await validate_bundle_spec(bundle_spec=pipelex_bundle_spec)
 
 
 def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:

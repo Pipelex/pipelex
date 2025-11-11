@@ -1,17 +1,18 @@
 import re
 from typing import TYPE_CHECKING
 
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.base_exceptions import PipelexException
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.exceptions import ConceptStringError
+from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.pipes.input_requirements import InputRequirement, InputRequirements
-from pipelex.exceptions import PipelexException
 from pipelex.hub import get_required_concept
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
 
-class InputRequirementsFactorySyntaxError(PipelexException):
+class InputRequirementsFactoryError(PipelexException):
     pass
 
 
@@ -61,7 +62,7 @@ class InputRequirementsFactory:
             InputRequirement with the parsed concept and multiplicity
 
         Raises:
-            InputRequirementsFactorySyntaxError: If the requirement string format is invalid
+            InputRequirementsFactorySyInputRequirementsFactoryErrorntaxError: If the requirement string format is invalid
         """
         # Pattern to match concept string and optional multiplicity brackets
         # Group 1: concept string (everything before brackets)
@@ -71,13 +72,18 @@ class InputRequirementsFactory:
 
         if not match:
             msg = f"Invalid input requirement string: {requirement_str}"
-            raise InputRequirementsFactorySyntaxError(msg)
+            raise InputRequirementsFactoryError(msg)
 
         concept_string_or_code = match.group(1)
         multiplicity_str = match.group(2)
 
         # Validate and resolve concept string with domain
-        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+        try:
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+        except ConceptStringError as exc:
+            msg = f"Invalid concept string '{concept_string_or_code}' when trying to make an 'InputRequirement' from string: {exc}"
+            raise InputRequirementsFactoryError(msg) from exc
+
         concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
             domain=domain,
             concept_sring_or_code=concept_string_or_code,

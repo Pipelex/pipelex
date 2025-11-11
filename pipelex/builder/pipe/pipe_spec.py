@@ -8,10 +8,10 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.core.pipes.exceptions import PipeBlueprintError
+from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
@@ -73,7 +73,7 @@ class PipeSpec(StructuredContent):
     def validate_pipe_type(cls, value: Any) -> Any:
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return value
 
     @field_validator("output", mode="after")
@@ -81,7 +81,7 @@ class PipeSpec(StructuredContent):
     def validate_output(cls, output: str) -> str:
         # Extract concept without multiplicity for validation
         parse_result = parse_concept_with_multiplicity(output)
-        ConceptSpec.validate_concept_string_or_code(concept_string_or_code=parse_result.concept)
+        validate_concept_string_or_code(concept_string_or_code=parse_result.concept)
         return output  # Return original with brackets intact
 
     @field_validator("inputs", mode="after")
@@ -91,12 +91,12 @@ class PipeSpec(StructuredContent):
             return None
 
         # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-        multiplicity_pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+        multiplicity_pattern = MUTLIPLICITY_PATTERN
 
         for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
-                raise PipeBlueprintError(msg)
+                raise PipeBlueprintValueError(msg)
 
             # Validate the concept spec format with optional multiplicity brackets
             match = re.match(multiplicity_pattern, concept_spec)
@@ -105,11 +105,11 @@ class PipeSpec(StructuredContent):
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
                     f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
                 )
-                raise PipeBlueprintError(msg)
+                raise PipeBlueprintValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
-            ConceptSpec.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
 
         return inputs
 
@@ -123,7 +123,7 @@ class PipeSpec(StructuredContent):
 
         if not is_snake_case(normalized_pipe_code):
             msg = f"Invalid pipe code syntax '{normalized_pipe_code}'. Must be in snake_case."
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return normalized_pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:

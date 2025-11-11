@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 from pipelex.cli.commands.init.config_files import init_config
-from pipelex.exceptions import PipelexCLIError
+from pipelex.cli.exceptions import PipelexCLIError
 
 
 class TestInitCmd:

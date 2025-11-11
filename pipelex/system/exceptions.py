@@ -1,13 +1,8 @@
 import logging
 from typing import ClassVar
 
+from pipelex.base_exceptions import RootException
 from pipelex.types import StrEnum
-
-
-class RootException(Exception):
-    def __init__(self, message: str):
-        super().__init__(message)
-        self.message = message
 
 
 class ToolException(RootException):
@@ -48,10 +43,6 @@ class FatalError(TracebackMessageError):
 
 
 class ConfigValidationError(FatalError):
-    pass
-
-
-class ConfigNotFoundError(RootException):
     pass
 
 
