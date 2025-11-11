@@ -63,7 +63,7 @@ def pretty_print_md(
     PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
 
 
-def make_pretty(value: Any, depth: int = 0) -> PrettyPrintable:
+def make_pretty(value: Any, inner_title: str | None = None, depth: int = 0) -> PrettyPrintable:
     pretty: PrettyPrintable
     # Format the value
     if isinstance(value, PrettyPrintable):
@@ -107,6 +107,10 @@ def make_pretty(value: Any, depth: int = 0) -> PrettyPrintable:
         # For other types, use Pretty
         pretty = Pretty(value)
 
+    if inner_title:
+        inner_title_text = Text(str(inner_title), style="dim")
+        pretty = Group(inner_title_text, pretty)
+
     return pretty
 
 
@@ -146,28 +150,11 @@ class PrettyPrinter:
         border_style: StyleType | None = None,
         width: int | None = None,
     ):
-        if isinstance(content, str):
-            if content.startswith(("http://", "https://")):
-                content = Text(content, style="link " + content, no_wrap=True)
-            else:
-                content = Text(str(content))  # Treat all other strings as plain text
-        elif isinstance(content, (PrettyPrintable)):
-            pass
-        elif isinstance(content, dict):
-            try:
-                content = JSON.from_data(content, indent=4)
-            except TypeError:
-                json_string = kajson.dumps(content, indent=4)
-                content = Syntax(json_string, "json", theme="monokai")
-        else:
-            content = Pretty(content)
+        pretty = make_pretty(content, inner_title=inner_title, depth=0)
 
-        if inner_title:
-            inner_title_text = Text(str(inner_title), style="dim")
-            content = Group(inner_title_text, content)
         rich_print()
         panel = Panel(
-            content,
+            pretty,
             title=title,
             subtitle=subtitle,
             expand=False,

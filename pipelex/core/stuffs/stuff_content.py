@@ -66,4 +66,6 @@ class StuffContent(ABC, CustomBaseModel):
         return JSON.from_data(json_content, indent=4)
 
     def pretty_print_content(self, title: str | None = None) -> None:
-        pretty_print(self.rendered_pretty(), title=title, width=pretty_width())
+        pretty = self.rendered_pretty()
+        width = pretty_width()
+        pretty_print(pretty, title=title, width=width)
