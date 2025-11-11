@@ -9,7 +9,7 @@
 # =========================================================================================
 
 # Which profile to use (change this to switch routing)
-active = "pipelex_first"
+active = "all_groq"
 
 # We recommend using the "pipelex_first" profile to get a head start with all models.
 # The Pipelex Inference backend is currently not recommended for production use,
@@ -149,3 +149,7 @@ description = "Example routing profile using specific models"
 
 "grok-3" = "pipelex_inference"
 "grok-3-mini" = "xai"
+
+[profiles.all_groq]
+description = "Use groq backend for all its supported models"
+default = "groq"
