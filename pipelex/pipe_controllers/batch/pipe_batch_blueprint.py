@@ -17,3 +17,11 @@ class PipeBatchBlueprint(PipeBlueprint):
     def pipe_dependencies(self) -> set[str]:
         """Return the set containing the branch pipe code."""
         return {self.branch_pipe_code}
+
+    @override
+    def _validate_inputs(self):
+        pass
+
+    @override
+    def _validate_output(self):
+        pass

@@ -1,4 +1,5 @@
 from typing import Literal
+from typing_extensions import override
 
 from pydantic import Field
 
@@ -10,4 +11,10 @@ class PipeFuncBlueprint(PipeBlueprint):
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     function_name: str = Field(description="The name of the function to call.")
 
-    # TODO: validate function_name
+    @override
+    def _validate_inputs(self):
+        pass
+
+    @override
+    def _validate_output(self):
+        pass

@@ -1,4 +1,5 @@
 from typing import Literal
+from typing_extensions import override
 
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -21,3 +22,11 @@ class PipeLLMBlueprint(PipeBlueprint):
     prompt: str | None = None
 
     structuring_method: StructuringMethod | None = None
+
+    @override
+    def _validate_inputs(self):
+        pass
+
+    @override
+    def _validate_output(self):
+        pass

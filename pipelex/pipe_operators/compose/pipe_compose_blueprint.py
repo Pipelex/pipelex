@@ -1,5 +1,6 @@
 from typing import Any, Literal
 
+from typing_extensions import override
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
@@ -37,3 +38,12 @@ class PipeComposeBlueprint(PipeBlueprint):
             return self.template.extra_context
         else:
             return None
+
+
+    @override
+    def _validate_inputs(self):
+        pass
+
+    @override
+    def _validate_output(self):
+        pass

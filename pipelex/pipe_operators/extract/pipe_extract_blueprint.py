@@ -16,8 +16,15 @@ class PipeExtractBlueprint(PipeBlueprint):
     page_views: bool | None = None
     page_views_dpi: int | None = None
 
-    @override
     @field_validator("output", mode="before")
     @classmethod
-    def validate_output(cls, output: str) -> str:
+    def force_output(cls, output: str) -> str:
         return "Page[]"
+
+    @override
+    def _validate_inputs(self):
+        pass
+
+    @override
+    def _validate_output(self):
+        pass

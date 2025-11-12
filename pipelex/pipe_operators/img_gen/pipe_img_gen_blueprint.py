@@ -1,4 +1,5 @@
 from typing import Literal
+from typing_extensions import override
 
 from pydantic import Field
 
@@ -21,3 +22,11 @@ class PipeImgGenBlueprint(PipeBlueprint):
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
     output_format: OutputFormat | None = Field(default=None, strict=False)
+
+    @override
+    def _validate_inputs(self):
+        pass 
+
+    @override
+    def _validate_output(self):
+        pass

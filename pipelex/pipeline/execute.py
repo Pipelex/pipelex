@@ -87,11 +87,10 @@ async def execute_pipeline(
     pipeline = get_pipeline_manager().add_new_pipeline()
     pipeline_run_id = pipeline.pipeline_run_id
 
-    library_manager = get_library_manager()
-
     if not library_id:
         library_id = pipeline_run_id
 
+    library_manager = get_library_manager()
     set_current_library_id(library_id=library_id)
     library_manager.open_library(library_id=library_id)
 

@@ -9,6 +9,8 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunInputsError
+from pipelex.tools.misc.string_utils import is_snake_case
+from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -37,7 +39,9 @@ class PipeAbstract(ABC, BaseModel):
     @field_validator("code", mode="before")
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:
-        PipeBlueprint.validate_pipe_code_syntax(pipe_code=code)
+        if not is_snake_case(code):
+            msg = f"Invalid pipe code syntax '{code}'. Must be in snake_case."
+            raise PipeDefinitionError(msg)
         return code
 
     @model_validator(mode="after")

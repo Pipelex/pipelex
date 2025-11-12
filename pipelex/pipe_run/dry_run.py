@@ -1,4 +1,5 @@
 import asyncio
+import contextvars
 import functools
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -96,17 +97,23 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
 
     if run_in_parallel:
 
-        def run_pipe_in_thread(pipe: PipeAbstract) -> DryRunOutput:
-            """Parallel execution using ThreadPoolExecutor"""
+        def run_pipe_in_thread(pipe: PipeAbstract, context: contextvars.Context) -> DryRunOutput:
+            """Parallel execution using ThreadPoolExecutor with context propagation"""
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                return loop.run_until_complete(dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
+                # Run the async function within the copied context
+                return context.run(loop.run_until_complete, dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
             finally:
                 loop.close()
 
+        # Capture the current context before spawning threads
+        current_context = contextvars.copy_context()
+
         with ThreadPoolExecutor() as executor:
-            futures = [asyncio.get_running_loop().run_in_executor(executor, functools.partial(run_pipe_in_thread, pipe)) for pipe in pipes]
+            futures = [
+                asyncio.get_running_loop().run_in_executor(executor, functools.partial(run_pipe_in_thread, pipe, current_context)) for pipe in pipes
+            ]
             for future in asyncio.as_completed(futures):
                 try:
                     output = await future

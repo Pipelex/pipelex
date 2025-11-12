@@ -275,6 +275,7 @@ class LibraryManager(LibraryManagerAbstract):
                 raise pipe_def_error from pipe_def_error
 
         library.pipe_library.add_pipes(pipes=all_pipes)
+        library.validate_library()
         return all_pipes
 
     def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> None:

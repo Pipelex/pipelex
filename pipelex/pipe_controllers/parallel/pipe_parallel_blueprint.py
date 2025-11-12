@@ -41,3 +41,11 @@ class PipeParallelBlueprint(PipeBlueprint):
             )
             raise PipeDefinitionError(message=msg, description=self.description, source=self.source)
         return self
+
+    @override
+    def _validate_inputs(self):
+        pass
+
+    @override
+    def _validate_output(self):
+        pass

@@ -25,3 +25,11 @@ class PipeSequenceBlueprint(PipeBlueprint):
         For sequences, the order of steps matters, so we preserve it.
         """
         return [step.pipe for step in self.steps]
+
+    @override
+    def _validate_inputs(self):
+        pass
+
+    @override
+    def _validate_output(self):
+        pass

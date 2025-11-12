@@ -1,7 +1,8 @@
 import re
-from typing import Any
-
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from abc import ABC, abstractmethod
+from typing import Any, final
+from pipelex.types import Self
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_string_or_code
@@ -77,7 +78,7 @@ class AllowedPipeTypes(StrEnum):
                 return AllowedPipeCategories.PIPE_CONTROLLER
 
 
-class PipeBlueprint(BaseModel):
+class PipeBlueprint(ABC, BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: str | None = None
     pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
@@ -110,33 +111,6 @@ class PipeBlueprint(BaseModel):
         """
         return None
 
-    @field_validator("inputs", mode="after")
-    @classmethod
-    def validate_inputs(cls, inputs: dict[str, str] | None) -> dict[str, str] | None:
-        if inputs is None:
-            return None
-
-        # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-        multiplicity_pattern = MUTLIPLICITY_PATTERN
-
-        for input_name, concept_spec in inputs.items():
-            validate_input_name(input_name)
-
-            # Validate the concept spec format with optional multiplicity brackets
-            match = re.match(multiplicity_pattern, concept_spec)
-            if not match:
-                msg = (
-                    f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
-                    f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
-                )
-                raise PipeBlueprintValueError(msg)
-
-            # Extract the concept part (without multiplicity) and validate it
-            concept_string_or_code = match.group(1)
-            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
-
-        return inputs
-
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
@@ -155,21 +129,54 @@ class PipeBlueprint(BaseModel):
             raise PipeBlueprintValueError(msg)
         return value
 
-    @field_validator("output", mode="before")
-    @classmethod
-    def validate_output(cls, output: str) -> str:
+    @model_validator(mode="after")
+    def validate_inputs_blueprint(self) -> Self:
+        self.validate_inputs()
+        self.validate_output()
+        return self
+
+    @abstractmethod
+    def _validate_inputs(self):
+        pass
+
+    @abstractmethod
+    def _validate_output(self):
+        pass
+
+    @final
+    def validate_inputs(self):
+        if self.inputs is None:
+            return None
+
+        # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
+        multiplicity_pattern = MUTLIPLICITY_PATTERN
+
+        for input_name, concept_spec in self.inputs.items():
+            validate_input_name(input_name)
+
+            # Validate the concept spec format with optional multiplicity brackets
+            match = re.match(multiplicity_pattern, concept_spec)
+            if not match:
+                msg = (
+                    f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
+                    f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
+                )
+                raise PipeBlueprintValueError(msg)
+
+            # Extract the concept part (without multiplicity) and validate it
+            concept_string_or_code = match.group(1)
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+        
+        self._validate_inputs()
+
+    @final
+    def validate_output(self):
         # Strip multiplicity brackets before validating
-        output_parse_result = parse_concept_with_multiplicity(output)
+        output_parse_result = parse_concept_with_multiplicity(self.output)
         try:
             validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
         except ConceptStringError as exc:
             msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
             raise PipeBlueprintValueError(msg) from exc
-        return output
-
-    @classmethod
-    def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
-        if not is_snake_case(pipe_code):
-            msg = f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case."
-            raise PipeBlueprintValueError(msg)
-        return pipe_code
+        
+        self._validate_output()

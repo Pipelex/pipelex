@@ -29,3 +29,11 @@ class PipeConditionBlueprint(PipeBlueprint):
         if self.default_outcome:
             pipe_codes.add(self.default_outcome)
         return pipe_codes - set(SpecialOutcome.value_list())
+
+    @override
+    def _validate_inputs(self):
+        pass
+
+    @override
+    def _validate_output(self):
+        pass
