@@ -87,6 +87,14 @@ class PipeBlueprint(ABC, BaseModel):
     output: str
 
     @property
+    def nb_inputs(self) -> int:
+        return len(self.inputs) if self.inputs else 0
+
+    @property
+    def input_names(self) -> list[str]:
+        return list(self.inputs.keys()) if self.inputs else []
+
+    @property
     def pipe_dependencies(self) -> set[str]:
         """Return the set of pipe codes that this pipe depends on.
 
@@ -163,6 +171,13 @@ class PipeBlueprint(ABC, BaseModel):
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
             validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+
+        # Check that every input_name is unique
+        input_names = list(self.inputs.keys())
+        if len(input_names) != len(set(input_names)):
+            duplicates = [name for name in input_names if input_names.count(name) > 1]
+            msg = f"Duplicate input names found: {duplicates}. Input names must be unique."
+            raise PipeBlueprintValueError(msg)
 
         self._validate_inputs()
 

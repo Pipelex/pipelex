@@ -4,7 +4,7 @@ from pipelex import pretty_print
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 from pipelex.hub import get_extract_worker
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.cases import ImageTestCases, PDFTestCases

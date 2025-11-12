@@ -3,7 +3,7 @@ import os
 import kajson
 from typing_extensions import override
 
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
 from pipelex.types import StrEnum
 

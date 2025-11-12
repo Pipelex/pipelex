@@ -22,7 +22,7 @@ class StaticValidationErrorData(StructuredContent):
     """Structured data for StaticValidationError."""
 
     error_type: StaticValidationErrorType = Field(description="The type of static validation error")
-    domain: str = Field(description="The domain where the error occurred")
+    domain: str | None = Field(description="The domain where the error occurred")
     pipe_code: str | None = Field(None, description="The pipe code if applicable")
     variable_names: list[str] | None = Field(None, description="Variable names involved in the error")
     required_concept_codes: list[str] | None = Field(None, description="Required concept codes")

@@ -13,7 +13,7 @@ from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_fr
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 from pipelex.plugins.groq.groq_factory import GroqFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar

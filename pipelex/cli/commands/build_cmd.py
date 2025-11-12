@@ -22,7 +22,7 @@ from pipelex.cli.error_handlers import (
     handle_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory

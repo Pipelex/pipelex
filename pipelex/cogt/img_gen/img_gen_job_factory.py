@@ -1,7 +1,7 @@
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobReport
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
 
 

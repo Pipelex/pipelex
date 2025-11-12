@@ -56,7 +56,5 @@ class LibraryManagerAbstract(ABC):
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
-        load_user_dirs: bool = True,
-        load_pipelex_dirs: bool = True,
     ) -> None:
         pass

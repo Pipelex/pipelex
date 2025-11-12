@@ -4,7 +4,6 @@ from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
@@ -37,10 +36,6 @@ class PipeSequence(PipeController):
     @override
     def validate_input_with_library(self):
         """Validate that the inputs declared for this PipeSequence match what is actually needed."""
-        static_validation_config = get_config().pipelex.static_validation_config
-        default_reaction = static_validation_config.default_reaction
-        reactions = static_validation_config.reactions
-
         the_needed_inputs = self.needed_inputs()
 
         # Check all required variables are in the inputs
@@ -53,13 +48,7 @@ class PipeSequence(PipeController):
                     variable_names=[named_input_requirement.variable_name],
                     required_concept_codes=[named_input_requirement.concept.code],
                 )
-                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(missing_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise missing_input_var_error
+                raise missing_input_var_error
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
@@ -71,16 +60,7 @@ class PipeSequence(PipeController):
                     pipe_code=self.code,
                     variable_names=[input_name],
                 )
-                match reactions.get(
-                    StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    default_reaction,
-                ):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(extraneous_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise extraneous_input_var_error
+                raise extraneous_input_var_error
 
     @override
     def validate_output_static(self):

@@ -4,7 +4,7 @@ from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol

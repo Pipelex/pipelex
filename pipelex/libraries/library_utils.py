@@ -3,7 +3,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from pipelex import log
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.tools.misc.file_utils import find_files_in_dir
 

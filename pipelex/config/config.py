@@ -1,5 +1,3 @@
-from typing import cast
-
 import shortuuid
 from pydantic import Field, field_validator
 
@@ -7,7 +5,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.core.pipes.exceptions import StaticValidationErrorType
+from pipelex.config.models import StaticValidationConfig
 from pipelex.hub import get_required_config
 from pipelex.language.plx_config import PlxConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
@@ -15,48 +13,6 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
-from pipelex.types import StrEnum
-
-
-class ConfigPaths:
-    DEFAULT_CONFIG_DIR_PATH = "./.pipelex"
-    INFERENCE_DIR_NAME = "inference"
-    INFERENCE_DIR_PATH = f"{DEFAULT_CONFIG_DIR_PATH}/{INFERENCE_DIR_NAME}"
-    BACKENDS_FILE_NAME = "backends.toml"
-    BACKENDS_FILE_PATH = f"{INFERENCE_DIR_PATH}/{BACKENDS_FILE_NAME}"
-    BACKENDS_DIR_NAME = "backends"
-    BACKENDS_DIR_PATH = f"{INFERENCE_DIR_PATH}/{BACKENDS_DIR_NAME}"
-    ROUTING_PROFILES_FILE_NAME = "routing_profiles.toml"
-    ROUTING_PROFILES_FILE_PATH = f"{INFERENCE_DIR_PATH}/{ROUTING_PROFILES_FILE_NAME}"
-    MODEL_DECKS_DIR_NAME = "deck"
-    MODEL_DECKS_DIR_PATH = f"{INFERENCE_DIR_PATH}/{MODEL_DECKS_DIR_NAME}"
-    BASE_DECK_FILE_NAME = "base_deck.toml"
-    BASE_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{BASE_DECK_FILE_NAME}"
-    OVERRIDES_DECK_FILE_NAME = "overrides.toml"
-    OVERRIDES_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{OVERRIDES_DECK_FILE_NAME}"
-
-
-class StaticValidationReaction(StrEnum):
-    RAISE = "raise"
-    LOG = "log"
-    IGNORE = "ignore"
-
-
-class StaticValidationConfig(ConfigModel):
-    default_reaction: StaticValidationReaction = Field(strict=False)
-    reactions: dict[StaticValidationErrorType, StaticValidationReaction]
-
-    @field_validator("reactions", mode="before")
-    @classmethod
-    def validate_reactions(cls, value: dict[str, str]) -> dict[StaticValidationErrorType, StaticValidationReaction]:
-        return cast(
-            "dict[StaticValidationErrorType, StaticValidationReaction]",
-            ConfigModel.transform_dict_str_to_enum(
-                input_dict=value,
-                key_enum_cls=StaticValidationErrorType,
-                value_enum_cls=StaticValidationReaction,
-            ),
-        )
 
 
 class PipeRunConfig(ConfigModel):

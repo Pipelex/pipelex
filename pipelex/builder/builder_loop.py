@@ -149,6 +149,9 @@ class BuilderLoop:
                 case StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS:
                     msg = "Static validation error had too many candidate inputs. We don't support fixing this error yet."
                     raise PipelexBundleNoFixForError(message=msg) from bundle_error
+                case StaticValidationErrorType.INADEQUATE_OUTPUT_CONCEPT:
+                    msg = "Static validation error had inadequate output concept. We don't support fixing this error yet."
+                    raise PipelexBundleNoFixForError(message=msg) from bundle_error
 
         if fixed_pipes and is_save_second_iteration_enabled:
             pipelex_bundle_spec = reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes)

@@ -122,26 +122,19 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
-        load_user_dirs: bool = False,
-        load_pipelex_dirs: bool = False,
     ) -> None:
         # Ensure libraries exist for this library_id
         if library_id not in self._libraries:
             msg = f"Trying to load a library that does not exist: '{library_id}'"
             raise LibraryError(msg)
+        
+        if not library_dirs:
+            library_dirs = [Path(".")]
 
         all_dirs: list[Path] = []
         all_plx_paths: list[Path] = []
-        if load_user_dirs or (library_dirs is None and library_file_paths is None):
-            all_dirs.append(Path(config_manager.local_root_dir))
-            all_plx_paths.extend(get_pipelex_plx_files_from_dirs({Path(config_manager.local_root_dir)}))
-        if load_pipelex_dirs:
-            all_dirs.extend(get_pipelex_plx_files_from_package())
-            all_plx_paths.extend(get_pipelex_plx_files_from_package())
-
-        if library_dirs:
-            all_dirs.extend(library_dirs)
-            all_plx_paths.extend(get_pipelex_plx_files_from_dirs(set(library_dirs)))
+        all_dirs.extend(library_dirs)
+        all_plx_paths.extend(get_pipelex_plx_files_from_dirs(set(library_dirs)))
 
         if library_file_paths:
             all_plx_paths.extend(library_file_paths)

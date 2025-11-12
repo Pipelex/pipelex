@@ -19,7 +19,7 @@ from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.model_manager import ModelManager
-from pipelex.config import PipelexConfig, get_config
+from pipelex.config.config import PipelexConfig, get_config
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.system.configuration.config_loader import config_manager

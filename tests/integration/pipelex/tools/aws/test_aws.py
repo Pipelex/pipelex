@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 from pipelex.tools.aws.aws_config import AwsKeyMethod
 
 

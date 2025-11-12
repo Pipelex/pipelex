@@ -5,7 +5,8 @@ from pydantic import field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config.config import get_config
+from pipelex.config.models import StaticValidationReaction
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory

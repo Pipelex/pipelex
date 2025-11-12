@@ -13,7 +13,7 @@ from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
@@ -80,9 +80,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def validate_input_with_library(self):
-        static_validation_config = get_config().pipelex.static_validation_config
-        default_reaction = static_validation_config.default_reaction
-        reactions = static_validation_config.reactions
         # Those are the variables required in the prompt template or system prompt
         required_variables = self.required_variables()
 
@@ -95,13 +92,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     pipe_code=self.code,
                     variable_names=[required_variable_name],
                 )
-                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(missing_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise missing_input_var_error
+                raise missing_input_var_error
 
         # 2: Check that all inputs are in the required variables
         for input_name, requirement in self.needed_inputs().items:
@@ -123,13 +114,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     variable_names=[input_name],
                     explanation=explanation,
                 )
-                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(extraneous_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise extraneous_input_var_error
+                raise extraneous_input_var_error
 
     @override
     def validate_output_static(self):

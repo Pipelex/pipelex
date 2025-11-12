@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.config import get_config
+from pipelex.config.config import get_config
 
 if TYPE_CHECKING:
     from anthropic.types import ModelInfo

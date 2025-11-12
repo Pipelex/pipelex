@@ -49,6 +49,7 @@ class StaticValidationErrorType(StrEnum):
     EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
     INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
     TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
+    INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"
 
 
 class PipeOperatorModelChoiceError(PipelexException):

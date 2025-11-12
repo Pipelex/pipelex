@@ -2,7 +2,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from pipelex.cli.commands.init.config_files import init_config
-from pipelex.config import ConfigPaths
+from pipelex.config.models import ConfigPaths
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.urls import URLs
 

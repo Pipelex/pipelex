@@ -29,11 +29,11 @@ class SyntaxErrorData(BaseModel):
         )
 
 
-class StaticValidationError(Exception):
+class StaticValidationError(ValueError):
     def __init__(
         self,
         error_type: StaticValidationErrorType,
-        domain: str,
+        domain: str | None = None,
         pipe_code: str | None = None,
         variable_names: list[str] | None = None,
         required_concept_codes: list[str] | None = None,

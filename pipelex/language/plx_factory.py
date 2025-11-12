@@ -7,7 +7,7 @@ from tomlkit import array, document, inline_table, table
 from tomlkit import string as tomlkit_string
 
 from pipelex import log
-from pipelex.config import PlxConfig, get_config
+from pipelex.config.config import PlxConfig, get_config
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 from pipelex.types import StrEnum
 
