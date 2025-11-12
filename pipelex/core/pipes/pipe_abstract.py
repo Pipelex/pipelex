@@ -180,7 +180,8 @@ class PipeAbstract(ABC, BaseModel):
             )
 
         pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
-        log.info(pipe_run_info)
+        if pipe_run_params.run_mode == PipeRunMode.LIVE:
+            log.info(pipe_run_info)
 
         self.validate_before_run(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
 
