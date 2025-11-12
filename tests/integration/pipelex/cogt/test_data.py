@@ -45,7 +45,7 @@ class LLMVisionTestCases:
     VISION_USER_TEXT_2 = "What is this image about?"
     VISION_IMAGES_COMPARE_PROMPT = "Compare these two images"
 
-    URL_WIKIPEDIA_ALAN_TURING = "https://pipelex-web.s3.amazonaws.com/tests/alan_turing.jpg"
+    URL_CLOUDFRONT_ALAN_TURING = "https://d2cinlfp2qnig1.cloudfront.net/tests/alan_turing.jpg"
 
     TEST_IMAGE_DIRECTORY = "tests/data/images"
 
@@ -73,7 +73,7 @@ class LLMVisionTestCases:
     IMAGE_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, image_uri
         (
             "Alan Turing",
-            URL_WIKIPEDIA_ALAN_TURING,
+            URL_CLOUDFRONT_ALAN_TURING,
         ),
         (
             "Gantt chart",
