@@ -122,8 +122,8 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
-        load_user_dirs: bool = True,
-        load_pipelex_dirs: bool = True,
+        load_user_dirs: bool = False,
+        load_pipelex_dirs: bool = False,
     ) -> None:
         # Ensure libraries exist for this library_id
         if library_id not in self._libraries:
@@ -206,6 +206,7 @@ class LibraryManager(LibraryManagerAbstract):
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
         # Load PLX files into the specific library
+
         self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
 
     ############################################################

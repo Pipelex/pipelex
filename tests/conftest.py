@@ -29,7 +29,7 @@ def reset_pipelex_config_fixture():
         library_manager.setup()
         set_current_library_id(library_id=SpecialLibraryId.TEST)
         library_manager.open_library(library_id=SpecialLibraryId.TEST)
-        library_manager.load_libraries(library_id=SpecialLibraryId.TEST, library_dirs=[Path("tests/test_libraries")])
+        library_manager.load_libraries(library_id=SpecialLibraryId.TEST, library_dirs=[Path("tests/test_pipelines/")])
         config = get_config()
         log.verbose(config, title="Test config")
         assert isinstance(config, pipelex.config.PipelexConfig)
