@@ -195,7 +195,7 @@ def validate_cmd(
     # Initialize Pipelex
     pipelex_instance: Pipelex
     try:
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     except LibraryLoadingError as library_loading_error:
         handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION)
     except ModelDeckPresetValidatonError as model_deck_error:

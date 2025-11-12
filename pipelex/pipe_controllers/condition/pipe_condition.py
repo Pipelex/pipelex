@@ -191,7 +191,7 @@ class PipeCondition(PipeController):
         pass
 
     @override
-    def validate_input_with_library(self, library_id: str):
+    def validate_input_with_library(self):
         """Validate that the inputs declared for this PipeCondition match what is actually needed."""
         # First validate required variables are in the inputs
         for required_variable_name in self.required_variables():
@@ -245,7 +245,7 @@ class PipeCondition(PipeController):
         pass
 
     @override
-    def validate_output_with_library(self, library_id: str):
+    def validate_output_with_library(self):
         """Validate the output for the pipe condition.
         The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
         """

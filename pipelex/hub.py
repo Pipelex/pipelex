@@ -1,3 +1,4 @@
+from contextvars import ContextVar
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -19,7 +20,6 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
 from pipelex.libraries.library import Library
-from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
@@ -239,27 +239,27 @@ class PipelexHub:
 
     # pipelex
 
-    def get_required_domain_library(self, library_id: str) -> DomainLibraryAbstract:
+    def get_required_domain_library(self) -> DomainLibraryAbstract:
         if self._library_manager is not None:
-            return self._library_manager.get_library(library_id=library_id).domain_library
+            return self._library_manager.get_library().domain_library
         if self._domain_library is None:
-            msg = "DomainLibrary with library_id '{library_id}' is not initialized"
+            msg = "DomainLibrary is not initialized"
             raise RuntimeError(msg)
         return self._domain_library
 
-    def get_required_concept_library(self, library_id: str) -> ConceptLibraryAbstract:
+    def get_required_concept_library(self) -> ConceptLibraryAbstract:
         if self._library_manager is not None:
-            return self._library_manager.get_library(library_id=library_id).concept_library
+            return self._library_manager.get_library().concept_library
         if self._concept_library is None:
-            msg = "ConceptLibrary    with library_id '{library_id}' is not initialized"
+            msg = "ConceptLibrary is not initialized"
             raise RuntimeError(msg)
         return self._concept_library
 
-    def get_required_pipe_library(self, library_id: str) -> PipeLibraryAbstract:
+    def get_required_pipe_library(self) -> PipeLibraryAbstract:
         if self._library_manager is not None:
-            return self._library_manager.get_library(library_id=library_id).pipe_library
+            return self._library_manager.get_library().pipe_library
         if self._pipe_library is None:
-            msg = "PipeLibrary with library_id '{library_id}' is not initialized"
+            msg = "PipeLibrary is not initialized"
             raise RuntimeError(msg)
         return self._pipe_library
 
@@ -290,10 +290,10 @@ class PipelexHub:
     def set_library_manager(self, library_manager: LibraryManagerAbstract):
         self._library_manager = library_manager
 
-    def get_library(self, library_id: str) -> Library:
+    def get_library(self) -> Library:
         if self._library_manager is not None:
-            return self._library_manager.get_library(library_id=library_id)
-        msg = "Library with library_id '{library_id}' is not initialized"
+            return self._library_manager.get_library()
+        msg = "Library is not initialized"
         raise RuntimeError(msg)
 
 
@@ -385,36 +385,60 @@ def get_secret(secret_id: str) -> str:
     return get_secrets_provider().get_secret(secret_id=secret_id)
 
 
-def get_required_domain(domain: str, library_id: str) -> Domain:
-    return get_pipelex_hub().get_required_domain_library(library_id=library_id).get_required_domain(domain=domain)
+# libraries
+
+_library_id: ContextVar[str | None] = ContextVar("library_id", default=None)
 
 
-def get_optional_domain(domain: str, library_id: str) -> Domain | None:
-    return get_pipelex_hub().get_required_domain_library(library_id=library_id).get_domain(domain=domain)
+def set_current_library_id(library_id: str) -> None:
+    """Set the library_id for the current async context."""
+    _library_id.set(library_id)
 
 
-def get_pipe_library(library_id: str) -> PipeLibraryAbstract:
-    return get_pipelex_hub().get_required_pipe_library(library_id=library_id)
+def get_current_library_id() -> str:
+    """Get the library_id from the current async context."""
+    library_id = _library_id.get()
+    if library_id is None:
+        msg = "No library context set. Must call set_current_library_id() first."
+        raise RuntimeError(msg)
+    return library_id
 
 
-def get_pipes(library_id: str) -> list[PipeAbstract]:
-    return get_pipelex_hub().get_required_pipe_library(library_id=library_id).get_pipes()
+def teardown_current_library_id() -> None:
+    """Teardown the library_id for the current async context."""
+    _library_id.set(None)
 
 
-def get_required_pipe(pipe_code: str, library_id: str) -> PipeAbstract:
-    return get_pipelex_hub().get_required_pipe_library(library_id=library_id).get_required_pipe(pipe_code=pipe_code)
+def get_required_domain(domain: str) -> Domain:
+    return get_pipelex_hub().get_required_domain_library().get_required_domain(domain=domain)
 
 
-def get_optional_pipe(pipe_code: str, library_id: str) -> PipeAbstract | None:
-    return get_pipelex_hub().get_required_pipe_library(library_id=library_id).get_optional_pipe(pipe_code=pipe_code)
+def get_optional_domain(domain: str) -> Domain | None:
+    return get_pipelex_hub().get_required_domain_library().get_domain(domain=domain)
 
 
-def get_concept_library(library_id: str) -> ConceptLibraryAbstract:
-    return get_pipelex_hub().get_library(library_id=library_id).concept_library
+def get_pipe_library() -> PipeLibraryAbstract:
+    return get_pipelex_hub().get_required_pipe_library()
 
 
-def get_required_concept(concept_string: str, library_id: str) -> Concept:
-    return get_pipelex_hub().get_library(library_id=library_id).concept_library.get_required_concept(concept_string=concept_string)
+def get_pipes() -> list[PipeAbstract]:
+    return get_pipelex_hub().get_required_pipe_library().get_pipes()
+
+
+def get_required_pipe(pipe_code: str) -> PipeAbstract:
+    return get_pipelex_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code)
+
+
+def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
+    return get_pipelex_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
+
+
+def get_concept_library() -> ConceptLibraryAbstract:
+    return get_pipelex_hub().get_library().concept_library
+
+
+def get_required_concept(concept_string: str) -> Concept:
+    return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_string=concept_string)
 
 
 def get_pipe_router() -> PipeRouterProtocol:
@@ -437,9 +461,9 @@ def get_library_manager() -> LibraryManagerAbstract:
     return get_pipelex_hub().get_library_manager()
 
 
-def get_library(library_id: str) -> Library:
-    return get_pipelex_hub().get_library(library_id=library_id)
+def get_library() -> Library:
+    return get_pipelex_hub().get_library()
 
 
 def get_native_concept(native_concept: NativeConceptCode) -> Concept:
-    return get_pipelex_hub().get_required_concept_library(library_id=SpecialLibraryId.UNTITLED).get_native_concept(native_concept=native_concept)
+    return get_pipelex_hub().get_required_concept_library().get_native_concept(native_concept=native_concept)

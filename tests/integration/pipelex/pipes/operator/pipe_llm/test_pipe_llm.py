@@ -4,7 +4,9 @@ from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_class_registry, get_pipe_library, get_pipe_router
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry, get_native_concept, get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -80,7 +82,13 @@ class TestPipeLLM:
     ):
         # TODO: Add assertion on generated objects vs expected results
         pretty_print(data, title="data")
-        working_memory = WorkingMemoryFactory.make_from_text(text=data, name="data")
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=TextContent(text=data),
+                name="data",
+            ),
+        )
 
         # Create pipe blueprint
         pipe_llm_blueprint = PipeLLMBlueprint(

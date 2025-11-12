@@ -18,7 +18,6 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
         domain: str,
         pipe_code: str,
         blueprint: PipeSequenceBlueprint,
-        library_id: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeSequence:
         # Parse output to strip multiplicity brackets
@@ -36,7 +35,6 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
             inputs=InputRequirementsFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
-                library_id=library_id,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_required_concept(
@@ -44,7 +42,6 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
                     domain=output_domain_and_code.domain,
                     concept_code=output_domain_and_code.concept_code,
                 ),
-                library_id=library_id,
             ),
             sequential_sub_pipes=[
                 SubPipeFactory.make_from_blueprint(blueprint=step, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain)

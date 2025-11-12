@@ -8,7 +8,7 @@ import pipelex.config
 import pipelex.pipelex
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.hub import get_library_manager, get_report_delegate
+from pipelex.hub import get_library_manager, get_report_delegate, set_current_library_id
 from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.system.runtime import IntegrationMode
 
@@ -27,6 +27,7 @@ def reset_pipelex_config_fixture():
         pipelex_instance = pipelex.pipelex.Pipelex.make(integration_mode=IntegrationMode.PYTEST)
         library_manager = get_library_manager()
         library_manager.setup()
+        set_current_library_id(library_id=SpecialLibraryId.TEST)
         library_manager.open_library(library_id=SpecialLibraryId.TEST)
         library_manager.load_libraries(library_id=SpecialLibraryId.TEST, library_dirs=[Path("tests/test_libraries")])
         config = get_config()

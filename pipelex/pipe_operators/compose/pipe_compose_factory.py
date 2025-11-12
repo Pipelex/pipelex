@@ -21,7 +21,6 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         domain: str,
         pipe_code: str,
         blueprint: PipeComposeBlueprint,
-        library_id: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeCompose:
         preprocessed_template = preprocess_template(blueprint.template_source)
@@ -45,7 +44,6 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             inputs=InputRequirementsFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
-                library_id=library_id,
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_required_concept(
@@ -53,7 +51,6 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
                     domain=output_domain_and_code.domain,
                     concept_code=output_domain_and_code.concept_code,
                 ),
-                library_id=library_id,
             ),
             template=preprocessed_template,
             templating_style=blueprint.templating_style,

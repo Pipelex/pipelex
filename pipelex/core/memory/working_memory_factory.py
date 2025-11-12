@@ -15,61 +15,13 @@ from pipelex.core.stuffs.text_content import TextContent
 
 
 class WorkingMemoryFactory(BaseModel):
-    # @classmethod
-    # def make_from_text(
-    #     cls,
-    #     text: str,
-    #     concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT,
-    #     name: str | None = "text",
-    # ) -> WorkingMemory:
-    #     ConceptBlueprint.validate_concept_string(concept_string=concept_string)
-    #     return cls.make_from_single_stuff(
-    #         stuff=StuffFactory.make_stuff(
-    #             concept=get_required_concept(concept_string=concept_string, library_id=library_id),
-    #             content=TextContent(text=text),
-    #             name=name,
-    #         ),
-    #     )
-
-    # @classmethod
-    # def make_from_image(
-    #     cls,
-    #     image_url: str,
-    #     concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptCode.IMAGE,
-    #     name: str | None = "image",
-    # ) -> WorkingMemory:
-    #     # TODO: validate that the concept is compatible with an image concept
-    #     ConceptBlueprint.validate_concept_string(concept_string=concept_string)
-    #     stuff = StuffFactory.make_stuff(
-    #         concept=get_required_concept(concept_string=concept_string),
-    #         content=ImageContent(url=image_url),
-    #         name=name,
-    #     )
-    #     return cls.make_from_single_stuff(stuff=stuff)
-
-    # @classmethod
-    # def make_from_pdf(
-    #     cls,
-    #     pdf_url: str,
-    #     concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptCode.PDF,
-    #     name: str | None = "pdf",
-    # ) -> WorkingMemory:
-    #     ConceptBlueprint.validate_concept_string(concept_string=concept_string)
-    #     return cls.make_from_single_stuff(
-    #         stuff=StuffFactory.make_stuff(
-    #             concept=get_required_concept(concept_string=concept_string),
-    #             content=PDFContent(url=pdf_url),
-    #             name=name,
-    #         ),
-    #     )
-
-    # @classmethod
-    # def make_from_single_stuff(cls, stuff: Stuff) -> WorkingMemory:
-    #     if not stuff.stuff_name:
-    #         msg = f"Cannot make_from_single_stuff because stuff has no name: {stuff}"
-    #         raise WorkingMemoryFactoryError(msg)
-    #     stuff_dict: StuffDict = {stuff.stuff_name: stuff}
-    #     return WorkingMemory(root=stuff_dict, aliases={MAIN_STUFF_NAME: stuff.stuff_name})
+    @classmethod
+    def make_from_single_stuff(cls, stuff: Stuff) -> WorkingMemory:
+        if not stuff.stuff_name:
+            msg = f"Cannot make_from_single_stuff because stuff has no name: {stuff}"
+            raise WorkingMemoryFactoryError(msg)
+        stuff_dict: StuffDict = {stuff.stuff_name: stuff}
+        return WorkingMemory(root=stuff_dict, aliases={MAIN_STUFF_NAME: stuff.stuff_name})
 
     @classmethod
     def make_from_multiple_stuffs(

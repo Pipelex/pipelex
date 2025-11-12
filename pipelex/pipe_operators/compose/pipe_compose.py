@@ -86,7 +86,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         pass
 
     @override
-    def validate_input_with_library(self, library_id: str):
+    def validate_input_with_library(self):
         required_variables = self.required_variables()
         for required_variable_name in required_variables:
             if required_variable_name not in self.inputs.variables:
@@ -98,7 +98,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         pass
 
     @override
-    def validate_output_with_library(self, library_id: str):
+    def validate_output_with_library(self):
         pass
 
     @override

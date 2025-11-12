@@ -5,7 +5,10 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.pdf_content import PDFContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_pipe_router
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
@@ -61,9 +64,17 @@ class TestPipeExtract:
                 blueprint=pipe_extract_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            working_memory=WorkingMemoryFactory.make_from_image(
-                image_url=image_url,
-                name="page_scan",
+            working_memory=WorkingMemoryFactory.make_from_single_stuff(
+                stuff=StuffFactory.make_stuff(
+                    concept=ConceptFactory.make(
+                        concept_code="PageScan",
+                        domain="extract",
+                        description="Lorem Ipsum",
+                        structure_class_name="PageScan",
+                    ),
+                    content=ImageContent(url=image_url),
+                    name="page_scan",
+                ),
             ),
         )
         pipe_extract_output = await get_pipe_router().run(
@@ -99,9 +110,14 @@ class TestPipeExtract:
                 blueprint=blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            working_memory=WorkingMemoryFactory.make_from_pdf(
-                pdf_url=pdf_url,
-                name=input_name,
+            working_memory=WorkingMemoryFactory.make_from_single_stuff(
+                stuff=StuffFactory.make_stuff(
+                    concept=ConceptFactory.make_native_concept(
+                        native_concept_code=NativeConceptCode.PDF,
+                    ),
+                    content=PDFContent(url=pdf_url),
+                    name=input_name,
+                ),
             ),
         )
         pipe_extract_output = await get_pipe_router().run(

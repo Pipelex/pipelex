@@ -39,7 +39,7 @@ class PipeBatch(PipeController):
         pass
 
     @override
-    def validate_input_with_library(self, library_id: str):
+    def validate_input_with_library(self):
         # Now check that the required variables ARE in the inputs of the pipe
         required_variables = self.required_variables()
         for variable_name in required_variables:
@@ -57,7 +57,7 @@ class PipeBatch(PipeController):
         pass
 
     @override
-    def validate_output_with_library(self, library_id: str):
+    def validate_output_with_library(self):
         pass
 
     @override
@@ -77,7 +77,9 @@ class PipeBatch(PipeController):
         return self.inputs
 
     @override
-    def _validate_inputs_in_memory(self, working_memory: WorkingMemory) -> None:
+    def validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ) -> None:
         try:
             required_concept_code = self.inputs.get_required_input_requirement(variable_name=self.batch_params.input_list_stuff_name).concept.code
         except PipeInputNotFoundError as exc:

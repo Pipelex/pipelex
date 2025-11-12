@@ -64,7 +64,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             check_extract_choice_with_deck(extract_choice=self.extract_choice)
 
     @override
-    def validate_input_with_library(self, library_id: str):
+    def validate_input_with_library(self):
         concept_library = get_concept_library()
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -140,7 +140,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         pass
 
     @override
-    def validate_output_with_library(self, library_id: str):
+    def validate_output_with_library(self):
         if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
             msg = f"PipeExtract output should be a Page concept, but is {self.output.concept_string}"
             raise PipeDefinitionError(msg)

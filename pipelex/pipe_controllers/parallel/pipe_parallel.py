@@ -116,7 +116,7 @@ class PipeParallel(PipeController):
         pass
 
     @override
-    def validate_input_with_library(self, library_id: str):
+    def validate_input_with_library(self):
         """Validate that the inputs declared for this PipeParallel match what is actually needed."""
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -163,7 +163,7 @@ class PipeParallel(PipeController):
         pass
 
     @override
-    def validate_output_with_library(self, library_id: str):
+    def validate_output_with_library(self):
         pass
 
     @override

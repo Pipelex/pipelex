@@ -71,28 +71,3 @@ def pretty_print_all_concepts(
 
     console.print("\n")
     console.print(table)
-
-
-# class TestLibraries:
-#     @pytest.mark.parametrize(("known_concept", "known_pipe"), LibraryTestCases.KNOWN_CONCEPTS_AND_PIPES)
-#     def test_load_combo_libraries(
-#         self,
-#         known_concept: str,
-#         known_pipe: str,
-#     ):
-#         library_manager = LibraryManager()
-#         test_pipelines_dir = [Path(LibraryTestCases.TEST_PIPELINES_DIR_PATH)]
-#         library_manager.load_libraries(library_dirs=test_pipelines_dir)
-#         # Verify that libraries were loaded
-#         concept_library = library_manager.get_library(library_id=SpecialLibraryId.UNTITLED).concept_library
-#         pipe_library = library_manager.get_pipe_library()
-#         assert len(concept_library.root) > 0, "No concepts were loaded"
-#         assert len(pipe_library.root) > 0, "No pipes were loaded"
-
-#         # Test individual concepts and pipes
-#         assert concept_library.get_required_concept(concept_string=known_concept) is not None
-#         pretty_print(
-#             f"Concept: {known_concept} is correctly loaded as {concept_library.get_required_concept(concept_string=known_concept)}",
-#         )
-#         assert pipe_library.get_optional_pipe(known_pipe) is not None
-#         pretty_print(f"Pipe: {known_pipe} is correctly loaded as {pipe_library.get_optional_pipe(known_pipe)}")

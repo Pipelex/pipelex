@@ -25,7 +25,8 @@ class TestPipeLLMValidateInputs:
             blueprint=blueprint,
         )
 
-        pipe_llm.validate_inputs()
+        pipe_llm.validate_input_static()
+        pipe_llm.validate_input_with_library()
 
     @pytest.mark.parametrize(
         ("test_id", "blueprint", "expected_error_message_fragment"),

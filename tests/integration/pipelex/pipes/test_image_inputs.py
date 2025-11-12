@@ -9,7 +9,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.hub import get_native_concept, get_pipe_router, get_required_pipe
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -33,7 +33,13 @@ class TestImageInputs:
         pipe_run_mode: PipeRunMode,
     ) -> None:
         """Test that an image is indeed given to the LLM, and that it can extract extact whats on the image."""
-        working_memory = WorkingMemoryFactory.make_from_image(name="image", image_url=ImageTestCases.IMAGE_FILE_PATH_PNG)
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.IMAGE),
+                content=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG),
+                name="image",
+            ),
+        )
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(

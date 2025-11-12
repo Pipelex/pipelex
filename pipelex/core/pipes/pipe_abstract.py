@@ -47,27 +47,26 @@ class PipeAbstract(ABC, BaseModel):
         return self
 
     @abstractmethod
-    def validate_input_with_library(self, library_id: str):
-        """Validate the inputs for the pipe with the library."""
+    def validate_input_with_library(self):
+        pass
 
     @abstractmethod
     def validate_input_static(self):
-        """Validate the inputs for the pipe."""
+        pass
 
     @abstractmethod
-    def validate_output_with_library(self, library_id: str):
-        """Validate the output for the pipe with the library."""
+    def validate_output_with_library(self):
+        pass
 
     @abstractmethod
     def validate_output_static(self):
-        """Validate the output for the pipe."""
+        pass
 
     @final
-    def validate_with_libraries(self, library_id: str):
-        """Validate the pipe with the libraries, after the static validation"""
+    def validate_with_libraries(self):
         try:
-            self.validate_input_with_library(library_id=library_id)
-            self.validate_output_with_library(library_id=library_id)
+            self.validate_input_with_library()
+            self.validate_output_with_library()
         except ModelChoiceNotFoundError as exc:
             raise PipeOperatorModelChoiceError(
                 message=exc.message,
@@ -76,6 +75,22 @@ class PipeAbstract(ABC, BaseModel):
                 model_type=exc.model_type,
                 model_choice=exc.model_choice,
             ) from exc
+
+    def validate_before_run(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ): ...
+
+    def validate_after_run(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ): ...
 
     @abstractmethod
     def required_variables(self) -> set[str]:
@@ -154,7 +169,8 @@ class PipeAbstract(ABC, BaseModel):
         missing_inputs: dict[str, str] = {}
         for required_stuff_name, requirement in self.needed_inputs().items:
             try:
-                working_memory.get_stuff(required_stuff_name)
+                if not working_memory.is_stuff_exists(name=required_stuff_name):
+                    missing_inputs[required_stuff_name] = requirement.concept.code
             except WorkingMemoryStuffNotFoundError as exc:
                 variable_name: str = exc.variable_name or required_stuff_name
                 missing_inputs[variable_name] = exc.concept_code or requirement.concept.code
@@ -166,9 +182,13 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
         log.info(pipe_run_info)
 
+        self.validate_before_run(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
+
         pipe_output = await self._run_pipe(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
+
+        self.validate_after_run(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
         return pipe_output

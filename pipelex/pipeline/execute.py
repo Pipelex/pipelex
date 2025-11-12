@@ -11,6 +11,8 @@ from pipelex.hub import (
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
+    set_current_library_id,
+    teardown_current_library_id,
 )
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -79,11 +81,15 @@ async def execute_pipeline(
         msg = "Either pipe_code or plx_content must be provided to the API execute_pipeline."
         raise ValueError(msg)
 
+    pipeline = get_pipeline_manager().add_new_pipeline()
+    pipeline_run_id = pipeline.pipeline_run_id
+    set_current_library_id(library_id=pipeline_run_id)
+
     pipe: PipeAbstract | None = None
     blueprint: PipelexBundleBlueprint | None = None
 
     if plx_content:
-        blueprint, _ = await validate_plx(plx_content=plx_content, remove_after_validation=False)
+        blueprint, _ = await validate_plx(library_id=pipeline_run_id, plx_content=plx_content, remove_after_validation=False)
 
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
@@ -119,8 +125,6 @@ async def execute_pipeline(
         else:
             pipe_run_mode = PipeRunMode.LIVE
 
-    pipeline = get_pipeline_manager().add_new_pipeline()
-    pipeline_run_id = pipeline.pipeline_run_id
     get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
     get_library_manager().open_library(library_id=pipeline_run_id)
 
@@ -159,8 +163,9 @@ async def execute_pipeline(
             pipe_stack=pipe_job.pipe_run_params.pipe_stack,
         ) from exc
     finally:
-        if plx_content and blueprint is not None:
-            get_library_manager().remove_from_blueprints(library_id=pipeline_run_id, blueprints=[blueprint])
+        library = get_library_manager().get_library()
+        library.teardown()
+        teardown_current_library_id()
     properties = {
         EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
         EventProperty.PIPE_TYPE: pipe.pipe_type,

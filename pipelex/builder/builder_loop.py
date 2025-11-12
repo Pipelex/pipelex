@@ -19,7 +19,6 @@ from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
-from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
@@ -135,7 +134,7 @@ class BuilderLoop:
                         )
                         raise PipelexBundleNoFixForError(message=msg) from bundle_error
 
-                    pipe = get_required_pipe(pipe_code=static_error.pipe_code, library_id=SpecialLibraryId.BUILDER)
+                    pipe = get_required_pipe(pipe_code=static_error.pipe_code)
                     needed_inputs = pipe.needed_inputs()
                     # Build the new inputs dict from needed_inputs
                     new_inputs: dict[str, str] = {}

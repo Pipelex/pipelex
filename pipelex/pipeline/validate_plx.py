@@ -7,11 +7,10 @@ from pipelex.core.interpreter import PipelexInterpreter, PLXDecodeError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager
 from pipelex.libraries.exceptions import ConceptLoadingError, DomainLoadingError, PipeLibraryError, PipeLoadingError
-from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipe_run.dry_run import DryRunError, dry_run_pipes
 
 
-async def validate_plx(plx_content: str, remove_after_validation: bool = True) -> tuple[PipelexBundleBlueprint, list[PipeAbstract]]:
+async def validate_plx(library_id: str, plx_content: str, remove_after_validation: bool = True) -> tuple[PipelexBundleBlueprint, list[PipeAbstract]]:
     """Validate PLX content.
 
     This function:
@@ -20,21 +19,9 @@ async def validate_plx(plx_content: str, remove_after_validation: bool = True) -
     3. Runs static validation and dry runs all pipes
 
     Args:
+        library_id: The library ID to use for validation
         plx_content: The PLX content to validate
         remove_after_validation: Whether to remove the blueprint from the library manager after validation
-
-    Returns:
-        Tuple of (blueprint, pipes): The blueprint and the loaded pipes
-
-    Raises:
-        PipelexConfigurationError: For interpreter configuration errors
-        PLXDecodeError: For PLX parsing/decoding errors
-        ValidationError: For Pydantic validation errors in blueprint
-        DomainLoadingError: For domain loading errors
-        ConceptLoadingError: For concept loading errors
-        PipeLoadingError: For pipe loading errors
-        PipeLibraryError: For pipe library validation errors
-        DryRunError: For dry run validation errors
     """
     library_manager = get_library_manager()
     blueprint: PipelexBundleBlueprint | None = None
@@ -43,14 +30,14 @@ async def validate_plx(plx_content: str, remove_after_validation: bool = True) -
         converter = PipelexInterpreter(file_content=plx_content)
         blueprint = converter.make_pipelex_bundle_blueprint()
 
-        pipes = library_manager.load_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[blueprint])
+        pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 
         for pipe in pipes:
             pipe.validate_with_libraries()
             await dry_run_pipes(pipes=[pipe], raise_on_failure=True)
 
         if remove_after_validation:
-            library_manager.remove_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[blueprint])
+            library_manager.remove_from_blueprints(library_id=library_id, blueprints=[blueprint])
         return blueprint, pipes
     except (
         PipelexConfigurationError,
@@ -64,7 +51,7 @@ async def validate_plx(plx_content: str, remove_after_validation: bool = True) -
     ):
         if blueprint is not None:
             try:
-                library_manager.remove_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[blueprint])
+                library_manager.remove_from_blueprints(library_id=library_id, blueprints=[blueprint])
             except Exception as cleanup_error:
                 log.error(f"Error during cleanup after validation failure: {cleanup_error}")
 

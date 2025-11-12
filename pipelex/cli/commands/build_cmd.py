@@ -26,7 +26,6 @@ from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoic
 from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.libraries.exceptions import LibraryLoadingError
-from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
@@ -335,7 +334,7 @@ def prepare_runner_cmd(
 
         # Get the pipe
         try:
-            pipe = get_required_pipe(pipe_code=pipe_code, library_id=SpecialLibraryId.BUILDER)
+            pipe = get_required_pipe(pipe_code=pipe_code)
         except Exception as exc:
             typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
@@ -491,7 +490,7 @@ def generate_inputs_cmd(
 
         # Get the pipe
         try:
-            pipe = get_required_pipe(pipe_code=pipe_code, library_id=SpecialLibraryId.BUILDER)
+            pipe = get_required_pipe(pipe_code=pipe_code)
         except Exception as exc:
             typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc

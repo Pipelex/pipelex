@@ -17,14 +17,13 @@ from pipelex.core.concepts.exceptions import (
 from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.hub import get_library_manager, get_required_pipe
+from pipelex.hub import get_current_library_id, get_library_manager, get_required_pipe
 from pipelex.libraries.exceptions import (
     ConceptLoadingError,
     DomainLoadingError,
     PipeDefinitionErrorData,
     PipeLoadingError,
 )
-from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 
 
@@ -63,7 +62,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
     log.dev(f"Loading bundle blueprint for domain '{bundle_spec.domain}' into library manager")
     library_manager = get_library_manager()
     try:
-        library_manager.load_from_blueprints(library_id=SpecialLibraryId.BUILDER, blueprints=[bundle_blueprint])
+        library_manager.load_from_blueprints(library_id=get_current_library_id(), blueprints=[bundle_blueprint])
         log.dev(f"Successfully loaded bundle with {len(bundle_spec.pipe)} pipes")
     except StaticValidationError as static_validation_error:
         static_validation_error_data = StaticValidationErrorData(
@@ -125,7 +124,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
                 log.dev(f"  Checking inputs for {pipe_spec.type} pipe '{pipe_code}'")
 
                 # Get the loaded pipe instance
-                pipe = get_required_pipe(pipe_code=pipe_code, library_id=SpecialLibraryId.BUILDER)
+                pipe = get_required_pipe(pipe_code=pipe_code)
 
                 # Get the actual needed inputs
                 needed_inputs = pipe.needed_inputs()
@@ -160,7 +159,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
     finally:
         # Clean up by removing the bundle from library manager
         log.dev("Cleaning up: removing bundle from library manager")
-        library_manager.remove_from_blueprints(library_id=SpecialLibraryId.BUILDER, blueprints=[bundle_blueprint])
+        library_manager.remove_from_blueprints(library_id=get_current_library_id(), blueprints=[bundle_blueprint])
 
     log.dev(f"✅ Input consistency fix completed: fixed {fixed_count} PipeController pipe(s)")
     return bundle_spec
@@ -178,7 +177,7 @@ async def validate_bundle_spec(bundle_spec: PipelexBundleSpec):
 
     library_manager = get_library_manager()
     dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
-    library_manager.remove_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[bundle_blueprint])
+    library_manager.remove_from_blueprints(library_id=get_current_library_id(), blueprints=[bundle_blueprint])
 
     dry_run_pipe_failures = extract_pipe_failures_from_dry_run_result(bundle_spec=bundle_spec, dry_run_result=dry_run_result)
     if dry_run_pipe_failures:
@@ -240,7 +239,7 @@ def document_pipe_failures_from_dry_run_blueprint(
 async def dry_run_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> dict[str, DryRunOutput]:
     library_manager = get_library_manager()
     try:
-        pipes = library_manager.load_from_blueprints(library_id=SpecialLibraryId.UNTITLED, blueprints=[bundle_blueprint])
+        pipes = library_manager.load_from_blueprints(library_id=get_current_library_id(), blueprints=[bundle_blueprint])
         dry_run_result = await dry_run_pipes(pipes=pipes, raise_on_failure=True)
     except StaticValidationError as static_validation_error:
         static_validation_error_data = StaticValidationErrorData(

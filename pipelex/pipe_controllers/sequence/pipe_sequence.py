@@ -35,7 +35,7 @@ class PipeSequence(PipeController):
         pass
 
     @override
-    def validate_input_with_library(self, library_id: str):
+    def validate_input_with_library(self):
         """Validate that the inputs declared for this PipeSequence match what is actually needed."""
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
@@ -87,13 +87,13 @@ class PipeSequence(PipeController):
         pass
 
     @override
-    def validate_output_with_library(self, library_id: str):
+    def validate_output_with_library(self):
         """Validate the output for the pipe sequence.
         The output of the pipe sequence should match the output of the last step.
         """
-        last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code, library_id=library_id)
+        last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
         concept_of_last_step = last_step_output_pipe.output
-        if not get_concept_library(library_id=library_id).is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
             msg = f"""PipeSequence concept mismatch:
 the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
 of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
@@ -216,11 +216,9 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
             msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
             raise PipeRunParamsError(msg)
         # Verify the output of this pipe is matching the output of the last step.
-        concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code, library_id=pipe_run_params.library_id).output
+        concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output
         # if self.output.concept_string != concept_string_of_last_step:
-        if not get_concept_library(library_id=pipe_run_params.library_id).is_compatible(
-            tested_concept=concept_of_last_step, wanted_concept=self.output
-        ):
+        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
             msg = f"""PipeSequence concept mismatch:
 the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
 of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.

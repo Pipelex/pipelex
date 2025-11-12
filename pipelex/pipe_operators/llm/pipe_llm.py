@@ -79,7 +79,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
     @override
-    def validate_input_with_library(self, library_id: str):
+    def validate_input_with_library(self):
         static_validation_config = get_config().pipelex.static_validation_config
         default_reaction = static_validation_config.default_reaction
         reactions = static_validation_config.reactions
@@ -136,7 +136,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         pass
 
     @override
-    def validate_output_with_library(self, library_id: str):
+    def validate_output_with_library(self):
         if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),

@@ -18,6 +18,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
+from pipelex.hub import get_current_library_id
 from pipelex.libraries.exceptions import (
     ConceptLibraryError,
     LibraryError,
@@ -84,24 +85,11 @@ class LibraryManager(LibraryManagerAbstract):
         self.setup()
 
     @override
-    def create_library(self, library_id: str):
-        if library_id in self._libraries:
-            msg = f"Library '{library_id}' already exists"
-            raise LibraryError(msg)
-        self._libraries[library_id] = LibraryFactory.make_empty()
-
-    @override
-    def open_library(self, library_id: str) -> None:
-        """Open a new library with the given library_id.
-
-        The new library will inherit native concepts and base pipes from the BASE library.
-        """
-        if library_id in self._libraries:
-            msg = f"Library '{library_id}' already exists"
-            raise LibraryError(msg)
-
-        # Create a new library that inherits from BASE
-        self.create_library(library_id=library_id)
+    def open_library(self, library_id: str) -> Library:
+        """Open a library with the given library_id. Creates it if it doesn't exist."""
+        if library_id not in self._libraries:
+            self._libraries[library_id] = LibraryFactory.make_empty()
+        return self._libraries[library_id]
 
     ############################################################
     # Public library accessors
@@ -115,10 +103,12 @@ class LibraryManager(LibraryManagerAbstract):
         self._libraries[library_id] = library
 
     @override
-    def get_library(self, library_id: str) -> Library:
-        """Get the Library object for a specific library_id."""
+    def get_library(self, library_id: str | None = None) -> Library:
+        """Get the library with the given library_id. Returns the UNTITLED library if no library_id is provided."""
+        if library_id is None:
+            library_id = get_current_library_id()
         if library_id not in self._libraries:
-            msg = f"Trying to get a library that does not exist: '{library_id}'"
+            msg = f"Library '{library_id}' does not exist"
             raise LibraryError(msg)
         return self._libraries[library_id]
 
@@ -233,7 +223,7 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of all pipes that were loaded
         """
-        library = self.get_library(library_id=library_id)
+        library = self.get_library()
         all_pipes: list[PipeAbstract] = []
 
         # Load all domains first
@@ -276,7 +266,6 @@ class LibraryManager(LibraryManagerAbstract):
                             domain=blueprint.domain,
                             pipe_code=pipe_name,
                             blueprint=pipe_blueprint,
-                            library_id=library_id,
                             concept_codes_from_the_same_domain=list(blueprint.concept.keys()) if blueprint.concept else None,
                         )
                         pipes.append(pipe)
@@ -348,8 +337,8 @@ class LibraryManager(LibraryManagerAbstract):
         functions_count = FuncRegistryUtils.register_pipe_funcs_from_package("pipelex.builder", pipelex.builder)
         log.verbose(f"Registered {functions_count} @pipe_func functions from pipelex.builder")
 
-    def _remove_pipes_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
-        library = self.get_library(library_id=library_id)
+    def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+        library = self.get_library()
         if blueprint.pipe is not None:
             library.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
 
@@ -361,8 +350,8 @@ class LibraryManager(LibraryManagerAbstract):
             ]
             library.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)
 
-    def _remove_concepts_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
-        library = self.get_library(library_id=library_id)
+    def _remove_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+        library = self.get_library()
         if blueprint.concept is not None:
             concept_codes_to_remove = [
                 ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
@@ -372,8 +361,8 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
-        self._remove_pipes_from_blueprint(library_id=library_id, blueprint=blueprint)
-        self._remove_concepts_from_blueprint(library_id=library_id, blueprint=blueprint)
+        self._remove_pipes_from_blueprint(blueprint=blueprint)
+        self._remove_concepts_from_blueprint(blueprint=blueprint)
 
     @override
     def remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
