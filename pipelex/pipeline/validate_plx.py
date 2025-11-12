@@ -29,7 +29,6 @@ async def validate_plx(library_id: str, plx_content: str, remove_after_validatio
     try:
         converter = PipelexInterpreter(file_content=plx_content)
         blueprint = converter.make_pipelex_bundle_blueprint()
-
         pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 
         for pipe in pipes:

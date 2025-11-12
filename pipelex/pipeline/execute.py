@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
 
 async def execute_pipeline(
+    library_id: str | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
@@ -51,6 +52,8 @@ async def execute_pipeline(
 
     Parameters
     ----------
+    library_id:
+        The library ID to use for the pipeline execution. If not provided, the current library ID is used.
     pipe_code:
         The code identifying the pipeline to execute.
     plx_content:
@@ -83,14 +86,20 @@ async def execute_pipeline(
 
     pipeline = get_pipeline_manager().add_new_pipeline()
     pipeline_run_id = pipeline.pipeline_run_id
-    set_current_library_id(library_id=pipeline_run_id)
+
+    library_manager = get_library_manager()
+
+    if not library_id:
+        library_id = pipeline_run_id
+
+    set_current_library_id(library_id=library_id)
+    library_manager.open_library(library_id=library_id)
 
     pipe: PipeAbstract | None = None
     blueprint: PipelexBundleBlueprint | None = None
 
     if plx_content:
-        blueprint, _ = await validate_plx(library_id=pipeline_run_id, plx_content=plx_content, remove_after_validation=False)
-
+        blueprint, _ = await validate_plx(library_id=library_id, plx_content=plx_content, remove_after_validation=False)
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
         elif blueprint.main_pipe:
@@ -99,6 +108,7 @@ async def execute_pipeline(
             msg = "No pipe code or main pipe in the PLX content provided to the API execute_pipeline."
             raise PipeExecutionError(message=msg)
     elif pipe_code:
+        library_manager.load_libraries(library_id=library_id)
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
         msg = "Either provide pipe_code or plx_content to the API execute_pipeline. 'pipe_code' must be provided when 'plx_content' is None"
@@ -126,7 +136,6 @@ async def execute_pipeline(
             pipe_run_mode = PipeRunMode.LIVE
 
     get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-    get_library_manager().open_library(library_id=pipeline_run_id)
 
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline.pipeline_run_id,

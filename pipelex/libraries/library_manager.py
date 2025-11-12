@@ -223,7 +223,7 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of all pipes that were loaded
         """
-        library = self.get_library()
+        library = self.get_library(library_id=library_id)
         all_pipes: list[PipeAbstract] = []
 
         # Load all domains first
@@ -275,7 +275,6 @@ class LibraryManager(LibraryManagerAbstract):
                 raise pipe_def_error from pipe_def_error
 
         library.pipe_library.add_pipes(pipes=all_pipes)
-
         return all_pipes
 
     def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> None:
