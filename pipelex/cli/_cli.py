@@ -8,11 +8,13 @@ from typing_extensions import override
 
 from pipelex.cli.commands.build_cmd import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
-from pipelex.cli.commands.init_cmd import InitFocus, init_cmd
+from pipelex.cli.commands.init.command import init_cmd
+from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
+from pipelex.cli.readiness import check_readiness
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -61,12 +63,15 @@ def app_callback(ctx: typer.Context) -> None:
 ░██         ░██░███   ░██ ░██        ░██ ░██         ░██  ░██
 ░██         ░██░██░█████   ░███████  ░██  ░███████  ░██    ░██
                ░██
-               ░██                                     v{package_version}
+               ░██                                     v[cyan]{package_version}[/cyan]
 """
     )
     # Skip checks if no command is being run (e.g., just --help) or if running init/doctor command
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand in ("init", "doctor"):
         return
+
+    # Check system readiness (dependencies and venv for dev installs)
+    check_readiness()
 
     init_cmd(silent=True)
 

@@ -46,7 +46,7 @@ pipelex init
 To use AI models, you need an API key:
 
 - **Free Pipelex API Key**: Join our [Discord community](https://go.pipelex.com/discord) and request your **free API key** (no credit card required) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
-- **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral)
+- **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral
 - **Local AI**: Ollama, vLLM, LM Studio, llama.cpp... any endpoint based on the OpenAI API or not, as you can plug-in your own non-standard APIs.
 
 See [Configure AI Providers](https://docs.pipelex.com/pages/setup/configure-ai-providers/) for details.
@@ -137,7 +137,7 @@ Performs comprehensive analysis comparing the candidate's CV against the job off
 """
 inputs = { cv_pages = "Page[]", job_offer_pages = "Page[]" }
 output = "MatchAnalysis"
-model = "llm_to_answer_hard_questions"
+model = "llm_to_answer_questions"
 system_prompt = """
 You are an expert HR analyst and recruiter specializing in candidate-job fit assessment. Your task is to generate a structured MatchAnalysis comparing a candidate's CV against job requirements.
 """
@@ -160,7 +160,7 @@ Generates exactly 5 targeted, relevant interview questions based on the match an
 """
 inputs = { match_analysis = "MatchAnalysis" }
 output = "Question[5]"
-model = "llm_to_write_questions"
+model = "llm_for_writing_cheap"
 system_prompt = """
 You are an expert HR interviewer and talent assessment specialist. Your task is to generate structured interview questions based on candidate-position match analysis.
 """

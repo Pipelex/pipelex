@@ -1,12 +1,18 @@
 import shutil
+from io import StringIO
 from typing import Any, ClassVar
 
+from kajson import kajson
 from rich import print as rich_print
+from rich.console import Console, Group
+from rich.json import JSON
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.pretty import Pretty
 from rich.style import StyleType
+from rich.syntax import Syntax
 from rich.table import Table
+from rich.terminal_theme import TerminalTheme
 from rich.text import Text, TextType
 
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor
@@ -16,29 +22,65 @@ TEXT_COLOR = TerminalColor.WHITE
 TITLE_COLOR = TerminalColor.CYAN
 BORDER_COLOR = TerminalColor.YELLOW
 
+# TODO: Make PrettyPrinter a manager so we can init it with a proper config
+PRETTY_WIDTH_MIN: int = 125
+PRETTY_WIDTH_FOR_EXPORT: int = 100
+MAX_RENDER_DEPTH = 6
+EXPORT_THEME = TerminalTheme(
+    (0, 0, 0),
+    (197, 200, 198),
+    [
+        (75, 78, 85),
+        (204, 85, 90),
+        (152, 168, 75),
+        (208, 179, 68),
+        (96, 138, 177),
+        (152, 114, 159),
+        (104, 160, 179),
+        (197, 200, 198),
+        (154, 155, 153),
+    ],
+    [
+        (255, 38, 39),
+        (0, 130, 61),
+        (208, 132, 66),
+        (25, 132, 233),
+        (255, 44, 122),
+        (57, 130, 128),
+        (253, 253, 197),
+    ],
+)
+
+PrettyPrintable = Markdown | Text | JSON | Table | Group | Syntax | Pretty
+
+
+class PrettyPrintMode(StrEnum):
+    RICH = "rich"
+    POOR = "poor"
+
 
 def pretty_print(
     content: str | Any,
     title: TextType | None = None,
     subtitle: TextType | None = None,
+    inner_title: str | None = None,
     border_style: StyleType | None = None,
+    width: int | None = None,
 ):
-    PrettyPrinter.pretty_print(content=content, title=title, subtitle=subtitle, border_style=border_style)
+    PrettyPrinter.pretty_print(content=content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
 
 
 def pretty_print_md(
     content: str,
     title: TextType | None = None,
     subtitle: TextType | None = None,
+    inner_title: str | None = None,
     border_style: StyleType | None = None,
+    width: int | None = None,
 ):
+    width = width or PrettyPrinter.pretty_width()
     md_content = Markdown(content)
-    PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, border_style=border_style)
-
-
-class PrettyPrintMode(StrEnum):
-    RICH = "rich"
-    POOR = "poor"
+    PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
 
 
 class PrettyPrinter:
@@ -50,13 +92,22 @@ class PrettyPrinter:
         content: str | Any,
         title: TextType | None = None,
         subtitle: TextType | None = None,
+        inner_title: str | None = None,
         border_style: StyleType | None = None,
+        width: int | None = None,
     ):
         match cls.mode:
             case PrettyPrintMode.RICH:
-                cls.pretty_print_using_rich(content=content, title=title, subtitle=subtitle, border_style=border_style)
+                cls.pretty_print_using_rich(
+                    content=content,
+                    title=title,
+                    subtitle=subtitle,
+                    inner_title=inner_title,
+                    border_style=border_style,
+                    width=width,
+                )
             case PrettyPrintMode.POOR:
-                cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle)
+                cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle, inner_title=inner_title)
 
     @classmethod
     def pretty_print_using_rich(
@@ -64,37 +115,132 @@ class PrettyPrinter:
         content: str | Any,
         title: TextType | None = None,
         subtitle: TextType | None = None,
+        inner_title: str | None = None,
         border_style: StyleType | None = None,
+        width: int | None = None,
     ):
-        if isinstance(content, str):
-            if content.startswith(("http://", "https://")):
-                content = Text(content, style="link " + content, no_wrap=True)
-            else:
-                content = Text(str(content))  # Treat all other strings as plain text
-        elif isinstance(content, Table):
-            # For tables, print directly without a panel
-            if title:
-                rich_print(f"\n[bold blue]{title}[/]\n")
-            rich_print(content)
-            rich_print("\n")
-            if subtitle:
-                rich_print(f"\n[dim]{subtitle}[/]")
-            return
-        elif isinstance(content, Markdown):
-            print("\n")
+        panel = cls.make_pretty_panel(
+            content=content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width
+        )
+
+        rich_print("", panel, "", sep="\n")
+
+    @classmethod
+    def pretty_width(cls, width: int | None = None, depth: int | None = None) -> int:
+        terminal_width = shutil.get_terminal_size().columns
+        absolute_width = width or min(max(PRETTY_WIDTH_MIN, terminal_width // 2), terminal_width)
+        if depth is not None:
+            # Calculate adaptive width factor based on depth to prevent excessive narrowing
+            # Factor decreases slowly: depth 0->1.0, depth 1->0.9, depth 2->0.8, etc., min 0.5
+            width_factor = max(0.5, 1.0 - (depth * 0.1))
+            return int(absolute_width * width_factor)
         else:
-            content = Pretty(content)
-        panel = Panel(
-            content,
+            return absolute_width
+
+    @classmethod
+    def make_pretty_panel(
+        cls,
+        content: str | Any,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
+        inner_title: str | None = None,
+        border_style: StyleType | None = None,
+        width: int | None = None,
+    ) -> Panel:
+        pretty = cls.make_pretty(content, inner_title=inner_title, depth=0)
+        return cls.wrap_in_panel(pretty=pretty, title=title, subtitle=subtitle, border_style=border_style, width=width)
+
+    @classmethod
+    def wrap_in_panel(
+        cls,
+        pretty: PrettyPrintable,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
+        border_style: StyleType | None = None,
+        width: int | None = None,
+    ) -> Panel:
+        return Panel(
+            pretty,
             title=title,
             subtitle=subtitle,
             expand=False,
             title_align="left",
             subtitle_align="right",
-            padding=(0, 1),
+            padding=(1, 1),
             border_style=border_style or "",
+            highlight=True,
+            width=width,
         )
-        rich_print(panel)
+
+    @classmethod
+    def pretty_html(
+        cls,
+        pretty: PrettyPrintable,
+        width: int = PRETTY_WIDTH_FOR_EXPORT,
+    ) -> str:
+        buf = StringIO()
+        console = Console(record=True, file=buf, width=width, force_terminal=False)
+        console.print(pretty)
+        return console.export_html(inline_styles=False, clear=False, theme=EXPORT_THEME)
+
+    @classmethod
+    def pretty_svg(cls, pretty: PrettyPrintable, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
+        buf = StringIO()
+        console = Console(record=True, file=buf, width=width, force_terminal=False)
+        console.print(pretty)
+        return console.export_svg()
+
+    @classmethod
+    def make_pretty(cls, value: Any, inner_title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        pretty: PrettyPrintable
+        # Format the value
+        if isinstance(value, PrettyPrintable):
+            pretty = value
+        elif isinstance(value, dict):
+            # For dicts, use JSON rendering
+            try:
+                pretty = JSON.from_data(value, indent=4)
+            except TypeError:
+                json_string = kajson.dumps(value, indent=4)
+                pretty = Syntax(json_string, "json", theme="monokai")
+        elif isinstance(value, list):
+            # For lists, build a table without headers
+            list_table = Table(
+                show_header=False,
+                show_edge=False,
+                show_lines=True,
+                border_style="dim",
+                padding=(0, 1),
+            )
+            list_table.add_column("No.", style="yellow", justify="center", width=4)
+            list_table.add_column("Item", style="white")
+
+            for idx, item in enumerate(value, start=1):  # type: ignore[arg-type]
+                pretty_item = cls.make_pretty(item, inner_title=None, depth=depth + 1)
+                list_table.add_row(str(idx), pretty_item)
+
+            pretty = list_table
+        elif isinstance(value, str):
+            # Handle URLs specially, otherwise use Text for simple strings
+            if value.startswith(("http://", "https://")):
+                pretty = Text(value, style="link " + value, no_wrap=True)
+            else:
+                # Use Text instead of Markdown to allow proper auto-sizing
+                pretty = Text(value)
+        elif isinstance(value, (int, float, bool)):
+            # For primitive types, convert to string
+            pretty = Text(str(value))
+        elif hasattr(value, "rendered_pretty"):
+            pretty = value.rendered_pretty(depth=depth)
+        else:
+            # For other types, use Pretty
+            pretty = Pretty(value)
+
+        if inner_title:
+            inner_title_text = Text(str(inner_title), style="dim")
+            pretty = Group(inner_title_text, pretty)
+
+        return pretty
 
     @classmethod
     def pretty_print_without_rich(
@@ -102,16 +248,25 @@ class PrettyPrinter:
         content: str | Any,
         title: TextType | None = None,
         subtitle: TextType | None = None,
+        inner_title: str | None = None,
     ):
         if isinstance(content, str) and content.startswith(("http://", "https://")):
             cls.pretty_print_url_without_rich(content=content, title=title, subtitle=subtitle)
             return
-        title = title or ""
+        title_str = str(title) if title else ""
         if subtitle:
-            title += f" ({subtitle})"
+            title_str += f"\n{subtitle!s}"
+        if inner_title:
+            title_str += f"\n{inner_title}"
         terminal_width = shutil.get_terminal_size().columns
         content_str = f"{content}"
-        max_content_width = terminal_width - len(title) - 8  # Accounting for frame and padding
+
+        # Split title into lines if it contains newlines
+        title_lines = title_str.splitlines() if title_str else []
+
+        # Calculate max content width based on longest title line
+        max_title_len = max(len(line) for line in title_lines) if title_lines else 0
+        max_content_width = terminal_width - max_title_len - 8  # Accounting for frame and padding
         wrapped_lines: list[str] = []
         for line in content_str.splitlines():
             while len(line) > max_content_width:
@@ -122,13 +277,18 @@ class PrettyPrinter:
         if not wrapped_lines:
             wrapped_lines.append("")
 
-        frame_width = max(len(title) + 6, max(len(line) for line in wrapped_lines) + 6)
+        # Calculate frame width based on longest title line and content lines
+        max_title_width = max((len(line) for line in title_lines), default=0)
+        max_content_line_width = max(len(line) for line in wrapped_lines)
+        frame_width = max(max_title_width + 6, max_content_line_width + 6)
         top_border = "╭" + "─" * (frame_width - 2) + "╮"
         bottom_border = "╰" + "─" * (frame_width - 2) + "╯"
 
         print(f"{BORDER_COLOR}{top_border}{RESET_FONT}")
-        if title:
-            print(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title}{RESET_FONT}:{' ' * (frame_width - len(title) - 4)}{BORDER_COLOR}│{RESET_FONT}")
+        # Print each title line separately
+        for title_line in title_lines:
+            padding = " " * (frame_width - len(title_line) - 4)
+            print(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title_line}{RESET_FONT}:{padding}{BORDER_COLOR}│{RESET_FONT}")
         for line in wrapped_lines:
             padding = " " * (frame_width - len(line) - 3)
             print(f"{BORDER_COLOR}│ {TEXT_COLOR}{line}{RESET_FONT}{padding}{BORDER_COLOR}│{RESET_FONT}")

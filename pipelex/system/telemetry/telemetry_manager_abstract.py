@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Generator
 
 from typing_extensions import override
 
@@ -30,6 +31,11 @@ class TelemetryManagerAbstract(ABC):
     def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):
         pass
 
+    @abstractmethod
+    @contextmanager
+    def telemetry_context(self) -> Generator[None, None, None]:
+        """Safe context manager for telemetry that works whether telemetry is enabled or not."""
+
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
@@ -43,3 +49,9 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
     def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):
         pass
+
+    @override
+    @contextmanager
+    def telemetry_context(self) -> Generator[None, None, None]:
+        """No-op context manager that doesn't use PostHog."""
+        yield

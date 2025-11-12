@@ -4,6 +4,7 @@ from typing import Any
 import markdown
 from typing_extensions import override
 
+from pipelex import pretty_print_md
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.file_utils import ensure_directory_exists, save_text_to_path
 
@@ -45,3 +46,7 @@ class TextContent(StuffContent):
         ensure_directory_exists(directory)
         filename = "text_content.txt"
         save_text_to_path(text=self.text, path=f"{directory}/{filename}")
+
+    @override
+    def pretty_print_content(self, title: str | None = None) -> None:
+        pretty_print_md(self.text, title=title)

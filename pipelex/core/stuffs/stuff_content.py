@@ -2,11 +2,12 @@ from abc import ABC
 from typing import Any, TypeVar
 
 from kajson import kajson
+from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.tools.misc.json_utils import remove_none_values
-from pipelex.tools.misc.pretty import pretty_print
+from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, pretty_print
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
@@ -54,6 +55,17 @@ class StuffContent(ABC, CustomBaseModel):
     def rendered_json(self) -> str:
         return kajson.dumps(self.smart_dump(), indent=4)
 
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:  # noqa: ARG002
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:  # noqa: ARG002
+        """Render content for pretty printing.
+
+        Args:
+            title: Optional title for the rendering
+            depth: Current nesting depth, used to prevent nesting too many sub-tables which would end up too narrow in the console
+        """
         json_content = remove_none_values(json_content=self.smart_dump())
-        pretty_print(json_content, title=title)
+        return JSON.from_data(json_content, indent=4)
+
+    def pretty_print_content(self, title: str | None = None) -> None:
+        pretty = self.rendered_pretty()
+        width = PrettyPrinter.pretty_width()
+        pretty_print(pretty, title=title, width=width)

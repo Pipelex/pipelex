@@ -1,6 +1,4 @@
 <!-- BEGIN_PIPELEX_RULES -->
-# Pipelex Rules
-
 ## Guide to write or edit pipelines using the Pipelex language in .plx files
 
 - Always first write your "plan" in natural language, then transcribe it in pipelex.
@@ -127,16 +125,16 @@ For concepts with structured fields, define them inline using TOML syntax:
 description = "A commercial document issued by a seller to a buyer"
 
 [concept.Invoice.structure]
-invoice_number = "The unique invoice identifier"
+invoice_number = "The unique invoice identifier" # This will be optional by default
 issue_date = { type = "date", description = "The date the invoice was issued", required = true }
 total_amount = { type = "number", description = "The total invoice amount", required = true }
-vendor_name = "The name of the vendor"
-line_items = { type = "list", item_type = "text", description = "List of items", required = false }
+vendor_name = "The name of the vendor" # This will be optional by default
+line_items = { type = "list", item_type = "text", description = "List of items" }
 ```
 
 **Supported inline field types:** `text`, `integer`, `boolean`, `number`, `date`, `list`, `dict`
 
-**Field properties:** `type`, `description`, `required` (default: true), `default_value`, `choices`, `item_type` (for lists), `key_type` and `value_type` (for dicts)
+**Field properties:** `type`, `description`, `required` (default: false), `default_value`, `choices`, `item_type` (for lists), `key_type` and `value_type` (for dicts)
 
 **Simple syntax** (creates required text field):
 ```plx
@@ -145,7 +143,7 @@ field_name = "Field description"
 
 **Detailed syntax** (with explicit properties):
 ```plx
-field_name = { type = "text", description = "Field description", required = false, default_value = "default" }
+field_name = { type = "text", description = "Field description", default_value = "default" }
 ```
 
 **3. Python StructuredContent Class (For Advanced Features)**
@@ -820,7 +818,7 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
+llm_to_engineer = { model = "base-claude", temperature = 1 }
 llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 
@@ -1147,7 +1145,7 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
+llm_to_engineer = { model = "base-claude", temperature = 1 }
 llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 

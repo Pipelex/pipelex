@@ -4,10 +4,10 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
-    ConceptStructureBlueprintFieldType,
 )
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.exceptions import StructureClassError
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.exceptions import StructureClassError
 from tests.unit.core.concepts.concept_factory.data import TestCases
 
 

@@ -1,7 +1,9 @@
-from pydantic import Field
+from pydantic import Field, model_validator
 
+from pipelex.cogt.exceptions import RoutingProfileBlueprintValueError
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.types import Self
 
 
 class RoutingProfileBlueprint(ConfigModel):
@@ -10,6 +12,16 @@ class RoutingProfileBlueprint(ConfigModel):
     description: str
     default: str | None = None
     routes: dict[str, str] = Field(default_factory=dict)
+    optional_routes: dict[str, str] = Field(default_factory=dict)
+    fallback_order: list[str] | None = None
+
+    @model_validator(mode="after")
+    def validate_routes(self) -> Self:
+        for pattern in self.optional_routes:
+            if pattern in self.routes:
+                msg = f"Pattern '{pattern}' is both in routes and optional_routes"
+                raise RoutingProfileBlueprintValueError(msg)
+        return self
 
 
 class RoutingProfileLibraryBlueprint(ConfigModel):
@@ -43,4 +55,5 @@ class RoutingProfileFactory:
             description=blueprint.description,
             default=blueprint.default,
             routes=blueprint.routes,
+            fallback_order=blueprint.fallback_order,
         )

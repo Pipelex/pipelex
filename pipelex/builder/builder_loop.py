@@ -8,16 +8,18 @@ from pipelex.builder.builder import (
 )
 from pipelex.builder.builder_errors import (
     PipeBuilderError,
-    PipelexBundleError,
     PipelexBundleNoFixForError,
     PipelexBundleUnexpectedError,
 )
 from pipelex.builder.builder_validation import fix_inputs_consistency, validate_bundle_spec
+from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.client.protocol import PipelineInputs
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
+from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.exceptions import PipelineExecutionError, StaticValidationErrorType, WorkingMemoryStuffNotFoundError
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
+from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -43,7 +45,6 @@ class BuilderLoop:
             console = Console(stderr=True)
             console.print_exception()
             raise PipeBuilderError(message=msg) from exc
-        pretty_print(pipe_output, title="Pipe Output")
 
         if is_save_working_memory_enabled:
             working_memory_path = get_incremental_file_path(
@@ -58,7 +59,6 @@ class BuilderLoop:
         except WorkingMemoryStuffNotFoundError as exc:
             msg = f"Builder loop: Failed to get pipelex bundle spec: {exc}."
             raise PipeBuilderError(message=msg, working_memory=pipe_output.working_memory) from exc
-        pretty_print(pipelex_bundle_spec, title="Pipelex Bundle Spec • 1st iteration")
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
 
         if is_save_first_iteration_enabled:
@@ -75,7 +75,6 @@ class BuilderLoop:
             pipelex_bundle_spec = fix_inputs_consistency(bundle_spec=pipelex_bundle_spec)
         except PipelexBundleError as bundle_error:
             # Let the error fall through to the existing error handling
-            pretty_print(bundle_error.as_structured_content(), title="Pipelex Bundle Error (during input fix)")
             pipelex_bundle_spec = self._fix_bundle_error(
                 bundle_error=bundle_error,
                 pipelex_bundle_spec=pipelex_bundle_spec,
@@ -95,7 +94,6 @@ class BuilderLoop:
         try:
             await validate_bundle_spec(bundle_spec=pipelex_bundle_spec)
         except PipelexBundleError as bundle_error:
-            pretty_print(bundle_error.as_structured_content(), title="Pipelex Bundle Error")
             pipelex_bundle_spec = self._fix_bundle_error(
                 bundle_error=bundle_error,
                 pipelex_bundle_spec=pipelex_bundle_spec,

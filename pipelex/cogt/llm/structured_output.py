@@ -9,6 +9,7 @@ class StructureMethod(StrEnum):
     INSTRUCTOR_MISTRAL_TOOLS = "mistral_tools"
     INSTRUCTOR_VERTEX_JSON = "vertex_json"
     INSTRUCTOR_GENAI_TOOLS = "genai_tools"
+    INSTRUCTOR_GROQ_TOOLS = "groq_tools"
     INSTRUCTOR_GENAI_STRUCTURED_OUTPUTS = "genai_structured_outputs"
 
     def as_instructor_mode(self) -> InstructorMode:
@@ -25,3 +26,5 @@ class StructureMethod(StrEnum):
                 return InstructorMode.GENAI_TOOLS
             case StructureMethod.INSTRUCTOR_GENAI_STRUCTURED_OUTPUTS:
                 return InstructorMode.GENAI_STRUCTURED_OUTPUTS
+            case StructureMethod.INSTRUCTOR_GROQ_TOOLS:
+                return InstructorMode.JSON

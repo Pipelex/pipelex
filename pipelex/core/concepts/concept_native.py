@@ -13,7 +13,6 @@ class NativeConceptCode(StrEnum):
     PDF = "PDF"
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
-    LLM_PROMPT = "LlmPrompt"
     IMG_GEN_PROMPT = "ImgGenPrompt"
     PAGE = "Page"
     ANYTHING = "Anything"
@@ -46,7 +45,6 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.PDF
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
-                | NativeConceptCode.LLM_PROMPT
                 | NativeConceptCode.IMG_GEN_PROMPT
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
@@ -67,7 +65,6 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.PDF
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
-                | NativeConceptCode.LLM_PROMPT
                 | NativeConceptCode.IMG_GEN_PROMPT
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING

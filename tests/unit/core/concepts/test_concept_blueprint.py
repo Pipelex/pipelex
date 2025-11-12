@@ -1,12 +1,10 @@
 """Tests for ConceptStructureBlueprint validation logic."""
 
 import pytest
+from pydantic import ValidationError
 
-from pipelex.core.concepts.concept_blueprint import (
-    ConceptStructureBlueprint,
-    ConceptStructureBlueprintError,
-    ConceptStructureBlueprintFieldType,
-)
+from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 
 
 class TestConceptStructureBlueprintValidation:
@@ -64,23 +62,23 @@ class TestConceptStructureBlueprintValidation:
     def test_default_value_type_mismatch(self):
         """Test that default_value type mismatches are caught."""
         # Text field with non-string default
-        with pytest.raises(ConceptStructureBlueprintError, match="default_value type mismatch: expected str"):
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected str"):
             ConceptStructureBlueprint(description="A text field", type=ConceptStructureBlueprintFieldType.TEXT, default_value=42)
 
         # Integer field with non-integer default
-        with pytest.raises(ConceptStructureBlueprintError, match="default_value type mismatch: expected int"):
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected int"):
             ConceptStructureBlueprint(description="An integer field", type=ConceptStructureBlueprintFieldType.INTEGER, default_value="not an int")
 
         # Boolean field with non-boolean default
-        with pytest.raises(ConceptStructureBlueprintError, match="default_value type mismatch: expected bool"):
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected bool"):
             ConceptStructureBlueprint(description="A boolean field", type=ConceptStructureBlueprintFieldType.BOOLEAN, default_value="not a bool")
 
         # Number field with invalid type
-        with pytest.raises(ConceptStructureBlueprintError, match="default_value type mismatch: expected number"):
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected number"):
             ConceptStructureBlueprint(description="A number field", type=ConceptStructureBlueprintFieldType.NUMBER, default_value="not a number")
 
         # List field with non-list default
-        with pytest.raises(ConceptStructureBlueprintError, match="default_value type mismatch: expected list"):
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected list"):
             ConceptStructureBlueprint(
                 description="A list field",
                 type=ConceptStructureBlueprintFieldType.LIST,
@@ -89,7 +87,7 @@ class TestConceptStructureBlueprintValidation:
             )
 
         # Dict field with non-dict default
-        with pytest.raises(ConceptStructureBlueprintError, match="default_value type mismatch: expected dict"):
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected dict"):
             ConceptStructureBlueprint(
                 description="A dict field",
                 type=ConceptStructureBlueprintFieldType.DICT,
@@ -101,7 +99,7 @@ class TestConceptStructureBlueprintValidation:
     def test_missing_type_with_default_value(self):
         """Test that missing type when default_value is provided (except for choices) is caught."""
         # Missing type with default_value (no choices) - this will trigger the "type is None (array)" validation first
-        with pytest.raises(ConceptStructureBlueprintError, match="When type is None \\(array\\), choices must not be empty"):
+        with pytest.raises(ValidationError, match="When type is None \\(array\\), choices must not be empty"):
             ConceptStructureBlueprint(description="A field without type", default_value="some value")
 
     def test_default_value_without_type_but_with_choices_allowed(self):
@@ -115,21 +113,21 @@ class TestConceptStructureBlueprintValidation:
     def test_invalid_choice_default_value(self):
         """Test that invalid default_value for choice fields is caught."""
         # Invalid choice default
-        with pytest.raises(ConceptStructureBlueprintError, match="default_value must be one of the valid choices"):
+        with pytest.raises(ValidationError, match="default_value must be one of the valid choices"):
             ConceptStructureBlueprint(description="A choice field", choices=["low", "medium", "high"], default_value="invalid_choice")
 
     def test_existing_validations_still_work(self):
         """Test that existing validations continue to work."""
         # Type None (array) without choices
-        with pytest.raises(ConceptStructureBlueprintError, match="When type is None \\(array\\), choices must not be empty"):
+        with pytest.raises(ValidationError, match="When type is None \\(array\\), choices must not be empty"):
             ConceptStructureBlueprint(description="Array field without choices", type=None)
 
         # Dict type without key_type
-        with pytest.raises(ConceptStructureBlueprintError, match="key_type must not be empty"):
+        with pytest.raises(ValidationError, match="key_type must not be empty"):
             ConceptStructureBlueprint(description="Dict field without key_type", type=ConceptStructureBlueprintFieldType.DICT, value_type="text")
 
         # Dict type without value_type
-        with pytest.raises(ConceptStructureBlueprintError, match="value_type must not be empty"):
+        with pytest.raises(ValidationError, match="value_type must not be empty"):
             ConceptStructureBlueprint(description="Dict field without value_type", type=ConceptStructureBlueprintFieldType.DICT, key_type="text")
 
     def test_edge_cases(self):

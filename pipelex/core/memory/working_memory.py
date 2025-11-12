@@ -5,6 +5,12 @@ from pydantic import BaseModel, Field, model_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
+from pipelex.core.memory.exceptions import (
+    WorkingMemoryConsistencyError,
+    WorkingMemoryStuffAttributeNotFoundError,
+    WorkingMemoryStuffNotFoundError,
+    WorkingMemoryTypeError,
+)
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -16,12 +22,6 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import (
-    WorkingMemoryConsistencyError,
-    WorkingMemoryStuffAttributeNotFoundError,
-    WorkingMemoryStuffNotFoundError,
-    WorkingMemoryTypeError,
-)
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.types import Self
 

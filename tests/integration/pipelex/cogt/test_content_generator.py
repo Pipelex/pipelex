@@ -2,7 +2,7 @@ import pytest
 from pytest import FixtureRequest
 
 from pipelex import pretty_print
-from pipelex.cogt.exceptions import LLMHandleNotFoundError
+from pipelex.cogt.exceptions import ModelNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -157,7 +157,7 @@ class TestContentGenerator:
     @pytest.mark.inference
     async def test_make_llm_text_with_error(self, request: FixtureRequest):
         llm_setting_main = LLMSetting(model="bad_handle_to_test_failure", temperature=0.5, max_tokens=100)
-        with pytest.raises(LLMHandleNotFoundError) as excinfo:
+        with pytest.raises(ModelNotFoundError) as excinfo:
             await get_content_generator().make_llm_text(
                 job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
                 llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
@@ -165,4 +165,4 @@ class TestContentGenerator:
             )
         error = excinfo.value
         pretty_print(f"Caught expected error: {error}")
-        assert str(error).startswith("Model handle 'bad_handle_to_test_failure' not found")
+        assert str(error).startswith("Model handle 'bad_handle_to_test_failure' was not found")

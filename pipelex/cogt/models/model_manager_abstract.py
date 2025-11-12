@@ -3,15 +3,20 @@ from abc import ABC, abstractmethod
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.models.model_deck import ModelDeck
+from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
 class ModelManagerAbstract(ABC):
+    @abstractmethod
+    def validate_model_deck(self):
+        pass
+
     @abstractmethod
     def teardown(self) -> None:
         pass
 
     @abstractmethod
-    def setup(self) -> None:
+    def setup(self, secrets_provider: SecretsProviderAbstract) -> None:
         pass
 
     @abstractmethod

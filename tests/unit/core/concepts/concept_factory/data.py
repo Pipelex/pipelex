@@ -4,10 +4,10 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
     ConceptStructureBlueprint,
-    ConceptStructureBlueprintFieldType,
 )
 from pipelex.core.concepts.concept_factory import DomainAndConceptCode
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 from pipelex.core.domains.domain import SpecialDomain
 
 
@@ -25,6 +25,11 @@ class TestCases:
                 description="A concept that refines a fully qualified native concept",
                 refines=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
             ),
+            f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+        ),
+        (
+            "without_domain",
+            ConceptBlueprint(description="A concept that refines a concept without domain", refines=NativeConceptCode.TEXT),
             f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         ),
     ]
@@ -64,7 +69,6 @@ class TestCases:
         ("my_domain", "Dynamic", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Dynamic")),
         ("my_domain", "TextAndImages", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="TextAndImages")),
         ("my_domain", "Number", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Number")),
-        ("my_domain", "LlmPrompt", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="LlmPrompt")),
         ("my_domain", "Page", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Page")),
         ("my_domain", "Anything", None, DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Anything")),
     ]

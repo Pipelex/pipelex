@@ -11,7 +11,7 @@ def get_kit_root() -> Traversable:
     return files("pipelex.kit")
 
 
-def get_agents_dir() -> Traversable:
+def get_kit_agents_dir() -> Traversable:
     """Get the agents directory within the kit package.
 
     Returns:
@@ -20,7 +20,7 @@ def get_agents_dir() -> Traversable:
     return get_kit_root() / "agent_rules"
 
 
-def get_configs_dir() -> Traversable:
+def get_kit_configs_dir() -> Traversable:
     """Get the configs directory within the kit package.
 
     Returns:
@@ -29,7 +29,7 @@ def get_configs_dir() -> Traversable:
     return get_kit_root() / "configs"
 
 
-def get_migrations_dir() -> Traversable:
+def get_kit_migrations_dir() -> Traversable:
     """Get the migrations directory within the kit package.
 
     Returns:

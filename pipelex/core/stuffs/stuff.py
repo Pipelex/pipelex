@@ -5,6 +5,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.exceptions import StuffArtefactReservedFieldError, StuffContentTypeError, StuffContentValidationError
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -15,7 +16,6 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.exceptions import StuffArtefactReservedFieldError, StuffContentTypeError, StuffContentValidationError
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
 
@@ -194,7 +194,7 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         return self.content_as(MermaidContent)
 
     def pretty_print_stuff(self, title: str | None = None) -> None:
-        title = title or f"{self.stuff_name} ({self.concept.code})"
+        title = title or f"[cyan]{self.stuff_name}[/cyan] ([bold green]{self.concept.code}[/bold green])"
         self.content.pretty_print_content(title=title)
 
 

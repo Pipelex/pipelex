@@ -9,6 +9,7 @@ from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupport
 from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
+from tests.integration.pipelex.plugins.conftest import is_backend_available
 
 REQUIRED_ENV_VARS = ["ANTHROPIC_API_KEY"]
 
@@ -26,12 +27,14 @@ class TestAnthropic:
         pytestconfig: pytest.Config,
         plugin_for_anthropic: Plugin,
     ):
+        if not is_backend_available(plugin_for_anthropic.backend):
+            pytest.skip(f"Backend '{plugin_for_anthropic.backend}' is not available or enabled")
         if not all_env_vars_are_set(keys=REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) missing amongst {REQUIRED_ENV_VARS}")
         if any_env_var_is_placeholder(REQUIRED_ENV_VARS):
             pytest.skip(f"Some key(s) among {REQUIRED_ENV_VARS} are a placeholder, can't be used to test listing models")
         try:
-            backend = get_models_manager().get_required_inference_backend("anthropic")
+            backend = get_models_manager().get_required_inference_backend(plugin_for_anthropic.backend)
             anthropic_models_list = await anthropic_list_available_models(
                 plugin=plugin_for_anthropic,
                 backend=backend,

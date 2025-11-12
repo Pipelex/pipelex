@@ -2,15 +2,18 @@ import re
 from typing import Any
 
 from pydantic import Field, field_validator
+from rich.console import Group
+from rich.table import Table
+from rich.text import Text
 from typing_extensions import override
 
-from pipelex import log, pretty_print
-from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.core.pipes.exceptions import PipeBlueprintError
+from pipelex import log
+from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.tools.misc.json_utils import remove_none_values_from_dict
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
 
 
@@ -70,7 +73,7 @@ class PipeSpec(StructuredContent):
     def validate_pipe_type(cls, value: Any) -> Any:
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return value
 
     @field_validator("output", mode="after")
@@ -78,7 +81,7 @@ class PipeSpec(StructuredContent):
     def validate_output(cls, output: str) -> str:
         # Extract concept without multiplicity for validation
         parse_result = parse_concept_with_multiplicity(output)
-        ConceptSpec.validate_concept_string_or_code(concept_string_or_code=parse_result.concept)
+        validate_concept_string_or_code(concept_string_or_code=parse_result.concept)
         return output  # Return original with brackets intact
 
     @field_validator("inputs", mode="after")
@@ -88,12 +91,12 @@ class PipeSpec(StructuredContent):
             return None
 
         # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-        multiplicity_pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+        multiplicity_pattern = MUTLIPLICITY_PATTERN
 
         for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
-                raise PipeBlueprintError(msg)
+                raise PipeBlueprintValueError(msg)
 
             # Validate the concept spec format with optional multiplicity brackets
             match = re.match(multiplicity_pattern, concept_spec)
@@ -102,11 +105,11 @@ class PipeSpec(StructuredContent):
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
                     f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
                 )
-                raise PipeBlueprintError(msg)
+                raise PipeBlueprintValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
-            ConceptSpec.validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
 
         return inputs
 
@@ -120,7 +123,7 @@ class PipeSpec(StructuredContent):
 
         if not is_snake_case(normalized_pipe_code):
             msg = f"Invalid pipe code syntax '{normalized_pipe_code}'. Must be in snake_case."
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return normalized_pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:
@@ -133,17 +136,40 @@ class PipeSpec(StructuredContent):
         )
 
     @override
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
-        the_dict: dict[str, Any] = self.smart_dump()
-        the_dict = remove_none_values_from_dict(data=the_dict)
-        if number:
-            title = f"Pipe #{number}: {self.pipe_code}"
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        pipe_group = Group()
+        if title:
+            pipe_group.renderables.append(Text(title, style="bold"))
+        pipe_group.renderables.append(Text.from_markup(f"Pipe: [bold red]{self.pipe_code}[/bold red]\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{self.type}[/bold magenta] ({self.pipe_category})\n"))
+        if self.description:
+            pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{self.description}[/yellow italic]\n"))
+
+        # Create inputs section
+        if not self.inputs:
+            pipe_group.renderables.append(Text.from_markup("\nNo inputs"))
+        elif len(self.inputs) == 1:
+            # Single input: display as a simple line of text
+            input_name, concept_spec = next(iter(self.inputs.items()))
+            pipe_group.renderables.append(Text.from_markup(f"\nInput: [cyan]{input_name}[/cyan] ([bold green]{concept_spec}[/bold green])"))
         else:
-            title = f"Pipe: {self.pipe_code}"
-        title += f" • {self.type}"
-        subtitle = self.description
-        the_dict.pop("pipe_code")
-        the_dict.pop("description")
-        the_dict.pop("type")
-        the_dict.pop("pipe_category")
-        pretty_print(the_dict, title=title, subtitle=subtitle)
+            # Multiple inputs: display as a table
+            inputs_table = Table(
+                title="Inputs:",
+                title_justify="left",
+                title_style="not italic",
+                show_header=False,
+                show_edge=True,
+                show_lines=True,
+                border_style="dim",
+            )
+            inputs_table.add_column("Variable Name", style="cyan")
+            inputs_table.add_column("Concept", style="bold green")
+            for input_name, concept_spec in self.inputs.items():
+                inputs_table.add_row(input_name, concept_spec)
+            pipe_group.renderables.append(inputs_table)
+
+        # Show output
+        pipe_group.renderables.append(Text.from_markup(f"\nOutput: [bold green]{self.output}[/bold green]"))
+
+        return pipe_group

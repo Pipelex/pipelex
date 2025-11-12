@@ -1,10 +1,13 @@
+import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.pipes.exceptions import PipeBlueprintError
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.core.concepts.exceptions import ConceptStringError
+from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.core.pipes.exceptions import PipeBlueprintValueError
+from pipelex.core.pipes.validation import validate_input_name
+from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import StrEnum
 
@@ -107,13 +110,40 @@ class PipeBlueprint(BaseModel):
         """
         return None
 
+    @field_validator("inputs", mode="after")
+    @classmethod
+    def validate_inputs(cls, inputs: dict[str, str] | None) -> dict[str, str] | None:
+        if inputs is None:
+            return None
+
+        # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
+        multiplicity_pattern = MUTLIPLICITY_PATTERN
+
+        for input_name, concept_spec in inputs.items():
+            validate_input_name(input_name)
+
+            # Validate the concept spec format with optional multiplicity brackets
+            match = re.match(multiplicity_pattern, concept_spec)
+            if not match:
+                msg = (
+                    f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
+                    f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
+                )
+                raise PipeBlueprintValueError(msg)
+
+            # Extract the concept part (without multiplicity) and validate it
+            concept_string_or_code = match.group(1)
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+
+        return inputs
+
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
         """Validate that the pipe type is one of the allowed values."""
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
@@ -122,7 +152,7 @@ class PipeBlueprint(BaseModel):
         """Validate that the pipe category is one of the allowed values."""
         if value not in AllowedPipeCategories.value_list():
             msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return value
 
     @field_validator("output", mode="before")
@@ -130,12 +160,16 @@ class PipeBlueprint(BaseModel):
     def validate_output(cls, output: str) -> str:
         # Strip multiplicity brackets before validating
         output_parse_result = parse_concept_with_multiplicity(output)
-        ConceptBlueprint.validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
-        return output  # Return with brackets intact
+        try:
+            validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
+        except ConceptStringError as exc:
+            msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
+            raise PipeBlueprintValueError(msg) from exc
+        return output
 
     @classmethod
     def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
         if not is_snake_case(pipe_code):
             msg = f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case."
-            raise PipeBlueprintError(msg)
+            raise PipeBlueprintValueError(msg)
         return pipe_code

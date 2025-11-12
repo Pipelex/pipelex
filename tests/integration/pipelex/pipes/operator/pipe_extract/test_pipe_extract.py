@@ -74,11 +74,13 @@ class TestPipeExtract:
         pretty_print(list_result, title="list_result")
 
     @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
+    @pytest.mark.parametrize("page_image_captions", [False])  # TODO: add True when captioning is implemented
     async def test_pipe_extract_from_pdf(
         self,
         extract_choice_for_pdf: str,
         pipe_run_mode: PipeRunMode,
         pdf_url: str,
+        page_image_captions: bool,
     ):
         input_name = "arbitrary_name"
         blueprint = PipeExtractBlueprint(
@@ -87,7 +89,7 @@ class TestPipeExtract:
             output=NativeConceptCode.TEXT_AND_IMAGES,
             model=extract_choice_for_pdf,
             page_images=True,
-            page_image_captions=False,
+            page_image_captions=page_image_captions,
             page_views=True,
             page_views_dpi=72,
         )

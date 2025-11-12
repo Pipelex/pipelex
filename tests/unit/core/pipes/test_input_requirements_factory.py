@@ -1,10 +1,8 @@
 import pytest
 
-from pipelex.core.concepts.exceptions import ConceptCodeError
-from pipelex.core.domains.exceptions import DomainError
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptStringError
 from pipelex.core.pipes.input_requirements import InputRequirement
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactorySyntaxError
-from pipelex.exceptions import ConceptLibraryConceptNotFoundError
+from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactoryError
 from tests.unit.core.pipes.data import (
     CONCEPT_CODE_RESOLUTION_TEST_CASES,
     DIFFERENT_CONCEPT_CODES_TEST_CASES,
@@ -97,15 +95,19 @@ class TestMakeInputRequirementsFromString:
 
     def test_empty_string_raises_value_error(self):
         """Test that an empty string raises InputRequirementsFactorySyntaxError."""
-        with pytest.raises(InputRequirementsFactorySyntaxError, match="Invalid input requirement string"):
+        with pytest.raises(InputRequirementsFactoryError, match="Invalid input requirement string") as exc_info:
             InputRequirementsFactory.make_from_string(domain="native", requirement_str="")
+        # This error is raised directly without a cause
+        assert exc_info.value.__cause__ is None
 
     def test_malformed_brackets_with_non_digit(self):
         """Test that brackets with non-digit content are treated as part of concept string."""
         # The regex will match "native.Text[abc]" as concept="native.Text[abc]", multiplicity=None
         # This will then fail during concept validation with ConceptCodeError
-        with pytest.raises(ConceptCodeError):
+        with pytest.raises(InputRequirementsFactoryError) as exc_info:
             InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[abc]")
+        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
     def test_multiplicity_zero_in_brackets(self):
         """Test parsing a concept string with 0 in brackets."""
@@ -139,25 +141,33 @@ class TestMakeInputRequirementsFromString:
     def test_whitespace_not_trimmed(self):
         """Test that whitespace is not automatically trimmed."""
         # Whitespace should cause domain validation to fail
-        with pytest.raises(DomainError):
+        with pytest.raises(InputRequirementsFactoryError) as exc_info:
             InputRequirementsFactory.make_from_string(domain="native", requirement_str=" native.Text")
+        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
         # Trailing whitespace should cause concept code validation to fail
-        with pytest.raises(ConceptCodeError):
+        with pytest.raises(InputRequirementsFactoryError) as exc_info:
             InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text ")
+        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
     def test_multiple_brackets_treated_as_concept_name(self):
         """Test that multiple brackets are treated as part of the concept name."""
         # "native.Text[5][10]" should match as concept="native.Text[5]", multiplicity=10
         # This will fail during concept code validation
-        with pytest.raises(ConceptCodeError):
+        with pytest.raises(InputRequirementsFactoryError) as exc_info:
             InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[5][10]")
+        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
     def test_brackets_at_start_treated_as_concept_name(self):
         """Test that brackets at the start are part of the concept name."""
         # This will fail during domain validation
-        with pytest.raises(DomainError):
+        with pytest.raises(InputRequirementsFactoryError) as exc_info:
             InputRequirementsFactory.make_from_string(domain="native", requirement_str="[5]native.Text")
+        assert exc_info.value.__cause__ is not None
+        assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
     @pytest.mark.parametrize(
         ("domain", "requirement_str", "concept_codes_from_same_domain", "expected_concept_string", "expected_multiplicity", "description"),

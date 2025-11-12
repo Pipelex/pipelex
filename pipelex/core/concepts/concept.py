@@ -5,13 +5,13 @@ from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.validation import validate_concept_code, validate_concept_string
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.exceptions import PipelexUnexpectedError
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field
 from pipelex.types import StrEnum
@@ -32,19 +32,19 @@ class Concept(BaseModel):
 
     @classmethod
     def is_implicit_concept(cls, concept_string: str) -> bool:
-        ConceptBlueprint.validate_concept_string(concept_string=concept_string)
+        validate_concept_string(concept_string=concept_string)
         return concept_string.startswith(SpecialDomain.IMPLICIT)
 
     @field_validator("code")
     @classmethod
     def validate_code(cls, code: str) -> str:
-        ConceptBlueprint.validate_concept_code(concept_code=code)
+        validate_concept_code(concept_code=code)
         return code
 
     @field_validator("domain")
     @classmethod
     def validate_domain(cls, domain: str) -> str:
-        DomainBlueprint.validate_domain_code(code=domain)
+        validate_domain_code(code=domain)
         return domain
 
     @field_validator("refines", mode="before")
@@ -52,7 +52,7 @@ class Concept(BaseModel):
     def validate_refines(cls, refines: str | None) -> str | None:
         if refines is None:
             return None
-        ConceptBlueprint.validate_concept_string(concept_string=refines)
+        validate_concept_string(concept_string=refines)
         return refines
 
     @classmethod

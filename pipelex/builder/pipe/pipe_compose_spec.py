@@ -2,6 +2,9 @@ from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
+from rich.console import Group
+from rich.panel import Panel
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
@@ -9,6 +12,7 @@ from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
+from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import StrEnum
 
 
@@ -85,6 +89,32 @@ class PipeComposeSpec(PipeSpec):
     @classmethod
     def validate_target_format(cls, target_format_value: str) -> TargetFormat:
         return TargetFormat(target_format_value)
+
+    @override
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        # Get base pipe information from parent
+        base_group = super().rendered_pretty(title=title, depth=depth)
+
+        # Create a group combining base info with compose-specific details
+        compose_group = Group()
+        compose_group.renderables.append(base_group)
+
+        # Add target format
+        compose_group.renderables.append(Text())  # Blank line
+        compose_group.renderables.append(Text.from_markup(f"Target Format: [bold yellow]{self.target_format}[/bold yellow]"))
+
+        # Add template in a panel
+        compose_group.renderables.append(Text())  # Blank line
+        template_panel = Panel(
+            self.template,
+            title="Template",
+            title_align="left",
+            border_style="green",
+            padding=(0, 1),
+        )
+        compose_group.renderables.append(template_panel)
+
+        return compose_group
 
     @override
     def to_blueprint(self) -> PipeComposeBlueprint:

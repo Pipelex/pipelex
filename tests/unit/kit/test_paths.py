@@ -1,4 +1,4 @@
-from pipelex.kit.paths import get_agents_dir, get_configs_dir, get_kit_root
+from pipelex.kit.paths import get_kit_agents_dir, get_kit_configs_dir, get_kit_root
 
 
 class TestKitPaths:
@@ -12,12 +12,12 @@ class TestKitPaths:
 
     def test_get_agents_dir(self):
         """Test that agents directory path is valid."""
-        agents_dir = get_agents_dir()
+        agents_dir = get_kit_agents_dir()
         assert agents_dir is not None
         assert agents_dir.is_dir()
 
     def test_get_configs_dir(self):
         """Test that configs directory path is valid."""
-        configs_dir = get_configs_dir()
+        configs_dir = get_kit_configs_dir()
         assert configs_dir is not None
         assert configs_dir.is_dir()

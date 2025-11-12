@@ -6,14 +6,26 @@ from typing import Annotated
 
 import click
 import typer
-from posthog import new_context, tag
+from posthog import tag
 from rich.console import Console
 
-from pipelex import log, pretty_print_md
+from pipelex import log
 from pipelex.builder.builder import load_and_validate_bundle
-from pipelex.builder.builder_errors import PipelexBundleError
-from pipelex.exceptions import PipeInputError, PipelineExecutionError
+from pipelex.builder.exceptions import PipelexBundleError
+from pipelex.cli.error_handlers import (
+    ErrorContext,
+    handle_model_availability_error,
+    handle_model_choice_error,
+    handle_model_deck_preset_error,
+    handle_validation_error,
+)
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
+from pipelex.hub import get_telemetry_manager
+from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -111,8 +123,6 @@ def run_cmd(
         raise typer.Exit(1)
 
     async def run_pipeline(pipe_code: str | None = None, bundle_path: str | None = None):
-        # Initialize Pipelex
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
         source_description: str
         if bundle_path:
             try:
@@ -141,63 +151,79 @@ def run_cmd(
             typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
 
+        # Load inputs if provided
+        pipeline_inputs = None
+        if inputs:
+            if inputs.startswith("{"):
+                pipeline_inputs = json.loads(inputs)
+            else:
+                try:
+                    pipeline_inputs = load_json_dict_from_path(inputs)
+                    typer.echo(f"Loaded inputs from: {inputs}")
+                except FileNotFoundError as file_not_found_exc:
+                    typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(1) from file_not_found_exc
+                except JsonTypeError as json_type_error_exc:
+                    typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(1) from json_type_error_exc
+
+        # Execute pipeline
+        typer.secho(f"\n🚀 Executing {source_description}...\n", fg=typer.colors.GREEN, bold=True)
+
         try:
-            # Load inputs if provided
-            pipeline_inputs = None
-            if inputs:
-                if inputs.startswith("{"):
-                    pipeline_inputs = json.loads(inputs)
-                else:
-                    try:
-                        pipeline_inputs = load_json_dict_from_path(inputs)
-                        typer.echo(f"Loaded inputs from: {inputs}")
-                    except FileNotFoundError as file_not_found_exc:
-                        typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
-                        raise typer.Exit(1) from file_not_found_exc
-                    except JsonTypeError as json_type_error_exc:
-                        typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
-                        raise typer.Exit(1) from json_type_error_exc
-
-            # Execute pipeline
-            typer.secho(f"\n🚀 Executing {source_description}...\n", fg=typer.colors.GREEN, bold=True)
-
-            try:
-                pipe_output = await execute_pipeline(
-                    pipe_code=pipe_code,
-                    inputs=pipeline_inputs,
-                )
-            except PipelineExecutionError as exc:
-                typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from exc
-
-            # Pretty print main_stuff unless disabled
-            if not no_pretty_print:
-                typer.echo("")
-                pretty_print_md(content=pipe_output.main_stuff.content.rendered_markdown(), title=f"Main output of '{pipe_code}'")
-                typer.echo("")
-
-            # Save working memory to JSON unless disabled
-            if not no_output:
-                output_path = output or get_incremental_file_path(
-                    base_path="results",
-                    base_name=f"run_{pipe_code}",
-                    extension="json",
-                )
-                working_memory_dict = pipe_output.working_memory.smart_dump()
-                save_as_json_to_path(object_to_save=working_memory_dict, path=output_path)
-                typer.secho(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN)
-
-            typer.secho("✅ Pipeline execution completed successfully", fg=typer.colors.GREEN)
-
-        except Exception as exc:
-            log.error(f"Error executing pipeline: {exc}")
-            console = Console(stderr=True)
-            console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
-            console.print_exception(show_locals=True)
+            pipe_output = await execute_pipeline(
+                pipe_code=pipe_code,
+                inputs=pipeline_inputs,
+            )
+        except PipelineExecutionError as exc:
+            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        tag(name=EventProperty.CLI_COMMAND, value=COMMAND)
-        asyncio.run(run_pipeline(pipe_code=pipe_code, bundle_path=bundle_path))
+        # Pretty print main_stuff unless disabled
+        if not no_pretty_print:
+            title = f"Final output of pipe [red]{pipe_code}[/red]"
+            pipe_output.main_stuff.pretty_print_stuff(title=title)
+            # TODO: no_pretty_print should also disable the pretty printing of each pipe operator step
+
+        # Save working memory to JSON unless disabled
+        if not no_output:
+            output_path = output or get_incremental_file_path(
+                base_path="results",
+                base_name=f"run_{pipe_code}",
+                extension="json",
+            )
+            working_memory_dict = pipe_output.working_memory.smart_dump()
+            save_as_json_to_path(object_to_save=working_memory_dict, path=output_path)
+            typer.secho(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN)
+
+        typer.secho("✅ Pipeline execution completed successfully", fg=typer.colors.GREEN)
+
+    # Initialize Pipelex BEFORE telemetry context to ensure proper setup
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
+
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=COMMAND)
+            asyncio.run(run_pipeline(pipe_code=pipe_code, bundle_path=bundle_path))
+
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.PIPE_RUN)
+
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.PIPE_RUN)
+
+    except Exception as exc:
+        log.error(f"Error executing pipeline: {exc}")
+        console = Console(stderr=True)
+        console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
+        console.print_exception(show_locals=True)
+        raise typer.Exit(1) from exc
+    finally:
+        pipelex_instance.teardown()

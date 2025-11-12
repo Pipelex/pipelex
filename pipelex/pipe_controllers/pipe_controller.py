@@ -4,12 +4,12 @@ from typing import Literal
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.exceptions import PipeRunInputsError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import PipeRunInputsError, WorkingMemoryStuffNotFoundError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -53,14 +53,12 @@ class PipeController(PipeAbstract):
         # check we have the required inputs in the working memory
         self._validate_inputs_in_memory(working_memory=working_memory)
 
+        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
+        # log.info(pipe_run_info)
+        if pipe_run_params.run_mode == PipeRunMode.LIVE:
+            log.info(pipe_run_info)
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
-                indent_level = len(pipe_run_params.pipe_stack) - 1
-                indent = "   " * indent_level
-                label = (
-                    f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} Running [blue]{self.class_name}[/blue] → [green]{self.code}[/green]"
-                )
-                log.info(f"{label} → [red]{self.output.code}[/red]")
                 pipe_output = await self._run_controller_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
@@ -68,11 +66,6 @@ class PipeController(PipeAbstract):
                     output_name=output_name,
                 )
             case PipeRunMode.DRY:
-                name = f"Dry running [blue]{self.class_name}[/blue]"
-                indent_level = len(pipe_run_params.pipe_stack) - 1
-                indent = "   " * indent_level
-                label = f"{indent}{'[yellow]↳[/yellow]' if indent_level > 0 else ''} {name}: [green]{self.code}[/green]"
-                log.info(f"{label} → [red]{self.output.code}[/red]")
                 pipe_output = await self._dry_run_controller_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,

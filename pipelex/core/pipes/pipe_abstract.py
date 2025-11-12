@@ -1,15 +1,18 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.exceptions import PipeStackOverflowError
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -38,7 +41,21 @@ class PipeAbstract(ABC, BaseModel):
     def validate_output(self):
         """Validate the output for the pipe."""
 
+    @final
     def validate_with_libraries(self):
+        """Validate the pipe with the libraries, after the static validation"""
+        try:
+            self._validate_with_libraries()
+        except ModelChoiceNotFoundError as exc:
+            raise PipeOperatorModelChoiceError(
+                message=exc.message,
+                pipe_type=self.pipe_type,
+                pipe_code=self.code,
+                model_type=exc.model_type,
+                model_choice=exc.model_choice,
+            ) from exc
+
+    def _validate_with_libraries(self):
         """Validate the pipe with the libraries, after the static validation"""
 
     @abstractmethod
@@ -96,6 +113,22 @@ class PipeAbstract(ABC, BaseModel):
         if len(pipe_stack) > limit:
             msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}"
             raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=pipe_stack)
+
+    def _format_pipe_run_info(self, pipe_run_params: PipeRunParams) -> str:
+        indent_level = len(pipe_run_params.pipe_stack) - 1
+        indent = "   " * indent_level
+        if indent_level > 0:
+            indent = f"{indent}[yellow]↳[/yellow] "
+        pipe_type_label = f"[white]{self.pipe_type}:[/white]"
+        match pipe_run_params.run_mode:
+            case PipeRunMode.LIVE:
+                pass
+            case PipeRunMode.DRY:
+                pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
+        pipe_code_label = f"[red]{self.code}[/red]"
+        concept_code_label = f"[bold green]{self.output.code}[/bold green]"
+        arrow = "[yellow]→[/yellow]"
+        return f"{indent}{pipe_type_label} {pipe_code_label} {arrow} {concept_code_label}"
 
 
 PipeAbstractType = type[PipeAbstract]

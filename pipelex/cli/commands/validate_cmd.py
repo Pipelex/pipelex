@@ -6,17 +6,26 @@ from typing import TYPE_CHECKING, Annotated
 
 import click
 import typer
-from posthog import new_context, tag
+from posthog import tag
 from rich.console import Console
-from rich.syntax import Syntax
 from rich.traceback import Traceback
 
-from pipelex import log, pretty_print
-from pipelex.builder.builder_errors import PipelexBundleError
+from pipelex import log
 from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
+from pipelex.builder.exceptions import PipelexBundleError
+from pipelex.cli.error_handlers import (
+    ErrorContext,
+    handle_model_availability_error,
+    handle_model_choice_error,
+    handle_model_deck_preset_error,
+    handle_validation_error,
+)
+from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.exceptions import LibraryLoadingError, PipeInputError
+from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
+from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
@@ -25,7 +34,6 @@ from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
-    from pipelex.core.validation_errors import ValidationErrorDetailsProtocol
 
 console = Console()
 
@@ -34,17 +42,30 @@ COMMAND = "validate"
 
 def do_validate_all_libraries_and_dry_run() -> None:
     """Validate libraries and dry-run all pipes."""
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
+    try:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+    except LibraryLoadingError as library_loading_error:
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION)
 
-        pipelex_instance.validate_libraries()
-        pipes = get_pipes()
-        get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
-        asyncio.run(dry_run_pipes(pipes=pipes, raise_on_failure=True))
-        log.info("Setup sequence passed OK, config and pipelines are validated.")
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
+
+            pipelex_instance.validate_libraries()
+            pipes = get_pipes()
+            get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
+            asyncio.run(dry_run_pipes(pipes=pipes, raise_on_failure=True))
+            log.info("Setup sequence passed OK, config and pipelines are validated.")
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
+    finally:
+        pipelex_instance.teardown()
 
 
 def validate_cmd(
@@ -152,9 +173,7 @@ def validate_cmd(
                 raise typer.Exit(1) from exc
             except PipelexBundleError as bundle_error:
                 console.print(Traceback())
-                typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
-                present_validation_error(details_provider=bundle_error)
-                raise typer.Exit(1) from bundle_error
+                handle_validation_error(exc=bundle_error, context=ErrorContext.VALIDATION)
             except PipeInputError as exc:
                 console.print(Traceback())
                 typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
@@ -176,58 +195,27 @@ def validate_cmd(
             raise typer.Exit(1)
 
     # Initialize Pipelex
+    pipelex_instance: Pipelex
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     except LibraryLoadingError as library_loading_error:
-        typer.secho(f"Failed to validate: {library_loading_error}", fg=typer.colors.RED, err=True)
-        present_validation_error(details_provider=library_loading_error)
-        raise typer.Exit(1) from library_loading_error
+        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION)
+    except ModelDeckPresetValidatonError as model_deck_error:
+        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION)
 
-    with new_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        if bundle_path:
-            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} bundle")
-        else:
-            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} pipe")
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            if bundle_path:
+                tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} bundle")
+            else:
+                tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} pipe")
 
-        asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path))
-
-
-def present_validation_error(details_provider: ValidationErrorDetailsProtocol):
-    console.print(details_provider)
-    concept_definition_errors = details_provider.get_concept_definition_errors()
-    if not concept_definition_errors:
-        return
-    for concept_definition_error in concept_definition_errors:
-        syntax_error_data = concept_definition_error.structure_class_syntax_error_data
-        if not syntax_error_data:
-            continue
-        message = concept_definition_error.message
-        code = concept_definition_error.structure_class_python_code or ""
-        highlight_lines: set[int] | None = None
-        if syntax_error_data.lineno:
-            highlight_lines = {syntax_error_data.lineno}
-        syntax = Syntax(
-            code=code,
-            lexer="python",
-            line_numbers=True,
-            word_wrap=False,
-            # theme="monokai",  # pick any theme rich knows; omit to use default
-            theme="ansi_dark",  # pick any theme rich knows; omit to use default
-            line_range=None,
-            highlight_lines=highlight_lines,
-        )
-        pretty_range = ""
-        if syntax_error_data.lineno and syntax_error_data.end_lineno:
-            pretty_range = f"lines {syntax_error_data.lineno} to {syntax_error_data.end_lineno}"
-        elif syntax_error_data.lineno:
-            pretty_range = f"line {syntax_error_data.lineno}"
-        if syntax_error_data.offset and syntax_error_data.end_offset:
-            pretty_range += f", column {syntax_error_data.offset} to {syntax_error_data.end_offset}"
-        elif syntax_error_data.offset:
-            pretty_range += f", column {syntax_error_data.offset}"
-        console.print(message)
-        if pretty_range:
-            pretty_print(f"Generated code error at {pretty_range}")
-        console.print(syntax)
+            asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path))
+    except PipeOperatorModelChoiceError as exc:
+        handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
+    except PipeOperatorModelAvailabilityError as exc:
+        handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
+    finally:
+        pipelex_instance.teardown()
