@@ -1,7 +1,7 @@
 from typing import Literal
-from typing_extensions import override
 
 from pydantic import Field
+from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 

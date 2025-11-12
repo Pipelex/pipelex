@@ -14,11 +14,10 @@ from pipelex.config import StaticValidationReaction, get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.exceptions import StaticValidationError
-from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError, UnexpectedPipeDefinitionError
-from pipelex.core.pipes.exceptions import PipeInputError
+from pipelex.core.pipes.exceptions import PipeInputError, StaticValidationErrorType
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -146,7 +145,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 case StaticValidationReaction.RAISE:
                     raise too_many_candidate_inputs_error
         elif nb_inputs < 1:
-
             missing_input_var_error = StaticValidationError(
                 error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
                 domain=self.domain,

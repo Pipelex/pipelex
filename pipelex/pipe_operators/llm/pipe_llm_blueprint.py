@@ -1,4 +1,5 @@
 from typing import Literal
+
 from typing_extensions import override
 
 from pipelex.cogt.llm.llm_setting import LLMModelChoice

@@ -1,7 +1,7 @@
 import re
 from abc import ABC, abstractmethod
 from typing import Any, final
-from pipelex.types import Self
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.core.concepts.exceptions import ConceptStringError
@@ -9,8 +9,7 @@ from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.validation import validate_input_name
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
-from pipelex.tools.misc.string_utils import is_snake_case
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class AllowedPipeCategories(StrEnum):
@@ -146,7 +145,7 @@ class PipeBlueprint(ABC, BaseModel):
     @final
     def validate_inputs(self):
         if self.inputs is None:
-            return None
+            return
 
         # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
         multiplicity_pattern = MUTLIPLICITY_PATTERN
@@ -166,7 +165,7 @@ class PipeBlueprint(ABC, BaseModel):
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
             validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
-        
+
         self._validate_inputs()
 
     @final
@@ -178,5 +177,5 @@ class PipeBlueprint(ABC, BaseModel):
         except ConceptStringError as exc:
             msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
             raise PipeBlueprintValueError(msg) from exc
-        
+
         self._validate_output()

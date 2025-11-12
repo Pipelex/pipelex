@@ -1,7 +1,7 @@
 from typing import Literal
-from typing_extensions import override
 
 from pydantic import Field
+from typing_extensions import override
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
@@ -25,7 +25,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
 
     @override
     def _validate_inputs(self):
-        pass 
+        pass
 
     @override
     def _validate_output(self):

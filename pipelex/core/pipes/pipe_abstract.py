@@ -8,16 +8,15 @@ from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunInputsError
-from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunInputsError
 from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
 
