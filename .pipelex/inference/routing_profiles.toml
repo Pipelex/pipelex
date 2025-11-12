@@ -149,3 +149,7 @@ description = "Example routing profile using specific models"
 
 "grok-3" = "pipelex_inference"
 "grok-3-mini" = "xai"
+
+[profiles.all_groq]
+description = "Use groq backend for all its supported models"
+default = "groq"

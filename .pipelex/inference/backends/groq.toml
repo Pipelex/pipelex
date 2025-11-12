@@ -1,0 +1,129 @@
+################################################################################
+# Groq Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Groq models.
+# It contains model definitions for various LLM models accessible through
+# the Groq API, including text-only and vision-capable models.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots or slashes must be quoted (e.g., ["meta-llama/llama-4-scout"])
+# - Model costs are in USD per million tokens (input/output)
+# - Vision models support max 5 images per request, 33MP max resolution
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "groq"
+prompting_target = "groq"
+
+################################################################################
+# PRODUCTION TEXT MODELS
+################################################################################
+
+# --- Meta Llama 3.x Series ----------------------------------------------------
+["llama-3.1-8b-instant"]
+model_id = "llama-3.1-8b-instant"
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.08 }
+
+["llama-3.3-70b-versatile"]
+model_id = "llama-3.3-70b-versatile"
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.59, output = 0.79 }
+
+# --- Meta Llama Guard ---------------------------------------------------------
+["meta-llama/llama-guard-4-12b"]
+model_id = "meta-llama/llama-guard-4-12b"
+max_tokens = 1024
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.20, output = 0.20 }
+
+# --- OpenAI GPT-OSS Models ----------------------------------------------------
+["openai/gpt-oss-20b"]
+model_id = "openai/gpt-oss-20b"
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.075, output = 0.30 }
+
+["openai/gpt-oss-120b"]
+model_id = "openai/gpt-oss-120b"
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.60 }
+
+# --- Groq Compound Systems ----------------------------------------------------
+["groq/compound"]
+model_id = "groq/compound"
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.45 }
+
+["groq/compound-mini"]
+model_id = "groq/compound-mini"
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.10, output = 0.30 }
+
+################################################################################
+# PREVIEW MODELS
+################################################################################
+
+# --- Meta Llama 4 Vision Models (Preview) -------------------------------------
+["meta-llama/llama-4-scout-17b-16e-instruct"]
+model_id = "meta-llama/llama-4-scout-17b-16e-instruct"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 5
+costs = { input = 0.11, output = 0.34 }
+
+["meta-llama/llama-4-maverick-17b-128e-instruct"]
+model_id = "meta-llama/llama-4-maverick-17b-128e-instruct"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 5
+costs = { input = 0.20, output = 0.60 }
+
+# --- Moonshot Kimi K2 ---------------------------------------------------------
+["moonshotai/kimi-k2-instruct-0905"]
+model_id = "moonshotai/kimi-k2-instruct-0905"
+max_tokens = 16384
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.00, output = 3.00 }
+
+# --- OpenAI Safety Model ------------------------------------------------------
+["openai/gpt-oss-safeguard-20b"]
+model_id = "openai/gpt-oss-safeguard-20b"
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.075, output = 0.30 }
+
+# --- Qwen 3 -------------------------------------------------------------------
+["qwen/qwen3-32b"]
+model_id = "qwen/qwen3-32b"
+max_tokens = 40960
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.29, output = 0.59 }

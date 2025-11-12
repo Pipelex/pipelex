@@ -21,12 +21,17 @@ base-claude = "claude-4.5-sonnet"
 base-gpt = "gpt-4o"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
+base-groq = "llama-3.3-70b-versatile"
 
 best-gpt = "gpt-4o"
 best-claude = "claude-4.1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-medium"
 best-grok = "grok-3"
+
+# Groq-specific aliases
+fast-groq = "llama-3.1-8b-instant"
+vision-groq = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 # Image generation aliases
 base-img-gen = "flux-pro/v1.1"
@@ -39,6 +44,7 @@ fast-img-gen = "fast-lightning-sdxl"
 
 [waterfalls]
 smart_llm = [
+    "llama-3.3-70b-versatile",
     "claude-4.5-sonnet",
     "claude-4.1-opus",
     "claude-4-sonnet",
@@ -121,10 +127,15 @@ llm_for_table_to_text = { model = "base-claude", temperature = 0.3 }
 llm_to_prompt_img_gen = { model = "base-claude", temperature = 0.2 }
 llm_to_prompt_img_gen_cheap = { model = "gpt-4o-mini", temperature = 0.5 }
 
+# Groq-specific presets (fast inference, low cost)
+llm_groq_fast_text = { model = "fast-groq", temperature = 0.2 }
+llm_groq_balanced = { model = "base-groq", temperature = 0.5 }
+llm_groq_vision = { model = "vision-groq", temperature = 0.3 }
+
 # LLM Presets — For Testing ---------------------------------------------------------------------
 
 llm_for_testing_gen_text = { model = "cheap_llm", temperature = 0.5 }
-llm_for_testing_gen_object = { model = "cheap_llm_for_structured", temperature = 0.5 }
+llm_for_testing_gen_object = { model = "cheap_llm_for_structured", temperature = 0.1 }
 llm_for_testing_vision = { model = "cheap_llm_for_vision", temperature = 0.5 }
 llm_for_testing_vision_structured = { model = "cheap_llm_for_vision", temperature = 0.5 }
 
