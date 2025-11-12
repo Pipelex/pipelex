@@ -1,5 +1,5 @@
 import re
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any, final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -134,11 +134,9 @@ class PipeBlueprint(ABC, BaseModel):
         self.validate_output()
         return self
 
-    @abstractmethod
     def _validate_inputs(self):
         pass
 
-    @abstractmethod
     def _validate_output(self):
         pass
 

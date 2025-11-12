@@ -18,7 +18,7 @@ class PipeExtractBlueprint(PipeBlueprint):
 
     @field_validator("output", mode="before")
     @classmethod
-    def force_output(cls, output: str) -> str:
+    def force_output(cls, _: str) -> str:
         return "Page[]"
 
     @override
