@@ -69,14 +69,14 @@ class PipeSignature(StructuredContent):
         return AllowedPipeTypes(type_value)
 
     @override
-    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))
         pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{self.code}[/red]\n", style="bold"))
         pipe_type = self.type.value if isinstance(self.type, AllowedPipeTypes) else str(self.type)
         pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{pipe_type}[/bold magenta] ({self.pipe_category.value})\n"))
-        pipe_group.renderables.append(Text.from_markup(f"Description: [italic]{self.description}[/italic]\n"))
+        pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{self.description}[/yellow italic]\n"))
 
         # Create inputs section
         if not self.inputs:

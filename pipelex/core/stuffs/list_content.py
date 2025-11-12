@@ -1,12 +1,13 @@
 from typing import Any, Generic
 
 from json2html import json2html
+from rich.pretty import Pretty
 from rich.table import Table
 from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
-from pipelex.tools.misc.pretty import PrettyPrintable, pretty_width
+from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, PrettyPrinter
 
 
 class ListContent(StuffContent, Generic[StuffContentType]):
@@ -82,14 +83,26 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return rendered
 
     @override
-    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
-        table = Table(title=title, show_header=False, show_edge=False, show_lines=True, border_style="white", width=pretty_width(factor=0.8))
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        # Check if we've exceeded maximum depth - fall back to Pretty rendering
+        # Pretty shows the Python object structure beautifully, just like when calling pretty_print(stuff)
+        if depth >= MAX_RENDER_DEPTH:
+            return Pretty(self)
+
+        table = Table(
+            title=title,
+            show_header=False,
+            show_edge=False,
+            show_lines=True,
+            border_style="white",
+            width=PrettyPrinter.pretty_width(depth=depth),
+        )
         table.add_column("No.", style="yellow", justify="center", width=6)
         table.add_column("Content", style="white")
 
         for item_index, item in enumerate(self.items):
             item_number = str(item_index + 1)
-            item_content = item.rendered_for_rich()
+            item_content = item.rendered_pretty(depth=depth + 1)
             table.add_row(item_number, item_content)
 
         return table

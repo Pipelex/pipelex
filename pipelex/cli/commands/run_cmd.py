@@ -9,7 +9,7 @@ import typer
 from posthog import tag
 from rich.console import Console
 
-from pipelex import log, pretty_print_md
+from pipelex import log
 from pipelex.builder.builder import load_and_validate_bundle
 from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.cli.error_handlers import (
@@ -181,9 +181,9 @@ def run_cmd(
 
         # Pretty print main_stuff unless disabled
         if not no_pretty_print:
-            typer.echo("")
-            pretty_print_md(content=pipe_output.main_stuff.content.rendered_markdown(), title=f"Main output of '{pipe_code}'")
-            typer.echo("")
+            title = f"Final output of pipe [red]{pipe_code}[/red]"
+            pipe_output.main_stuff.pretty_print_stuff(title=title)
+            # TODO: no_pretty_print should also disable the pretty printing of each pipe operator step
 
         # Save working memory to JSON unless disabled
         if not no_output:

@@ -1,9 +1,10 @@
 import shutil
+from io import StringIO
 from typing import Any, ClassVar
 
 from kajson import kajson
 from rich import print as rich_print
-from rich.console import Group
+from rich.console import Console, Group
 from rich.json import JSON
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -11,6 +12,7 @@ from rich.pretty import Pretty
 from rich.style import StyleType
 from rich.syntax import Syntax
 from rich.table import Table
+from rich.terminal_theme import TerminalTheme
 from rich.text import Text, TextType
 
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor
@@ -20,17 +22,41 @@ TEXT_COLOR = TerminalColor.WHITE
 TITLE_COLOR = TerminalColor.CYAN
 BORDER_COLOR = TerminalColor.YELLOW
 
-PRETTY_WIDTH_MIN = 125
+# TODO: Make PrettyPrinter a manager so we can init it with a proper config
+PRETTY_WIDTH_MIN: int = 125
+PRETTY_WIDTH_FOR_EXPORT: int = 100
+MAX_RENDER_DEPTH = 6
+EXPORT_THEME = TerminalTheme(
+    (0, 0, 0),
+    (197, 200, 198),
+    [
+        (75, 78, 85),
+        (204, 85, 90),
+        (152, 168, 75),
+        (208, 179, 68),
+        (96, 138, 177),
+        (152, 114, 159),
+        (104, 160, 179),
+        (197, 200, 198),
+        (154, 155, 153),
+    ],
+    [
+        (255, 38, 39),
+        (0, 130, 61),
+        (208, 132, 66),
+        (25, 132, 233),
+        (255, 44, 122),
+        (57, 130, 128),
+        (253, 253, 197),
+    ],
+)
 
-PrettyPrintable = Markdown | Text | JSON | Table | Group
+PrettyPrintable = Markdown | Text | JSON | Table | Group | Syntax | Pretty
 
 
-def pretty_width(width: int | None = None, factor: float | None = None) -> int:
-    terminal_width = shutil.get_terminal_size().columns
-    absolute_width = width or min(max(PRETTY_WIDTH_MIN, int(terminal_width / 2)), terminal_width)
-    if factor:
-        return int(absolute_width * factor)
-    return absolute_width
+class PrettyPrintMode(StrEnum):
+    RICH = "rich"
+    POOR = "poor"
 
 
 def pretty_print(
@@ -52,14 +78,9 @@ def pretty_print_md(
     border_style: StyleType | None = None,
     width: int | None = None,
 ):
-    width = width or pretty_width()
+    width = width or PrettyPrinter.pretty_width()
     md_content = Markdown(content)
     PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
-
-
-class PrettyPrintMode(StrEnum):
-    RICH = "rich"
-    POOR = "poor"
 
 
 class PrettyPrinter:
@@ -98,28 +119,48 @@ class PrettyPrinter:
         border_style: StyleType | None = None,
         width: int | None = None,
     ):
-        if isinstance(content, str):
-            if content.startswith(("http://", "https://")):
-                content = Text(content, style="link " + content, no_wrap=True)
-            else:
-                content = Text(str(content))  # Treat all other strings as plain text
-        elif isinstance(content, (Pretty, JSON, Table, Markdown, Group)):
-            pass
-        elif isinstance(content, dict):
-            try:
-                content = JSON.from_data(content, indent=4)
-            except TypeError:
-                json_string = kajson.dumps(content, indent=4)
-                content = Syntax(json_string, "json", theme="monokai")
-        else:
-            content = Pretty(content)
+        panel = cls.make_pretty_panel(
+            content=content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width
+        )
 
-        if inner_title:
-            inner_title_text = Text(str(inner_title), style="dim")
-            content = Group(inner_title_text, content)
-        rich_print()
-        panel = Panel(
-            content,
+        rich_print("", panel, "", sep="\n")
+
+    @classmethod
+    def pretty_width(cls, width: int | None = None, depth: int | None = None) -> int:
+        terminal_width = shutil.get_terminal_size().columns
+        absolute_width = width or min(max(PRETTY_WIDTH_MIN, terminal_width // 2), terminal_width)
+        if depth is not None:
+            # Calculate adaptive width factor based on depth to prevent excessive narrowing
+            # Factor decreases slowly: depth 0->1.0, depth 1->0.9, depth 2->0.8, etc., min 0.5
+            width_factor = max(0.5, 1.0 - (depth * 0.1))
+            return int(absolute_width * width_factor)
+        else:
+            return absolute_width
+
+    @classmethod
+    def make_pretty_panel(
+        cls,
+        content: str | Any,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
+        inner_title: str | None = None,
+        border_style: StyleType | None = None,
+        width: int | None = None,
+    ) -> Panel:
+        pretty = cls.make_pretty(content, inner_title=inner_title, depth=0)
+        return cls.wrap_in_panel(pretty=pretty, title=title, subtitle=subtitle, border_style=border_style, width=width)
+
+    @classmethod
+    def wrap_in_panel(
+        cls,
+        pretty: PrettyPrintable,
+        title: TextType | None = None,
+        subtitle: TextType | None = None,
+        border_style: StyleType | None = None,
+        width: int | None = None,
+    ) -> Panel:
+        return Panel(
+            pretty,
             title=title,
             subtitle=subtitle,
             expand=False,
@@ -130,8 +171,76 @@ class PrettyPrinter:
             highlight=True,
             width=width,
         )
-        rich_print(panel)
-        rich_print()
+
+    @classmethod
+    def pretty_html(
+        cls,
+        pretty: PrettyPrintable,
+        width: int = PRETTY_WIDTH_FOR_EXPORT,
+    ) -> str:
+        buf = StringIO()
+        console = Console(record=True, file=buf, width=width, force_terminal=False)
+        console.print(pretty)
+        return console.export_html(inline_styles=False, clear=False, theme=EXPORT_THEME)
+
+    @classmethod
+    def pretty_svg(cls, pretty: PrettyPrintable, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
+        buf = StringIO()
+        console = Console(record=True, file=buf, width=width, force_terminal=False)
+        console.print(pretty)
+        return console.export_svg()
+
+    @classmethod
+    def make_pretty(cls, value: Any, inner_title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        pretty: PrettyPrintable
+        # Format the value
+        if isinstance(value, PrettyPrintable):
+            pretty = value
+        elif isinstance(value, dict):
+            # For dicts, use JSON rendering
+            try:
+                pretty = JSON.from_data(value, indent=4)
+            except TypeError:
+                json_string = kajson.dumps(value, indent=4)
+                pretty = Syntax(json_string, "json", theme="monokai")
+        elif isinstance(value, list):
+            # For lists, build a table without headers
+            list_table = Table(
+                show_header=False,
+                show_edge=False,
+                show_lines=True,
+                border_style="dim",
+                padding=(0, 1),
+            )
+            list_table.add_column("No.", style="yellow", justify="center", width=4)
+            list_table.add_column("Item", style="white")
+
+            for idx, item in enumerate(value, start=1):  # type: ignore[arg-type]
+                pretty_item = cls.make_pretty(item, inner_title=None, depth=depth + 1)
+                list_table.add_row(str(idx), pretty_item)
+
+            pretty = list_table
+        elif isinstance(value, str):
+            # Handle URLs specially, otherwise use Text for simple strings
+            if value.startswith(("http://", "https://")):
+                pretty = Text(value, style="link " + value, no_wrap=True)
+            else:
+                # Use Text instead of Markdown to allow proper auto-sizing
+                pretty = Text(value)
+        elif isinstance(value, (int, float, bool)):
+            # For primitive types, convert to string
+            pretty = Text(str(value))
+        elif hasattr(value, "rendered_pretty"):
+            pretty = value.rendered_pretty(depth=depth)
+        else:
+            # For other types, use Pretty
+            pretty = Pretty(value)
+
+        if inner_title:
+            inner_title_text = Text(str(inner_title), style="dim")
+            pretty = Group(inner_title_text, pretty)
+
+        return pretty
 
     @classmethod
     def pretty_print_without_rich(

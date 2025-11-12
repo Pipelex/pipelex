@@ -48,5 +48,5 @@ class TextContent(StuffContent):
         save_text_to_path(text=self.text, path=f"{directory}/{filename}")
 
     @override
-    def pretty_print_content(self, title: str | None = None, number: int | None = None) -> None:
+    def pretty_print_content(self, title: str | None = None) -> None:
         pretty_print_md(self.text, title=title)

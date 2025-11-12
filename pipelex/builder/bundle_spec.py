@@ -130,7 +130,7 @@ class PipelexBundleSpec(StructuredContent):
         )
 
     @override
-    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         bundle_group = Group()
 
         # Bundle header info
@@ -138,7 +138,7 @@ class PipelexBundleSpec(StructuredContent):
             bundle_group.renderables.append(Text(title, style="bold"))
         bundle_group.renderables.append(Text.from_markup(f"Domain: [yellow]{self.domain}[/yellow]\n", style="bold"))
         if self.description:
-            bundle_group.renderables.append(Text.from_markup(f"Description: [italic]{self.description}[/italic]\n"))
+            bundle_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{self.description}[/yellow italic]\n"))
         bundle_group.renderables.append(Text.from_markup(f"Main Pipe: [red]{self.main_pipe}[/red]\n"))
         if self.system_prompt:
             bundle_group.renderables.append(Text(f"System Prompt: {self.system_prompt}\n", style="dim"))
@@ -153,7 +153,7 @@ class PipelexBundleSpec(StructuredContent):
 
             for concept_code, concept_spec_or_name in self.concept.items():
                 if isinstance(concept_spec_or_name, ConceptSpec):
-                    concept_rendered = concept_spec_or_name.rendered_for_rich()
+                    concept_rendered = concept_spec_or_name.rendered_pretty()
                     concepts_table.add_row(concept_rendered)
                 else:
                     # Simple string concept reference
@@ -168,7 +168,7 @@ class PipelexBundleSpec(StructuredContent):
             pipes_table.add_column("Pipe", style="white")
 
             for pipe_spec in self.pipe.values():
-                pipe_rendered = pipe_spec.rendered_for_rich()
+                pipe_rendered = pipe_spec.rendered_pretty()
                 pipes_table.add_row(pipe_rendered)
 
             bundle_group.renderables.append(pipes_table)

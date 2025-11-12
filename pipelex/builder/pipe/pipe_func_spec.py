@@ -19,9 +19,9 @@ class PipeFuncSpec(PipeSpec):
     function_name: str = Field(description="The name of the function to call.")
 
     @override
-    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # Get base pipe information from parent
-        base_group = super().rendered_for_rich(title=title, number=number)
+        base_group = super().rendered_pretty(title=title, depth=depth)
 
         # Create a group combining base info with func-specific details
         func_group = Group()

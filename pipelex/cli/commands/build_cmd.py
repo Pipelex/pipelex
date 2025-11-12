@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Annotated
 import click
 import typer
 from posthog import tag
+from rich.console import Console
 
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
@@ -39,6 +40,7 @@ from pipelex.tools.misc.file_utils import (
     save_text_to_path,
 )
 from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.pretty import PrettyPrinter
 
 if TYPE_CHECKING:
     from pipelex.client.protocol import PipelineInputs
@@ -119,6 +121,7 @@ def build_pipe_cmd(
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
     async def run_pipeline():
+        start_time = time.time()
         # Get builder config
         builder_config = get_config().pipelex.builder_config
 
@@ -178,13 +181,26 @@ def build_pipe_cmd(
         ensure_directory_for_file_path(file_path=plx_file_path)
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
         save_text_to_path(text=plx_content, path=plx_file_path)
-        typer.secho(f"✅ Bundle saved to: {plx_file_path}", fg=typer.colors.GREEN)
+        typer.secho(f"✅ Pipelex bundle saved to: {plx_file_path}", fg=typer.colors.GREEN)
 
         # Generate extras (inputs and runner) if requested
         if not no_extras:
             main_pipe_code = pipelex_bundle_spec.main_pipe
             if main_pipe_code:
                 try:
+                    pretty = pipelex_bundle_spec.rendered_pretty()
+                    # Generate pretty HTML
+                    pretty_html = PrettyPrinter.pretty_html(pretty=pretty)
+                    html_path = os.path.join(extras_output_dir, "bundle_view.html")
+                    save_text_to_path(text=pretty_html, path=html_path)
+                    typer.secho(f"✅ Pretty HTML saved to: {html_path}", fg=typer.colors.GREEN)
+
+                    # Generate pretty SVG
+                    pretty_svg = PrettyPrinter.pretty_svg(pretty=pretty)
+                    svg_path = os.path.join(extras_output_dir, "bundle_view.svg")
+                    save_text_to_path(text=pretty_svg, path=svg_path)
+                    typer.secho(f"✅ Pretty SVG saved to: {svg_path}", fg=typer.colors.GREEN)
+
                     # Load the bundle from the file we just saved to register the pipe
                     _ = await load_and_validate_bundle(plx_file_path)
                     pipe = get_required_pipe(pipe_code=main_pipe_code)
@@ -193,13 +209,24 @@ def build_pipe_cmd(
                     inputs_json_str = generate_input_memory_json_string(pipe.inputs, indent=2)
                     inputs_json_path = os.path.join(extras_output_dir, "inputs.json")
                     save_text_to_path(text=inputs_json_str, path=inputs_json_path)
-                    typer.secho(f"✅ Inputs saved to: {inputs_json_path}", fg=typer.colors.GREEN)
+                    typer.secho(f"✅ Inputs template saved to: {inputs_json_path}", fg=typer.colors.GREEN)
 
                     # Generate runner.py
                     runner_code = generate_runner_code(pipe)
                     runner_path = os.path.join(extras_output_dir, f"run_{main_pipe_code}.py")
                     save_text_to_path(text=runner_code, path=runner_path)
-                    typer.secho(f"✅ Runner saved to: {runner_path}", fg=typer.colors.GREEN)
+                    typer.secho(f"✅ Python runner script saved to: {runner_path}", fg=typer.colors.GREEN)
+
+                    end_time = time.time()
+                    typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds\n", fg=typer.colors.WHITE)
+
+                    get_report_delegate().generate_report()
+
+                    # Show how to run the pipe
+                    console = Console()
+                    console.print("\n📋 [cyan]To run your pipeline:[/cyan]")
+                    console.print(f"   [cyan]• Execute the runner:[/cyan] python {runner_path}")
+                    console.print(f"   [cyan]• Or use CLI:[/cyan] pipelex run {plx_file_path} --inputs {inputs_json_path}\n")
 
                 except Exception as exc:
                     typer.secho(f"⚠️  Warning: Could not generate extras: {exc}", fg=typer.colors.YELLOW)
@@ -210,12 +237,7 @@ def build_pipe_cmd(
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
-            start_time = time.time()
             asyncio.run(run_pipeline())
-            end_time = time.time()
-            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
-
-            get_report_delegate().generate_report()
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.BUILD)

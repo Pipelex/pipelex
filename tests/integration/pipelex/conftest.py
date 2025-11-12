@@ -20,7 +20,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     params=[
         # "o1",
         # "gpt-4o",
-        # "gpt-4o-mini",
+        "gpt-4o-mini",
         # "gpt-4-5-preview",
         # "o1-mini",
         # "o3-mini",
@@ -49,7 +49,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gpt-5-chat",
         # "claude-4.5-sonnet",
         # "claude-4.1-opus",
-        "claude-4.5-haiku",
+        # "claude-4.5-haiku",
         # "claude-4.5-sonnet",
         # "grok-3",
         # "grok-3-mini",
@@ -57,6 +57,10 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gemini-2.5-flash-lite",
         # "gemini-2.5-flash",
         # "gemini-2.5-pro",
+        # "openai/gpt-oss-120b",
+        # "meta-llama/llama-4-scout-17b-16e-instruct",
+        # "meta-llama/llama-4-maverick-17b-128e-instruct",
+        # "moonshotai/kimi-k2-instruct-0905",
     ],
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:
@@ -231,6 +235,7 @@ def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(
     params=[
         "extract_text_from_visuals",
+        "extract_text_from_pdf",
     ],
 )
 def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:

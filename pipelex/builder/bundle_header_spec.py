@@ -14,12 +14,12 @@ class BundleHeaderSpec(StructuredContent):
     main_pipe: str = Field(description="The main pipe of the domain.")
 
     @override
-    def rendered_for_rich(self, title: str | None = None, number: int | None = None) -> PrettyPrintable:
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         bundle_group = Group()
         if title:
             bundle_group.renderables.append(Text(title, style="bold"))
         bundle_group.renderables.append(Text.from_markup(f"Domain: [yellow]{self.domain}[/yellow]\n", style="bold"))
-        bundle_group.renderables.append(Text.from_markup(f"Description: [italic]{self.description}[/italic]\n"))
+        bundle_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{self.description}[/yellow italic]\n"))
         bundle_group.renderables.append(Text.from_markup(f"Main Pipe: [red]{self.main_pipe}[/red]\n"))
         if self.system_prompt:
             bundle_group.renderables.append(Text(f"System Prompt: {self.system_prompt}", style="dim"))

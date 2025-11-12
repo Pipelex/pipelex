@@ -50,7 +50,11 @@ class ImageContent(StuffContent):
     @classmethod
     def make_from_extracted_image(cls, extracted_image: ExtractedImage) -> Self:
         if base_64 := extracted_image.base_64:
-            prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
+            # Check if it's already a prefixed base64 string
+            if base_64.startswith("data:"):
+                prefixed_base64_str = base_64
+            else:
+                prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
             return cls(
                 url=prefixed_base64_str,
                 base_64=extracted_image.base_64,
