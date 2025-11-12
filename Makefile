@@ -222,7 +222,7 @@ codex-tests: env
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
