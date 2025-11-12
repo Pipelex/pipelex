@@ -300,10 +300,10 @@ class LibraryManager(LibraryManagerAbstract):
             except PipeDefinitionError as pipe_def_error:
                 msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {pipe_def_error}"
                 raise LibraryLoadingError(msg) from pipe_def_error
-            except ValidationError as validation_error:
-                validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+            except ValidationError as pipelex_bundle_validation_error:
+                validation_error_msg = report_validation_error(category="plx", validation_error=pipelex_bundle_validation_error)
                 msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {validation_error_msg}"
-                raise LibraryLoadingError(msg) from validation_error
+                raise LibraryLoadingError(msg) from pipelex_bundle_validation_error
             blueprints.append(blueprint)
 
         self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
