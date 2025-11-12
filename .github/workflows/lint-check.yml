@@ -9,7 +9,7 @@ jobs:
 # --------------------------------------------------------------------------
   lint:
     name: Lint (${{ matrix.python-version }})
-    runs-on: Linux-x64-16-core
+    runs-on: Large-Linux-x64
     strategy:
       fail-fast: false
       matrix:
