@@ -40,6 +40,7 @@ from pipelex.tools.misc.file_utils import (
     save_text_to_path,
 )
 from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.pretty import PrettyPrinter
 
 if TYPE_CHECKING:
     from pipelex.client.protocol import PipelineInputs
@@ -187,6 +188,19 @@ def build_pipe_cmd(
             main_pipe_code = pipelex_bundle_spec.main_pipe
             if main_pipe_code:
                 try:
+                    pretty = pipelex_bundle_spec.rendered_pretty()
+                    # Generate pretty HTML
+                    pretty_html = PrettyPrinter.pretty_html(pretty=pretty)
+                    html_path = os.path.join(extras_output_dir, "bundle_view.html")
+                    save_text_to_path(text=pretty_html, path=html_path)
+                    typer.secho(f"✅ Pretty HTML saved to: {html_path}", fg=typer.colors.GREEN)
+
+                    # Generate pretty SVG
+                    pretty_svg = PrettyPrinter.pretty_svg(pretty=pretty)
+                    svg_path = os.path.join(extras_output_dir, "bundle_view.svg")
+                    save_text_to_path(text=pretty_svg, path=svg_path)
+                    typer.secho(f"✅ Pretty SVG saved to: {svg_path}", fg=typer.colors.GREEN)
+
                     # Load the bundle from the file we just saved to register the pipe
                     _ = await load_and_validate_bundle(plx_file_path)
                     pipe = get_required_pipe(pipe_code=main_pipe_code)
