@@ -57,6 +57,10 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gemini-2.5-flash-lite",
         # "gemini-2.5-flash",
         # "gemini-2.5-pro",
+        # "openai/gpt-oss-120b",
+        # "meta-llama/llama-4-scout-17b-16e-instruct",
+        # "meta-llama/llama-4-maverick-17b-128e-instruct",
+        # "moonshotai/kimi-k2-instruct-0905",
     ],
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:
