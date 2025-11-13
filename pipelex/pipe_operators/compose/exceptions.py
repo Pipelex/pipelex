@@ -1,0 +1,2 @@
+class PipeComposeBlueprintValueError(ValueError):
+    pass

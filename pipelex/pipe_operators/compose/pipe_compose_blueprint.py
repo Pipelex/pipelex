@@ -7,7 +7,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_operators.exceptions import PipeComposeBlueprintValueError
+from pipelex.pipe_operators.compose.exceptions import PipeComposeBlueprintValueError
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables

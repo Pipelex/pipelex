@@ -35,7 +35,7 @@ class PipeConditionBlueprint(PipeBlueprint):
     @classmethod
     def validate_outcome_map(cls, outcomes: OutcomeMap) -> OutcomeMap:
         if not outcomes:
-            msg = "PipeCondition must have at least one mapping in outcomes"
+            msg = "PipeConditionBlueprint must have at least one mapping in outcomes"
             raise PipeConditionBlueprintValueError(msg)
         return outcomes
 

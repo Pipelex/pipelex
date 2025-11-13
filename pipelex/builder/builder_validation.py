@@ -7,9 +7,9 @@ from pipelex.builder.builder_errors import (
     ValidateDryRunError,
 )
 from pipelex.builder.bundle_spec import PipelexBundleSpec
-from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.validation_error_data import DomainFailure, PipeInputErrorData, StaticValidationErrorData
+from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.exceptions import (
     ConceptDefinitionErrorData,
@@ -24,7 +24,8 @@ from pipelex.libraries.exceptions import (
     PipeDefinitionErrorData,
     PipeLoadingError,
 )
-from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
+from pipelex.pipe_run.dry_run import DryRunOutput
+from pipelex.pipeline.validate_bundle import validate_bundle
 
 
 def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
@@ -175,11 +176,9 @@ async def validate_bundle_spec(bundle_spec: PipelexBundleSpec):
         pipe_failures = [pipe_spec_error.pipe_failure]
         raise PipelexBundleError(message=pipe_spec_error.message, pipe_failures=pipe_failures) from pipe_spec_error
 
-    library_manager = get_library_manager()
-    dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
-    library_manager.remove_from_blueprints(library_id=get_current_library_id(), blueprints=[bundle_blueprint])
+    validate_bundle_result = await validate_bundle(blueprints=[bundle_blueprint])
 
-    dry_run_pipe_failures = extract_pipe_failures_from_dry_run_result(bundle_spec=bundle_spec, dry_run_result=dry_run_result)
+    dry_run_pipe_failures = extract_pipe_failures_from_dry_run_result(bundle_spec=bundle_spec, dry_run_result=validate_bundle_result.dry_run_result)
     if dry_run_pipe_failures:
         raise PipelexBundleError(message="Pipes failed during dry run", pipe_failures=dry_run_pipe_failures)
 
@@ -234,68 +233,3 @@ def document_pipe_failures_from_dry_run_blueprint(
             )
             dry_run_pipe_failures.append(pipe_failure)
     return dry_run_pipe_failures
-
-
-async def dry_run_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint) -> dict[str, DryRunOutput]:
-    library_manager = get_library_manager()
-    try:
-        pipes = library_manager.load_from_blueprints(library_id=get_current_library_id(), blueprints=[bundle_blueprint])
-        dry_run_result = await dry_run_pipes(pipes=pipes, raise_on_failure=True)
-    except StaticValidationError as static_validation_error:
-        static_validation_error_data = StaticValidationErrorData(
-            error_type=static_validation_error.error_type,
-            domain=static_validation_error.domain,
-            pipe_code=static_validation_error.pipe_code,
-            variable_names=static_validation_error.variable_names,
-            required_concept_codes=static_validation_error.required_concept_codes,
-            provided_concept_code=static_validation_error.provided_concept_code,
-            file_path=static_validation_error.file_path,
-            explanation=static_validation_error.explanation,
-        )
-        raise PipelexBundleError(
-            message=static_validation_error.desc(), static_validation_error=static_validation_error_data
-        ) from static_validation_error
-    except DomainLoadingError as domain_loading_error:
-        domain_failures = [DomainFailure(domain_code=domain_loading_error.domain_code, error_message=str(domain_loading_error))]
-        raise PipelexBundleError(message=domain_loading_error.message, domain_failures=domain_failures) from domain_loading_error
-    except ConceptLoadingError as concept_loading_error:
-        concept_def_error = concept_loading_error.concept_definition_error
-        concept_definition_error_data = ConceptDefinitionErrorData(
-            message=str(concept_def_error),
-            domain_code=concept_def_error.domain_code,
-            concept_code=concept_def_error.concept_code,
-            description=concept_def_error.description,
-            structure_class_python_code=concept_def_error.structure_class_python_code,
-            structure_class_syntax_error_data=concept_def_error.structure_class_syntax_error_data,
-            source=concept_def_error.source,
-        )
-        raise PipelexBundleError(
-            message=concept_loading_error.message, concept_definition_errors=[concept_definition_error_data]
-        ) from concept_loading_error
-    except PipeLoadingError as pipe_loading_error:
-        pipe_def_error = pipe_loading_error.pipe_definition_error
-        pipe_definition_error_data = PipeDefinitionErrorData(
-            message=str(pipe_def_error),
-            domain_code=pipe_def_error.domain_code,
-            pipe_code=pipe_def_error.pipe_code,
-            description=pipe_def_error.description,
-            source=pipe_def_error.source,
-        )
-        raise PipelexBundleError(message=pipe_loading_error.message, pipe_definition_errors=[pipe_definition_error_data]) from pipe_loading_error
-    except PipeInputError as pipe_input_error:
-        pipe_input_error_data = PipeInputErrorData(
-            message=str(pipe_input_error),
-            pipe_code=pipe_input_error.pipe_code,
-            variable_name=pipe_input_error.variable_name,
-            concept_code=pipe_input_error.concept_code,
-        )
-        raise PipelexBundleError(message=pipe_input_error.message, pipe_input_errors=[pipe_input_error_data]) from pipe_input_error
-    return dry_run_result
-
-
-async def validate_dry_run_bundle_blueprint(bundle_blueprint: PipelexBundleBlueprint):
-    dry_run_result = await dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
-    pipe_failures = document_pipe_failures_from_dry_run_blueprint(bundle_blueprint=bundle_blueprint, dry_run_result=dry_run_result)
-    if pipe_failures:
-        msg = "Dry run failed for bundle"
-        raise PipelexBundleError(message=msg, pipe_failures=pipe_failures)

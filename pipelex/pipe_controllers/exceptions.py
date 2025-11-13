@@ -10,3 +10,7 @@ class PipeControllerOutputConceptMismatchError(PipeControllerError):
         self.tested_concept = tested_concept
         self.wanted_concept = wanted_concept
         super().__init__(message)
+
+
+class SubPipeBlueprintValueError(ValueError):
+    pass

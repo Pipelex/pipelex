@@ -1,0 +1,2 @@
+class PipeParallelBlueprintValueError(ValueError):
+    pass

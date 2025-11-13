@@ -4,8 +4,8 @@ from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_operators.extract.exceptions import PipeExtractBlueprintValueError
 
 
 class PipeExtractBlueprint(PipeBlueprint):
@@ -30,32 +30,16 @@ class PipeExtractBlueprint(PipeBlueprint):
             f"Only {nb_inputs} inputs were provided."
         )
         if self.inputs is None:
-            raise StaticValidationError(
-                error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                variable_names=self.input_names,
-                explanation=msg,
-            )
+            raise PipeExtractBlueprintValueError(msg)
         if nb_inputs > 1:
-            too_many_candidate_inputs_error = StaticValidationError(
-                error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
-                variable_names=self.input_names,
-                explanation=msg,
-            )
-            raise too_many_candidate_inputs_error
+            msg = f"Too many inputs provided for PipeExtract: {self.input_names}. Only one input is allowed."
+            raise PipeExtractBlueprintValueError(msg)
         if nb_inputs < 1:
-            missing_input_variable_error = StaticValidationError(
-                error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                variable_names=self.input_names,
-                explanation="For PipeExtract you must provide either a pdf or an image or a concept that refines one of them",
-            )
-            raise missing_input_variable_error
+            msg = f"Missing input provided for PipeExtract: {self.input_names}. Only one input is allowed."
+            raise PipeExtractBlueprintValueError(msg)
 
     @override
     def _validate_output(self):
         if self.output != "Page[]":
-            msg = "PipeExtract output should be a Page concept, but is {self.output.concept_string}"
-            raise StaticValidationError(
-                error_type=StaticValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                variable_names=[self.output],
-                explanation=msg,
-            )
+            msg = f"PipeExtract output should be a Page concept, but is {self.output}"
+            raise PipeExtractBlueprintValueError(msg)

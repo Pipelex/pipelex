@@ -1,0 +1,2 @@
+class PipeExtractBlueprintValueError(ValueError):
+    pass

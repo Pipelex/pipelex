@@ -7,11 +7,9 @@ from pipelex.builder.builder_errors import (
     PipeBuilderError,
     PipelexBundleUnexpectedError,
 )
-from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -24,12 +22,14 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
+from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.registries.func_registry import pipe_func
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -150,10 +150,10 @@ async def load_and_validate_bundle(bundle_path: str) -> PipelexBundleBlueprint:
     bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
 
     try:
-        await validate_dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
+        validate_bundle_result = await validate_bundle(blueprints=[bundle_blueprint])
     except PipelexBundleError as exc:
         msg = f"Bundle at '{bundle_path}' failed to validate"
         pretty_print(exc, title="Validation Error Details")
         raise PipelexBundleError(message=msg, pipe_failures=exc.pipe_failures) from exc
 
-    return bundle_blueprint
+    return validate_bundle_result.blueprints[0]

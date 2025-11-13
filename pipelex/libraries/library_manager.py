@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -27,7 +28,6 @@ from pipelex.libraries.exceptions import (
 )
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
-from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
     get_pipelex_package_dir_for_imports,
@@ -65,11 +65,12 @@ class LibraryManager(LibraryManagerAbstract):
     ############################################################
     # Manager lifecycle
     ############################################################
+    def generate_library_id(self) -> str:
+        return str(uuid.uuid4())
+
     @override
     def setup(self) -> None:
         self._libraries.clear()
-        # Create and initialize UNTITLED library with base PLX files
-        self.open_library(library_id=SpecialLibraryId.UNTITLED)
 
     @override
     def teardown(self) -> None:
@@ -83,11 +84,13 @@ class LibraryManager(LibraryManagerAbstract):
         self.setup()
 
     @override
-    def open_library(self, library_id: str) -> Library:
-        """Open a library with the given library_id. Creates it if it doesn't exist."""
+    def open_library(self, library_id: str | None = None) -> tuple[str, Library]:
+        if not library_id:
+            library_id = self.generate_library_id()
+            self._libraries[library_id] = LibraryFactory.make_empty()
         if library_id not in self._libraries:
             self._libraries[library_id] = LibraryFactory.make_empty()
-        return self._libraries[library_id]
+        return library_id, self._libraries[library_id]
 
     ############################################################
     # Public library accessors

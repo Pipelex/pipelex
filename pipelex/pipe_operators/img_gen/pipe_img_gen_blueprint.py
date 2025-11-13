@@ -5,12 +5,8 @@ from typing_extensions import override
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-
-
-class PipeImgGenBlueprintValueError(ValueError):
-    pass
+from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenBlueprintValueError
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
@@ -42,12 +38,8 @@ class PipeImgGenBlueprint(PipeBlueprint):
 
         nb_inputs = self.nb_inputs
         if nb_inputs > 1:
-            too_many_candidate_inputs_error = StaticValidationError(
-                error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
-                variable_names=self.input_names,
-                explanation="Only one text input can be provided for PipeImgGen",
-            )
-            raise too_many_candidate_inputs_error
+            msg = f"Too many inputs provided for PipeImgGen: {self.input_names}. Only one input is allowed."
+            raise PipeImgGenBlueprintValueError(msg)
 
     @override
     def _validate_output(self):

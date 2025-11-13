@@ -1,0 +1,2 @@
+class LLMPromptBlueprintValueError(ValueError):
+    pass

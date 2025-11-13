@@ -1,0 +1,2 @@
+class PipeImgGenBlueprintValueError(ValueError):
+    pass

@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMPromptSpecError
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -11,6 +10,7 @@ from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
+from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
@@ -85,7 +85,7 @@ class LLMPromptBlueprint(BaseModel):
                         for image_item in prompt_image_content:  # pyright: ignore[reportUnknownVariableType]
                             if not isinstance(image_item, ImageContent):
                                 msg = f"Item of '{user_image_name}' is of type '{type(image_item).__name__}', it should be ImageContent"  # pyright: ignore[reportUnknownArgumentType]
-                                raise LLMPromptSpecError(msg)
+                                raise LLMPromptBlueprintValueError(msg)
                             user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
                             prompt_user_images[user_image_name] = user_image
                     else:
@@ -93,7 +93,7 @@ class LLMPromptBlueprint(BaseModel):
                             f"User image '{user_image_name}' is of type '{type(prompt_image_content).__name__}', "
                             "it should be ImageContent or list of ImageContent"
                         )
-                        raise LLMPromptSpecError(msg)
+                        raise LLMPromptBlueprintValueError(msg)
                 except ContextProviderException:
                     # If single image failed, try to get as a collection (list or tuple)
                     try:
@@ -108,10 +108,10 @@ class LLMPromptBlueprint(BaseModel):
                             msg = (
                                 f"Could not find a valid user image or image collection named '{user_image_name}' from the provided context_provider"
                             )
-                            raise LLMPromptSpecError(msg)
+                            raise LLMPromptBlueprintValueError(msg)
                     except ContextProviderException as exc:
                         msg = f"Could not find a valid user image named '{user_image_name}' from the provided context_provider: {exc}"
-                        raise LLMPromptSpecError(msg) from exc
+                        raise LLMPromptBlueprintValueError(msg) from exc
 
         ############################################################
         # User text

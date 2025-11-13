@@ -12,8 +12,9 @@ from pipelex.builder.builder_errors import (
     PipeSpecError,
 )
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.exceptions import PipelexBundleError, PipelexBundleSpecValueError
+from pipelex.builder.exceptions import PipelexBundleSpecValueError
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
+from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint

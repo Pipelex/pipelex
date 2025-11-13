@@ -27,8 +27,8 @@ class LibraryManagerAbstract(ABC):
         """Set the Library object for a specific library_id. Raises an error if the library does not exist."""
 
     @abstractmethod
-    def open_library(self, library_id: str) -> "Library":
-        """Open a library with the given library_id. Creates it if it doesn't exist."""
+    def open_library(self, library_id: str | None = None) -> tuple[str, "Library"]:
+        """Open a library with the given library_id. Creates it if it doesn't exist. If no library_id is provided, it creates one."""
 
     @abstractmethod
     def get_library(self) -> "Library":

@@ -24,7 +24,7 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.pipeline.validate_plx import validate_plx
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 
@@ -98,7 +98,10 @@ async def execute_pipeline(
     blueprint: PipelexBundleBlueprint | None = None
 
     if plx_content:
-        blueprint, _ = await validate_plx(library_id=library_id, plx_content=plx_content, remove_after_validation=False)
+        validate_bundle_result = await validate_bundle(plx_content=plx_content)
+        library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result.blueprints)
+        # For now, we only support one blueprint when given a plx_content. So blueprints is of length 1.
+        blueprint = validate_bundle_result.blueprints[0]
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
         elif blueprint.main_pipe:

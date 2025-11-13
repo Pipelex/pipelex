@@ -11,7 +11,6 @@ from rich.console import Console
 
 from pipelex import log
 from pipelex.builder.builder import load_and_validate_bundle
-from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -20,6 +19,7 @@ from pipelex.cli.error_handlers import (
     handle_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_telemetry_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
