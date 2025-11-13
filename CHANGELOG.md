@@ -12,6 +12,7 @@
  - **CLI Output and Visualization**: Overhauled command-line output with rich, table-based layouts for pipeline components. Final output of `pipelex run` is now pretty-printed and adapts to content type.
  - **Documentation**: Updated "Get Started" and "Build Reliable AI Workflows" to reflect new directory-based build output and CLI options.
  - **Internal Code Refactoring**: Reorganized exception hierarchy into dedicated `exceptions.py` files per module, centralized validation logic into `validation.py` modules, added `ValueError` to blueprints, and removed unused exceptions for improved maintainability.
+- Updated pytest to `>=9.0.1` to support their new `pyproject.toml` config format.
 
 ### Fixed
  - Adjusted default temperature for `llm_for_testing_gen_object` preset from `0.5` to `0.1` for more deterministic structured data generation.

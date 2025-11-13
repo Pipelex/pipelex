@@ -71,7 +71,7 @@ dev = [
     "mypy>=1.11.2",
     "pyright>=1.1.405",
     "pylint>=3.3.8",
-    "pytest>=8.3.3",
+    "pytest>=9.0.1",
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.1.1",
     "pytest-mock>=3.14.0",
@@ -201,9 +201,16 @@ strictParameterNoneValue = true
 strictSetInference = true
 typeCheckingMode = "strict"
 
-[tool.pytest.ini_options]
-addopts = "--import-mode=importlib -ra -m 'not (inference or llm or img_gen or extract or needs_output or pipelex_api)'"
+[tool.pytest]
+minversion = "9.0"
+addopts = [
+    "--import-mode=importlib",
+    "-ra",
+    "-m",
+    "not (inference or llm or img_gen or extract or needs_output or pipelex_api)",
+]
 asyncio_default_fixture_loop_scope = "session"
+xfail_strict = true
 filterwarnings = [
     "ignore:Support for class-based `config` is deprecated:DeprecationWarning",
     "ignore:websockets.*is deprecated:DeprecationWarning",
@@ -223,8 +230,6 @@ markers = [
     "dry_runnable: tests that can be run in dry-run mode",
     "pipelex_api: tests that require access to the Pipelex API",
 ]
-minversion = "8.0"
-xfail_strict = true
 
 [tool.coverage.run]
 source = ["pipelex"]
