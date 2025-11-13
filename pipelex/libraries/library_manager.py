@@ -258,50 +258,40 @@ class LibraryManager(LibraryManagerAbstract):
         library_file_paths: list[Path] | None = None,
     ) -> None:
         # Collect directories to scan (user project directories)
-        user_dirs: set[Path] = set()
+        all_pipelex_plx_paths: set[Path] = set()
         if library_dirs:
-            user_dirs.update(library_dirs)
-        else:
-            user_dirs.add(Path(config_manager.local_root_dir))
+            all_pipelex_plx_paths.update(self._get_pipelex_plx_files_from_dirs(set(library_dirs)))
+        if library_file_paths:
+            all_pipelex_plx_paths.update(library_file_paths)
 
         valid_plx_paths: list[Path]
-        if library_file_paths:
-            valid_plx_paths = library_file_paths
-        else:
-            # Get PLX files from user directories
-            user_plx_paths: list[Path] = self._get_pipelex_plx_files_from_dirs(user_dirs)
+        # Combine and deduplicate
+        seen_absolute_paths: set[str] = set()
+        valid_plx_paths = []
+        for plx_path in all_pipelex_plx_paths:
+            try:
+                absolute_path = str(plx_path.resolve())
+            except (OSError, RuntimeError):
+                # For paths that can't be resolved (e.g., in zipped packages), use string representation
+                absolute_path = str(plx_path)
 
-            # Get PLX files from pipelex package using importlib.resources
-            # This works reliably in all installation modes (wheel, source, relative)
-            pipelex_plx_paths: list[Path] = get_pipelex_plx_files_from_package()
-
-            # Combine and deduplicate
-            all_plx_paths = user_plx_paths + pipelex_plx_paths
-            seen_absolute_paths: set[str] = set()
-            valid_plx_paths = []
-            for plx_path in all_plx_paths:
-                try:
-                    absolute_path = str(plx_path.resolve())
-                except (OSError, RuntimeError):
-                    # For paths that can't be resolved (e.g., in zipped packages), use string representation
-                    absolute_path = str(plx_path)
-
-                if absolute_path not in seen_absolute_paths:
-                    valid_plx_paths.append(plx_path)
-                    seen_absolute_paths.add(absolute_path)
+            if absolute_path not in seen_absolute_paths:
+                valid_plx_paths.append(plx_path)
+                seen_absolute_paths.add(absolute_path)
 
         # Import modules to load them into sys.modules (but don't register classes yet)
         # Import from user directories
-        for library_dir in user_dirs:
-            # Only import files that contain StructuredContent subclasses (uses AST pre-check)
-            ClassRegistryUtils.import_modules_in_folder(
-                folder_path=str(library_dir),
-                base_class_names=[StructuredContent.__name__],
-            )
-            # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
-            FuncRegistryUtils.register_funcs_in_folder(
-                folder_path=str(library_dir),
-            )
+        if library_dirs:
+            for library_dir in library_dirs:
+                # Only import files that contain StructuredContent subclasses (uses AST pre-check)
+                ClassRegistryUtils.import_modules_in_folder(
+                    folder_path=str(library_dir),
+                    base_class_names=[StructuredContent.__name__],
+                )
+                # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
+                FuncRegistryUtils.register_funcs_in_folder(
+                    folder_path=str(library_dir),
+                )
 
         # Import from pipelex package
         # Always directly import critical builder modules first (works in all installation modes)
