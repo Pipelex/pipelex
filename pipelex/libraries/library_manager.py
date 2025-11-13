@@ -257,10 +257,11 @@ class LibraryManager(LibraryManagerAbstract):
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> None:
+        if library_dirs is None:
+            library_dirs = [Path(config_manager.local_root_dir)]
         # Collect directories to scan (user project directories)
         all_pipelex_plx_paths: set[Path] = set()
-        if library_dirs:
-            all_pipelex_plx_paths.update(self._get_pipelex_plx_files_from_dirs(set(library_dirs)))
+        all_pipelex_plx_paths.update(self._get_pipelex_plx_files_from_dirs(set(library_dirs)))
         if library_file_paths:
             all_pipelex_plx_paths.update(library_file_paths)
 
@@ -323,7 +324,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Auto-discover and register all StructuredContent classes from sys.modules
         num_registered = ClassRegistryUtils.auto_register_all_subclasses(base_class=StructuredContent)
         log.verbose(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
-
+        
         # Parse all blueprints first
         blueprints: list[PipelexBundleBlueprint] = []
         for plx_file_path in valid_plx_paths:
