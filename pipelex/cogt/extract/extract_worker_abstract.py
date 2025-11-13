@@ -30,7 +30,7 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
     @property
     @override
     def desc(self) -> str:
-        return f"OCR-Worker:{self.inference_model.tag}"
+        return f"Extraction using {self.inference_model.desc}"
 
     def _check_can_perform_job(self, extract_job: ExtractJob):
         # This can be overridden by subclasses for specific checks
@@ -40,7 +40,7 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         self,
         extract_job: ExtractJob,
     ) -> ExtractOutput:
-        log.verbose(f"Extract Worker extract_pages:\n{self.inference_model.desc}")
+        log.info(f"✨ {self.desc} ✨")
 
         # Verify that the job is valid
         extract_job.validate_before_execution()

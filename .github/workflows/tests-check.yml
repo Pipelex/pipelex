@@ -6,8 +6,7 @@ on:
 jobs:
   matrix-test:
     name: Tests check
-    runs-on:
-      group: Large
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
