@@ -19,7 +19,7 @@ class PipeImgGenInputTestCases:
 
     VALID_WITH_INLINE_PROMPT: ClassVar[tuple[str, PipeImgGenBlueprint]] = (
         "valid_with_inline_prompt",
-        PipeImgGenBlueprint(    
+        PipeImgGenBlueprint(
             description="VALID_WITH_INLINE_PROMPT: Test case: valid_with_inline_prompt",
             inputs={},
             output="native.Image",
@@ -107,7 +107,6 @@ class PipeImgGenInputTestCases:
         VALID_WITH_OUTPUT_FORMAT,
         VALID_WITH_IS_RAW,
     ]
-
 
     ERROR_WRONG_INPUT_TYPE: ClassVar[tuple[str, PipeImgGenBlueprint, str]] = (
         "wrong_input_type",

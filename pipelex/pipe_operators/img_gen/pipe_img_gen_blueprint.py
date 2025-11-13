@@ -8,8 +8,10 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
+
 class PipeImgGenBlueprintValueError(ValueError):
     pass
+
 
 class PipeImgGenBlueprint(PipeBlueprint):
     type: Literal["PipeImgGen"] = "PipeImgGen"

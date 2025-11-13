@@ -32,9 +32,7 @@ from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
     get_pipelex_package_dir_for_imports,
     get_pipelex_plx_files_from_dirs,
-    get_pipelex_plx_files_from_package,
 )
-from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
@@ -127,9 +125,9 @@ class LibraryManager(LibraryManagerAbstract):
         if library_id not in self._libraries:
             msg = f"Trying to load a library that does not exist: '{library_id}'"
             raise LibraryError(msg)
-        
+
         if not library_dirs:
-            library_dirs = [Path(".")]
+            library_dirs = [Path()]
 
         all_dirs: list[Path] = []
         all_plx_paths: list[Path] = []
