@@ -6,6 +6,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.exceptions import (
     ConceptDefinitionErrorData,
 )
+from pipelex.core.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager
@@ -69,6 +70,11 @@ async def validate_bundle(
         for pipe in loaded_pipes:
             pipe.validate_with_libraries()
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+
+    except PipelexInterpreterError as interpreter_error:
+        # TODO: enrich
+        raise ValidateBundleError(message=interpreter_error.message) from interpreter_error
+
     except ConceptLoadingError as concept_loading_error:
         concept_def_error = concept_loading_error.concept_definition_error
         concept_definition_error_data = ConceptDefinitionErrorData(

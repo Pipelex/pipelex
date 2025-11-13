@@ -1,10 +1,10 @@
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError, PLXDecodeError
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
 
 
@@ -66,4 +66,47 @@ class PipelexInterpreter(BaseModel):
             msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the PLX file"
             raise PipelexInterpreterError(msg)
 
-        return PipelexBundleBlueprint.model_validate(blueprint_dict)
+        try:
+            return PipelexBundleBlueprint.model_validate(blueprint_dict)
+        except ValidationError as exc:
+            # Parse Pydantic validation errors into structured error data
+            validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
+
+            for error in exc.errors():
+                loc = error.get("loc", ())
+                msg = error.get("msg", "Unknown validation error")
+
+                # Determine if it's a pipe or concept error
+                pipe_code: str | None = None
+                concept_code: str | None = None
+                other: str | None = None
+
+                if len(loc) >= 2:
+                    if loc[0] == "pipe":
+                        pipe_code = str(loc[1])
+                    elif loc[0] == "concept":
+                        concept_code = str(loc[1])
+                    else:
+                        other = str(loc[0])
+                elif len(loc) == 1:
+                    other = str(loc[0])
+
+                # Create field path string
+                field_path = " → ".join(str(item) for item in loc)
+
+                # Create validation error data
+                val_error = PipelexBundleBlueprintValidationErrorData(
+                    pipe_code=pipe_code,
+                    concept_code=concept_code,
+                    field_path=field_path,
+                    message=msg,
+                    other=other,
+                    domain=blueprint_dict.get("domain"),
+                    source=blueprint_dict.get("source") or bundle_path,
+                )
+                validation_errors.append(val_error)
+
+            raise PipelexInterpreterError(
+                message=str(exc),
+                validation_errors=validation_errors,
+            ) from exc
