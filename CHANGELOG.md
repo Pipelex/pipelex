@@ -9,6 +9,11 @@
 ### Refactor
 
 - Refactored the Blueprint validation errors, and validation functions.
+- Refactored the PipelexInterpreter validation errors.
+
+### Changed
+
+- Changed the location of native concepts folders
 
 ## [v0.15.4] - 2025-11-12
 
