@@ -7,7 +7,7 @@ from pipelex.base_exceptions import PipelexException
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -196,7 +196,9 @@ class StuffFactory:
                 content_class_name = type(first_item).__name__
 
                 # Check if it's a native concept
-                if "Content" in content_class_name and NativeConceptCode.is_native_concept(concept_code=content_class_name.split("Content")[0]):
+                if "Content" in content_class_name and NativeConceptCode.is_native_concept_string_or_code(
+                    concept_string_or_code=content_class_name.split("Content")[0]
+                ):
                     concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
                     try:
@@ -223,7 +225,9 @@ class StuffFactory:
                 content_class_name = stuff_content_or_data.__class__.__name__
 
                 # Check if it's a native concept
-                if "Content" in content_class_name and NativeConceptCode.is_native_concept(concept_code=content_class_name.split("Content")[0]):
+                if "Content" in content_class_name and NativeConceptCode.is_native_concept_string_or_code(
+                    concept_string_or_code=content_class_name.split("Content")[0]
+                ):
                     # It's a native concept like TextContent, ImageContent, etc.
                     concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
@@ -288,7 +292,9 @@ class StuffFactory:
                             raise StuffFactoryError(msg)
 
                     # Check if it's a native concept
-                    if "Content" in content_class_name and NativeConceptCode.is_native_concept(concept_code=content_class_name.split("Content")[0]):
+                    if "Content" in content_class_name and NativeConceptCode.is_native_concept_string_or_code(
+                        concept_string_or_code=content_class_name.split("Content")[0]
+                    ):
                         concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                     else:
                         try:

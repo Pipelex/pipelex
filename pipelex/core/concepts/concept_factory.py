@@ -3,7 +3,6 @@ from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import (
     ConceptDefinitionError,
@@ -12,8 +11,9 @@ from pipelex.core.concepts.exceptions import (
     ConceptStructureGeneratorError,
     StructureClassError,
 )
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generator import StructureGenerator
-from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid, validate_refine
+from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
 
@@ -202,19 +202,7 @@ class ConceptFactory:
             ConceptFactoryError: If the refine is invalid
 
         """
-        try:
-            validate_refine(refine=refine)
-        except ConceptRefineError as exc:
-            msg = f"Could not validate refine '{refine}': {exc}"
-            raise ConceptFactoryError(msg) from exc
-
-        # Normalize the refine string (adds native domain if missing)
-        normalized_refine = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
-        if normalized_refine is None:
-            msg = f"Could not normalize refine '{refine}' to a native concept string"
-            raise ConceptFactoryError(msg)
-
-        return normalized_refine
+        return NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
 
     @classmethod
     def make_from_blueprint_or_description(

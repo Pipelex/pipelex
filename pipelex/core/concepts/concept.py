@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_code, validate_concept_string
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.validation import validate_domain_code
@@ -61,7 +61,7 @@ class Concept(BaseModel):
 
     @classmethod
     def is_native_concept(cls, concept: "Concept") -> bool:
-        return NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept.concept_string) is not None
+        return NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=concept.concept_string)
 
     @classmethod
     def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept", strict: bool = False) -> bool:

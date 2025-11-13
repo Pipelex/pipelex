@@ -147,7 +147,7 @@ async def load_and_validate_bundle(bundle_path: str) -> PipelexBundleBlueprint:
     Raises:
         PipelexBundleError: If any pipe failed during dry run.
     """
-    bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
+    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
 
     try:
         validate_bundle_result = await validate_bundle(blueprints=[bundle_blueprint])

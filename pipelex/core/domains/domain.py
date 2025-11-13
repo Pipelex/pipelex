@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from pipelex.types import Self, StrEnum
+from pipelex.types import StrEnum
 
 
 class SpecialDomain(StrEnum):
@@ -25,7 +25,3 @@ class Domain(BaseModel):
     code: str
     description: str | None = None
     system_prompt: str | None = None
-
-    @classmethod
-    def make_default(cls) -> Self:
-        return cls(code=SpecialDomain.NATIVE)

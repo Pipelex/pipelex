@@ -1,30 +1,15 @@
 from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import PipelexConfigurationError
+from pipelex.core.exceptions import PipelexInterpreterError, PLXDecodeError
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
-from pipelex.types import Self
-
-
-class PLXDecodeError(TomlError):
-    """Raised when PLX decoding fails."""
 
 
 class PipelexInterpreter(BaseModel):
     """plx -> PipelexBundleBlueprint"""
-
-    file_path: Path | None = None
-    file_content: str | None = None
-
-    @model_validator(mode="after")
-    def check_file_path_or_file_content(self) -> Self:
-        """Need to check if there is at least one of file_path or file_content"""
-        if self.file_path is None and self.file_content is None:
-            msg = "Either file_path or file_content must be provided"
-            raise PipelexConfigurationError(msg)
-        return self
 
     # TODO: rethink this method
     @staticmethod
@@ -62,29 +47,23 @@ class PipelexInterpreter(BaseModel):
             # If we can't read the file, it's not a valid Pipelex file
             return False
 
-    def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
-        """Make a PipelexBundleBlueprint from the file_path or file_content"""
-        # Load PLX content from file_path or use file_content directly.
+    @classmethod
+    def make_pipelex_bundle_blueprint(cls, bundle_path: str | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:
+        if bundle_path is None and plx_content is None:
+            msg = "Either 'bundle_path' or 'plx_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
+            raise PipelexInterpreterError(msg)
+        blueprint_dict: dict[str, Any] | None = None
         try:
-            if self.file_path:
-                blueprint_dict = load_toml_from_path(path=str(self.file_path))
-                blueprint_dict.update(source=str(self.file_path))
-            elif self.file_content:
-                blueprint_dict = load_toml_from_content(content=self.file_content)
-            else:
-                msg = "Could not make PipelexBundleBlueprint: either file_path or file_content must be provided"
-                raise PipelexConfigurationError(msg)
+            if bundle_path is not None:
+                blueprint_dict = load_toml_from_path(path=bundle_path)
+                blueprint_dict.update(source=bundle_path)
+            elif plx_content is not None:
+                blueprint_dict = load_toml_from_content(content=plx_content)
         except TomlError as exc:
             raise PLXDecodeError(message=exc.message, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
+
+        if not blueprint_dict:
+            msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the PLX file"
+            raise PipelexInterpreterError(msg)
+
         return PipelexBundleBlueprint.model_validate(blueprint_dict)
-
-    @classmethod
-    def load_bundle_blueprint(cls, bundle_path: str) -> PipelexBundleBlueprint:
-        """Load a bundle file and return its blueprint."""
-        bundle_path_obj = Path(bundle_path)
-        if not bundle_path_obj.exists():
-            msg = f"Bundle file not found: {bundle_path}"
-            raise FileNotFoundError(msg)
-
-        interpreter = cls(file_path=bundle_path_obj)
-        return interpreter.make_pipelex_bundle_blueprint()

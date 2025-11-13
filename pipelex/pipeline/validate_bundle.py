@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from pydantic import BaseModel
 
 from pipelex.base_exceptions import PipelexException
@@ -51,14 +49,12 @@ async def validate_bundle(
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
         if plx_content is not None:
-            converter = PipelexInterpreter(file_content=plx_content)
-            blueprint = converter.make_pipelex_bundle_blueprint()
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
             loaded_blueprints = [blueprint]
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 
         if plx_file_path is not None:
-            converter = PipelexInterpreter(file_path=Path(plx_file_path))
-            blueprint = converter.make_pipelex_bundle_blueprint()
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file_path)
             loaded_blueprints = [blueprint]
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 

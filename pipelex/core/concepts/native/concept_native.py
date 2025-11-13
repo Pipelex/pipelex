@@ -1,9 +1,7 @@
+from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
+from pipelex.core.concepts.validation import is_concept_string_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.types import StrEnum
-
-
-class NativeConceptEnumError(Exception):
-    pass
 
 
 class NativeConceptCode(StrEnum):
@@ -78,25 +76,29 @@ class NativeConceptCode(StrEnum):
         return list(cls)
 
     @classmethod
-    def is_native_concept(cls, concept_code: str) -> bool:
-        return concept_code in cls.values_list()
-
-    @classmethod
     def native_concept_class_names(cls):
         return [native_concept.structure_class_name for native_concept in cls]
 
     @classmethod
-    def get_validated_native_concept_string(cls, concept_string_or_code: str) -> str | None:
+    def is_native_concept_string_or_code(cls, concept_string_or_code: str) -> bool:
+        if not is_concept_string_or_code_valid(concept_string_or_code=concept_string_or_code):
+            return False
+
         if "." in concept_string_or_code:
-            if concept_string_or_code.count(".") > 1:
-                msg = f"Trying to get a native concept with code '{concept_string_or_code}' but that is not a native concept"
-                raise NativeConceptEnumError(msg)
             domain_code, concept_code = concept_string_or_code.split(".", 1)
-            if SpecialDomain.is_native(domain=domain_code) and concept_code in cls.values_list():
-                return concept_string_or_code
-            else:
-                return None
-        elif concept_string_or_code in cls.values_list():
-            return f"{SpecialDomain.NATIVE}.{concept_string_or_code}"
+            return SpecialDomain.is_native(domain=domain_code) and concept_code in cls.values_list()
+        return concept_string_or_code in cls.values_list()
+
+    @classmethod
+    def validate_native_concept_string_or_code(cls, concept_string_or_code: str) -> None:
+        if not cls.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
+            msg = f"Concept string or code '{concept_string_or_code}' is not a valid native concept string or code"
+            raise NativeConceptDefinitionError(msg)
+
+    @classmethod
+    def get_validated_native_concept_string(cls, concept_string_or_code: str) -> str:
+        cls.validate_native_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+        if "." in concept_string_or_code:
+            return concept_string_or_code
         else:
-            return None
+            return f"{SpecialDomain.NATIVE}.{concept_string_or_code}"

@@ -7,7 +7,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory

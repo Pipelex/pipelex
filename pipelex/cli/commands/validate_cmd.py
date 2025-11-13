@@ -143,7 +143,7 @@ def validate_cmd(
         if bundle_path:
             absolute_bundle_path = str(Path(bundle_path).resolve())
             if absolute_bundle_path in get_library_manager().get_loaded_plx_paths():
-                bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
+                bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
                 if not bundle_blueprint.pipe:
                     typer.secho(f"Failed to validate bundle '{bundle_path}': no pipes found in bundle", fg=typer.colors.RED, err=True)
                     raise typer.Exit(1)
@@ -156,7 +156,7 @@ def validate_cmd(
                 return
             # When validating a bundle, load_pipe_from_bundle validates ALL pipes in the bundle
             try:
-                bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
+                bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
                 get_telemetry_manager().track_event(
                     EventName.BUNDLE_DRY_RUN,
                     properties={EventProperty.NB_PIPES: bundle_blueprint.nb_pipes, EventProperty.NB_CONCEPTS: bundle_blueprint.nb_concepts},

@@ -3,6 +3,7 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexException
 from pipelex.core.pipes.exceptions import StaticValidationErrorType
+from pipelex.tools.misc.toml_utils import TomlError
 
 
 class PipelexConfigurationError(PipelexException):
@@ -70,3 +71,11 @@ class StaticValidationError(ValueError):
     @override
     def __str__(self) -> str:
         return self.desc()
+
+
+class PLXDecodeError(TomlError):
+    """Raised when PLX decoding fails."""
+
+
+class PipelexInterpreterError(PipelexException):
+    """Raised when PipelexInterpreter fails."""

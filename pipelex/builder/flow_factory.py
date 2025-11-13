@@ -36,8 +36,7 @@ class FlowFactory:
         Returns:
             Flow with controllers preserved and operators as signatures.
         """
-        plx_path = Path(plx_file_path) if isinstance(plx_file_path, str) else plx_file_path
-        bundle_blueprint = PipelexInterpreter(file_path=plx_path).make_pipelex_bundle_blueprint()
+        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=str(plx_file_path))
         return FlowFactory.make_from_bundle_blueprint(bundle_blueprint)
 
     @staticmethod
