@@ -1,49 +1,49 @@
 import pytest
 
 from pipelex import log
-from pipelex.core.exceptions import StaticValidationError
-from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
-from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
-from tests.unit.pipe_operators.pipe_extract.data import PipeExtractInputTestCases
+from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
+from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
+from tests.unit.core.pipes.pipe_operators.pipe_compose.data import PipeComposeInputTestCases
 
 
-class TestPipeExtractValidateInputs:
+class TestPipeComposeValidateInputs:
     @pytest.mark.parametrize(
         ("test_id", "blueprint"),
-        PipeExtractInputTestCases.VALID_CASES,
+        PipeComposeInputTestCases.VALID_CASES,
     )
     def test_validate_inputs_valid_cases(
         self,
         test_id: str,
-        blueprint: PipeExtractBlueprint,
+        blueprint: PipeComposeBlueprint,
     ):
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
-        pipe_extract = PipeExtractFactory.make_from_blueprint(
+        pipe_compose = PipeComposeFactory.make_from_blueprint(
             domain="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
         )
 
         # Assert that the pipe was created successfully
-        assert pipe_extract is not None
-        assert pipe_extract.code == f"test_pipe_{test_id}"
+        assert pipe_compose is not None
+        assert pipe_compose.code == f"test_pipe_{test_id}"
 
     @pytest.mark.parametrize(
-        ("test_id", "blueprint", "expected_error_message_fragment"),
-        PipeExtractInputTestCases.ERROR_CASES,
+        ("test_id", "blueprint", "expected_error_type", "expected_error_message_fragment"),
+        PipeComposeInputTestCases.ERROR_CASES,
     )
     def test_validate_inputs_error_cases(
         self,
         test_id: str,
-        blueprint: PipeExtractBlueprint,
+        blueprint: PipeComposeBlueprint,
+        expected_error_type: type[Exception],
         expected_error_message_fragment: str,
     ):
         log.verbose(f"Testing error case: {test_id}")
 
-        with pytest.raises(StaticValidationError) as exc_info:
-            PipeExtractFactory.make_from_blueprint(
+        with pytest.raises(expected_error_type) as exc_info:
+            PipeComposeFactory.make_from_blueprint(
                 domain="test_domain",
                 pipe_code=f"test_pipe_{test_id}",
                 blueprint=blueprint,

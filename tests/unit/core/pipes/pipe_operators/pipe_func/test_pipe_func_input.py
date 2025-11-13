@@ -5,7 +5,7 @@ from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from pipelex.system.registries.func_registry import func_registry
-from tests.unit.pipe_operators.pipe_func.data import ERROR_TEST_FUNCTIONS, PipeFuncInputTestCases
+from tests.unit.core.pipes.pipe_operators.pipe_func.data import ERROR_TEST_FUNCTIONS, PipeFuncInputTestCases
 
 
 @pytest.fixture(scope="class")
