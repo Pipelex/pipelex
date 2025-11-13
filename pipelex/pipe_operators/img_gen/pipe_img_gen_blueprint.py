@@ -36,12 +36,16 @@ class PipeImgGenBlueprint(PipeBlueprint):
                 msg = "If no inputs are provided, you must provide an 'img_gen_prompt' as attribute."
                 raise PipeImgGenBlueprintValueError(msg)
 
+        if self.inputs and self.img_gen_prompt:
+            msg = "You must provide either an 'img_gen_prompt' as attribute or as a single text input, but not both"
+            raise PipeImgGenBlueprintValueError(msg)
+
         nb_inputs = self.nb_inputs
         if nb_inputs > 1:
             too_many_candidate_inputs_error = StaticValidationError(
                 error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
                 variable_names=self.input_names,
-                explanation="Only one text input can be provided for image gen prompt",
+                explanation="Only one text input can be provided for PipeImgGen",
             )
             raise too_many_candidate_inputs_error
 

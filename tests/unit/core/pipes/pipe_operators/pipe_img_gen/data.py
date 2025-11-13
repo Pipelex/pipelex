@@ -108,28 +108,15 @@ class PipeImgGenInputTestCases:
         VALID_WITH_IS_RAW,
     ]
 
-    ERROR_WRONG_INPUT_TYPE: ClassVar[tuple[str, PipeImgGenBlueprint, str]] = (
+    ERROR_WRONG_INPUT_TYPE: ClassVar[tuple[str, PipeImgGenBlueprint]] = (
         "wrong_input_type",
         PipeImgGenBlueprint(
             description="ERROR_WRONG_INPUT_TYPE: Test case: wrong_input_type",
             inputs={"image": "native.Image"},
             output="native.Image",
         ),
-        "inadequate_input_concept",
     )
 
-    ERROR_BOTH_PROMPT_AND_INPUT: ClassVar[tuple[str, PipeImgGenBlueprint, str]] = (
-        "both_prompt_and_input",
-        PipeImgGenBlueprint(
-            description="ERROR_BOTH_PROMPT_AND_INPUT: Test case: both_prompt_and_input",
-            inputs={"prompt": "native.Text"},
-            output="native.Image",
-            img_gen_prompt="A beautiful sunset",
-        ),
-        "There must be no inputs if img_gen_prompt is provided",
-    )
-
-    ERROR_CASES: ClassVar[list[tuple[str, PipeImgGenBlueprint, str]]] = [
+    ERROR_CASES: ClassVar[list[tuple[str, PipeImgGenBlueprint]]] = [
         ERROR_WRONG_INPUT_TYPE,
-        ERROR_BOTH_PROMPT_AND_INPUT,
     ]

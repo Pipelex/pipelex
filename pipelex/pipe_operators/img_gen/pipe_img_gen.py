@@ -13,7 +13,6 @@ from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError, UnexpectedPipeDefinitionError
@@ -97,7 +96,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     def validate_fields(self) -> Self:
         # Either we have img_gen_prompt or img_gen_prompt_var_name, but not both
         if self.img_gen_prompt_var_name is not None and self.img_gen_prompt is not None:
-            msg = "Either img_gen_prompt or img_gen_prompt_var_name must be provided, but not both"
+            msg = "Either 'img_gen_prompt' or 'img_gen_prompt_var_name' must be provided, but not both"
             raise PipeDefinitionError(msg)
         return self
 
@@ -109,21 +108,19 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     @override
     def validate_input_with_library(self):
         concept_library = get_concept_library()
-
         input_name = self.inputs.variables[0]
         input_requirement = self.inputs.get_required_input_requirement(input_name)
 
         if not concept_library.is_compatible(
             tested_concept=input_requirement.concept,
             wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+            strict=True,
         ):
-            inadequate_input_concept_error = StaticValidationError(
-                error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
-                domain=self.domain,
+            inadequate_input_concept_error = PipeDefinitionError(
+                message="For PipeImgGen you must provide a text input or a concept that refines 'native.Text'",
+                domain_code=self.domain,
                 pipe_code=self.code,
-                variable_names=[input_name],
-                provided_concept_code=input_requirement.concept.code,
-                explanation="For PipeImgGen you must provide a text input or a concept that refines text",
+                description=self.description,
             )
             raise inadequate_input_concept_error
 
