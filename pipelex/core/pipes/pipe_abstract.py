@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunInputsError
+from pipelex.core.pipes.exceptions import PipeAbstractValueError, PipeRunInputsError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -71,13 +71,8 @@ class PipeAbstract(ABC, BaseModel):
             self.validate_input_with_library()
             self.validate_output_with_library()
         except ModelChoiceNotFoundError as exc:
-            raise PipeOperatorModelChoiceError(
-                message=exc.message,
-                pipe_type=self.pipe_type,
-                pipe_code=self.code,
-                model_type=exc.model_type,
-                model_choice=exc.model_choice,
-            ) from exc
+            msg = f"Model choice not found for pipe '{self.code}': {exc}"
+            raise PipeAbstractValueError(msg) from exc
 
     def validate_before_run(
         self,

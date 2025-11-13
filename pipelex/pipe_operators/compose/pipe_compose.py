@@ -19,12 +19,14 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_content_generator
+from pipelex.pipe_operators.compose.exceptions import PipeComposeValueError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 
 
@@ -51,10 +53,14 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     def required_variables(self) -> set[str]:
-        required_variables = detect_jinja2_required_variables(
-            template_category=self.category,
-            template_source=self.template,
-        )
+        try:
+            required_variables = detect_jinja2_required_variables(
+                template_category=self.category,
+                template_source=self.template,
+            )
+        except Jinja2DetectVariablesError as exc:
+            msg = f"Error detecting required variables for PipeCompose: {exc}"
+            raise PipeComposeValueError(msg) from exc
         return {
             variable_name
             for variable_name in required_variables

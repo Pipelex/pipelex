@@ -17,7 +17,7 @@ from pipelex.core.concepts.exceptions import (
 from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.hub import get_current_library_id, get_library_manager, get_required_pipe
+from pipelex.hub import get_current_library_id, get_library_manager, get_required_pipe, set_current_library_id
 from pipelex.libraries.exceptions import (
     ConceptLoadingError,
     DomainLoadingError,
@@ -63,7 +63,9 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
     log.dev(f"Loading bundle blueprint for domain '{bundle_spec.domain}' into library manager")
     library_manager = get_library_manager()
     try:
-        library_manager.load_from_blueprints(library_id=get_current_library_id(), blueprints=[bundle_blueprint])
+        library_id, _ = library_manager.open_library()
+        set_current_library_id(library_id=library_id)
+        library_manager.load_from_blueprints(library_id=library_id, blueprints=[bundle_blueprint])
         log.dev(f"Successfully loaded bundle with {len(bundle_spec.pipe)} pipes")
     except StaticValidationError as static_validation_error:
         static_validation_error_data = StaticValidationErrorData(

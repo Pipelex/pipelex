@@ -3,9 +3,8 @@ from typing import Literal
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
+from pipelex.core.pipes.exceptions import PipeInputNotFoundError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -13,6 +12,7 @@ from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -39,26 +39,15 @@ class PipeSequence(PipeController):
         # Check all required variables are in the inputs
         for named_input_requirement in the_needed_inputs.named_input_requirements:
             if named_input_requirement.variable_name not in self.inputs.variables:
-                missing_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[named_input_requirement.variable_name],
-                    required_concept_codes=[named_input_requirement.concept.code],
-                )
-                raise missing_input_var_error
+                msg = f"Required variable '{named_input_requirement.variable_name}' is not in the inputs of pipe {self.code}"
+                raise PipeSequenceValueError(msg)
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
                 log.verbose(f"the_needed_inputs.required_names: {the_needed_inputs.required_names}")
-                extraneous_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[input_name],
-                )
-                raise extraneous_input_var_error
+                msg = f"Extraneous input '{input_name}' found in the inputs of pipe '{self.code}'"
+                raise PipeSequenceValueError(msg)
 
     @override
     def validate_output_static(self):
@@ -76,9 +65,7 @@ class PipeSequence(PipeController):
 the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
 of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
 """
-            raise PipeControllerOutputConceptMismatchError(
-                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
-            )
+            raise PipeSequenceValueError(msg)
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
@@ -116,9 +103,7 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
                             f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
                             f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
                         )
-                        raise PipeInputError(
-                            message=msg, pipe_code=self.code, variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name, concept_code=None
-                        ) from exc
+                        raise PipeSequenceValueError(msg) from exc
                     needed_inputs.add_requirement(
                         variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
                         concept=requirement.concept,

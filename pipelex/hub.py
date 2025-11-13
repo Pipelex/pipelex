@@ -396,6 +396,10 @@ def set_current_library_id(library_id: str) -> None:
     _library_id.set(library_id)
 
 
+def get_optional_current_library_id() -> str | None:
+    return _library_id.get()
+
+
 def get_current_library_id() -> str:
     """Get the library_id from the current async context."""
     library_id = _library_id.get()

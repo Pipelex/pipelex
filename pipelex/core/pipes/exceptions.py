@@ -21,6 +21,14 @@ class PipeFactoryError(PipelexException):
     pass
 
 
+class PipeAbstractValueError(ValueError):
+    pass
+
+
+class PipeVariableMultiplicityError(ValueError):
+    pass
+
+
 class PipeInputError(PipelexException):
     def __init__(self, message: str, pipe_code: str, variable_name: str, concept_code: str | None = None):
         self.pipe_code = pipe_code

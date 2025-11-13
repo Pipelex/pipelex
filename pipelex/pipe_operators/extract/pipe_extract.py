@@ -6,6 +6,7 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
@@ -26,6 +27,7 @@ from pipelex.hub import (
     get_model_deck,
     get_native_concept,
 )
+from pipelex.pipe_operators.extract.exceptions import PipeExtractValueError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -60,13 +62,17 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     def validate_fields(self) -> Self:
         if self.image_stuff_name is None and self.pdf_stuff_name is None:
             msg = "For PipeExtract you must provide either a pdf or an image or a concept that refines one of them"
-            raise PipeDefinitionError(msg)
+            raise PipeExtractValueError(msg)
         return self
 
     @override
     def validate_input_static(self):
         if self.extract_choice:
-            check_extract_choice_with_deck(extract_choice=self.extract_choice)
+            try:
+                check_extract_choice_with_deck(extract_choice=self.extract_choice)
+            except ModelChoiceNotFoundError as exc:
+                msg = f"Extract choice '{self.extract_choice}' was not found in the model deck"
+                raise PipeExtractValueError(msg) from exc
 
     @override
     def validate_input_with_library(self):
@@ -80,7 +86,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     def validate_output_with_library(self):
         if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
             msg = f"PipeExtract output should be a Page concept, but is {self.output.concept_string}"
-            raise PipeDefinitionError(msg)
+            raise PipeExtractValueError(msg)
 
     @override
     async def _run_operator_pipe(

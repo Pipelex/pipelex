@@ -15,7 +15,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError, UnexpectedPipeDefinitionError
+from pipelex.core.pipe_errors import UnexpectedPipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
@@ -26,6 +26,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
+from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenValueError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -77,12 +78,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
             else:
                 msg = "For PipeImgGen you must provide an image generation prompt either as attribute of the pipe or as a single text input"
-                raise PipeDefinitionError(
-                    message=msg,
-                    domain_code=self.domain,
-                    pipe_code=self.code,
-                    description=self.description,
-                )
+                raise PipeImgGenValueError(msg)
         return needed_inputs
 
     @override
@@ -96,7 +92,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # Either we have img_gen_prompt or img_gen_prompt_var_name, but not both
         if self.img_gen_prompt_var_name is not None and self.img_gen_prompt is not None:
             msg = "Either 'img_gen_prompt' or 'img_gen_prompt_var_name' must be provided, but not both"
-            raise PipeDefinitionError(msg)
+            raise PipeImgGenValueError(msg)
         return self
 
     @override
@@ -115,13 +111,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
             strict=True,
         ):
-            inadequate_input_concept_error = PipeDefinitionError(
-                message="For PipeImgGen you must provide a text input or a concept that refines 'native.Text'",
-                domain_code=self.domain,
-                pipe_code=self.code,
-                description=self.description,
-            )
-            raise inadequate_input_concept_error
+            msg = "For PipeImgGen you must provide a text input or a concept that refines 'native.Text'"
+            raise PipeImgGenValueError(msg)
 
     @override
     def validate_output_static(self):
@@ -138,7 +129,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 f"The output of a ImgGen pipe must be compatible with the Image concept. "
                 f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
             )
-            raise PipeDefinitionError(msg)
+            raise PipeImgGenValueError(msg)
 
     @override
     async def _run_operator_pipe(

@@ -15,6 +15,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.pipe_operators.func.exceptions import PipeFuncValueError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import DryRunMissingInputsError
@@ -44,16 +45,16 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         function = func_registry.get_function(function_name)
         if not function:
             msg = f"Function '{function_name}' not found in registry"
-            raise PipeDefinitionError(msg)
+            raise PipeFuncValueError(msg)
 
         return_type = get_type_hints(function).get("return")
 
         if return_type is None:
             msg = f"Function '{function_name}' has no return type annotation"
-            raise PipeDefinitionError(msg)
+            raise PipeFuncValueError(msg)
         if not issubclass(return_type, StuffContent):
             msg = f"Function '{function_name}' return type {return_type} is not a subclass of StuffContent"
-            raise PipeDefinitionError(msg)
+            raise PipeFuncValueError(msg)
         return function_name
 
     @override

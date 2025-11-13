@@ -6,11 +6,11 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
+from pipelex.pipe_operators.llm.exceptions import PipeLLMFactoryError
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
@@ -43,7 +43,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     f"Template syntax error in system prompt for pipe '{pipe_code}' "
                     f"in domain '{domain}': {exc}. Template source:\n{blueprint.system_prompt}"
                 )
-                raise PipeDefinitionError(error_msg) from exc
+                raise PipeLLMFactoryError(error_msg) from exc
 
         user_text_jinja2_blueprint: TemplateBlueprint | None = None
         if blueprint.prompt:
@@ -56,7 +56,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 error_msg = (
                     f"Template syntax error in user prompt for pipe '{pipe_code}' in domain '{domain}': {exc}. Template source:\n{blueprint.prompt}"
                 )
-                raise PipeDefinitionError(error_msg) from exc
+                raise PipeLLMFactoryError(error_msg) from exc
 
         user_images: list[str] = []
         if blueprint.inputs:

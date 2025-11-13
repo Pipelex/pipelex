@@ -3,11 +3,11 @@ from typing_extensions import override
 from pipelex.config.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_concept_library, get_native_concept, get_required_concept
+from pipelex.pipe_operators.extract.exceptions import PipeExtractFactoryError
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 
@@ -36,12 +36,8 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         concept_library = get_concept_library()
 
         if blueprint.inputs is None:
-            raise PipeDefinitionError(
-                message="For PipeExtract you must provide either a pdf or an image or a concept that refines one of them",
-                domain_code=domain,
-                pipe_code=pipe_code,
-                description=blueprint.description,
-            )
+            msg = "For PipeExtract you must provide either a pdf or an image or a concept that refines one of them"
+            raise PipeExtractFactoryError(msg)
         inputs = InputRequirementsFactory.make_from_blueprint(
             domain=domain,
             blueprint=blueprint.inputs or {},
@@ -69,12 +65,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
                 f"with the required concept {get_native_concept(native_concept=NativeConceptCode.IMAGE).concept_string} or "
                 f"{get_native_concept(native_concept=NativeConceptCode.PDF).concept_string}"
             )
-            raise PipeDefinitionError(
-                message=msg,
-                domain_code=domain,
-                pipe_code=pipe_code,
-                description=blueprint.description,
-            )
+            raise PipeExtractFactoryError(msg)
 
         return PipeExtract(
             domain=domain,

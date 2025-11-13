@@ -18,9 +18,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -37,6 +35,7 @@ from pipelex.hub import (
     get_native_concept,
     get_required_concept,
 )
+from pipelex.pipe_operators.llm.exceptions import PipeLLMValueError
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -69,7 +68,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 f"Output concept '{self.output.code}' is considered a Text concept, "
                 f"so it cannot be structured. Maybe you forgot to add '{NativeConceptCode.TEXT}' to the class registry?"
             )
-            raise PipeDefinitionError(msg)
+            raise PipeLLMValueError(msg)
         return self
 
     @override
@@ -86,13 +85,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         # 1: Check that all the required variables are actually in the inputs
         for required_variable_name in required_variables:
             if required_variable_name not in self.needed_inputs().variables:
-                missing_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[required_variable_name],
-                )
-                raise missing_input_var_error
+                msg = f"Required variable '{required_variable_name}' not found in the inputs of pipe '{self.code}'"
+                raise PipeLLMValueError(msg)
 
         # 2: Check that all inputs are in the required variables
         for input_name, requirement in self.needed_inputs().items:
@@ -107,14 +101,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                         "Please add it to the prompt template."
                     )
 
-                extraneous_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[input_name],
-                    explanation=explanation,
-                )
-                raise extraneous_input_var_error
+                msg = f"Extraneous input '{input_name}' found in the inputs of pipe '{self.code}': {explanation}"
+                raise PipeLLMValueError(msg)
 
     @override
     def validate_output_static(self):
@@ -131,7 +119,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 f"pipe '{self.code}' the output is '{self.output.concept_string}'"
                 "Use a PipeImgGen if you want to generate images. You can use a PipeLLM to generate the prompt for a PipeImgGen."
             )
-            raise PipeDefinitionError(msg)
+            raise PipeLLMValueError(msg)
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:

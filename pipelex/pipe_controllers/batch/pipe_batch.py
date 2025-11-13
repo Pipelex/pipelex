@@ -7,12 +7,13 @@ from typing_extensions import override
 from pipelex.config.config import get_config
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError, PipeRunInputsError
+from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
+from pipelex.pipe_controllers.batch.exceptions import PipeBatchValueError
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -66,7 +67,7 @@ class PipeBatch(PipeController):
                     f"Input '{variable_name}' required by branch pipe '{self.branch_pipe_code}' "
                     f"of PipeBatch '{self.code}', is not listed in its inputs"
                 )
-                raise PipeInputError(message=msg, pipe_code=self.code, variable_name=variable_name, concept_code=None)
+                raise PipeBatchValueError(msg)
 
     @override
     def validate_output_static(self):
@@ -87,7 +88,7 @@ class PipeBatch(PipeController):
                 f"Batch input list named '{self.batch_params.input_list_stuff_name}' is not in "
                 f"PipeBatch '{self.code}' input requirements: {self.inputs}"
             )
-            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=self.batch_params.input_list_stuff_name, concept_code=None) from exc
+            raise PipeBatchValueError(msg) from exc
 
         required_stuff_name = self.batch_params.input_list_stuff_name
         try:
@@ -96,7 +97,7 @@ class PipeBatch(PipeController):
             variable_name: str = exc.variable_name or required_stuff_name
             missing_inputs: dict[str, str] = {variable_name: exc.concept_code or required_concept_code}
             msg = f"Missing required inputs for pipe '{self.code}': {missing_inputs}"
-            raise PipeRunInputsError(message=msg, pipe_code=self.code, missing_inputs=missing_inputs) from exc
+            raise PipeBatchValueError(msg) from exc
 
     async def _run_batch_pipe(
         self,
