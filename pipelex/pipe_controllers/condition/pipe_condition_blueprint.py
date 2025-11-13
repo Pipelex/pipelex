@@ -1,9 +1,10 @@
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_controllers.condition.exceptions import PipeConditionBlueprintValueError
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 
 OutcomeMap = dict[str, str]
@@ -29,6 +30,14 @@ class PipeConditionBlueprint(PipeBlueprint):
         if self.default_outcome:
             pipe_codes.add(self.default_outcome)
         return pipe_codes - set(SpecialOutcome.value_list())
+
+    @field_validator("outcomes", mode="after")
+    @classmethod
+    def validate_outcome_map(cls, outcomes: OutcomeMap) -> OutcomeMap:
+        if not outcomes:
+            msg = "PipeCondition must have at least one mapping in outcomes"
+            raise PipeConditionBlueprintValueError(msg)
+        return outcomes
 
     @override
     def _validate_inputs(self):

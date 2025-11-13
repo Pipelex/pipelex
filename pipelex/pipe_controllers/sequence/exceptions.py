@@ -1,6 +1,6 @@
-class PipeSequenceBlueprintError(Exception):
+class PipeSequenceError(Exception):
     pass
 
 
-class PipeSequenceError(Exception):
+class PipeSequenceBlueprintValueError(ValueError):
     pass

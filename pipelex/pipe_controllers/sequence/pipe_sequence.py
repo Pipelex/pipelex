@@ -1,12 +1,10 @@
 from typing import Literal
 
-from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
@@ -81,14 +79,6 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
             raise PipeControllerOutputConceptMismatchError(
                 message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
             )
-
-    @field_validator("sequential_sub_pipes", mode="before")
-    @classmethod
-    def validate_steps(cls, sequential_sub_pipes: list[SubPipe]) -> list[SubPipe]:
-        if len(sequential_sub_pipes) == 0:
-            msg = f"Pipe'{cls.code}'(PipeSequence) must have at least 1 step"
-            raise PipeDefinitionError(message=msg, domain_code=cls.domain, pipe_code=cls.code, description=cls.description)
-        return sequential_sub_pipes
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:

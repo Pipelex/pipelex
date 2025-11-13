@@ -1,7 +1,7 @@
 from typing import Literal
 
 import shortuuid
-from pydantic import field_validator, model_validator
+from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex import log
@@ -176,14 +176,6 @@ class PipeCondition(PipeController):
             msg = "PipeCondition should have exactly one of expression_template or expression"
             raise PipeDefinitionError(message=msg, domain_code=self.domain, pipe_code=self.code, description=self.description)
         return self
-
-    @field_validator("outcome_map", mode="before")
-    @classmethod
-    def validate_outcome_map(cls, outcome_map: ConditionOutcomeMap) -> ConditionOutcomeMap:
-        if not outcome_map:
-            msg = f"Pipe'{cls.code}'(PipeCondition) must have at least one mapping in outcomes"
-            raise PipeDefinitionError(message=msg, domain_code=cls.domain, pipe_code=cls.code, description=cls.description)
-        return outcome_map
 
     @override
     def validate_input_static(self):
