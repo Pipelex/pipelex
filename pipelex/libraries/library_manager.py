@@ -30,11 +30,9 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
-    get_pipelex_package_dir_for_imports,
     get_pipelex_plx_files_from_dirs,
 )
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.types import StrEnum
 
@@ -165,27 +163,6 @@ class LibraryManager(LibraryManagerAbstract):
             # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
             FuncRegistryUtils.register_funcs_in_folder(
                 folder_path=str(library_dir),
-            )
-
-        # Verify critical functions were registered
-        # TODO: This should be a Unit test
-        critical_functions = ["create_concept_spec", "assemble_pipelex_bundle_spec"]
-        for func_name in critical_functions:
-            if func_registry.has_function(func_name):
-                log.verbose(f"✓ Function '{func_name}' successfully registered")
-            else:
-                log.error(f"✗ Function '{func_name}' NOT registered - this will cause errors!")
-
-        # Then try filesystem-based scanning if package is accessible (for completeness)
-        pipelex_pkg_dir = get_pipelex_package_dir_for_imports()
-        if pipelex_pkg_dir:
-            log.verbose(f"Additionally scanning pipelex package filesystem: {pipelex_pkg_dir}")
-            ClassRegistryUtils.import_modules_in_folder(
-                folder_path=str(pipelex_pkg_dir),
-                base_class_names=[StructuredContent.__name__],
-            )
-            FuncRegistryUtils.register_funcs_in_folder(
-                folder_path=str(pipelex_pkg_dir),
             )
 
         # Auto-discover and register all StructuredContent classes from sys.modules

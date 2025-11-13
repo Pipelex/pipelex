@@ -84,10 +84,12 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         If it is not native and doesnt have a domain, it should raise an error
         """
         if Concept.is_implicit_concept(concept_string=concept_string):
-            return ConceptFactory.make_implicit_concept(concept_string=concept_string)
+            return ConceptFactory.make_implicit_concept(concept_code=concept_string.split(".")[1])
+
         if not is_concept_string_valid(concept_string=concept_string):
             msg = f"Concept string '{concept_string}' is not a valid concept string"
             raise ConceptLibraryError(msg)
+
         the_concept = self.get_optional_concept(concept_string=concept_string)
         if not the_concept:
             msg = f"Concept '{concept_string}' not found in the library"
@@ -115,7 +117,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             raise ConceptLibraryError(msg) from exc
 
         if NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
-            return self.get_native_concept(native_concept=NativeConceptCode(concept_string_or_code))
+            native_concept_string = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code)
+            return self.get_native_concept(native_concept=NativeConceptCode(native_concept_string.split(".")[1]))
         elif "." in concept_string_or_code:
             return self.get_required_concept(concept_string=concept_string_or_code)
         else:

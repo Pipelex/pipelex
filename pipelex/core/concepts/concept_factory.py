@@ -8,12 +8,13 @@ from pipelex.core.concepts.exceptions import (
     ConceptDefinitionError,
     ConceptFactoryError,
     ConceptRefineError,
+    ConceptStringError,
     ConceptStructureGeneratorError,
     StructureClassError,
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generator import StructureGenerator
-from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid
+from pipelex.core.concepts.validation import is_concept_code_valid, validate_concept_string_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
 
@@ -53,14 +54,11 @@ class ConceptFactory:
         return normalized
 
     @classmethod
-    def make_implicit_concept(cls, concept_string: str) -> Concept:
-        if not is_concept_string_valid(concept_string=concept_string):
-            msg = f"Concept string '{concept_string}' is not a valid concept string"
-            raise ConceptFactoryError(msg)
+    def make_implicit_concept(cls, concept_code: str) -> Concept:
         return Concept(
-            code=concept_string.split(".")[1],
+            code=concept_code,
             domain=SpecialDomain.IMPLICIT,
-            description=concept_string,
+            description=concept_code,
             structure_class_name=TextContent.__name__,
         )
 
@@ -153,13 +151,19 @@ class ConceptFactory:
         concept_string_or_code: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> DomainAndConceptCode:
-        # At this point, the concept_string_or_code is already validated
+        try:
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+        except ConceptStringError as exc:
+            msg = f"Concept string or code '{concept_string_or_code}' is not a valid concept string or code"
+            raise ConceptFactoryError(msg) from exc
+
+        if NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
+            natice_concept_string = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code)
+            return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=natice_concept_string.split(".")[1])
+
         if "." in concept_string_or_code:
-            # Is a concept string.
-            parts = concept_string_or_code.rsplit(".")
-            return DomainAndConceptCode(domain=parts[0], concept_code=parts[1])
-        if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code):
-            return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_code)
+            domain_code, concept_code = concept_string_or_code.rsplit(".")
+            return DomainAndConceptCode(domain=domain_code, concept_code=concept_code)
         if (
             concept_codes_from_the_same_domain and concept_string_or_code in concept_codes_from_the_same_domain
         ):  # Is a concept code from the same domain

@@ -20,6 +20,5 @@ class TestPipelexInterpreter:
     def test_invalid_plx_should_raise_exception(self, test_name: str, invalid_plx_content: str, expected_exception: type[Exception]):
         """Test that invalid PLX content raises appropriate exceptions."""
         log.verbose(f"Testing invalid PLX content: {test_name}")
-
         with pytest.raises(expected_exception):
             PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=invalid_plx_content)

@@ -94,6 +94,26 @@ class PipelexInterpreter(BaseModel):
                 # Create field path string
                 field_path = " → ".join(str(item) for item in loc)
 
+                # Handle domain and source fields carefully when they are the error location
+                # If the error is on the domain field itself, don't use blueprint_dict.get("domain")
+                # since it's the field that failed validation
+                domain_value: str | None = None
+                source_value: str | None = None
+
+                if loc and loc[0] == "domain":
+                    # The domain field itself has an error, don't use it
+                    domain_value = None
+                else:
+                    # Use the domain from blueprint_dict if available
+                    domain_value = blueprint_dict.get("domain")
+
+                if loc and loc[0] == "source":
+                    # The source field itself has an error, use bundle_path as fallback
+                    source_value = bundle_path
+                else:
+                    # Use source from blueprint_dict or bundle_path
+                    source_value = blueprint_dict.get("source") or bundle_path
+
                 # Create validation error data
                 val_error = PipelexBundleBlueprintValidationErrorData(
                     pipe_code=pipe_code,
@@ -101,8 +121,8 @@ class PipelexInterpreter(BaseModel):
                     field_path=field_path,
                     message=msg,
                     other=other,
-                    domain=blueprint_dict.get("domain"),
-                    source=blueprint_dict.get("source") or bundle_path,
+                    domain=domain_value,
+                    source=source_value,
                 )
                 validation_errors.append(val_error)
 
