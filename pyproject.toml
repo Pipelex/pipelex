@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.15.3"
+version = "0.15.4"
 description = "The open standard for repeatable AI workflows. Write business logic, not API calls."
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -22,7 +22,7 @@ dependencies = [
     "backports.strenum>=1.3.0 ; python_version < '3.11'",
     "filetype>=1.2.0",
     "httpx>=0.23.0,<1.0.0",
-    "instructor>=1.8.3,<1.11.0", # 1.11.x causes typing errors with mypy
+    "instructor>=1.8.3,<1.11.0",                          # 1.11.x causes typing errors with mypy
     "instructor[groq]==1.8.3",
     "jinja2>=3.1.4",
     "json2html>=1.3.0",
