@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Feature
+
+- Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
+
+### Refactor
+
+- Refactored the Blueprint validation errors, and validation functions.
+
 ## [v0.15.4] - 2025-11-12
 
 ### Added
