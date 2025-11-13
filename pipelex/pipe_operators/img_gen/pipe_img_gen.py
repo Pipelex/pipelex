@@ -53,9 +53,6 @@ class PipeImgGenOutput(PipeOutput):
         return the_urls
 
 
-DEFAULT_PROMPT_VAR_NAME = "prompt"
-
-
 class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     img_gen_prompt: str | None = None
@@ -74,23 +71,25 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         needed_inputs = InputRequirementsFactory.make_empty()
-        if self.img_gen_prompt:
-            needed_inputs.add_requirement(
-                variable_name="img_gen_prompt",
-                concept=ConceptFactory.make_native_concept(
-                    native_concept_code=NativeConceptCode.TEXT,
-                ),
-            )
-        else:
-            for input_name, requirement in self.inputs.items:
+        if not self.img_gen_prompt:
+            if len(self.inputs.items) == 1:
+                input_name, requirement = self.inputs.items[0]  # We know there is only one input because of the validation
                 needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
+            else:
+                msg = "For PipeImgGen you must provide an image generation prompt either as attribute of the pipe or as a single text input"
+                raise PipeDefinitionError(
+                    message=msg,
+                    domain_code=self.domain,
+                    pipe_code=self.code,
+                    description=self.description,
+                )
         return needed_inputs
 
     @override
     def required_variables(self) -> set[str]:
         if self.img_gen_prompt_var_name:
             return {self.img_gen_prompt_var_name}
-        return {DEFAULT_PROMPT_VAR_NAME}
+        return set()
 
     @model_validator(mode="after")
     def validate_fields(self) -> Self:

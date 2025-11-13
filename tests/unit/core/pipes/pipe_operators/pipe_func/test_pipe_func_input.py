@@ -82,7 +82,7 @@ class TestPipeFuncValidation:
                 domain="test_domain",
                 pipe_code=f"test_pipe_{test_id}",
                 blueprint=blueprint,
-            )
+            ).validate_with_libraries()
 
         # Assert that the error message contains the expected substring
         error_message = str(exc_info.value)

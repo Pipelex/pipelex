@@ -129,6 +129,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             msg = (
                 f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
                 f"pipe '{self.code}' the output is '{self.output.concept_string}'"
+                "Use a PipeImgGen if you want to generate images. You can use a PipeLLM to generate the prompt for a PipeImgGen."
             )
             raise PipeDefinitionError(msg)
 

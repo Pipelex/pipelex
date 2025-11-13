@@ -45,7 +45,7 @@ class TestPipeLLMValidateInputs:
                 domain="test_domain",
                 pipe_code=f"test_pipe_{test_id}",
                 blueprint=blueprint,
-            )
+            ).validate_with_libraries()
 
         error_str = str(exc_info.value)
         assert expected_error_message_fragment in error_str, (

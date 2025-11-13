@@ -20,3 +20,7 @@ class PipeOperatorModelAvailabilityError(PipelexException):
         self.model_handle = model_handle
         self.fallback_list = fallback_list
         super().__init__(message)
+
+
+class PipeComposeBlueprintValueError(ValueError):
+    pass

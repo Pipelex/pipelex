@@ -1,9 +1,7 @@
 from typing_extensions import override
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
@@ -56,23 +54,4 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             templating_style=blueprint.templating_style,
             category=blueprint.template_category,
             extra_context=blueprint.extra_context,
-        )
-
-    @classmethod
-    def make_pipe_compose_from_template_str(
-        cls,
-        domain: str,
-        template_str: str,
-        inputs: InputRequirements | None = None,
-    ) -> PipeCompose:
-        preprocessed_template = preprocess_template(template_str)
-        check_jinja2_parsing(
-            template_source=preprocessed_template,
-            template_category=TemplateCategory.LLM_PROMPT,
-        )
-        return PipeCompose(
-            domain=domain,
-            code="adhoc_pipe_compose_from_template_str",
-            template=preprocessed_template,
-            inputs=inputs or InputRequirementsFactory.make_empty(),
         )
