@@ -44,9 +44,10 @@ excluded_dirs = [
 ]
 
 [pipelex.builder_config]
-default_output_dir = "results"
-default_bundle_file_name = "bundle"
-default_directory_base_name = "pipeline"
+# Uncomment to change where the generated pipelines are saved
+# default_output_dir = "."
+# default_bundle_file_name = "bundle"
+# default_directory_base_name = "pipeline"
 
 [pipelex.log_config]
 default_log_level = "INFO"

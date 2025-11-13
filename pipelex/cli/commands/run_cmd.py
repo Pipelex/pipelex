@@ -219,11 +219,15 @@ def run_cmd(
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.PIPE_RUN)
 
+    except typer.Exit:
+        raise
+
     except Exception as exc:
         log.error(f"Error executing pipeline: {exc}")
         console = Console(stderr=True)
         console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
         console.print_exception(show_locals=True)
         raise typer.Exit(1) from exc
+
     finally:
         pipelex_instance.teardown()

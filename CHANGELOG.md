@@ -1,12 +1,26 @@
 # Changelog
 
-## Unreleased - 
+## [v0.15.4] - 2025-11-12
 
-### Refactor
+### Added
+ - **Enhanced `pipelex build` Command**: Now generates a self-contained directory (e.g., `results/pipeline_01/`) containing `bundle.plx`, `inputs.json`, `run_{pipe_code}.py`, `bundle_view.html`, and `bundle_view.svg`. New CLI options: `--output-name (-o)` for custom base name, `--output-dir` for custom directory, and `--no-extras` to generate only the `.plx` file.
+ - **CLI Readiness Check**: Verifies that a virtual environment is active for development installations.
+ - **Model Deck Presets**: Added `llm_for_creativity` and `cheap_llm_for_creativity` model waterfalls, plus `[cogt.model_deck_config]` section in `pipelex.toml` for configuring model fallback behavior.
+ - WIP: **Groq Inference Backend Support**: Integrated full support for the Groq API with configuration file (`.pipelex/inference/backends/groq.toml`), model specifications, costs, capabilities, new model aliases (`base-groq`, `fast-groq`, `vision-groq`), and routing profile (`all_groq`).
 
-- Organized all exceptions specific folders.
-- Added Value error to blueprints.
-- Removed usedless exceptions.
+### Changed
+ - **CLI Output and Visualization**: Overhauled command-line output with rich, table-based layouts for pipeline components. Final output of `pipelex run` is now pretty-printed and adapts to content type.
+ - **Documentation**: Updated "Get Started" and "Build Reliable AI Workflows" to reflect new directory-based build output and CLI options.
+ - **Internal Code Refactoring**: Reorganized exception hierarchy into dedicated `exceptions.py` files per module, centralized validation logic into `validation.py` modules, added `ValueError` to blueprints, and removed unused exceptions for improved maintainability.
+
+### Fixed
+ - Adjusted default temperature for `llm_for_testing_gen_object` preset from `0.5` to `0.1` for more deterministic structured data generation.
+ - Corrected `LLM_FOR_VISUAL_DESIGN` skill in `pipe_llm_spec` to point to `cheap_llm_for_creativity` preset.
+ - Standardized input variable names in `pipe_llm_vision.plx` from `imageA`/`imageB` to `image_a`/`image_b`.
+
+### Removed
+ - Deleted `pipelex/core/validation_errors.py` file as part of exception hierarchy refactoring.
+
 
 ## [v0.15.3] - 2025-11-07
 
