@@ -164,11 +164,6 @@ class LibraryManager(LibraryManagerAbstract):
                 folder_path=str(library_dir),
             )
 
-        # Import from pipelex package
-        # Always directly import critical builder modules first (works in all installation modes)
-        log.verbose("About to import pipelex.builder modules for @pipe_func registration")
-        self._import_pipelex_modules_directly()
-
         # Verify critical functions were registered
         # TODO: This should be a Unit test
         critical_functions = ["create_concept_spec", "assemble_pipelex_bundle_spec"]
@@ -316,18 +311,6 @@ class LibraryManager(LibraryManagerAbstract):
             validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
             msg = f"Could not load blueprints because of: {validation_error_msg}"
             raise LibraryLoadingError(msg) from validation_error
-
-    def _import_pipelex_modules_directly(self) -> None:
-        """Import pipelex modules to register @pipe_func decorated functions.
-
-        This ensures critical pipelex functions are registered regardless of how pipelex
-        is installed (wheel, source, relative path, etc.).
-        """
-        import pipelex.builder  # noqa: PLC0415 - intentional local import
-
-        log.verbose("Registering @pipe_func functions from pipelex.builder")
-        functions_count = FuncRegistryUtils.register_pipe_funcs_from_package("pipelex.builder", pipelex.builder)
-        log.verbose(f"Registered {functions_count} @pipe_func functions from pipelex.builder")
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_library()
