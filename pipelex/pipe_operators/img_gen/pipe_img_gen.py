@@ -13,6 +13,7 @@ from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError, UnexpectedPipeDefinitionError
@@ -63,14 +64,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     img_gen: ImgGenModelChoice | None = None
 
-    # Legacy individual settings (for backwards compatibility)
-    # img_gen_handle: str | None = None
-    # quality: Quality | None = Field(default=None, strict=False)
-    # nb_steps: int | None = Field(default=None, gt=0)
-    # guidance_scale: float | None = Field(default=None, gt=0)
-    # is_moderated: bool | None = None
-    # safety_tolerance: int | None = Field(default=None, ge=1, le=6)
-
     # One-time settings (not in ImgGenSetting)
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
     is_raw: bool | None = None
@@ -115,7 +108,24 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     @override
     def validate_input_with_library(self):
-        pass
+        concept_library = get_concept_library()
+
+        input_name = self.inputs.variables[0]
+        input_requirement = self.inputs.get_required_input_requirement(input_name)
+
+        if not concept_library.is_compatible(
+            tested_concept=input_requirement.concept,
+            wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+        ):
+            inadequate_input_concept_error = StaticValidationError(
+                error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
+                domain=self.domain,
+                pipe_code=self.code,
+                variable_names=[input_name],
+                provided_concept_code=input_requirement.concept.code,
+                explanation="For PipeImgGen you must provide a text input or a concept that refines text",
+            )
+            raise inadequate_input_concept_error
 
     @override
     def validate_output_static(self):
@@ -181,16 +191,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         if self.img_gen is not None:
             # New pattern: use img_gen choice (preset or inline setting)
             img_gen_setting = model_deck.get_img_gen_setting(self.img_gen)
-        # elif self.img_gen_handle is not None:
-        #     # Legacy pattern: create ImgGenSetting from individual settings
-        #     img_gen_setting = ImgGenSetting(
-        #         model=self.img_gen_handle,
-        #         quality=self.quality,
-        #         nb_steps=self.nb_steps,
-        #         guidance_scale=self.guidance_scale or img_gen_param_defaults.guidance_scale,
-        #         is_moderated=self.is_moderated if self.is_moderated is not None else img_gen_param_defaults.is_moderated,
-        #         safety_tolerance=self.safety_tolerance or img_gen_param_defaults.safety_tolerance,
-        #     )
         else:
             # Use default from model deck
             img_gen_setting = model_deck.get_img_gen_setting(model_deck.img_gen_choice_default)

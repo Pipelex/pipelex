@@ -33,7 +33,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
         # check that we have either an img_gen_prompt passed as attribute or as a single text input
         if not self.inputs:
             if not self.img_gen_prompt:
-                msg = "No inputs provided, and not prompt."
+                msg = "If no inputs are provided, you must provide an 'img_gen_prompt' as attribute."
                 raise PipeImgGenBlueprintValueError(msg)
 
         nb_inputs = self.nb_inputs

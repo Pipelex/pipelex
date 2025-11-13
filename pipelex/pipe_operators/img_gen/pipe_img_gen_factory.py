@@ -1,12 +1,10 @@
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.hub import get_concept_library, get_required_concept
+from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
@@ -38,28 +36,16 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             blueprint=blueprint.inputs or {},
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
-        concept_library = get_concept_library()
 
-        input_name = blueprint.input_names[0]
-        input_requirement = inputs.get_required_input_requirement(input_name)
-
+        img_gen_prompt = blueprint.img_gen_prompt
         img_gen_prompt_var_name = blueprint.img_gen_prompt_var_name
 
-        if concept_library.is_compatible(
-            tested_concept=input_requirement.concept,
-            wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
-        ):
-            img_gen_prompt_var_name = input_name
+        # If we have inputs, that means that the prompt is in the inputs.
+        # The blueprint already validated that there is only 1 input.
+        if blueprint.inputs and len(blueprint.inputs) != 0:
+            img_gen_prompt_var_name = blueprint.input_names[0]
         else:
-            inadequate_input_concept_error = StaticValidationError(
-                error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
-                domain=domain,
-                pipe_code=pipe_code,
-                variable_names=[input_name],
-                provided_concept_code=input_requirement.concept.code,
-                explanation="For PipeImgGen you must provide a text input or a concept that refines text",
-            )
-            raise inadequate_input_concept_error
+            img_gen_prompt = blueprint.img_gen_prompt
 
         return PipeImgGen(
             domain=domain,
@@ -73,7 +59,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
                 ),
             ),
             output_multiplicity=final_multiplicity,
-            img_gen_prompt=blueprint.img_gen_prompt,
+            img_gen_prompt=img_gen_prompt,
             img_gen_prompt_var_name=img_gen_prompt_var_name,
             img_gen=blueprint.model,
             aspect_ratio=blueprint.aspect_ratio,

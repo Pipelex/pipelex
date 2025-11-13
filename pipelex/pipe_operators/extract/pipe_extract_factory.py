@@ -34,6 +34,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         image_stuff_name = None
         pdf_stuff_name = None
         concept_library = get_concept_library()
+
         if blueprint.inputs is None:
             raise PipeDefinitionError(
                 message="For PipeExtract you must provide either a pdf or an image or a concept that refines one of them",
