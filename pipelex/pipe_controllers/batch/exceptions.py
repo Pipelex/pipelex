@@ -1,13 +1,13 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
 class PipeBatchValueError(ValueError):
     pass
 
 
-class PipeBatchFactoryError(PipelexException):
+class PipeBatchFactoryError(PipelexError):
     pass
 
 
-class PipeBatchRunError(PipelexException):
+class PipeBatchRunError(PipelexError):
     pass

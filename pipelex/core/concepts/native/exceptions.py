@@ -1,9 +1,9 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
-class NativeConceptDefinitionError(PipelexException):
+class NativeConceptDefinitionError(PipelexError):
     pass
 
 
-class NativeConceptEnumError(PipelexException):
+class NativeConceptEnumError(PipelexError):
     pass

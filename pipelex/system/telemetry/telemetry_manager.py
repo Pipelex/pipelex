@@ -6,7 +6,7 @@ from posthog import Posthog, new_context, tag  # type: ignore[attr-defined]
 from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 
-from pipelex.system.exceptions import RootException
+from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
@@ -58,8 +58,8 @@ class TelemetryManager(TelemetryManagerAbstract):
             exception: ExceptionArg | None = None,
             **kwargs: Unpack[OptionalCaptureArgs],
         ) -> Any:
-            """Capture exception with message sanitization for RootException subclasses."""
-            if exception and isinstance(exception, RootException):
+            """Capture exception with message sanitization for PipelexError subclasses."""
+            if exception and isinstance(exception, PipelexError):
                 # Create a new exception with sanitized message while preserving the class type
                 # Use __new__ to create an instance without calling __init__, which may require extra args
                 # This creates a "shell" instance with NO custom attributes (e.g., no tested_concept, wanted_concept, etc.)
@@ -79,7 +79,7 @@ class TelemetryManager(TelemetryManagerAbstract):
 
                 return self._original_capture_exception(sanitized_exception, **kwargs)
             else:
-                # For non-RootException, capture as-is (or auto-detect current exception)
+                # For non-PipelexError, capture as-is (or auto-detect current exception)
                 return self._original_capture_exception(exception, **kwargs)
 
         # Replace the method

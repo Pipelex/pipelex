@@ -1,4 +1,4 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
 class PipeComposeBlueprintValueError(ValueError):
@@ -9,5 +9,5 @@ class PipeComposeValueError(ValueError):
     pass
 
 
-class PipeComposeFactoryError(PipelexException):
+class PipeComposeFactoryError(PipelexError):
     pass

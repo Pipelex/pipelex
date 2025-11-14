@@ -1,7 +1,7 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
-class PipeControllerError(PipelexException):
+class PipeControllerError(PipelexError):
     pass
 
 

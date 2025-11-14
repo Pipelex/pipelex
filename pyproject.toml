@@ -350,7 +350,6 @@ ignore = [
     "UP036",   # Version block is outdated for minimum Python version
     "SIM102",  # Use a single `if` statement instead of nested `if` statements
     "S701",    # Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
-    "N818",    # Exception name `RootException` should be named with an Error suffix
     "TRY301",  # Abstract `raise` to an inner function
     "PERF401", # Use a list comprehension to create a transformed list
     "PLW2901", # `for` loop variable `line` overwritten by assignment target

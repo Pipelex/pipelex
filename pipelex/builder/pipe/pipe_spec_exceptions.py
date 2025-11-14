@@ -1,33 +1,33 @@
 from pipelex.core.pipe_errors import PipeDefinitionError
 
 
-class PipeSpecException(PipeDefinitionError):
+class PipeSpecError(PipeDefinitionError):
     pass
 
 
-class PipeExtractSpecError(PipeSpecException):
+class PipeExtractSpecError(PipeSpecError):
     pass
 
 
-class PipeParallelSpecError(PipeSpecException):
+class PipeParallelSpecError(PipeSpecError):
     pass
 
 
-class PipeSequenceSpecError(PipeSpecException):
+class PipeSequenceSpecError(PipeSpecError):
     pass
 
 
-class PipeFuncSpecError(PipeSpecException):
+class PipeFuncSpecError(PipeSpecError):
     pass
 
 
-class PipeImgGenSpecError(PipeSpecException):
+class PipeImgGenSpecError(PipeSpecError):
     pass
 
 
-class PipeComposeSpecError(PipeSpecException):
+class PipeComposeSpecError(PipeSpecError):
     pass
 
 
-class PipeLLMSpecError(PipeSpecException):
+class PipeLLMSpecError(PipeSpecError):
     pass

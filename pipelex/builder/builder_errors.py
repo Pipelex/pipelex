@@ -1,4 +1,4 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.builder.validation_error_data import (
     ConceptFailure,
     PipeFailure,
@@ -13,7 +13,7 @@ class PipeBuilderError(Exception):
         super().__init__(message)
 
 
-class ConceptSpecError(PipelexException):
+class ConceptSpecError(PipelexError):
     """Details of a single concept failure during dry run."""
 
     def __init__(self: Self, message: str, concept_failure: ConceptFailure) -> None:
@@ -21,7 +21,7 @@ class ConceptSpecError(PipelexException):
         super().__init__(message)
 
 
-class PipeSpecError(PipelexException):
+class PipeSpecError(PipelexError):
     """Details of a single pipe failure during dry run."""
 
     def __init__(self: Self, message: str, pipe_failure: PipeFailure) -> None:
@@ -33,9 +33,9 @@ class ValidateDryRunError(Exception):
     """Raised when validating the dry run of a pipe."""
 
 
-class PipelexBundleNoFixForError(PipelexException):
+class PipelexBundleNoFixForError(PipelexError):
     """Raised when no fix is found for a static validation error."""
 
 
-class PipelexBundleUnexpectedError(PipelexException):
+class PipelexBundleUnexpectedError(PipelexError):
     """Raised when an unexpected error occurs during validation."""

@@ -1,4 +1,4 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
 class PipeImgGenBlueprintValueError(ValueError):
@@ -9,9 +9,9 @@ class PipeImgGenValueError(ValueError):
     pass
 
 
-class PipeImgGenFactoryError(PipelexException):
+class PipeImgGenFactoryError(PipelexError):
     pass
 
 
-class PipeImgGenRunError(PipelexException):
+class PipeImgGenRunError(PipelexError):
     pass

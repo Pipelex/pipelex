@@ -1,8 +1,8 @@
-from pipelex.system.exceptions import RootException
+from pipelex.base_exceptions import PipelexError
 
 
 # TODO: add details from all cases raising this error
-class PipeDefinitionError(RootException):
+class PipeDefinitionError(PipelexError):
     def __init__(
         self,
         message: str,

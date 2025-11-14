@@ -7,7 +7,7 @@ from pipelex.builder.validation_error_data import (
     PipeInputErrorData,
     StaticValidationErrorData,
 )
-from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData, PipelexValidationExceptionAbstract
+from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData, PipelexValidationExceptionAbstractError
 from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
 
 
@@ -15,7 +15,7 @@ class PipelexBundleBlueprintValueError(ValueError):
     pass
 
 
-class PipelexBundleError(PipelexValidationExceptionAbstract):
+class PipelexBundleError(PipelexValidationExceptionAbstractError):
     """Main bundle error that aggregates multiple types of errors."""
 
     def __init__(

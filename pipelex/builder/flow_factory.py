@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.flow import Flow, FlowElement
 from pipelex.builder.pipe.pipe_signature import PipeSignature
@@ -15,7 +15,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
 
-class FlowFactoryError(PipelexException):
+class FlowFactoryError(PipelexError):
     """Exception raised by FlowFactory."""
 
 

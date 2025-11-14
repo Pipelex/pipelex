@@ -7,7 +7,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.tools.misc.filetype_utils import (
     FileType,
-    FileTypeException,
+    FileTypeError,
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
     detect_file_type_from_path,
@@ -30,7 +30,7 @@ class TestFileType:
 
 class TestFileTypeException:
     def test_file_type_exception_inheritance(self):
-        error = FileTypeException("test message")
+        error = FileTypeError("test message")
         assert isinstance(error, Exception)
         assert str(error) == "test message"
 
@@ -69,7 +69,7 @@ class TestDetectFileTypeFromPath:
         # Mock filetype.guess to return None (unrecognized file type)
         mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
 
-        with pytest.raises(FileTypeException, match=r"Could not identify file type of '/unknown/file\.xyz'"):
+        with pytest.raises(FileTypeError, match=r"Could not identify file type of '/unknown/file\.xyz'"):
             detect_file_type_from_path("/unknown/file.xyz")
 
         mock_filetype_guess.assert_called_once_with("/unknown/file.xyz")
@@ -79,7 +79,7 @@ class TestDetectFileTypeFromPath:
         mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
 
         path = Path("/unknown/file.xyz")
-        with pytest.raises(FileTypeException, match=r"Could not identify file type of '/unknown/file\.xyz'"):
+        with pytest.raises(FileTypeError, match=r"Could not identify file type of '/unknown/file\.xyz'"):
             detect_file_type_from_path(path)
 
         mock_filetype_guess.assert_called_once_with(path)
@@ -106,7 +106,7 @@ class TestDetectFileTypeFromBytes:
         mock_filetype_guess = mocker.patch("filetype.guess", return_value=None)
 
         test_bytes = b"unknown file content"
-        with pytest.raises(FileTypeException, match="Could not identify file type of given bytes: b'unknown file content'"):
+        with pytest.raises(FileTypeError, match="Could not identify file type of given bytes: b'unknown file content'"):
             detect_file_type_from_bytes(test_bytes)
 
         mock_filetype_guess.assert_called_once_with(test_bytes)
@@ -117,7 +117,7 @@ class TestDetectFileTypeFromBytes:
 
         # Create bytes longer than 300 characters to test truncation
         test_bytes = b"a" * 350
-        with pytest.raises(FileTypeException) as exc_info:
+        with pytest.raises(FileTypeError) as exc_info:
             detect_file_type_from_bytes(test_bytes)
 
         # Check that the error message contains truncated bytes (first 300 chars)
@@ -206,14 +206,14 @@ class TestDetectFileTypeFromBase64:
         # Test with invalid base64 string
         invalid_b64 = "invalid!base64!string!"
 
-        with pytest.raises(FileTypeException, match="Could not identify file type of given bytes because input is not valid Base-64"):
+        with pytest.raises(FileTypeError, match="Could not identify file type of given bytes because input is not valid Base-64"):
             detect_file_type_from_base64(invalid_b64)
 
     def test_detect_file_type_from_base64_invalid_base64_bytes(self, mocker: MockerFixture):  # noqa: ARG002
         # Test with invalid base64 bytes
         invalid_b64_bytes = b"invalid!base64!bytes!"
 
-        with pytest.raises(FileTypeException, match="Could not identify file type of given bytes because input is not valid Base-64"):
+        with pytest.raises(FileTypeError, match="Could not identify file type of given bytes because input is not valid Base-64"):
             detect_file_type_from_base64(invalid_b64_bytes)
 
     def test_detect_file_type_from_base64_data_url_no_comma(self, mocker: MockerFixture):
@@ -238,7 +238,7 @@ class TestDetectFileTypeFromBase64:
         # Test that binascii.Error is properly chained when base64 decode fails
         mocker.patch("base64.b64decode", side_effect=binascii.Error("Invalid base64"))
 
-        with pytest.raises(FileTypeException) as exc_info:
+        with pytest.raises(FileTypeError) as exc_info:
             detect_file_type_from_base64("invalid")
 
         # Check that the original exception is chained

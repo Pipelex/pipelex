@@ -1,7 +1,7 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
-class StuffArtefactError(PipelexException):
+class StuffArtefactError(PipelexError):
     pass
 
 
@@ -9,7 +9,7 @@ class StuffArtefactReservedFieldError(StuffArtefactError):
     pass
 
 
-class StuffError(PipelexException):
+class StuffError(PipelexError):
     pass
 
 

@@ -1,4 +1,4 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
 class PipeParallelBlueprintValueError(ValueError):
@@ -9,5 +9,5 @@ class PipeParallelValueError(ValueError):
     pass
 
 
-class PipeParallelFactoryError(PipelexException):
+class PipeParallelFactoryError(PipelexError):
     pass

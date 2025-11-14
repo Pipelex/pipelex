@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ValidationError
 
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter import PipelexInterpreter
@@ -10,7 +10,7 @@ from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
 
 
-class ValidateBundleError(PipelexException):
+class ValidateBundleError(PipelexError):
     pass
 
 

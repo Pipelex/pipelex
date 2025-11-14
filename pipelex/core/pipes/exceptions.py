@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
@@ -13,11 +13,11 @@ class PipeBlueprintValueError(ValueError):
     pass
 
 
-class PipeInputNotFoundError(PipelexException):
+class PipeInputNotFoundError(PipelexError):
     pass
 
 
-class PipeFactoryError(PipelexException):
+class PipeFactoryError(PipelexError):
     pass
 
 
@@ -29,7 +29,7 @@ class PipeVariableMultiplicityError(ValueError):
     pass
 
 
-class PipeInputError(PipelexException):
+class PipeInputError(PipelexError):
     def __init__(self, message: str, pipe_code: str, variable_name: str, concept_code: str | None = None):
         self.pipe_code = pipe_code
         self.variable_name = variable_name
@@ -37,7 +37,7 @@ class PipeInputError(PipelexException):
         super().__init__(message)
 
 
-class PipeRunInputsError(PipelexException):
+class PipeRunInputsError(PipelexError):
     def __init__(self, message: str, pipe_code: str, missing_inputs: dict[str, str]):
         self.pipe_code = pipe_code
         self.missing_inputs = missing_inputs
@@ -60,7 +60,7 @@ class StaticValidationErrorType(StrEnum):
     INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"
 
 
-class PipeOperatorModelChoiceError(PipelexException):
+class PipeOperatorModelChoiceError(PipelexError):
     def __init__(
         self,
         message: str,

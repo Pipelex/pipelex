@@ -12,7 +12,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderException
+from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderError
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 
 if TYPE_CHECKING:
@@ -94,7 +94,7 @@ class LLMPromptBlueprint(BaseModel):
                             "it should be ImageContent or list of ImageContent"
                         )
                         raise LLMPromptBlueprintValueError(msg)
-                except ContextProviderException:
+                except ContextProviderError:
                     # If single image failed, try to get as a collection (list or tuple)
                     try:
                         image_collection = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=None)
@@ -109,7 +109,7 @@ class LLMPromptBlueprint(BaseModel):
                                 f"Could not find a valid user image or image collection named '{user_image_name}' from the provided context_provider"
                             )
                             raise LLMPromptBlueprintValueError(msg)
-                    except ContextProviderException as exc:
+                    except ContextProviderError as exc:
                         msg = f"Could not find a valid user image named '{user_image_name}' from the provided context_provider: {exc}"
                         raise LLMPromptBlueprintValueError(msg) from exc
 

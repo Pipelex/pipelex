@@ -328,7 +328,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Changed `PipeLLMPromptTemplate.make_llm_prompt()` to private method `_make_llm_prompt()`
  - Updated pipe-builder prompts to include concept specs for better context
  - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
- - Changed exception base class from `PipelexError` to `PipelexException` throughout codebase
+ - Changed exception base class from `PipelexError` to `PipelexError` throughout codebase
  - Updated Makefile pyright target to use `--pythonpath` flag correctly
  - Enhanced `LibraryManager` to use `importlib.resources` for reliable PLX file discovery across all installation modes (wheel, source, relative path)
  - Simplified `FuncRegistryUtils` to exclusively register functions with `@pipe_func` decorator (removed `decorator_names` and `require_decorator` parameters)

@@ -3,7 +3,7 @@ from typing import Any, cast
 import shortuuid
 from pydantic import BaseModel, ValidationError, field_validator
 
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -19,7 +19,7 @@ from pipelex.libraries.concept.concept_library import ConceptLibraryConceptNotFo
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
-class StuffFactoryError(PipelexException):
+class StuffFactoryError(PipelexError):
     pass
 
 
@@ -493,7 +493,7 @@ class StuffFactory:
         raise StuffFactoryError(msg)
 
 
-class StuffContentFactoryError(PipelexException):
+class StuffContentFactoryError(PipelexError):
     pass
 
 

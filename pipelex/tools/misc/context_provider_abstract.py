@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pipelex.system.exceptions import ToolException
+from pipelex.system.exceptions import ToolError
 
 
-class ContextProviderException(ToolException):
+class ContextProviderError(ToolError):
     def __init__(self, message: str, variable_name: str):
         super().__init__(message=message)
         self.variable_name = variable_name

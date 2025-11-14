@@ -1,5 +1,5 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
-class DomainLibraryError(PipelexException):
+class DomainLibraryError(PipelexError):
     pass

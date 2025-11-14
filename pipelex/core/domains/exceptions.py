@@ -1,9 +1,9 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
-class DomainCodeError(PipelexException):
+class DomainCodeError(PipelexError):
     pass
 
 
-class DomainFactoryError(PipelexException):
+class DomainFactoryError(PipelexError):
     pass

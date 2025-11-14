@@ -1,12 +1,12 @@
 from pydantic import BaseModel
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.tools.misc.toml_utils import TomlError
 
 
-class PipelexConfigurationError(PipelexException):
+class PipelexConfigurationError(PipelexError):
     """Raised when there are configuration issues with the PipelexInterpreter."""
 
 
@@ -87,7 +87,7 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     other: str | None = None
 
 
-class PipelexInterpreterError(PipelexException):
+class PipelexInterpreterError(PipelexError):
     """Raised when PipelexInterpreter fails."""
 
     def __init__(

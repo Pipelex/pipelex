@@ -1,23 +1,23 @@
 import re
 
 from pipelex.system.environment import EnvVarNotFoundError, get_optional_env, get_required_env
-from pipelex.system.exceptions import ToolException
+from pipelex.system.exceptions import ToolError
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.types import StrEnum
 
 
-class VarNotFoundError(ToolException):
+class VarNotFoundError(ToolError):
     def __init__(self, var_name: str, message: str):
         self.var_name = var_name
         super().__init__(message)
 
 
-class VarFallbackPatternError(ToolException):
+class VarFallbackPatternError(ToolError):
     pass
 
 
-class UnknownVarPrefixError(ToolException):
+class UnknownVarPrefixError(ToolError):
     """Raised when an unknown variable prefix is used in variable substitution."""
 
     def __init__(self, var_name: str, message: str):

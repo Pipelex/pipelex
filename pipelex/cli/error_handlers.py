@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.syntax import Syntax
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.core.concepts.exceptions import PipelexValidationExceptionAbstract
+from pipelex.core.concepts.exceptions import PipelexValidationExceptionAbstractError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.types import StrEnum
@@ -114,7 +114,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
     raise typer.Exit(1) from exc
 
 
-def handle_validation_error(exc: PipelexValidationExceptionAbstract, context: ErrorContext) -> NoReturn:
+def handle_validation_error(exc: PipelexValidationExceptionAbstractError, context: ErrorContext) -> NoReturn:
     """Handle and display validation errors with formatted output.
 
     Args:

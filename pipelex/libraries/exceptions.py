@@ -1,12 +1,12 @@
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexException
-from pipelex.core.concepts.exceptions import ConceptDefinitionError, ConceptDefinitionErrorData, PipelexValidationExceptionAbstract
+from pipelex.base_exceptions import PipelexError
+from pipelex.core.concepts.exceptions import ConceptDefinitionError, ConceptDefinitionErrorData, PipelexValidationExceptionAbstractError
 from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
 
 
-class LibraryError(PipelexException):
+class LibraryError(PipelexError):
     pass
 
 
@@ -18,7 +18,7 @@ class LibraryLoadingErrorData(BaseModel):
     pipe_definition_errors: list[PipeDefinitionErrorData] | None = Field(None, description="List of pipe definition errors")
 
 
-class LibraryLoadingError(LibraryError, PipelexValidationExceptionAbstract):
+class LibraryLoadingError(LibraryError, PipelexValidationExceptionAbstractError):
     """Error raised when loading library components fails."""
 
     def __init__(

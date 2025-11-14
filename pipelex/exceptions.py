@@ -13,7 +13,7 @@ from pipelex.core.concepts.exceptions import (
     ConceptStructureBlueprintValueError,
     ConceptStructureGeneratorError,
     ConceptStructureValidationError,
-    PipelexValidationExceptionAbstract,
+    PipelexValidationExceptionAbstractError,
     StructureClassError,
 )
 from pipelex.core.domains.exceptions import DomainCodeError
@@ -70,7 +70,7 @@ from pipelex.system.exceptions import (
     CredentialsError,
     FatalError,
     NestedKeyConflictError,
-    ToolException,
+    ToolError,
     TracebackMessageError,
 )
 
@@ -95,7 +95,7 @@ __all__ = [
     "ConceptDefinitionErrorData",
     "ConceptDefinitionError",
     "ConceptStructureGeneratorError",
-    "PipelexValidationExceptionAbstract",
+    "PipelexValidationExceptionAbstractError",
     # from pipelex.libraries.exceptions
     "LibraryError",
     "LibraryLoadingErrorData",
@@ -150,7 +150,7 @@ __all__ = [
     # from pipelex.pipeline.track.exceptions
     "JobHistoryError",
     # from pipelex.system.exceptions
-    "ToolException",
+    "ToolError",
     "NestedKeyConflictError",
     "CredentialsError",
     "TracebackMessageError",

@@ -1,4 +1,4 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
 class LLMPromptBlueprintValueError(ValueError):
@@ -9,5 +9,5 @@ class PipeLLMValueError(ValueError):
     pass
 
 
-class PipeLLMFactoryError(PipelexException):
+class PipeLLMFactoryError(PipelexError):
     pass
