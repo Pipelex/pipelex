@@ -45,11 +45,8 @@ class DryRunOutput(BaseModel):
 
 async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
     """Dry run a single pipe directly without parallelization."""
-    allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
-    # TODO: fail and raise properly
     try:
         needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
-
         working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
         pipe.validate_with_libraries()
         await pipe.run_pipe(
@@ -58,7 +55,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
     except PipeStackOverflowError as exc:
-        if pipe.code in allowed_to_fail_pipes:
+        if pipe.code in get_config().pipelex.dry_run_config.allowed_to_fail_pipes:
             error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"
             return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
         elif raise_on_failure:

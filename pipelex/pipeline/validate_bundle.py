@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from pipelex.base_exceptions import PipelexException
 from pipelex.core.bundles.exceptions import PipelexBundleError
@@ -8,8 +8,9 @@ from pipelex.core.concepts.exceptions import (
 )
 from pipelex.core.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import get_library_manager, set_current_library_id
+from pipelex.hub import get_library_manager, set_current_library_id, teardown_current_library_id
 from pipelex.libraries.exceptions import (
     ConceptLoadingError,
     PipeDefinitionErrorData,
@@ -71,36 +72,14 @@ async def validate_bundle(
         for pipe in loaded_pipes:
             pipe.validate_with_libraries()
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-
+    except ValidationError as validation_error:
+        raise ValidateBundleError(message="") from validation_error
     except PipelexInterpreterError as interpreter_error:
-        # TODO: enrich
         raise ValidateBundleError(message=interpreter_error.message) from interpreter_error
-
-    except ConceptLoadingError as concept_loading_error:
-        concept_def_error = concept_loading_error.concept_definition_error
-        concept_definition_error_data = ConceptDefinitionErrorData(
-            message=str(concept_def_error),
-            domain_code=concept_def_error.domain_code,
-            concept_code=concept_def_error.concept_code,
-            description=concept_def_error.description,
-            structure_class_python_code=concept_def_error.structure_class_python_code,
-            structure_class_syntax_error_data=concept_def_error.structure_class_syntax_error_data,
-            source=concept_def_error.source,
-        )
-        raise PipelexBundleError(
-            message=concept_loading_error.message, concept_definition_errors=[concept_definition_error_data]
-        ) from concept_loading_error
-    except PipeLoadingError as pipe_loading_error:
-        pipe_def_error = pipe_loading_error.pipe_definition_error
-        pipe_definition_error_data = PipeDefinitionErrorData(
-            message=str(pipe_def_error),
-            domain_code=pipe_def_error.domain_code,
-            pipe_code=pipe_def_error.pipe_code,
-            description=pipe_def_error.description,
-            source=pipe_def_error.source,
-        )
-        raise PipelexBundleError(message=pipe_loading_error.message, pipe_definition_errors=[pipe_definition_error_data]) from pipe_loading_error
+    except LibraryLoadingError as library_loading_error:
+        raise ValidateBundleError(message=library_loading_error.message) from library_loading_error
     finally:
-        library_manager.teardown()
+        library_manager.teardown(library_id=library_id)
+        teardown_current_library_id()
 
     return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)

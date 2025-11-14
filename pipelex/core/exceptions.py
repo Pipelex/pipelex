@@ -78,15 +78,13 @@ class PLXDecodeError(TomlError):
 
 
 class PipelexBundleBlueprintValidationErrorData(BaseModel):
-    """Structured data for blueprint validation errors."""
-
-    pipe_code: str | None = Field(None, description="The pipe code if this is a pipe error")
-    concept_code: str | None = Field(None, description="The concept code if this is a concept error")
-    field_path: str = Field(description="Full path to the field that failed")
-    message: str = Field(description="The validation error message")
-    other: str | None = Field(None, description="Other error information if not pipe or concept related")
-    domain: str | None = Field(None, description="The domain code from the bundle")
-    source: str | None = Field(None, description="Source file path if available")
+    domain: str | None = None
+    source: str | None = None
+    pipe_code: str | None = None
+    concept_code: str | None = None
+    field_path: str
+    message: str
+    other: str | None = None
 
 
 class PipelexInterpreterError(PipelexException):

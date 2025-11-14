@@ -58,7 +58,17 @@ class LibraryManager(LibraryManagerAbstract):
         self._libraries.clear()
 
     @override
-    def teardown(self) -> None:
+    def teardown(self, library_id: str | None = None) -> None:
+        if library_id:
+            if library_id not in self._libraries:
+                msg = f"Trying to teardown a library that does not exist: '{library_id}'"
+                raise LibraryError(msg)
+            else:
+                library = self._libraries[library_id]
+                library.teardown()
+                del self._libraries[library_id]
+                return
+
         for library in self._libraries.values():
             library.teardown()
         self._libraries.clear()

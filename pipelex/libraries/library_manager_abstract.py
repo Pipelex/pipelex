@@ -15,7 +15,7 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def teardown(self) -> None:
+    def teardown(self, library_id: str | None = None) -> None:
         pass
 
     @abstractmethod
