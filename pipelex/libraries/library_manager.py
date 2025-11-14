@@ -63,11 +63,10 @@ class LibraryManager(LibraryManagerAbstract):
             if library_id not in self._libraries:
                 msg = f"Trying to teardown a library that does not exist: '{library_id}'"
                 raise LibraryError(msg)
-            else:
-                library = self._libraries[library_id]
-                library.teardown()
-                del self._libraries[library_id]
-                return
+            library = self._libraries[library_id]
+            library.teardown()
+            del self._libraries[library_id]
+            return
 
         for library in self._libraries.values():
             library.teardown()
@@ -263,11 +262,11 @@ class LibraryManager(LibraryManagerAbstract):
         try:
             library.validate_library()
         except LibraryError as library_error:
-            msg = f"Could not validate library for blueprint '{blueprint.source}': {library_error}"
+            msg = f"Could not validate library for blueprints: {library_error}"
             raise LibraryLoadingError(msg) from library_error
         except ValidationError as validation_error:
             validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-            msg = f"Could not validate library for blueprint '{blueprint.source}' because of: {validation_error_msg}"
+            msg = f"Could not validate library for blueprints because of: {validation_error_msg}"
             raise LibraryLoadingError(msg) from validation_error
         return all_pipes
 

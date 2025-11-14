@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexException
