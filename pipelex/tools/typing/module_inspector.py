@@ -6,8 +6,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from pipelex.base_exceptions import PipelexError
 
-class ModuleFileError(Exception):
+
+class ModuleFileError(PipelexError):
     """Exception raised for errors related to module file operations."""
 
 

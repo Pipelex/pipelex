@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
@@ -22,7 +23,7 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class GoogleLLMWorkerError(Exception):
+class GoogleLLMWorkerError(PipelexError):
     """Base exception for Google LLM Worker errors."""
 
 

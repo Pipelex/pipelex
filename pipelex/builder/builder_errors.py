@@ -7,7 +7,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.types import Self
 
 
-class PipeBuilderError(Exception):
+class PipeBuilderError(PipelexError):
     def __init__(self: Self, message: str, working_memory: WorkingMemory | None = None) -> None:
         self.working_memory = working_memory
         super().__init__(message)
@@ -29,7 +29,7 @@ class PipeSpecError(PipelexError):
         super().__init__(message)
 
 
-class ValidateDryRunError(Exception):
+class ValidateDryRunError(PipelexError):
     """Raised when validating the dry run of a pipe."""
 
 

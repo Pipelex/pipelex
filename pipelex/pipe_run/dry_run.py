@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pydantic import BaseModel
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.config.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedInputRequirement
@@ -20,7 +21,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import StrEnum
 
 
-class DryRunError(Exception):
+class DryRunError(PipelexError):
     """Raised when a dry run fails due to missing inputs or other validation issues."""
 
 
