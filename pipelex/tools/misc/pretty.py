@@ -1,4 +1,5 @@
 import shutil
+from abc import ABC, abstractmethod
 from io import StringIO
 from typing import Any, ClassVar
 
@@ -52,6 +53,12 @@ EXPORT_THEME = TerminalTheme(
 )
 
 PrettyPrintable = Markdown | Text | JSON | Table | Group | Syntax | Pretty
+
+
+class PrettyRenderable(ABC):
+    @abstractmethod
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        pass
 
 
 class PrettyPrintMode(StrEnum):
@@ -230,7 +237,7 @@ class PrettyPrinter:
         elif isinstance(value, (int, float, bool)):
             # For primitive types, convert to string
             pretty = Text(str(value))
-        elif hasattr(value, "rendered_pretty"):
+        elif isinstance(value, PrettyRenderable):
             pretty = value.rendered_pretty(depth=depth)
         else:
             # For other types, use Pretty

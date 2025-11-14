@@ -74,6 +74,10 @@ default = "fal"
 description = "Use Google GenAI backend for all its supported models"
 default = "google"
 
+[profiles.all_groq]
+description = "Use groq backend for all its supported models"
+default = "groq"
+
 [profiles.all_mistral]
 description = "Use Mistral backend for all its supported models"
 default = "mistral"

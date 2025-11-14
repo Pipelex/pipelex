@@ -44,7 +44,6 @@ fast-img-gen = "fast-lightning-sdxl"
 
 [waterfalls]
 smart_llm = [
-    "llama-3.3-70b-versatile",
     "claude-4.5-sonnet",
     "claude-4.1-opus",
     "claude-4-sonnet",
@@ -128,14 +127,14 @@ llm_to_prompt_img_gen = { model = "base-claude", temperature = 0.2 }
 llm_to_prompt_img_gen_cheap = { model = "gpt-4o-mini", temperature = 0.5 }
 
 # Groq-specific presets (fast inference, low cost)
-llm_groq_fast_text = { model = "fast-groq", temperature = 0.2 }
+llm_groq_fast_text = { model = "fast-groq", temperature = 0.7 }
 llm_groq_balanced = { model = "base-groq", temperature = 0.5 }
 llm_groq_vision = { model = "vision-groq", temperature = 0.3 }
 
 # LLM Presets — For Testing ---------------------------------------------------------------------
 
 llm_for_testing_gen_text = { model = "cheap_llm", temperature = 0.5 }
-llm_for_testing_gen_object = { model = "cheap_llm_for_structured", temperature = 0.1 }
+llm_for_testing_gen_object = { model = "cheap_llm_for_structured", temperature = 0.5 }
 llm_for_testing_vision = { model = "cheap_llm_for_vision", temperature = 0.5 }
 llm_for_testing_vision_structured = { model = "cheap_llm_for_vision", temperature = 0.5 }
 
