@@ -7,8 +7,8 @@ from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError,
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_string_valid, validate_concept_string_or_code
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.exceptions import ConceptLibraryError
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
+from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
@@ -93,7 +93,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         the_concept = self.get_optional_concept(concept_string=concept_string)
         if not the_concept:
             msg = f"Concept '{concept_string}' not found in the library"
-            raise ConceptLibraryConceptNotFoundError(msg)
+            raise ConceptLibraryError(msg)
         return the_concept
 
     @override

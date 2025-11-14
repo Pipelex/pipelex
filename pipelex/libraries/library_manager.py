@@ -8,23 +8,23 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.exceptions import ConceptDefinitionError
+from pipelex.core.concepts.exceptions import ConceptDefinitionError, ConceptFactoryError
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
-from pipelex.core.domains.exceptions import DomainDefinitionError
+from pipelex.core.domains.exceptions import DomainFactoryError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory, PipeFactoryError
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_current_library_id
+from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.domain.exceptions import DomainLibraryError
 from pipelex.libraries.exceptions import (
-    ConceptLibraryError,
     LibraryError,
     LibraryLoadingError,
-    PipeLibraryError,
 )
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
@@ -32,26 +32,13 @@ from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
     get_pipelex_plx_files_from_dirs,
 )
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.domains.domain import Domain
-
-
-class LibraryComponent(StrEnum):
-    CONCEPT = "concept"
-    PIPE = "pipe"
-
-    @property
-    def error_class(self) -> type[LibraryError]:
-        match self:
-            case LibraryComponent.CONCEPT:
-                return ConceptLibraryError
-            case LibraryComponent.PIPE:
-                return PipeLibraryError
 
 
 class LibraryManager(LibraryManagerAbstract):
@@ -196,16 +183,24 @@ class LibraryManager(LibraryManagerAbstract):
         # Load all domains first
         all_domains: list[Domain] = []
         for blueprint in blueprints:
-            domain = DomainFactory.make_from_blueprint(
-                blueprint=DomainBlueprint(
-                    source=blueprint.source,
-                    code=blueprint.domain,
-                    description=blueprint.description or "",
-                    system_prompt=blueprint.system_prompt,
-                ),
-            )
+            try:
+                domain = DomainFactory.make_from_blueprint(
+                    blueprint=DomainBlueprint(
+                        source=blueprint.source,
+                        code=blueprint.domain,
+                        description=blueprint.description or "",
+                        system_prompt=blueprint.system_prompt,
+                    ),
+                )
+            except DomainFactoryError as domain_factory_error:
+                msg = f"Could not load domain from blueprint '{blueprint.source}': {domain_factory_error}"
+                raise LibraryLoadingError(msg) from domain_factory_error
             all_domains.append(domain)
-        library.domain_library.add_domains(domains=all_domains)
+        try:
+            library.domain_library.add_domains(domains=all_domains)
+        except DomainLibraryError as domain_library_error:
+            msg = f"Could not add domains to domain library: {domain_library_error}"
+            raise LibraryLoadingError(msg) from domain_library_error
 
         # Load all concepts second
         all_concepts: list[Concept] = []
@@ -213,36 +208,57 @@ class LibraryManager(LibraryManagerAbstract):
             if blueprint.concept is not None:
                 concepts: list[Concept] = []
                 for concept_code, concept_blueprint_or_description in blueprint.concept.items():
-                    concept = ConceptFactory.make_from_blueprint_or_description(
-                        domain=blueprint.domain,
-                        concept_code=concept_code,
-                        concept_codes_from_the_same_domain=list(blueprint.concept.keys()),
-                        concept_blueprint_or_description=concept_blueprint_or_description,
-                    )
+                    try:
+                        concept = ConceptFactory.make_from_blueprint_or_description(
+                            domain=blueprint.domain,
+                            concept_code=concept_code,
+                            concept_codes_from_the_same_domain=list(blueprint.concept.keys()),
+                            concept_blueprint_or_description=concept_blueprint_or_description,
+                        )
+                    except ConceptFactoryError as concept_factory_error:
+                        msg = f"Could not load concept from blueprint '{blueprint.source}': {concept_factory_error}"
+                        raise LibraryLoadingError(msg) from concept_factory_error
                     concepts.append(concept)
                 all_concepts.extend(concepts)
-        library.concept_library.add_concepts(concepts=all_concepts)
+        try:
+            library.concept_library.add_concepts(concepts=all_concepts)
+        except ConceptLibraryError as concept_library_error:
+            msg = f"Could not add concepts to concept library: {concept_library_error}"
+            raise LibraryLoadingError(msg) from concept_library_error
 
         # Load all pipes third
         for blueprint in blueprints:
-            try:
-                pipes: list[PipeAbstract] = []
-                if blueprint.pipe is not None:
-                    for pipe_name, pipe_blueprint in blueprint.pipe.items():
+            pipes: list[PipeAbstract] = []
+            if blueprint.pipe is not None:
+                for pipe_name, pipe_blueprint in blueprint.pipe.items():
+                    try:
                         pipe = PipeFactory.make_from_blueprint(
                             domain=blueprint.domain,
                             pipe_code=pipe_name,
                             blueprint=pipe_blueprint,
                             concept_codes_from_the_same_domain=list(blueprint.concept.keys()) if blueprint.concept else None,
                         )
-                        pipes.append(pipe)
-                all_pipes.extend(pipes)
-            except PipeDefinitionError as pipe_def_error:
-                pipe_def_error.source = blueprint.source
-                raise pipe_def_error from pipe_def_error
+                    except PipeFactoryError as pipe_factory_error:
+                        msg = f"Could not load pipe from blueprint '{blueprint.source}': {pipe_factory_error}"
+                        raise LibraryLoadingError(msg) from pipe_factory_error
+                    pipes.append(pipe)
+            all_pipes.extend(pipes)
 
-        library.pipe_library.add_pipes(pipes=all_pipes)
-        library.validate_library()
+        try:
+            library.pipe_library.add_pipes(pipes=all_pipes)
+        except PipeLibraryError as pipe_library_error:
+            msg = f"Could not add pipes to pipe library: {pipe_library_error}"
+            raise LibraryLoadingError(msg) from pipe_library_error
+
+        try:
+            library.validate_library()
+        except LibraryError as library_error:
+            msg = f"Could not validate library for blueprint '{blueprint.source}': {library_error}"
+            raise LibraryLoadingError(msg) from library_error
+        except ValidationError as validation_error:
+            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+            msg = f"Could not validate library for blueprint '{blueprint.source}' because of: {validation_error_msg}"
+            raise LibraryLoadingError(msg) from validation_error
         return all_pipes
 
     def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> None:
@@ -278,9 +294,6 @@ class LibraryManager(LibraryManagerAbstract):
         # Load all blueprints into the library
         try:
             self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-        except DomainDefinitionError as domain_def_error:
-            msg = f"Could not load domains from blueprints: {domain_def_error}"
-            raise LibraryLoadingError(msg) from domain_def_error
         except ConceptDefinitionError as concept_def_error:
             msg = f"Could not load concepts from blueprints: {concept_def_error}"
             raise LibraryLoadingError(msg) from concept_def_error

@@ -5,12 +5,10 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import (
-    ConceptDefinitionError,
     ConceptFactoryError,
     ConceptRefineError,
     ConceptStringError,
     ConceptStructureGeneratorError,
-    StructureClassError,
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generator import StructureGenerator
@@ -251,7 +249,7 @@ class ConceptFactory:
                         f"Structure class '{blueprint.structure}' set for concept '{concept_code}' in domain '{domain}' "
                         "is not a registered subclass of StuffContent"
                     )
-                    raise StructureClassError(msg)
+                    raise ConceptFactoryError(msg)
                 structure_class_name = blueprint.structure
             else:
                 # Structure is defined as a ConceptStructureBlueprint - run the structure generator and put it in the class registry
@@ -265,14 +263,8 @@ class ConceptFactory:
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain}': {exc}"
-                    raise ConceptDefinitionError(
+                    raise ConceptFactoryError(
                         msg,
-                        domain_code=domain,
-                        concept_code=concept_code,
-                        description=blueprint.description,
-                        structure_class_python_code=exc.structure_class_python_code,
-                        structure_class_syntax_error_data=exc.syntax_error_data,
-                        source=blueprint.source,
                     ) from exc
 
                 # Register the generated class
@@ -290,16 +282,12 @@ class ConceptFactory:
                     f"Concept '{concept_code}' in domain '{domain}' has refines but also has a structure class registered. "
                     "A concept cannot have both structure and refines."
                 )
-                raise ConceptDefinitionError(
-                    msg, domain_code=domain, concept_code=concept_code, description=blueprint.description, source=blueprint.source
-                )
+                raise ConceptFactoryError(msg)
             try:
                 current_refine = cls.make_refine(refine=blueprint.refines)
             except ConceptRefineError as exc:
                 msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain}': {exc}"
-                raise ConceptDefinitionError(
-                    msg, domain_code=domain, concept_code=concept_code, description=blueprint.description, source=blueprint.source
-                ) from exc
+                raise ConceptFactoryError(msg) from exc
             structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
         # Handle neither structure nor refines - check the class registry
         # If there is a class, use it. structure_class_name is then the concept_code

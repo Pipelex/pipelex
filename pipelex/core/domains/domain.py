@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.types import StrEnum
 
@@ -22,6 +22,8 @@ class SpecialDomain(StrEnum):
 
 
 class Domain(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     code: str
     description: str | None = None
     system_prompt: str | None = None
