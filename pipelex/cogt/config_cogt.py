@@ -21,7 +21,6 @@ class ImgGenConfig(ConfigModel):
 
 
 class InstructorConfig(ConfigModel):
-    is_openai_structured_output_enabled: bool
     is_dump_kwargs_enabled: bool
     is_dump_response_enabled: bool
     is_dump_error_enabled: bool

@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "google"
 prompting_target = "gemini"
+structure_method = "genai_structured_outputs"
 
 ################################################################################
 # LANGUAGE MODELS
