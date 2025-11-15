@@ -6,6 +6,7 @@ from pipelex.types import StrEnum
 class StructureMethod(StrEnum):
     INSTRUCTOR_TOOLS = "tools"
     INSTRUCTOR_TOOLS_STRICT = "tools_strict"
+    INSTRUCTOR_JSON_O1 = "json_o1"
     INSTRUCTOR_ANTHROPIC_TOOLS = "anthropic_tools"
     INSTRUCTOR_MISTRAL_TOOLS = "mistral_tools"
     INSTRUCTOR_VERTEXAI_TOOLS = "vertexai_tools"
@@ -20,6 +21,8 @@ class StructureMethod(StrEnum):
                 return InstructorMode.TOOLS
             case StructureMethod.INSTRUCTOR_TOOLS_STRICT:
                 return InstructorMode.TOOLS_STRICT
+            case StructureMethod.INSTRUCTOR_JSON_O1:
+                return InstructorMode.JSON_O1
             case StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS:
                 return InstructorMode.ANTHROPIC_TOOLS
             case StructureMethod.INSTRUCTOR_MISTRAL_TOOLS:
