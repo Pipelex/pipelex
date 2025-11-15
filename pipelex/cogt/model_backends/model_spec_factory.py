@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 
+from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -17,6 +18,7 @@ class InferenceModelSpecBlueprint(ConfigModel):
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
     costs: CostsByCategoryDict = Field(strict=False)
+    structure_method: StructureMethod | None = Field(default=None, strict=False)
     max_tokens: int | None = None
     max_prompt_images: int | None = None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
@@ -56,6 +58,7 @@ class InferenceModelSpecFactory(BaseModel):
             inputs=blueprint.inputs,
             outputs=blueprint.outputs,
             costs=blueprint.costs,
+            structure_method=blueprint.structure_method,
             max_tokens=blueprint.max_tokens,
             max_prompt_images=blueprint.max_prompt_images,
             prompting_target=blueprint.prompting_target,

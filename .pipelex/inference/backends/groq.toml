@@ -24,7 +24,7 @@
 [defaults]
 model_type = "llm"
 sdk = "groq"
-prompting_target = "groq"
+structure_method = "groq_tools"
 
 ################################################################################
 # PRODUCTION TEXT MODELS
