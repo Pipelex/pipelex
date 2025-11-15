@@ -144,24 +144,6 @@ class LLMWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "groq":
-                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker  # noqa: PLC0415
-
-                plugin.sdk = "openai"
-
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
-                    sdk_instance=OpenAIFactory.make_openai_client(
-                        plugin=plugin,
-                        backend=backend,
-                    ),
-                )
-                llm_worker = OpenAILLMWorker(
-                    sdk_instance=sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
             case _:
                 msg = f"Plugin '{plugin}' is not supported"
                 raise NotImplementedError(msg)
