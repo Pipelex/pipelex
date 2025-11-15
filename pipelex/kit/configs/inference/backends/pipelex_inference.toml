@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "openai"
 prompting_target = "anthropic"
+structure_method = "tools"
 
 ################################################################################
 # LANGUAGE MODELS

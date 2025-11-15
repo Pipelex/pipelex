@@ -23,6 +23,7 @@
 [defaults]
 model_type = "llm"
 sdk = "openai"
+structure_method = "tools"
 
 ################################################################################
 # LANGUAGE MODELS

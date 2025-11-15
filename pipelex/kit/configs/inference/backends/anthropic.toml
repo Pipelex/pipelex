@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "anthropic"
 prompting_target = "anthropic"
+structure_method = "anthropic_tools"
 
 ################################################################################
 # LANGUAGE MODELS

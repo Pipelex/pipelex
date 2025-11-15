@@ -16,6 +16,7 @@ VENV_MYPY := "$(VIRTUAL_ENV)/bin/mypy"
 VENV_PIPELEX := "$(VIRTUAL_ENV)/bin/pipelex"
 VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
+VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -103,6 +104,8 @@ make li                       - Shorthand -> lock install
 make test-count              - Count the number of tests
 make check-test-badge        - Check if the test count matches the badge value
 
+make dev-check-config-sync   - Verify .pipelex and pipelex/kit/configs are in sync
+
 endef
 export HELP
 
@@ -117,7 +120,8 @@ export HELP
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
 	config-template cft \
-	test-count check-test-badge
+	test-count check-test-badge \
+	dev-check-config-sync
 
 all help:
 	@echo "$$HELP"
@@ -173,7 +177,7 @@ build: env
 
 config-template:
 	$(call PRINT_TITLE,"Updating config template from .pipelex/")
-	@rsync -av --exclude='inference/backends.toml' --delete .pipelex/ pipelex/config_template/
+	@rsync -av --exclude='inference/backends.toml' --delete .pipelex/ pipelex/kit/configs/
 
 cft: config-template
 	@echo "> done: cft = config-template"
@@ -507,4 +511,12 @@ check-test-badge: env
 	else \
 		echo "✅ Test count matches: $$ACTUAL"; \
 	fi
+
+##########################################################################################
+### INTERNAL DEV CLI
+##########################################################################################
+
+dev-check-config-sync: env
+	$(call PRINT_TITLE,Checking config sync between .pipelex and pipelex/kit/configs)
+	$(VENV_PIPELEX_DEV) check-config-sync
 	

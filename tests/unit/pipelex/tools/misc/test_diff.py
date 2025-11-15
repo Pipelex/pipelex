@@ -1,4 +1,5 @@
 import tempfile
+import time
 from pathlib import Path
 
 from pytest_mock import MockerFixture
@@ -274,3 +275,30 @@ class TestDiff:
 
             assert "-content1" in diff
             assert "+content2" in diff
+
+    def test_make_diff_dirs_pretty_shows_update_direction(self):
+        """Test that diff output shows which file is newer based on modification time."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dir1 = Path(temp_dir) / "dir1"
+            dir2 = Path(temp_dir) / "dir2"
+            dir1.mkdir()
+            dir2.mkdir()
+
+            # Create file in dir1
+            (dir1 / "file.txt").write_text("content1")
+            time.sleep(0.1)  # Ensure different modification times
+            # Create file in dir2 (newer)
+            (dir2 / "file.txt").write_text("content2")
+
+            result = make_diff_dirs_pretty(dir1, dir2)
+
+            # Result should be a Group containing the diff
+            assert isinstance(result, Group)
+
+            # Convert to string to check for direction indicator
+            result_str = ""
+            for item in result.renderables:
+                result_str += str(item)
+
+            # Should indicate that right is newer
+            assert "→" in result_str or "right is newer" in result_str
