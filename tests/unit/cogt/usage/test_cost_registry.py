@@ -177,7 +177,8 @@ class TestCostRegistry:
     def test_generate_report_aggregation(self, mocker: MockerFixture, tmp_path: Path):
         """Test groupby logic and cost calculations are correct."""
         # Mock console output to avoid printing during tests
-        mock_console = mocker.patch("pipelex.cogt.usage.cost_registry.Console")
+        mock_console = mocker.MagicMock()
+        mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mock_console)
 
         # Create test data with multiple LLM usages
         job_metadata = JobMetadata(pipeline_run_id="test-pipeline")
@@ -243,9 +244,7 @@ class TestCostRegistry:
         )
 
         # Verify console was called to print table
-        mock_console.assert_called_once()
-        mock_instance = mock_console.return_value
-        mock_instance.print.assert_called_once()
+        mock_console.print.assert_called_once()
 
         # Read the CSV and verify aggregation
         with open(csv_file, encoding="utf-8") as file:
@@ -307,7 +306,7 @@ class TestCostRegistry:
     def test_generate_report_with_file_output(self, tmp_path: Path, mocker: MockerFixture):
         """Test that CSV file is created when file path is provided."""
         # Mock console output
-        mocker.patch("pipelex.cogt.usage.cost_registry.Console")
+        mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mocker.MagicMock())
 
         # Create test data
         job_metadata = JobMetadata(pipeline_run_id="test-pipeline")
@@ -370,7 +369,7 @@ class TestCostRegistry:
     def test_generate_report_unit_scaling(self, unit_scale: float, expected_scaled_cost: float, mocker: MockerFixture):
         """Test that unit scaling is applied correctly to cost display."""
         # Mock console to avoid output during tests
-        mocker.patch("pipelex.cogt.usage.cost_registry.Console")
+        mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mocker.MagicMock())
         mock_table_class = mocker.patch("pipelex.cogt.usage.cost_registry.Table")
         mock_table = mock_table_class.return_value
 

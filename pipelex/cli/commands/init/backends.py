@@ -3,8 +3,6 @@
 import os
 from typing import Any
 
-from rich.console import Console
-
 from pipelex.cli.commands.init.ui.backends_ui import (
     build_backend_selection_panel,
     display_selected_backends,
@@ -12,6 +10,7 @@ from pipelex.cli.commands.init.ui.backends_ui import (
     get_currently_enabled_backends,
     prompt_backend_indices,
 )
+from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import path_exists
@@ -65,7 +64,7 @@ def get_selected_backend_keys(backends_toml_path: str) -> list[str]:
 
 def customize_backends_config() -> None:
     """Interactively customize which inference backends are enabled in backends.toml."""
-    console = Console()
+    console = get_console()
     backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
     template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
 

@@ -96,7 +96,9 @@ class Pipelex(metaclass=MetaSingleton):
             msg = f"Could not setup config because of: {validation_error_msg}"
             raise PipelexConfigError(msg) from validation_error
 
-        log.configure(log_config=get_config().pipelex.log_config)
+        log_config = get_config().pipelex.log_config
+        self.pipelex_hub.set_console_print_target(target=log_config.console_print_target)
+        log.configure(log_config=log_config)
         log.verbose("Logs are configured")
 
         # tools

@@ -2,12 +2,12 @@ from pathlib import Path
 
 import pytest
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_library import ConceptLibrary
 from pipelex.core.pipes.pipe_library import PipeLibrary
+from pipelex.hub import get_console
 from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from tests.integration.pipelex.test_data import LibraryTestCases
 
@@ -16,7 +16,7 @@ def pretty_print_all_pipes(
     pipe_library: PipeLibrary,
     title: str | None = None,
 ):
-    console = Console()
+    console = get_console()
     table = Table(
         title=title,
         show_header=True,
@@ -50,7 +50,7 @@ def pretty_print_all_concepts(
     concept_library: ConceptLibrary,
     title: str | None = None,
 ):
-    console = Console()
+    console = get_console()
     table = Table(
         title=title,
         show_header=True,

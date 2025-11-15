@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Annotated
 import click
 import typer
 from posthog import tag
-from rich.console import Console
 
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
@@ -24,7 +23,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
-from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_console, get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -220,7 +219,7 @@ def build_pipe_cmd(
                     get_report_delegate().generate_report()
 
                     # Show how to run the pipe
-                    console = Console()
+                    console = get_console()
                     console.print("\n📋 [cyan]To run your pipeline:[/cyan]")
                     console.print(f"   [cyan]• Execute the runner:[/cyan] python {runner_path}")
                     console.print(f"   [cyan]• Or use CLI:[/cyan] pipelex run {main_pipe_code} --inputs {inputs_json_path}\n")

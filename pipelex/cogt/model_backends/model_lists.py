@@ -5,11 +5,11 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.config import get_config
+from pipelex.hub import get_console
 
 if TYPE_CHECKING:
     from anthropic.types import ModelInfo
@@ -45,8 +45,6 @@ class ModelLister:
             # TODO: This should not raise this error in here.
             raise PipelexCLIError(msg) from exc
 
-        console = Console()
-
         # Determine which SDKs are used in this backend
         if not backend.model_specs:
             msg = f"Backend '{backend_name}' has no model specifications"
@@ -73,7 +71,6 @@ class ModelLister:
                             sdk=sdk,
                             backend_name=backend_name,
                             backend=backend,
-                            console=console,
                             flat=flat,
                             any_listed=any_listed,
                         )
@@ -101,7 +98,6 @@ class ModelLister:
                                 sdk=sdk,
                                 backend_name=backend_name,
                                 backend=backend,
-                                console=console,
                                 flat=flat,
                                 any_listed=any_listed,
                             )
@@ -128,7 +124,6 @@ class ModelLister:
                         cls._list_mistral_models(
                             sdk=sdk,
                             backend_name=backend_name,
-                            console=console,
                             flat=flat,
                             any_listed=any_listed,
                         )
@@ -149,7 +144,6 @@ class ModelLister:
                             sdk=sdk,
                             backend_name=backend_name,
                             backend=backend,
-                            console=console,
                             flat=flat,
                             any_listed=any_listed,
                         )
@@ -172,7 +166,6 @@ class ModelLister:
             unsupported_sdks=unsupported_sdks,
             backend_name=backend_name,
             models_by_sdk=models_by_sdk,
-            console=console,
             flat=flat,
         )
 
@@ -182,7 +175,6 @@ class ModelLister:
         sdk: str,
         backend_name: str,
         backend: InferenceBackend,
-        console: Console,
         flat: bool,
         any_listed: bool,
     ) -> None:
@@ -198,7 +190,6 @@ class ModelLister:
                 models=openai_models,
                 sdk=sdk,
                 backend_name=backend_name,
-                console=console,
                 any_listed=any_listed,
             )
         else:
@@ -206,7 +197,6 @@ class ModelLister:
                 models=openai_models,
                 sdk=sdk,
                 backend_name=backend_name,
-                console=console,
             )
 
     @classmethod
@@ -215,7 +205,6 @@ class ModelLister:
         sdk: str,
         backend_name: str,
         backend: InferenceBackend,
-        console: Console,
         flat: bool,
         any_listed: bool,
     ) -> None:
@@ -250,7 +239,6 @@ class ModelLister:
                     models=anthropic_models,
                     sdk=sdk,
                     backend_name=backend_name,
-                    console=console,
                     any_listed=any_listed,
                 )
             else:
@@ -258,7 +246,6 @@ class ModelLister:
                     models=anthropic_models,
                     sdk=sdk,
                     backend_name=backend_name,
-                    console=console,
                 )
         except AuthenticationError as auth_exc:
             msg = f"Authentication error for SDK '{sdk}' in backend '{backend_name}': {auth_exc}"
@@ -269,7 +256,6 @@ class ModelLister:
         cls,
         sdk: str,
         backend_name: str,
-        console: Console,
         flat: bool,
         any_listed: bool,
     ) -> None:
@@ -297,7 +283,6 @@ class ModelLister:
                 models=mistral_models,
                 sdk=sdk,
                 backend_name=backend_name,
-                console=console,
                 any_listed=any_listed,
             )
         else:
@@ -305,7 +290,6 @@ class ModelLister:
                 models=mistral_models,
                 sdk=sdk,
                 backend_name=backend_name,
-                console=console,
             )
 
     @classmethod
@@ -314,7 +298,6 @@ class ModelLister:
         sdk: str,
         backend_name: str,
         backend: InferenceBackend,
-        console: Console,
         flat: bool,
         any_listed: bool,
     ) -> None:
@@ -354,7 +337,6 @@ class ModelLister:
                     sdk=sdk,
                     backend_name=backend_name,
                     aws_region=aws_region,
-                    console=console,
                     any_listed=any_listed,
                 )
             else:
@@ -362,7 +344,6 @@ class ModelLister:
                     models=bedrock_models_list,
                     sdk=sdk,
                     aws_region=aws_region,
-                    console=console,
                 )
 
         except Exception as exc:
@@ -374,10 +355,10 @@ class ModelLister:
         models: list[Model],
         sdk: str,
         backend_name: str,
-        console: Console,
         any_listed: bool,
     ) -> None:
         """Display OpenAI models in CSV format."""
+        console = get_console()
         if not any_listed:
             console.print("model_id,created,owned_by,sdk,backend")
         for model in models:
@@ -394,7 +375,6 @@ class ModelLister:
         models: list[Model],
         sdk: str,
         backend_name: str,
-        console: Console,
     ) -> None:
         """Display OpenAI models in table format."""
         table = Table(
@@ -415,7 +395,7 @@ class ModelLister:
                 created = "N/A"
             owned_by = model.owned_by if hasattr(model, "owned_by") else "N/A"
             table.add_row(model.id, created, owned_by)
-
+        console = get_console()
         console.print("\n")
         console.print(table)
         console.print("\n")
@@ -425,10 +405,10 @@ class ModelLister:
         models: list[ModelInfo],
         sdk: str,
         backend_name: str,
-        console: Console,
         any_listed: bool,
     ) -> None:
         """Display Anthropic models in CSV format."""
+        console = get_console()
         if not any_listed:
             console.print("model_id,display_name,created_at,sdk,backend")
         for anthropic_model in models:
@@ -441,7 +421,6 @@ class ModelLister:
         models: list[ModelInfo],
         sdk: str,
         backend_name: str,
-        console: Console,
     ) -> None:
         """Display Anthropic models in table format."""
         table = Table(
@@ -458,6 +437,7 @@ class ModelLister:
             created_date = anthropic_model.created_at.strftime("%Y-%m-%d") if anthropic_model.created_at else "N/A"
             table.add_row(anthropic_model.id, anthropic_model.display_name, created_date)
 
+        console = get_console()
         console.print("\n")
         console.print(table)
         console.print("\n")
@@ -467,10 +447,10 @@ class ModelLister:
         models: list[Any],
         sdk: str,
         backend_name: str,
-        console: Console,
         any_listed: bool,
     ) -> None:
         """Display Mistral models in CSV format."""
+        console = get_console()
         if not any_listed:
             console.print("model_id,max_context_length,sdk,backend")
         for mistral_model in models:
@@ -482,7 +462,6 @@ class ModelLister:
         models: list[Any],
         sdk: str,
         backend_name: str,
-        console: Console,
     ) -> None:
         """Display Mistral models in table format."""
         table = Table(
@@ -498,6 +477,7 @@ class ModelLister:
             max_ctx = str(mistral_model.max_context_length) if mistral_model.max_context_length else "N/A"
             table.add_row(mistral_model.id, max_ctx)
 
+        console = get_console()
         console.print("\n")
         console.print(table)
         console.print("\n")
@@ -508,10 +488,10 @@ class ModelLister:
         sdk: str,
         backend_name: str,
         aws_region: str,
-        console: Console,
         any_listed: bool,
     ) -> None:
         """Display Bedrock models in CSV format."""
+        console = get_console()
         if not any_listed:
             console.print("model_id,provider,model_arn,sdk,backend,region")
         for bedrock_model in models:  # pyright: ignore[reportUnknownVariableType]
@@ -525,7 +505,6 @@ class ModelLister:
         models: list[dict[str, Any]],
         sdk: str,
         aws_region: str,
-        console: Console,
     ) -> None:
         """Display Bedrock models in table format."""
         table = Table(
@@ -544,6 +523,7 @@ class ModelLister:
             model_arn = bedrock_model.get("modelArn", "N/A")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
             table.add_row(model_id, provider, model_arn)  # pyright: ignore[reportUnknownArgumentType]
 
+        console = get_console()
         console.print("\n")
         console.print(table)
         console.print("\n")
@@ -554,11 +534,11 @@ class ModelLister:
         unsupported_sdks: list[str],
         backend_name: str,
         models_by_sdk: dict[str, list[str]],
-        console: Console,
         flat: bool,
     ) -> None:
         """Display message about unsupported SDKs."""
         if not any_listed and unsupported_sdks:
+            console = get_console()
             if not flat:
                 console.print(f"\n[yellow]Note: Backend '{backend_name}' has models using SDKs that don't support remote listing:[/yellow]")
                 for sdk in unsupported_sdks:
