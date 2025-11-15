@@ -23,7 +23,7 @@
 
 [defaults]
 model_type = "llm"
-sdk = "groq"
+sdk = "openai"
 structure_method = "groq_tools"
 
 ################################################################################

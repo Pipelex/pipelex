@@ -1,3 +1,4 @@
+from instructor import Mode as InstructorMode
 from pydantic import Field
 
 from pipelex.cogt.llm.structured_output import StructureMethod
@@ -39,3 +40,9 @@ class InferenceModelSpec(ConfigModel):
     @property
     def is_vision_supported(self) -> bool:
         return "images" in self.inputs
+
+    def get_instructor_mode(self) -> InstructorMode | None:
+        if self.structure_method:
+            return self.structure_method.as_instructor_mode()
+        else:
+            return None

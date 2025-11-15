@@ -1,6 +1,5 @@
 import importlib.util
 
-from pipelex import log
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.structured_output import StructureMethod
@@ -21,13 +20,12 @@ class LLMWorkerFactory:
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         llm_worker: LLMWorkerInternalAbstract
-        structure_method = inference_model.structure_method
         match plugin.sdk:
             case "openai" | "azure_openai":
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
 
                 if get_config().cogt.llm_config.instructor_config.is_openai_structured_output_enabled:
-                    structure_method = StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED
+                    inference_model.structure_method = StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED
 
                 from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker  # noqa: PLC0415
 
@@ -42,7 +40,6 @@ class LLMWorkerFactory:
                 llm_worker = OpenAILLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
-                    structure_method=structure_method,
                     reporting_delegate=reporting_delegate,
                 )
             case "anthropic" | "bedrock_anthropic":
@@ -72,7 +69,6 @@ class LLMWorkerFactory:
                     sdk_instance=sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
             case "mistral":
@@ -101,7 +97,6 @@ class LLMWorkerFactory:
                 llm_worker = MistralLLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_MISTRAL_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
             case "bedrock_boto3" | "bedrock_aioboto3":
@@ -153,7 +148,6 @@ class LLMWorkerFactory:
                 llm_worker = GoogleLLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_GENAI_STRUCTURED_OUTPUTS,
                     reporting_delegate=reporting_delegate,
                 )
             case "groq":
@@ -169,29 +163,11 @@ class LLMWorkerFactory:
                         backend=backend,
                     ),
                 )
-                log.debug(structure_method, title="Structure method")
                 llm_worker = OpenAILLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
-                    structure_method=structure_method,
                     reporting_delegate=reporting_delegate,
                 )
-
-                # Groq uses OpenAI-compatible API, so no separate SDK needed
-                # from pipelex.plugins.groq.groq_factory import GroqFactory
-                # from pipelex.plugins.groq.groq_llm_worker import GroqLLMWorker
-
-                # sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                #     plugin=plugin,
-                #     sdk_instance=GroqFactory.make_groq_client(plugin=plugin, backend=backend),
-                # )
-
-                # llm_worker = GroqLLMWorker(
-                #     sdk_instance=sdk_instance,
-                #     inference_model=inference_model,
-                #     structure_method=StructureMethod.INSTRUCTOR_GROQ_TOOLS,
-                #     reporting_delegate=reporting_delegate,
-                # )
             case _:
                 msg = f"Plugin '{plugin}' is not supported"
                 raise NotImplementedError(msg)
