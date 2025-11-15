@@ -1,5 +1,11 @@
 # Changelog
 
+## Unrelease
+
+### Added
+
+- JSONContent to have as inputs and outputs of pipe unknown JSON format
+
 ## [v0.15.4] - 2025-11-12
 
 ### Added
