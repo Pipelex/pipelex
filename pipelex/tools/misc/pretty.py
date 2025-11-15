@@ -16,7 +16,7 @@ from rich.table import Table
 from rich.terminal_theme import TerminalTheme
 from rich.text import Text, TextType
 
-from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor
+from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor, print_to_stderr
 from pipelex.types import StrEnum
 
 TEXT_COLOR = TerminalColor.WHITE
@@ -291,15 +291,15 @@ class PrettyPrinter:
         top_border = "╭" + "─" * (frame_width - 2) + "╮"
         bottom_border = "╰" + "─" * (frame_width - 2) + "╯"
 
-        print(f"{BORDER_COLOR}{top_border}{RESET_FONT}")
+        print_to_stderr(f"{BORDER_COLOR}{top_border}{RESET_FONT}")
         # Print each title line separately
         for title_line in title_lines:
             padding = " " * (frame_width - len(title_line) - 4)
-            print(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title_line}{RESET_FONT}:{padding}{BORDER_COLOR}│{RESET_FONT}")
+            print_to_stderr(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title_line}{RESET_FONT}:{padding}{BORDER_COLOR}│{RESET_FONT}")
         for line in wrapped_lines:
             padding = " " * (frame_width - len(line) - 3)
-            print(f"{BORDER_COLOR}│ {TEXT_COLOR}{line}{RESET_FONT}{padding}{BORDER_COLOR}│{RESET_FONT}")
-        print(f"{BORDER_COLOR}{bottom_border}{RESET_FONT}")
+            print_to_stderr(f"{BORDER_COLOR}│ {TEXT_COLOR}{line}{RESET_FONT}{padding}{BORDER_COLOR}│{RESET_FONT}")
+        print_to_stderr(f"{BORDER_COLOR}{bottom_border}{RESET_FONT}")
 
     @classmethod
     def pretty_print_url_without_rich(
@@ -316,8 +316,9 @@ class PrettyPrinter:
         top_border = "╭" + "─" * (frame_width - 2) + "╮"
         bottom_border = "╰" + "─" * (frame_width - 2) + "╯"
 
-        print(f"{BORDER_COLOR}{top_border}{RESET_FONT}")
+        print_to_stderr(f"{BORDER_COLOR}{top_border}{RESET_FONT}")
         if title:
-            print(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title}{RESET_FONT}:{' ' * (frame_width - len(title) - 4)}{BORDER_COLOR}│{RESET_FONT}")
-        print(f"{TEXT_COLOR}{content}{RESET_FONT}")
-        print(f"{BORDER_COLOR}{bottom_border}{RESET_FONT}")
+            title_padding = " " * (frame_width - len(title) - 4)
+            print_to_stderr(f"{BORDER_COLOR}│ {BOLD_FONT}{TITLE_COLOR}{title}{RESET_FONT}:{title_padding}{BORDER_COLOR}│{RESET_FONT}")
+        print_to_stderr(f"{TEXT_COLOR}{content}{RESET_FONT}")
+        print_to_stderr(f"{BORDER_COLOR}{bottom_border}{RESET_FONT}")
