@@ -12,6 +12,147 @@ def is_llm_handle_supported(llm_handle: str) -> bool:
     return model_deck.is_handle_defined(llm_handle)
 
 
+# ================================================================================================
+# LLM Handles by Manufacturer
+# each can be supported by multiple backends
+# ================================================================================================
+
+# --- Amazon Models (Nova) -----------------------------------------------------------------------
+AMAZON_MODELS = [
+    "bedrock-nova-pro",
+    "nova-lite-v1",
+    "nova-micro-v1",
+]
+
+# --- Anthropic Models (Claude) ------------------------------------------------------------------
+ANTHROPIC_MODELS = [
+    "claude-3-haiku",
+    "claude-3-opus",
+    "claude-3.5-haiku",
+    "claude-3.5-sonnet",
+    "claude-3.7-sonnet",
+    "claude-4-opus",
+    "claude-4-sonnet",
+    "claude-4.1-opus",
+    "claude-4.5-haiku",
+    "claude-4.5-sonnet",
+    "claude-opus-4",
+]
+
+# --- DeepSeek Models ----------------------------------------------------------------------------
+DEEPSEEK_MODELS = [
+    "deepseek-chat-free",
+    "deepseek-r1-free",
+]
+
+# --- Google Models (Gemini) ---------------------------------------------------------------------
+GOOGLE_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-flash-1.5-8b",
+]
+
+# --- Groq Models --------------------------------------------------------------------------------
+GROQ_MODELS = [
+    "groq/compound",
+    "groq/compound-mini",
+]
+
+# --- Meta Models (Llama) ------------------------------------------------------------------------
+META_MODELS = [
+    "bedrock-meta-llama-3-3-70b-instruct",
+    "llama-3.1-8b-instant",
+    "llama-3.2-11b-vision-instruct",
+    "llama-3.3-70b-instruct",
+    "llama-3.3-70b-instruct-free",
+    "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "meta-llama/llama-guard-4-12b",
+]
+
+# --- Mistral Models -----------------------------------------------------------------------------
+MISTRAL_MODELS = [
+    "bedrock-mistral-large",
+    "ministral-3b",
+    "ministral-8b",
+    "mistral-7b-2312",
+    "mistral-8x7b-2312",
+    "mistral-codestral-2405",
+    "mistral-large",
+    "mistral-large-2402",
+    "mistral-medium",
+    "mistral-medium-2508",
+    "mistral-small",
+    "mistral-small-2402",
+    "pixtral-12b",
+    "pixtral-large",
+    "pixtral-large-2411",
+]
+
+# --- Moonshot AI Models -------------------------------------------------------------------------
+MOONSHOT_MODELS = [
+    "moonshotai/kimi-k2-instruct-0905",
+]
+
+# --- OpenAI Models ------------------------------------------------------------------------------
+OPENAI_MODELS = [
+    "gpt-3.5-turbo",
+    "gpt-4",
+    "gpt-4-turbo",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4.1-nano",
+    "gpt-4o",
+    "gpt-4o-2024-11-20",
+    "gpt-4o-mini",
+    "gpt-4o-mini-2024-07-18",
+    "gpt-5",
+    "gpt-5-chat",
+    "gpt-5-mini",
+    "gpt-5-nano",
+    "o1",
+    "o1-mini",
+    "o3",
+    "o3-mini",
+    "o4-mini",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-safeguard-20b",
+]
+
+# --- Qwen Models --------------------------------------------------------------------------------
+QWEN_MODELS = [
+    "qwen-2.5-72b-instruct",
+    "qwen/qwen3-32b",
+    "qwen2.5-vl-72b-instruct",
+]
+
+# --- XAI Models (Grok) --------------------------------------------------------------------------
+XAI_MODELS = [
+    "grok-3",
+    "grok-3-fast",
+    "grok-3-mini",
+    "grok-3-mini-fast",
+]
+
+# --- All LLM Handles ----------------------------------------------------------------------------
+ALL_LLM_HANDLES = [
+    *AMAZON_MODELS,
+    *ANTHROPIC_MODELS,
+    *DEEPSEEK_MODELS,
+    *GOOGLE_MODELS,
+    *GROQ_MODELS,
+    *META_MODELS,
+    *MISTRAL_MODELS,
+    *MOONSHOT_MODELS,
+    *OPENAI_MODELS,
+    *QWEN_MODELS,
+    *XAI_MODELS,
+]
+
+
 @pytest.fixture(
     params=[
         # "llm_for_testing_gen_text",
@@ -26,44 +167,20 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        # "gpt-4o",
-        "gpt-4o-mini",
-        # "gpt-4-5-preview",
-        # "o1",
-        # "o1-mini",
-        # "o3",
-        # "o3-mini",
-        # "gpt-5-mini",
-        # "gpt-5-nano",
-        # "gpt-5-chat",
-        # "gpt-5",
-        # "mistral-large",
-        # "ministral-3b",
-        # "ministral-8b",
-        # "mistral-medium",
-        # "mistral-medium-2508",
-        # "bedrock-mistral-large",
-        # "bedrock-claude-3-7-sonnet",
-        # "bedrock-meta-llama-3-3-70b-instruct",
-        # "bedrock-nova-pro",
-        # "pipelex/gpt-4o-mini",
-        # "pipelex/claude-3.7-sonnet",
-        # "pipelex/gemini-2.0-flash-vertex",
-        # "pipelex/gemini-2.0-flash",
-        # "claude-4.5-sonnet",
-        # "claude-4.1-opus",
-        # "claude-4.5-haiku",
-        # "claude-4.5-sonnet",
-        # "grok-3",
-        # "grok-3-mini",
-        # "gemini-2.5-flash-lite",
-        # "gemini-2.5-flash",
-        # "gemini-2.5-pro",
-        # "openai/gpt-oss-120b",
-        # "meta-llama/llama-4-scout-17b-16e-instruct",
-        # "meta-llama/llama-4-maverick-17b-128e-instruct",
-        # "moonshotai/kimi-k2-instruct-0905",
+        LLMJobParams(
+            temperature=0.5,
+            max_tokens=None,
+            seed=None,
+        ),
     ],
+)
+def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
+    assert isinstance(request.param, LLMJobParams)
+    return request.param
+
+
+@pytest.fixture(
+    params=ALL_LLM_HANDLES,
 )
 def llm_handle(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
@@ -75,24 +192,12 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        # "o1",
-        # "o3-mini",
         # "gpt-4o",
         # "gpt-4o-mini",
         # "gpt-5-mini",
         # "gpt-5-nano",
         # "gpt-5-chat",
-        # "gpt-4-5-preview",
-        # "claude-3-haiku",
-        # "claude-3.5-sonnet",
-        # "claude-3.7-sonnet",
-        # "claude-4.1-opus",
-        # "pixtral-12b",
-        # "pixtral-large",
-        # "gemini-2.5-pro",
-        # "gemini-2.5-flash",
-        # "mistral-small3.1",
-        # "mistral-medium",
+        # "claude-4.5-sonnet",
         # "mistral-medium-2508",
         "gemini-2.5-flash-lite",
         # "gemini-2.5-flash",
@@ -106,68 +211,3 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
     if not is_llm_handle_supported(llm_handle_param):
         pytest.skip(f"LLM handle '{llm_handle_param}' not available on the active routing profile")
     return llm_handle_param
-
-
-@pytest.fixture(
-    params=[
-        "gpt-5-mini-2025-08-07",
-        # "gpt-5-nano-2025-08-07",
-        # "gpt-5-chat-2025-08-07",
-        # "gpt-5-mini",
-        # "gpt-5-nano",
-        # "gpt-5-chat-latest",
-        # "gpt-5",
-        "gpt-4o-mini",
-        # "open-mixtral-8x7b",
-        # "google/gemini-2.0-flash",
-        # "google/gemini-2.5-pro-preview-05-06",
-        # "google/gemini-2.5-pro-preview-06-05",  # not yet on VertexAI
-        # "google/gemini-2.5-flash-preview-04-17",
-        # "google/gemini-2.5-flash-preview-05-20",
-        # "o1",
-        # "o4-mini",
-        # "bedrock-mistral-large",
-        # "sonar",
-        # "claude-3-7-sonnet-20250219",
-        # "claude-sonnet-4-20250514",
-        # "claude-opus-4-20250514",
-        # "claude-opus-4-1-20250805",
-        # "us.anthropic.claude-sonnet-4-20250514-v1:0",
-        # "us.anthropic.claude-opus-4-20250514-v1:0",
-        # "us.anthropic.claude-opus-4-1-20250805-v1:0",
-        # "sonar",
-        # "sonar-pro",
-        # "gemma3:4b",
-        # "llama4:scout",
-        # "mistral-small3.1:24b",
-        # "qwen3:8b",
-        # "blackboxai/openai/gpt-4o-mini",
-        # "pipelex/openai/gpt-4o-mini",
-        # "openai/gpt-4o-mini",
-        # "grok-3",
-        # "grok-3-mini",
-        # "pipelex/gpt-4o-mini",
-        # "pipelex/claude-3.7-sonnet",
-        # "vertex_ai/gemini-2.0-flash",
-    ],
-)
-def llm_id(request: pytest.FixtureRequest) -> str:
-    assert isinstance(request.param, str)
-    llm_handle_param = request.param
-    if not is_llm_handle_supported(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not available on the active routing profile")
-    return llm_handle_param
-
-
-@pytest.fixture(
-    params=[
-        LLMJobParams(
-            temperature=0.5,
-            max_tokens=None,
-            seed=None,
-        ),
-    ],
-)
-def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
-    assert isinstance(request.param, LLMJobParams)
-    return request.param

@@ -41,6 +41,11 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     def is_gen_object_supported(self) -> bool:
         return self.inference_model.is_gen_object_supported
 
+    @property
+    @override
+    def is_vision_supported(self) -> bool:
+        return self.inference_model.is_vision_supported
+
     @override
     async def _before_job(
         self,
