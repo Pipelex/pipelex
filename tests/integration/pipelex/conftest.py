@@ -19,8 +19,8 @@ from .fixtures.llm_fixtures import llm_handle, llm_handle_for_vision, llm_job_pa
 from .fixtures.plugin_fixtures import openai_endpoint, plugin_for_anthropic, plugin_for_openai
 from .fixtures.routing_fixtures import (
     check_backend_supports_model,
+    extract_backend_from_profile_name_if_possible,
     get_all_routing_profiles,
-    get_backend_from_profile,
     routing_profile_override,
     routing_profile_setup,
 )
@@ -72,7 +72,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item], config: pytest.Confi
             continue
 
         # Extract backend name from routing profile
-        backend_name = get_backend_from_profile(routing_profile)
+        backend_name = extract_backend_from_profile_name_if_possible(routing_profile)
         if not backend_name:
             continue
 

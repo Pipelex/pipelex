@@ -11,16 +11,47 @@ from rich.console import Console
 from pipelex.config import ConfigPaths
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
+# ================================================================================================
+# Backend Names for Testing
+# Comment out backends you don't want to test
+# ================================================================================================
+
+ALL_BACKENDS = [
+    "anthropic",
+    "azure_openai",
+    "bedrock",
+    "blackboxai",
+    "fal",
+    "google",
+    "groq",
+    "mistral",
+    "ollama",
+    "openai",
+    "pipelex_inference",
+    "vertexai",
+    "xai",
+]
+
 
 def get_all_routing_profiles() -> list[str]:
     """Load all routing profiles that start with 'all_' for parametrized testing."""
     routing_profiles_doc = load_toml_from_path(ConfigPaths.ROUTING_PROFILES_FILE_PATH)
     profiles = routing_profiles_doc.get("profiles", {})
-    all_profiles = sorted(profile_name for profile_name in profiles if profile_name.startswith("all_"))
-    return all_profiles or ["pipelex_first"]
+
+    # Get all profiles starting with 'all_'
+    all_profiles = [profile_name for profile_name in profiles if profile_name.startswith("all_")]
+
+    # Filter to only include profiles for enabled backends
+    enabled_profiles: list[str] = []
+    for profile_name in all_profiles:
+        backend_name = extract_backend_from_profile_name_if_possible(profile_name)
+        if backend_name and backend_name in ALL_BACKENDS:
+            enabled_profiles.append(profile_name)
+
+    return sorted(enabled_profiles) or ["pipelex_first"]
 
 
-def get_backend_from_profile(profile_name: str) -> str | None:
+def extract_backend_from_profile_name_if_possible(profile_name: str) -> str | None:
     """Extract the backend name from an 'all_*' profile name."""
     if not profile_name.startswith("all_"):
         return None
