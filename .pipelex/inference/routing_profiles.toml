@@ -90,6 +90,10 @@ default = "ollama"
 description = "Use OpenAI backend for all its supported models"
 default = "openai"
 
+[profiles.all_pipelex_inference]
+description = "Use Pipelex Inference backend for all its supported models"
+default = "pipelex_inference"
+
 [profiles.all_vertexai]
 description = "Use Vertex AI backend for all its supported models"
 default = "vertexai"
