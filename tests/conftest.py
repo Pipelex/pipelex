@@ -17,7 +17,7 @@ TEST_OUTPUTS_DIR = "temp/test_outputs"
 
 
 @pytest.fixture(scope="module")
-def _routing_profile_setup(request: pytest.FixtureRequest):  # noqa: ARG001  # pyright: ignore[reportUnusedFunction]
+def routing_profile_setup(request: pytest.FixtureRequest):  # noqa: ARG001  # pyright: ignore[reportUnusedFunction]
     """Hook for downstream conftest to inject routing profile setup before Pipelex init.
 
     This fixture can be overridden in integration/conftest.py to setup routing overrides.
@@ -27,9 +27,9 @@ def _routing_profile_setup(request: pytest.FixtureRequest):  # noqa: ARG001  # p
 
 
 @pytest.fixture(scope="module", autouse=True)
-def reset_pipelex_config_fixture(_routing_profile_setup: str | None):
+def reset_pipelex_config_fixture(routing_profile_setup: str | None):  # noqa: ARG001
     # Code to run before each test
-    # The _routing_profile_setup dependency ensures any routing overrides happen first
+    # The routing_profile_setup dependency ensures any routing overrides happen first
     Console().print("[magenta]pipelex setup[/magenta]")
     try:
         pipelex_instance = pipelex.pipelex.Pipelex.make(integration_mode=IntegrationMode.PYTEST)
@@ -42,5 +42,5 @@ def reset_pipelex_config_fixture(_routing_profile_setup: str | None):
     yield
     # Code to run after each test
     get_report_delegate().generate_report()
-    Console().print("[magenta]pipelex teardown[/magenta]")
+    Console().print("[dim magenta]pipelex teardown[/dim magenta]")
     pipelex_instance.teardown()

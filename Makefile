@@ -54,8 +54,10 @@ make lint                     - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
 
-make config-template          - Update config template from .pipelex/
-make cft                      - Shorthand -> config-template
+make up-kit-configs           - Update kit configs from .pipelex/
+make ukc                      - Shorthand -> up-kit-configs
+make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
+make ccs                      - Shorthand -> check-config-sync
 
 make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
@@ -104,9 +106,6 @@ make li                       - Shorthand -> lock install
 make test-count               - Count the number of tests
 make check-test-badge         - Check if the test count matches the badge value
 
-make dev-check-config-sync    - Verify .pipelex and pipelex/kit/configs are in sync
-make dccs                     - Shorthand -> dev-check-config-sync
-
 endef
 export HELP
 
@@ -120,9 +119,8 @@ export HELP
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
-	config-template cft \
-	test-count check-test-badge \
-	dev-check-config-sync dccs
+	up-kit-configs ukc check-config-sync ccs \
+	test-count check-test-badge
 
 all help:
 	@echo "$$HELP"
@@ -176,12 +174,19 @@ build: env
 	$(call PRINT_TITLE,"Building the wheels")
 	@uv build
 
-config-template:
-	$(call PRINT_TITLE,"Updating config template from .pipelex/")
-	@rsync -av --exclude='inference/backends.toml' --delete .pipelex/ pipelex/kit/configs/
+up-kit-configs:
+	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
+	@rsync -av --delete .pipelex/ pipelex/kit/configs/
 
-cft: config-template
-	@echo "> done: cft = config-template"
+ukc: up-kit-configs
+	@echo "> done: ukc = up-kit-configs"
+
+check-config-sync: env
+	$(call PRINT_TITLE,"Checking config sync between .pipelex and pipelex/kit/configs")
+	$(VENV_PIPELEX_DEV) check-config-sync
+
+ccs: check-config-sync
+	@echo "> done: ccs = check-config-sync"
 
 ##############################################################################################
 ############################      Cleaning                        ############################
@@ -297,17 +302,17 @@ tb: env
 test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	else \
-		$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
 test-inference-fast: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	else \
-		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
 tip: test-inference-with-prints
@@ -319,9 +324,9 @@ ti: test-inference-fast
 ti-dry: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	else \
-		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference" -s -rfE $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
 
 test-llm: env
@@ -512,15 +517,3 @@ check-test-badge: env
 	else \
 		echo "✅ Test count matches: $$ACTUAL"; \
 	fi
-
-##########################################################################################
-### INTERNAL DEV CLI
-##########################################################################################
-
-dev-check-config-sync: env
-	$(call PRINT_TITLE,Checking config sync between .pipelex and pipelex/kit/configs)
-	$(VENV_PIPELEX_DEV) check-config-sync
-
-dccs: dev-check-config-sync
-	@echo "> done: dccs = dev-check-config-sync"
-	
