@@ -24,7 +24,7 @@
 model_type = "llm"
 sdk = "openai"
 prompting_target = "openai"
-structure_method = "tools"
+structure_method = "instructor/openai_tools"
 
 ################################################################################
 # LANGUAGE MODELS

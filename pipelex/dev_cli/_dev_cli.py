@@ -64,7 +64,7 @@ def check_config_sync_command(
     leading: Annotated[
         LeadingConfig,
         typer.Option(help="Which configuration is the leading (left) one: 'installed' (.pipelex) or 'kit' (pipelex/kit/configs)"),
-    ] = LeadingConfig.INSTALLED,
+    ] = LeadingConfig.KIT,
 ) -> None:
     """Verify that .pipelex and pipelex/kit/configs are in sync."""
     check_config_sync_cmd(show_diff=show_diff, leading=leading)
