@@ -10,10 +10,6 @@ from pipelex.hub import get_inference_manager
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, LLMVisionTestCases, Person
 
 
-def test_show_params(request: pytest.FixtureRequest, llm_handle: str, routing_profile_override: str):
-    """Dummy test to show which routing profile and LLM handle combinations are being tested."""
-
-
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
