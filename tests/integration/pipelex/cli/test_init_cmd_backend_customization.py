@@ -188,11 +188,11 @@ class TestBackendCustomization:
         # Verify backend customization was NOT applied (original values preserved)
         toml_doc = load_toml_with_tomlkit(str(target_dir / "inference" / "backends.toml"))
 
-        # Verify original enabled states from template (template has most backends disabled)
+        # Verify original enabled states from template (template has all backends enabled by default)
         assert toml_doc["pipelex_inference"]["enabled"] is True  # type: ignore[index]
-        assert toml_doc["openai"]["enabled"] is False  # type: ignore[index]
-        assert toml_doc["anthropic"]["enabled"] is False  # type: ignore[index]
-        assert toml_doc["mistral"]["enabled"] is False  # type: ignore[index]
+        assert toml_doc["openai"]["enabled"] is True  # type: ignore[index]
+        assert toml_doc["anthropic"]["enabled"] is True  # type: ignore[index]
+        assert toml_doc["mistral"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["internal"]["enabled"] is True  # type: ignore[index]
 
     def test_customize_backends_handles_missing_file_gracefully(self, tmp_path: Path, mocker: MockerFixture) -> None:

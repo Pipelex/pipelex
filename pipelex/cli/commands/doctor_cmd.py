@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import contextlib
 import io
-import os
-import shutil
 import sys
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 from rich.console import Console
@@ -271,7 +270,8 @@ def check_backend_files() -> tuple[bool, dict[str, BackendFileReport], str]:
 
         # Only check enabled backends
         if isinstance(backend_dict, dict):
-            enabled = backend_dict.get("enabled", True)
+            the_backend_dict: dict[str, Any] = backend_dict  # type: ignore[reportUnknownMemberType]
+            enabled = the_backend_dict.get("enabled", True)
         else:
             enabled = True
 
@@ -589,7 +589,7 @@ def check_models() -> tuple[bool, str, dict[str, BackendFileReport]]:
         # Backend library error - try to identify which backend
         error_str = str(exc)
         # Parse error to see if we can identify a specific backend
-        for backend_name in backend_file_reports.keys():
+        for backend_name in backend_file_reports:
             if backend_name in error_str:
                 # Update the report for this backend
                 if backend_name in backend_file_reports:

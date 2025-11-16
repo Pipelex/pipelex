@@ -101,10 +101,11 @@ make c                        - Shorthand -> check
 make cc                       - Shorthand -> cleanderived check
 make li                       - Shorthand -> lock install
 
-make test-count              - Count the number of tests
-make check-test-badge        - Check if the test count matches the badge value
+make test-count               - Count the number of tests
+make check-test-badge         - Check if the test count matches the badge value
 
-make dev-check-config-sync   - Verify .pipelex and pipelex/kit/configs are in sync
+make dev-check-config-sync    - Verify .pipelex and pipelex/kit/configs are in sync
+make dccs                     - Shorthand -> dev-check-config-sync
 
 endef
 export HELP
@@ -121,7 +122,7 @@ export HELP
 	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
 	config-template cft \
 	test-count check-test-badge \
-	dev-check-config-sync
+	dev-check-config-sync dccs
 
 all help:
 	@echo "$$HELP"
@@ -519,4 +520,7 @@ check-test-badge: env
 dev-check-config-sync: env
 	$(call PRINT_TITLE,Checking config sync between .pipelex and pipelex/kit/configs)
 	$(VENV_PIPELEX_DEV) check-config-sync
+
+dccs: dev-check-config-sync
+	@echo "> done: dccs = dev-check-config-sync"
 	
