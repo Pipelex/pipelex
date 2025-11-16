@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
+import shutil
 import sys
+from pathlib import Path
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
@@ -17,11 +20,13 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
+from pipelex.cogt.exceptions import InferenceBackendLibraryError
+from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import PipelexHub, set_pipelex_hub
+from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
@@ -31,6 +36,16 @@ from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+
+class BackendFileReport(BaseModel):
+    """Report on the health of an individual backend configuration file."""
+
+    backend_name: str
+    file_path: str
+    is_valid: bool
+    error_message: str | None = None
+    has_kit_template: bool = False
 
 
 def check_config_files() -> tuple[bool, int, str]:
@@ -163,6 +178,166 @@ def check_backend_credentials() -> tuple[bool, dict[str, BackendCredentialsRepor
         return False, {}, f"Error checking backend credentials: {exc}"
 
 
+def check_kit_template_exists(backend_name: str) -> bool:
+    """Check if a kit template exists for the given backend.
+
+    Args:
+        backend_name: Name of the backend to check
+
+    Returns:
+        True if a template exists in the kit, False otherwise
+    """
+    try:
+        kit_configs_dir = get_kit_configs_dir()
+        # The kit configs are in a Traversable (from importlib.resources)
+        # We need to check if the backend file exists
+        backends_dir = kit_configs_dir / "inference" / "backends"
+        backend_file = backends_dir / f"{backend_name}.toml"
+
+        # For Traversable, we check if it's a file
+        return backend_file.is_file()
+    except Exception:
+        return False
+
+
+def replace_backend_file(backend_name: str, dry_run: bool = False) -> bool:
+    """Replace a backend configuration file with the kit template.
+
+    Args:
+        backend_name: Name of the backend to replace
+        dry_run: If True, only report what would be done without actually doing it
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Get kit template path
+        kit_configs_dir = get_kit_configs_dir()
+        template_file = kit_configs_dir / "inference" / "backends" / f"{backend_name}.toml"
+
+        if not template_file.is_file():
+            return False
+
+        # Read template content
+        template_content = template_file.read_text(encoding="utf-8")
+
+        # Determine target path
+        target_dir = Path(".pipelex") / "inference" / "backends"
+        target_file = target_dir / f"{backend_name}.toml"
+
+        if dry_run:
+            return True
+
+        # Ensure target directory exists
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write the file
+        target_file.write_text(template_content, encoding="utf-8")
+        return True
+
+    except Exception:
+        return False
+
+
+def check_backend_files() -> tuple[bool, dict[str, BackendFileReport], str]:
+    """Check individual backend configuration files for validity.
+
+    Returns:
+        Tuple of (is_healthy, backend_file_reports_dict, summary_message)
+    """
+    backends_dir_path = ".pipelex/inference/backends"
+
+    if not path_exists(backends_dir_path):
+        return True, {}, "No backend files to check"
+
+    # Get list of enabled backends from backends.toml
+    backends_toml_path = ".pipelex/inference/backends.toml"
+    if not path_exists(backends_toml_path):
+        return True, {}, "No backends.toml to check"
+
+    try:
+        backends_dict = load_toml_from_path(backends_toml_path)
+    except Exception as exc:
+        return False, {}, f"Error loading backends.toml: {exc}"
+
+    backend_file_reports: dict[str, BackendFileReport] = {}
+    all_valid = True
+
+    # Check each enabled backend
+    for backend_name, backend_dict in backends_dict.items():
+        # Skip internal backend
+        if backend_name == "internal":
+            continue
+
+        # Only check enabled backends
+        if isinstance(backend_dict, dict):
+            enabled = backend_dict.get("enabled", True)
+        else:
+            enabled = True
+
+        if not enabled:
+            continue
+
+        # Check if backend file exists
+        backend_file_path = f"{backends_dir_path}/{backend_name}.toml"
+
+        if not path_exists(backend_file_path):
+            # No separate file - this is OK, configuration might be inline
+            continue
+
+        # Try to validate the backend file by loading it
+        is_valid = True
+        error_message = None
+
+        try:
+            # Create a temporary backend library and try to load this backend
+            secrets_provider = EnvSecretsProvider()
+            temp_library = InferenceBackendLibrary.make_empty()
+
+            # Try to load just this backend's specs
+            temp_library.load(
+                secrets_provider=secrets_provider,
+                backends_library_path=backends_toml_path,
+                backends_dir_path=backends_dir_path,
+                include_disabled=False,
+            )
+
+        except InferenceBackendLibraryError as exc:
+            # Check if this specific backend caused the error
+            error_str = str(exc)
+            if backend_name in error_str or backend_file_path in error_str:
+                is_valid = False
+                error_message = error_str
+                all_valid = False
+        except Exception as exc:
+            # Other errors might also be related to this backend
+            error_str = str(exc)
+            if backend_name in error_str or backend_file_path in error_str:
+                is_valid = False
+                error_message = error_str
+                all_valid = False
+
+        # Check if kit template exists for this backend
+        has_kit_template = check_kit_template_exists(backend_name)
+
+        # Create report
+        backend_file_report = BackendFileReport(
+            backend_name=backend_name,
+            file_path=backend_file_path,
+            is_valid=is_valid,
+            error_message=error_message,
+            has_kit_template=has_kit_template,
+        )
+        backend_file_reports[backend_name] = backend_file_report
+
+    if all_valid:
+        return True, backend_file_reports, "All backend files are valid"
+
+    # Count backends with issues
+    invalid_count = sum(1 for r in backend_file_reports.values() if not r.is_valid)
+    return False, backend_file_reports, f"{invalid_count} backend file(s) have validation errors"
+
+
 def display_health_report(
     console: Console,
     config_healthy: bool,
@@ -172,9 +347,11 @@ def display_health_report(
     telemetry_message: str,
     backends_healthy: bool,
     backends_message: str,
-    backend_reports: dict[str, BackendCredentialsReport],
+    backend_credential_reports: dict[str, BackendCredentialsReport],
     models_healthy: bool,
     models_message: str,
+    backend_file_reports: dict[str, BackendFileReport],
+    fix_mode: bool = False,
 ) -> None:
     """Display a comprehensive health report.
 
@@ -187,9 +364,11 @@ def display_health_report(
         telemetry_message: Message about telemetry status
         backends_healthy: Whether backends check passed
         backends_message: Message about backends status
-        backend_reports: Dict of backend credential reports
+        backend_credential_reports: Dict of backend credential reports
         models_healthy: Whether models check passed
         models_message: Message about models status
+        backend_file_reports: Dict of backend file validation reports
+        fix_mode: Whether we're in interactive fix mode (--fix flag)
     """
     all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
 
@@ -229,7 +408,7 @@ def display_health_report(
     console.print("[bold]Backend Credentials[/bold]")
     if backends_healthy:
         console.print(f"  [green]✓[/green] {backends_message}")
-    elif not backend_reports:
+    elif not backend_credential_reports:
         # No backends were checked (e.g., file not found)
         console.print(f"  [red]✗[/red] {backends_message}")
     else:
@@ -237,16 +416,16 @@ def display_health_report(
         console.print()
 
         # Show details for each backend
-        for backend_name, backend_report in backend_reports.items():
-            if backend_report.all_credentials_valid:
+        for backend_name, backend_credential_report in backend_credential_reports.items():
+            if backend_credential_report.all_credentials_valid:
                 console.print(f"  [dim]{backend_name}[/dim]")
                 console.print("    [green]✓[/green] All credentials set")
             else:
                 console.print(f"  [bold]{backend_name}[/bold]")
-                if backend_report.missing_vars:
-                    console.print(f"    [red]✗[/red] Missing: {', '.join(backend_report.missing_vars)}")
-                if backend_report.placeholder_vars:
-                    console.print(f"    [yellow]⚠[/yellow] Placeholders: {', '.join(backend_report.placeholder_vars)}")
+                if backend_credential_report.missing_vars:
+                    console.print(f"    [red]✗[/red] Missing: {', '.join(backend_credential_report.missing_vars)}")
+                if backend_credential_report.placeholder_vars:
+                    console.print(f"    [yellow]⚠[/yellow] Placeholders: {', '.join(backend_credential_report.placeholder_vars)}")
     console.print()
 
     # Models section
@@ -255,6 +434,24 @@ def display_health_report(
         console.print(f"  [green]✓[/green] {models_message}")
     else:
         console.print(f"  [red]✗[/red] {models_message}")
+
+        # Show details for backend file issues if any
+        if backend_file_reports:
+            invalid_backends = {name: report for name, report in backend_file_reports.items() if not report.is_valid}
+            if invalid_backends:
+                console.print()
+                for backend_name, backend_file_report in invalid_backends.items():
+                    console.print(f"  [bold]{backend_name}[/bold]")
+                    if backend_file_report.has_kit_template:
+                        console.print("    [yellow]⚠[/yellow] Backend configuration format may be outdated")
+                        console.print("    [dim]Template available for replacement[/dim]")
+                    else:
+                        console.print("    [yellow]⚠[/yellow] Backend configuration has errors")
+                        console.print("    [dim]This appears to be a custom backend - manual fix required[/dim]")
+                    if backend_file_report.error_message:
+                        # Show first line of error
+                        error_lines = backend_file_report.error_message.split("\n")
+                        console.print(f"    [dim]{error_lines[0][:100]}[/dim]")
     console.print()
 
     # Recommended actions
@@ -264,9 +461,26 @@ def display_health_report(
         can_auto_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
         has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
 
+        # Check for backend file issues
+        has_backend_file_issues = False
+        can_auto_fix_backends = False
+        has_custom_backend_issues = False
+        if backend_file_reports:
+            invalid_backends = {name: report for name, report in backend_file_reports.items() if not report.is_valid}
+            if invalid_backends:
+                has_backend_file_issues = True
+                # Check if any have kit templates (auto-fixable)
+                can_auto_fix_backends = any(report.has_kit_template for report in invalid_backends.values())
+                # Check if any are custom backends (manual fix)
+                has_custom_backend_issues = any(not report.has_kit_template for report in invalid_backends.values())
+
         # Determine if we have any recommendations to show
         has_recommendations = (
-            can_auto_fix_config or can_auto_fix_telemetry or has_telemetry_validation_error or (not backends_healthy and backend_reports)
+            can_auto_fix_config
+            or can_auto_fix_telemetry
+            or has_telemetry_validation_error
+            or (not backends_healthy and backend_credential_reports)
+            or has_backend_file_issues
         )
 
         if has_recommendations:
@@ -282,15 +496,31 @@ def display_health_report(
                 console.print("  • Fix validation errors in [cyan].pipelex/telemetry.toml[/cyan]")
                 console.print("    or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate")
 
-            if not backends_healthy and backend_reports:
+            # Backend file issues
+            if can_auto_fix_backends:
+                if fix_mode:
+                    # We're in fix mode, show what's happening next and the alternative
+                    console.print("  • Interactive fixes for outdated backend configurations will be offered below")
+                    console.print("  • Alternatively, run [cyan]pipelex init config --reset[/cyan] to reset all configuration files")
+                else:
+                    # Not in fix mode, suggest running --fix
+                    console.print("  • Run [cyan]pipelex doctor --fix[/cyan] to replace outdated backend configurations")
+                    console.print("    [dim]or run[/dim] [cyan]pipelex init config --reset[/cyan] [dim]to reset all configuration files[/dim]")
+
+            if has_custom_backend_issues:
+                invalid_custom = [name for name, report in backend_file_reports.items() if not report.is_valid and not report.has_kit_template]
+                for backend_name in invalid_custom:
+                    console.print(f"  • Manually fix backend configuration in [cyan].pipelex/inference/backends/{backend_name}.toml[/cyan]")
+
+            if not backends_healthy and backend_credential_reports:
                 # Collect all missing and placeholder vars
                 all_missing_vars: set[str] = set()
                 all_placeholder_vars: set[str] = set()
 
-                for backend_report in backend_reports.values():
-                    if not backend_report.all_credentials_valid:
-                        all_missing_vars.update(backend_report.missing_vars)
-                        all_placeholder_vars.update(backend_report.placeholder_vars)
+                for backend_credential_report in backend_credential_reports.values():
+                    if not backend_credential_report.all_credentials_valid:
+                        all_missing_vars.update(backend_credential_report.missing_vars)
+                        all_placeholder_vars.update(backend_credential_report.placeholder_vars)
 
                 if all_missing_vars:
                     console.print("  • Set the following environment variables:")
@@ -304,14 +534,14 @@ def display_health_report(
 
             console.print()
 
-            # Only suggest --fix if there are auto-fixable issues
-            if can_auto_fix_config or can_auto_fix_telemetry:
+            # Only suggest --fix if there are auto-fixable issues AND we're not already in fix mode
+            if not fix_mode and (can_auto_fix_config or can_auto_fix_telemetry or can_auto_fix_backends):
                 console.print("[dim]Run[/dim] [cyan]pipelex doctor --fix[/cyan] [dim]to interactively fix auto-fixable issues.[/dim]")
                 console.print()
 
         # Show Discord support for manual-fix issues (regardless of --fix flag)
         has_config_validation_error = not config_healthy and config_missing_count == 0
-        has_backend_credential_issues = not backends_healthy and backend_reports
+        has_backend_credential_issues = not backends_healthy and backend_credential_reports
         if has_config_validation_error or has_backend_credential_issues or has_telemetry_validation_error:
             console.print("[dim]If you need help with manual fixes:[/dim]")
             console.print("  [cyan]https://docs.pipelex.com[/cyan] - Documentation")
@@ -319,16 +549,28 @@ def display_health_report(
             console.print()
 
 
-def check_models() -> tuple[bool, str]:
-    """Check if models are valid.
+def check_models() -> tuple[bool, str, dict[str, BackendFileReport]]:
+    """Check if models are valid, including backend file validation.
 
     Returns:
-        Tuple of (is_healthy, message)
+        Tuple of (is_healthy, message, backend_file_reports)
     """
+    # First check backend files individually
+    backend_files_healthy, backend_file_reports, _ = check_backend_files()
+
+    # If backend files have issues, report that immediately
+    if not backend_files_healthy:
+        invalid_backends = [name for name, report in backend_file_reports.items() if not report.is_valid]
+        if invalid_backends:
+            # Get the first error message for summary
+            first_error = next((report.error_message for report in backend_file_reports.values() if report.error_message), "Unknown error")
+            msg = f"Backend configuration error: {first_error}"
+            return False, msg, backend_file_reports
+
+    # If backend files are OK, try to load and validate models
     pipelex_hub = PipelexHub()
     set_pipelex_hub(pipelex_hub)
 
-    # tools
     try:
         pipelex_hub.setup_config(config_cls=PipelexConfig)
     except ValidationError as validation_error:
@@ -343,9 +585,21 @@ def check_models() -> tuple[bool, str]:
     try:
         models_manager.setup(secrets_provider=secrets_provider)
         models_manager.validate_model_deck()
+    except InferenceBackendLibraryError as exc:
+        # Backend library error - try to identify which backend
+        error_str = str(exc)
+        # Parse error to see if we can identify a specific backend
+        for backend_name in backend_file_reports.keys():
+            if backend_name in error_str:
+                # Update the report for this backend
+                if backend_name in backend_file_reports:
+                    backend_file_reports[backend_name].is_valid = False
+                    backend_file_reports[backend_name].error_message = error_str
+        return False, f"Error checking models: {exc}", backend_file_reports
     except Exception as exc:
-        return False, f"Error checking models: {exc}"
-    return True, "Models are valid"
+        return False, f"Error checking models: {exc}", backend_file_reports
+
+    return True, "Models are valid", backend_file_reports
 
 
 def doctor_cmd(
@@ -386,8 +640,8 @@ def do_doctor_cmd(
     # Run health checks
     config_healthy, config_missing_count, config_message = check_config_files()
     telemetry_healthy, telemetry_message = check_telemetry_config()
-    backends_healthy, backend_reports, backends_message = check_backend_credentials()
-    models_healthy, models_message = check_models()
+    backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
+    models_healthy, models_message, backend_file_reports = check_models()
 
     # Display report
     display_health_report(
@@ -399,9 +653,11 @@ def do_doctor_cmd(
         telemetry_message=telemetry_message,
         backends_healthy=backends_healthy,
         backends_message=backends_message,
-        backend_reports=backend_reports,
+        backend_credential_reports=backend_credential_reports,
         models_healthy=models_healthy,
         models_message=models_message,
+        backend_file_reports=backend_file_reports,
+        fix_mode=fix,
     )
 
     all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
@@ -413,12 +669,21 @@ def do_doctor_cmd(
     # Determine what can be auto-fixed
     can_fix_config = not config_healthy and config_missing_count > 0
     can_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
-    has_auto_fixable_issues = can_fix_config or can_fix_telemetry
+
+    # Check for backend file issues that can be auto-fixed
+    can_fix_backends = False
+    fixable_backends: list[tuple[str, BackendFileReport]] = []
+    if backend_file_reports:
+        invalid_backends = [(name, report) for name, report in backend_file_reports.items() if not report.is_valid]
+        fixable_backends = [(name, report) for name, report in invalid_backends if report.has_kit_template]
+        can_fix_backends = len(fixable_backends) > 0
+
+    has_auto_fixable_issues = can_fix_config or can_fix_telemetry or can_fix_backends
 
     # Determine what requires manual fixes
     has_config_validation_error = not config_healthy and config_missing_count == 0
     has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
-    has_backend_credential_issues = not backends_healthy and backend_reports
+    has_backend_credential_issues = not backends_healthy and backend_credential_reports
 
     # If --fix flag is provided, offer to fix auto-fixable issues
     if fix and has_auto_fixable_issues:
@@ -447,6 +712,31 @@ def do_doctor_cmd(
                     console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
                 console.print()
 
+        # Fix outdated backend files
+        if can_fix_backends and fixable_backends:
+            console.print("[bold]Outdated Backend Configuration Files[/bold]")
+            console.print()
+
+            for backend_name, backend_file_report in fixable_backends:
+                console.print(f"  Backend: [cyan]{backend_name}[/cyan]")
+                console.print(f"  File: [dim]{backend_file_report.file_path}[/dim]")
+                console.print("  [yellow]⚠[/yellow] Configuration format may be outdated")
+                console.print()
+
+                if Confirm.ask("[bold]Replace with latest template from the Pipelex kit?[/bold]", default=True):
+                    try:
+                        success = replace_backend_file(backend_name, dry_run=False)
+                        if success:
+                            console.print(f"[green]✓[/green] Replaced {backend_name} backend configuration")
+                        else:
+                            console.print(f"[red]Failed to replace {backend_name}: Template not found or copy failed[/red]")
+                    except Exception as exc:
+                        console.print(f"[red]Failed to replace {backend_name}: {exc!s}[/red]")
+                    console.print()
+                else:
+                    console.print(f"[dim]Skipped {backend_name}[/dim]")
+                    console.print()
+
     # Handle issues that can't be auto-fixed
     if has_config_validation_error or has_telemetry_validation_error or has_backend_credential_issues:
         console.print("[bold yellow]Manual Fixes Required[/bold yellow]")
@@ -473,7 +763,7 @@ def do_doctor_cmd(
         # Backend credentials
         if has_backend_credential_issues:
             all_missing_vars: set[str] = set()
-            for backend_report in backend_reports.values():
+            for backend_report in backend_credential_reports.values():
                 if not backend_report.all_credentials_valid:
                     all_missing_vars.update(backend_report.missing_vars)
 
