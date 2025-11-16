@@ -36,7 +36,7 @@ def has_diff_dirs(dir1: str | Path, dir2: str | Path) -> bool:
         # Force deep comparison for common files that passed shallow comparison
         # This is needed because shallow comparison only checks metadata (size, mtime)
         if dir_comparison.common_files:
-            match, mismatch, errors = filecmp.cmpfiles(
+            _, mismatch, errors = filecmp.cmpfiles(
                 dir_comparison.left,
                 dir_comparison.right,
                 dir_comparison.common_files,
@@ -229,10 +229,10 @@ def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path) -> PrettyPrintable
         # Different files - combine shallow diff_files with deep comparison of common_files
         # This is needed because diff_files only contains files that failed shallow comparison
         different_files = set(dir_comparison.diff_files)
-        
+
         # Force deep comparison for common files
         if dir_comparison.common_files:
-            match, mismatch, errors = filecmp.cmpfiles(
+            _, mismatch, errors = filecmp.cmpfiles(
                 dir_comparison.left,
                 dir_comparison.right,
                 dir_comparison.common_files,
@@ -240,7 +240,7 @@ def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path) -> PrettyPrintable
             )
             different_files.update(mismatch)
             different_files.update(errors)
-        
+
         for name in sorted(different_files):
             p1 = Path(dir_comparison.left, name)
             p2 = Path(dir_comparison.right, name)
