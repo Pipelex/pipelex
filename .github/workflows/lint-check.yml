@@ -46,6 +46,9 @@ jobs:
       - name: Run mypy merge check
         run: make merge-check-mypy
 
+      - name: Run config sync check
+        run: make dev-check-config-sync
+
 # --------------------------------------------------------------------------
 # 2.  Aggregator job — the *single* required status check
 # --------------------------------------------------------------------------

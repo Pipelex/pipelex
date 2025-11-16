@@ -29,9 +29,21 @@ def has_diff_dirs(dir1: str | Path, dir2: str | Path) -> bool:
         if dir_comparison.left_only or dir_comparison.right_only:
             return True
 
-        # Check for different files
+        # Check for different files using shallow comparison
         if dir_comparison.diff_files:
             return True
+
+        # Force deep comparison for common files that passed shallow comparison
+        # This is needed because shallow comparison only checks metadata (size, mtime)
+        if dir_comparison.common_files:
+            match, mismatch, errors = filecmp.cmpfiles(
+                dir_comparison.left,
+                dir_comparison.right,
+                dir_comparison.common_files,
+                shallow=False,  # Force byte-by-byte comparison
+            )
+            if mismatch or errors:
+                return True
 
         # Check subdirectories recursively
         return any(_has_diff(sub) for sub in dir_comparison.subdirs.values())
@@ -214,8 +226,22 @@ def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path) -> PrettyPrintable
                 table.add_row(str(full_path))
             sections.append(table)
 
-        # Different files
-        for name in sorted(dir_comparison.diff_files):
+        # Different files - combine shallow diff_files with deep comparison of common_files
+        # This is needed because diff_files only contains files that failed shallow comparison
+        different_files = set(dir_comparison.diff_files)
+        
+        # Force deep comparison for common files
+        if dir_comparison.common_files:
+            match, mismatch, errors = filecmp.cmpfiles(
+                dir_comparison.left,
+                dir_comparison.right,
+                dir_comparison.common_files,
+                shallow=False,  # Force byte-by-byte comparison
+            )
+            different_files.update(mismatch)
+            different_files.update(errors)
+        
+        for name in sorted(different_files):
             p1 = Path(dir_comparison.left, name)
             p2 = Path(dir_comparison.right, name)
             full_path = Path(relative_path, name) if relative_path else Path(name)
