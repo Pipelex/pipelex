@@ -1,13 +1,13 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, cast
 
 import instructor
 from google import genai
 from google.genai import types
-
-if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionMessageParam
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
@@ -18,6 +18,9 @@ from pipelex.config import get_config
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
 
 
 class GoogleLLMWorkerError(Exception):
@@ -49,6 +52,28 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             self.instructor_for_objects.on(hook_name="completion:response", handler=dump_response_from_structured_gen)
         if instructor_config.is_dump_error_enabled:
             self.instructor_for_objects.on(hook_name="completion:error", handler=dump_error)
+
+    @override
+    def teardown(self):
+        """Close the async client to free resources."""
+        try:
+            # Try to get the running event loop
+            asyncio.get_running_loop()
+            # If there's a running loop, run the close in a separate thread
+            # to avoid blocking or creating conflicts
+            with ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, self.genai_async_client.aclose())
+                future.result(timeout=5)  # Wait up to 5 seconds for cleanup
+        except RuntimeError:
+            # No running event loop, we can safely use asyncio.run()
+            try:
+                asyncio.run(self.genai_async_client.aclose())
+            except Exception as exc:
+                # Log but don't fail teardown if cleanup has issues
+                log.debug(f"Error closing Google async client during teardown: {exc}")
+        except Exception as exc:
+            # Log but don't fail teardown if cleanup has issues
+            log.debug(f"Error during Google async client teardown: {exc}")
 
     @override
     async def _gen_text(
