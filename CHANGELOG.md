@@ -1,4 +1,26 @@
 # Changelog
+## Unreleased
+
+### Added
+ - **Improved configuration repair**: New `--fix` option for `pipelex doctor` command that interactively detects and repairs outdated or invalid backend configuration files using latest templates from the Pipelex kit.
+ - **Developer CLI & tooling**: New internal `pipelex-dev` CLI for project maintenance with `check-config-sync` command to verify user-facing configuration templates (`.pipelex/`) are synchronized with package's internal kit configs. Includes `make check-config-sync` command and CI check (`lint-check.yml`) to enforce synchronization.
+ - **Enhanced test infrastructure**: Integration tests now automatically parameterized to run against all supported backend routing profiles. Tests are intelligently skipped at collection time if a model is not supported by the active backend profile, with a summary of skipped tests provided at session end.
+ - **New routing profiles**: Added `all_groq` and `all_pipelex_inference` routing profiles.
+ - **Vision support flag**: Added `is_vision_supported` property to `LLMWorkerAbstract` class for explicit checks of model vision capabilities.
+
+### Changed
+ - **Unified structured output**: Complete overhaul of structured generation settings. Replaced global configuration setting with new `structure_method` parameter in backend `.toml` files (configurable at backend level in `[defaults]` or per individual model). Expanded `StructureMethod` enum to include dozens of modes supported by `instructor`, enabling fine-grained control over provider-specific features like OpenAI Structured Outputs or Anthropic Tools, and various JSON-based modes.
+ - **Groq integration**: Updated to use standard `openai` SDK, simplifying integration.
+ - **Default configurations**: All official backend providers now enabled by default after `pipelex init`. Default prompting style changed from `ticks` to `xml`.
+ - **Code & test organization**: Unit test suite reorganized from `tests/unit/core` and other directories into unified `tests/unit/pipelex/` structure. Integration test fixtures modularized from `conftest.py` into separate files within `tests/integration/pipelex/fixtures/`.
+
+### Fixed
+ - Improved Pydantic validation error messages when loading backend configurations to clearly indicate the specific file and model containing the error.
+
+### Removed
+ - **Perplexity backend**: Default configuration for Perplexity AI backend (`perplexity.toml`) removed from kit (it was obsolete, it will come back).
+ - **Groq plugin**: Dedicated `pipelex/plugins/groq` plugin removed (now uses standard `openai` SDK).
+ - **Global instructor config**: Global `is_openai_structured_output_enabled` setting, replaced by per-model `structure_method` approach.
 
 ## [v0.15.4] - 2025-11-12
 
