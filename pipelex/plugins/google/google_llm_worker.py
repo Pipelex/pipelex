@@ -1,5 +1,4 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, cast
 
 import instructor
@@ -40,6 +39,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         )
         genai_client: genai.Client = sdk_instance
         self.genai_async_client = genai_client.aio
+
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_genai(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
@@ -53,24 +53,43 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         if instructor_config.is_dump_error_enabled:
             self.instructor_for_objects.on(hook_name="completion:error", handler=dump_error)
 
+        # Capture the event loop at creation time if one is running
+        self._event_loop: asyncio.AbstractEventLoop | None
+        try:
+            self._event_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop at creation time
+            self._event_loop = None
+
     @override
     def teardown(self):
         """Close the async client to free resources."""
         try:
-            # Try to get the running event loop
-            asyncio.get_running_loop()
-            # If there's a running loop, run the close in a separate thread
-            # to avoid blocking or creating conflicts
-            with ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, self.genai_async_client.aclose())
-                future.result(timeout=5)  # Wait up to 5 seconds for cleanup
-        except RuntimeError:
-            # No running event loop, we can safely use asyncio.run()
+            # First, try to use the loop captured at creation time if it's still running
+            if self._event_loop is not None and self._event_loop.is_running():
+                # Schedule cleanup on the captured loop and store reference to prevent garbage collection
+                task = self._event_loop.create_task(self.genai_async_client.aclose())
+                # Add a callback to log any errors that occur during cleanup
+                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                log.verbose("Scheduled Google async client cleanup on captured event loop")
+                return
+
+            # Otherwise, try to get the current running loop
             try:
-                asyncio.run(self.genai_async_client.aclose())
-            except Exception as exc:
-                # Log but don't fail teardown if cleanup has issues
-                log.debug(f"Error closing Google async client during teardown: {exc}")
+                current_loop = asyncio.get_running_loop()
+                # Schedule cleanup on the current running loop and store reference to prevent garbage collection
+                task = current_loop.create_task(self.genai_async_client.aclose())
+                # Add a callback to log any errors that occur during cleanup
+                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                log.verbose("Scheduled Google async client cleanup on current event loop")
+            except RuntimeError:
+                # No running event loop, we can safely use asyncio.run()
+                try:
+                    asyncio.run(self.genai_async_client.aclose())
+                    log.verbose("Closed Google async client using asyncio.run()")
+                except Exception as exc:
+                    # Log but don't fail teardown if cleanup has issues
+                    log.verbose(f"Error closing Google async client during teardown: {exc}")
         except Exception as exc:
             # Log but don't fail teardown if cleanup has issues
             log.debug(f"Error during Google async client teardown: {exc}")
