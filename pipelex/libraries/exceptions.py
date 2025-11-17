@@ -31,17 +31,6 @@ class LibraryLoadingError(LibraryError, PipelexValidationExceptionAbstractError)
         self.pipe_definition_errors = pipe_definition_errors
         super().__init__(message)
 
-    def as_structured_content(self) -> LibraryLoadingErrorData:
-        return LibraryLoadingErrorData(
-            message=str(self),
-            concept_definition_errors=self.concept_definition_errors,
-            pipe_definition_errors=self.pipe_definition_errors,
-        )
-
-    @override
-    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
-        return self.concept_definition_errors or []
-
 
 class DomainLoadingError(LibraryLoadingError):
     def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):

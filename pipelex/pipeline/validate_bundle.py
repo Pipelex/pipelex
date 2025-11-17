@@ -2,16 +2,38 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import PipelexInterpreterError
+from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager, set_current_library_id, teardown_current_library_id
 from pipelex.libraries.exceptions import LibraryLoadingError
-from pipelex.pipe_run.dry_run import DryRunOutput, dry_run_pipes
+from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 
 
 class ValidateBundleError(PipelexError):
-    pass
+    """Raised when bundle validation fails.
+
+    This error aggregates validation errors from different stages:
+    - Interpreter errors (blueprint validation)
+    - Library loading errors (concept/pipe definition errors)
+    - Dry run errors
+    """
+
+    def __init__(
+        self,
+        message: str,
+        validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        concept_definition_errors: list[ConceptDefinitionErrorData] | None = None,
+        pipe_definition_errors: list[PipeDefinitionErrorData] | None = None,
+        dry_run_error_message: str | None = None,
+    ):
+        self.validation_errors = validation_errors or []
+        self.concept_definition_errors = concept_definition_errors or []
+        self.pipe_definition_errors = pipe_definition_errors or []
+        self.dry_run_error_message = dry_run_error_message
+        super().__init__(message)
 
 
 class ValidateBundleResult(BaseModel):
@@ -63,12 +85,25 @@ async def validate_bundle(
         for pipe in loaded_pipes:
             pipe.validate_with_libraries()
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
-    except ValidationError as validation_error:
-        raise ValidateBundleError(message="") from validation_error
     except PipelexInterpreterError as interpreter_error:
-        raise ValidateBundleError(message=interpreter_error.message) from interpreter_error
+        # Forward categorized validation errors from interpreter
+        raise ValidateBundleError(
+            message=interpreter_error.message,
+            validation_errors=interpreter_error.validation_errors,
+        ) from interpreter_error
     except LibraryLoadingError as library_loading_error:
-        raise ValidateBundleError(message=library_loading_error.message) from library_loading_error
+        # Forward concept and pipe definition errors from library loading
+        raise ValidateBundleError(
+            message=library_loading_error.message,
+            concept_definition_errors=library_loading_error.concept_definition_errors,
+            pipe_definition_errors=library_loading_error.pipe_definition_errors,
+        ) from library_loading_error
+    except DryRunError as dry_run_error:
+        # Forward dry run error message
+        raise ValidateBundleError(
+            message=dry_run_error.message,
+            dry_run_error_message=dry_run_error.message,
+        ) from dry_run_error
     finally:
         library_manager.teardown(library_id=library_id)
         teardown_current_library_id()

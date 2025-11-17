@@ -86,7 +86,7 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
         raise PipelexBundleError(message=domain_loading_error.message, domain_failures=domain_failures) from domain_loading_error
     except ConceptLoadingError as concept_loading_error:
         concept_def_error = concept_loading_error.concept_definition_error
-        concept_definition_error_data = ConceptDefinitionErrorData(
+        concept_definition_error_data = ConceptBlueprintValidationErrorData(
             message=str(concept_def_error),
             domain_code=concept_def_error.domain_code,
             concept_code=concept_def_error.concept_code,

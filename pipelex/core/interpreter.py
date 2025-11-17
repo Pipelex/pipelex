@@ -70,59 +70,27 @@ class PipelexInterpreter(BaseModel):
             return PipelexBundleBlueprint.model_validate(blueprint_dict)
         except ValidationError as exc:
             # Parse Pydantic validation errors into structured error data
+            from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
+
             validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
+
+            # Handle domain and source fields carefully for context
+            domain_value: str | None = blueprint_dict.get("domain") if blueprint_dict else None
+            source_value: str | None = blueprint_dict.get("source") or bundle_path if blueprint_dict else bundle_path
 
             for error in exc.errors():
                 loc = error.get("loc", ())
-                msg = error.get("msg", "Unknown validation error")
 
-                # Determine if it's a pipe or concept error
-                pipe_code: str | None = None
-                concept_code: str | None = None
-                other: str | None = None
+                # Don't use domain/source from blueprint if they're the fields that failed
+                error_domain = None if (loc and loc[0] == "domain") else domain_value
+                error_source = bundle_path if (loc and loc[0] == "source") else source_value
 
-                if len(loc) >= 2:
-                    if loc[0] == "pipe":
-                        pipe_code = str(loc[1])
-                    elif loc[0] == "concept":
-                        concept_code = str(loc[1])
-                    else:
-                        other = str(loc[0])
-                elif len(loc) == 1:
-                    other = str(loc[0])
-
-                # Create field path string
-                field_path = " → ".join(str(item) for item in loc)
-
-                # Handle domain and source fields carefully when they are the error location
-                # If the error is on the domain field itself, don't use blueprint_dict.get("domain")
-                # since it's the field that failed validation
-                domain_value: str | None = None
-                source_value: str | None = None
-
-                if loc and loc[0] == "domain":
-                    # The domain field itself has an error, don't use it
-                    domain_value = None
-                else:
-                    # Use the domain from blueprint_dict if available
-                    domain_value = blueprint_dict.get("domain")
-
-                if loc and loc[0] == "source":
-                    # The source field itself has an error, use bundle_path as fallback
-                    source_value = bundle_path
-                else:
-                    # Use source from blueprint_dict or bundle_path
-                    source_value = blueprint_dict.get("source") or bundle_path
-
-                # Create validation error data
-                val_error = PipelexBundleBlueprintValidationErrorData(
-                    pipe_code=pipe_code,
-                    concept_code=concept_code,
-                    field_path=field_path,
-                    message=msg,
-                    other=other,
-                    domain=domain_value,
-                    source=source_value,
+                # Categorize error and create structured error data
+                val_error = categorize_and_create_error_data(
+                    error=error,
+                    blueprint_dict=blueprint_dict,
+                    domain=error_domain,
+                    source=error_source,
                 )
                 validation_errors.append(val_error)
 
