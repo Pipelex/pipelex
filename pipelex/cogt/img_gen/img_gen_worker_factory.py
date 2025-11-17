@@ -1,13 +1,14 @@
-from pipelex.cogt.exceptions import CogtError, MissingDependencyError
+from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_models_manager, get_plugin_manager, get_secret
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 
 
-class FalCredentialsError(CogtError):
+class FalCredentialsError(CredentialsError):
     pass
 
 
