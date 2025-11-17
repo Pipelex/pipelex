@@ -4,12 +4,18 @@ import pytest
 
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.hub import get_model_deck
+from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
 
 
 def is_llm_handle_supported(llm_handle: str) -> bool:
     """Check if an LLM handle is available in the current model deck."""
     model_deck = get_model_deck()
     return model_deck.is_handle_defined(llm_handle)
+
+
+def is_llm_handle_supported_by_enabled_backends(llm_handle: str) -> bool:
+    """Check if an LLM handle is supported by at least one enabled backend."""
+    return any(check_backend_supports_model(backend, llm_handle) for backend in ALL_BACKENDS)
 
 
 # ================================================================================================
@@ -186,7 +192,9 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     llm_handle_param = request.param
     if not is_llm_handle_supported(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not available on the active routing profile")
+        pytest.skip(f"LLM handle '{llm_handle_param}' not available in model deck")
+    if not is_llm_handle_supported_by_enabled_backends(llm_handle_param):
+        pytest.skip(f"LLM handle '{llm_handle_param}' not supported by any enabled backend")
     return llm_handle_param
 
 
@@ -209,5 +217,7 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)
     llm_handle_param = request.param
     if not is_llm_handle_supported(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not available on the active routing profile")
+        pytest.skip(f"LLM handle '{llm_handle_param}' not available in model deck")
+    if not is_llm_handle_supported_by_enabled_backends(llm_handle_param):
+        pytest.skip(f"LLM handle '{llm_handle_param}' not supported by any enabled backend")
     return llm_handle_param

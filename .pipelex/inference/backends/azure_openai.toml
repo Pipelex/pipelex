@@ -115,3 +115,15 @@ model_id = "gpt-5-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
+
+################################################################################
+# IMAGE GENERATION MODELS
+################################################################################
+
+# --- OpenAI Image Generation --------------------------------------------------
+[gpt-image-1]
+model_type = "img_gen"
+model_id = "gpt-image-1"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.04, output = 0.0 }

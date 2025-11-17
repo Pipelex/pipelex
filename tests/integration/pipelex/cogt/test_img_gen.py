@@ -9,6 +9,7 @@ from tests.integration.pipelex.test_data import ImageGenTestCases
 @pytest.mark.img_gen
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
+@pytest.mark.usefixtures("routing_profile_override")
 class TestImageGeneration:
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_using_handle(self, img_gen_handle: str, topic: str, img_gen_prompt_text: str):
