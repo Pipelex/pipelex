@@ -52,6 +52,10 @@ excluded_dirs = [
 [pipelex.log_config]
 default_log_level = "INFO"
 
+# Uncomment to log to stderr instead of stdout
+# console_log_target = "stderr"
+# console_print_target = "stderr"
+
 [pipelex.log_config.package_log_levels]
 pipelex = "INFO"
 

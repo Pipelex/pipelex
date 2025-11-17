@@ -1,3 +1,6 @@
+import sys
+from typing import Any
+
 from pipelex.types import StrEnum
 
 BOLD_FONT = "\033[1m"
@@ -12,3 +15,8 @@ class TerminalColor(StrEnum):
     CYAN = "\033[0;36m"
     MAGENTA = "\033[0;35m"
     YELLOW = "\033[0;33m"
+
+
+def print_to_stderr(*args: Any, **kwargs: Any):
+    kwargs.setdefault("file", sys.stderr)
+    print(*args, **kwargs)

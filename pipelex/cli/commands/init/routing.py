@@ -3,7 +3,6 @@
 import os
 from typing import Any
 
-from rich.console import Console
 from rich.prompt import Confirm
 from tomlkit import table
 
@@ -15,6 +14,7 @@ from pipelex.cli.commands.init.ui.routing_ui import (
     prompt_fallback_order,
     prompt_primary_backend,
 )
+from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import path_exists
@@ -27,7 +27,7 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
     Args:
         selected_backend_keys: List of backend keys that are enabled.
     """
-    console = Console()
+    console = get_console()
     routing_profiles_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "routing_profiles.toml")
     template_routing_path = os.path.join(str(get_kit_configs_dir()), "inference", "routing_profiles.toml")
     backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")

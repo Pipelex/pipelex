@@ -2,7 +2,6 @@ from typing import Annotated
 
 import typer
 from click import Command, Context
-from rich.console import Console
 from typer.core import TyperGroup
 from typing_extensions import override
 
@@ -15,6 +14,7 @@ from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
 from pipelex.cli.readiness import check_readiness
+from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -50,7 +50,7 @@ app = typer.Typer(
 @app.callback(invoke_without_command=True)
 def app_callback(ctx: typer.Context) -> None:
     """Run pre-command checks like printing the logo and checking telemetry consent."""
-    console = Console()
+    console = get_console()
     package_version = get_package_version()
     console.print(
         f"""

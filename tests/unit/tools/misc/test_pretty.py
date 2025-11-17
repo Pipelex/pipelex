@@ -233,7 +233,7 @@ class TestPrettyPrintInSandbox:
         PrettyPrinter.pretty_print_without_rich(content="")
 
         captured = capsys.readouterr()
-        output = remove_ansi_escape_codes(captured.out)
+        output = remove_ansi_escape_codes(captured.err)
 
         expected_output = textwrap.dedent("""\
             ╭────╮
@@ -247,7 +247,7 @@ class TestPrettyPrintInSandbox:
         PrettyPrinter.pretty_print_without_rich(content=None, title="title", subtitle="subtitle")
 
         captured = capsys.readouterr()
-        output = remove_ansi_escape_codes(captured.out)
+        output = remove_ansi_escape_codes(captured.err)
 
         expected_output = textwrap.dedent("""\
             ╭────────────╮

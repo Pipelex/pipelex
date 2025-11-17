@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
+from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 
 class Article(BaseModel):
@@ -28,8 +29,8 @@ def test_convert_md():
 
     json_data = obj.model_dump()
     json_data_md = convert_to_markdown(json_data)
-    print(json_data_md)
+    print_to_stderr(json_data_md)
 
     # Convert that dictionary to Markdown
     obj_md = convert_to_markdown(obj)
-    print(obj_md)
+    print_to_stderr(obj_md)
