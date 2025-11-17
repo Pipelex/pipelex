@@ -75,9 +75,8 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         job_params = img_gen_job.job_params
 
         # Convert parameters to Azure format
-        size = AzureImgGenFactory.image_size_for_azure(job_params.aspect_ratio)
+        size, width, height = AzureImgGenFactory.image_size_for_azure(job_params.aspect_ratio)
         output_format = AzureImgGenFactory.output_format_for_azure(job_params.output_format)
-        quality = AzureImgGenFactory.quality_for_azure(job_params.quality)
 
         # Get deployment name (model_id from the inference model)
         deployment = self.inference_model.model_id
@@ -86,14 +85,14 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         base_path = f"openai/deployments/{deployment}/images"
         params = f"?api-version={self.api_version}"
         generation_url = f"{self.endpoint}/{base_path}/generations{params}"
-        # generation_url = f"https://azure-m5wc1gw2-eastus2.cognitiveservices.azure.com/{base_path}/generations{params}"
 
         # Build the request body
         generation_body = {
             "prompt": img_gen_prompt_text,
             "n": nb_images,
             "size": size,
-            "quality": quality,
+            "background": job_params.background,
+            "quality": job_params.quality,
             "output_format": output_format,
         }
 
@@ -106,14 +105,13 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     "Content-Type": "application/json",
                 },
                 json=generation_body,
-                timeout=60.0,
+                timeout=180.0,
             )
             response.raise_for_status()
             response_data = response.json()
 
         # Parse the response and create GeneratedImage objects
         generated_images: list[GeneratedImage] = []
-        width, height = AzureImgGenFactory.parse_image_dimensions(size)
 
         for item in response_data["data"]:
             # Get base64 image data

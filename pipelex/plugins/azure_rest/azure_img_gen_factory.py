@@ -1,26 +1,31 @@
-from typing import Literal
-
 from pipelex.cogt.exceptions import ImgGenParameterError
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat
+from pipelex.types import StrEnum
 
-AzureSizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
-AzureOutputFormatType = Literal["png", "jpeg", "webp"]
-AzureQualityType = Literal["low", "medium", "high"]
+
+class AzureSize(StrEnum):
+    SQUARE = "1024x1024"
+    LANDSCAPE_3_2 = "1536x1024"
+    PORTRAIT_2_3 = "1024x1536"
+
+
+class AzureOutputFormat(StrEnum):
+    PNG = "png"
+    JPEG = "jpeg"
+    WEBP = "webp"
 
 
 class AzureImgGenFactory:
-    """Factory for converting Pipelex parameters to Azure OpenAI Image API format."""
-
     @classmethod
-    def image_size_for_azure(cls, aspect_ratio: AspectRatio) -> AzureSizeType:
-        """Convert Pipelex aspect ratio to Azure image size format."""
+    def image_size_for_azure(cls, aspect_ratio: AspectRatio) -> tuple[AzureSize, int, int]:
+        """Convert our aspect ratio to Azure image size format."""
         match aspect_ratio:
             case AspectRatio.SQUARE:
-                return "1024x1024"
+                return AzureSize.SQUARE, 1024, 1024
             case AspectRatio.LANDSCAPE_3_2:
-                return "1536x1024"
+                return AzureSize.LANDSCAPE_3_2, 1536, 1024
             case AspectRatio.PORTRAIT_2_3:
-                return "1024x1536"
+                return AzureSize.PORTRAIT_2_3, 1024, 1536
             case (
                 AspectRatio.LANDSCAPE_4_3
                 | AspectRatio.LANDSCAPE_16_9
@@ -33,25 +38,12 @@ class AzureImgGenFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def output_format_for_azure(cls, output_format: OutputFormat) -> AzureOutputFormatType:
-        """Convert Pipelex output format to Azure format."""
+    def output_format_for_azure(cls, output_format: OutputFormat) -> AzureOutputFormat:
+        """Convert our output format to Azure format."""
         match output_format:
             case OutputFormat.PNG:
-                return "png"
+                return AzureOutputFormat.PNG
             case OutputFormat.JPG:
-                return "jpeg"
+                return AzureOutputFormat.JPEG
             case OutputFormat.WEBP:
-                return "webp"
-
-    @classmethod
-    def quality_for_azure(cls, quality: Quality | None) -> AzureQualityType:
-        """Convert Pipelex quality to Azure quality format."""
-        if quality is None:
-            return "medium"
-        return quality.value
-
-    @classmethod
-    def parse_image_dimensions(cls, size: str) -> tuple[int, int]:
-        """Parse Azure size string to width and height."""
-        width_str, height_str = size.split("x")
-        return int(width_str), int(height_str)
+                return AzureOutputFormat.WEBP
