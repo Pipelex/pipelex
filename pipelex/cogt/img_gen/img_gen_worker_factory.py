@@ -53,7 +53,7 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "openai" | "azure_openai":
+            case "openai":
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
 
@@ -84,6 +84,14 @@ class ImgGenWorkerFactory:
 
                 img_gen_worker = OpenAIImgGenAlternativeWorker(
                     sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "azure_openai":
+                from pipelex.plugins.azure_rest.azure_img_gen_worker import AzureImgGenWorker  # noqa: PLC0415
+
+                img_gen_worker = AzureImgGenWorker(
+                    plugin=plugin,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
