@@ -8,17 +8,19 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.exceptions import ConceptDefinitionError, ConceptFactoryError
+from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.domains.exceptions import DomainFactoryError
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory, PipeFactoryError
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
+from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
 from pipelex.hub import get_current_library_id
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.exceptions import DomainLibraryError
@@ -204,6 +206,9 @@ class LibraryManager(LibraryManagerAbstract):
             except DomainFactoryError as domain_factory_error:
                 msg = f"Could not load domain from blueprint '{blueprint.source}': {domain_factory_error}"
                 raise LibraryLoadingError(msg) from domain_factory_error
+            except ValidationError as validation_error:
+                msg = f"Could not load domain from blueprint '{blueprint.source}': {validation_error}"
+                raise LibraryLoadingError(msg) from validation_error
             all_domains.append(domain)
         try:
             library.domain_library.add_domains(domains=all_domains)
@@ -227,6 +232,9 @@ class LibraryManager(LibraryManagerAbstract):
                     except ConceptFactoryError as concept_factory_error:
                         msg = f"Could not load concept from blueprint '{blueprint.source}': {concept_factory_error}"
                         raise LibraryLoadingError(msg) from concept_factory_error
+                    except ValidationError as validation_error:
+                        msg = f"Could not load concept from blueprint '{blueprint.source}': {validation_error}"
+                        raise LibraryLoadingError(msg) from validation_error
                     concepts.append(concept)
                 all_concepts.extend(concepts)
         try:
@@ -250,6 +258,9 @@ class LibraryManager(LibraryManagerAbstract):
                     except PipeFactoryError as pipe_factory_error:
                         msg = f"Could not load pipe from blueprint '{blueprint.source}': {pipe_factory_error}"
                         raise LibraryLoadingError(msg) from pipe_factory_error
+                    except ValidationError as validation_error:
+                        msg = f"Could not load pipe from blueprint '{blueprint.source}': {validation_error}"
+                        raise LibraryLoadingError(msg) from validation_error
                     pipes.append(pipe)
             all_pipes.extend(pipes)
 
@@ -261,13 +272,10 @@ class LibraryManager(LibraryManagerAbstract):
 
         try:
             library.validate_library()
-        except LibraryError as library_error:
-            msg = f"Could not validate library for blueprints: {library_error}"
-            raise LibraryLoadingError(msg) from library_error
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-            msg = f"Could not validate library for blueprints because of: {validation_error_msg}"
+            msg = f"Could not validate library for blueprints: {validation_error}"
             raise LibraryLoadingError(msg) from validation_error
+
         return all_pipes
 
     def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> None:
@@ -289,13 +297,16 @@ class LibraryManager(LibraryManagerAbstract):
             except FileNotFoundError as file_not_found_error:
                 msg = f"Could not find PLX bundle at '{plx_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
+            except PipelexInterpreterError as interpreter_error:
+                # Forward categorized validation errors from interpreter
+                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {interpreter_error.message}"
+                raise LibraryLoadingError(
+                    message=msg,
+                    validation_errors=interpreter_error.validation_errors,
+                ) from interpreter_error
             except PipeDefinitionError as pipe_def_error:
                 msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {pipe_def_error}"
                 raise LibraryLoadingError(msg) from pipe_def_error
-            except ValidationError as pipelex_bundle_validation_error:
-                validation_error_msg = report_validation_error(category="plx", validation_error=pipelex_bundle_validation_error)
-                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {validation_error_msg}"
-                raise LibraryLoadingError(msg) from pipelex_bundle_validation_error
             blueprints.append(blueprint)
 
         self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
@@ -303,16 +314,27 @@ class LibraryManager(LibraryManagerAbstract):
         # Load all blueprints into the library
         try:
             self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-        except ConceptDefinitionError as concept_def_error:
-            msg = f"Could not load concepts from blueprints: {concept_def_error}"
-            raise LibraryLoadingError(msg) from concept_def_error
         except PipeDefinitionError as pipe_def_error:
             msg = f"Could not load pipes from blueprints '{pipe_def_error.source}': {pipe_def_error}"
             raise LibraryLoadingError(msg) from pipe_def_error
         except ValidationError as validation_error:
+            # Categorize and forward Pydantic validation errors
+            validation_errors: list[PipelexBundleBlueprintValidationErrorData]   = []
+            for error in validation_error.errors():
+                val_error = categorize_and_create_error_data(
+                    error=error,
+                    blueprint_dict=None,
+                    domain=None,
+                    source=None,
+                )
+                validation_errors.append(val_error)
+
             validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
             msg = f"Could not load blueprints because of: {validation_error_msg}"
-            raise LibraryLoadingError(msg) from validation_error
+            raise LibraryLoadingError(
+                message=msg,
+                validation_errors=validation_errors,
+            ) from validation_error
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_library()

@@ -1,11 +1,9 @@
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.exceptions import ConceptDefinitionErrorData
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError
 from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager, set_current_library_id, teardown_current_library_id
 from pipelex.libraries.exceptions import LibraryLoadingError
@@ -17,21 +15,19 @@ class ValidateBundleError(PipelexError):
 
     This error aggregates validation errors from different stages:
     - Interpreter errors (blueprint validation)
-    - Library loading errors (concept/pipe definition errors)
+    - Library loading errors (factory and validation errors)
     - Dry run errors
+
+    All errors are categorized and stored in validation_errors.
     """
 
     def __init__(
         self,
         message: str,
         validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
-        concept_definition_errors: list[ConceptDefinitionErrorData] | None = None,
-        pipe_definition_errors: list[PipeDefinitionErrorData] | None = None,
         dry_run_error_message: str | None = None,
     ):
         self.validation_errors = validation_errors or []
-        self.concept_definition_errors = concept_definition_errors or []
-        self.pipe_definition_errors = pipe_definition_errors or []
         self.dry_run_error_message = dry_run_error_message
         super().__init__(message)
 
@@ -92,11 +88,10 @@ async def validate_bundle(
             validation_errors=interpreter_error.validation_errors,
         ) from interpreter_error
     except LibraryLoadingError as library_loading_error:
-        # Forward concept and pipe definition errors from library loading
+        # Forward categorized validation errors from library loading
         raise ValidateBundleError(
             message=library_loading_error.message,
-            concept_definition_errors=library_loading_error.concept_definition_errors,
-            pipe_definition_errors=library_loading_error.pipe_definition_errors,
+            validation_errors=library_loading_error.validation_errors,
         ) from library_loading_error
     except DryRunError as dry_run_error:
         # Forward dry run error message

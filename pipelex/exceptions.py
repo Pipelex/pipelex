@@ -3,8 +3,6 @@ from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValueError
 from pipelex.core.concepts.exceptions import (
     ConceptBlueprintValueError,
     ConceptCodeError,
-    ConceptDefinitionError,
-    ConceptDefinitionErrorData,
     ConceptError,
     ConceptFactoryError,
     ConceptLibraryConceptNotFoundError,
@@ -13,7 +11,6 @@ from pipelex.core.concepts.exceptions import (
     ConceptStructureBlueprintValueError,
     ConceptStructureGeneratorError,
     ConceptStructureValidationError,
-    PipelexValidationExceptionAbstractError,
     StructureClassError,
 )
 from pipelex.core.domains.exceptions import DomainCodeError
@@ -48,7 +45,6 @@ from pipelex.libraries.exceptions import (
     DomainLoadingError,
     LibraryError,
     LibraryLoadingError,
-    LibraryLoadingErrorData,
     PipeLoadingError,
 )
 from pipelex.pipe_controllers.exceptions import PipeControllerError, PipeControllerOutputConceptMismatchError
@@ -92,13 +88,9 @@ __all__ = [
     "ConceptStringError",
     "ConceptRefineError",
     "ConceptLibraryConceptNotFoundError",
-    "ConceptDefinitionErrorData",
-    "ConceptDefinitionError",
     "ConceptStructureGeneratorError",
-    "PipelexValidationExceptionAbstractError",
     # from pipelex.libraries.exceptions
     "LibraryError",
-    "LibraryLoadingErrorData",
     "LibraryLoadingError",
     "ConceptLoadingError",
     "DomainLoadingError",

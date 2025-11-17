@@ -1,11 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import override
 
-from pydantic import Field
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.tools.misc.toml_utils import TomlError
 from pipelex.types import StrEnum
+
 
 class PipelexConfigurationError(PipelexError):
     """Raised when there are configuration issues with the PipelexInterpreter."""

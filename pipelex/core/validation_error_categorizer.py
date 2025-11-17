@@ -6,6 +6,8 @@ into PipelexBundleBlueprintFixableErrorType with proper context extraction.
 
 from typing import Any
 
+from pydantic_core import ErrorDetails
+
 from pipelex.core.exceptions import (
     PipelexBundleBlueprintFixableErrorType,
     PipelexBundleBlueprintValidationErrorData,
@@ -13,7 +15,7 @@ from pipelex.core.exceptions import (
 
 
 def categorize_and_create_error_data(
-    error: dict[str, Any],
+    error: ErrorDetails,
     blueprint_dict: dict[str, Any] | None,
     domain: str | None,
     source: str | None,
@@ -48,8 +50,8 @@ def categorize_and_create_error_data(
         field_name=field_name,
     )
 
-    # Build base error data
-    error_data = PipelexBundleBlueprintValidationErrorData(
+    # Build and return base error data
+    return PipelexBundleBlueprintValidationErrorData(
         domain=domain,
         source=source,
         pipe_code=pipe_code,
@@ -62,10 +64,8 @@ def categorize_and_create_error_data(
         **extra_context,  # Add any type-specific context
     )
 
-    return error_data
 
-
-def _extract_context_from_loc(loc: tuple[str, ...]) -> tuple[str | None, str | None, str | None, str | None]:
+def _extract_context_from_loc(loc: tuple[int | str, ...]) -> tuple[str | None, str | None, str | None, str | None]:
     """Extract pipe_code, concept_code, field_name, and error_scope from location tuple.
 
     Returns:
@@ -102,7 +102,7 @@ def _extract_context_from_loc(loc: tuple[str, ...]) -> tuple[str | None, str | N
 
 
 def _categorize_error(
-    loc: tuple[str, ...],
+    loc: tuple[int | str, ...],
     msg: str,
     pydantic_type: str,
     blueprint_dict: dict[str, Any] | None,
@@ -148,7 +148,7 @@ def _categorize_error(
 
 
 def _categorize_value_error(
-    loc: tuple[str, ...],
+    loc: tuple[int | str, ...],
     msg: str,
     blueprint_dict: dict[str, Any] | None,
     pipe_code: str | None,
@@ -167,8 +167,8 @@ def _categorize_value_error(
                 concepts = blueprint_dict.get("concept", {})
                 concept_data = concepts.get(concept_code, {})
                 if isinstance(concept_data, dict):
-                    extra_context["concept_refines"] = concept_data.get("refines")
-                    extra_context["concept_structure"] = concept_data.get("structure")
+                    extra_context["concept_refines"] = concept_data["refines"]
+                    extra_context["concept_structure"] = concept_data["structure"]
             return PipelexBundleBlueprintFixableErrorType.CONCEPT_REFINES_STRUCTURE_CONFLICT, extra_context
 
         elif field_name == "refines" or "Could not validate refine" in msg:
@@ -176,7 +176,7 @@ def _categorize_value_error(
                 concepts = blueprint_dict.get("concept", {})
                 concept_data = concepts.get(concept_code, {})
                 if isinstance(concept_data, dict):
-                    extra_context["concept_refines"] = concept_data.get("refines")
+                    extra_context["concept_refines"] = concept_data["refines"]
             return PipelexBundleBlueprintFixableErrorType.CONCEPT_REFINES_INVALID, extra_context
 
         elif field_name == "structure":
@@ -243,4 +243,3 @@ def _extract_expected_output_from_msg(msg: str) -> str | None:
     except (ValueError, IndexError):
         pass
     return None
-

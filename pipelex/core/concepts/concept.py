@@ -6,9 +6,11 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_code, validate_concept_string
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -32,19 +34,31 @@ class Concept(BaseModel):
 
     @classmethod
     def is_implicit_concept(cls, concept_string: str) -> bool:
-        validate_concept_string(concept_string=concept_string)
+        try:
+            validate_concept_string(concept_string=concept_string)
+        except ConceptStringError as exc:
+            msg = f"Concept string '{concept_string}' is not a valid concept string for concept '{cls.concept_string}'"
+            raise ConceptValueError(msg) from exc
         return concept_string.startswith(SpecialDomain.IMPLICIT)
 
     @field_validator("code")
     @classmethod
     def validate_code(cls, code: str) -> str:
-        validate_concept_code(concept_code=code)
+        try:
+            validate_concept_code(concept_code=code)
+        except ConceptCodeError as exc:
+            msg = f"Concept code '{code}' is not a valid concept code for concept '{cls.concept_string}'"
+            raise ConceptValueError(msg) from exc
         return code
 
     @field_validator("domain")
     @classmethod
     def validate_domain(cls, domain: str) -> str:
-        validate_domain_code(code=domain)
+        try:
+            validate_domain_code(code=domain)
+        except DomainCodeError as exc:
+            msg = f"Domain code '{domain}' is not a valid domain code for concept '{cls.concept_string}'"
+            raise ConceptValueError(msg) from exc
         return domain
 
     @field_validator("refines", mode="before")
@@ -52,7 +66,11 @@ class Concept(BaseModel):
     def validate_refines(cls, refines: str | None) -> str | None:
         if refines is None:
             return None
-        validate_concept_string(concept_string=refines)
+        try:
+            validate_concept_string(concept_string=refines)
+        except ConceptStringError as exc:
+            msg = f"Refines '{refines}' is not a valid concept string for concept '{cls.concept_string}'"
+            raise ConceptValueError(msg) from exc
         return refines
 
     @classmethod

@@ -2,10 +2,8 @@ from typing import NoReturn
 
 import typer
 from rich.console import Console
-from rich.syntax import Syntax
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.core.concepts.exceptions import PipelexValidationExceptionAbstractError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.types import StrEnum
@@ -110,67 +108,5 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         f"  3. Enable a backend that supports [yellow]'{exc.model_handle}'[/yellow]"
     )
     console.print(f"\n[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
-def handle_validation_error(exc: PipelexValidationExceptionAbstractError, context: ErrorContext) -> NoReturn:
-    """Handle and display validation errors with formatted output.
-
-    Args:
-        exc: The validation error exception (implements ValidationErrorDetailsProtocol)
-        context: Context for the error message
-    """
-    console = Console(stderr=True)
-    console.print(f"\n[bold red]❌ {context} failed due to validation error[/bold red]\n")
-    console.print(f"[bold red]Error:[/bold red]        {exc}\n")
-
-    # Display concept definition errors with syntax highlighting
-    concept_definition_errors = exc.get_concept_definition_errors()
-    if concept_definition_errors:
-        console.print("[bold cyan]Concept Definition Errors:[/bold cyan]\n")
-        for concept_definition_error in concept_definition_errors:
-            syntax_error_data = concept_definition_error.structure_class_syntax_error_data
-            if not syntax_error_data:
-                continue
-
-            message = concept_definition_error.message
-            code = concept_definition_error.structure_class_python_code or ""
-            highlight_lines: set[int] | None = None
-            if syntax_error_data.lineno:
-                highlight_lines = {syntax_error_data.lineno}
-
-            syntax = Syntax(
-                code=code,
-                lexer="python",
-                line_numbers=True,
-                word_wrap=False,
-                theme="ansi_dark",
-                line_range=None,
-                highlight_lines=highlight_lines,
-            )
-
-            # Build pretty error location
-            pretty_range = ""
-            if syntax_error_data.lineno and syntax_error_data.end_lineno:
-                pretty_range = f"lines {syntax_error_data.lineno} to {syntax_error_data.end_lineno}"
-            elif syntax_error_data.lineno:
-                pretty_range = f"line {syntax_error_data.lineno}"
-            if syntax_error_data.offset and syntax_error_data.end_offset:
-                pretty_range += f", column {syntax_error_data.offset} to {syntax_error_data.end_offset}"
-            elif syntax_error_data.offset:
-                pretty_range += f", column {syntax_error_data.offset}"
-
-            console.print(f"[yellow]{message}[/yellow]")
-            if pretty_range:
-                console.print(f"[dim]Generated code error at {pretty_range}[/dim]")
-            console.print(syntax)
-            console.print()
-
-    console.print(
-        "[bold green]💡 Tip:[/bold green] Review the error message above and check your pipeline configuration. "
-        "Make sure all required fields are present and correctly formatted."
-    )
-    console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

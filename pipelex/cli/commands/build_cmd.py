@@ -18,11 +18,9 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
     handle_model_deck_preset_error,
-    handle_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.config.config import get_config
-from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory

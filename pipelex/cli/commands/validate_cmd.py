@@ -41,13 +41,7 @@ COMMAND = "validate"
 
 
 def do_validate_all_libraries_and_dry_run() -> None:
-    """Validate libraries and dry-run all pipes."""
-    try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION)
+    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
 
     try:
         with get_telemetry_manager().telemetry_context():

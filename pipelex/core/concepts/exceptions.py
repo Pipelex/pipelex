@@ -1,7 +1,3 @@
-from abc import ABC, abstractmethod
-
-from pydantic import BaseModel, Field
-
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.exceptions import SyntaxErrorData
 
@@ -12,7 +8,8 @@ class ConceptError(PipelexError):
 
 class ConceptBlueprintValueError(ValueError):
     pass
-
+class ConceptValueError(ValueError):
+    pass
 
 class ConceptStructureBlueprintValueError(ValueError):
     pass

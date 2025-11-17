@@ -11,9 +11,6 @@ from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.validation_error_data import DomainFailure, PipeInputErrorData, StaticValidationErrorData
 from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.exceptions import (
-    ConceptDefinitionErrorData,
-)
 from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
@@ -21,7 +18,6 @@ from pipelex.hub import get_current_library_id, get_library_manager, get_require
 from pipelex.libraries.exceptions import (
     ConceptLoadingError,
     DomainLoadingError,
-    PipeDefinitionErrorData,
     PipeLoadingError,
 )
 from pipelex.pipe_run.dry_run import DryRunOutput
@@ -85,29 +81,11 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
         domain_failures = [DomainFailure(domain_code=domain_loading_error.domain_code, error_message=str(domain_loading_error))]
         raise PipelexBundleError(message=domain_loading_error.message, domain_failures=domain_failures) from domain_loading_error
     except ConceptLoadingError as concept_loading_error:
-        concept_def_error = concept_loading_error.concept_definition_error
-        concept_definition_error_data = ConceptBlueprintValidationErrorData(
-            message=str(concept_def_error),
-            domain_code=concept_def_error.domain_code,
-            concept_code=concept_def_error.concept_code,
-            description=concept_def_error.description,
-            structure_class_python_code=concept_def_error.structure_class_python_code,
-            structure_class_syntax_error_data=concept_def_error.structure_class_syntax_error_data,
-            source=concept_def_error.source,
-        )
-        raise PipelexBundleError(
-            message=concept_loading_error.message, concept_definition_errors=[concept_definition_error_data]
-        ) from concept_loading_error
+        # Concept loading errors now use validation_errors
+        raise PipelexBundleError(message=concept_loading_error.message) from concept_loading_error
     except PipeLoadingError as pipe_loading_error:
-        pipe_def_error = pipe_loading_error.pipe_definition_error
-        pipe_definition_error_data = PipeDefinitionErrorData(
-            message=str(pipe_def_error),
-            domain_code=pipe_def_error.domain_code,
-            pipe_code=pipe_def_error.pipe_code,
-            description=pipe_def_error.description,
-            source=pipe_def_error.source,
-        )
-        raise PipelexBundleError(message=pipe_loading_error.message, pipe_definition_errors=[pipe_definition_error_data]) from pipe_loading_error
+        # Pipe loading errors now use validation_errors
+        raise PipelexBundleError(message=pipe_loading_error.message) from pipe_loading_error
     except PipeInputError as pipe_input_error:
         pipe_input_error_data = PipeInputErrorData(
             message=str(pipe_input_error),

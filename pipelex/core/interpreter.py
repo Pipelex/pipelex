@@ -5,6 +5,7 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError, PLXDecodeError
+from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
 
 
@@ -70,8 +71,6 @@ class PipelexInterpreter(BaseModel):
             return PipelexBundleBlueprint.model_validate(blueprint_dict)
         except ValidationError as exc:
             # Parse Pydantic validation errors into structured error data
-            from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
-
             validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
             # Handle domain and source fields carefully for context
