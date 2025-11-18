@@ -102,7 +102,8 @@ async def validate_bundle(
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
     finally:
-        library_manager.teardown(library_id=library_id)
-        teardown_current_library_id()
+        pass
+        # library_manager.teardown(library_id=library_id)
+        # teardown_current_library_id()
 
     return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)

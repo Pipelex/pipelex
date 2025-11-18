@@ -131,7 +131,7 @@ class PipeCondition(PipeController):
     def validate_expression_and_expression_template(self) -> Self:
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
             msg = "PipeCondition should have exactly one of expression_template or expression"
-            raise PipeConditionValueError(msg)
+            raise ValueError(msg)
         return self
 
     @override
@@ -145,7 +145,7 @@ class PipeCondition(PipeController):
         for required_variable_name in self.required_variables():
             if required_variable_name not in self.inputs.variables:
                 msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}"
-                raise PipeConditionValueError(msg)
+                raise ValueError(msg)
 
         # Then validate that all inputs are actually needed
         the_needed_inputs = self.needed_inputs()
@@ -154,13 +154,13 @@ class PipeCondition(PipeController):
         for named_input_requirement in the_needed_inputs.named_input_requirements:
             if named_input_requirement.variable_name not in self.inputs.variables:
                 msg = f"Required variable '{named_input_requirement.variable_name}' is not in the inputs of pipe {self.code}"
-                raise PipeConditionValueError(msg)
+                raise ValueError(msg)
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
                 msg = f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}"
-                raise PipeConditionValueError(msg)
+                raise ValueError(msg)
 
     @override
     def validate_output_static(self):
@@ -182,7 +182,7 @@ class PipeCondition(PipeController):
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
                     f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"
                 )
-                raise PipeConditionValueError(msg)
+                raise ValueError(msg)
 
     async def _evaluate_expression(
         self,

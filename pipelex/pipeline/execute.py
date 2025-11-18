@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING
-
+from pathlib import Path
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 async def execute_pipeline(
     library_id: str | None = None,
+    library_path: str|None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
@@ -110,7 +111,10 @@ async def execute_pipeline(
             msg = "No pipe code or main pipe in the PLX content provided to the API execute_pipeline."
             raise PipeExecutionError(message=msg)
     elif pipe_code:
-        library_manager.load_libraries(library_id=library_id)
+        if library_path:
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(library_path)])
+        else:
+            library_manager.load_libraries(library_id=library_id)
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
         msg = "Either provide pipe_code or plx_content to the API execute_pipeline. 'pipe_code' must be provided when 'plx_content' is None"

@@ -4,7 +4,6 @@ from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_controllers.condition.exceptions import PipeConditionBlueprintValueError
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 
 OutcomeMap = dict[str, str]
@@ -35,8 +34,8 @@ class PipeConditionBlueprint(PipeBlueprint):
     @classmethod
     def validate_outcome_map(cls, outcomes: OutcomeMap) -> OutcomeMap:
         if not outcomes:
-            msg = "PipeConditionBlueprint must have at least one mapping in outcomes"
-            raise PipeConditionBlueprintValueError(msg)
+            msg = f"PipeConditionBlueprint must have at least one mapping in outcomes, got: {outcomes}"
+            raise ValueError(msg)
         return outcomes
 
     @override

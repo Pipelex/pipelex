@@ -68,7 +68,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
-async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True, raise_on_failure: bool = True) -> dict[str, DryRunOutput]:
+async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = False, raise_on_failure: bool = True) -> dict[str, DryRunOutput]:
     """Dry run pipes with optional parallelization.
 
     Args:

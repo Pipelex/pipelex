@@ -124,7 +124,7 @@ class PipeBlueprint(ABC, BaseModel):
         """Validate that the pipe type is one of the allowed values."""
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
@@ -133,7 +133,7 @@ class PipeBlueprint(ABC, BaseModel):
         """Validate that the pipe category is one of the allowed values."""
         if value not in AllowedPipeCategories.value_list():
             msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
@@ -166,7 +166,7 @@ class PipeBlueprint(ABC, BaseModel):
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
                     f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
                 )
-                raise PipeBlueprintValueError(msg)
+                raise ValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
@@ -177,7 +177,7 @@ class PipeBlueprint(ABC, BaseModel):
         if len(input_names) != len(set(input_names)):
             duplicates = [name for name in input_names if input_names.count(name) > 1]
             msg = f"Duplicate input names found: {duplicates}. Input names must be unique."
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
 
         self._validate_inputs()
 
@@ -189,6 +189,6 @@ class PipeBlueprint(ABC, BaseModel):
             validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
         except ConceptStringError as exc:
             msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
-            raise PipeBlueprintValueError(msg) from exc
+            raise ValueError(msg) from exc
 
         self._validate_output()

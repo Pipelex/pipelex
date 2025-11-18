@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic_core import ErrorDetails
 
-from pipelex.core.exceptions import (
+from pipelex.core.bundles.exceptions import (
     PipelexBundleBlueprintFixableErrorType,
     PipelexBundleBlueprintValidationErrorData,
 )

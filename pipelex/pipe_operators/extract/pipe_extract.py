@@ -62,7 +62,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     def validate_fields(self) -> Self:
         if self.image_stuff_name is None and self.pdf_stuff_name is None:
             msg = "For PipeExtract you must provide either a pdf or an image or a concept that refines one of them"
-            raise PipeExtractValueError(msg)
+            raise ValueError(msg)
         return self
 
     @override
@@ -72,7 +72,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
                 check_extract_choice_with_deck(extract_choice=self.extract_choice)
             except ModelChoiceNotFoundError as exc:
                 msg = f"Extract choice '{self.extract_choice}' was not found in the model deck"
-                raise PipeExtractValueError(msg) from exc
+                raise ValueError(msg) from exc
 
     @override
     def validate_input_with_library(self):
@@ -86,7 +86,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     def validate_output_with_library(self):
         if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
             msg = f"PipeExtract output should be a Page concept, but is {self.output.concept_string}"
-            raise PipeExtractValueError(msg)
+            raise ValueError(msg)
 
     @override
     async def _run_operator_pipe(

@@ -272,10 +272,9 @@ class LibraryManager(LibraryManagerAbstract):
 
         try:
             library.validate_library()
-        except ValidationError as validation_error:
+        except (ValidationError, ValueError) as validation_error:
             msg = f"Could not validate library for blueprints: {validation_error}"
             raise LibraryLoadingError(msg) from validation_error
-
         return all_pipes
 
     def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> None:

@@ -63,9 +63,9 @@ class Library(BaseModel):
         for pipe in self.pipe_library.root.values():
             try:
                 pipe.validate_with_libraries()
-            except ValidationError as pipe_validation_error:
-                msg = f"Error validating pipe '{pipe.code}' because of: {pipe_validation_error}"
-                raise LibraryError(msg) from pipe_validation_error
+            except (ValidationError, ValueError) as validation_error:
+                msg = f"Error validating pipe '{pipe.code}' (type: {pipe.__class__.__name__}) because of: {validation_error}"
+                raise LibraryError(msg) from validation_error
 
     def validate_concept_library_with_libraries(self) -> None:
         pass

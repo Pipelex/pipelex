@@ -40,14 +40,14 @@ class PipeSequence(PipeController):
         for named_input_requirement in the_needed_inputs.named_input_requirements:
             if named_input_requirement.variable_name not in self.inputs.variables:
                 msg = f"Required variable '{named_input_requirement.variable_name}' is not in the inputs of pipe {self.code}"
-                raise PipeSequenceValueError(msg)
+                raise ValueError(msg)
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
                 log.verbose(f"the_needed_inputs.required_names: {the_needed_inputs.required_names}")
                 msg = f"Extraneous input '{input_name}' found in the inputs of pipe '{self.code}'"
-                raise PipeSequenceValueError(msg)
+                raise ValueError(msg)
 
     @override
     def validate_output_static(self):
@@ -65,7 +65,7 @@ class PipeSequence(PipeController):
 the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
 of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
 """
-            raise PipeSequenceValueError(msg)
+            raise ValueError(msg)
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:

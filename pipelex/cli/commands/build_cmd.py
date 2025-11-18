@@ -198,13 +198,6 @@ def build_pipe_cmd(
                     save_text_to_path(text=pretty_svg, path=svg_path)
                     typer.secho(f"✅ Pretty SVG saved to: {svg_path}", fg=typer.colors.GREEN)
 
-                    # Validate the bundle
-                    _ = await validate_bundle(plx_file_path=plx_file_path)
-                    # Load
-                    library_manager = get_library_manager()
-                    library_id, _ = library_manager.open_library()
-                    set_current_library_id(library_id=library_id)
-                    library_manager.load_libraries(library_id=library_id, library_file_paths=[Path(plx_file_path)])
                     pipe = get_required_pipe(pipe_code=main_pipe_code)
 
                     # Generate inputs.json

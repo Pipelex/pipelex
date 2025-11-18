@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from rich.console import Console
 
 from pipelex import log, pretty_print
@@ -6,12 +8,10 @@ from pipelex.builder.builder import (
     PipeSpecUnion,
     reconstruct_bundle_with_pipe_fixes,
 )
-from pipelex.builder.builder_errors import (
-    PipeBuilderError,
-)
+from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_validation import fix_inputs_consistency
 from pipelex.client.protocol import PipelineInputs
-from pipelex.core.exceptions import PipelexBundleBlueprintFixableErrorType
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintFixableErrorType
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
@@ -35,6 +35,7 @@ class BuilderLoop:
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
+                library_path=str(Path(__file__).parent),
                 inputs=inputs,
             )
         except PipelineExecutionError as exc:

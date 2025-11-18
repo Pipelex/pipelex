@@ -60,7 +60,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             )
         except Jinja2DetectVariablesError as exc:
             msg = f"Error detecting required variables for PipeCompose: {exc}"
-            raise PipeComposeValueError(msg) from exc
+            raise ValueError(msg) from exc
         return {
             variable_name
             for variable_name in required_variables

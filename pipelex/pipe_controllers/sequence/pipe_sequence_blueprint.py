@@ -33,7 +33,7 @@ class PipeSequenceBlueprint(PipeBlueprint):
     def validate_steps(cls, steps: list[SubPipeBlueprint]) -> list[SubPipeBlueprint]:
         if len(steps) == 0:
             msg = "PipeSequence must have at least 1 step"
-            raise PipeSequenceBlueprintValueError(msg)
+            raise ValueError(msg)
         return steps
 
     @override

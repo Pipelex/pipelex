@@ -55,7 +55,7 @@ class PipeComposeBlueprint(PipeBlueprint):
             )
         except Jinja2TemplateSyntaxError as exc:
             msg = f"Could not parse template for PipeCompose: {exc}"
-            raise PipeComposeBlueprintValueError(msg) from exc
+            raise ValueError(msg) from exc
         required_variables = {
             variable_name
             for variable_name in detect_jinja2_required_variables(
@@ -67,7 +67,7 @@ class PipeComposeBlueprint(PipeBlueprint):
         for required_variable_name in required_variables:
             if required_variable_name not in self.input_names:
                 msg = f"Required variable '{required_variable_name}' is not in the inputs of PipeCompose."
-                raise PipeComposeBlueprintValueError(msg)
+                raise ValueError(msg)
 
     @override
     def _validate_output(self):

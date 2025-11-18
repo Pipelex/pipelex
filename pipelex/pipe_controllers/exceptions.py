@@ -1,4 +1,5 @@
 from pipelex.base_exceptions import PipelexError
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 
 class PipeControllerError(PipelexError):
@@ -14,3 +15,7 @@ class PipeControllerOutputConceptMismatchError(PipeControllerError):
 
 class SubPipeBlueprintValueError(ValueError):
     pass
+
+class PipeValueError(PipelexError):
+    pipe: PipeAbstract
+    category: str

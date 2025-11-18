@@ -5,7 +5,6 @@ from typing_extensions import override
 
 from pipelex.core.concepts.validation import is_concept_string_or_code_valid
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_controllers.parallel.exceptions import PipeParallelBlueprintValueError
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.types import Self
 
@@ -29,7 +28,7 @@ class PipeParallelBlueprint(PipeBlueprint):
         if combined_output:
             if not is_concept_string_or_code_valid(concept_string_or_code=combined_output):
                 msg = f"Combined output '{combined_output}' is not a valid concept string or code"
-                raise PipeParallelBlueprintValueError(msg)
+                raise ValueError(msg)
         return combined_output
 
     @model_validator(mode="after")
@@ -39,7 +38,7 @@ class PipeParallelBlueprint(PipeBlueprint):
                 "PipeParallel requires either add_each_output to be True or combined_output to be set, "
                 "or both, otherwise the pipe won't output anything"
             )
-            raise PipeParallelBlueprintValueError(msg)
+            raise ValueError(msg)
         return self
 
     @override
