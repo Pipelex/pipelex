@@ -30,16 +30,16 @@ class PipeExtractBlueprint(PipeBlueprint):
             f"Only {nb_inputs} inputs were provided."
         )
         if self.inputs is None:
-            raise PipeExtractBlueprintValueError(msg)
+            raise ValueError(msg)
         if nb_inputs > 1:
             msg = f"Too many inputs provided for PipeExtract: {self.input_names}. Only one input is allowed."
-            raise PipeExtractBlueprintValueError(msg)
+            raise ValueError(msg)
         if nb_inputs < 1:
             msg = f"Missing input provided for PipeExtract: {self.input_names}. Only one input is allowed."
-            raise PipeExtractBlueprintValueError(msg)
+            raise ValueError(msg)
 
     @override
     def _validate_output(self):
         if self.output != "Page[]":
             msg = f"PipeExtract output should be a Page concept, but is {self.output}"
-            raise PipeExtractBlueprintValueError(msg)
+            raise ValueError(msg)

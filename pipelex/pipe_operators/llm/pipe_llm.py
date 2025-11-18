@@ -68,7 +68,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 f"Output concept '{self.output.code}' is considered a Text concept, "
                 f"so it cannot be structured. Maybe you forgot to add '{NativeConceptCode.TEXT}' to the class registry?"
             )
-            raise PipeLLMValueError(msg)
+            raise ValueError(msg)
         return self
 
     @override

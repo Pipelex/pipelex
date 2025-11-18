@@ -67,7 +67,7 @@ class PipeBatch(PipeController):
                     f"Input '{variable_name}' required by branch pipe '{self.branch_pipe_code}' "
                     f"of PipeBatch '{self.code}', is not listed in its inputs"
                 )
-                raise ValueError(msg)
+                raise PipeBatchValueError(msg)
 
     @override
     def validate_output_static(self):

@@ -23,5 +23,5 @@ class TemplateBlueprint(BaseModel):
             check_jinja2_parsing(template_source=self.template, template_category=self.category)
         except Jinja2TemplateSyntaxError as exc:
             msg = f"Could not parse template for TemplateBlueprint: {exc}"
-            raise TemplateBlueprintValueError(msg) from exc
+            raise ValueError(msg) from exc
         return self

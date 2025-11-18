@@ -30,16 +30,16 @@ class PipeImgGenBlueprint(PipeBlueprint):
         if not self.inputs:
             if not self.img_gen_prompt:
                 msg = "If no inputs are provided, you must provide an 'img_gen_prompt' as attribute."
-                raise PipeImgGenBlueprintValueError(msg)
+                raise ValueError(msg)
 
         if self.inputs and self.img_gen_prompt:
             msg = "You must provide either an 'img_gen_prompt' as attribute or as a single text input, but not both"
-            raise PipeImgGenBlueprintValueError(msg)
+            raise ValueError(msg)
 
         nb_inputs = self.nb_inputs
         if nb_inputs > 1:
             msg = f"Too many inputs provided for PipeImgGen: {self.input_names}. Only one input is allowed."
-            raise PipeImgGenBlueprintValueError(msg)
+            raise ValueError(msg)
 
     @override
     def _validate_output(self):

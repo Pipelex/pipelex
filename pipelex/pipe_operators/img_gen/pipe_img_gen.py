@@ -78,7 +78,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
             else:
                 msg = "For PipeImgGen you must provide an image generation prompt either as attribute of the pipe or as a single text input"
-                raise PipeImgGenValueError(msg)
+                raise ValueError(msg)
         return needed_inputs
 
     @override
@@ -92,7 +92,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # Either we have img_gen_prompt or img_gen_prompt_var_name, but not both
         if self.img_gen_prompt_var_name is not None and self.img_gen_prompt is not None:
             msg = "Either 'img_gen_prompt' or 'img_gen_prompt_var_name' must be provided, but not both"
-            raise PipeImgGenValueError(msg)
+            raise ValueError(msg)
         return self
 
     @override
@@ -129,7 +129,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 f"The output of a ImgGen pipe must be compatible with the Image concept. "
                 f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
             )
-            raise PipeImgGenValueError(msg)
+            raise ValueError(msg)
 
     @override
     async def _run_operator_pipe(
