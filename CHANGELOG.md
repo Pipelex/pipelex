@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.15.7] - 2025-11-18
+
+### Fixed
+ - Fixed issue with `get_console()` function returning `None` if Pipelex is not initialized. Now always defaults to `stderr` if not set.
+
 ## [v0.15.6] - 2025-11-18
 
 ### Contributors
