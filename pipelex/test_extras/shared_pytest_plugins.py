@@ -2,8 +2,8 @@ import os
 
 import pytest
 from pytest import FixtureRequest, Parser
-from rich import print  # noqa: A004
 
+from pipelex.hub import get_console
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.system.environment import is_env_var_set, set_env
 from pipelex.system.runtime import RunMode, runtime_manager
@@ -81,7 +81,7 @@ def _setup_env_var_placeholders(env_var_keys: list[str]) -> None:
             substitutions_counter += 1
 
     if substitutions_counter > 0:
-        print(f"[yellow]Set {substitutions_counter} placeholder environment variables[/yellow]")
+        get_console().print(f"[yellow]Set {substitutions_counter} placeholder environment variables[/yellow]")
 
 
 def _cleanup_placeholder_env_vars(env_var_keys: list[str]) -> None:
@@ -104,7 +104,7 @@ def _cleanup_placeholder_env_vars(env_var_keys: list[str]) -> None:
             removed_counter += 1
 
     if removed_counter > 0:
-        print(f"[yellow]Cleaned up {removed_counter} placeholder environment variables[/yellow]")
+        get_console().print(f"[yellow]Cleaned up {removed_counter} placeholder environment variables[/yellow]")
 
 
 @pytest.fixture(scope="session", autouse=True)

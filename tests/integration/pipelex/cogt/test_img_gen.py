@@ -11,6 +11,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background,
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.hub import get_img_gen_worker
 from pipelex.tools.misc.file_utils import ensure_path
+from pipelex.tools.misc.terminal_utils import print_to_stderr
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
 TEMP_OUTPUTS_DIR = "temp/img_gen_by_gpt_image"
@@ -59,7 +60,7 @@ class TestImageGeneration:
                 extension = ""
             output_path = f"{image_name}{extension}"
             image.save(output_path)
-            print(f"✓ Image saved to: {output_path}\n")
+            print_to_stderr(f"✓ Image saved to: {output_path}\n")
 
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_transparent(self, img_gen_handle: str, topic: str, img_gen_prompt_text: str):
@@ -103,4 +104,4 @@ class TestImageGeneration:
             extension = ""
         output_path = f"{image_name}{extension}"
         image.save(output_path)
-        print(f"✓ Image saved to: {output_path}\n")
+        print_to_stderr(f"✓ Image saved to: {output_path}\n")
