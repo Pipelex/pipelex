@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 import instructor
 import openai
-from instructor.core import InstructorRetryException
+from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError, omit
 
 if TYPE_CHECKING:
