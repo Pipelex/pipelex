@@ -100,7 +100,7 @@ def check_config_sync_cmd(
         console.print()
 
     console.print("[bold yellow]Recommended Actions:[/bold yellow]")
-    console.print("  • If [cyan].pipelex[/cyan] is correct, run: [cyan]make up-kit-configs[/cyan]")
+    console.print("  • If [cyan].pipelex[/cyan] is correct, run: [cyan]make up-kit-configs[/cyan] or simply [cyan]make ukc[/cyan]")
     console.print("  • If [cyan]pipelex/kit/configs[/cyan] is correct, copy it to [cyan].pipelex[/cyan]")
     console.print()
 

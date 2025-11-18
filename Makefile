@@ -488,7 +488,7 @@ c: format lint pyright mypy
 cc: cleanderived c
 	@echo "> done: cc = cleanderived format lint pyright mypy"
 
-check: cc check-unused-imports pylint
+check: cc check-unused-imports pylint ccs
 	@echo "> done: check"
 
 v: validate

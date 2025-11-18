@@ -1,13 +1,14 @@
-from pipelex.cogt.exceptions import CogtError, MissingDependencyError
+from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_models_manager, get_plugin_manager, get_secret
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 
 
-class FalCredentialsError(CogtError):
+class FalCredentialsError(CredentialsError):
     pass
 
 
@@ -53,7 +54,7 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "openai" | "azure_openai":
+            case "openai":
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
 
@@ -84,6 +85,14 @@ class ImgGenWorkerFactory:
 
                 img_gen_worker = OpenAIImgGenAlternativeWorker(
                     sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "azure_openai":
+                from pipelex.plugins.azure_rest.azure_img_gen_worker import AzureImgGenWorker  # noqa: PLC0415
+
+                img_gen_worker = AzureImgGenWorker(
+                    plugin=plugin,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
