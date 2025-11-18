@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 from pytest import MonkeyPatch
-from rich.console import Console
 
 from pipelex.config import ConfigPaths
+from pipelex.hub import get_console
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
 # ================================================================================================
@@ -102,7 +102,7 @@ def routing_profile_setup(request: pytest.FixtureRequest):  # pyright: ignore[re
         "ROUTING_PROFILES_FILE_PATH",
         str(routing_override_path),
     )
-    Console().print(f"[cyan]Overriding routing profile:[/cyan] {routing_profile_name}")
+    get_console().print(f"[cyan]Overriding routing profile:[/cyan] {routing_profile_name}")
 
     yield routing_profile_name
 

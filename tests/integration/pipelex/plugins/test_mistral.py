@@ -1,9 +1,9 @@
 import pytest
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
 from pipelex import pretty_print
+from pipelex.hub import get_console
 from pipelex.plugins.mistral.mistral_llms import mistral_list_available_models
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
 from tests.integration.pipelex.plugins.conftest import is_backend_available
@@ -27,7 +27,7 @@ class TestMistral:
         mistral_models_list = mistral_list_available_models()
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
-            console = Console()
+            console = get_console()
             table = Table(
                 title="Available Mistral Models",
                 show_header=True,

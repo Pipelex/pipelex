@@ -6,10 +6,9 @@ import os
 import sys
 from pathlib import Path
 
-from rich.console import Console
-
 import pipelex
 from pipelex.cli.exceptions import ReadinessCheckError
+from pipelex.hub import get_console
 
 
 def _is_in_virtual_environment() -> bool:
@@ -75,7 +74,7 @@ def check_readiness() -> None:
     """
     # Then check virtual environment requirement for development installs
     if _is_development_install() and not _is_in_virtual_environment():
-        console = Console(stderr=True)
+        console = get_console()
         console.print("\n[bold red]❌ Virtual Environment Required (Development Mode)[/bold red]\n")
         console.print("[yellow]Pipelex is running in development mode but no virtual environment is active.[/yellow]\n")
 

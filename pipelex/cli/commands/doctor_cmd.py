@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
-from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.text import Text
@@ -24,7 +23,7 @@ from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import PipelexConfig, get_config
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import PipelexHub, set_pipelex_hub
+from pipelex.hub import PipelexHub, get_console, set_pipelex_hub
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import get_optional_env
@@ -339,7 +338,6 @@ def check_backend_files() -> tuple[bool, dict[str, BackendFileReport], str]:
 
 
 def display_health_report(
-    console: Console,
     config_healthy: bool,
     config_message: str,
     config_missing_count: int,
@@ -384,6 +382,7 @@ def display_health_report(
         border_style="cyan" if all_healthy else "yellow",
         padding=(1, 2),
     )
+    console = get_console()
     console.print()
     console.print(status_panel)
     console.print()
@@ -610,10 +609,9 @@ def doctor_cmd(
     Args:
         fix: If True, offer to fix detected issues interactively
     """
-    console = Console()
-    do_doctor_cmd(console=console, fix=fix)
+    console = get_console()
     try:
-        do_doctor_cmd(console=console, fix=fix)
+        do_doctor_cmd(fix=fix)
 
     except Exception as exc:
         # Handle unexpected errors gracefully without printing traces
@@ -628,13 +626,11 @@ def doctor_cmd(
 
 
 def do_doctor_cmd(
-    console: Console,
     fix: bool = False,
 ) -> None:
     """Check Pipelex configuration health and suggest fixes.
 
     Args:
-        console: Rich Console instance for output
         fix: If True, offer to fix detected issues interactively
     """
     # Run health checks
@@ -645,7 +641,6 @@ def do_doctor_cmd(
 
     # Display report
     display_health_report(
-        console=console,
         config_healthy=config_healthy,
         config_message=config_message,
         config_missing_count=config_missing_count,
@@ -687,6 +682,7 @@ def do_doctor_cmd(
 
     # If --fix flag is provided, offer to fix auto-fixable issues
     if fix and has_auto_fixable_issues:
+        console = get_console()
         console.print("[bold yellow]Interactive Fix Mode[/bold yellow]")
         console.print()
 
@@ -739,6 +735,7 @@ def do_doctor_cmd(
 
     # Handle issues that can't be auto-fixed
     if has_config_validation_error or has_telemetry_validation_error or has_backend_credential_issues:
+        console = get_console()
         console.print("[bold yellow]Manual Fixes Required[/bold yellow]")
         console.print()
 

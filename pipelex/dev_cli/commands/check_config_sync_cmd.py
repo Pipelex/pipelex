@@ -5,9 +5,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from rich.console import Console
 from rich.panel import Panel
 
+from pipelex.hub import get_console
 from pipelex.tools.misc.diff import has_diff_dirs, make_diff_dirs_pretty
 from pipelex.types import StrEnum
 
@@ -31,7 +31,7 @@ def check_config_sync_cmd(
                  LeadingConfig.INSTALLED means .pipelex is the reference (default),
                  LeadingConfig.KIT means pipelex/kit/configs is the reference
     """
-    console = Console()
+    console = get_console()
 
     # Define the directories to compare
     pipelex_dir = Path(".pipelex")

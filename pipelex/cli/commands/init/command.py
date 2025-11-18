@@ -13,6 +13,7 @@ from pipelex.cli.commands.init.routing import customize_routing_profile
 from pipelex.cli.commands.init.telemetry import setup_telemetry
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel, display_already_configured_message
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
@@ -240,7 +241,7 @@ def init_cmd(
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
         silent: If True, suppress all output when everything is already configured
     """
-    console = Console()
+    console = get_console()
     pipelex_config_dir = config_manager.pipelex_config_dir
     telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
     backends_toml_path = os.path.join(pipelex_config_dir, "inference", "backends.toml")

@@ -22,6 +22,12 @@
  - **Groq plugin**: Dedicated `pipelex/plugins/groq` plugin removed (now uses standard `openai` SDK).
  - **Global instructor config**: Global `is_openai_structured_output_enabled` setting, replaced by per-model `structure_method` approach.
 
+## Unrelease
+
+### Added
+
+- JSONContent to have as inputs and outputs of pipe unknown JSON format
+
 ## [v0.15.4] - 2025-11-12
 
 ### Added

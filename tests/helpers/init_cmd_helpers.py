@@ -188,10 +188,16 @@ class MockedInitEnvironment:
         self.mocker.patch("pipelex.cli.commands.init.config_files.config_manager", self.mock_config_manager)
 
     def mock_console_outputs(self) -> None:
-        """Mock Console to suppress output."""
-        self.mock_console = self.mocker.patch("pipelex.cli.commands.init.command.Console")
-        self.mocker.patch("pipelex.cli.commands.init.backends.Console")
-        self.mocker.patch("pipelex.cli.commands.init.routing.Console")
+        """Mock Console handling to suppress output."""
+        self.mock_console = self.mocker.MagicMock()
+
+        # Patch modules that use the Pipelex hub console provider
+        self.mocker.patch("pipelex.hub.get_console", return_value=self.mock_console)
+        self.mocker.patch("pipelex.cli.commands.init.command.get_console", return_value=self.mock_console)
+        self.mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=self.mock_console)
+        self.mocker.patch("pipelex.cli.commands.init.routing.get_console", return_value=self.mock_console)
+
+        # Patch UI modules that still instantiate Console directly
         self.mocker.patch("pipelex.cli.commands.init.telemetry.Console")
         self.mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Console")
         self.mocker.patch("pipelex.cli.commands.init.ui.routing_ui.Console")
@@ -218,19 +224,22 @@ class MockedInitEnvironment:
         self.mock_config_manager_paths()
         self.mock_console_outputs()
 
-        # Mock Prompt.ask with side_effect for sequential inputs
-        if self.prompt_inputs:
-            self.mock_prompt_ask = self.mocker.patch(
-                "rich.prompt.Prompt.ask",
-                side_effect=self.prompt_inputs,
-            )
+        def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
+            if not self.prompt_inputs:
+                question = str(args[0]) if args else "<unknown prompt>"
+                msg = f"Unexpected prompt without predefined input: {question}"
+                raise AssertionError(msg)
+            return self.prompt_inputs.pop(0)
 
-        # Mock Confirm.ask with side_effect for sequential inputs
-        if self.confirm_inputs:
-            self.mock_confirm_ask = self.mocker.patch(
-                "rich.prompt.Confirm.ask",
-                side_effect=self.confirm_inputs,
-            )
+        def confirm_side_effect(*args: Any, **_kwargs: Any) -> bool:
+            if not self.confirm_inputs:
+                question = str(args[0]) if args else "<unknown confirmation>"
+                msg = f"Unexpected confirm without predefined input: {question}"
+                raise AssertionError(msg)
+            return self.confirm_inputs.pop(0)
+
+        self.mock_prompt_ask = self.mocker.patch("rich.prompt.Prompt.ask", side_effect=prompt_side_effect)
+        self.mock_confirm_ask = self.mocker.patch("rich.prompt.Confirm.ask", side_effect=confirm_side_effect)
 
         # Mock typer.echo to suppress output
         self.mocker.patch("typer.echo")

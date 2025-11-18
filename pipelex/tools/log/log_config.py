@@ -1,11 +1,14 @@
+import sys
 from enum import Enum
 from typing import cast
 
 from pydantic import Field, field_validator
+from rich.console import Console
 from rich.highlighter import Highlighter, JSONHighlighter, ReprHighlighter
 from rich.logging import RichHandler
 
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.types import StrEnum
 
@@ -59,7 +62,17 @@ class RichLogConfig(ConfigModel):
     tracebacks_suppress: list[str]
     keywords_to_hilight: list[str]
 
-    def make_rich_handler(self) -> RichHandler:
+    def make_rich_handler(self, target: ConsoleTarget) -> RichHandler:
+        match target:
+            case ConsoleTarget.STDOUT:
+                console = Console(file=sys.stdout)
+            case ConsoleTarget.STDERR:
+                console = Console(file=sys.stderr)
+            # case ConsoleTarget.FILE:
+            #     console = Console(file=target.file_path)
+            case _:
+                msg = f"Invalid console target: {target}"
+                raise ValueError(msg)
         highlighter: Highlighter
         match self.highlighter_name:
             case HighlighterName.JSON:
@@ -68,6 +81,7 @@ class RichLogConfig(ConfigModel):
                 highlighter = ReprHighlighter()
 
         return RichHandler(
+            console=console,
             show_time=self.is_show_time,
             show_level=self.is_show_level,
             enable_link_path=self.is_link_path_enabled,
@@ -85,6 +99,8 @@ class LogConfig(ConfigModel):
     default_log_level: LogLevel = Field(strict=False)
     package_log_levels: dict[str, LogLevel]
     log_mode: LogMode = Field(strict=False)
+    console_log_target: ConsoleTarget = Field(strict=False)
+    console_print_target: ConsoleTarget = Field(strict=False)
 
     is_console_logging_enabled: bool
 
@@ -102,8 +118,8 @@ class LogConfig(ConfigModel):
     poor_loggers: list[str]
 
     @field_validator("package_log_levels", mode="before")
-    @staticmethod
-    def validate_package_log_levels(value: dict[str, str]) -> dict[str, LogLevel]:
+    @classmethod
+    def validate_package_log_levels(cls, value: dict[str, str]) -> dict[str, LogLevel]:
         return cast(
             "dict[str, LogLevel]",
             ConfigModel.transform_dict_str_to_enum(input_dict=value, value_enum_cls=LogLevel),

@@ -1,12 +1,11 @@
 import pytest
-from rich.console import Console
 from rich.traceback import Traceback
 
 import pipelex.config
 import pipelex.pipelex
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.hub import get_report_delegate
+from pipelex.hub import get_console, get_report_delegate
 from pipelex.system.runtime import IntegrationMode
 
 pytest_plugins = [
@@ -30,17 +29,18 @@ def routing_profile_setup(request: pytest.FixtureRequest):  # noqa: ARG001  # py
 def reset_pipelex_config_fixture(routing_profile_setup: str | None):  # noqa: ARG001
     # Code to run before each test
     # The routing_profile_setup dependency ensures any routing overrides happen first
-    Console().print("[magenta]pipelex setup[/magenta]")
+    console = get_console()
+    console.print("[magenta]pipelex setup[/magenta]")
     try:
         pipelex_instance = pipelex.pipelex.Pipelex.make(integration_mode=IntegrationMode.PYTEST)
         config = get_config()
         log.verbose(config, title="Test config")
         assert isinstance(config, pipelex.config.PipelexConfig)
     except Exception as exc:
-        Console().print(Traceback())
+        console.print(Traceback())
         pytest.exit(f"Critical Pipelex setup error: {exc}")
     yield
     # Code to run after each test
     get_report_delegate().generate_report()
-    Console().print("[dim magenta]pipelex teardown[/dim magenta]")
+    console.print("[dim magenta]pipelex teardown[/dim magenta]")
     pipelex_instance.teardown()

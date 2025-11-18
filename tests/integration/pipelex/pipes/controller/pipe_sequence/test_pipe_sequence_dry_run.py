@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pytest import FixtureRequest
 
-from pipelex import pretty_print
+from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
@@ -116,7 +116,7 @@ class TestPipeSequenceDryRun:
                 "Number of summaries should match number of original channel updates"
             )
 
-            print("✅ Successfully verified dry run working memory:")
-            print(f"   - discord_channel_updates: ListContent with {len(discord_updates_list.items)} items")
-            print(f"   - channel_summaries: ListContent with {len(channel_summaries_list.items)} items")
-            print(f"   - Final output: ChannelSummary list with concept code {pipe_output.main_stuff.concept.code}")
+            log.info("✅ Successfully verified dry run working memory:")
+            log.info(f"   - discord_channel_updates: ListContent with {len(discord_updates_list.items)} items")
+            log.info(f"   - channel_summaries: ListContent with {len(channel_summaries_list.items)} items")
+            log.info(f"   - Final output: ChannelSummary list with concept code {pipe_output.main_stuff.concept.code}")

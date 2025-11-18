@@ -50,8 +50,8 @@ class TestBackendCustomization:
         mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        # Mock Console and Prompt to simulate user selecting default [1]
-        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        # Mock console provider and Prompt to simulate user selecting default [1]
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
         mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value="1")
 
         # Execute
@@ -93,7 +93,7 @@ class TestBackendCustomization:
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         # Mock user input with dynamically determined indices
-        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
         mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value=indices_str)
 
         # Execute
@@ -135,7 +135,7 @@ class TestBackendCustomization:
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         # Mock user input with spaces and dynamically determined indices
-        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
         mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value=indices_str)
 
         # Execute
@@ -205,10 +205,11 @@ class TestBackendCustomization:
         mock_config_manager.pipelex_config_dir = str(config_dir)
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        mock_console = mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mock_console = mocker.MagicMock()
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mock_console)
 
         # Execute - should not raise exception
         customize_backends_config()
 
         # Verify warning was printed
-        mock_console.return_value.print.assert_called()
+        mock_console.print.assert_called()

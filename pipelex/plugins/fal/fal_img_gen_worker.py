@@ -11,6 +11,7 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 
 class FalImgGenWorker(ImgGenWorkerAbstract):
@@ -52,7 +53,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
                     continue
                 new_logs = event.logs[log_index:]
                 for event_log in new_logs:
-                    print(event_log["message"])
+                    print_to_stderr(event_log["message"])
                 log_index = len(event.logs)
 
         fal_result = await handler.get()
