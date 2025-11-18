@@ -11,10 +11,10 @@ from pipelex.tools.misc.markdown_utils import convert_to_markdown
 from pipelex.tools.misc.pretty import PrettyPrintable
 
 
+# TODO: use pipelex.tools.misc.json_utils.JsonContent to support lists in addition to dicts
 class JSONContent(StuffContent):
     json_obj: dict[str, Any]
 
-    # check that it's valid JSON
     @field_validator("json_obj", mode="before")
     @classmethod
     def check_valid_json(cls, value: dict[str, Any]) -> dict[str, Any]:
