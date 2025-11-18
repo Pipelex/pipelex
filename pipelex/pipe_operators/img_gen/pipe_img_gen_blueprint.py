@@ -6,7 +6,6 @@ from typing_extensions import override
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenBlueprintValueError
 
 
 class PipeImgGenBlueprint(PipeBlueprint):

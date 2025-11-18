@@ -5,7 +5,6 @@ from typing_extensions import override
 
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_operators.extract.exceptions import PipeExtractBlueprintValueError
 
 
 class PipeExtractBlueprint(PipeBlueprint):

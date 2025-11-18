@@ -1,4 +1,4 @@
-domain = "test_integration"
+domain = "test_integration4"
 description = "Test pipe for capitalizing text to uppercase"
 
 [pipe]

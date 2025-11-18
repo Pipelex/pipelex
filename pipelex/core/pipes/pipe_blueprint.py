@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.pipes.validation import validate_input_name
-from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, PipeVariableMultiplicityError, parse_concept_with_multiplicity
 from pipelex.types import Self, StrEnum
 
 
@@ -169,7 +169,11 @@ class PipeBlueprint(ABC, BaseModel):
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
-            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            try:
+                validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            except ConceptStringError as exc:
+                msg = f"Invalid concept string or code '{concept_string_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
+                raise ValueError(msg) from exc
 
         # Check that every input_name is unique
         input_names = list(self.inputs.keys())
@@ -183,7 +187,11 @@ class PipeBlueprint(ABC, BaseModel):
     @final
     def validate_output(self):
         # Strip multiplicity brackets before validating
-        output_parse_result = parse_concept_with_multiplicity(self.output)
+        try:
+            output_parse_result = parse_concept_with_multiplicity(self.output)
+        except PipeVariableMultiplicityError as exc:
+            msg = f"Invalid concept specification syntax: '{self.output}'. {exc}"
+            raise ValueError(msg) from exc
         try:
             validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
         except ConceptStringError as exc:

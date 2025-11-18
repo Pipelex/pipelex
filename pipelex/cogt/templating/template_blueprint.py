@@ -2,7 +2,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from pipelex.cogt.templating.exceptions import TemplateBlueprintValueError
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError

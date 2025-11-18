@@ -1,4 +1,4 @@
-domain = "test_integration"
+domain = "test_integration3"
 description = "Test pipes for PipeParallel text analysis"
 
 [pipe]

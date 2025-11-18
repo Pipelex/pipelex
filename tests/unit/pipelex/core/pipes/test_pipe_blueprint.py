@@ -1,0 +1,144 @@
+import pytest
+from pydantic import ValidationError
+
+from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
+
+
+class ConcretePipeBlueprint(PipeBlueprint):
+    pass
+
+
+class TestPipeBlueprintValidation:
+    def test_validate_pipe_type_correct(self):
+        for pipe_type_enum in AllowedPipeTypes:
+            pipe_type = pipe_type_enum.value
+            match pipe_type:
+                case "PipeFunc" | "PipeImgGen" | "PipeCompose" | "PipeLLM" | "PipeExtract":
+                    category = "PipeOperator"
+                case "PipeBatch" | "PipeCondition" | "PipeParallel" | "PipeSequence":
+                    category = "PipeController"
+            blueprint = ConcretePipeBlueprint(
+                type=pipe_type,
+                pipe_category=category,
+                output="Text",
+            )
+            assert blueprint.type == pipe_type
+
+    def test_validate_pipe_type_incorrect(self):
+        invalid_types = ["InvalidType", "PipeTest", "RandomPipe", "NotAPipe", ""]
+        for invalid_type in invalid_types:
+            with pytest.raises(ValidationError) as exc_info:
+                ConcretePipeBlueprint(
+                    type=invalid_type,
+                    pipe_category="PipeOperator",
+                    output="Text",
+                )
+            assert "Invalid pipe type" in str(exc_info.value)
+
+    def test_validate_pipe_category_correct(self):
+        for category_enum in AllowedPipeCategories:
+            category = category_enum.value
+            match category:
+                case "PipeOperator":
+                    pipe_type = "PipeLLM"
+                case "PipeController":
+                    pipe_type = "PipeSequence"
+            blueprint = ConcretePipeBlueprint(
+                type=pipe_type,
+                pipe_category=category,
+                output="Text",
+            )
+            assert blueprint.pipe_category == category
+
+    def test_validate_pipe_category_incorrect(self):
+        invalid_categories = ["InvalidCategory", "Operator", "Controller", "PipeOp", "RandomCategory", ""]
+        for invalid_category in invalid_categories:
+            with pytest.raises(ValidationError) as exc_info:
+                ConcretePipeBlueprint(
+                    type="PipeLLM",
+                    pipe_category=invalid_category,
+                    output="Text",
+                )
+            assert "Invalid pipe category" in str(exc_info.value)
+
+    def test_validate_inputs_blueprint_correct(self):
+        blueprint = ConcretePipeBlueprint(
+            type="PipeLLM",
+            pipe_category="PipeOperator",
+            inputs={"text": "Text", "prompt": "Text"},
+            output="Text",
+        )
+        assert blueprint.inputs == {"text": "Text", "prompt": "Text"}
+
+        blueprint = ConcretePipeBlueprint(
+            type="PipeLLM",
+            pipe_category="PipeOperator",
+            inputs=None,
+            output="Text",
+        )
+        assert blueprint.inputs is None
+
+        blueprint = ConcretePipeBlueprint(
+            type="PipeLLM",
+            pipe_category="PipeOperator",
+            inputs={"items": "Text[]", "count": "Number[2]"},
+            output="Text",
+        )
+        assert blueprint.inputs == {"items": "Text[]", "count": "Number[2]"}
+
+    def test_validate_inputs_blueprint_incorrect(self):
+        with pytest.raises(ValidationError) as exc_info:
+            ConcretePipeBlueprint(
+                type="PipeLLM",
+                pipe_category="PipeOperator",
+                inputs={"text": "InvalidFormat!"},
+                output="Text",
+            )
+        assert "Invalid input syntax" in str(exc_info.value)
+
+        with pytest.raises(ValidationError) as exc_info:
+            ConcretePipeBlueprint(
+                type="PipeLLM",
+                pipe_category="PipeOperator",
+                inputs={"text": "invalid_concept"},
+                output="Text",
+            )
+        assert "Invalid concept string or code" in str(exc_info.value)
+
+        with pytest.raises(ValidationError) as exc_info:
+            ConcretePipeBlueprint(
+                type="PipeLLM",
+                pipe_category="PipeOperator",
+                inputs={"text": "Text"},
+                output="InvalidConcept!",
+            )
+        assert "Invalid concept specification syntax" in str(exc_info.value)
+
+    def test_extra_fields_raises_error(self):
+        with pytest.raises(ValidationError) as exc_info:
+            ConcretePipeBlueprint(
+                type="PipeLLM",
+                pipe_category="PipeOperator",
+                output="Text",
+                extra_field="should not be allowed",  # type: ignore[call-arg]
+            )
+        assert "extra fields" in str(exc_info.value).lower() or "Extra inputs are not permitted" in str(exc_info.value)
+
+    def test_missing_mandatory_fields_raises_error(self):
+        with pytest.raises(ValidationError) as exc_info:
+            ConcretePipeBlueprint(pipe_category="PipeOperator", output="Text")  # type: ignore[call-arg]
+        assert "type" in str(exc_info.value).lower()
+
+        with pytest.raises(ValidationError) as exc_info:
+            ConcretePipeBlueprint(
+                type="PipeLLM",
+                output="Text",
+            )  # type: ignore[call-arg]
+        assert "pipe_category" in str(exc_info.value).lower() or "pipe_category" in str(exc_info.value)
+
+        with pytest.raises(ValidationError) as exc_info:
+            ConcretePipeBlueprint(
+                type="PipeLLM",
+                pipe_category="PipeOperator",
+            )  # type: ignore[call-arg]
+        assert "output" in str(exc_info.value).lower()
