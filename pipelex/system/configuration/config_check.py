@@ -1,8 +1,8 @@
-from rich.console import Console
 from rich.panel import Panel
 
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.config.models import ConfigPaths
+from pipelex.hub import get_console
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.urls import URLs
 
@@ -19,7 +19,7 @@ def check_is_initialized(print_warning_if_not: bool = True) -> bool:
     is_initialized = config_exists and backends_exists and routing_exists
 
     if not is_initialized and print_warning_if_not:
-        console = Console()
+        console = get_console()
 
         # Build a descriptive message about what's missing
         issues: list[str] = []

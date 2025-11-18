@@ -7,7 +7,6 @@ from typing import Annotated
 import click
 import typer
 from posthog import tag
-from rich.console import Console
 
 from pipelex import log
 from pipelex.cli.error_handlers import (
@@ -18,7 +17,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
-from pipelex.hub import get_telemetry_manager
+from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
@@ -219,7 +218,7 @@ def run_cmd(
 
     except Exception as exc:
         log.error(f"Error executing pipeline: {exc}")
-        console = Console(stderr=True)
+        console = get_console()
         console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
         console.print_exception(show_locals=True)
         raise typer.Exit(1) from exc

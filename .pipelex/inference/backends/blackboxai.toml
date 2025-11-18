@@ -23,6 +23,7 @@
 [defaults]
 model_type = "llm"
 sdk = "openai"
+structure_method = "instructor/openai_tools"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -145,7 +146,7 @@ costs = { input = 0.12, output = 0.39 }
 ["qwen2.5-vl-72b-instruct"]
 model_id = "blackboxai/qwen/qwen2.5-vl-72b-instruct"
 inputs = ["text", "images"]
-outputs = ["text", "structured"]
+outputs = ["text"]
 costs = { input = 0.25, output = 0.75 }
 
 # --- Amazon Nova Models -------------------------------------------------------

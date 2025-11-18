@@ -6,7 +6,6 @@ from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
 from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory
@@ -23,13 +22,11 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
-        structure_method: StructureMethod | None = None,
         reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
             inference_model=inference_model,
-            structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
 

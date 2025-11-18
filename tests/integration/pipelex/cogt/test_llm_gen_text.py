@@ -36,6 +36,7 @@ def get_worker_and_job(llm_preset_id: str, user_text: str) -> tuple[LLMWorkerAbs
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
+@pytest.mark.usefixtures("routing_profile_override")
 class TestLLMGenText:
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str):

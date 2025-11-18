@@ -137,6 +137,13 @@ class ConceptFactory:
                     description="Anything",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.JSON:
+                return Concept(
+                    code=native_concept_code,
+                    domain=SpecialDomain.NATIVE,
+                    description="A JSON object",
+                    structure_class_name=structure_class_name,
+                )
 
     @classmethod
     def make_all_native_concepts(cls) -> list[Concept]:

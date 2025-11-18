@@ -134,7 +134,7 @@ llm_groq_vision = { model = "vision-groq", temperature = 0.3 }
 # LLM Presets — For Testing ---------------------------------------------------------------------
 
 llm_for_testing_gen_text = { model = "cheap_llm", temperature = 0.5 }
-llm_for_testing_gen_object = { model = "cheap_llm_for_structured", temperature = 0.5 }
+llm_for_testing_gen_object = { model = "cheap_llm_for_structured", temperature = 0.1 }
 llm_for_testing_vision = { model = "cheap_llm_for_vision", temperature = 0.5 }
 llm_for_testing_vision_structured = { model = "cheap_llm_for_vision", temperature = 0.5 }
 

@@ -24,5 +24,4 @@ class TestPdfRender:
         assert all(isinstance(text, str) for text in texts)
         if pytestconfig.get_verbosity() >= 2:
             full_text = "\n".join(texts)
-            print("\n")
             pretty_print(full_text, title=f"Full text from pdf '{file_path}'")

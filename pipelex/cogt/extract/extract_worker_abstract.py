@@ -40,7 +40,7 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         self,
         extract_job: ExtractJob,
     ) -> ExtractOutput:
-        log.info(f"✨ {self.desc} ✨")
+        log.dev(f"✨ {self.desc} ✨")
 
         # Verify that the job is valid
         extract_job.validate_before_execution()

@@ -37,10 +37,6 @@ is_structure_prompt_enabled = false
 [cogt.llm_config.llm_job_config]
 is_streaming_enabled = false
 max_retries = 3  # Between 1 and 10
-
-# Instructor settings
-[cogt.llm_config.instructor_config]
-is_openai_structured_output_enabled = false
 ```
 
 ### LLM Job Parameters
@@ -178,9 +174,6 @@ is_structure_prompt_enabled = false
 [cogt.llm_config.llm_job_config]
 is_streaming_enabled = false
 max_retries = 3
-
-[cogt.llm_config.instructor_config]
-is_openai_structured_output_enabled = false
 
 [cogt.img_gen_config.img_gen_job_config]
 is_sync_mode = false

@@ -2,7 +2,7 @@
 
 import pytest
 
-from pipelex import pretty_print
+from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -100,7 +100,7 @@ class TestPipeConditionSimple:
             # If it succeeds completely
             assert pipe_output is not None
             assert pipe_output.working_memory is not None
-            print("✅ Direct PipeCondition SUCCEEDED completely!")
+            log.info("✅ Direct PipeCondition SUCCEEDED completely!")
             pretty_print(pipe_output)
 
         except DryRunMissingInputsError as exc:
@@ -109,5 +109,5 @@ class TestPipeConditionSimple:
             assert "missing required inputs" not in str(msg_exc)
             # Should be due to expression evaluation or other validation
             assert any(keyword in str(msg_exc) for keyword in ["expression", "evaluation", "empty result"])
-            print(f"✅ Direct PipeCondition passed input validation, failed at expression evaluation (expected): {exc}")
-        print("✅ Direct PipeCondition test completed successfully!")
+            log.info(f"✅ Direct PipeCondition passed input validation, failed at expression evaluation (expected): {exc}")
+        log.info("✅ Direct PipeCondition test completed successfully!")

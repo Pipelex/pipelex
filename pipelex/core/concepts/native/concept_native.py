@@ -13,6 +13,7 @@ class NativeConceptCode(StrEnum):
     NUMBER = "Number"
     IMG_GEN_PROMPT = "ImgGenPrompt"
     PAGE = "Page"
+    JSON = "JSON"
     ANYTHING = "Anything"
 
     @property
@@ -46,6 +47,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.IMG_GEN_PROMPT
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
+                | NativeConceptCode.JSON
             ):
                 return False
 
@@ -66,6 +68,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.IMG_GEN_PROMPT
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
+                | NativeConceptCode.JSON
             ):
                 return False
             case NativeConceptCode.DYNAMIC:

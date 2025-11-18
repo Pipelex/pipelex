@@ -1,10 +1,9 @@
 import pytest
 from anthropic import AuthenticationError
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
-from pipelex.hub import get_models_manager
+from pipelex.hub import get_console, get_models_manager
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError
 from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models
 from pipelex.plugins.plugin_sdk_registry import Plugin
@@ -48,7 +47,7 @@ class TestAnthropic:
                 pytest.fail(f"Error listing Anthropic models: {exc}")
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
-            console = Console()
+            console = get_console()
             table = Table(
                 title="Available Anthropic Models",
                 show_header=True,

@@ -16,11 +16,12 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.tools.misc.pretty import PrettyPrintable, PrettyRenderable
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
 
 
-class Stuff(CustomBaseModel):
+class Stuff(PrettyRenderable, CustomBaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     stuff_code: str
@@ -192,6 +193,24 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
     def as_mermaid(self) -> MermaidContent:
         """Get content as MermaidContent if applicable."""
         return self.content_as(MermaidContent)
+
+    @override
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        """Render stuff for pretty printing.
+
+        Args:
+            title: Optional title for the rendering
+            depth: Current nesting depth, used to prevent nesting too many sub-tables which would end up too narrow in the console
+        """
+        if title and self.stuff_name:
+            title = f"[cyan]{title}:[/cyan] — {self.stuff_name} ([bold green]{self.concept.code}[/bold green]"
+        elif self.stuff_name:
+            title = f"[cyan]{self.stuff_name}[/cyan] ([bold green]{self.concept.code}[/bold green])"
+        elif title:
+            title = f"[cyan]{title}:[/cyan] some stuff ([bold green]{self.concept.code}[/bold green])"
+        else:
+            title = f"Some stuff ([bold green]{self.concept.code}[/bold green])"
+        return self.content.rendered_pretty(title=title, depth=depth)
 
     def pretty_print_stuff(self, title: str | None = None) -> None:
         title = title or f"[cyan]{self.stuff_name}[/cyan] ([bold green]{self.concept.code}[/bold green])"

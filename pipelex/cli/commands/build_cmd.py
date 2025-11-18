@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Annotated
 import click
 import typer
 from posthog import tag
-from rich.console import Console
 
 from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec
@@ -23,7 +22,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.config.config import get_config
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
-from pipelex.hub import get_library_manager, get_report_delegate, get_required_pipe, get_telemetry_manager, set_current_library_id
+from pipelex.hub import get_console, get_library_manager, get_report_delegate, get_required_pipe, get_telemetry_manager, set_current_library_id
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
@@ -64,10 +63,7 @@ pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and ge
 pipelex build pipe \
     "Take a Job offer text and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
 
-pipelex build partial "Given an expense report, apply company rules" -o results/generated.json
-pipelex build flow "Given an expense report, apply company rules" -o results/flow.json
-
-Other ideas:
+# Other ideas:
 pipelex build pipe "Take a photo as input, and render the opposite of the photo, don't structure anything, use only text content, be super concise"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
@@ -218,7 +214,7 @@ def build_pipe_cmd(
                     get_report_delegate().generate_report()
 
                     # Show how to run the pipe
-                    console = Console()
+                    console = get_console()
                     console.print("\n📋 [cyan]To run your pipeline:[/cyan]")
                     console.print(f"   [cyan]• Execute the runner:[/cyan] python {runner_path}")
                     console.print(f"   [cyan]• Or use CLI:[/cyan] pipelex run {main_pipe_code} --inputs {inputs_json_path}\n")

@@ -1,5 +1,7 @@
+from instructor import Mode as InstructorMode
 from pydantic import Field
 
+from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
@@ -17,6 +19,7 @@ class InferenceModelSpec(ConfigModel):
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
     costs: CostsByCategoryDict = Field(strict=False)
+    structure_method: StructureMethod | None = Field(default=None, strict=False)
     max_tokens: int | None
     max_prompt_images: int | None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
@@ -37,3 +40,9 @@ class InferenceModelSpec(ConfigModel):
     @property
     def is_vision_supported(self) -> bool:
         return "images" in self.inputs
+
+    def get_instructor_mode(self) -> InstructorMode | None:
+        if self.structure_method:
+            return self.structure_method.as_instructor_mode()
+        else:
+            return None

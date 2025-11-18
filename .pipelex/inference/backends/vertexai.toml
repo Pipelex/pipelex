@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "openai"
 prompting_target = "gemini"
+structure_method = "instructor/vertexai_tools"
 
 ################################################################################
 # LANGUAGE MODELS

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Annotated
 import click
 import typer
 from posthog import tag
-from rich.console import Console
 from rich.traceback import Traceback
 
 from pipelex import log
@@ -20,7 +19,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
-from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_console, get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
@@ -31,8 +30,6 @@ from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
-
-console = Console()
 
 COMMAND = "validate"
 
@@ -158,13 +155,13 @@ def validate_cmd(
                 else:
                     typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}' (including '{pipe_code}')", fg=typer.colors.GREEN)
             except FileNotFoundError as exc:
-                console.print(Traceback())
+                get_console().print(Traceback())
                 typer.secho(f"Failed to load bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
             except ValidateBundleError as bundle_error:
                 typer.secho(f"Failed to validate bundle '{bundle_path}': {bundle_error}", fg=typer.colors.RED, err=True)
             except PipeInputError as exc:
-                console.print(Traceback())
+                get_console().print(Traceback())
                 typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
         elif pipe_code:

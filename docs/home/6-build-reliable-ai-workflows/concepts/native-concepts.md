@@ -28,6 +28,7 @@ Here are all the native concepts you can use out of the box:
 | `Number` | A number | `NumberContent` |
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
 | `Dynamic` | A dynamic concept that adapts to context | `DynamicContent` |
+| `JSON` | A JSON object | `JSONContent` |
 | `Anything` | Any type of content | *No specific implementation* |
 
 ## Native Concept Structures
@@ -130,6 +131,15 @@ class DynamicContent(StuffContent):
 ```
 
 **Use for:** Workflows where the content structure isn't known in advance.
+
+### JSONContent
+
+A concept that represents a JSON object. This enables pipes to receive as input or to output any JSON object.
+
+```python
+class JSONContent(StuffContent):
+    json_obj: dict[str, Any]
+```
 
 ### Anything
 

@@ -50,8 +50,8 @@ class TestBackendCustomization:
         mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        # Mock Console and Prompt to simulate user selecting default [1]
-        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        # Mock console provider and Prompt to simulate user selecting default [1]
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
         mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value="1")
 
         # Execute
@@ -93,7 +93,7 @@ class TestBackendCustomization:
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         # Mock user input with dynamically determined indices
-        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
         mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value=indices_str)
 
         # Execute
@@ -135,7 +135,7 @@ class TestBackendCustomization:
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         # Mock user input with spaces and dynamically determined indices
-        mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
         mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value=indices_str)
 
         # Execute
@@ -188,11 +188,11 @@ class TestBackendCustomization:
         # Verify backend customization was NOT applied (original values preserved)
         toml_doc = load_toml_with_tomlkit(str(target_dir / "inference" / "backends.toml"))
 
-        # Verify original enabled states from template (template has most backends disabled)
+        # Verify original enabled states from template (template has all backends enabled by default)
         assert toml_doc["pipelex_inference"]["enabled"] is True  # type: ignore[index]
-        assert toml_doc["openai"]["enabled"] is False  # type: ignore[index]
-        assert toml_doc["anthropic"]["enabled"] is False  # type: ignore[index]
-        assert toml_doc["mistral"]["enabled"] is False  # type: ignore[index]
+        assert toml_doc["openai"]["enabled"] is True  # type: ignore[index]
+        assert toml_doc["anthropic"]["enabled"] is True  # type: ignore[index]
+        assert toml_doc["mistral"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["internal"]["enabled"] is True  # type: ignore[index]
 
     def test_customize_backends_handles_missing_file_gracefully(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -205,10 +205,11 @@ class TestBackendCustomization:
         mock_config_manager.pipelex_config_dir = str(config_dir)
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        mock_console = mocker.patch("pipelex.cli.commands.init.backends.Console")
+        mock_console = mocker.MagicMock()
+        mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mock_console)
 
         # Execute - should not raise exception
         customize_backends_config()
 
         # Verify warning was printed
-        mock_console.return_value.print.assert_called()
+        mock_console.print.assert_called()
