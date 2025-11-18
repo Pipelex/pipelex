@@ -20,6 +20,9 @@ class JSONContent(StuffContent):
     def check_valid_json(cls, value: dict[str, Any]) -> dict[str, Any]:
         try:
             json.dumps(value)
+        except TypeError as exc:
+            msg = f"json_obj is not valid JSON: {exc}"
+            raise TypeError(msg) from exc
         except json.JSONDecodeError as exc:
             msg = f"json_obj is not valid JSON: {exc}"
             raise ValueError(msg) from exc
