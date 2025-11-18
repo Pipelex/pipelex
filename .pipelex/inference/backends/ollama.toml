@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "openai"
 prompting_target = "anthropic"
+structure_method = "instructor/openai_tools"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -60,4 +61,3 @@ inputs = ["text"]
 outputs = ["text"]
 costs = { input = 0, output = 0 }
 # TODO: support <think> tokens
-

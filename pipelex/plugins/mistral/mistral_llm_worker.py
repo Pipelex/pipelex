@@ -7,11 +7,9 @@ if TYPE_CHECKING:
     from mistralai.models import ChatCompletionResponse
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.mistral.mistral_exceptions import MistralWorkerConfigurationError
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
@@ -24,13 +22,11 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
-        structure_method: StructureMethod | None = None,
         reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
             inference_model=inference_model,
-            structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
 
@@ -45,9 +41,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             raise MistralWorkerConfigurationError(msg)
         self.mistral_client_for_text: Mistral = sdk_instance
 
-        if structure_method:
-            instructor_mode = structure_method.as_instructor_mode()
-            log.verbose(f"Mistral structure mode: {structure_method} --> {instructor_mode}")
+        if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
             self.instructor_for_objects = instructor.from_mistral(client=sdk_instance, use_async=True)

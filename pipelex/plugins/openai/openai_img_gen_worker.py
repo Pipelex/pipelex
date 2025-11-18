@@ -39,7 +39,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> GeneratedImage:
-        one_image_list = await self.gen_image_list(img_gen_job=img_gen_job, nb_images=1)
+        one_image_list = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=1)
         return one_image_list[0]
 
     @override

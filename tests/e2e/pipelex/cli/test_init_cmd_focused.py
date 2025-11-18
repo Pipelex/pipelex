@@ -103,17 +103,19 @@ class TestFocusedInitialization:
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
         # Enable multiple backends (anthropic, mistral, openai - in TOML order)
-        # Disable pipelex_inference so we get custom_routing instead of pipelex_first
+        # Disable all the others so we precisely control the selections
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
-        toml_doc["pipelex_inference"]["enabled"] = False  # type: ignore[index]
-        toml_doc["anthropic"]["enabled"] = True  # type: ignore[index]
-        toml_doc["mistral"]["enabled"] = True  # type: ignore[index]
-        toml_doc["openai"]["enabled"] = True  # type: ignore[index]
+        enabled_set = {"anthropic", "mistral", "openai"}
+        for backend_key in toml_doc:
+            if backend_key == "internal":
+                continue
+            toml_doc[backend_key]["enabled"] = backend_key in enabled_set  # type: ignore[index]
         save_toml_to_path(toml_doc, str(backends_path))
 
         # User inputs for routing - need to confirm reconfigure since routing already exists
-        env.add_confirm_input(True)  # Confirm reconfigure
+        env.add_confirm_input(True)  # Confirm "Would you like to reconfigure routing?"
+        env.add_confirm_input(True)  # Confirm "Continue with initialization?"
         # The backends are enabled and will be listed as: anthropic, mistral, openai
         env.add_prompt_input("1")  # Primary backend: first one (anthropic)
         env.add_prompt_input("1,2")  # Fallback order for remaining 2
@@ -132,14 +134,18 @@ class TestFocusedInitialization:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Enable only openai
+        # Enable only openai (disable everything else)
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
-        toml_doc["openai"]["enabled"] = True  # type: ignore[index]
-        toml_doc["pipelex_inference"]["enabled"] = False  # type: ignore[index]
+        for backend_key in toml_doc:
+            if backend_key == "internal":
+                continue
+            toml_doc[backend_key]["enabled"] = backend_key == "openai"  # type: ignore[index]
         save_toml_to_path(toml_doc, str(backends_path))
 
         # User inputs
+        env.add_confirm_input(True)  # Confirm "Would you like to reconfigure routing?"
+        env.add_confirm_input(True)  # Confirm "Continue with initialization?"
         env.add_confirm_input(True)  # Confirm creating profile if needed
 
         env.setup_mocks()
@@ -198,12 +204,13 @@ class TestFocusedInitialization:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Enable only pipelex_inference
+        # Enable only pipelex_inference (disable everything else)
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
-        toml_doc["pipelex_inference"]["enabled"] = True  # type: ignore[index]
-        toml_doc["openai"]["enabled"] = False  # type: ignore[index]
-        toml_doc["anthropic"]["enabled"] = False  # type: ignore[index]
+        for backend_key in toml_doc:
+            if backend_key == "internal":
+                continue
+            toml_doc[backend_key]["enabled"] = backend_key == "pipelex_inference"  # type: ignore[index]
         save_toml_to_path(toml_doc, str(backends_path))
 
         # Modify routing to have wrong config (simulating the bug scenario)
@@ -212,8 +219,8 @@ class TestFocusedInitialization:
         routing_doc["active"] = "wrong_profile"  # type: ignore[index]
         save_toml_to_path(routing_doc, str(routing_path))
 
-        # User inputs - need to confirm reset
-        env.add_confirm_input(True)  # Confirm reset initialization
+        # User inputs - need to confirm reset initialization
+        env.add_confirm_input(True)  # Confirm "Continue with initialization?" (reset mode)
 
         env.setup_mocks()
 

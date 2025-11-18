@@ -98,8 +98,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             raise CostRegistryError(msg)
 
         console = Console()
-        title = "Costs by LLM model"
-        title += f" for pipeline '{pipeline_run_id}'"
+        title = f"Costs by LLM model for pipeline '{pipeline_run_id}'"
         table = Table(title=title, box=box.ROUNDED)
 
         scale_str: str
@@ -108,7 +107,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         else:
             scale_str = str(unit_scale)
         # Add columns
-        table.add_column("Model", style="cyan")
+        table.add_column("Model", style="cyan", overflow="fold", width=30)
         table.add_column("Input Cached", justify="right", style="green")
         table.add_column("Input Non Cached", justify="right", style="green")
         table.add_column("Input Joined", justify="right", style="green")

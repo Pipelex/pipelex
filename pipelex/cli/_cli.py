@@ -49,7 +49,6 @@ app = typer.Typer(
 
 @app.callback(invoke_without_command=True)
 def app_callback(ctx: typer.Context) -> None:
-    """Run pre-command checks like printing the logo and checking telemetry consent."""
     console = Console()
     package_version = get_package_version()
     console.print(
