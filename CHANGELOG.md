@@ -1,6 +1,9 @@
 # Changelog
 
-## [v0.15.5] - 2025-11-18
+## [v0.15.6] - 2025-11-18
+
+### Contributors
+ - Welcome to our new contributor @0x090909 (yup, that's his github username) for his work on Groq support in PR #445! 🎉
 
 ### Added
  - **Improved configuration repair**: New `--fix` option for `pipelex doctor` command that interactively detects and repairs outdated or invalid backend configuration files using latest templates from the Pipelex kit.
