@@ -1,5 +1,3 @@
-from typing import TYPE_CHECKING
-
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
@@ -8,9 +6,7 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
-
-if TYPE_CHECKING:
-    from pipelex.core.bundles.exceptions import PipeValidationErrorType
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 
 
 class PipeBlueprintValueError(ValueError):
@@ -94,7 +90,7 @@ class PipeOperatorModelChoiceError(PipelexError):
 class PipeValidationErrorData(BaseModel):
     """Structured data for PipeValidationError."""
 
-    error_type: "PipeValidationErrorType" = Field(description="The type of pipe validation error")
+    error_type: PipeValidationErrorType = Field(description="The type of pipe validation error")
     domain: str | None = Field(None, description="The domain where the error occurred")
     pipe_code: str | None = Field(None, description="The pipe code if applicable")
     variable_names: list[str] | None = Field(None, description="Variable names involved in the error")
