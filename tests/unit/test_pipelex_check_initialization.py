@@ -103,14 +103,15 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
         # Mock console.print to suppress output during test
-        mock_console_print = mocker.patch("pipelex.system.configuration.config_check.Console.print")
+        mock_console = mocker.MagicMock()
+        mocker.patch("pipelex.system.configuration.config_check.get_console", return_value=mock_console)
 
         # Test - should print warning and return False
         result = check_is_initialized(print_warning_if_not=True)
 
         # Verify
         assert result is False
-        assert mock_console_print.called
+        assert mock_console.print.called
 
     def test_check_is_initialized_returns_true_when_initialized_with_print_warning(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test that check_is_initialized returns True when initialized with print_warning_if_not=True."""
@@ -146,7 +147,7 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
         # Mock console.print to suppress output during test
-        mocker.patch("pipelex.system.configuration.config_check.Console.print")
+        mocker.patch("pipelex.system.configuration.config_check.get_console", return_value=mocker.MagicMock())
 
         # Test
         result = check_is_initialized(print_warning_if_not=True)
@@ -168,7 +169,7 @@ class TestPipelexCheckInitialization:
         mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
 
         # Mock console.print to suppress output during test
-        mocker.patch("pipelex.system.configuration.config_check.Console.print")
+        mocker.patch("pipelex.system.configuration.config_check.get_console", return_value=mocker.MagicMock())
 
         # Test
         result = check_is_initialized(print_warning_if_not=True)

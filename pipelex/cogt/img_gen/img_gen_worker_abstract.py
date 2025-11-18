@@ -37,7 +37,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> GeneratedImage:
-        log.verbose(f"Image gen worker gen_image using {self.desc}")
+        log.dev(f"✨ {self.desc} ✨")
 
         # Verify that the job is valid
         img_gen_job.validate_before_execution()
@@ -73,7 +73,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> list[GeneratedImage]:
-        log.verbose(f"Image gen worker gen_image_list using {self.desc}")
+        log.dev(f"✨ {self.desc} ✨")
 
         # Verify that the job is valid
         img_gen_job.validate_before_execution()

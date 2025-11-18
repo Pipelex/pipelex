@@ -3,8 +3,6 @@
 import os
 from typing import Any
 
-from rich.console import Console
-
 from pipelex.cli.commands.init.ui.backends_ui import (
     build_backend_selection_panel,
     display_selected_backends,
@@ -12,6 +10,7 @@ from pipelex.cli.commands.init.ui.backends_ui import (
     get_currently_enabled_backends,
     prompt_backend_indices,
 )
+from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import path_exists
@@ -56,16 +55,16 @@ def get_selected_backend_keys(backends_toml_path: str) -> list[str]:
         if backend_key != "internal":
             backend_section = toml_doc[backend_key]
             if isinstance(backend_section, dict):
-                if (setting := backend_section.get("enabled")) is not None and not setting:  # type: ignore[reportUnknownMemberType]
-                    continue
-                selected_backends.append(backend_key)
+                # Only include backends that are explicitly enabled
+                if backend_section.get("enabled", False) is True:  # type: ignore[union-attr]
+                    selected_backends.append(backend_key)
 
     return selected_backends
 
 
 def customize_backends_config() -> None:
     """Interactively customize which inference backends are enabled in backends.toml."""
-    console = Console()
+    console = get_console()
     backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
     template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
 
@@ -80,6 +79,11 @@ def customize_backends_config() -> None:
 
         # Get currently enabled backends to show user their current selection
         currently_enabled = get_currently_enabled_backends(backends_toml_path, backend_options)
+
+        # If all backends are enabled, treat this as a fresh copy (not a meaningful selection)
+        # In this case, don't use currently_enabled as the default to avoid selecting everything
+        if currently_enabled and len(currently_enabled) == len(backend_options):
+            currently_enabled = []
 
         # Load the backends.toml file
         toml_doc = load_toml_with_tomlkit(backends_toml_path)

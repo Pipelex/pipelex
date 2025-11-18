@@ -4,7 +4,7 @@ from anthropic.types import ModelInfo
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicModelListingError, AnthropicSDKUnsupportedError
 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory
-from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.plugins.plugin import Plugin
 
 
 async def anthropic_list_available_models(plugin: Plugin, backend: InferenceBackend) -> list[ModelInfo]:

@@ -1,17 +1,17 @@
 # from pipelex.libraries.library_manager_factory import LibraryManagerFactory
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
+from pipelex.hub import get_console
 
 
 def pretty_print_all_pipes(
     pipe_library: PipeLibrary,
     title: str | None = None,
 ):
-    console = Console()
+    console = get_console()
     table = Table(
         title=title,
         show_header=True,
@@ -45,7 +45,7 @@ def pretty_print_all_concepts(
     concept_library: ConceptLibrary,
     title: str | None = None,
 ):
-    console = Console()
+    console = get_console()
     table = Table(
         title=title,
         show_header=True,

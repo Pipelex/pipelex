@@ -13,6 +13,7 @@ from tests.cases import ImageTestCases, PDFTestCases
 @pytest.mark.extract
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
+@pytest.mark.usefixtures("routing_profile_override")
 class TestExtract:
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
     async def test_extract_pdf_path(self, extract_handle: str, file_path: str):

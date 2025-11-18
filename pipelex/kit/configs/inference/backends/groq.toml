@@ -23,8 +23,8 @@
 
 [defaults]
 model_type = "llm"
-sdk = "groq"
-prompting_target = "groq"
+sdk = "openai"
+structure_method = "instructor/json"
 
 ################################################################################
 # PRODUCTION TEXT MODELS

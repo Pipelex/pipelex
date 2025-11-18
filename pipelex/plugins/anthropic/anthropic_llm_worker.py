@@ -13,7 +13,6 @@ from pipelex.cogt.llm.llm_utils import (
     dump_response_from_structured_gen,
 )
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config.config import get_config
 from pipelex.plugins.anthropic.anthropic_exceptions import (
@@ -50,13 +49,11 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         sdk_instance: Any,
         extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
-        structure_method: StructureMethod | None = None,
         reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
             inference_model=inference_model,
-            structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
         self.extra_config: dict[str, Any] = extra_config
@@ -79,9 +76,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             raise SdkTypeError(msg)
 
         self.anthropic_async_client = sdk_instance
-        if structure_method:
-            instructor_mode = structure_method.as_instructor_mode()
-            log.verbose(f"Anthropic structure mode: {structure_method} --> {instructor_mode}")
+        if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance, mode=instructor_mode)
         else:
             self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance)

@@ -1,7 +1,9 @@
 from contextvars import ContextVar
+import sys
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
+from rich.console import Console
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import (
@@ -31,6 +33,7 @@ from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -47,6 +50,7 @@ class PipelexHub:
     def __init__(self):
         # tools
         self._config: ConfigRoot | None = None
+        self._console: Console | None = None
         self._secrets_provider: SecretsProviderAbstract | None = None
         self._class_registry: ClassRegistryAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
@@ -74,6 +78,10 @@ class PipelexHub:
     ############################################################
     # Class methods for singleton management
     ############################################################
+
+    @classmethod
+    def get_optional_instance(cls) -> "PipelexHub | None":
+        return cls._instance
 
     @classmethod
     def get_instance(cls) -> "PipelexHub":
@@ -111,6 +119,19 @@ class PipelexHub:
         """Reset the global configuration instance and the config manager."""
         self._config = None
         log.reset()
+
+    def set_console_print_target(self, target: ConsoleTarget):
+        match target:
+            case ConsoleTarget.STDOUT:
+                self._console = Console(file=sys.stdout)
+            case ConsoleTarget.STDERR:
+                self._console = Console(file=sys.stderr)
+            case _:
+                msg = f"Invalid console target: {target}"
+                raise ValueError(msg)
+
+    def set_console(self, console: Console):
+        self._console = console
 
     def set_secrets_provider(self, secrets_provider: SecretsProviderAbstract):
         self._secrets_provider = secrets_provider
@@ -186,6 +207,12 @@ class PipelexHub:
             msg = "Config instance is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
         return self._config
+
+    def get_console(self) -> Console:
+        if self._console is None:
+            msg = "Console is not set. You must initialize Pipelex first."
+            raise RuntimeError(msg)
+        return self._console
 
     def get_required_secrets_provider(self) -> SecretsProviderAbstract:
         if self._secrets_provider is None:
@@ -468,3 +495,11 @@ def get_library() -> Library:
 
 def get_native_concept(native_concept: NativeConceptCode) -> Concept:
     return get_pipelex_hub().get_required_concept_library().get_native_concept(native_concept=native_concept)
+
+
+def get_console() -> Console:
+    pipelex_hub = PipelexHub.get_optional_instance()
+    if pipelex_hub:
+        return get_pipelex_hub().get_console()
+    else:
+        return Console(stderr=True)

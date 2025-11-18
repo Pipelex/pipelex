@@ -7,13 +7,13 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
 from pipelex.tools.misc.json_utils import remove_none_values
-from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, pretty_print
+from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, PrettyRenderable, pretty_print
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 
-class StuffContent(ABC, CustomBaseModel):
+class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     @property
     def short_desc(self) -> str:
         return f"some {self.__class__.__name__}"
@@ -55,7 +55,8 @@ class StuffContent(ABC, CustomBaseModel):
     def rendered_json(self) -> str:
         return kajson.dumps(self.smart_dump(), indent=4)
 
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:  # noqa: ARG002
+    @override
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         """Render content for pretty printing.
 
         Args:

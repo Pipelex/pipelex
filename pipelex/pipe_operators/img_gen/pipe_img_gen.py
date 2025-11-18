@@ -58,7 +58,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     img_gen_prompt: str | None = None
     img_gen_prompt_var_name: str | None = None
 
-    img_gen: ImgGenModelChoice | None = None
+    img_gen_choice: ImgGenModelChoice | None = None
 
     # One-time settings (not in ImgGenSetting)
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
@@ -101,8 +101,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     @override
     def validate_input_static(self):
-        if self.img_gen:
-            check_img_gen_choice_with_deck(img_gen_choice=self.img_gen)
+        if self.img_gen_choice:
+            check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
 
     @override
     def validate_input_with_library(self):
@@ -184,9 +184,9 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
         # Get ImgGenSetting either from img_gen choice or legacy settings
         img_gen_setting: ImgGenSetting
-        if self.img_gen is not None:
+        if self.img_gen_choice is not None:
             # New pattern: use img_gen choice (preset or inline setting)
-            img_gen_setting = model_deck.get_img_gen_setting(self.img_gen)
+            img_gen_setting = model_deck.get_img_gen_setting(self.img_gen_choice)
         else:
             # Use default from model deck
             img_gen_setting = model_deck.get_img_gen_setting(model_deck.img_gen_choice_default)

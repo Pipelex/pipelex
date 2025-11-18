@@ -5,7 +5,6 @@ from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_prompt, dump_response_from_text_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
-from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config.config import get_config
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -15,7 +14,6 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     def __init__(
         self,
         inference_model: InferenceModelSpec,
-        structure_method: StructureMethod | None = None,
         reporting_delegate: ReportingProtocol | None = None,
     ):
         """Initialize the LLMWorker.
@@ -28,7 +26,6 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         """
         LLMWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
         self.inference_model = inference_model
-        self.structure_method = structure_method
 
     #########################################################
     # Instance methods
@@ -43,6 +40,11 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @override
     def is_gen_object_supported(self) -> bool:
         return self.inference_model.is_gen_object_supported
+
+    @property
+    @override
+    def is_vision_supported(self) -> bool:
+        return self.inference_model.is_vision_supported
 
     @override
     async def _before_job(

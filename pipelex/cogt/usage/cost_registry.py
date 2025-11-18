@@ -3,7 +3,6 @@ from typing import Any
 
 from pydantic import Field, RootModel
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
 from pipelex import log
@@ -12,6 +11,7 @@ from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportFi
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.costs_per_token import model_cost_per_token
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.hub import get_console
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 CostRegistryRoot = list[LLMTokenCostReport]
@@ -97,9 +97,8 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             msg = "Empty report aggregation by LLM name"
             raise CostRegistryError(msg)
 
-        console = Console()
-        title = "Costs by LLM model"
-        title += f" for pipeline '{pipeline_run_id}'"
+        console = get_console()
+        title = f"Costs by LLM model for pipeline '{pipeline_run_id}'"
         table = Table(title=title, box=box.ROUNDED)
 
         scale_str: str
@@ -108,7 +107,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         else:
             scale_str = str(unit_scale)
         # Add columns
-        table.add_column("Model", style="cyan")
+        table.add_column("Model", style="cyan", overflow="fold", width=30)
         table.add_column("Input Cached", justify="right", style="green")
         table.add_column("Input Non Cached", justify="right", style="green")
         table.add_column("Input Joined", justify="right", style="green")

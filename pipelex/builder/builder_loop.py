@@ -1,5 +1,3 @@
-from rich.console import Console
-
 from pipelex import log, pretty_print
 from pipelex.builder.builder import (
     PipelexBundleSpec,
@@ -17,7 +15,7 @@ from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.hub import get_required_pipe
+from pipelex.hub import get_console, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
@@ -42,7 +40,7 @@ class BuilderLoop:
             )
         except PipelineExecutionError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."
-            console = Console(stderr=True)
+            console = get_console()
             console.print_exception()
             raise PipeBuilderError(message=msg) from exc
 

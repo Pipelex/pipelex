@@ -4,9 +4,9 @@ from typing import Any
 import boto3
 import pytest
 from rich import box
-from rich.console import Console
 from rich.table import Table
 
+from pipelex.hub import get_console
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
 
 warnings.filterwarnings(
@@ -40,7 +40,7 @@ class TestBedrock:
         bedrock_models_list: list[dict[str, Any]] = response["modelSummaries"]  # pyright: ignore[reportUnknownVariableType]
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
-            console = Console()
+            console = get_console()
             table = Table(
                 title=f"Models from {bedrock_provider} available for Bedrock in {bedrock_region_name}",
                 show_header=True,
@@ -76,7 +76,7 @@ class TestBedrock:
         inference_profiles_list: list[dict[str, Any]] = response["inferenceProfileSummaries"]  # pyright: ignore[reportUnknownVariableType]
         if pytestconfig.get_verbosity() >= 2:
             # Create and configure the table
-            console = Console()
+            console = get_console()
             table = Table(
                 title=f"Inference Profiles Available for Bedrock in {bedrock_region_name}",
                 show_header=True,

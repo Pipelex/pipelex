@@ -74,6 +74,10 @@ default = "fal"
 description = "Use Google GenAI backend for all its supported models"
 default = "google"
 
+[profiles.all_groq]
+description = "Use groq backend for all its supported models"
+default = "groq"
+
 [profiles.all_mistral]
 description = "Use Mistral backend for all its supported models"
 default = "mistral"
@@ -85,6 +89,10 @@ default = "ollama"
 [profiles.all_openai]
 description = "Use OpenAI backend for all its supported models"
 default = "openai"
+
+[profiles.all_pipelex_inference]
+description = "Use Pipelex Inference backend for all its supported models"
+default = "pipelex_inference"
 
 [profiles.all_vertexai]
 description = "Use Vertex AI backend for all its supported models"
@@ -149,7 +157,3 @@ description = "Example routing profile using specific models"
 
 "grok-3" = "pipelex_inference"
 "grok-3-mini" = "xai"
-
-[profiles.all_groq]
-description = "Use groq backend for all its supported models"
-default = "groq"
