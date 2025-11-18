@@ -138,7 +138,7 @@ A concept that represents a JSON object. This enables pipes to receive as input 
 
 ```python
 class JSONContent(StuffContent):
-    json_obj: dict[Any, Any]
+    json_obj: dict[str, Any]
 ```
 
 ### Anything
