@@ -1,5 +1,5 @@
-from contextvars import ContextVar
 import sys
+from contextvars import ContextVar
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract

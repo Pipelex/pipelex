@@ -3,11 +3,7 @@ import pytest
 from pipelex import log
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
-<<<<<<<< HEAD:tests/unit/core/pipes/pipe_operators/pipe_compose/test_pipe_compose_input.py
-from tests.unit.core.pipes.pipe_operators.pipe_compose.data import PipeComposeInputTestCases
-========
 from tests.unit.pipelex.pipe_operators.pipe_compose.data import PipeComposeInputTestCases
->>>>>>>> dev:tests/unit/pipelex/pipe_operators/pipe_compose/test_pipe_compose_input.py
 
 
 class TestPipeComposeValidateInputs:

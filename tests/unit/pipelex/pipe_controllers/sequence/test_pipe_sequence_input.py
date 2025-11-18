@@ -7,11 +7,7 @@ from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
-<<<<<<<< HEAD:tests/unit/core/pipes/pipe_controllers/sequence/test_pipe_sequence_input.py
-from tests.unit.core.pipes.pipe_controllers.sequence.data import PipeSequenceInputTestCases
-========
 from tests.unit.pipelex.pipe_controllers.sequence.data import PipeSequenceInputTestCases
->>>>>>>> dev:tests/unit/pipelex/pipe_controllers/sequence/test_pipe_sequence_input.py
 
 
 class TestPipeSequenceValidateInputs:

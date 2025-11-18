@@ -7,11 +7,7 @@ from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
-<<<<<<<< HEAD:tests/unit/core/pipes/pipe_controllers/condition/test_pipe_condition_input.py
-from tests.unit.core.pipes.pipe_controllers.condition.data import PipeConditionInputTestCases
-========
 from tests.unit.pipelex.pipe_controllers.condition.data import PipeConditionInputTestCases
->>>>>>>> dev:tests/unit/pipelex/pipe_controllers/condition/test_pipe_condition_input.py
 
 
 class TestPipeConditionValidateInputs:

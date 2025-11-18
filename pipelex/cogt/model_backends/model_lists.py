@@ -10,6 +10,7 @@ from rich.table import Table
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.config.config import get_config
 from pipelex.hub import get_console
+
 if TYPE_CHECKING:
     from anthropic.types import ModelInfo
     from openai.types import Model

@@ -1,5 +1,6 @@
-from typing import TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING
+
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
 
 async def execute_pipeline(
     library_id: str | None = None,
-    library_path: str|None = None,
+    library_path: str | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,

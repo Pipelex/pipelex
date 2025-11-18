@@ -3,11 +3,7 @@ import pytest
 from pipelex import log
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
-<<<<<<<< HEAD:tests/unit/core/pipes/pipe_controllers/batch/test_pipe_batch_input.py
-from tests.unit.core.pipes.pipe_controllers.batch.data import PipeBatchInputTestCases
-========
 from tests.unit.pipelex.pipe_controllers.batch.data import PipeBatchInputTestCases
->>>>>>>> dev:tests/unit/pipelex/pipe_controllers/batch/test_pipe_batch_input.py
 
 
 class TestPipeBatchValidateInputs:

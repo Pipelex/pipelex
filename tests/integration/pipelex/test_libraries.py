@@ -2,9 +2,9 @@
 from rich import box
 from rich.table import Table
 
+from pipelex.hub import get_console
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
-from pipelex.hub import get_console
 
 
 def pretty_print_all_pipes(

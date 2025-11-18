@@ -3,7 +3,7 @@ import pytest
 from pipelex import log
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
-from tests.unit.core.pipes.pipe_operators.pipe_extract.data import PipeExtractInputTestCases
+from tests.unit.pipelex.pipe_operators.pipe_extract.data import PipeExtractInputTestCases
 
 
 class TestPipeExtractValidateInputs:

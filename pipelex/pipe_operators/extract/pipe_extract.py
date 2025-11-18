@@ -27,7 +27,6 @@ from pipelex.hub import (
     get_model_deck,
     get_native_concept,
 )
-from pipelex.pipe_operators.extract.exceptions import PipeExtractValueError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams

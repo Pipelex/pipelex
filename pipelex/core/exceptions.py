@@ -1,11 +1,10 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.pipes.exceptions import StaticValidationErrorType
 from pipelex.tools.misc.toml_utils import TomlError
-from pipelex.types import StrEnum
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 
 
 class PipelexConfigurationError(PipelexError):
@@ -77,8 +76,6 @@ class StaticValidationError(ValueError):
 
 class PLXDecodeError(TomlError):
     """Raised when PLX decoding fails."""
-
-
 
 
 class PipelexInterpreterError(PipelexError):

@@ -4,11 +4,7 @@ from pipelex import log
 from pipelex.core.exceptions import StaticValidationError
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
-<<<<<<<< HEAD:tests/unit/core/pipes/pipe_operators/pipe_llm/test_pipe_llm_input.py
-from tests.unit.core.pipes.pipe_operators.pipe_llm.data import PipeLLMInputTestCases
-========
 from tests.unit.pipelex.pipe_operators.pipe_llm.data import PipeLLMInputTestCases
->>>>>>>> dev:tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_input.py
 
 
 class TestPipeLLMValidateInputs:

@@ -1,7 +1,5 @@
 from pydantic import BaseModel, Field
-from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.types import StrEnum
 
 
@@ -45,9 +43,9 @@ class PipelexBundleBlueprintFixableErrorType(StrEnum):
     UNKNOWN = "unknown"  # Could not categorize error
 
 
-
 class PipelexBundleBlueprintValueError(ValueError):
     pass
+
 
 class PipelexBundleBlueprintValidationErrorData(BaseModel):
     """Structured validation error data with context for categorization and fixing.

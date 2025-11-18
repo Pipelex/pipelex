@@ -1,7 +1,6 @@
 import asyncio
 import os
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import click
@@ -22,7 +21,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.config.config import get_config
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
-from pipelex.hub import get_console, get_library_manager, get_report_delegate, get_required_pipe, get_telemetry_manager, set_current_library_id
+from pipelex.hub import get_console, get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex

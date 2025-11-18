@@ -4,7 +4,6 @@ from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceBlueprintValueError
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 

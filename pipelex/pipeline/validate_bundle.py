@@ -5,7 +5,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import get_library_manager, set_current_library_id, teardown_current_library_id
+from pipelex.hub import get_library_manager, set_current_library_id
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 

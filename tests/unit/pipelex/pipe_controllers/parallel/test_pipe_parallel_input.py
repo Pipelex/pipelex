@@ -7,11 +7,7 @@ from pipelex.core.exceptions import StaticValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
-<<<<<<<< HEAD:tests/unit/core/pipes/pipe_controllers/parallel/test_pipe_parallel_input.py
-from tests.unit.core.pipes.pipe_controllers.parallel.data import PipeParallelInputTestCases
-========
 from tests.unit.pipelex.pipe_controllers.parallel.data import PipeParallelInputTestCases
->>>>>>>> dev:tests/unit/pipelex/pipe_controllers/parallel/test_pipe_parallel_input.py
 
 
 class TestPipeParallelValidateInputs:

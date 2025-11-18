@@ -16,6 +16,7 @@ class PipeControllerOutputConceptMismatchError(PipeControllerError):
 class SubPipeBlueprintValueError(ValueError):
     pass
 
+
 class PipeValueError(PipelexError):
     pipe: PipeAbstract
     category: str

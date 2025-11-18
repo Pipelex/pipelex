@@ -1,7 +1,6 @@
 from typing import NoReturn
 
 import typer
-from rich.console import Console
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError

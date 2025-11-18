@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from rich.console import Console
-
 from pipelex import log, pretty_print
 from pipelex.builder.builder import (
     PipelexBundleSpec,
