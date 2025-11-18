@@ -10,7 +10,6 @@ from pipelex import log, pretty_print
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.hub import get_img_gen_worker
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 from pipelex.tools.misc.file_utils import ensure_path
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
