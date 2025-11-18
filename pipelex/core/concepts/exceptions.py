@@ -8,8 +8,11 @@ class ConceptError(PipelexError):
 
 class ConceptBlueprintValueError(ValueError):
     pass
+
+
 class ConceptValueError(ValueError):
     pass
+
 
 class ConceptStructureBlueprintValueError(ValueError):
     pass

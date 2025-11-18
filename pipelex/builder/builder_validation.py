@@ -1,30 +1,11 @@
 from pipelex import log
-from pipelex.builder.builder_errors import (
-    ConceptSpecError,
-    PipeFailure,
-    PipelexBundleUnexpectedError,
-    PipeSpecError,
-    ValidateDryRunError,
-)
 from pipelex.builder.bundle_spec import PipelexBundleSpec
-from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
-from pipelex.builder.validation_error_data import DomainFailure, PipeInputErrorData, StaticValidationErrorData
-from pipelex.core.bundles.exceptions import PipelexBundleError
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import StaticValidationError
-from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
-from pipelex.hub import get_current_library_id, get_library_manager, get_required_pipe, set_current_library_id
-from pipelex.libraries.exceptions import (
-    ConceptLoadingError,
-    DomainLoadingError,
-    PipeLoadingError,
-)
-from pipelex.pipe_run.dry_run import DryRunOutput
+from pipelex.hub import get_required_pipe
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 
-def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
+async def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
     """Proactively fix input declarations for all PipeController pipes.
 
     This function rebuilds the inputs dict for all PipeController pipes (PipeSequence,
@@ -36,9 +17,6 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
 
     Returns:
         The modified bundle spec with fixed inputs.
-
-    Raises:
-        PipelexBundleError: If loading the bundle fails or other errors occur.
     """
     log.dev(f"🔧 Starting input consistency fix for domain '{bundle_spec.domain}'")
 
@@ -46,170 +24,79 @@ def fix_inputs_consistency(bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
         log.dev("No pipes found in bundle spec, skipping input consistency fix")
         return bundle_spec
 
-    # Convert to blueprint and load into library
-    try:
-        bundle_blueprint = bundle_spec.to_blueprint()
-    except ConceptSpecError as concept_spec_error:
-        concept_failures = [concept_spec_error.concept_failure]
-        raise PipelexBundleError(message=concept_spec_error.message, concept_failures=concept_failures) from concept_spec_error
-    except PipeSpecError as pipe_spec_error:
-        pipe_failures = [pipe_spec_error.pipe_failure]
-        raise PipelexBundleError(message=pipe_spec_error.message, pipe_failures=pipe_failures) from pipe_spec_error
-
-    log.dev(f"Loading bundle blueprint for domain '{bundle_spec.domain}' into library manager")
-    library_manager = get_library_manager()
-    try:
-        library_id, _ = library_manager.open_library()
-        set_current_library_id(library_id=library_id)
-        library_manager.load_from_blueprints(library_id=library_id, blueprints=[bundle_blueprint])
-        log.dev(f"Successfully loaded bundle with {len(bundle_spec.pipe)} pipes")
-    except StaticValidationError as static_validation_error:
-        static_validation_error_data = StaticValidationErrorData(
-            error_type=static_validation_error.error_type,
-            domain=static_validation_error.domain,
-            pipe_code=static_validation_error.pipe_code,
-            variable_names=static_validation_error.variable_names,
-            required_concept_codes=static_validation_error.required_concept_codes,
-            provided_concept_code=static_validation_error.provided_concept_code,
-            file_path=static_validation_error.file_path,
-            explanation=static_validation_error.explanation,
-        )
-        raise PipelexBundleError(
-            message=static_validation_error.desc(), static_validation_error=static_validation_error_data
-        ) from static_validation_error
-    except DomainLoadingError as domain_loading_error:
-        domain_failures = [DomainFailure(domain_code=domain_loading_error.domain_code, error_message=str(domain_loading_error))]
-        raise PipelexBundleError(message=domain_loading_error.message, domain_failures=domain_failures) from domain_loading_error
-    except ConceptLoadingError as concept_loading_error:
-        # Concept loading errors now use validation_errors
-        raise PipelexBundleError(message=concept_loading_error.message) from concept_loading_error
-    except PipeLoadingError as pipe_loading_error:
-        # Pipe loading errors now use validation_errors
-        raise PipelexBundleError(message=pipe_loading_error.message) from pipe_loading_error
-    except PipeInputError as pipe_input_error:
-        pipe_input_error_data = PipeInputErrorData(
-            message=str(pipe_input_error),
-            pipe_code=pipe_input_error.pipe_code,
-            variable_name=pipe_input_error.variable_name,
-            concept_code=pipe_input_error.concept_code,
-        )
-        raise PipelexBundleError(message=pipe_input_error.message, pipe_input_errors=[pipe_input_error_data]) from pipe_input_error
+    bundle_blueprint = bundle_spec.to_blueprint()
+    await validate_bundle(blueprints=[bundle_blueprint])
 
     # Fix inputs for all PipeController pipes
     log.dev("Starting to fix inputs for PipeController pipes")
     fixed_count = 0
-    try:
-        for pipe_code, pipe_spec in bundle_spec.pipe.items():
-            # Check if this is a PipeController
-            if AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
-                log.dev(f"  Checking inputs for {pipe_spec.type} pipe '{pipe_code}'")
+    for pipe_code, pipe_spec in bundle_spec.pipe.items():
+        # Check if this is a PipeController
+        if AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
+            log.dev(f"  Checking inputs for {pipe_spec.type} pipe '{pipe_code}'")
 
-                # Get the loaded pipe instance
-                pipe = get_required_pipe(pipe_code=pipe_code)
+            # Get the loaded pipe instance
+            pipe = get_required_pipe(pipe_code=pipe_code)
 
-                # Get the actual needed inputs
-                needed_inputs = pipe.needed_inputs()
+            # Get the actual needed inputs
+            needed_inputs = pipe.needed_inputs()
 
-                # Store old inputs for logging
-                old_inputs = pipe_spec.inputs.copy()
+            # Store old inputs for logging
+            old_inputs = pipe_spec.inputs.copy()
 
-                # Rebuild the inputs dict from needed_inputs, preserving multiplicity
-                new_inputs: dict[str, str] = {}
-                for named_requirement in needed_inputs.named_input_requirements:
-                    concept_code = named_requirement.concept.code
-                    # Preserve multiplicity brackets
-                    if named_requirement.multiplicity is not None:
-                        if named_requirement.multiplicity is True:
-                            # Variable-length list []
-                            concept_code = f"{concept_code}[]"
-                        else:
-                            # Fixed-length list [N] where N is an int
-                            concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
-                    new_inputs[named_requirement.variable_name] = concept_code
+            # Rebuild the inputs dict from needed_inputs, preserving multiplicity
+            new_inputs: dict[str, str] = {}
+            for named_requirement in needed_inputs.named_input_requirements:
+                concept_code = named_requirement.concept.code
+                # Preserve multiplicity brackets
+                if named_requirement.multiplicity is not None:
+                    if named_requirement.multiplicity is True:
+                        # Variable-length list []
+                        concept_code = f"{concept_code}[]"
+                    else:
+                        # Fixed-length list [N] where N is an int
+                        concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
+                new_inputs[named_requirement.variable_name] = concept_code
 
-                # Update the pipe spec inputs
-                pipe_spec.inputs = new_inputs
+            # Update the pipe spec inputs
+            pipe_spec.inputs = new_inputs
 
-                # Log the changes
-                if old_inputs != new_inputs:
-                    log.dev(f"    Old inputs: {old_inputs}")
-                    log.dev(f"    New inputs: {new_inputs}")
-                    fixed_count += 1
-                else:
-                    log.dev("    ✅")
-    finally:
-        # Clean up by removing the bundle from library manager
-        log.dev("Cleaning up: removing bundle from library manager")
-        library_manager.remove_from_blueprints(library_id=get_current_library_id(), blueprints=[bundle_blueprint])
+            # Log the changes
+            if old_inputs != new_inputs:
+                log.dev(f"    Old inputs: {old_inputs}")
+                log.dev(f"    New inputs: {new_inputs}")
+                fixed_count += 1
+            else:
+                log.dev("    ✅")
 
     log.dev(f"✅ Input consistency fix completed: fixed {fixed_count} PipeController pipe(s)")
     return bundle_spec
 
-
-async def validate_bundle_spec(bundle_spec: PipelexBundleSpec):
-    try:
-        bundle_blueprint = bundle_spec.to_blueprint()
-    except ConceptSpecError as concept_spec_error:
-        concept_failures = [concept_spec_error.concept_failure]
-        raise PipelexBundleError(message=concept_spec_error.message, concept_failures=concept_failures) from concept_spec_error
-    except PipeSpecError as pipe_spec_error:
-        pipe_failures = [pipe_spec_error.pipe_failure]
-        raise PipelexBundleError(message=pipe_spec_error.message, pipe_failures=pipe_failures) from pipe_spec_error
-
-    validate_bundle_result = await validate_bundle(blueprints=[bundle_blueprint])
-
-    dry_run_pipe_failures = extract_pipe_failures_from_dry_run_result(bundle_spec=bundle_spec, dry_run_result=validate_bundle_result.dry_run_result)
-    if dry_run_pipe_failures:
-        raise PipelexBundleError(message="Pipes failed during dry run", pipe_failures=dry_run_pipe_failures)
+    # dry_run_pipe_failures = extract_pipe_failures_from_dry_run_result(bundle_spec=bundle_spec, dry_run_result=validate_bundle_result.dry_run_result)
+    # if dry_run_pipe_failures:
+    #     raise PipelexBundleError(message="Pipes failed during dry run", pipe_failures=dry_run_pipe_failures)
 
 
-def extract_pipe_failures_from_dry_run_result(bundle_spec: PipelexBundleSpec, dry_run_result: dict[str, DryRunOutput]) -> list[PipeFailure]:
-    dry_run_pipe_failures: list[PipeFailure] = []
-    for pipe_code, dry_run_output in dry_run_result.items():
-        if dry_run_output.status.is_failure:
-            if not bundle_spec.pipe:
-                msg = f"No pipes section found in bundle spec but we recorded a dry run failure for pipe '{pipe_code}'"
-                raise PipelexBundleUnexpectedError(message="No pipes section found in bundle spec")
-            if pipe_code not in bundle_spec.pipe:
-                msg = f"Pipe '{pipe_code}' not found in bundle spec but we recorded a dry run failure for it"
-                raise PipelexBundleUnexpectedError(message=msg)
+# def extract_pipe_failures_from_dry_run_result(bundle_spec: PipelexBundleSpec, dry_run_result: dict[str, DryRunOutput]) -> list[PipeFailure]:
+#     dry_run_pipe_failures: list[PipeFailure] = []
+#     for pipe_code, dry_run_output in dry_run_result.items():
+#         if dry_run_output.status.is_failure:
+#             if not bundle_spec.pipe:
+#                 msg = f"No pipes section found in bundle spec but we recorded a dry run failure for pipe '{pipe_code}'"
+#                 raise PipelexBundleUnexpectedError(message="No pipes section found in bundle spec")
+#             if pipe_code not in bundle_spec.pipe:
+#                 msg = f"Pipe '{pipe_code}' not found in bundle spec but we recorded a dry run failure for it"
+#                 raise PipelexBundleUnexpectedError(message=msg)
 
-            pipe_spec = bundle_spec.pipe[pipe_code]
-            spec_class = pipe_type_to_spec_class.get(pipe_spec.type)
-            if not spec_class:
-                msg = f"Unknown pipe type: {pipe_spec.type}"
-                raise ValidateDryRunError(msg)
-            pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
-            pipe_failure = PipeFailure(
-                pipe_spec=pipe_spec,
-                error_message=dry_run_output.error_message or "",
-            )
-            dry_run_pipe_failures.append(pipe_failure)
-    return dry_run_pipe_failures
-
-
-def document_pipe_failures_from_dry_run_blueprint(
-    bundle_blueprint: PipelexBundleBlueprint, dry_run_result: dict[str, DryRunOutput]
-) -> list[PipeFailure]:
-    dry_run_pipe_failures: list[PipeFailure] = []
-    for pipe_code, dry_run_output in dry_run_result.items():
-        if dry_run_output.status.is_failure:
-            if not bundle_blueprint.pipe:
-                msg = f"No pipes section found in bundle spec but we recorded a dry run failure for pipe '{pipe_code}'"
-                raise PipelexBundleUnexpectedError(message="No pipes section found in bundle spec")
-            if pipe_code not in bundle_blueprint.pipe:
-                msg = f"Pipe '{pipe_code}' not found in bundle spec but we recorded a dry run failure for it"
-                raise PipelexBundleUnexpectedError(message=msg)
-
-            pipe_spec = bundle_blueprint.pipe[pipe_code]
-            spec_class = pipe_type_to_spec_class.get(pipe_spec.type)
-            if not spec_class:
-                msg = f"Unknown pipe type: {pipe_spec.type}"
-                raise ValidateDryRunError(msg)
-            pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
-            pipe_failure = PipeFailure(
-                pipe_spec=pipe_spec,
-                error_message=dry_run_output.error_message or "",
-            )
-            dry_run_pipe_failures.append(pipe_failure)
-    return dry_run_pipe_failures
+#             pipe_spec = bundle_spec.pipe[pipe_code]
+#             spec_class = pipe_type_to_spec_class.get(pipe_spec.type)
+#             if not spec_class:
+#                 msg = f"Unknown pipe type: {pipe_spec.type}"
+#                 raise ValidateDryRunError(msg)
+#             pipe_spec = spec_class(**pipe_spec.model_dump(serialize_as_any=True))
+#             pipe_failure = PipeFailure(
+#                 pipe_spec=pipe_spec,
+#                 error_message=dry_run_output.error_message or "",
+#             )
+#             dry_run_pipe_failures.append(pipe_failure)
+#     return dry_run_pipe_failures

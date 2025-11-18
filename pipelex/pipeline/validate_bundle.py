@@ -25,10 +25,12 @@ class ValidateBundleError(PipelexError):
         self,
         message: str,
         validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        library_loading_errors: list[LibraryLoadingError] | None = None,
         dry_run_error_message: str | None = None,
     ):
         self.validation_errors = validation_errors or []
         self.dry_run_error_message = dry_run_error_message
+        self.library_loading_errors = library_loading_errors or []
         super().__init__(message)
 
 

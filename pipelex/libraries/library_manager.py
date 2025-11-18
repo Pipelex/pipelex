@@ -319,7 +319,7 @@ class LibraryManager(LibraryManagerAbstract):
             raise LibraryLoadingError(msg) from pipe_def_error
         except ValidationError as validation_error:
             # Categorize and forward Pydantic validation errors
-            validation_errors: list[PipelexBundleBlueprintValidationErrorData]   = []
+            validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
             for error in validation_error.errors():
                 val_error = categorize_and_create_error_data(
                     error=error,

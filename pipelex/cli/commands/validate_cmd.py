@@ -16,18 +16,15 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
     handle_model_deck_preset_error,
-    handle_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.core.bundles.exceptions import PipelexBundleError
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
-from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
@@ -164,9 +161,8 @@ def validate_cmd(
                 console.print(Traceback())
                 typer.secho(f"Failed to load bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
-            except PipelexBundleError as bundle_error:
-                console.print(Traceback())
-                handle_validation_error(exc=bundle_error, context=ErrorContext.VALIDATION)
+            except ValidateBundleError as bundle_error:
+                typer.secho(f"Failed to validate bundle '{bundle_path}': {bundle_error}", fg=typer.colors.RED, err=True)
             except PipeInputError as exc:
                 console.print(Traceback())
                 typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
@@ -190,8 +186,6 @@ def validate_cmd(
     pipelex_instance: Pipelex
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION)
 

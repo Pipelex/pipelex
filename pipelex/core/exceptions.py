@@ -172,27 +172,6 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # === Legacy fields (for backwards compatibility) ===
     other: str | None = Field(None, description="Other context (legacy)")
 
-    @property
-    def is_concept_error(self) -> bool:
-        """Check if this is a concept-related error."""
-        return self.error_scope == "concept" or self.concept_code is not None
-
-    @property
-    def is_pipe_error(self) -> bool:
-        """Check if this is a pipe-related error."""
-        return self.error_scope == "pipe" or self.pipe_code is not None
-
-    @property
-    def is_fixable(self) -> bool:
-        """Check if this error type is potentially fixable."""
-        return self.error_type != PipelexBundleBlueprintFixableErrorType.UNKNOWN
-
-    def get_dispatch_key(self) -> str:
-        """Get unique key for error dispatch: 'concept.refines_structure_conflict', etc."""
-        if self.error_scope and self.error_type:
-            return f"{self.error_scope}.{self.error_type}"
-        return str(self.error_type)
-
 
 class PipelexInterpreterError(PipelexError):
     """Raised when PipelexInterpreter fails."""

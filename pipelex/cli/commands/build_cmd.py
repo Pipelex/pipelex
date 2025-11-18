@@ -1,6 +1,7 @@
 import asyncio
 import os
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import click
@@ -9,7 +10,7 @@ from posthog import tag
 from rich.console import Console
 
 from pipelex import pretty_print
-from pipelex.builder.builder import PipelexBundleSpec, load_and_validate_bundle
+from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
@@ -22,13 +23,13 @@ from pipelex.cli.error_handlers import (
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.config.config import get_config
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
-from pipelex.hub import get_report_delegate, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_library_manager, get_report_delegate, get_required_pipe, get_telemetry_manager, set_current_library_id
 from pipelex.language.plx_factory import PlxFactory
-from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
@@ -111,8 +112,6 @@ def build_pipe_cmd(
 ) -> None:
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
 
@@ -199,8 +198,13 @@ def build_pipe_cmd(
                     save_text_to_path(text=pretty_svg, path=svg_path)
                     typer.secho(f"✅ Pretty SVG saved to: {svg_path}", fg=typer.colors.GREEN)
 
-                    # Load the bundle from the file we just saved to register the pipe
-                    _ = await load_and_validate_bundle(plx_file_path)
+                    # Validate the bundle
+                    _ = await validate_bundle(plx_file_path=plx_file_path)
+                    # Load
+                    library_manager = get_library_manager()
+                    library_id, _ = library_manager.open_library()
+                    set_current_library_id(library_id=library_id)
+                    library_manager.load_libraries(library_id=library_id, library_file_paths=[Path(plx_file_path)])
                     pipe = get_required_pipe(pipe_code=main_pipe_code)
 
                     # Generate inputs.json
@@ -329,9 +333,9 @@ def prepare_runner_cmd(
     async def prepare_runner(pipe_code: str | None = None, bundle_path: str | None = None):
         if bundle_path:
             try:
-                bundle_blueprint = await load_and_validate_bundle(bundle_path)
+                validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
                 if not pipe_code:
-                    main_pipe_code = bundle_blueprint.main_pipe
+                    main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
                     if not main_pipe_code:
                         typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
                         raise typer.Exit(1)
@@ -342,7 +346,7 @@ def prepare_runner_cmd(
             except FileNotFoundError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
-            except PipelexBundleError as exc:
+            except ValidateBundleError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
             except PipeInputError as exc:
@@ -384,8 +388,6 @@ def prepare_runner_cmd(
 
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_RUNNER)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_RUNNER)
 
@@ -485,9 +487,9 @@ def generate_inputs_cmd(
     async def generate_inputs(pipe_code: str | None = None, bundle_path: str | None = None):
         if bundle_path:
             try:
-                bundle_blueprint = await load_and_validate_bundle(bundle_path)
+                validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
                 if not pipe_code:
-                    main_pipe_code = bundle_blueprint.main_pipe
+                    main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
                     if not main_pipe_code:
                         typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
                         raise typer.Exit(1)
@@ -498,7 +500,7 @@ def generate_inputs_cmd(
             except FileNotFoundError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
-            except PipelexBundleError as exc:
+            except ValidateBundleError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
             except PipeInputError as exc:
@@ -536,8 +538,6 @@ def generate_inputs_cmd(
 
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
 
@@ -580,8 +580,6 @@ def build_one_shot_cmd(
 ) -> None:
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
 
@@ -671,8 +669,6 @@ def build_partial_cmd(
 ) -> None:
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
 

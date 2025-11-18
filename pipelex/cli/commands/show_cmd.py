@@ -14,7 +14,6 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_deck_preset_error,
-    handle_validation_error,
 )
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
@@ -22,7 +21,6 @@ from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.config.models import ConfigPaths
 from pipelex.hub import get_models_manager, get_pipe_library, get_required_pipe, get_secrets_provider, get_telemetry_manager
-from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
@@ -195,8 +193,6 @@ def list_pipes_cmd() -> None:
     """
     try:
         Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
 
@@ -220,8 +216,6 @@ def show_pipe_cmd(
     """
     try:
         Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
 
@@ -256,8 +250,6 @@ def show_models_cmd(
     """
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
 
@@ -291,8 +283,6 @@ def show_backends_cmd(
     """
     try:
         Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
 
