@@ -20,9 +20,9 @@ if TYPE_CHECKING:
 @pytest.mark.img_gen
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeImgGen:
+class TestPipeImgGenRun:
     @pytest.mark.parametrize(("topic", "image_desc"), ImageGenTestCases.IMAGE_DESC)
-    async def test_pipe_img_gen(
+    async def test_pipe_img_gen_run(
         self,
         pipe_run_mode: PipeRunMode,
         img_gen_handle: str,
