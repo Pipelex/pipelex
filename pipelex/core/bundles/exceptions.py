@@ -3,6 +3,33 @@ from pydantic import BaseModel, Field
 from pipelex.types import StrEnum
 
 
+class PipeValidationErrorType(StrEnum):
+    """Types of pipe validation errors.
+
+    These error types are raised during pipe validation (validate_input_with_library, validate_output_with_library).
+    """
+
+    MISSING_INPUT_VARIABLE = "missing_input_variable"
+    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
+    INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
+    TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
+    INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"
+
+    # Pydantic validation errors
+    FIELD_REQUIRED = "field_required"
+    FIELD_MISSING = "field_missing"
+    MUTUALLY_EXCLUSIVE_FIELDS = "mutually_exclusive_fields"
+    MODEL_NOT_IN_DECK = "model_not_in_deck"
+    FUNCTION_NOT_FOUND = "function_not_found"
+    INVALID_RETURN_TYPE = "invalid_return_type"
+    OUTPUT_CONCEPT_INCONSISTENCY = "output_concept_inconsistency"
+    DUPLICATE_OUTPUT_NAME = "duplicate_output_name"
+    PIPE_PARALLEL_OUTPUT_CONFIG_ERROR = "pipe_parallel_output_config_error"
+
+    # Generic fallback
+    UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
+
+
 class PipelexBundleBlueprintFixableErrorType(StrEnum):
     """Types of fixable validation errors in Pipelex bundle blueprints.
 
@@ -18,13 +45,6 @@ class PipelexBundleBlueprintFixableErrorType(StrEnum):
     # Pipe sequence errors
     PIPE_SEQUENCE_OUTPUT_MISMATCH = "pipe_sequence_output_mismatch"  # Last step output doesn't match sequence output
     PIPE_SEQUENCE_EMPTY_STEPS = "pipe_sequence_empty_steps"  # No steps defined
-
-    # Pipe input/output errors (from StaticValidationError)
-    PIPE_MISSING_INPUT_VARIABLE = "pipe_missing_input_variable"  # Input variable not in inputs dict
-    PIPE_EXTRANEOUS_INPUT_VARIABLE = "pipe_extraneous_input_variable"  # Extra variable in inputs dict
-    PIPE_INADEQUATE_INPUT_CONCEPT = "pipe_inadequate_input_concept"  # Input concept doesn't match requirement
-    PIPE_TOO_MANY_CANDIDATE_INPUTS = "pipe_too_many_candidate_inputs"  # Multiple inputs match requirement
-    PIPE_INADEQUATE_OUTPUT_CONCEPT = "pipe_inadequate_output_concept"  # Output concept incompatible
 
     # Domain errors
     DOMAIN_CODE_INVALID = "domain_code_invalid"  # Domain code format invalid

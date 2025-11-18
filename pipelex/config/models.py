@@ -2,9 +2,12 @@ from typing import cast
 
 from pydantic import Field, field_validator
 
-from pipelex.core.exceptions import StaticValidationErrorType
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import StrEnum
+
+# Legacy alias
+StaticValidationErrorType = PipeValidationErrorType
 
 
 class ConfigPaths:

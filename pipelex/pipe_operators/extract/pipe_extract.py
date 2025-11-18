@@ -11,7 +11,9 @@ from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.input_requirements import InputRequirements
@@ -84,8 +86,14 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     @override
     def validate_output_with_library(self):
         if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
-            msg = f"PipeExtract output should be a Page concept, but is {self.output.concept_string}"
-            raise ValueError(msg)
+            raise PipeValidationError(
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain=self.domain,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept_string,
+                required_concept_codes=[NativeConceptCode.PAGE.concept_string],
+                explanation=f"PipeExtract output should be a Page concept, but is {self.output.concept_string}",
+            )
 
     @override
     async def _run_operator_pipe(

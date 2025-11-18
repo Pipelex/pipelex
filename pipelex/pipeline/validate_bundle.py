@@ -1,13 +1,93 @@
-from pydantic import BaseModel
+from typing import Any
+
+from pydantic import BaseModel, ValidationError
 
 from pipelex.base_exceptions import PipelexError
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError, PipeValidationError
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.pipes.exceptions import PipeValidationErrorData
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_library_manager, set_current_library_id
-from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
+
+
+def categorize_pipe_validation_error_data(error_dict: dict[str, Any], pipe_code: str | None = None) -> PipeValidationErrorData:
+    """Categorize a Pydantic ValidationError into structured PipeValidationErrorData.
+
+    Analyzes the error location, type, and message to determine the appropriate error category.
+
+    Args:
+        error_dict: The error dictionary from Pydantic ValidationError.errors()
+        pipe_code: Optional pipe code to associate with the error
+
+    Returns:
+        PipeValidationErrorData with appropriate error_type categorization
+    """
+    error_type_str: str = str(error_dict.get("type", ""))
+    error_msg: str = str(error_dict.get("msg", ""))
+    error_loc: tuple[Any, ...] = error_dict.get("loc", ())
+
+    # Convert location tuple to field path string
+    field_path = ".".join(str(loc) for loc in error_loc) if error_loc else None
+
+    # Determine error type based on patterns in the message and error type
+    categorized_error_type: PipeValidationErrorType = PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+
+    # Pattern matching on error messages to categorize
+    error_msg_lower: str = error_msg.lower()
+
+    # PipeParallel: requires either add_each_output or combined_output
+    if "requires either add_each_output or combined_output" in error_msg_lower:
+        categorized_error_type = PipeValidationErrorType.PIPE_PARALLEL_OUTPUT_CONFIG_ERROR
+
+    # PipeParallel: duplicate output names
+    elif "output name" in error_msg_lower and ("already used" in error_msg_lower or "duplicate" in error_msg_lower):
+        categorized_error_type = PipeValidationErrorType.DUPLICATE_OUTPUT_NAME
+
+    # PipeExtract: must provide either pdf or image
+    elif "must provide either" in error_msg_lower and ("pdf" in error_msg_lower or "image" in error_msg_lower):
+        categorized_error_type = PipeValidationErrorType.FIELD_REQUIRED
+
+    # Model not found in deck (Extract, ImgGen, LLM)
+    elif "was not found in the model deck" in error_msg_lower or "not found in deck" in error_msg_lower:
+        categorized_error_type = PipeValidationErrorType.MODEL_NOT_IN_DECK
+
+    # PipeFunc: function not found in registry
+    elif "not found in registry" in error_msg_lower:
+        categorized_error_type = PipeValidationErrorType.FUNCTION_NOT_FOUND
+
+    # PipeFunc: invalid return type
+    elif "has no return type annotation" in error_msg_lower or "is not a subclass of" in error_msg_lower:
+        categorized_error_type = PipeValidationErrorType.INVALID_RETURN_TYPE
+
+    # PipeLLM: output concept inconsistency with structuring
+    elif "cannot be structured" in error_msg_lower or ("output concept" in error_msg_lower and "text concept" in error_msg_lower):
+        categorized_error_type = PipeValidationErrorType.OUTPUT_CONCEPT_INCONSISTENCY
+
+    # PipeImgGen: mutually exclusive fields
+    elif "either" in error_msg_lower and "or" in error_msg_lower and "but not both" in error_msg_lower:
+        categorized_error_type = PipeValidationErrorType.MUTUALLY_EXCLUSIVE_FIELDS
+
+    # Pydantic standard error types
+    elif error_type_str in ("missing", "missing_required"):
+        categorized_error_type = PipeValidationErrorType.FIELD_MISSING
+
+    elif error_type_str == "value_error" and not categorized_error_type:
+        # Generic value error - keep as unknown unless we caught it above
+        categorized_error_type = PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+
+    return PipeValidationErrorData(
+        error_type=categorized_error_type,
+        domain=None,
+        pipe_code=pipe_code,
+        variable_names=[str(loc) for loc in error_loc] if error_loc else None,
+        required_concept_codes=None,
+        provided_concept_code=None,
+        file_path=field_path,
+        explanation=error_msg,
+    )
 
 
 class ValidateBundleError(PipelexError):
@@ -24,13 +104,13 @@ class ValidateBundleError(PipelexError):
     def __init__(
         self,
         message: str,
-        validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
-        library_loading_errors: list[LibraryLoadingError] | None = None,
+        pipelex_bundle_blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        pipe_validation_error_data: list[PipeValidationErrorData] | None = None,
         dry_run_error_message: str | None = None,
     ):
-        self.validation_errors = validation_errors or []
+        self.pipelex_bundle_blueprint_validation_errors = pipelex_bundle_blueprint_validation_errors or []
+        self.pipe_validation_error_data = pipe_validation_error_data or []
         self.dry_run_error_message = dry_run_error_message
-        self.library_loading_errors = library_loading_errors or []
         super().__init__(message)
 
 
@@ -80,30 +160,46 @@ async def validate_bundle(
             msg = "No blueprints found in the bundle"
             raise ValidateBundleError(message=msg)
 
-        for pipe in loaded_pipes:
-            pipe.validate_with_libraries()
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
     except PipelexInterpreterError as interpreter_error:
         # Forward categorized validation errors from interpreter
         raise ValidateBundleError(
             message=interpreter_error.message,
-            validation_errors=interpreter_error.validation_errors,
+            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
         ) from interpreter_error
-    except LibraryLoadingError as library_loading_error:
-        # Forward categorized validation errors from library loading
+    except PipeValidationError as pipe_error:
+        # Convert PipeValidationError to PipeValidationErrorData
+        pipe_error_data = PipeValidationErrorData(
+            error_type=pipe_error.error_type,
+            domain=pipe_error.domain,
+            pipe_code=pipe_error.pipe_code,
+            variable_names=pipe_error.variable_names,
+            required_concept_codes=pipe_error.required_concept_codes,
+            provided_concept_code=pipe_error.provided_concept_code,
+            file_path=pipe_error.file_path,
+            explanation=pipe_error.explanation,
+        )
         raise ValidateBundleError(
-            message=library_loading_error.message,
-            validation_errors=library_loading_error.validation_errors,
-        ) from library_loading_error
+            message=f"Pipe validation failed: {pipe_error}",
+            pipe_validation_error_data=[pipe_error_data],
+        ) from pipe_error
+    except ValidationError as validation_error:
+        # Convert Pydantic ValidationError to categorized PipeValidationErrorData
+        pipe_error_data_list: list[PipeValidationErrorData] = []
+        for error in validation_error.errors():
+            # Categorize each validation error based on its content and location
+            # Cast to dict[str, Any] since ErrorDetails is a TypedDict compatible with dict
+            categorized_error = categorize_pipe_validation_error_data(error_dict=dict(error), pipe_code=None)
+            pipe_error_data_list.append(categorized_error)
+        raise ValidateBundleError(
+            message=f"Validation failed: {validation_error}",
+            pipe_validation_error_data=pipe_error_data_list,
+        ) from validation_error
     except DryRunError as dry_run_error:
         # Forward dry run error message
         raise ValidateBundleError(
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
-    finally:
-        pass
-        # library_manager.teardown(library_id=library_id)
-        # teardown_current_library_id()
 
     return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)

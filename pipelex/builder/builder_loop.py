@@ -7,9 +7,9 @@ from pipelex.builder.builder import (
     reconstruct_bundle_with_pipe_fixes,
 )
 from pipelex.builder.builder_errors import PipeBuilderError
-from pipelex.builder.builder_validation import fix_inputs_consistency
+from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintFixableErrorType
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintFixableErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
 from pipelex.hub import get_console, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
@@ -61,31 +61,17 @@ class BuilderLoop:
             )
             save_text_to_path(text=plx_content, path=first_iteration_path)
 
-        # Fix input consistency for all PipeController pipes before validation
-        log.dev("🔄 Calling fix_inputs_consistency() to ensure PipeController inputs are consistent")
-        pipelex_bundle_spec = await fix_inputs_consistency(bundle_spec=pipelex_bundle_spec)
-
-        # Save the fixed bundle for debugging if enabled
-        if is_save_first_iteration_enabled:
-            plx_content_after_fix = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-            first_iteration_after_fix_path = get_incremental_file_path(
-                base_path="results",
-                base_name="generated_pipeline_1st_iteration_after_fix",
-                extension="plx",
-            )
-            save_text_to_path(text=plx_content_after_fix, path=first_iteration_after_fix_path)
-
         bundle_blueprint = pipelex_bundle_spec.to_blueprint()
         try:
             await validate_bundle(blueprints=[bundle_blueprint])
         except ValidateBundleError as exc:
-            self._fix_bundle_validaiton_error(
+            pipelex_bundle_spec = self._fix_bundle_validation_error(
                 bundle_error=exc, pipelex_bundle_spec=pipelex_bundle_spec, is_save_second_iteration_enabled=is_save_second_iteration_enabled
             )
 
         return pipelex_bundle_spec
 
-    def _fix_bundle_validaiton_error(
+    def _fix_bundle_validation_error(
         self,
         bundle_error: ValidateBundleError,
         pipelex_bundle_spec: PipelexBundleSpec,
@@ -94,13 +80,13 @@ class BuilderLoop:
         """Fix validation errors in the bundle spec.
 
         Currently supports fixing:
-        - PIPE_MISSING_INPUT_VARIABLE / PIPE_EXTRANEOUS_INPUT_VARIABLE
+        - PIPE_MISSING_INPUT_VARIABLE / PIPE_EXTRANEOUS_INPUT_VARIABLE (for PipeController only)
         - PIPE_SEQUENCE_OUTPUT_MISMATCH
         """
         fixed_pipes: list[PipeSpecUnion] = []
 
-        # Process categorized validation errors
-        for val_error in bundle_error.validation_errors:
+        # Process pipe validation error data (MISSING_INPUT_VARIABLE / EXTRANEOUS_INPUT_VARIABLE for PipeController)
+        for val_error in bundle_error.pipe_validation_error_data:
             if not val_error.pipe_code or not pipelex_bundle_spec.pipe:
                 continue
 
@@ -109,11 +95,8 @@ class BuilderLoop:
                 continue
 
             match val_error.error_type:
-                case (
-                    PipelexBundleBlueprintFixableErrorType.PIPE_MISSING_INPUT_VARIABLE
-                    | PipelexBundleBlueprintFixableErrorType.PIPE_EXTRANEOUS_INPUT_VARIABLE
-                ):
-                    # Fix input variables for PipeController
+                case PipeValidationErrorType.MISSING_INPUT_VARIABLE | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE:
+                    # Fix input variables for PipeController ONLY
                     if not AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         continue
 
@@ -121,54 +104,64 @@ class BuilderLoop:
                     needed_inputs = pipe.needed_inputs()
                     new_inputs: dict[str, str] = {}
                     for named_requirement in needed_inputs.named_input_requirements:
-                        new_inputs[named_requirement.variable_name] = named_requirement.concept.code
+                        concept_code = named_requirement.concept.code
+                        # Preserve multiplicity brackets
+                        if named_requirement.multiplicity is not None:
+                            if named_requirement.multiplicity is True:
+                                # Variable-length list []
+                                concept_code = f"{concept_code}[]"
+                            else:
+                                # Fixed-length list [N] where N is an int
+                                concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
+                        new_inputs[named_requirement.variable_name] = concept_code
                     pipe_spec.inputs = new_inputs
                     fixed_pipes.append(pipe_spec)
                     log.dev(f"Fixed inputs for '{val_error.pipe_code}': {new_inputs}")
 
-                case PipelexBundleBlueprintFixableErrorType.PIPE_SEQUENCE_OUTPUT_MISMATCH:
-                    # Fix pipe sequence output to match last step output
-                    if val_error.last_step_output_concept:
-                        pipe_spec.output = val_error.last_step_output_concept
-                        fixed_pipes.append(pipe_spec)
-                        log.dev(f"Fixed PipeSequence '{val_error.pipe_code}' output to '{val_error.last_step_output_concept}'")
-                case PipelexBundleBlueprintFixableErrorType.PIPE_SEQUENCE_EMPTY_STEPS:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.PIPE_INADEQUATE_INPUT_CONCEPT:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.PIPE_TOO_MANY_CANDIDATE_INPUTS:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.PIPE_INADEQUATE_OUTPUT_CONCEPT:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.DOMAIN_CODE_INVALID:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.MAIN_PIPE_NOT_FOUND:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.MISSING_REQUIRED_FIELD:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.TYPE_MISMATCH:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.EXTRA_FORBIDDEN_FIELD:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.DISCRIMINATOR_MISSING:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.ENUM_INVALID_VALUE:
-                    continue
-                case PipelexBundleBlueprintFixableErrorType.UNKNOWN:
-                    continue
                 case _:
+                    # Other error types not handled for pipe validation errors
                     continue
 
-        # Save fixed bundle if we made changes
-        if fixed_pipes and is_save_second_iteration_enabled:
+        # Process pipelex bundle blueprint validation errors (PIPE_SEQUENCE_OUTPUT_MISMATCH)
+        for blueprint_error in bundle_error.pipelex_bundle_blueprint_validation_errors:
+            if blueprint_error.error_type != PipelexBundleBlueprintFixableErrorType.PIPE_SEQUENCE_OUTPUT_MISMATCH:
+                continue
+
+            if not blueprint_error.pipe_code or not pipelex_bundle_spec.pipe:
+                continue
+
+            pipe_spec = pipelex_bundle_spec.pipe.get(blueprint_error.pipe_code)
+            if not pipe_spec or not isinstance(pipe_spec, PipeSequenceSpec):
+                continue
+
+            # Get the last step's output
+            if not pipe_spec.steps:
+                continue
+
+            last_step = pipe_spec.steps[-1]
+            last_step_pipe_code = last_step.pipe_code
+
+            # Get the last step's pipe spec to retrieve its output
+            last_step_pipe_spec = pipelex_bundle_spec.pipe.get(last_step_pipe_code)
+            if not last_step_pipe_spec:
+                continue
+
+            # Set the sequence output to match the last step's output
+            pipe_spec.output = last_step_pipe_spec.output
+            fixed_pipes.append(pipe_spec)
+            log.dev(f"Fixed output for '{blueprint_error.pipe_code}': set to '{last_step_pipe_spec.output}' (from last step '{last_step_pipe_code}')")
+
+        # Reconstruct bundle if we made changes
+        if fixed_pipes:
             pipelex_bundle_spec = reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes)
-            pretty_print(pipelex_bundle_spec, title="Pipelex Bundle Spec • 2nd iteration")
-            plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-            second_iteration_path = get_incremental_file_path(
-                base_path="results",
-                base_name="generated_pipeline_2nd_iteration",
-                extension="plx",
-            )
-            save_text_to_path(text=plx_content, path=second_iteration_path)
+            if is_save_second_iteration_enabled:
+                pretty_print(pipelex_bundle_spec, title="Pipelex Bundle Spec • 2nd iteration")
+                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                second_iteration_path = get_incremental_file_path(
+                    base_path="results",
+                    base_name="generated_pipeline_2nd_iteration",
+                    extension="plx",
+                )
+                save_text_to_path(text=plx_content, path=second_iteration_path)
 
         return pipelex_bundle_spec

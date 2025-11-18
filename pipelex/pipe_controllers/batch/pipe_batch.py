@@ -57,17 +57,7 @@ class PipeBatch(PipeController):
 
     @override
     def validate_input_with_library(self):
-        # Now check that the required variables ARE in the inputs of the pipe
-        required_variables = self.required_variables()
-        for variable_name in required_variables:
-            if variable_name == self.batch_params.input_item_stuff_name:
-                continue
-            if variable_name not in self.inputs.root:
-                msg = (
-                    f"Input '{variable_name}' required by branch pipe '{self.branch_pipe_code}' "
-                    f"of PipeBatch '{self.code}', is not listed in its inputs"
-                )
-                raise PipeBatchValueError(msg)
+        pass
 
     @override
     def validate_output_static(self):

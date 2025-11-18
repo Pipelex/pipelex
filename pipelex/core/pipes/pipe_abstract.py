@@ -5,7 +5,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from pipelex import log
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
@@ -49,6 +51,51 @@ class PipeAbstract(ABC, BaseModel):
         self.validate_output_static()
         return self
 
+    @final
+    def _validate_input_with_library(self):
+        # First validate required variables are in the inputs
+        for required_variable_name in self.required_variables():
+            if required_variable_name not in self.inputs.variables:
+                raise PipeValidationError(
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[required_variable_name],
+                    explanation=(
+                        f"Required variable '{required_variable_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+                    ),
+                )
+
+        # Then validate that all inputs are actually needed
+        the_needed_inputs = self.needed_inputs()
+
+        # Check all required variables are in the inputs
+        for named_input_requirement in the_needed_inputs.named_input_requirements:
+            if named_input_requirement.variable_name not in self.inputs.variables:
+                raise PipeValidationError(
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[named_input_requirement.variable_name],
+                    explanation=(
+                        f"Required variable '{named_input_requirement.variable_name}' is not in the inputs of "
+                        f"pipe '{self.code}'. Current inputs: {self.inputs}"
+                    ),
+                )
+
+        # Check that all declared inputs are actually needed
+        for input_name in self.inputs.variables:
+            if input_name not in the_needed_inputs.required_names:
+                raise PipeValidationError(
+                    error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                    domain=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[input_name],
+                    explanation=f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}",
+                )
+
+        self.validate_input_with_library()
+
     @abstractmethod
     def validate_input_with_library(self):
         pass
@@ -56,6 +103,10 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     def validate_input_static(self):
         pass
+
+    @final
+    def _validate_output_with_library(self):
+        self.validate_output_with_library()
 
     @abstractmethod
     def validate_output_with_library(self):
@@ -68,8 +119,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     def validate_with_libraries(self):
         try:
-            self.validate_input_with_library()
-            self.validate_output_with_library()
+            self._validate_input_with_library()
+            self._validate_output_with_library()
         except ModelChoiceNotFoundError as exc:
             msg = f"Model choice not found for pipe '{self.code}': {exc}"
             raise PipeAbstractValueError(msg) from exc

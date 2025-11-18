@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
@@ -6,7 +8,9 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.types import StrEnum
+
+if TYPE_CHECKING:
+    from pipelex.core.bundles.exceptions import PipeValidationErrorType
 
 
 class PipeBlueprintValueError(ValueError):
@@ -52,14 +56,6 @@ class PipeDefinitionErrorData(BaseModel):
     source: str | None = Field(None, description="Source of the error")
 
 
-class StaticValidationErrorType(StrEnum):
-    MISSING_INPUT_VARIABLE = "missing_input_variable"
-    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
-    INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
-    TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
-    INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"
-
-
 class PipeOperatorModelChoiceError(PipelexError):
     def __init__(
         self,
@@ -93,3 +89,16 @@ class PipeOperatorModelChoiceError(PipelexError):
     @override
     def __str__(self) -> str:
         return self.desc()
+
+
+class PipeValidationErrorData(BaseModel):
+    """Structured data for PipeValidationError."""
+
+    error_type: "PipeValidationErrorType" = Field(description="The type of pipe validation error")
+    domain: str | None = Field(None, description="The domain where the error occurred")
+    pipe_code: str | None = Field(None, description="The pipe code if applicable")
+    variable_names: list[str] | None = Field(None, description="Variable names involved in the error")
+    required_concept_codes: list[str] | None = Field(None, description="Required concept codes")
+    provided_concept_code: str | None = Field(None, description="The provided concept code")
+    file_path: str | None = Field(None, description="The file path where the error occurred")
+    explanation: str | None = Field(None, description="Additional explanation of the error")

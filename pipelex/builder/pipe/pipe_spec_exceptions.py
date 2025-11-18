@@ -11,23 +11,3 @@ class PipeExtractSpecError(PipeSpecError):
 
 class PipeParallelSpecError(PipeSpecError):
     pass
-
-
-class PipeSequenceSpecError(PipeSpecError):
-    pass
-
-
-class PipeFuncSpecError(PipeSpecError):
-    pass
-
-
-class PipeImgGenSpecError(PipeSpecError):
-    pass
-
-
-class PipeComposeSpecError(PipeSpecError):
-    pass
-
-
-class PipeLLMSpecError(PipeSpecError):
-    pass

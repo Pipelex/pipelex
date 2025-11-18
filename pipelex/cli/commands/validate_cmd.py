@@ -142,6 +142,7 @@ def validate_cmd(
                 await dry_run_pipes(pipes=pipes, raise_on_failure=True)
                 typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}'", fg=typer.colors.GREEN)
                 return
+
             # When validating a bundle, load_pipe_from_bundle validates ALL pipes in the bundle
             try:
                 bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=bundle_path)

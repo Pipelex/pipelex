@@ -11,8 +11,10 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config.config import get_config
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import UnexpectedPipeDefinitionError
@@ -125,11 +127,17 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
             strict=True,
         ):
-            msg = (
-                f"The output of a ImgGen pipe must be compatible with the Image concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
+            raise PipeValidationError(
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain=self.domain,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept_string,
+                required_concept_codes=[NativeConceptCode.IMAGE.concept_string],
+                explanation=(
+                    f"The output of a ImgGen pipe must be compatible with the Image concept. "
+                    f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
+                ),
             )
-            raise ValueError(msg)
 
     @override
     async def _run_operator_pipe(

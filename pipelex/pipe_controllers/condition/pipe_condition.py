@@ -6,8 +6,10 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeInputError
@@ -140,27 +142,7 @@ class PipeCondition(PipeController):
 
     @override
     def validate_input_with_library(self):
-        """Validate that the inputs declared for this PipeCondition match what is actually needed."""
-        # First validate required variables are in the inputs
-        for required_variable_name in self.required_variables():
-            if required_variable_name not in self.inputs.variables:
-                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe {self.code}"
-                raise ValueError(msg)
-
-        # Then validate that all inputs are actually needed
-        the_needed_inputs = self.needed_inputs()
-
-        # Check all required variables are in the inputs
-        for named_input_requirement in the_needed_inputs.named_input_requirements:
-            if named_input_requirement.variable_name not in self.inputs.variables:
-                msg = f"Required variable '{named_input_requirement.variable_name}' is not in the inputs of pipe {self.code}"
-                raise ValueError(msg)
-
-        # Check that all declared inputs are actually needed
-        for input_name in self.inputs.variables:
-            if input_name not in the_needed_inputs.required_names:
-                msg = f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}"
-                raise ValueError(msg)
+        pass
 
     @override
     def validate_output_static(self):
@@ -178,11 +160,17 @@ class PipeCondition(PipeController):
                 NativeConceptCode.DYNAMIC.concept_string,
                 NativeConceptCode.ANYTHING.concept_string,
             ):
-                msg = (
-                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is "
-                    f"not matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"
+                raise PipeValidationError(
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                    domain=self.domain,
+                    pipe_code=self.code,
+                    provided_concept_code=pipe.output.concept_string,
+                    required_concept_codes=[self.output.concept_string],
+                    explanation=(
+                        f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is not "
+                        f"matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"
+                    ),
                 )
-                raise ValueError(msg)
 
     async def _evaluate_expression(
         self,

@@ -31,7 +31,6 @@ from pipelex.core.pipes.exceptions import (
     PipeInputNotFoundError,
     PipeOperatorModelChoiceError,
     PipeRunInputsError,
-    StaticValidationErrorType,
 )
 from pipelex.core.stuffs.exceptions import (
     StuffArtefactError,
@@ -112,7 +111,6 @@ __all__ = [
     "PipeFactoryError",
     "PipeOperatorModelChoiceError",
     "PipeInputError",
-    "StaticValidationErrorType",
     "PipeRunInputsError",
     # from pipelex.core.stuffs.exceptions
     "StuffArtefactError",

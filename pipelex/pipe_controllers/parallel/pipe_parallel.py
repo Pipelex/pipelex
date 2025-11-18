@@ -45,13 +45,13 @@ class PipeParallel(PipeController):
         for sub_pipe in parallel_sub_pipes:
             if not sub_pipe.output_name:
                 msg = f"PipeParallel '{cls.code}' sub-pipe '{sub_pipe.pipe_code}' output name not specified"
-                raise PipeParallelValueError(msg)
+                raise ValueError(msg)
             if sub_pipe.output_name in seen_output_names:
                 msg = (
                     f"PipeParallel '{cls.code}' sub-pipe '{sub_pipe.pipe_code}' output name '{sub_pipe.output_name}' "
                     "is already used by another sub-pipe"
                 )
-                raise PipeParallelValueError(msg)
+                raise ValueError(msg)
             seen_output_names.add(sub_pipe.output_name)
         return parallel_sub_pipes
 
@@ -104,7 +104,7 @@ class PipeParallel(PipeController):
         # Validate that either add_each_output or combined_output is set
         if not self.add_each_output and not self.combined_output:
             msg = f"PipeParallel'{self.code}'requires either add_each_output or combined_output to be set"
-            raise PipeParallelValueError(msg)
+            raise ValueError(msg)
 
         return self
 
@@ -114,20 +114,7 @@ class PipeParallel(PipeController):
 
     @override
     def validate_input_with_library(self):
-        """Validate that the inputs declared for this PipeParallel match what is actually needed."""
-        the_needed_inputs = self.needed_inputs()
-
-        # Check all required variables are in the inputs
-        for named_input_requirement in the_needed_inputs.named_input_requirements:
-            if named_input_requirement.variable_name not in self.inputs.variables:
-                msg = f"Required variable '{named_input_requirement.variable_name}' is not in the inputs of pipe {self.code}"
-                raise PipeParallelValueError(msg)
-
-        # Check that all declared inputs are actually needed
-        for input_name in self.inputs.variables:
-            if input_name not in the_needed_inputs.required_names:
-                msg = f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}"
-                raise PipeParallelValueError(msg)
+        pass
 
     @override
     def validate_output_static(self):
