@@ -245,6 +245,7 @@ class LogDispatch:
             case LogMode.POOR:
                 logger = logging.getLogger(self._log_config.generic_poor_logger)
                 logger.log(level=severity, msg=message, stacklevel=6)
+                return
 
         stack = inspect.stack()
         try:

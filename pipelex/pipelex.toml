@@ -45,7 +45,8 @@ cost_report_unit_scale = 1.0
 
 [pipelex.log_config]
 default_log_level = "INFO"
-
+console_log_target = "stdout"
+console_print_target = "stdout"
 is_console_logging_enabled = true
 
 json_logs_indent = 4
@@ -109,7 +110,6 @@ is_dump_text_prompts_enabled = false
 is_dump_response_text_enabled = false
 
 [cogt.llm_config.instructor_config]
-is_openai_structured_output_enabled = false
 is_dump_kwargs_enabled = false
 is_dump_response_enabled = false
 is_dump_error_enabled = false
@@ -192,7 +192,7 @@ default_page_views_dpi = 72
 ####################################################################################################
 
 [pipelex.prompting_config]
-default_prompting_style = { tag_style = "ticks" }
+default_prompting_style = { tag_style = "xml" }
 
 [pipelex.prompting_config.prompting_styles]
 openai = { tag_style = "ticks" }

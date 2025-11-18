@@ -23,6 +23,7 @@ from pipelex.pipeline.track.tracker_models import (
     SpecialNodeName,
 )
 from pipelex.tools.misc.mermaid_utils import print_mermaid_url
+from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 
 # TODO: manage a separate graph for each pipeline_run_id
@@ -335,7 +336,7 @@ class PipelineTracker(PipelineTrackerProtocol):
             raise JobHistoryError(msg)
         flowchart = PipelineFlowChart(nx_graph=self.nx_graph, start_node=self.start_node, tracker_config=self._tracker_config)
         mermaid_code, url = flowchart.generate_mermaid_flowchart(title=title, subtitle=subtitle)
-        print(mermaid_code)
+        print_to_stderr(mermaid_code)
         title_to_print = "Mermaid flowchart URL"
         if title:
             title_to_print += f" for {title}"

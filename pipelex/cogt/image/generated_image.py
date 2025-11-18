@@ -1,7 +1,7 @@
-from pydantic import BaseModel
+from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 
-class GeneratedImage(BaseModel):
+class GeneratedImage(CustomBaseModel):
     # TODO: add image_format
     # image_format: str = "jpeg"
     url: str

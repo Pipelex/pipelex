@@ -15,6 +15,7 @@ from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
+@pytest.mark.usefixtures("routing_profile_override")
 class TestLLMVision:
     @pytest.mark.parametrize(("topic", "image_uri"), LLMVisionTestCases.IMAGE_URLS)
     async def test_gen_text_from_vision_by_url(self, llm_handle_for_vision: str, topic: str, image_uri: str):

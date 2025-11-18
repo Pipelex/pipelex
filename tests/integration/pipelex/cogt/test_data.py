@@ -40,6 +40,12 @@ class Pet(BaseModel):
     name: str
 
 
+class ImageDescription(BaseModel):
+    title: str = Field(description="A short title for the image")
+    description: str = Field(description="A detailed description of what is shown in the image")
+    time_period: str = Field(description="An estimated date or time period relevant to the image (e.g., '2024', 'Modern era', 'Unknown')")
+
+
 class LLMVisionTestCases:
     VISION_USER_TEXT_1 = "Describe the provide image."
     VISION_USER_TEXT_2 = "What is this image about?"

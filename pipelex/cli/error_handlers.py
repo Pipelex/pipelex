@@ -1,12 +1,12 @@
 from typing import NoReturn
 
 import typer
-from rich.console import Console
 from rich.syntax import Syntax
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.concepts.exceptions import PipelexValidationExceptionAbstract
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
@@ -39,7 +39,7 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorC
         exc: The model choice error exception
         context: Context for the error message
     """
-    console = Console(stderr=True)
+    console = get_console()
     console.print(f"\n[bold red]❌ {context} failed because of a model choice could not be interpreted correctly[/bold red]\n")
     console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{exc.pipe_code}'[/yellow] [dim]({exc.pipe_type})[/dim]")
     console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{exc.model_type}'[/yellow]")
@@ -61,7 +61,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
         exc: The model availability error exception
         context: Context for the error message
     """
-    console = Console(stderr=True)
+    console = get_console()
     console.print(f"\n[bold red]❌ {context} failed because a model wasn't available[/bold red]\n")
     console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{exc.pipe_code}'[/yellow] [dim]({exc.pipe_type})[/dim]")
     console.print(f"[bold cyan]Model:[/bold cyan]        [yellow]'{exc.model_handle}'[/yellow]")
@@ -88,7 +88,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         exc: The model deck preset validation error exception
         context: Context for the error message
     """
-    console = Console(stderr=True)
+    console = get_console()
     console.print(f"\n[bold red]❌ {context} failed due to model deck preset validation error[/bold red]\n")
     console.print(f"[bold cyan]Preset ID:[/bold cyan]    [yellow]'{exc.preset_id}'[/yellow]")
     console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{exc.model_type}'[/yellow]")
@@ -121,7 +121,7 @@ def handle_validation_error(exc: PipelexValidationExceptionAbstract, context: Er
         exc: The validation error exception (implements ValidationErrorDetailsProtocol)
         context: Context for the error message
     """
-    console = Console(stderr=True)
+    console = get_console()
     console.print(f"\n[bold red]❌ {context} failed due to validation error[/bold red]\n")
     console.print(f"[bold red]Error:[/bold red]        {exc}\n")
 

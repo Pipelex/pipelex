@@ -173,7 +173,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         blueprint=model_spec_blueprint,
                     )
                     backend_model_specs[model_spec_name] = model_spec
-                except (InferenceModelSpecError, ValidationError) as exc:
+                except ValidationError as validation_error:
+                    validation_error_msg = format_pydantic_validation_error(validation_error)
+                    msg = (
+                        f"Invalid inference model spec '{model_spec_name}' for backend '{backend_name}' "
+                        f"in file '{path_to_model_specs_toml}': {validation_error_msg}"
+                    )
+                    raise InferenceBackendLibraryError(msg) from validation_error
+                except InferenceModelSpecError as exc:
                     msg = (
                         f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from file '{path_to_model_specs_toml}'"
                     )

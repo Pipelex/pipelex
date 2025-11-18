@@ -1,11 +1,9 @@
+import asyncio
 from typing import TYPE_CHECKING, cast
 
 import instructor
 from google import genai
 from google.genai import types
-
-if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionMessageParam
 from typing_extensions import override
 
 from pipelex import log
@@ -13,13 +11,15 @@ from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
 
 
 class GoogleLLMWorkerError(Exception):
@@ -31,19 +31,16 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         self,
         sdk_instance: genai.Client,
         inference_model: InferenceModelSpec,
-        structure_method: StructureMethod | None = None,
         reporting_delegate: ReportingProtocol | None = None,
     ):
         super().__init__(
             inference_model=inference_model,
-            structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
         genai_client: genai.Client = sdk_instance
         self.genai_async_client = genai_client.aio
-        if structure_method:
-            instructor_mode = structure_method.as_instructor_mode()
-            log.verbose(f"Google structure mode: {structure_method} --> {instructor_mode}")
+
+        if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_genai(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
             self.instructor_for_objects = instructor.from_genai(client=sdk_instance, use_async=True)
@@ -55,6 +52,47 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             self.instructor_for_objects.on(hook_name="completion:response", handler=dump_response_from_structured_gen)
         if instructor_config.is_dump_error_enabled:
             self.instructor_for_objects.on(hook_name="completion:error", handler=dump_error)
+
+        # Capture the event loop at creation time if one is running
+        self._event_loop: asyncio.AbstractEventLoop | None
+        try:
+            self._event_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop at creation time
+            self._event_loop = None
+
+    @override
+    def teardown(self):
+        """Close the async client to free resources."""
+        try:
+            # First, try to use the loop captured at creation time if it's still running
+            if self._event_loop is not None and self._event_loop.is_running():
+                # Schedule cleanup on the captured loop and store reference to prevent garbage collection
+                task = self._event_loop.create_task(self.genai_async_client.aclose())
+                # Add a callback to log any errors that occur during cleanup
+                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                log.verbose("Scheduled Google async client cleanup on captured event loop")
+                return
+
+            # Otherwise, try to get the current running loop
+            try:
+                current_loop = asyncio.get_running_loop()
+                # Schedule cleanup on the current running loop and store reference to prevent garbage collection
+                task = current_loop.create_task(self.genai_async_client.aclose())
+                # Add a callback to log any errors that occur during cleanup
+                task.add_done_callback(lambda t: log.debug(f"Google async client cleanup error: {t.exception()}") if t.exception() else None)
+                log.verbose("Scheduled Google async client cleanup on current event loop")
+            except RuntimeError:
+                # No running event loop, we can safely use asyncio.run()
+                try:
+                    asyncio.run(self.genai_async_client.aclose())
+                    log.verbose("Closed Google async client using asyncio.run()")
+                except Exception as exc:
+                    # Log but don't fail teardown if cleanup has issues
+                    log.verbose(f"Error closing Google async client during teardown: {exc}")
+        except Exception as exc:
+            # Log but don't fail teardown if cleanup has issues
+            log.debug(f"Error during Google async client teardown: {exc}")
 
     @override
     async def _gen_text(
