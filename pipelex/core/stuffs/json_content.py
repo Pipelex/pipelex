@@ -10,7 +10,7 @@ from pipelex.tools.typing.pydantic_utils import clean_model_to_dict
 
 
 class JSONContent(StuffContent):
-    json_obj: dict[Any, Any]
+    json_obj: dict[str, Any]
 
     @override
     def rendered_html(self) -> str:
