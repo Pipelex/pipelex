@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "openai"
 prompting_target = "openai"
+structure_method = "instructor/openai_tools"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -167,4 +168,3 @@ model_id = "gpt-image-1"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.04, output = 0.0 }
-

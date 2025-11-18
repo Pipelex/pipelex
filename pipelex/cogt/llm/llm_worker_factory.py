@@ -2,9 +2,7 @@ import importlib.util
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.config import get_config
 from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -23,11 +21,6 @@ class LLMWorkerFactory:
         match plugin.sdk:
             case "openai" | "azure_openai":
                 from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
-
-                structure_method: StructureMethod | None = None
-                if get_config().cogt.llm_config.instructor_config.is_openai_structured_output_enabled:
-                    structure_method = StructureMethod.INSTRUCTOR_OPENAI_STRUCTURED
-
                 from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
@@ -41,7 +34,6 @@ class LLMWorkerFactory:
                 llm_worker = OpenAILLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
-                    structure_method=structure_method,
                     reporting_delegate=reporting_delegate,
                 )
             case "anthropic" | "bedrock_anthropic":
@@ -71,7 +63,6 @@ class LLMWorkerFactory:
                     sdk_instance=sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_ANTHROPIC_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
             case "mistral":
@@ -100,7 +91,6 @@ class LLMWorkerFactory:
                 llm_worker = MistralLLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_MISTRAL_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
             case "bedrock_boto3" | "bedrock_aioboto3":
@@ -152,23 +142,6 @@ class LLMWorkerFactory:
                 llm_worker = GoogleLLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_GENAI_STRUCTURED_OUTPUTS,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "groq":
-                # Groq uses OpenAI-compatible API, so no separate SDK needed
-                from pipelex.plugins.groq.groq_factory import GroqFactory  # noqa: PLC0415
-                from pipelex.plugins.groq.groq_llm_worker import GroqLLMWorker  # noqa: PLC0415
-
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
-                    sdk_instance=GroqFactory.make_groq_client(plugin=plugin, backend=backend),
-                )
-
-                llm_worker = GroqLLMWorker(
-                    sdk_instance=sdk_instance,
-                    inference_model=inference_model,
-                    structure_method=StructureMethod.INSTRUCTOR_GROQ_TOOLS,
                     reporting_delegate=reporting_delegate,
                 )
             case _:

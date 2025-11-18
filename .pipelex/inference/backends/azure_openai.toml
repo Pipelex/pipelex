@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "azure_openai"
 prompting_target = "openai"
+structure_method = "instructor/openai_tools"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -67,24 +68,28 @@ model_id = "o1-mini-2024-09-12"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 3.0, output = 12.0 }
+constraints = ["temperature_must_be_1"]
 
 [o1]
 model_id = "o1-2024-12-17"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 15.0, output = 60.0 }
+constraints = ["temperature_must_be_1"]
 
 [o3-mini]
 model_id = "o3-mini-2025-01-31"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
+constraints = ["temperature_must_be_1"]
 
 [o3]
 model_id = "o3-2025-04-16"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
+constraints = ["temperature_must_be_1"]
 
 # --- GPT-5 Series -------------------------------------------------------------
 [gpt-5-mini]
@@ -110,3 +115,15 @@ model_id = "gpt-5-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
+
+################################################################################
+# IMAGE GENERATION MODELS
+################################################################################
+
+# --- OpenAI Image Generation --------------------------------------------------
+[gpt-image-1]
+model_type = "img_gen"
+model_id = "gpt-image-1-2025-04-15"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.04, output = 0.0 }

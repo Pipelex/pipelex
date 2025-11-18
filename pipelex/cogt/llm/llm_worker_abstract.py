@@ -42,6 +42,11 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def is_gen_object_supported(self) -> bool:
         return False
 
+    @property
+    @abstractmethod
+    def is_vision_supported(self) -> bool:
+        return False
+
     async def _before_job(
         self,
         llm_job: LLMJob,

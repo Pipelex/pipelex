@@ -1,9 +1,9 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class AspectRatio(StrEnum):
@@ -47,6 +47,20 @@ class ImgGenJobParams(BaseModel):
     is_raw: bool
     output_format: OutputFormat = Field(strict=False)
     seed: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_background_vs_output_format(self) -> Self:
+        match self.background:
+            case Background.OPAQUE | Background.AUTO:
+                pass
+            case Background.TRANSPARENT:
+                match self.output_format:
+                    case OutputFormat.PNG:
+                        pass
+                    case OutputFormat.JPG | OutputFormat.WEBP:
+                        msg = "ImgGenJobParams cannot have a non-PNG output format when background is transparent."
+                        raise ValueError(msg)
+        return self
 
 
 class ImgGenJobParamsDefaults(ConfigModel):

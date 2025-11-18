@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 import instructor
 import openai
-from instructor.exceptions import InstructorRetryException
+from instructor.core import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError, omit
 
 if TYPE_CHECKING:
@@ -14,7 +14,6 @@ from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, S
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
@@ -28,13 +27,11 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
-        structure_method: StructureMethod | None,
         reporting_delegate: ReportingProtocol | None = None,
     ):
         LLMWorkerInternalAbstract.__init__(
             self,
             inference_model=inference_model,
-            structure_method=structure_method,
             reporting_delegate=reporting_delegate,
         )
 
@@ -43,9 +40,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             raise SdkTypeError(msg)
 
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
-        if structure_method:
-            instructor_mode = structure_method.as_instructor_mode()
-            log.verbose(f"OpenAI structure mode: {structure_method} --> {instructor_mode}")
+        if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance, mode=instructor_mode)
         else:
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance)
@@ -79,7 +74,9 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
                 temperature *= 2
             if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
-                log.warning(f"OpenAI model {self.inference_model.desc} used with a temperature of {temperature}, but it must be 1 for this model")
+                log.warning(
+                    f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
+                )
                 temperature = 1
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
@@ -121,7 +118,9 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
                 temperature *= 2
             if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
-                log.warning(f"OpenAI model {self.inference_model.desc} used with a temperature of {temperature}, but it must be 1 for this model")
+                log.warning(
+                    f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
+                )
                 temperature = 1
             try:
                 result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(

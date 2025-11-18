@@ -7,4 +7,3 @@ class PromptingTarget(StrEnum):
     MISTRAL = "mistral"
     GEMINI = "gemini"
     FAL = "fal"
-    GROQ = "groq"
