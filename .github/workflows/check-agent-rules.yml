@@ -1,4 +1,4 @@
-name: Check Agent Rules Sync
+name: Check Agent Rules Synca
 
 on:
   pull_request:
