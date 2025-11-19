@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
@@ -61,11 +61,7 @@ class Library(BaseModel):
                         raise LibraryError(msg) from pipe_error
 
         for pipe in self.pipe_library.root.values():
-            try:
-                pipe.validate_with_libraries()
-            except (ValidationError, ValueError) as validation_error:
-                msg = f"Error validating pipe '{pipe.code}' (type: {pipe.__class__.__name__}) because of: {validation_error}"
-                raise LibraryError(msg) from validation_error
+            pipe.validate_with_libraries()
 
     def validate_concept_library_with_libraries(self) -> None:
         pass
