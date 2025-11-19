@@ -71,6 +71,16 @@ def invalid_function_wrong_return_type(working_memory: WorkingMemory) -> str:
     '''This should not be registered - wrong return type.'''
     return "test"
 
+# No return type annotation - should be rejected
+async def invalid_function_no_return_type(working_memory: WorkingMemory):
+    '''This should not be registered - no return type annotation.'''
+    return TextContent(text="no return type")
+
+# Wrong return type (not StuffContent) - should be rejected
+async def invalid_function_returns_str(working_memory: WorkingMemory) -> str:
+    '''This should not be registered - returns str instead of StuffContent.'''
+    return "wrong type"
+
 # Too many parameters - should be rejected
 def invalid_function_too_many_params(working_memory: WorkingMemory, extra_param: str) -> StructuredContent:
     '''This should not be registered - too many parameters.'''
@@ -98,6 +108,8 @@ def invalid_function_no_type_hints(working_memory):
                 "invalid_function_wrong_param_name",
                 "invalid_function_wrong_param_type",
                 "invalid_function_wrong_return_type",
+                "invalid_function_no_return_type",
+                "invalid_function_returns_str",
                 "invalid_function_too_many_params",
                 "invalid_function_no_params",
                 "invalid_function_no_type_hints",

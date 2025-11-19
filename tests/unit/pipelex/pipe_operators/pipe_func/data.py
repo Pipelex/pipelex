@@ -44,25 +44,6 @@ async def process_all(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text=f"processed all: {text}, {image.url}, {number}")
 
 
-# Error test functions - these have validation issues
-# NOT registered automatically - must be registered in test fixtures
-async def no_return_type_func(working_memory: WorkingMemory):  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
-    """Test function with no return type annotation."""
-    return TextContent(text="no return type")
-
-
-async def wrong_return_type_func(working_memory: WorkingMemory) -> str:  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
-    """Test function with wrong return type (not StuffContent)."""
-    return "wrong type"
-
-
-# Map of error function names to actual functions (for test fixtures)
-ERROR_TEST_FUNCTIONS = {
-    "no_return_type": no_return_type_func,
-    "wrong_return_type": wrong_return_type_func,
-}
-
-
 class PipeFuncInputTestCases:
     """Test cases for PipeFunc input validation."""
 
@@ -123,44 +104,4 @@ class PipeFuncInputTestCases:
         VALID_MULTIPLE_INPUTS,
         VALID_IMAGE_INPUT,
         VALID_MIXED_INPUTS,
-    ]
-
-    # Error test cases: (test_id, blueprint, expected_error_message_substring)
-    ERROR_FUNCTION_NOT_FOUND: ClassVar[tuple[str, PipeFuncBlueprint, str]] = (
-        "function_not_found",
-        PipeFuncBlueprint(
-            description="Test case: function_not_found",
-            inputs={},
-            output="native.Text",
-            function_name="nonexistent_function",
-        ),
-        "not found in registry",
-    )
-
-    ERROR_NO_RETURN_TYPE: ClassVar[tuple[str, PipeFuncBlueprint, str]] = (
-        "no_return_type",
-        PipeFuncBlueprint(
-            description="Test case: no_return_type",
-            inputs={},
-            output="native.Text",
-            function_name="no_return_type",
-        ),
-        "has no return type annotation",
-    )
-
-    ERROR_WRONG_RETURN_TYPE: ClassVar[tuple[str, PipeFuncBlueprint, str]] = (
-        "wrong_return_type",
-        PipeFuncBlueprint(
-            description="Test case: wrong_return_type",
-            inputs={},
-            output="native.Text",
-            function_name="wrong_return_type",
-        ),
-        "is not a subclass of StuffContent",
-    )
-
-    ERROR_CASES: ClassVar[list[tuple[str, PipeFuncBlueprint, str]]] = [
-        ERROR_FUNCTION_NOT_FOUND,
-        ERROR_NO_RETURN_TYPE,
-        ERROR_WRONG_RETURN_TYPE,
     ]

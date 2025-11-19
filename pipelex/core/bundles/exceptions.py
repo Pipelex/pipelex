@@ -15,6 +15,7 @@ class PipeValidationErrorType(StrEnum):
     INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
     TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
     INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"
+    LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
 
     # Pydantic validation errors
     FIELD_REQUIRED = "field_required"

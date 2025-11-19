@@ -48,7 +48,6 @@ class LLMPromptBlueprint(BaseModel):
                     template_source=system_prompt_template_source,
                 )
             )
-
         return {
             variable_name
             for variable_name in required_variables
