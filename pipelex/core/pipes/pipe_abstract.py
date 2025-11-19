@@ -131,6 +131,7 @@ class PipeAbstract(ABC, BaseModel):
                     explanation=(f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"),
                 )
 
+            # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
             if AllowedPipeCategories(self.pipe_category) == AllowedPipeCategories.PIPE_CONTROLLER:
                 # Compare the essential parts of InputRequirement (concept code + multiplicity)
                 # Skip validation if the needed requirement is Dynamic or Anything (flexible output types)
