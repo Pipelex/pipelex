@@ -28,7 +28,6 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
-from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenValueError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -75,12 +74,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         needed_inputs = InputRequirementsFactory.make_empty()
         if not self.img_gen_prompt:
-            if len(self.inputs.items) == 1:
-                input_name, requirement = self.inputs.items[0]  # We know there is only one input because of the validation
-                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
-            else:
-                msg = "For PipeImgGen you must provide an image generation prompt either as attribute of the pipe or as a single text input"
-                raise ValueError(msg)
+            input_name, requirement = self.inputs.items[0]  # We know there is only one input because of the validation
+            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
         return needed_inputs
 
     @override
@@ -113,8 +108,19 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
             strict=True,
         ):
-            msg = "For PipeImgGen you must provide a text input or a concept that refines 'native.Text'"
-            raise PipeImgGenValueError(msg)
+            explanation = (
+                f"The input of a PipeImgGen must be compatible with the Text concept (or refine it). "
+                f"Input '{input_name}' has concept '{input_requirement.concept.concept_string}'. "
+                "Image generation requires a text prompt. Use native.Text or a concept that refines it."
+            )
+            raise PipeValidationError(
+                error_type=PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE,
+                pipe_code=self.code,
+                variable_names=[input_name],
+                required_concept_codes=["native.Text"],
+                provided_concept_code=input_requirement.concept.concept_string,
+                explanation=explanation,
+            )
 
     @override
     def validate_output_static(self):
