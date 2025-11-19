@@ -209,10 +209,10 @@ class PipelexHub:
         return self._config
 
     def get_console(self) -> Console:
-        if self._console is None:
-            msg = "Console is not set. You must initialize Pipelex first."
-            raise RuntimeError(msg)
-        return self._console
+        if self._console:
+            return self._console
+        else:
+            return Console(stderr=True)
 
     def get_required_secrets_provider(self) -> SecretsProviderAbstract:
         if self._secrets_provider is None:
@@ -500,6 +500,6 @@ def get_native_concept(native_concept: NativeConceptCode) -> Concept:
 def get_console() -> Console:
     pipelex_hub = PipelexHub.get_optional_instance()
     if pipelex_hub:
-        return get_pipelex_hub().get_console()
+        return pipelex_hub.get_console()
     else:
         return Console(stderr=True)

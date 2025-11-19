@@ -1,16 +1,14 @@
 # Changelog
 
-## Unreleased
+## [v0.15.7] - 2025-11-18
 
-### Feature
+### Fixed
+ - Fixed issue with `get_console()` function returning `None` if Pipelex is not initialized. Now always defaults to `stderr` if not set.
 
-- Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
+## [v0.15.6] - 2025-11-18
 
-### Refactor
-
-- Refactored the Blueprint validation errors, and validation functions.
-
-## [v0.15.5] - 2025-11-18
+### Contributors
+ - Welcome to our new contributor @0x090909 (yup, that's his github username) for his work on Groq support in PR #445! 🎉
 
 ### Added
  - **Improved configuration repair**: New `--fix` option for `pipelex doctor` command that interactively detects and repairs outdated or invalid backend configuration files using latest templates from the Pipelex kit.
