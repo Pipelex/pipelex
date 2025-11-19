@@ -8,7 +8,7 @@ from rich import box
 from rich.table import Table
 
 from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.hub import get_console
 
 if TYPE_CHECKING:

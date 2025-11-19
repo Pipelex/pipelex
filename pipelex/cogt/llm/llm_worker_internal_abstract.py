@@ -6,7 +6,7 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_prompt, dump_response_from_text_gen
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 

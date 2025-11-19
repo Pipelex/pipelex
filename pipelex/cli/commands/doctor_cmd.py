@@ -21,11 +21,12 @@ from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.exceptions import InferenceBackendLibraryError
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.models.model_manager import ModelManager
-from pipelex.config.config import PipelexConfig, get_config
+from pipelex.config import get_config
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import PipelexHub, get_console, set_pipelex_hub
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive

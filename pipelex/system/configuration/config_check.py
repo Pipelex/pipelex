@@ -1,8 +1,8 @@
 from rich.panel import Panel
 
 from pipelex.cli.commands.init.config_files import init_config
-from pipelex.config.models import ConfigPaths
 from pipelex.hub import get_console
+from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.urls import URLs
 

@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import Field
 
-from pipelex.config.config import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 
 
 class CursorFileOverride(ConfigModel):

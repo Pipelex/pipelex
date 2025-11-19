@@ -19,7 +19,6 @@ from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
-from pipelex.config.models import ConfigPaths
 from pipelex.hub import (
     get_console,
     get_library_manager,
@@ -32,6 +31,7 @@ from pipelex.hub import (
 )
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_abstract import PipeAbstract

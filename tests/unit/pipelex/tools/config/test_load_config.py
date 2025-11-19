@@ -1,5 +1,5 @@
-from pipelex.config.config import PipelexConfig
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import shortuuid
 from typing_extensions import override
 
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError

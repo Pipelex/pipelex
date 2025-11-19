@@ -7,7 +7,7 @@ from typing import Any
 from kajson.kajson_manager import KajsonManager
 
 from pipelex import log
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
 from pipelex.tools.typing.module_inspector import (
     ModuleFileError,

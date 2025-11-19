@@ -4,10 +4,11 @@ import pytest
 from rich.traceback import Traceback
 
 from pipelex import log
-from pipelex.config.config import PipelexConfig, get_config
+from pipelex.config import get_config
 from pipelex.hub import get_console, get_library_manager, get_report_delegate, set_current_library_id
 from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipelex import Pipelex
+from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.runtime import IntegrationMode
 
 pytest_plugins = [

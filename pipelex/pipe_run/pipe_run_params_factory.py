@@ -1,6 +1,6 @@
 from typing import Any
 
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 

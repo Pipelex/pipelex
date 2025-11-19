@@ -5,7 +5,7 @@ from pipelex.cogt.exceptions import ImgGenGeneratedTypeError, ImgGenParameterErr
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 
 
 class FalFactory:

@@ -7,7 +7,7 @@ from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
 from pipelex.cogt.usage.cost_registry import CostRegistry
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path

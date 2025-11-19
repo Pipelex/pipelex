@@ -25,8 +25,7 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config.config import PipelexConfig, get_config
-from pipelex.config.models import ConfigPaths
+from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import PipelexHub, set_pipelex_hub
@@ -48,6 +47,7 @@ from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.runtime import IntegrationMode, runtime_manager

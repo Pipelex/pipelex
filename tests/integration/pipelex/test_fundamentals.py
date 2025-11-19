@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.hub import get_pipes
 from pipelex.pipe_run.dry_run import dry_run_pipes
 

@@ -1,7 +1,7 @@
 from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.tools.typing.pydantic_utils import analyze_pydantic_validation_error
 
 

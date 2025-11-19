@@ -10,8 +10,8 @@ from pipelex.cogt.model_routing.routing_profile_loader import load_active_routin
 from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config.config import get_config
-from pipelex.config.models import ConfigPaths
+from pipelex.config import get_config
+from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 

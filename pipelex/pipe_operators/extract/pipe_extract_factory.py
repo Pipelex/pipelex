@@ -1,6 +1,6 @@
 from typing_extensions import override
 
-from pipelex.config.config import get_config
+from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
