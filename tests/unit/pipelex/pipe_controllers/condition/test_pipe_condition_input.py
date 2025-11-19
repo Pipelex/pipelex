@@ -3,7 +3,7 @@ from typing import Any
 import pytest
 
 from pipelex import log
-from pipelex.core.exceptions import StaticValidationError
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
@@ -45,7 +45,7 @@ class TestPipeConditionValidateInputs:
     ):
         log.verbose(f"Testing error case: {test_id}")
 
-        with pytest.raises((StaticValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
+        with pytest.raises((PipeValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeConditionBlueprint.model_validate(blueprint_dict)
             PipeConditionFactory.make_from_blueprint(

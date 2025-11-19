@@ -14,7 +14,7 @@ from pipelex.core.concepts.exceptions import (
     StructureClassError,
 )
 from pipelex.core.domains.exceptions import DomainCodeError
-from pipelex.core.exceptions import PipelexConfigurationError, StaticValidationError, SyntaxErrorData
+from pipelex.core.exceptions import PipelexConfigurationError, PipeValidationError, SyntaxErrorData
 from pipelex.core.memory.exceptions import (
     WorkingMemoryConsistencyError,
     WorkingMemoryError,
@@ -121,7 +121,7 @@ __all__ = [
     # from pipelex.core.exceptions
     "PipelexConfigurationError",
     "SyntaxErrorData",
-    "StaticValidationError",
+    "PipeValidationError",
     # from pipelex.core.memory.exceptions
     "WorkingMemoryConsistencyError",
     "WorkingMemoryError",
