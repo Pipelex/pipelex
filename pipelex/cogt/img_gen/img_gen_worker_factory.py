@@ -88,7 +88,7 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "azure_openai":
+            case "azure_rest":
                 from pipelex.plugins.azure_rest.azure_img_gen_worker import AzureImgGenWorker  # noqa: PLC0415
 
                 img_gen_worker = AzureImgGenWorker(
