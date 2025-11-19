@@ -5,18 +5,16 @@ from pydantic import field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.config.config import get_config
-from pipelex.config.models import StaticValidationReaction
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
+from pipelex.core.pipes.exceptions import PipeInputNotFoundError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
+from pipelex.pipe_controllers.parallel.exceptions import PipeParallelValueError
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunParamsError
@@ -47,13 +45,13 @@ class PipeParallel(PipeController):
         for sub_pipe in parallel_sub_pipes:
             if not sub_pipe.output_name:
                 msg = f"PipeParallel '{cls.code}' sub-pipe '{sub_pipe.pipe_code}' output name not specified"
-                raise PipeDefinitionError(msg)
+                raise ValueError(msg)
             if sub_pipe.output_name in seen_output_names:
                 msg = (
                     f"PipeParallel '{cls.code}' sub-pipe '{sub_pipe.pipe_code}' output name '{sub_pipe.output_name}' "
                     "is already used by another sub-pipe"
                 )
-                raise PipeDefinitionError(msg)
+                raise ValueError(msg)
             seen_output_names.add(sub_pipe.output_name)
         return parallel_sub_pipes
 
@@ -87,9 +85,7 @@ class PipeParallel(PipeController):
                         f"Batch input item named '{sub_pipe.batch_params.input_item_stuff_name}' is not "
                         f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
                     )
-                    raise PipeInputError(
-                        message=msg, pipe_code=self.code, variable_name=sub_pipe.batch_params.input_item_stuff_name, concept_code=None
-                    ) from exc
+                    raise PipeParallelValueError(msg) from exc
                 needed_inputs.add_requirement(
                     variable_name=sub_pipe.batch_params.input_list_stuff_name,
                     concept=requirement.concept,
@@ -108,7 +104,7 @@ class PipeParallel(PipeController):
         # Validate that either add_each_output or combined_output is set
         if not self.add_each_output and not self.combined_output:
             msg = f"PipeParallel'{self.code}'requires either add_each_output or combined_output to be set"
-            raise PipeDefinitionError(msg)
+            raise ValueError(msg)
 
         return self
 
@@ -118,46 +114,7 @@ class PipeParallel(PipeController):
 
     @override
     def validate_input_with_library(self):
-        """Validate that the inputs declared for this PipeParallel match what is actually needed."""
-        static_validation_config = get_config().pipelex.static_validation_config
-        default_reaction = static_validation_config.default_reaction
-        reactions = static_validation_config.reactions
-
-        the_needed_inputs = self.needed_inputs()
-
-        # Check all required variables are in the inputs
-        for named_input_requirement in the_needed_inputs.named_input_requirements:
-            if named_input_requirement.variable_name not in self.inputs.variables:
-                missing_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[named_input_requirement.variable_name],
-                )
-                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(missing_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise missing_input_var_error
-
-        # Check that all declared inputs are actually needed
-        for input_name in self.inputs.variables:
-            if input_name not in the_needed_inputs.required_names:
-                extraneous_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[input_name],
-                )
-                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(extraneous_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise extraneous_input_var_error
+        pass
 
     @override
     def validate_output_static(self):

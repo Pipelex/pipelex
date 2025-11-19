@@ -4,7 +4,6 @@ from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceBlueprintValueError
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
 
@@ -33,13 +32,13 @@ class PipeSequenceBlueprint(PipeBlueprint):
     def validate_steps(cls, steps: list[SubPipeBlueprint]) -> list[SubPipeBlueprint]:
         if len(steps) == 0:
             msg = "PipeSequence must have at least 1 step"
-            raise PipeSequenceBlueprintValueError(msg)
+            raise ValueError(msg)
         return steps
 
     @override
-    def _validate_inputs(self):
+    def validate_inputs(self):
         pass
 
     @override
-    def _validate_output(self):
+    def validate_output(self):
         pass

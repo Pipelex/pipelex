@@ -2,7 +2,7 @@ from typing import cast
 
 from pydantic import Field, field_validator
 
-from pipelex.core.exceptions import StaticValidationErrorType
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import StrEnum
 
@@ -25,24 +25,24 @@ class ConfigPaths:
     OVERRIDES_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{OVERRIDES_DECK_FILE_NAME}"
 
 
-class StaticValidationReaction(StrEnum):
+class ValidationErrorReaction(StrEnum):
     RAISE = "raise"
     LOG = "log"
     IGNORE = "ignore"
 
 
-class StaticValidationConfig(ConfigModel):
-    default_reaction: StaticValidationReaction = Field(strict=False)
-    reactions: dict[StaticValidationErrorType, StaticValidationReaction]
+class ValidationErrorConfig(ConfigModel):
+    default_reaction: ValidationErrorReaction = Field(strict=False)
+    reactions: dict[PipeValidationErrorType, ValidationErrorReaction]
 
     @field_validator("reactions", mode="before")
     @classmethod
-    def validate_reactions(cls, value: dict[str, str]) -> dict[StaticValidationErrorType, StaticValidationReaction]:
+    def validate_reactions(cls, value: dict[str, str]) -> dict[PipeValidationErrorType, ValidationErrorReaction]:
         return cast(
-            "dict[StaticValidationErrorType, StaticValidationReaction]",
+            "dict[PipeValidationErrorType, ValidationErrorReaction]",
             ConfigModel.transform_dict_str_to_enum(
                 input_dict=value,
-                key_enum_cls=StaticValidationErrorType,
-                value_enum_cls=StaticValidationReaction,
+                key_enum_cls=PipeValidationErrorType,
+                value_enum_cls=ValidationErrorReaction,
             ),
         )

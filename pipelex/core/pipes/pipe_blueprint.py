@@ -6,9 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_string_or_code
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.validation import validate_input_name
-from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, PipeVariableMultiplicityError, parse_concept_with_multiplicity
 from pipelex.types import Self, StrEnum
 
 
@@ -121,35 +120,40 @@ class PipeBlueprint(ABC, BaseModel):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        """Validate that the pipe type is one of the allowed values."""
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
     @classmethod
     def validate_pipe_category(cls, value: Any) -> Any:
-        """Validate that the pipe category is one of the allowed values."""
         if value not in AllowedPipeCategories.value_list():
             msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
-    def validate_inputs_blueprint(self) -> Self:
-        self.validate_inputs()
-        self.validate_output()
+    def validate_pipe_category_based_on_type(self) -> Self:
+        if self.pipe_category != AllowedPipeTypes(self.type).category:
+            msg = f"Invalid pipe category '{self.pipe_category}'. Must be one of: {self.type.category}"
+            raise ValueError(msg)
         return self
 
-    def _validate_inputs(self):
+    @model_validator(mode="after")
+    def validate_inputs_blueprint(self) -> Self:
+        self.generic_validate_inputs()
+        self.generic_validate_output()
+        return self
+
+    def validate_inputs(self):
         pass
 
-    def _validate_output(self):
+    def validate_output(self):
         pass
 
     @final
-    def validate_inputs(self):
+    def generic_validate_inputs(self):
         if self.inputs is None:
             return
 
@@ -166,29 +170,37 @@ class PipeBlueprint(ABC, BaseModel):
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
                     f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
                 )
-                raise PipeBlueprintValueError(msg)
+                raise ValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
-            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            try:
+                validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            except ConceptStringError as exc:
+                msg = f"Invalid concept string or code '{concept_string_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
+                raise ValueError(msg) from exc
 
         # Check that every input_name is unique
         input_names = list(self.inputs.keys())
         if len(input_names) != len(set(input_names)):
             duplicates = [name for name in input_names if input_names.count(name) > 1]
             msg = f"Duplicate input names found: {duplicates}. Input names must be unique."
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
 
-        self._validate_inputs()
+        self.validate_inputs()
 
     @final
-    def validate_output(self):
+    def generic_validate_output(self):
         # Strip multiplicity brackets before validating
-        output_parse_result = parse_concept_with_multiplicity(self.output)
+        try:
+            output_parse_result = parse_concept_with_multiplicity(self.output)
+        except PipeVariableMultiplicityError as exc:
+            msg = f"Invalid concept specification syntax: '{self.output}'. {exc}"
+            raise ValueError(msg) from exc
         try:
             validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
         except ConceptStringError as exc:
             msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
-            raise PipeBlueprintValueError(msg) from exc
+            raise ValueError(msg) from exc
 
-        self._validate_output()
+        self.validate_output()

@@ -7,7 +7,6 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_operators.exceptions import PipeComposeBlueprintValueError
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -46,7 +45,7 @@ class PipeComposeBlueprint(PipeBlueprint):
             return None
 
     @override
-    def _validate_inputs(self):
+    def validate_inputs(self):
         preprocessed_template = preprocess_template(self.template_source)
         try:
             check_jinja2_parsing(
@@ -55,7 +54,7 @@ class PipeComposeBlueprint(PipeBlueprint):
             )
         except Jinja2TemplateSyntaxError as exc:
             msg = f"Could not parse template for PipeCompose: {exc}"
-            raise PipeComposeBlueprintValueError(msg) from exc
+            raise ValueError(msg) from exc
         required_variables = {
             variable_name
             for variable_name in detect_jinja2_required_variables(
@@ -67,8 +66,8 @@ class PipeComposeBlueprint(PipeBlueprint):
         for required_variable_name in required_variables:
             if required_variable_name not in self.input_names:
                 msg = f"Required variable '{required_variable_name}' is not in the inputs of PipeCompose."
-                raise PipeComposeBlueprintValueError(msg)
+                raise ValueError(msg)
 
     @override
-    def _validate_output(self):
+    def validate_output(self):
         pass

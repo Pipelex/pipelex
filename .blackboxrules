@@ -70,7 +70,7 @@ output = "ConceptName"
 The pipes will all have at least this base definition. 
 - `inputs`: Dictionary of key being the variable used in the prompts, and the value being the ConceptName. It should ALSO LIST THE INPUTS OF THE INTERMEDIATE STEPS (if PipeSequence) or of the conditional pipes (if PipeCondition).
 So If you have this error:
-`StaticValidationError: missing_input_variable • domain='expense_validator' • pipe='validate_expense' • 
+`PipeValidationError: missing_input_variable • domain='expense_validator' • pipe='validate_expense' • 
 variable='['invoice']'``
 That means that the pipe validate_expense is missing the input `invoice` because one of the subpipe is needing it.
 

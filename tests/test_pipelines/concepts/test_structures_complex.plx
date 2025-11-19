@@ -1,4 +1,4 @@
-domain = "test_structured_generations"
+domain = "test_structured_generations2"
 description = "Concepts to test complex structures (dicts, unions, etc.)"
 
 [concept]

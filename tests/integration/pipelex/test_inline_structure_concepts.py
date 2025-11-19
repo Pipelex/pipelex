@@ -8,7 +8,7 @@ from pipelex.core.concepts.concept_blueprint import (
 )
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import StructureClassError
+from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_class_registry
 
@@ -180,7 +180,7 @@ class TestInlineStructureConcepts:
     def test_invalid_string_reference_raises_error(self):
         """Test that invalid string references raise appropriate errors."""
         with pytest.raises(
-            StructureClassError,
+            ConceptFactoryError,
             match="Structure class 'NonExistentClass' set for concept 'TestInvalidRef' in domain 'test_domain' is \
 not a registered subclass of StuffContent",
         ):

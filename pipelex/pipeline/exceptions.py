@@ -1,14 +1,14 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
-class PipeExecutionError(PipelexException):
+class PipeExecutionError(PipelexError):
     pass
 
 
-class PipelineExecutionError(PipelexException):
+class PipelineExecutionError(PipelexError):
     def __init__(
         self,
         message: str,
@@ -58,7 +58,7 @@ class DryRunTemplatingError(DryRunError):
         super().__init__(message, pipe_type, pipe_code)
 
 
-class PipeStackOverflowError(PipelexException):
+class PipeStackOverflowError(PipelexError):
     def __init__(self, message: str, limit: int, pipe_stack: list[str]):
         self.limit = limit
         self.pipe_stack = pipe_stack

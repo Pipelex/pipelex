@@ -204,13 +204,13 @@ gemini = { tag_style = "xml" }
 is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
 ####################################################################################################
-# Static validation config
+# Validation error config
 ####################################################################################################
 
-[pipelex.static_validation_config]
+[pipelex.validation_error_config]
 default_reaction = "raise"
 
-[pipelex.static_validation_config.reactions]
+[pipelex.validation_error_config.reactions]
 # default_reaction is on raise
 # missing_input_variable = "log"
 # extraneous_input_variable = "log"

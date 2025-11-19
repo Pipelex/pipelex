@@ -1,8 +1,9 @@
 import pytest
 
-from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptStringError
+from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.pipes.input_requirements import InputRequirement
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactoryError
+from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from tests.unit.pipelex.core.pipes.data import (
     CONCEPT_CODE_RESOLUTION_TEST_CASES,
     DIFFERENT_CONCEPT_CODES_TEST_CASES,
@@ -85,12 +86,12 @@ class TestMakeInputRequirementsFromString:
 
     def test_concept_not_found_raises_error(self):
         """Test that an invalid concept code raises ConceptLibraryConceptNotFoundError."""
-        with pytest.raises(ConceptLibraryConceptNotFoundError):
+        with pytest.raises(ConceptLibraryError):
             InputRequirementsFactory.make_from_string(domain="nonexistent", requirement_str="nonexistent.InvalidConcept")
 
     def test_concept_not_found_with_multiplicity_raises_error(self):
         """Test that an invalid concept code with multiplicity raises ConceptLibraryConceptNotFoundError."""
-        with pytest.raises(ConceptLibraryConceptNotFoundError):
+        with pytest.raises(ConceptLibraryError):
             InputRequirementsFactory.make_from_string(domain="nonexistent", requirement_str="nonexistent.InvalidConcept[5]")
 
     def test_empty_string_raises_value_error(self):

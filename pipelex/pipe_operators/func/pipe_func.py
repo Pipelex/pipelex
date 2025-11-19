@@ -44,16 +44,16 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         function = func_registry.get_function(function_name)
         if not function:
             msg = f"Function '{function_name}' not found in registry"
-            raise PipeDefinitionError(msg)
+            raise ValueError(msg)
 
         return_type = get_type_hints(function).get("return")
 
         if return_type is None:
             msg = f"Function '{function_name}' has no return type annotation"
-            raise PipeDefinitionError(msg)
+            raise ValueError(msg)
         if not issubclass(return_type, StuffContent):
             msg = f"Function '{function_name}' return type {return_type} is not a subclass of StuffContent"
-            raise PipeDefinitionError(msg)
+            raise TypeError(msg)
         return function_name
 
     @override

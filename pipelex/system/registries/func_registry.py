@@ -5,7 +5,7 @@ from typing import Any, TypeVar, cast, get_type_hints
 
 from pydantic import Field, PrivateAttr, RootModel
 
-from pipelex.system.exceptions import ToolException
+from pipelex.system.exceptions import ToolError
 from pipelex.urls import URLs
 
 FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
@@ -18,7 +18,7 @@ FuncRegistryDict = dict[str, Callable[..., Any]]
 PIPE_FUNC_MARKER = "_is_pipe_func"
 
 
-class FuncRegistryError(ToolException):
+class FuncRegistryError(ToolError):
     pass
 
 

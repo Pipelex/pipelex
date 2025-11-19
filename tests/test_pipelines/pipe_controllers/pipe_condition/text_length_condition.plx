@@ -1,4 +1,4 @@
-domain = "test_integration"
+domain = "test_integration2"
 description = "Test pipes for PipeCondition based on text length"
 
 [pipe]

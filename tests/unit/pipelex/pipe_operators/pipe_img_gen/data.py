@@ -1,6 +1,7 @@
 from typing import ClassVar
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
 
@@ -108,15 +109,17 @@ class PipeImgGenInputTestCases:
         VALID_WITH_IS_RAW,
     ]
 
-    ERROR_WRONG_INPUT_TYPE: ClassVar[tuple[str, PipeImgGenBlueprint]] = (
+    # Error test cases: (test_id, blueprint, expected_error_type)
+    ERROR_WRONG_INPUT_TYPE: ClassVar[tuple[str, PipeImgGenBlueprint, PipeValidationErrorType]] = (
         "wrong_input_type",
         PipeImgGenBlueprint(
             description="ERROR_WRONG_INPUT_TYPE: Test case: wrong_input_type",
             inputs={"image": "native.Image"},
             output="native.Image",
         ),
+        PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE,
     )
 
-    ERROR_CASES: ClassVar[list[tuple[str, PipeImgGenBlueprint]]] = [
+    ERROR_CASES: ClassVar[list[tuple[str, PipeImgGenBlueprint, PipeValidationErrorType]]] = [
         ERROR_WRONG_INPUT_TYPE,
     ]

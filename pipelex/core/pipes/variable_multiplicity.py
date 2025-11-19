@@ -4,6 +4,8 @@ import re
 
 from pydantic import BaseModel, Field
 
+from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
+
 VariableMultiplicity = bool | int
 
 MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
@@ -88,7 +90,7 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
             f"'domain.ConceptName', 'domain.ConceptName[]', or 'domain.ConceptName[N]' "
             f"where concept and domain names must start with a letter or underscore."
         )
-        raise ValueError(msg)
+        raise PipeVariableMultiplicityError(msg)
 
     concept = match.group(1)
     bracket_content = match.group(2)

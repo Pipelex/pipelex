@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 
 
 class ConceptLibraryAbstract(ABC):

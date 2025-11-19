@@ -8,10 +8,11 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
-from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import ConceptBlueprintValueError, ConceptStructureBlueprintValueError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
@@ -26,7 +27,7 @@ class ConceptStructureSpecFieldType(StrEnum):
     DATE = "date"
 
 
-class ConceptSpecError(Exception):
+class ConceptSpecError(PipelexError):
     pass
 
 
@@ -204,7 +205,7 @@ class ConceptSpec(StructuredContent):
         if values.get("refines") and values.get("structure"):
             msg = (
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the description `{values.get('description')}`",
+                f"and `{values.get('structure')}` for concept that has the description `{values.get('description')}`"
             )
             raise ConceptSpecError(msg)
         return values

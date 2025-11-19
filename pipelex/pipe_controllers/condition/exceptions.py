@@ -1,9 +1,9 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 
 
-class PipeConditionError(PipelexException):
+class PipeConditionFactoryError(PipelexError):
     pass
 
 
-class PipeConditionBlueprintValueError(ValueError):
+class PipeConditionRunError(PipelexError):
     pass

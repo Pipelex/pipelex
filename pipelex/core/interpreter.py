@@ -1,30 +1,16 @@
 from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import PipelexConfigurationError
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError, PLXDecodeError
+from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
-from pipelex.types import Self
-
-
-class PLXDecodeError(TomlError):
-    """Raised when PLX decoding fails."""
 
 
 class PipelexInterpreter(BaseModel):
     """plx -> PipelexBundleBlueprint"""
-
-    file_path: Path | None = None
-    file_content: str | None = None
-
-    @model_validator(mode="after")
-    def check_file_path_or_file_content(self) -> Self:
-        """Need to check if there is at least one of file_path or file_content"""
-        if self.file_path is None and self.file_content is None:
-            msg = "Either file_path or file_content must be provided"
-            raise PipelexConfigurationError(msg)
-        return self
 
     # TODO: rethink this method
     @staticmethod
@@ -62,29 +48,53 @@ class PipelexInterpreter(BaseModel):
             # If we can't read the file, it's not a valid Pipelex file
             return False
 
-    def make_pipelex_bundle_blueprint(self) -> PipelexBundleBlueprint:
-        """Make a PipelexBundleBlueprint from the file_path or file_content"""
-        # Load PLX content from file_path or use file_content directly.
+    @classmethod
+    def make_pipelex_bundle_blueprint(cls, bundle_path: str | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:
+        if bundle_path is None and plx_content is None:
+            msg = "Either 'bundle_path' or 'plx_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
+            raise PipelexInterpreterError(msg)
+        blueprint_dict: dict[str, Any] | None = None
         try:
-            if self.file_path:
-                blueprint_dict = load_toml_from_path(path=str(self.file_path))
-                blueprint_dict.update(source=str(self.file_path))
-            elif self.file_content:
-                blueprint_dict = load_toml_from_content(content=self.file_content)
-            else:
-                msg = "Could not make PipelexBundleBlueprint: either file_path or file_content must be provided"
-                raise PipelexConfigurationError(msg)
+            if bundle_path is not None:
+                blueprint_dict = load_toml_from_path(path=bundle_path)
+                blueprint_dict.update(source=bundle_path)
+            elif plx_content is not None:
+                blueprint_dict = load_toml_from_content(content=plx_content)
         except TomlError as exc:
             raise PLXDecodeError(message=exc.message, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
-        return PipelexBundleBlueprint.model_validate(blueprint_dict)
 
-    @classmethod
-    def load_bundle_blueprint(cls, bundle_path: str) -> PipelexBundleBlueprint:
-        """Load a bundle file and return its blueprint."""
-        bundle_path_obj = Path(bundle_path)
-        if not bundle_path_obj.exists():
-            msg = f"Bundle file not found: {bundle_path}"
-            raise FileNotFoundError(msg)
+        if not blueprint_dict:
+            msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the PLX file"
+            raise PipelexInterpreterError(msg)
 
-        interpreter = cls(file_path=bundle_path_obj)
-        return interpreter.make_pipelex_bundle_blueprint()
+        try:
+            return PipelexBundleBlueprint.model_validate(blueprint_dict)
+        except ValidationError as exc:
+            # TODO: Move this to the validate_bundle function
+            # Parse Pydantic validation errors into structured error data
+            validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
+
+            # Handle domain and source fields carefully for context
+            domain_value: str | None = blueprint_dict.get("domain") if blueprint_dict else None
+            source_value: str | None = blueprint_dict.get("source") or bundle_path if blueprint_dict else bundle_path
+
+            for error in exc.errors():
+                loc = error.get("loc", ())
+
+                # Don't use domain/source from blueprint if they're the fields that failed
+                error_domain = None if (loc and loc[0] == "domain") else domain_value
+                error_source = bundle_path if (loc and loc[0] == "source") else source_value
+
+                # Categorize error and create structured error data
+                val_error = categorize_and_create_error_data(
+                    error=error,
+                    blueprint_dict=blueprint_dict,
+                    domain=error_domain,
+                    source=error_source,
+                )
+                validation_errors.append(val_error)
+
+            raise PipelexInterpreterError(
+                message=str(exc),
+                validation_errors=validation_errors,
+            ) from exc

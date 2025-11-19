@@ -5,6 +5,7 @@ from anthropic import AsyncAnthropic, AsyncAnthropicBedrock, omit
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import (
@@ -31,7 +32,7 @@ class AnthropicExtraField(StrEnum):
     CLAUDE_4_TOKENS_LIMIT = "claude_4_tokens_limit"
 
 
-class AnthropicLLMWorkerError(Exception):
+class AnthropicLLMWorkerError(PipelexError):
     """Base exception for Anthropic LLM Worker errors."""
 
 

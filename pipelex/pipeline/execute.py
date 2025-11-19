@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex.client.protocol import PipelineInputs
@@ -24,7 +25,7 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.pipeline.validate_plx import validate_plx
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 
@@ -35,6 +36,7 @@ if TYPE_CHECKING:
 
 async def execute_pipeline(
     library_id: str | None = None,
+    library_path: str | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
@@ -98,7 +100,10 @@ async def execute_pipeline(
     blueprint: PipelexBundleBlueprint | None = None
 
     if plx_content:
-        blueprint, _ = await validate_plx(library_id=library_id, plx_content=plx_content, remove_after_validation=False)
+        validate_bundle_result = await validate_bundle(plx_content=plx_content)
+        library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result.blueprints)
+        # For now, we only support one blueprint when given a plx_content. So blueprints is of length 1.
+        blueprint = validate_bundle_result.blueprints[0]
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
         elif blueprint.main_pipe:
@@ -107,7 +112,10 @@ async def execute_pipeline(
             msg = "No pipe code or main pipe in the PLX content provided to the API execute_pipeline."
             raise PipeExecutionError(message=msg)
     elif pipe_code:
-        library_manager.load_libraries(library_id=library_id)
+        if library_path:
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(library_path)])
+        else:
+            library_manager.load_libraries(library_id=library_id)
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
         msg = "Either provide pipe_code or plx_content to the API execute_pipeline. 'pipe_code' must be provided when 'plx_content' is None"

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory

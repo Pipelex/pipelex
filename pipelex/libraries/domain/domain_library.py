@@ -2,8 +2,8 @@ from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex.core.domains.domain import Domain
-from pipelex.exceptions import DomainLibraryError
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
+from pipelex.libraries.domain.exceptions import DomainLibraryError
 from pipelex.types import Self
 
 DomainLibraryRoot = dict[str, Domain]
@@ -31,19 +31,20 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
 
     def add_domain(self, domain: Domain):
         domain_code = domain.code
-        if existing_domain := self.root.get(domain_code):
-            # merge the new domain with the existing one
-            self.root[domain_code] = existing_domain.model_copy(update=domain.model_dump())
-        else:
-            self.root[domain_code] = domain
+        if domain_code in self.root:
+            msg = f"Trying to add domain '{domain_code}' to domain library but it already exists"
+            raise DomainLibraryError(msg)
+        self.root[domain_code] = domain
 
     def add_domains(self, domains: list[Domain]):
         for domain in domains:
             self.add_domain(domain=domain)
 
     def remove_domain_by_code(self, domain_code: str) -> None:
-        if domain_code in self.root:
-            del self.root[domain_code]
+        if domain_code not in self.root:
+            msg = f"Trying to remove domain '{domain_code}' from domain library but it does not exist"
+            raise DomainLibraryError(msg)
+        del self.root[domain_code]
 
     @override
     def get_required_domain(self, domain: str) -> Domain:

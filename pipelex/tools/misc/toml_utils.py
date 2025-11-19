@@ -5,11 +5,11 @@ from typing import Any
 import tomli
 import tomlkit
 
-from pipelex.system.exceptions import ToolException
+from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.file_utils import path_exists
 
 
-class TomlError(ToolException):
+class TomlError(ToolError):
     def __init__(self, message: str, doc: str, pos: int, lineno: int, colno: int):
         super().__init__(message)
         self.doc = doc

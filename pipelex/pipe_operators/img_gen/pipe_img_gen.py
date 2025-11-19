@@ -11,11 +11,13 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.config.config import get_config
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError, UnexpectedPipeDefinitionError
+from pipelex.core.pipe_errors import UnexpectedPipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
@@ -72,17 +74,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         needed_inputs = InputRequirementsFactory.make_empty()
         if not self.img_gen_prompt:
-            if len(self.inputs.items) == 1:
-                input_name, requirement = self.inputs.items[0]  # We know there is only one input because of the validation
-                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
-            else:
-                msg = "For PipeImgGen you must provide an image generation prompt either as attribute of the pipe or as a single text input"
-                raise PipeDefinitionError(
-                    message=msg,
-                    domain_code=self.domain,
-                    pipe_code=self.code,
-                    description=self.description,
-                )
+            input_name, requirement = self.inputs.items[0]  # We know there is only one input because of the validation
+            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
         return needed_inputs
 
     @override
@@ -96,7 +89,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # Either we have img_gen_prompt or img_gen_prompt_var_name, but not both
         if self.img_gen_prompt_var_name is not None and self.img_gen_prompt is not None:
             msg = "Either 'img_gen_prompt' or 'img_gen_prompt_var_name' must be provided, but not both"
-            raise PipeDefinitionError(msg)
+            raise ValueError(msg)
         return self
 
     @override
@@ -115,13 +108,19 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
             strict=True,
         ):
-            inadequate_input_concept_error = PipeDefinitionError(
-                message="For PipeImgGen you must provide a text input or a concept that refines 'native.Text'",
-                domain_code=self.domain,
-                pipe_code=self.code,
-                description=self.description,
+            explanation = (
+                f"The input of a PipeImgGen must be compatible with the Text concept (or refine it). "
+                f"Input '{input_name}' has concept '{input_requirement.concept.concept_string}'. "
+                "Image generation requires a text prompt. Use native.Text or a concept that refines it."
             )
-            raise inadequate_input_concept_error
+            raise PipeValidationError(
+                error_type=PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE,
+                pipe_code=self.code,
+                variable_names=[input_name],
+                required_concept_codes=["native.Text"],
+                provided_concept_code=input_requirement.concept.concept_string,
+                explanation=explanation,
+            )
 
     @override
     def validate_output_static(self):
@@ -134,11 +133,17 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
             strict=True,
         ):
-            msg = (
-                f"The output of a ImgGen pipe must be compatible with the Image concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
+            raise PipeValidationError(
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain=self.domain,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept_string,
+                required_concept_codes=[NativeConceptCode.IMAGE.concept_string],
+                explanation=(
+                    f"The output of a ImgGen pipe must be compatible with the Image concept. "
+                    f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
+                ),
             )
-            raise PipeDefinitionError(msg)
 
     @override
     async def _run_operator_pipe(

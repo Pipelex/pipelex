@@ -3,12 +3,12 @@ from typing_extensions import override
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError
-from pipelex.core.concepts.validation import is_concept_string_valid
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptStringError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.validation import is_concept_string_valid, validate_concept_string_or_code
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.exceptions import ConceptLibraryError
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
+from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
@@ -84,14 +84,16 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         If it is not native and doesnt have a domain, it should raise an error
         """
         if Concept.is_implicit_concept(concept_string=concept_string):
-            return ConceptFactory.make_implicit_concept(concept_string=concept_string)
+            return ConceptFactory.make_implicit_concept(concept_code=concept_string.split(".")[1])
+
         if not is_concept_string_valid(concept_string=concept_string):
             msg = f"Concept string '{concept_string}' is not a valid concept string"
             raise ConceptLibraryError(msg)
+
         the_concept = self.get_optional_concept(concept_string=concept_string)
         if not the_concept:
             msg = f"Concept '{concept_string}' not found in the library"
-            raise ConceptLibraryConceptNotFoundError(msg)
+            raise ConceptLibraryError(msg)
         return the_concept
 
     @override
@@ -108,10 +110,17 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def get_required_concept_from_concept_string_or_code(self, concept_string_or_code: str, search_domains: list[str] | None = None) -> Concept:
-        if "." in concept_string_or_code:
+        try:
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+        except ConceptStringError as exc:
+            msg = f"Could not validate concept string or code '{concept_string_or_code}': {exc}"
+            raise ConceptLibraryError(msg) from exc
+
+        if NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
+            native_concept_string = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code)
+            return self.get_native_concept(native_concept=NativeConceptCode(native_concept_string.split(".")[1]))
+        elif "." in concept_string_or_code:
             return self.get_required_concept(concept_string=concept_string_or_code)
-        elif NativeConceptCode.is_native_concept(concept_code=concept_string_or_code):
-            return self.get_native_concept(native_concept=NativeConceptCode(concept_string_or_code))
         else:
             found_concepts: list[Concept] = []
             if search_domains is None:

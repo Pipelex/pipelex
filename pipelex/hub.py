@@ -1,5 +1,5 @@
-from contextvars import ContextVar
 import sys
+from contextvars import ContextVar
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -16,7 +16,7 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import Domain
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
@@ -421,6 +421,10 @@ _library_id: ContextVar[str | None] = ContextVar("library_id", default=None)
 def set_current_library_id(library_id: str) -> None:
     """Set the library_id for the current async context."""
     _library_id.set(library_id)
+
+
+def get_optional_current_library_id() -> str | None:
+    return _library_id.get()
 
 
 def get_current_library_id() -> str:

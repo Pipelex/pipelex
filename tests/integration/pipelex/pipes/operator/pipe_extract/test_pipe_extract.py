@@ -3,7 +3,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -49,7 +49,7 @@ class TestPipeExtract:
         pipe_extract_blueprint = PipeExtractBlueprint(
             description="OCR test for image processing",
             inputs={"page_scan": NativeConceptCode.IMAGE},
-            output=NativeConceptCode.TEXT_AND_IMAGES,
+            output="Page[]",
             page_images=True,
             page_image_captions=False,
             page_views=True,
@@ -97,7 +97,7 @@ class TestPipeExtract:
         blueprint = PipeExtractBlueprint(
             description="OCR test for PDF processing",
             inputs={input_name: NativeConceptCode.PDF},
-            output=NativeConceptCode.TEXT_AND_IMAGES,
+            output="Page[]",
             model=extract_choice_for_pdf,
             page_images=True,
             page_image_captions=page_image_captions,

@@ -9,23 +9,20 @@ import typer
 from posthog import tag
 
 from pipelex import log
-from pipelex.builder.builder import load_and_validate_bundle
-from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
     handle_model_deck_preset_error,
-    handle_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
 from pipelex.hub import get_console, get_telemetry_manager
-from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import get_incremental_file_path
@@ -125,9 +122,9 @@ def run_cmd(
         source_description: str
         if bundle_path:
             try:
-                bundle_blueprint = await load_and_validate_bundle(bundle_path)
+                validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
                 if not pipe_code:
-                    main_pipe_code = bundle_blueprint.main_pipe
+                    main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
                     if not main_pipe_code:
                         typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
                         raise typer.Exit(1)
@@ -138,7 +135,7 @@ def run_cmd(
             except FileNotFoundError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
-            except PipelexBundleError as exc:
+            except ValidateBundleError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
             except PipeInputError as exc:
@@ -200,8 +197,6 @@ def run_cmd(
     # Initialize Pipelex BEFORE telemetry context to ensure proper setup
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except LibraryLoadingError as library_loading_error:
-        handle_validation_error(exc=library_loading_error, context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
 

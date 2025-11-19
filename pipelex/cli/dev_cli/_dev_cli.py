@@ -7,7 +7,7 @@ from click import Command, Context
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
+from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 

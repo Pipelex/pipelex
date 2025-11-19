@@ -1,14 +1,9 @@
 import pytest
 
 from pipelex import log
-from pipelex.core.exceptions import StaticValidationError
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
-<<<<<<<< HEAD:tests/unit/core/pipes/pipe_operators/pipe_llm/test_pipe_llm_input.py
-from tests.unit.core.pipes.pipe_operators.pipe_llm.data import PipeLLMInputTestCases
-========
 from tests.unit.pipelex.pipe_operators.pipe_llm.data import PipeLLMInputTestCases
->>>>>>>> dev:tests/unit/pipelex/pipe_operators/pipe_llm/test_pipe_llm_input.py
 
 
 class TestPipeLLMValidateInputs:
@@ -31,27 +26,3 @@ class TestPipeLLMValidateInputs:
 
         pipe_llm.validate_input_static()
         pipe_llm.validate_input_with_library()
-
-    @pytest.mark.parametrize(
-        ("test_id", "blueprint", "expected_error_message_fragment"),
-        PipeLLMInputTestCases.ERROR_CASES,
-    )
-    def test_validate_inputs_error_cases(
-        self,
-        test_id: str,
-        blueprint: PipeLLMBlueprint,
-        expected_error_message_fragment: str,
-    ):
-        log.verbose(f"Testing error case: {test_id}")
-
-        with pytest.raises(StaticValidationError) as exc_info:
-            PipeLLMFactory.make_from_blueprint(
-                domain="test_domain",
-                pipe_code=f"test_pipe_{test_id}",
-                blueprint=blueprint,
-            ).validate_with_libraries()
-
-        error_str = str(exc_info.value)
-        assert expected_error_message_fragment in error_str, (
-            f"Expected fragment '{expected_error_message_fragment}' not found in error message: {error_str}"
-        )

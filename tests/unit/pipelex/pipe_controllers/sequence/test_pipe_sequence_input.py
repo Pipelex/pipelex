@@ -3,15 +3,11 @@ from typing import Any
 import pytest
 
 from pipelex import log
-from pipelex.core.exceptions import StaticValidationError
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
-<<<<<<<< HEAD:tests/unit/core/pipes/pipe_controllers/sequence/test_pipe_sequence_input.py
-from tests.unit.core.pipes.pipe_controllers.sequence.data import PipeSequenceInputTestCases
-========
 from tests.unit.pipelex.pipe_controllers.sequence.data import PipeSequenceInputTestCases
->>>>>>>> dev:tests/unit/pipelex/pipe_controllers/sequence/test_pipe_sequence_input.py
 
 
 class TestPipeSequenceValidateInputs:
@@ -49,7 +45,7 @@ class TestPipeSequenceValidateInputs:
     ):
         log.verbose(f"Testing error case: {test_id}")
 
-        with pytest.raises((StaticValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
+        with pytest.raises((PipeValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeSequenceBlueprint.model_validate(blueprint_dict)
             PipeSequenceFactory.make_from_blueprint(

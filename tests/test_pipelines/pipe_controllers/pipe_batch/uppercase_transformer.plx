@@ -1,4 +1,4 @@
-domain = "test_integration"
+domain = "test_integration1"
 description = "Simple pipes for testing PipeBatch integration"
 
 [concept]

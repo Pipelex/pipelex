@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.flow import Flow, FlowElement
 from pipelex.builder.pipe.pipe_signature import PipeSignature
@@ -15,7 +15,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
 
-class FlowFactoryError(PipelexException):
+class FlowFactoryError(PipelexError):
     """Exception raised by FlowFactory."""
 
 
@@ -36,8 +36,7 @@ class FlowFactory:
         Returns:
             Flow with controllers preserved and operators as signatures.
         """
-        plx_path = Path(plx_file_path) if isinstance(plx_file_path, str) else plx_file_path
-        bundle_blueprint = PipelexInterpreter(file_path=plx_path).make_pipelex_bundle_blueprint()
+        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=str(plx_file_path))
         return FlowFactory.make_from_bundle_blueprint(bundle_blueprint)
 
     @staticmethod

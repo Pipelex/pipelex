@@ -2,16 +2,13 @@ from typing import TYPE_CHECKING, cast
 
 from pydantic import ValidationError
 
-from pipelex import pretty_print
 from pipelex.builder.builder_errors import (
     PipeBuilderError,
     PipelexBundleUnexpectedError,
 )
-from pipelex.builder.builder_validation import validate_dry_run_bundle_blueprint
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.exceptions import PipelexBundleError
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -24,8 +21,6 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.list_content import ListContent
@@ -133,27 +128,3 @@ def reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec: PipelexBundleSpec, f
         pipelex_bundle_spec.pipe[pipe_code] = fixed_pipe_blueprint
 
     return pipelex_bundle_spec
-
-
-async def load_and_validate_bundle(bundle_path: str) -> PipelexBundleBlueprint:
-    """Load a bundle file and extract its main_pipe.
-
-    Args:
-        bundle_path: Path to the .plx bundle file.
-
-    Returns:
-        PipelexBundleBlueprint: The blueprint of the bundle.
-
-    Raises:
-        PipelexBundleError: If any pipe failed during dry run.
-    """
-    bundle_blueprint = PipelexInterpreter.load_bundle_blueprint(bundle_path=bundle_path)
-
-    try:
-        await validate_dry_run_bundle_blueprint(bundle_blueprint=bundle_blueprint)
-    except PipelexBundleError as exc:
-        msg = f"Bundle at '{bundle_path}' failed to validate"
-        pretty_print(exc, title="Validation Error Details")
-        raise PipelexBundleError(message=msg, pipe_failures=exc.pipe_failures) from exc
-
-    return bundle_blueprint

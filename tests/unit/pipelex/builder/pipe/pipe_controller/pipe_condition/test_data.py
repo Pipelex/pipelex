@@ -11,7 +11,7 @@ class PipeConditionTestCases:
             pipe_code="template_condition",
             description="Conditional with template",
             inputs={"item": "Item"},
-            output="ProcessedItem",
+            output="Dynamic",
             jinja2_expression_template="{{ item.category }}",
             outcomes={
                 "A": "process_a",
@@ -23,7 +23,7 @@ class PipeConditionTestCases:
         PipeConditionBlueprint(
             description="Conditional with template",
             inputs={"item": "Item"},
-            output="ProcessedItem",
+            output="Dynamic",
             type="PipeCondition",
             pipe_category="PipeController",
             expression=None,

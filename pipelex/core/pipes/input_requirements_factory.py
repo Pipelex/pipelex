@@ -1,7 +1,7 @@
 import re
 from typing import TYPE_CHECKING
 
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_string_or_code
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
 
-class InputRequirementsFactoryError(PipelexException):
+class InputRequirementsFactoryError(PipelexError):
     pass
 
 

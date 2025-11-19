@@ -1,11 +1,12 @@
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.pipe_controllers.condition.exceptions import PipeConditionBlueprintValueError
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
+from pipelex.types import Self
 
 OutcomeMap = dict[str, str]
 
@@ -35,14 +36,21 @@ class PipeConditionBlueprint(PipeBlueprint):
     @classmethod
     def validate_outcome_map(cls, outcomes: OutcomeMap) -> OutcomeMap:
         if not outcomes:
-            msg = "PipeCondition must have at least one mapping in outcomes"
-            raise PipeConditionBlueprintValueError(msg)
+            msg = f"PipeConditionBlueprint must have at least one mapping in outcomes, got: {outcomes}"
+            raise ValueError(msg)
         return outcomes
 
+    @model_validator(mode="after")
+    def validate_expression_and_expression_template(self) -> Self:
+        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
+            msg = "PipeCondition should have exactly one of 'expression_template' or 'expression'"
+            raise ValueError(msg)
+        return self
+
     @override
-    def _validate_inputs(self):
+    def validate_inputs(self):
         pass
 
     @override
-    def _validate_output(self):
+    def validate_output(self):
         pass

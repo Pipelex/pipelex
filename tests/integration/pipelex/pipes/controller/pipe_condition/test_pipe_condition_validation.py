@@ -44,7 +44,7 @@ class TestPipeConditionValidation:
         assert pipe_condition.code == "test_condition"
         assert pipe_condition.domain == domain
         assert len(pipe_condition.outcome_map) == 2
-        assert pipe_condition.expression == "input_var"
+        assert pipe_condition.expression == "{{ input_var }}"
         assert pipe_condition.default_outcome == "default_pipe"
 
         concept_library.teardown()
@@ -100,6 +100,6 @@ class TestPipeConditionValidation:
         )
 
         # Both should have the same applied expression template format
-        assert pipe_condition_template.applied_expression_template == "{{ var }}"
-        assert pipe_condition_expr.applied_expression_template == "{{ var }}"
+        assert pipe_condition_template.expression == "{{ var }}"
+        assert pipe_condition_expr.expression == "{{ var }}"
         concept_library.teardown()

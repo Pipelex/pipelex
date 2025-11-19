@@ -1,13 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from pipelex.exceptions import (
-    ConceptError,
-    ConceptLibraryConceptNotFoundError,
-    PipeLibraryError,
-    PipeLibraryPipeNotFoundError,
-)
 from pipelex.libraries.concept.concept_library import ConceptLibrary
+from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
+from pipelex.libraries.exceptions import LibraryError
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 from pipelex.pipe_controllers.pipe_controller import PipeController
 
@@ -41,29 +38,34 @@ class Library(BaseModel):
 
     def validate_library(self) -> None:
         self.validate_pipe_library_with_libraries()
+        self.validate_concept_library_with_libraries()
+        self.validate_domain_library_with_libraries()
 
     def validate_pipe_library_with_libraries(self) -> None:
         for pipe in self.pipe_library.root.values():
-            try:
-                # Validate concept dependencies exit
-                for concept in [pipe.output, *pipe.inputs.concepts]:
+            # Validate concept dependencies exit
+            for concept in [pipe.output, *pipe.inputs.concepts]:
+                try:
+                    self.concept_library.get_required_concept(concept_string=concept.concept_string)
+                except ConceptLibraryError as concept_error:
+                    msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
+                    raise LibraryError(msg) from concept_error
+
+            # Validate pipe dependencies exit for pipe controllers
+            if isinstance(pipe, PipeController):
+                for pipe_code in pipe.pipe_dependencies():
                     try:
-                        self.concept_library.get_required_concept(concept_string=concept.concept_string)
-                    except ConceptError as concept_error:
-                        msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
-                        raise PipeLibraryError(msg) from concept_error
-
-                # Validate pipe dependencies exit for pipe controllers
-                if isinstance(pipe, PipeController):
-                    for pipe_code in pipe.pipe_dependencies():
                         self.pipe_library.get_required_pipe(pipe_code=pipe_code)
-
-            except (ConceptLibraryConceptNotFoundError, PipeLibraryPipeNotFoundError) as not_found_error:
-                msg = f"Missing dependency for pipe '{pipe.code}': {not_found_error}"
-                raise PipeLibraryError(msg) from not_found_error
+                    except PipeLibraryError as pipe_error:
+                        msg = f"Error validating pipe '{pipe.code}' dependency pipe '{pipe_code}' because of: {pipe_error}"
+                        raise LibraryError(msg) from pipe_error
 
         for pipe in self.pipe_library.root.values():
-            pipe.validate_with_libraries()
+            try:
+                pipe.validate_with_libraries()
+            except (ValidationError, ValueError) as validation_error:
+                msg = f"Error validating pipe '{pipe.code}' (type: {pipe.__class__.__name__}) because of: {validation_error}"
+                raise LibraryError(msg) from validation_error
 
     def validate_concept_library_with_libraries(self) -> None:
         pass
