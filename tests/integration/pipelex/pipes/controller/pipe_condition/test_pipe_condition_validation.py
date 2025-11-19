@@ -100,6 +100,6 @@ class TestPipeConditionValidation:
         )
 
         # Both should have the same applied expression template format
-        assert pipe_condition_template.applied_expression_template == "{{ var }}"
-        assert pipe_condition_expr.applied_expression_template == "{{ var }}"
+        assert pipe_condition_template.expression == "{{ var }}"
+        assert pipe_condition_expr.expression == "var"
         concept_library.teardown()

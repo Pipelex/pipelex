@@ -2,12 +2,24 @@
 
 ## Unreleased
 
+### Fixed
+
+- Fixed some issues with inputs of pipes: The validation methods was not detecting misconceptions with implicit concepts.
+- Fixed validation of pipe inputs: The mulitplicity was not checked properly.
+
+### Changed
+
+- Improved pipe builder by auto-fixing errors, forcing consistency in the inputs and outputs of the pipes.
+- PipeCondition:
+  - Moved the expression/expression_template choosing to the factory.
+
 ### Feature
 
 - Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
 
 ### Refactor
 
+- Moved a lot of validation to blueprints instead of pipe instances.
 - Refactored the Blueprint validation errors, and validation functions.
 - Refactored the PipelexInterpreter validation errors.
 - Refactored the pipe builder validation loop.

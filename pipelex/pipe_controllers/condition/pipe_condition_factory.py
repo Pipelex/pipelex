@@ -55,14 +55,23 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
                 concept_code=output_domain_and_code.concept_code,
             ),
         )
+
+        # Compute expression from expression_template or expression in blueprint
+        if blueprint.expression_template:
+            expression = blueprint.expression_template
+        elif blueprint.expression:
+            expression = "{{ " + blueprint.expression + " }}"
+        else:
+            msg = "PipeCondition must have either expression_template or expression"
+            raise PipeConditionFactoryError(msg)
+
         return PipeCondition(
             domain=domain,
             code=pipe_code,
             description=blueprint.description,
             inputs=inputs,
             output=output,
-            expression_template=blueprint.expression_template,
-            expression=blueprint.expression,
+            expression=expression,
             outcome_map=blueprint.outcomes,
             default_outcome=blueprint.default_outcome,
             add_alias_from_expression_to=blueprint.add_alias_from_expression_to,

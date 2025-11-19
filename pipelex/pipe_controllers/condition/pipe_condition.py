@@ -1,7 +1,6 @@
 from typing import Literal
 
 import shortuuid
-from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex import log
@@ -17,7 +16,7 @@ from pipelex.core.pipes.input_requirements import InputRequirements
 from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
-from pipelex.pipe_controllers.condition.exceptions import PipeConditionRunError, PipeConditionValueError
+from pipelex.pipe_controllers.condition.exceptions import PipeConditionRunError
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -27,16 +26,13 @@ from pipelex.pipeline.exceptions import DryRunMissingInputsError, DryRunMissingP
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
-from pipelex.types import Self
 
 ConditionOutcomeMap = dict[str, str | SpecialOutcome]
 
 
 class PipeCondition(PipeController):
     type: Literal["PipeCondition"] = "PipeCondition"
-    expression_template: str | None = None
-    expression: str | None = None
+    expression: str
     outcome_map: ConditionOutcomeMap
     default_outcome: str | SpecialOutcome
     add_alias_from_expression_to: str | None = None
@@ -48,20 +44,10 @@ class PipeCondition(PipeController):
             codes.add(self.default_outcome)
         return codes - set(SpecialOutcome.value_list())
 
-    @property
-    def applied_expression_template(self) -> str:
-        if self.expression_template:
-            return self.expression_template
-        elif self.expression:
-            return "{{ " + self.expression + " }}"
-        else:
-            msg = "No expression or expression_template provided"
-            raise PipeConditionValueError(msg)
-
     def _make_pipe_condition_details(self, evaluated_expression: str, chosen_pipe_code: str) -> PipeConditionDetails:
         return PipeConditionDetails(
             code=shortuuid.uuid()[:5],
-            test_expression=self.expression or self.applied_expression_template,
+            test_expression=self.expression,
             outcomes=self.outcome_map,
             default_pipe_code=self.default_outcome,
             evaluated_expression=evaluated_expression,
@@ -78,7 +64,7 @@ class PipeCondition(PipeController):
         # Variables from the expression/expression_template
         expression_required_variables = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
-            template_source=self.applied_expression_template,
+            template_source=self.expression,
         )
         required_variables.update(expression_required_variables)
 
@@ -104,7 +90,7 @@ class PipeCondition(PipeController):
         # 1. Add the variables from the expression/expression_template
         required_variables = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
-            template_source=self.applied_expression_template,
+            template_source=self.expression,
         )
 
         for var_name in required_variables:
@@ -128,13 +114,6 @@ class PipeCondition(PipeController):
                 needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
 
         return needed_inputs
-
-    @model_validator(mode="after")
-    def validate_expression_and_expression_template(self) -> Self:
-        if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
-            msg = "PipeCondition should have exactly one of expression_template or expression"
-            raise ValueError(msg)
-        return self
 
     @override
     def validate_input_static(self):
@@ -192,14 +171,14 @@ class PipeCondition(PipeController):
         # Evaluate the expression using templating
         evaluated_expression = await content_generator.make_templated_text(
             context=working_memory.generate_context(),
-            template=self.applied_expression_template,
+            template=self.expression,
             template_category=TemplateCategory.EXPRESSION,
         )
 
         # Validate the evaluated expression
         if not evaluated_expression or evaluated_expression == "None":
             error_msg = f"Conditional expression returned no result in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.applied_expression_template}"
+            error_msg += f"\n\nExpression: {self.expression}"
             raise PipeConditionRunError(error_msg)
         log.verbose(f"evaluated_expression: '{evaluated_expression}'")
 
@@ -244,7 +223,7 @@ class PipeCondition(PipeController):
 
         # Create condition details for tracking
         condition_details = self._make_pipe_condition_details(
-            evaluated_expression=self.applied_expression_template,
+            evaluated_expression=self.expression,
             chosen_pipe_code=chosen_pipe.code,
         )
 
@@ -265,7 +244,7 @@ class PipeCondition(PipeController):
             get_pipeline_tracker().add_condition_step(
                 from_stuff=required_stuff,
                 to_condition=condition_details,
-                condition_expression=self.expression or self.applied_expression_template,
+                condition_expression=self.expression,
                 pipe_layer=pipe_run_params.pipe_layers,
                 comment="PipeCondition required for condition",
             )
@@ -325,21 +304,21 @@ class PipeCondition(PipeController):
         try:
             required_variables = detect_jinja2_required_variables(
                 template_category=TemplateCategory.EXPRESSION,
-                template_source=self.applied_expression_template,
+                template_source=self.expression,
             )
             log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")
             msg = (
                 f"Dry run failed for pipe '{self.code}' (PipeCondition): could not detect required variables "
-                f"from expression template: {exc}\nTemplate:\n'{self.applied_expression_template}'"
+                f"from expression template: {exc}\nTemplate:\n'{self.expression}'"
             )
             raise DryRunTemplatingError(
                 message=msg,
                 pipe_type=self.__class__.__name__,
                 pipe_code=self.code,
                 template_category=TemplateCategory.EXPRESSION,
-                template=self.applied_expression_template,
+                template=self.expression,
             ) from exc
 
         # 3. Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes

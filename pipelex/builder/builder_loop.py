@@ -95,18 +95,46 @@ class BuilderLoop:
                 continue
 
             match val_error.error_type:
-                case (
-                    PipeValidationErrorType.MISSING_INPUT_VARIABLE
-                    | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
-                    | PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH
-                ):
-                    # Fix input variables for PipeController ONLY by copying requirements from needed_inputs
+                case PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH:
+                    # Fix input requirement mismatch by updating the specific mismatched input(s)
+                    # This applies to ALL pipe categories
+                    pipe = get_required_pipe(pipe_code=val_error.pipe_code)
+                    needed_inputs = pipe.needed_inputs()
+
+                    # Start with existing inputs, we'll only override the mismatched ones
+                    new_inputs: dict[str, str] = dict(pipe_spec.inputs) if pipe_spec.inputs else {}
+
+                    # Get the variable names that have mismatches
+                    mismatched_variables = val_error.variable_names or []
+
+                    # Update only the mismatched inputs with the correct concept from needed_inputs
+                    for variable_name in mismatched_variables:
+                        for named_requirement in needed_inputs.named_input_requirements:
+                            if named_requirement.variable_name == variable_name:
+                                concept_code = named_requirement.concept.code
+                                # Preserve multiplicity brackets
+                                if named_requirement.multiplicity is not None:
+                                    if named_requirement.multiplicity is True:
+                                        # Variable-length list []
+                                        concept_code = f"{concept_code}[]"
+                                    else:
+                                        # Fixed-length list [N] where N is an int
+                                        concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
+                                new_inputs[variable_name] = concept_code
+                                log.dev(f"Fixed input '{variable_name}' for '{val_error.pipe_code}': {concept_code}")
+                                break
+
+                    pipe_spec.inputs = new_inputs
+                    fixed_pipes.append(pipe_spec)
+
+                case PipeValidationErrorType.MISSING_INPUT_VARIABLE | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE:
+                    # Fix input variables for PipeController ONLY by copying all requirements from needed_inputs
                     if not AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         continue
 
                     pipe = get_required_pipe(pipe_code=val_error.pipe_code)
                     needed_inputs = pipe.needed_inputs()
-                    new_inputs: dict[str, str] = {}
+                    fixed_inputs: dict[str, str] = {}
                     for named_requirement in needed_inputs.named_input_requirements:
                         concept_code = named_requirement.concept.code
                         # Preserve multiplicity brackets
@@ -117,10 +145,10 @@ class BuilderLoop:
                             else:
                                 # Fixed-length list [N] where N is an int
                                 concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
-                        new_inputs[named_requirement.variable_name] = concept_code
-                    pipe_spec.inputs = new_inputs
+                        fixed_inputs[named_requirement.variable_name] = concept_code
+                    pipe_spec.inputs = fixed_inputs
                     fixed_pipes.append(pipe_spec)
-                    log.dev(f"Fixed inputs for '{val_error.pipe_code}': {new_inputs}")
+                    log.dev(f"Fixed inputs for '{val_error.pipe_code}': {fixed_inputs}")
 
                 case _:
                     # Other error types not handled for pipe validation errors

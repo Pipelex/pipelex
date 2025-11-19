@@ -7,7 +7,3 @@ class PipeBatchValueError(ValueError):
 
 class PipeBatchFactoryError(PipelexError):
     pass
-
-
-class PipeBatchRunError(PipelexError):
-    pass
