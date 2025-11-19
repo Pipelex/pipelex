@@ -10,10 +10,6 @@ on:
       - '.cursor/rules/**'
       - '.github/copilot-instructions.md'
       - 'pipelex/kit/**'
-  push:
-    branches:
-      - main
-      - master
 
 jobs:
   check-agent-rules:
