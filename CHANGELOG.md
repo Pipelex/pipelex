@@ -10,12 +10,20 @@
 
 - Refactored the Blueprint validation errors, and validation functions.
 - Refactored the PipelexInterpreter validation errors.
+- Refactored the pipe builder validation loop.
+- Reorganized the unit tests, and added new ones.
+- Reorganized the config files.
+- Moved `dev_cli` to `cli.dev_cli`.
 
-### Changed
+## [v0.15.7] - 2025-11-18
 
-- Changed the location of native concepts folders
+### Fixed
+ - Fixed issue with `get_console()` function returning `None` if Pipelex is not initialized. Now always defaults to `stderr` if not set.
 
-## [v0.15.5] - 2025-11-18
+## [v0.15.6] - 2025-11-18
+
+### Contributors
+ - Welcome to our new contributor @0x090909 (yup, that's his github username) for his work on Groq support in PR #445! 🎉
 
 ### Added
  - **Improved configuration repair**: New `--fix` option for `pipelex doctor` command that interactively detects and repairs outdated or invalid backend configuration files using latest templates from the Pipelex kit.

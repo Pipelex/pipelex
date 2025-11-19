@@ -5,7 +5,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.config.models import StaticValidationConfig
+from pipelex.config.models import ValidationErrorConfig
 from pipelex.hub import get_required_config
 from pipelex.language.plx_config import PlxConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
@@ -90,7 +90,7 @@ class Pipelex(ConfigModel):
     log_config: LogConfig
     aws_config: AwsConfig
 
-    static_validation_config: StaticValidationConfig
+    validation_error_config: ValidationErrorConfig
     tracker_config: TrackerConfig
     structure_config: StructureConfig
     prompting_config: PromptingConfig
