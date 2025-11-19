@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Annotated
 
 import click
@@ -18,7 +19,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.hub import get_console, get_pipes, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library_id
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
@@ -39,8 +40,14 @@ def do_validate_all_libraries_and_dry_run() -> None:
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} all")
 
-            pipes = get_pipes()
+            library_manager = get_library_manager()
+            library_id, library = library_manager.open_library()
+            set_current_library_id(library_id=library_id)
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+            pipes = library.get_pipe_library().get_pipes()
+
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
+
             asyncio.run(dry_run_pipes(pipes=pipes, raise_on_failure=True))
             log.info("Setup sequence passed OK, config and pipelines are validated.")
     except PipeOperatorModelAvailabilityError as exc:
