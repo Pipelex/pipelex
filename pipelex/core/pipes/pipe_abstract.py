@@ -131,27 +131,28 @@ class PipeAbstract(ABC, BaseModel):
                     explanation=(f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"),
                 )
 
-            # Compare the essential parts of InputRequirement (concept code + multiplicity)
-            # Skip validation if the needed requirement is Dynamic or Anything (flexible output types)
-            declared_requirement = self.inputs.root[var_name]
-            needed_requirement = the_needed_inputs.root[named_input_requirement.requirement_expression or var_name]
+            if AllowedPipeCategories(self.pipe_category) == AllowedPipeCategories.PIPE_CONTROLLER:
+                # Compare the essential parts of InputRequirement (concept code + multiplicity)
+                # Skip validation if the needed requirement is Dynamic or Anything (flexible output types)
+                declared_requirement = self.inputs.root[var_name]
+                needed_requirement = the_needed_inputs.root[named_input_requirement.requirement_expression or var_name]
 
-            # Allow mismatch if the needed requirement is a flexible type (Dynamic or Anything)
-            if (
-                needed_requirement.concept.code not in (NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING)
-                and declared_requirement != needed_requirement
-            ):
-                raise PipeValidationError(
-                    error_type=PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[var_name],
-                    explanation=(
-                        f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'.\n"
-                        f"Declared: input requirement {declared_requirement}.\n"
-                        f"Required: input requirement {needed_requirement}"
-                    ),
-                )
+                # Allow mismatch if the needed requirement is a flexible type (Dynamic or Anything)
+                if (
+                    needed_requirement.concept.code not in (NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING)
+                    and declared_requirement != needed_requirement
+                ):
+                    raise PipeValidationError(
+                        error_type=PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH,
+                        domain=self.domain,
+                        pipe_code=self.code,
+                        variable_names=[var_name],
+                        explanation=(
+                            f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'.\n"
+                            f"Declared: input requirement {declared_requirement}.\n"
+                            f"Required: input requirement {needed_requirement}"
+                        ),
+                    )
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
