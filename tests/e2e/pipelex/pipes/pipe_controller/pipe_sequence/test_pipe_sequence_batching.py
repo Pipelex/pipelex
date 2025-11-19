@@ -14,7 +14,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.test_pipelines.pipe_controllers.pipe_sequence.pipe_sequence import Document, ProductRating
+from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence import Document, ProductRating
 
 
 @pytest.mark.dry_runnable

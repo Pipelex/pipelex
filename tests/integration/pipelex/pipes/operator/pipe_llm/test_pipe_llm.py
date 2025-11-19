@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Callable
+
 import pytest
 
 from pipelex import log, pretty_print
@@ -19,11 +22,13 @@ from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, Pi
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeLLM:
+class TestPipeLLMBasic:
     async def test_pipe_llm_simple(
         self,
         pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         pipe_llm_blueprint = PipeLLMBlueprint(
             description="LLM test for basic text generation",
             output=NativeConceptCode.TEXT,
@@ -79,7 +84,9 @@ class TestPipeLLM:
         pipe_run_mode: PipeRunMode,
         llm: str,
         llm_to_structure: str,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         # TODO: Add assertion on generated objects vs expected results
         pretty_print(data, title="data")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
@@ -144,7 +151,9 @@ class TestPipeLLM:
         stuff: Stuff,
         attribute_paths: list[str],
         pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         for attribute_path in attribute_paths:
             stuff_name = attribute_path
             if not stuff_name:

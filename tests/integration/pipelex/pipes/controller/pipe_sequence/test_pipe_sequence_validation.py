@@ -1,3 +1,5 @@
+from pathlib import Path
+from typing import Callable
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.hub import get_concept_library
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
@@ -8,8 +10,9 @@ from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 class TestPipeSequenceValidation:
     """Tests for PipeSequence validate_inputs method"""
 
-    def test_pipe_sequence_creation(self):
+    def test_pipe_sequence_creation(self, load_test_library: Callable[[list[Path]], None]):
         """Test basic PipeSequence creation"""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
         domain = "test_domain"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept",
@@ -47,8 +50,9 @@ class TestPipeSequenceValidation:
 
         concept_library.teardown()
 
-    def test_pipe_sequence_multiple_sub_pipes(self):
+    def test_pipe_sequence_multiple_sub_pipes(self, load_test_library: Callable[[list[Path]], None]):
         """Test PipeSequence with multiple sequential sub-pipes"""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
         domain = "test_domain"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept",

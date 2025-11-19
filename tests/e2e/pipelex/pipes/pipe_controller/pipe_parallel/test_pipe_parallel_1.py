@@ -1,4 +1,5 @@
-from typing import cast
+from pathlib import Path
+from typing import Callable, cast
 
 import pytest
 from pytest import FixtureRequest
@@ -12,7 +13,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.test_pipelines.pipe_controllers.pipe_parallel.pipe_parallel import ContentAnalysis, DocumentInput, LengthAnalysis
+from tests.integration.pipelex.pipes.controller.pipe_parallel.pipe_parallel import ContentAnalysis, DocumentInput, LengthAnalysis
 
 
 @pytest.mark.llm
@@ -32,8 +33,10 @@ class TestPipeParallelDocumentAnalysis:
         request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
         document_text: str,
+        load_test_library: Callable[[list[Path]], None],
     ):
         """Test that PipeParallel processes document analysis in parallel."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
         # Create input data
         document_input = DocumentInput(text=document_text)
         stuff = StuffFactory.make_stuff(

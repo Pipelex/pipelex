@@ -1,5 +1,7 @@
 """E2E test for PipeLLM with vision capabilities."""
 
+from pathlib import Path
+
 import pytest
 
 from pipelex import pretty_print
@@ -12,13 +14,11 @@ from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio
 class TestPipeLLMVision:
-    """Test PipeLLM with vision capabilities."""
-
     async def test_describe_image(self):
-        """Test the describe_image pipeline with a simple image."""
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code="describe_image",
+            library_path=str(Path("tests/e2e/pipelex/pipes/pipe_operators")),
             inputs={
                 "image": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
             },
@@ -52,6 +52,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
+            library_path=str(Path("tests/e2e/pipelex/pipes/pipe_operators")),
             inputs={
                 "image_a": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
                 "image_b": ImageContent(url=LLMVisionTestCases.PATH_IMG_JPEG_3),

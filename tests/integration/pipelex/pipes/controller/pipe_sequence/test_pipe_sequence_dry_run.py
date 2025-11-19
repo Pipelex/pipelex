@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import Callable, TYPE_CHECKING
 
 import pytest
 from pytest import FixtureRequest
@@ -14,7 +15,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.json_utils import load_json_list_from_path
-from tests.test_pipelines.discord_newsletter import ChannelSummary, DiscordChannelUpdate
+from tests.integration.pipelex.pipes.controller.pipe_sequence.discord_newsletter import ChannelSummary, DiscordChannelUpdate
 
 if TYPE_CHECKING:
     from pipelex.core.memory.working_memory import WorkingMemory
@@ -28,8 +29,10 @@ class TestPipeSequenceDryRun:
         self,
         request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
     ) -> None:
         """Test that the Discord newsletter pipeline creates correct working memory with ListContent for batched inputs."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
         # Load the discord channel updates data from JSON
         discord_channel_updates_data = load_json_list_from_path(path="tests/data/discord_newsletter/discord_sample.json")
 
