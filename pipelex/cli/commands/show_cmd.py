@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, cast
 
 import typer
@@ -19,7 +20,16 @@ from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.config.models import ConfigPaths
-from pipelex.hub import get_console, get_models_manager, get_pipe_library, get_required_pipe, get_secrets_provider, get_telemetry_manager
+from pipelex.hub import (
+    get_console,
+    get_library_manager,
+    get_models_manager,
+    get_pipe_library,
+    get_required_pipe,
+    get_secrets_provider,
+    get_telemetry_manager,
+    set_current_library_id,
+)
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
@@ -48,12 +58,8 @@ def do_show_config() -> None:
 
 def do_list_pipes() -> None:
     """List all available pipes."""
-    # try:
     nb_pipes = get_pipe_library().pretty_list_pipes()
     get_telemetry_manager().track_event(EventName.PIPES_LIST, properties={EventProperty.NB_PIPES: nb_pipes})
-    # except Exception as exc:
-    #     msg = f"Failed to list pipes: {exc}"
-    #     raise PipelexCLIError(msg) from exc
 
 
 def do_show_pipe(pipe_code: str) -> None:
@@ -195,6 +201,11 @@ def list_pipes_cmd() -> None:
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
 
+    library_manager = get_library_manager()
+    library_id, _ = library_manager.open_library()
+    set_current_library_id(library_id=library_id)
+    library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+
     with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
         tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
@@ -218,9 +229,10 @@ def show_pipe_cmd(
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
 
-    # library_manager = get_library_manager()
-    # library_manager.create_library(library_id=library_id)
-    # library_manager.load_libraries(library_id=library_id, load_user_dirs=False, load_pipelex_dirs=False)
+    library_manager = get_library_manager()
+    library_id, _ = library_manager.open_library()
+    set_current_library_id(library_id=library_id)
+    library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
 
     with get_telemetry_manager().telemetry_context():
         tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)

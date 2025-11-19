@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import click
 import typer
@@ -15,11 +14,11 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
     handle_model_deck_preset_error,
+    handle_validate_bundle_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.exceptions import PipeInputError, PipeOperatorModelChoiceError
-from pipelex.hub import get_console, get_library_manager, get_pipes, get_required_pipe, get_telemetry_manager
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.hub import get_console, get_pipes, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
@@ -27,9 +26,6 @@ from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundl
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
-
-if TYPE_CHECKING:
-    from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 COMMAND = "validate"
 
@@ -129,42 +125,15 @@ def validate_cmd(
 
     async def validate_pipe(pipe_code: str | None = None, bundle_path: str | None = None):
         if bundle_path:
-            absolute_bundle_path = str(Path(bundle_path).resolve())
-            if absolute_bundle_path in get_library_manager().get_loaded_plx_paths():
-                bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
-                if not bundle_blueprint.pipe:
-                    typer.secho(f"Failed to validate bundle '{bundle_path}': no pipes found in bundle", fg=typer.colors.RED, err=True)
-                    raise typer.Exit(1)
-                pipe_codes = list(bundle_blueprint.pipe.keys())
-                pipes: list[PipeAbstract] = []
-                for the_pipe_code in pipe_codes:
-                    pipes.append(get_required_pipe(pipe_code=the_pipe_code))
-                await dry_run_pipes(pipes=pipes, raise_on_failure=True)
-                typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}'", fg=typer.colors.GREEN)
-                return
-
-            # When validating a bundle, load_pipe_from_bundle validates ALL pipes in the bundle
             try:
-                bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
-                get_telemetry_manager().track_event(
-                    EventName.BUNDLE_DRY_RUN,
-                    properties={EventProperty.NB_PIPES: bundle_blueprint.nb_pipes, EventProperty.NB_CONCEPTS: bundle_blueprint.nb_concepts},
-                )
-                await validate_bundle(blueprints=[bundle_blueprint])
-                if not pipe_code:
-                    typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}'", fg=typer.colors.GREEN)
-                else:
-                    typer.secho(f"✅ Successfully validated all pipes in bundle '{bundle_path}' (including '{pipe_code}')", fg=typer.colors.GREEN)
+                await validate_bundle(plx_file_path=bundle_path)
+                typer.secho(f"✅ Successfully validated bundle '{bundle_path}'", fg=typer.colors.GREEN)
             except FileNotFoundError as exc:
                 get_console().print(Traceback())
                 typer.secho(f"Failed to load bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
             except ValidateBundleError as bundle_error:
-                typer.secho(f"Failed to validate bundle '{bundle_path}': {bundle_error}", fg=typer.colors.RED, err=True)
-            except PipeInputError as exc:
-                get_console().print(Traceback())
-                typer.secho(f"\n❌ Failed to validate bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from exc
+                handle_validate_bundle_error(bundle_error, bundle_path=bundle_path)
         elif pipe_code:
             # Validate a single pipe by code
             typer.echo(f"Validating pipe '{pipe_code}'...")
