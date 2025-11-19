@@ -28,7 +28,7 @@ class PipeLLMBlueprint(PipeBlueprint):
     structuring_method: StructuringMethod | None = None
 
     @override
-    def _validate_inputs(self):
+    def validate_inputs(self):
         # Get all required variables from prompt and system_prompt
         required_variables: set[str] = set()
 
@@ -66,5 +66,5 @@ class PipeLLMBlueprint(PipeBlueprint):
             raise ValueError(msg)
 
     @override
-    def _validate_output(self):
+    def validate_output(self):
         pass

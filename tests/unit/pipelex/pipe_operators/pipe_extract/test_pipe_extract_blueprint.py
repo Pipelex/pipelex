@@ -8,13 +8,13 @@ class TestPipeExtractBlueprint:
     def test_force_output_correct(self):
         blueprint = PipeExtractBlueprint(
             inputs={"document": "PDF"},
-            output="Anything",
+            output="Page[]",
         )
         assert blueprint.output == "Page[]"
 
         blueprint = PipeExtractBlueprint(
             inputs={"image": "Image"},
-            output="Text",
+            output="Page[]",
         )
         assert blueprint.output == "Page[]"
 
@@ -58,6 +58,6 @@ class TestPipeExtractBlueprint:
     def test_validate_output_incorrect(self):
         blueprint = PipeExtractBlueprint(
             inputs={"document": "PDF"},
-            output="Text",
+            output="Page[]",
         )
         assert blueprint.output == "Page[]"

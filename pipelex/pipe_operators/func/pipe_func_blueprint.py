@@ -12,9 +12,9 @@ class PipeFuncBlueprint(PipeBlueprint):
     function_name: str = Field(description="The name of the function to call.")
 
     @override
-    def _validate_inputs(self):
+    def validate_inputs(self):
         pass
 
     @override
-    def _validate_output(self):
+    def validate_output(self):
         pass

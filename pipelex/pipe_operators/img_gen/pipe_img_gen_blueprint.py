@@ -24,7 +24,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     output_format: OutputFormat | None = Field(default=None, strict=False)
 
     @override
-    def _validate_inputs(self):
+    def validate_inputs(self):
         # check that we have either an img_gen_prompt passed as attribute or as a single text input
         if not self.inputs:
             if not self.img_gen_prompt:
@@ -41,5 +41,5 @@ class PipeImgGenBlueprint(PipeBlueprint):
             raise ValueError(msg)
 
     @override
-    def _validate_output(self):
+    def validate_output(self):
         pass

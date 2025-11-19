@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pipelex import builder, log, pretty_print
+from pipelex import builder, log
 from pipelex.builder.builder import (
     PipelexBundleSpec,
     PipeSpecUnion,
@@ -23,16 +23,14 @@ from pipelex.tools.misc.json_utils import save_as_json_to_path
 class BuilderLoop:
     async def build_and_fix(
         self,
-        pipe_code: str,
         inputs: PipelineInputs | None = None,
         is_save_first_iteration_enabled: bool = True,
         is_save_second_iteration_enabled: bool = True,
         is_save_working_memory_enabled: bool = True,
     ) -> PipelexBundleSpec:
-        pretty_print(f"Building and fixing with {pipe_code}")
         try:
             pipe_output = await execute_pipeline(
-                pipe_code=pipe_code,
+                pipe_code="pipe_builder",
                 library_path=str(Path(builder.__file__).parent),
                 inputs=inputs,
             )
@@ -62,18 +60,30 @@ class BuilderLoop:
             save_text_to_path(text=plx_content, path=first_iteration_path)
 
         bundle_blueprint = pipelex_bundle_spec.to_blueprint()
-        try:
-            await validate_bundle(blueprints=[bundle_blueprint])
-        except ValidateBundleError as exc:
-            pipelex_bundle_spec = self._fix_bundle_validation_error(
-                bundle_error=exc, pipelex_bundle_spec=pipelex_bundle_spec, is_save_second_iteration_enabled=is_save_second_iteration_enabled
-            )
+        max_attempts = 10
+        for attempt in range(1, max_attempts + 1):
+            try:
+                if attempt == 1:
+                    await validate_bundle(blueprints=[bundle_blueprint])
+                else:
+                    log.info(f"Validating bundle after fixes (attempt {attempt}/{max_attempts})...")
+                    fixed_bundle_blueprint = pipelex_bundle_spec.to_blueprint()
+                    await validate_bundle(blueprints=[fixed_bundle_blueprint])
 
-            # Re-validate the fixed bundle
-            log.info("Re-validating bundle after fixes...")
-            fixed_bundle_blueprint = pipelex_bundle_spec.to_blueprint()
-            await validate_bundle(blueprints=[fixed_bundle_blueprint])
-            log.info("✅ Bundle validation passed after fixes")
+                if attempt > 1:
+                    log.info(f"✅ Bundle validation passed after fixes (attempt {attempt}/{max_attempts})")
+                break  # Validation passed, exit the loop
+
+            except ValidateBundleError as exc:
+                if attempt < max_attempts:
+                    log.info(f"⚠️ Validation failed on attempt {attempt}/{max_attempts}, attempting fixes...")
+                    pipelex_bundle_spec = self._fix_bundle_validation_error(
+                        bundle_error=exc, pipelex_bundle_spec=pipelex_bundle_spec, is_save_second_iteration_enabled=is_save_second_iteration_enabled
+                    )
+                else:
+                    # Final attempt failed, re-raise the error
+                    log.error(f"❌ Validation failed after {max_attempts} attempts, raising error")
+                    raise
 
         return pipelex_bundle_spec
 
@@ -102,10 +112,11 @@ class BuilderLoop:
 
             match val_error.error_type:
                 case PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH:
+                    # Fix input requirement mismatch by updating the specific mismatched input(s)
+                    # This applies to ALL pipe categories (operators and controllers)
                     if not AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         continue
-                    # Fix input requirement mismatch by updating the specific mismatched input(s)
-                    # This applies to ALL pipe categories
+
                     pipe = get_required_pipe(pipe_code=val_error.pipe_code)
                     needed_inputs = pipe.needed_inputs()
 
@@ -121,7 +132,8 @@ class BuilderLoop:
                             if named_requirement.variable_name == variable_name:
                                 old_value = new_inputs.get(variable_name, "NOT SET")
                                 concept_code = named_requirement.concept.code
-                                # Preserve multiplicity brackets
+
+                                # Add multiplicity brackets if required
                                 if named_requirement.multiplicity is not None:
                                     if named_requirement.multiplicity is True:
                                         # Variable-length list []
@@ -129,8 +141,14 @@ class BuilderLoop:
                                     else:
                                         # Fixed-length list [N] where N is an int
                                         concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
+                                # If multiplicity is None, concept_code stays without brackets
+                                # This effectively removes multiplicity if it was present in old_value
+
                                 new_inputs[variable_name] = concept_code
-                                log.info(f"🔧 Fixed input '{variable_name}' for pipe '{val_error.pipe_code}': '{old_value}' → '{concept_code}'")
+                                log.info(
+                                    f"🔧 Fixed input requirement mismatch for pipe '{val_error.pipe_code}': input '{variable_name}' \
+                                        changed from '{old_value}' → '{concept_code}'"
+                                )
                                 break
 
                     pipe_spec.inputs = new_inputs
@@ -143,6 +161,7 @@ class BuilderLoop:
 
                     pipe = get_required_pipe(pipe_code=val_error.pipe_code)
                     needed_inputs = pipe.needed_inputs()
+                    old_inputs = dict(pipe_spec.inputs) if pipe_spec.inputs else {}
                     fixed_inputs: dict[str, str] = {}
                     for named_requirement in needed_inputs.named_input_requirements:
                         concept_code = named_requirement.concept.code
@@ -155,9 +174,42 @@ class BuilderLoop:
                                 # Fixed-length list [N] where N is an int
                                 concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
                         fixed_inputs[named_requirement.variable_name] = concept_code
-                    pipe_spec.inputs = fixed_inputs
+
+                    # Only apply fix if it actually changes something (avoid infinite loops)
+                    if fixed_inputs != old_inputs:
+                        pipe_spec.inputs = fixed_inputs
+                        fixed_pipes.append(pipe_spec)
+                        log.info(f"🔧 Fixed input variables for pipe '{val_error.pipe_code}': BEFORE={old_inputs} → AFTER={fixed_inputs}")
+                    else:
+                        log.warning(
+                            f"⚠️ Cannot auto-fix MISSING_INPUT_VARIABLE for pipe '{val_error.pipe_code}': needed_inputs() \
+                                doesn't include the missing variable '{val_error.variable_names}'. \
+                                    This might be an intermediate variable that shouldn't be in inputs."
+                        )
+
+                case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT:
+                    # Fix output concept mismatch for PipeSequence by updating to match last step's output
+                    if not isinstance(pipe_spec, PipeSequenceSpec):
+                        continue
+
+                    last_step = pipe_spec.steps[-1]
+                    last_step_pipe_code = last_step.pipe_code
+
+                    # Get the last step's pipe spec to retrieve its output
+                    last_step_pipe_spec = pipelex_bundle_spec.pipe.get(last_step_pipe_code)
+                    if not last_step_pipe_spec:
+                        continue
+
+                    old_output = pipe_spec.output
+                    new_output = last_step_pipe_spec.output
+
+                    # Set the sequence output to match the last step's output
+                    pipe_spec.output = new_output
                     fixed_pipes.append(pipe_spec)
-                    log.dev(f"Fixed inputs for '{val_error.pipe_code}': {fixed_inputs}")
+                    log.info(
+                        f"🔧 Fixed output concept for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
+                            '{new_output}' (matching last step '{last_step_pipe_code}')"
+                    )
 
                 case _:
                     # Other error types not handled for pipe validation errors
@@ -187,10 +239,16 @@ class BuilderLoop:
             if not last_step_pipe_spec:
                 continue
 
+            old_output = pipe_spec.output
+            new_output = last_step_pipe_spec.output
+
             # Set the sequence output to match the last step's output
-            pipe_spec.output = last_step_pipe_spec.output
+            pipe_spec.output = new_output
             fixed_pipes.append(pipe_spec)
-            log.dev(f"Fixed output for '{blueprint_error.pipe_code}': set to '{last_step_pipe_spec.output}' (from last step '{last_step_pipe_code}')")
+            log.info(
+                f"🔧 Fixed sequence output mismatch for pipe '{blueprint_error.pipe_code}': output changed from '{old_output}' → \
+                    '{new_output}' (from last step '{last_step_pipe_code}')"
+            )
 
         # Reconstruct bundle if we made changes
         if fixed_pipes:

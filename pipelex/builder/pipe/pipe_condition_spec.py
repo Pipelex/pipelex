@@ -34,7 +34,7 @@ class PipeConditionSpec(PipeSpec):
     @field_validator("output", mode="after")
     @classmethod
     def forced_output(cls, _: str) -> str:
-        return "Dynamic"
+        return "native.Anything"
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

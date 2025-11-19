@@ -12,7 +12,7 @@ class PipeExtractInputTestCases:
         PipeExtractBlueprint(
             description="Test case: valid_image_input",
             inputs={"document_image": "native.Image"},
-            output="native.Page",
+            output="native.Page[]",
         ),
     )
 
@@ -21,7 +21,7 @@ class PipeExtractInputTestCases:
         PipeExtractBlueprint(
             description="Test case: valid_pdf_input",
             inputs={"document": "native.PDF"},
-            output="native.Page",
+            output="native.Page[]",
         ),
     )
 
@@ -30,7 +30,7 @@ class PipeExtractInputTestCases:
         PipeExtractBlueprint(
             description="Test case: valid_image_with_page_images",
             inputs={"invoice_image": "native.Image"},
-            output="native.Page",
+            output="native.Page[]",
             page_images=True,
         ),
     )
@@ -40,7 +40,7 @@ class PipeExtractInputTestCases:
         PipeExtractBlueprint(
             description="Test case: valid_pdf_with_page_views",
             inputs={"contract": "native.PDF"},
-            output="native.Page",
+            output="native.Page[]",
             page_views=True,
             page_views_dpi=150,
         ),
@@ -51,7 +51,7 @@ class PipeExtractInputTestCases:
         PipeExtractBlueprint(
             description="Test case: valid_image_with_captions",
             inputs={"report_image": "native.Image"},
-            output="native.Page",
+            output="native.Page[]",
             page_images=True,
             page_image_captions=True,
         ),

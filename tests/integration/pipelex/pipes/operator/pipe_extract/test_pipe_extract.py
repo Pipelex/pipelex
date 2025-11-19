@@ -49,7 +49,7 @@ class TestPipeExtract:
         pipe_extract_blueprint = PipeExtractBlueprint(
             description="OCR test for image processing",
             inputs={"page_scan": NativeConceptCode.IMAGE},
-            output=NativeConceptCode.TEXT_AND_IMAGES,
+            output="Page[]",
             page_images=True,
             page_image_captions=False,
             page_views=True,
@@ -97,7 +97,7 @@ class TestPipeExtract:
         blueprint = PipeExtractBlueprint(
             description="OCR test for PDF processing",
             inputs={input_name: NativeConceptCode.PDF},
-            output=NativeConceptCode.TEXT_AND_IMAGES,
+            output="Page[]",
             model=extract_choice_for_pdf,
             page_images=True,
             page_image_captions=page_image_captions,

@@ -142,23 +142,15 @@ async def validate_bundle(
             loaded_blueprints = blueprints
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
-        if plx_content is not None:
+        elif plx_content is not None:
             blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
             loaded_blueprints = [blueprint]
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 
-        if plx_file_path is not None:
+        else:  # plx_file_path is not None
             blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file_path)
             loaded_blueprints = [blueprint]
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
-
-        if loaded_pipes is None:
-            msg = "No pipes found in the bundle"
-            raise ValidateBundleError(message=msg)
-
-        if loaded_blueprints is None:
-            msg = "No blueprints found in the bundle"
-            raise ValidateBundleError(message=msg)
 
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
     except PipelexInterpreterError as interpreter_error:

@@ -120,7 +120,6 @@ class PipeBlueprint(ABC, BaseModel):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        """Validate that the pipe type is one of the allowed values."""
         if value not in AllowedPipeTypes.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
             raise ValueError(msg)
@@ -129,26 +128,32 @@ class PipeBlueprint(ABC, BaseModel):
     @field_validator("pipe_category", mode="after")
     @classmethod
     def validate_pipe_category(cls, value: Any) -> Any:
-        """Validate that the pipe category is one of the allowed values."""
         if value not in AllowedPipeCategories.value_list():
             msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
             raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
-    def validate_inputs_blueprint(self) -> Self:
-        self.validate_inputs()
-        self.validate_output()
+    def validate_pipe_category_based_on_type(self) -> Self:
+        if self.pipe_category != AllowedPipeTypes(self.type).category:
+            msg = f"Invalid pipe category '{self.pipe_category}'. Must be one of: {self.type.category}"
+            raise ValueError(msg)
         return self
 
-    def _validate_inputs(self):
+    @model_validator(mode="after")
+    def validate_inputs_blueprint(self) -> Self:
+        self.generic_validate_inputs()
+        self.generic_validate_output()
+        return self
+
+    def validate_inputs(self):
         pass
 
-    def _validate_output(self):
+    def validate_output(self):
         pass
 
     @final
-    def validate_inputs(self):
+    def generic_validate_inputs(self):
         if self.inputs is None:
             return
 
@@ -182,10 +187,10 @@ class PipeBlueprint(ABC, BaseModel):
             msg = f"Duplicate input names found: {duplicates}. Input names must be unique."
             raise ValueError(msg)
 
-        self._validate_inputs()
+        self.validate_inputs()
 
     @final
-    def validate_output(self):
+    def generic_validate_output(self):
         # Strip multiplicity brackets before validating
         try:
             output_parse_result = parse_concept_with_multiplicity(self.output)
@@ -198,4 +203,4 @@ class PipeBlueprint(ABC, BaseModel):
             msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
             raise ValueError(msg) from exc
 
-        self._validate_output()
+        self.validate_output()

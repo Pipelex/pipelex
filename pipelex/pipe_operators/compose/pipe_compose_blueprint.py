@@ -45,7 +45,7 @@ class PipeComposeBlueprint(PipeBlueprint):
             return None
 
     @override
-    def _validate_inputs(self):
+    def validate_inputs(self):
         preprocessed_template = preprocess_template(self.template_source)
         try:
             check_jinja2_parsing(
@@ -69,5 +69,5 @@ class PipeComposeBlueprint(PipeBlueprint):
                 raise ValueError(msg)
 
     @override
-    def _validate_output(self):
+    def validate_output(self):
         pass

@@ -84,10 +84,6 @@ def build_pipe_cmd(
         str,
         typer.Argument(help="Prompt describing what the pipeline should do"),
     ],
-    builder_pipe: Annotated[
-        str,
-        typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
-    ] = "pipe_builder",
     output_name: Annotated[
         str | None,
         typer.Option("--output-name", "-o", help="Base name for the generated file or directory (without extension)"),
@@ -124,7 +120,7 @@ def build_pipe_cmd(
         # Build the pipeline
         builder_loop = BuilderLoop()
         try:
-            pipelex_bundle_spec = await builder_loop.build_and_fix(pipe_code=builder_pipe, inputs={"brief": prompt})
+            pipelex_bundle_spec = await builder_loop.build_and_fix(inputs={"brief": prompt})
         except PipeBuilderError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."
             if exc.working_memory:

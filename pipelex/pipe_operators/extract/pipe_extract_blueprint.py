@@ -1,6 +1,5 @@
 from typing import Literal
 
-from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
@@ -16,13 +15,8 @@ class PipeExtractBlueprint(PipeBlueprint):
     page_views: bool | None = None
     page_views_dpi: int | None = None
 
-    @field_validator("output", mode="before")
-    @classmethod
-    def force_output(cls, _: str) -> str:
-        return "Page[]"
-
     @override
-    def _validate_inputs(self):
+    def validate_inputs(self):
         nb_inputs = self.nb_inputs
         msg = (
             "Only one input must be provided for the PipeExtract, and it must be a pdf or an image or a concept that refines one of them."
@@ -38,7 +32,7 @@ class PipeExtractBlueprint(PipeBlueprint):
             raise ValueError(msg)
 
     @override
-    def _validate_output(self):
+    def validate_output(self):
         if self.output != "Page[]":
-            msg = f"PipeExtract output should be a Page concept, but is {self.output}"
+            msg = f"PipeExtract output should be a 'native.Page[]' concept, but is {self.output}"
             raise ValueError(msg)

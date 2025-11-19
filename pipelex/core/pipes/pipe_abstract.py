@@ -14,6 +14,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeAbstractValueError, PipeRunInputsError
 from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -46,14 +47,61 @@ class PipeAbstract(ABC, BaseModel):
             raise PipeDefinitionError(msg)
         return code
 
+    @field_validator("type", mode="after")
+    @classmethod
+    def validate_pipe_type(cls, value: Any) -> Any:
+        if value not in AllowedPipeTypes.value_list():
+            msg = f"Invalid pipe type '{value}' for pipe '{cls.code}'. Must be one of: {AllowedPipeTypes.value_list()}"
+            raise ValueError(msg)
+        return value
+
+    @field_validator("pipe_category", mode="after")
+    @classmethod
+    def validate_pipe_category(cls, value: Any) -> Any:
+        if value not in AllowedPipeCategories.value_list():
+            msg = f"Invalid pipe category '{value}' for pipe '{cls.code}'. Must be one of: {AllowedPipeCategories.value_list()}"
+            raise ValueError(msg)
+        return value
+
+    @model_validator(mode="after")
+    def validate_pipe_category_based_on_type(self) -> Self:
+        if self.pipe_category != AllowedPipeTypes(self.type).category:
+            msg = f"Invalid pipe category '{self.pipe_category}' for pipe '{self.code}'. Must be one of: {self.type.category}"
+            raise ValueError(msg)
+        return self
+
     @model_validator(mode="after")
     def validate_pipe(self) -> Self:
-        self.validate_input_static()
-        self.validate_output_static()
+        self.generic_validate_input_static()
+        self.generic_validate_output_static()
         return self
 
     @final
-    def _validate_input_with_library(self):
+    def validate_with_libraries(self):
+        try:
+            self.generic_validate_input_with_library()
+            self.generic_validate_output_with_library()
+        except ModelChoiceNotFoundError as exc:
+            msg = f"Model choice not found for pipe '{self.code}': {exc}"
+            raise PipeAbstractValueError(msg) from exc
+
+    @final
+    def generic_validate_input_static(self):
+        # Put here the validation that is common to all pipes
+        # ...
+
+        # Now apply custom validation for pipes
+        self.validate_input_static()
+
+    @final
+    def generic_validate_output_static(self):
+        # Put here the validation that is common to all pipes
+        # ...
+        # Now apply custom validation for pipes
+        self.validate_output_static()
+
+    @final
+    def generic_validate_input_with_library(self):
         # First validate required variables are in the inputs
         for required_variable_name in self.required_variables():
             if required_variable_name not in self.inputs.variables:
@@ -116,7 +164,16 @@ class PipeAbstract(ABC, BaseModel):
                     explanation=f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}",
                 )
 
+        # Now apply custom validation for pipes
         self.validate_input_with_library()
+
+    @final
+    def generic_validate_output_with_library(self):
+        # Put here the validation that is common to all pipes
+        # ...
+
+        # Now apply custom validation for pipes
+        self.validate_output_with_library()
 
     @abstractmethod
     def validate_input_with_library(self):
@@ -126,10 +183,6 @@ class PipeAbstract(ABC, BaseModel):
     def validate_input_static(self):
         pass
 
-    @final
-    def _validate_output_with_library(self):
-        self.validate_output_with_library()
-
     @abstractmethod
     def validate_output_with_library(self):
         pass
@@ -137,15 +190,6 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     def validate_output_static(self):
         pass
-
-    @final
-    def validate_with_libraries(self):
-        try:
-            self._validate_input_with_library()
-            self._validate_output_with_library()
-        except ModelChoiceNotFoundError as exc:
-            msg = f"Model choice not found for pipe '{self.code}': {exc}"
-            raise PipeAbstractValueError(msg) from exc
 
     def validate_before_run(
         self,

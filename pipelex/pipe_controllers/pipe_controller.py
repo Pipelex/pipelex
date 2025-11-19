@@ -24,7 +24,6 @@ class PipeController(PipeAbstract):
         - PipeCondition: The pipes in the outcome_map
         - PipeSequence: The pipes in the steps
         """
-        return set[str]()
 
     @final
     @override
