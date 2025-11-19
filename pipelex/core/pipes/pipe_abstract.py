@@ -7,6 +7,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -66,20 +67,41 @@ class PipeAbstract(ABC, BaseModel):
                     ),
                 )
 
-        # Then validate that all inputs are actually needed
+        # Then validate that all inputs are actually needed and match requirements exactly
         the_needed_inputs = self.needed_inputs()
 
-        # Check all required variables are in the inputs
+        # Check all required variables are in the inputs and match the required InputRequirement
         for named_input_requirement in the_needed_inputs.named_input_requirements:
-            if named_input_requirement.variable_name not in self.inputs.variables:
+            var_name = named_input_requirement.variable_name
+
+            if var_name not in self.inputs.variables:
                 raise PipeValidationError(
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain=self.domain,
                     pipe_code=self.code,
-                    variable_names=[named_input_requirement.variable_name],
+                    variable_names=[var_name],
+                    explanation=(f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"),
+                )
+
+            # Compare the essential parts of InputRequirement (concept code + multiplicity)
+            # Skip validation if the needed requirement is Dynamic or Anything (flexible output types)
+            declared_requirement = self.inputs.root[var_name]
+            needed_requirement = the_needed_inputs.root[named_input_requirement.requirement_expression or var_name]
+
+            # Allow mismatch if the needed requirement is a flexible type (Dynamic or Anything)
+            if (
+                needed_requirement.concept.code not in (NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING)
+                and declared_requirement != needed_requirement
+            ):
+                raise PipeValidationError(
+                    error_type=PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH,
+                    domain=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[var_name],
                     explanation=(
-                        f"Required variable '{named_input_requirement.variable_name}' is not in the inputs of "
-                        f"pipe '{self.code}'. Current inputs: {self.inputs}"
+                        f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'. "
+                        f"Declared: input requirement {declared_requirement}"
+                        f"Required: input requirement {needed_requirement}"
                     ),
                 )
 

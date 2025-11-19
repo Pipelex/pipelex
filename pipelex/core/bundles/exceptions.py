@@ -11,6 +11,7 @@ class PipeValidationErrorType(StrEnum):
 
     MISSING_INPUT_VARIABLE = "missing_input_variable"
     EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
+    INPUT_REQUIREMENT_MISMATCH = "input_requirement_mismatch"
     INADEQUATE_INPUT_CONCEPT = "inadequate_input_concept"
     TOO_MANY_CANDIDATE_INPUTS = "too_many_candidate_inputs"
     INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"

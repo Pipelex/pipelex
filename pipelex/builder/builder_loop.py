@@ -80,7 +80,7 @@ class BuilderLoop:
         """Fix validation errors in the bundle spec.
 
         Currently supports fixing:
-        - PIPE_MISSING_INPUT_VARIABLE / PIPE_EXTRANEOUS_INPUT_VARIABLE (for PipeController only)
+        - MISSING_INPUT_VARIABLE / EXTRANEOUS_INPUT_VARIABLE / INPUT_REQUIREMENT_MISMATCH (for PipeController only)
         - PIPE_SEQUENCE_OUTPUT_MISMATCH
         """
         fixed_pipes: list[PipeSpecUnion] = []
@@ -95,8 +95,12 @@ class BuilderLoop:
                 continue
 
             match val_error.error_type:
-                case PipeValidationErrorType.MISSING_INPUT_VARIABLE | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE:
-                    # Fix input variables for PipeController ONLY
+                case (
+                    PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                    | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                    | PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH
+                ):
+                    # Fix input variables for PipeController ONLY by copying requirements from needed_inputs
                     if not AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         continue
 
