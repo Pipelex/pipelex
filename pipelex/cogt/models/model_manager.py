@@ -79,7 +79,7 @@ class ModelManager(ModelManagerAbstract):
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
         inference_models: dict[str, InferenceModelSpec] = {}
 
-        for model_name, available_backends in all_models_and_possible_backends.items():
+        for model_name in all_models_and_possible_backends:
             backend_match_for_model = self.routing_profile.get_backend_match_for_model(
                 enabled_backends=enabled_backends,
                 model_name=model_name,
@@ -107,15 +107,15 @@ class ModelManager(ModelManagerAbstract):
                     case BackendMatchingMethod.DEFAULT:
                         # We could not find the model spec, but it was a default match,
                         # so we can look for it in the other available backends
-                        # Use fallback_order if specified, then try remaining enabled backends
+                        # Use fallback_order if specified (fallback is opt-in)
                         if backend_match_for_model.fallback_order:
                             # Try fallback_order first, then any enabled backends not in fallback_order
                             backends_to_try = backend_match_for_model.fallback_order + [
                                 b for b in enabled_backends if b not in backend_match_for_model.fallback_order
                             ]
                         else:
-                            # No fallback_order specified, use all available_backends
-                            backends_to_try = available_backends
+                            # No fallback_order specified, skip this model (fallback is opt-in)
+                            continue
 
                         for available_backend in backends_to_try:
                             if available_backend == matched_backend_name:

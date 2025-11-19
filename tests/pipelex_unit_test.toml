@@ -1,4 +1,7 @@
 
+[cogt.model_deck_config]
+# Allow tests to run with restrictive routing profiles that don't support all presets
+missing_presets_reaction = "none"
+
 [pipelex.feature_config]
 is_reporting_enabled = true
-
