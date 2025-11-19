@@ -99,8 +99,8 @@ class PipeAbstract(ABC, BaseModel):
                     pipe_code=self.code,
                     variable_names=[var_name],
                     explanation=(
-                        f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'. "
-                        f"Declared: input requirement {declared_requirement}"
+                        f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'.\n"
+                        f"Declared: input requirement {declared_requirement}.\n"
                         f"Required: input requirement {needed_requirement}"
                     ),
                 )
