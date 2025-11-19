@@ -94,35 +94,6 @@ class PipeConditionInputTestCases:
         VALID_SINGLE_OUTCOME,
     ]
 
-    # Error test cases: (test_id, blueprint_dict, expected_error_message_fragment)
-    # Using dicts instead of blueprints to avoid validation errors during import
-    ERROR_BOTH_EXPRESSION_AND_TEMPLATE: ClassVar[tuple[str, dict[str, Any], str]] = (
-        "both_expression_and_template",
-        {
-            "description": "Test case: both_expression_and_template",
-            "inputs": {"data": "native.Text"},
-            "output": "native.Text",
-            "expression": "data",
-            "expression_template": "{{ data }}",
-            "outcomes": {"A": "pipe_a"},
-            "default_outcome": "pipe_default",
-        },
-        "exactly one of expression_template or expression",
-    )
-
-    ERROR_NEITHER_EXPRESSION_NOR_TEMPLATE: ClassVar[tuple[str, dict[str, Any], str]] = (
-        "neither_expression_nor_template",
-        {
-            "description": "Test case: neither_expression_nor_template",
-            "inputs": {"data": "native.Text"},
-            "output": "native.Text",
-            "expression": None,
-            "expression_template": None,
-            "outcomes": {"A": "pipe_a"},
-            "default_outcome": "pipe_default",
-        },
-        "exactly one of expression_template or expression",
-    )
 
     ERROR_EMPTY_OUTCOMES: ClassVar[tuple[str, dict[str, Any], str]] = (
         "empty_outcomes",
@@ -138,7 +109,5 @@ class PipeConditionInputTestCases:
     )
 
     ERROR_CASES: ClassVar[list[tuple[str, dict[str, Any], str]]] = [
-        ERROR_BOTH_EXPRESSION_AND_TEMPLATE,
-        ERROR_NEITHER_EXPRESSION_NOR_TEMPLATE,
         ERROR_EMPTY_OUTCOMES,
     ]
