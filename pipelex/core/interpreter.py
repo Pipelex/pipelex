@@ -70,7 +70,7 @@ class PipelexInterpreter(BaseModel):
         try:
             return PipelexBundleBlueprint.model_validate(blueprint_dict)
         except ValidationError as exc:
-            #TODO: Move this to the validate_bundle function
+            # TODO: Move this to the validate_bundle function
             # Parse Pydantic validation errors into structured error data
             validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
