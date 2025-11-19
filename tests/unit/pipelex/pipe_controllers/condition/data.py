@@ -94,7 +94,6 @@ class PipeConditionInputTestCases:
         VALID_SINGLE_OUTCOME,
     ]
 
-
     ERROR_EMPTY_OUTCOMES: ClassVar[tuple[str, dict[str, Any], str]] = (
         "empty_outcomes",
         {
