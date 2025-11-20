@@ -74,9 +74,9 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
 {self.concept.code} — {type(self.content).__name__}:
 {self.content.short_desc}"""
 
-    # @override
-    # def __str__(self) -> str:
-    #     return f"{self.title}\n{self.content.rendered_json()}"
+    @override
+    def __str__(self) -> str:
+        return f"{self.title}\n{self.content.rendered_json()}"
 
     @property
     def is_list(self) -> bool:
