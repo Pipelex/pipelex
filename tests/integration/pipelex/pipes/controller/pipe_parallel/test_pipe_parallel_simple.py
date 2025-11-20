@@ -139,7 +139,9 @@ class TestPipeParallelSimple:
         assert isinstance(final_result.content, TextContent)
         assert final_result.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
 
-    async def test_parallel_short_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_parallel_short_text_analysis(
+        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeParallel with shorter text to verify consistent behavior."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
         # Create PipeParallel instance

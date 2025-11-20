@@ -110,13 +110,6 @@ class PipeTestCases:
         concept_string="answer.Question",
         content=USER_TEXT_TRICKY_2,
     )
-    BLUEPRINT_AND_PIPE: ClassVar[list[tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
-        (
-            "Tricky question conclude",
-            TRICKY_QUESTION_BLUEPRINT,
-            "conclude_tricky_question_by_steps",
-        ),
-    ]
     NO_INPUT: ClassVar[list[tuple[str, str]]] = [  # topic, pipe
         (
             "Test with no input",

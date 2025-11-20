@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Callable
+
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.hub import get_concept_library
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 from pytest import FixtureRequest

@@ -1,4 +1,5 @@
-from typing import Any, ClassVar
+from pathlib import Path
+from typing import Any, Callable, ClassVar
 
 import pytest
 
@@ -143,8 +144,9 @@ class TestStuffContentFactory:
         ("test_name", "blueprint"),
         TestCases.TEST_BLUEPRINTS,
     )
-    def test_blueprint_scenarios(self, test_name: str, blueprint: dict[str, Any]):
+    def test_blueprint_scenarios(self, test_name: str, blueprint: dict[str, Any], load_test_library: Callable[[list[Path]], None]):
         """Test various blueprint scenarios with parametrized test cases."""
+        load_test_library([Path("tests/unit/pipelex/core/stuffs")])
         content = blueprint["content"]
 
         if test_name.startswith("text_"):
