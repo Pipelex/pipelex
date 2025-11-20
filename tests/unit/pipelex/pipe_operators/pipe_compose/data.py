@@ -94,5 +94,3 @@ class PipeComposeInputTestCases:
         VALID_WITH_HTML_TEMPLATE,
         VALID_COMPLEX_JINJA2,
     ]
-
-    
