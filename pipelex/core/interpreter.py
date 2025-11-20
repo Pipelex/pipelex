@@ -50,16 +50,16 @@ class PipelexInterpreter(BaseModel):
 
     @classmethod
     def make_pipelex_bundle_blueprint(cls, bundle_path: str | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:
-        if bundle_path is None and plx_content is None:
-            msg = "Either 'bundle_path' or 'plx_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
-            raise PipelexInterpreterError(msg)
-        blueprint_dict: dict[str, Any] | None = None
+        blueprint_dict: dict[str, Any]
         try:
             if bundle_path is not None:
                 blueprint_dict = load_toml_from_path(path=bundle_path)
                 blueprint_dict.update(source=bundle_path)
             elif plx_content is not None:
                 blueprint_dict = load_toml_from_content(content=plx_content)
+            else:
+                msg = "Either 'bundle_path' or 'plx_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
+                raise PipelexInterpreterError(msg)
         except TomlError as exc:
             raise PLXDecodeError(message=exc.message, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
 
