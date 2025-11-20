@@ -1,5 +1,8 @@
 """Integration tests for bracket notation in operator pipe factories."""
 
+from pathlib import Path
+from typing import Callable
+
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
@@ -31,7 +34,8 @@ async def process_function(working_memory: WorkingMemory) -> ListContent[TextCon
 class TestBracketNotationInOperators:
     """Test that operator factories correctly handle bracket notation in inputs and outputs."""
 
-    def test_pipe_llm_with_bracket_output_variable_list(self):
+    def test_pipe_llm_with_bracket_output_variable_list(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeLLM factory with variable list output (Text[])."""
         blueprint = PipeLLMBlueprint(
             description="Generate multiple items",
@@ -49,7 +53,8 @@ class TestBracketNotationInOperators:
         assert pipe.output.code == "Text"
         assert pipe.output_multiplicity is True
 
-    def test_pipe_llm_with_bracket_output_fixed_count(self):
+    def test_pipe_llm_with_bracket_output_fixed_count(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeLLM factory with fixed count output (Text[5])."""
         blueprint = PipeLLMBlueprint(
             description="Generate exactly 5 items",
@@ -67,7 +72,8 @@ class TestBracketNotationInOperators:
         assert pipe.output.code == "Text"
         assert pipe.output_multiplicity == 5
 
-    def test_pipe_llm_with_bracket_inputs(self):
+    def test_pipe_llm_with_bracket_inputs(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeLLM factory with bracket notation in inputs."""
         blueprint = PipeLLMBlueprint(
             description="Process multiple documents",
@@ -87,7 +93,8 @@ class TestBracketNotationInOperators:
         assert pipe.inputs.root["documents"].multiplicity is True
         assert pipe.inputs.root["query"].multiplicity is None
 
-    def test_pipe_img_gen_with_bracket_output(self):
+    def test_pipe_img_gen_with_bracket_output(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeImgGen factory with fixed count output (Image[3])."""
         blueprint = PipeImgGenBlueprint(
             description="Generate 3 images",
@@ -104,8 +111,9 @@ class TestBracketNotationInOperators:
         assert pipe.output.code == "Image"
         assert pipe.output_multiplicity == 3
 
-    def test_pipe_func_with_bracket_input_and_output(self):
-        """Test PipeFunc factory with bracket notation."""
+    def test_pipe_func_with_bracket_input_and_output(self, load_test_library: Callable[[list[Path]], None]):
+        load_test_library([Path(Path(__file__).parent)])
+
         blueprint = PipeFuncBlueprint(
             description="Process items",
             inputs={"two_texts": f"{NativeConceptCode.TEXT}[2]"},
@@ -122,7 +130,8 @@ class TestBracketNotationInOperators:
         assert pipe.inputs.root["two_texts"].multiplicity == 2
         assert pipe.output.code == "Text"
 
-    def test_pipe_compose_with_bracket_notation(self):
+    def test_pipe_compose_with_bracket_notation(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeCompose factory with bracket notation."""
         blueprint = PipeComposeBlueprint(
             description="Compose multiple items",
@@ -140,7 +149,8 @@ class TestBracketNotationInOperators:
         assert pipe.inputs.root["items"].multiplicity is True
         assert pipe.output.code == "Text"
 
-    def test_pipe_extract_with_bracket_output(self):
+    def test_pipe_extract_with_bracket_output(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeExtract factory with bracket notation in output."""
         blueprint = PipeExtractBlueprint(
             description="Extract pages",

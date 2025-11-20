@@ -1,5 +1,6 @@
 import os
-from typing import Any
+from typing import Any, Callable
+from pathlib import Path
 
 import pytest
 
@@ -11,11 +12,13 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_TEST_CASES, TEST_CASES
+from tests.unit.pipelex.core.stuffs.data import get_error_test_cases, get_search_domain_test_cases, get_test_cases
 
 
 @pytest.fixture(scope="class")
-def setup_test_concept():
+def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
+    load_test_library([Path(__file__).parent])
+
     # Register the class in the class registry
     ClassRegistryUtils.register_classes_in_file(
         file_path=os.path.join(os.path.dirname(__file__), "data.py"),
@@ -84,31 +87,29 @@ class TestStuffFactoryImplicitMemory:
       - List of dicts (2.6)
     """
 
-    @pytest.mark.parametrize(
-        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "expected_stuff"),
-        TEST_CASES,
-    )
     def test_implicit_memory_case(
         self,
         setup_test_concept: Any,
-        test_name: str,
-        stuff_content_or_data: StuffContentOrData,
-        stuff_name: str | None,
-        stuff_code: str,
-        expected_stuff: Stuff,
     ):
-        log.info(f"Testing case: {test_name}")
-        log.verbose(f"setup_test_concept: {setup_test_concept}")
+        test_cases = get_test_cases()
+        
+        for test_name, stuff_content_or_data, stuff_name, stuff_code, expected_stuff in test_cases:
+            log.info(f"Testing case: {test_name}")
+            log.verbose(f"setup_test_concept: {setup_test_concept}")
 
-        result = StuffFactory.make_stuff_from_stuff_content_or_data(
-            name=stuff_name,
-            code=stuff_code,
-            stuff_content_or_data=stuff_content_or_data,
-        )
-        pretty_print(result, title=f"Result for test case: {test_name}")
-        pretty_print(expected_stuff, title=f"Expected stuff for test case: {test_name}")
+            result = StuffFactory.make_stuff_from_stuff_content_or_data(
+                name=stuff_name,
+                code=stuff_code,
+                stuff_content_or_data=stuff_content_or_data,
+            )
+            pretty_print(result, title=f"Result for test case: {test_name}")
+            pretty_print(expected_stuff, title=f"Expected stuff for test case: {test_name}")
+            print(f"---- result content of {test_name} ----")
+            print(result)
+            print(f"---- expected stuff content of {test_name} ----")
+            print(expected_stuff)
 
-        assert result == expected_stuff, f"Failed for test case: {test_name}"
+            assert result == expected_stuff, f"Failed for test case: {test_name}"
 
 
 class TestStuffFactoryImplicitMemoryWithSearchDomains:
@@ -117,33 +118,26 @@ class TestStuffFactoryImplicitMemoryWithSearchDomains:
     This tests that search_domains correctly resolves concepts.
     """
 
-    @pytest.mark.parametrize(
-        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_domains", "expected_stuff"),
-        SEARCH_DOMAIN_TEST_CASES,
-    )
     def test_search_domain_case(
         self,
         setup_test_concept: Any,
-        test_name: str,
-        stuff_content_or_data: StuffContentOrData,
-        stuff_name: str | None,
-        stuff_code: str,
-        search_domains: list[str],
-        expected_stuff: Stuff,
     ):
-        log.info(f"Testing search domain case: {test_name}")
-        log.verbose(f"setup_test_concept: {setup_test_concept}")
-        result = StuffFactory.make_stuff_from_stuff_content_or_data(
-            name=stuff_name,
-            code=stuff_code,
-            stuff_content_or_data=stuff_content_or_data,
-            search_domains=search_domains,
-        )
+        test_cases = get_search_domain_test_cases()
+        
+        for test_name, stuff_content_or_data, stuff_name, stuff_code, search_domains, expected_stuff in test_cases:
+            log.info(f"Testing search domain case: {test_name}")
+            log.verbose(f"setup_test_concept: {setup_test_concept}")
+            result = StuffFactory.make_stuff_from_stuff_content_or_data(
+                name=stuff_name,
+                code=stuff_code,
+                stuff_content_or_data=stuff_content_or_data,
+                search_domains=search_domains,
+            )
 
-        pretty_print(result, title=f"Result for test case: {test_name}")
-        pretty_print(expected_stuff, title=f"Expected stuff for test case: {test_name}")
+            pretty_print(result, title=f"Result for test case: {test_name}")
+            pretty_print(expected_stuff, title=f"Expected stuff for test case: {test_name}")
 
-        assert result == expected_stuff, f"Failed for test case: {test_name}"
+            assert result == expected_stuff, f"Failed for test case: {test_name}"
 
 
 class TestStuffFactoryImplicitMemoryErrors:
@@ -152,28 +146,20 @@ class TestStuffFactoryImplicitMemoryErrors:
     This tests that the factory properly raises exceptions for invalid inputs.
     """
 
-    @pytest.mark.parametrize(
-        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_domains", "expected_exception", "error_match"),
-        ERROR_TEST_CASES,
-    )
     def test_error_case(
         self,
         setup_test_concept: Any,
-        test_name: str,
-        stuff_content_or_data: StuffContentOrData,
-        stuff_name: str | None,
-        stuff_code: str,
-        search_domains: list[str] | None,
-        expected_exception: type[Exception],
-        error_match: str,
     ):
-        log.info(f"Testing error case: {test_name}")
-        log.verbose(f"setup_test_concept: {setup_test_concept}")
+        test_cases = get_error_test_cases()
+        
+        for test_name, stuff_content_or_data, stuff_name, stuff_code, search_domains, expected_exception, error_match in test_cases:
+            log.info(f"Testing error case: {test_name}")
+            log.verbose(f"setup_test_concept: {setup_test_concept}")
 
-        with pytest.raises(expected_exception, match=error_match):
-            StuffFactory.make_stuff_from_stuff_content_or_data(
-                name=stuff_name,
-                code=stuff_code,
-                stuff_content_or_data=stuff_content_or_data,
-                search_domains=search_domains,
-            )
+            with pytest.raises(expected_exception, match=error_match):
+                StuffFactory.make_stuff_from_stuff_content_or_data(
+                    name=stuff_name,
+                    code=stuff_code,
+                    stuff_content_or_data=stuff_content_or_data,
+                    search_domains=search_domains,
+                )

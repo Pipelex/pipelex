@@ -1,3 +1,5 @@
+from typing import Callable
+
 import pytest
 
 from pipelex import log
@@ -15,7 +17,9 @@ class TestPipeComposeValidateInputs:
         self,
         test_id: str,
         blueprint: PipeComposeBlueprint,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
@@ -39,7 +43,9 @@ class TestPipeComposeValidateInputs:
         blueprint: PipeComposeBlueprint,
         expected_error_type: type[Exception],
         expected_error_message_fragment: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing error case: {test_id}")
 
         with pytest.raises(expected_error_type) as exc_info:

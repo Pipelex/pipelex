@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Callable
+
 import pytest
 from pytest import FixtureRequest
 
@@ -27,8 +30,10 @@ class TestPipeConditionExpressionTemplate:
         request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
         category: str,
+        load_test_library: Callable[[list[Path]], None],
     ):
         """Test that PipeCondition routes to the correct pipe based on expression."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create input data
         category_input = CategoryInput(category=category)
         stuff = StuffFactory.make_stuff(

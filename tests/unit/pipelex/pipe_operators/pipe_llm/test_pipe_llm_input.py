@@ -1,3 +1,5 @@
+from typing import Callable
+
 import pytest
 
 from pipelex import log
@@ -15,7 +17,9 @@ class TestPipeLLMValidateInputs:
         self,
         test_id: str,
         blueprint: PipeLLMBlueprint,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing valid case: {test_id}")
 
         pipe_llm = PipeLLMFactory.make_from_blueprint(

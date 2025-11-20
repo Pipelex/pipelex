@@ -1,6 +1,7 @@
 """Test pipe sequence functionality with batching operations."""
 
-from typing import cast
+from pathlib import Path
+from typing import Callable, cast
 
 import pytest
 
@@ -20,7 +21,8 @@ from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence impo
 @pytest.mark.dry_runnable
 @pytest.mark.inference
 @pytest.mark.asyncio
-async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode):
+async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
     """Test customer review analysis sequence with batching."""
     # Create test input - a document with reviews
     if pipe_run_mode == PipeRunMode.DRY:

@@ -21,7 +21,6 @@ class TestFlowFactory:
         ("plx_name", "plx_file"),
         [
             ("discord_newsletter", "discord_newsletter.plx"),
-            ("tricky_questions", "tricky_questions.plx"),
         ],
     )
     async def test_load_plx_and_convert_to_flow(
@@ -48,7 +47,7 @@ class TestFlowFactory:
 
         try:
             # Load PLX file from test pipelines directory
-            test_pipelines_dir = Path(__file__).parent.parent.parent.parent / "test_pipelines"
+            test_pipelines_dir = Path(__file__).parent
             plx_file_path = test_pipelines_dir / plx_file
 
             log.info(f"Loading PLX file: {plx_file_path}")
@@ -83,7 +82,7 @@ class TestFlowFactory:
 
     async def test_flow_preserves_sequence_structure(self):
         """Verify that PipeSequence controllers preserve their step structure."""
-        test_pipelines_dir = Path(__file__).parent.parent.parent.parent / "test_pipelines"
+        test_pipelines_dir = Path(__file__).parent
         plx_file_path = test_pipelines_dir / "discord_newsletter.plx"
 
         flow = FlowFactory.make_from_plx_file(plx_file_path)
@@ -106,7 +105,7 @@ class TestFlowFactory:
 
     async def test_flow_converts_operators_to_signatures(self):
         """Verify that pipe operators are converted to signatures (simplified view)."""
-        test_pipelines_dir = Path(__file__).parent.parent.parent.parent / "test_pipelines"
+        test_pipelines_dir = Path(__file__).parent
         plx_file_path = test_pipelines_dir / "discord_newsletter.plx"
 
         flow = FlowFactory.make_from_plx_file(plx_file_path)

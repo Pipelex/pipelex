@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Callable
+
 import pytest
 
 from pipelex import log
@@ -21,7 +24,9 @@ class TestPipeFuncValidation:
         self,
         test_id: str,
         blueprint: PipeFuncBlueprint,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path(Path(__file__).parent)])
         """Test that PipeFunc works correctly with valid, registered functions."""
         log.verbose(f"Testing valid case: {test_id}")
 
