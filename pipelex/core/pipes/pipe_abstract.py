@@ -9,7 +9,6 @@ from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.exceptions import PipeValidationError
-from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeAbstractValueError, PipeRunInputsError
@@ -273,12 +272,8 @@ class PipeAbstract(ABC, BaseModel):
         # check we have the required inputs in the working memory
         missing_inputs: dict[str, str] = {}
         for required_stuff_name, requirement in self.needed_inputs().items:
-            try:
-                if not working_memory.is_stuff_exists(name=required_stuff_name):
-                    missing_inputs[required_stuff_name] = requirement.concept.code
-            except WorkingMemoryStuffNotFoundError as exc:
-                variable_name: str = exc.variable_name or required_stuff_name
-                missing_inputs[variable_name] = exc.concept_code or requirement.concept.code
+            if not working_memory.is_stuff_exists(name=required_stuff_name):
+                missing_inputs[required_stuff_name] = requirement.concept.code
         if missing_inputs:
             raise PipeRunInputsError(
                 message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs

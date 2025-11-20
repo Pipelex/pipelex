@@ -1,3 +1,4 @@
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
@@ -38,9 +39,9 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                     template=system_prompt,
                     category=TemplateCategory.LLM_PROMPT,
                 )
-            except Jinja2TemplateSyntaxError as exc:
+            except ValidationError as exc:
                 error_msg = (
-                    f"Template syntax error in system prompt for pipe '{pipe_code}' "
+                    f"Template syntax error in system prompt for pipe '{pipe_code}'"
                     f"in domain '{domain}': {exc}. Template source:\n{blueprint.system_prompt}"
                 )
                 raise PipeLLMFactoryError(error_msg) from exc

@@ -154,38 +154,35 @@ class PipeBlueprint(ABC, BaseModel):
 
     @final
     def generic_validate_inputs(self):
-        if self.inputs is None:
-            return
-
         # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
         multiplicity_pattern = MUTLIPLICITY_PATTERN
+        if self.inputs:
+            for input_name, concept_spec in self.inputs.items():
+                validate_input_name(input_name)
 
-        for input_name, concept_spec in self.inputs.items():
-            validate_input_name(input_name)
+                # Validate the concept spec format with optional multiplicity brackets
+                match = re.match(multiplicity_pattern, concept_spec)
+                if not match:
+                    msg = (
+                        f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
+                        f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
+                    )
+                    raise ValueError(msg)
 
-            # Validate the concept spec format with optional multiplicity brackets
-            match = re.match(multiplicity_pattern, concept_spec)
-            if not match:
-                msg = (
-                    f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
-                    f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
-                )
+                # Extract the concept part (without multiplicity) and validate it
+                concept_string_or_code = match.group(1)
+                try:
+                    validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+                except ConceptStringError as exc:
+                    msg = f"Invalid concept string or code '{concept_string_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
+                    raise ValueError(msg) from exc
+
+            # Check that every input_name is unique
+            input_names = list(self.inputs.keys())
+            if len(input_names) != len(set(input_names)):
+                duplicates = [name for name in input_names if input_names.count(name) > 1]
+                msg = f"Duplicate input names found: {duplicates}. Input names must be unique."
                 raise ValueError(msg)
-
-            # Extract the concept part (without multiplicity) and validate it
-            concept_string_or_code = match.group(1)
-            try:
-                validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
-            except ConceptStringError as exc:
-                msg = f"Invalid concept string or code '{concept_string_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
-                raise ValueError(msg) from exc
-
-        # Check that every input_name is unique
-        input_names = list(self.inputs.keys())
-        if len(input_names) != len(set(input_names)):
-            duplicates = [name for name in input_names if input_names.count(name) > 1]
-            msg = f"Duplicate input names found: {duplicates}. Input names must be unique."
-            raise ValueError(msg)
 
         self.validate_inputs()
 
