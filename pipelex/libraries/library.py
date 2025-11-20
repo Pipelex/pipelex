@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
@@ -45,13 +46,19 @@ class Library(BaseModel):
 
     def validate_pipe_library_with_libraries(self) -> None:
         for pipe in self.pipe_library.get_pipes():
-            # Validate concept dependencies exit
+            # Validate concept dependencies exist
+            # Note: This should NEVER fail as concepts are validated during pipe construction via get_required_concept()
             for concept in [pipe.output, *pipe.inputs.concepts]:
                 try:
                     self.concept_library.is_concept_exists(concept_string=concept.concept_string)
                 except ConceptLibraryError as concept_error:
-                    msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
-                    raise LibraryError(msg) from concept_error
+                    msg = (
+                        f"INTERNAL ERROR: Pipe '{pipe.code}' references concept '{concept.concept_string}' "
+                        f"which doesn't exist in the concept library. This should be impossible as concepts are "
+                        f"validated during pipe construction (via get_required_concept() in pipe factories). "
+                        f"This indicates a bug in the system. Original error: {concept_error}"
+                    )
+                    raise PipelexUnexpectedError(msg) from concept_error
 
             # Validate pipe dependencies exist for pipe controllers
             if isinstance(pipe, PipeController):
