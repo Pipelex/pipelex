@@ -48,7 +48,7 @@ class Library(BaseModel):
             # Validate concept dependencies exit
             for concept in [pipe.output, *pipe.inputs.concepts]:
                 try:
-                    self.concept_library.get_required_concept(concept_string=concept.concept_string)
+                    self.concept_library.is_concept_exists(concept_string=concept.concept_string)
                 except ConceptLibraryError as concept_error:
                     msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
                     raise LibraryError(msg) from concept_error

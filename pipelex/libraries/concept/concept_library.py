@@ -154,3 +154,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                     msg = f"Multiple concepts found for '{concept_string_or_code}': {found_concepts}. Please specify the domain."
                     raise ConceptLibraryConceptNotFoundError(msg)
                 return found_concepts[0]
+
+    def is_concept_exists(self, concept_string: str) -> bool:
+        return concept_string in self.root
