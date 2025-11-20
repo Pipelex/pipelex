@@ -20,8 +20,8 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -87,7 +87,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def validate_output_with_library(self):
-        # TODO: generalize because there are other concepts PipeLLM can't generate, not just images, and PipeLLM is not the only one with this kind of constraints
+        # TODO: generalize because there are other concepts PipeLLM can't generate, not just images,
+        # and PipeLLM is not the only one with this kind of constraints
         if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),

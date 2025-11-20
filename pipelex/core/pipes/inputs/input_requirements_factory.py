@@ -5,7 +5,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_string_or_code
-from pipelex.core.pipes.input_requirements import InputRequirement, InputRequirements
+from pipelex.core.pipes.inputs.input_requirements import InputRequirement, InputRequirements
 from pipelex.hub import get_required_concept
 
 if TYPE_CHECKING:

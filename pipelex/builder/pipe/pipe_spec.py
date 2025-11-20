@@ -10,7 +10,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.pipes.exceptions import PipeBlueprintValueError
-from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType, PipeBlueprint
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -39,8 +39,7 @@ class PipeSpec(StructuredContent):
     pipe_code: str = Field(description="Unique pipe identifier. Must be snake_case.")
     type: Any = Field(
         description=(
-            f"Pipe type. Validated at runtime, must be one of: {PipeType}. "
-            "Examples: PipeLLM, PipeImgGen, PipeExtract, PipeSequence, PipeParallel."
+            f"Pipe type. Validated at runtime, must be one of: {PipeType}. Examples: PipeLLM, PipeImgGen, PipeExtract, PipeSequence, PipeParallel."
         )
     )
     pipe_category: Any = Field(

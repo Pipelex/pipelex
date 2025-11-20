@@ -931,8 +931,8 @@ from pipelex.core.pipes.pipe_input_factory import PipeInputSpecFactory
 
 **After:**
 ```python
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 ```
 
 #### Comprehensive OCR → Extract Renaming
@@ -1219,7 +1219,7 @@ The following replacements can be done with find/replace tools:
 - Remove `config_folder_path` parameters from `Pipelex.make()`
 - `from pipelex.core.stuffs.stuff_content import` → Update to specific module imports
 - `from pipelex.pipe_works` → `from pipelex.pipe_run`
-- `from pipelex.core.pipes.pipe_input` → `from pipelex.core.pipes.input_requirements`
+- `from pipelex.core.pipes.pipe_input` → `from pipelex.core.pipes.inputs.input_requirements`
 - `from pipelex.cogt.ocr` → `from pipelex.cogt.extract`
 - `PipeInputSpec` → `InputRequirements`
 - `ConceptProviderAbstract` → `ConceptLibraryAbstract`

@@ -13,7 +13,7 @@ from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeAbstractValueError, PipeRunInputsError
-from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -87,17 +87,10 @@ class PipeAbstract(ABC, BaseModel):
 
     @final
     def generic_validate_input_static(self):
-        # Put here the validation that is common to all pipes
-        # ...
-
-        # Now apply custom validation for pipes
         self.validate_input_static()
 
     @final
     def generic_validate_output_static(self):
-        # Put here the validation that is common to all pipes
-        # ...
-        # Now apply custom validation for pipes
         self.validate_output_static()
 
     @final
@@ -166,15 +159,10 @@ class PipeAbstract(ABC, BaseModel):
                     explanation=f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}",
                 )
 
-        # Now apply custom validation for pipes
         self.validate_input_with_library()
 
     @final
     def generic_validate_output_with_library(self):
-        # Put here the validation that is common to all pipes
-        # ...
-
-        # Now apply custom validation for pipes
         self.validate_output_with_library()
 
     @abstractmethod

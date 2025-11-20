@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType, PipeBlueprint
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 
 
 class ConcretePipeBlueprint(PipeBlueprint):

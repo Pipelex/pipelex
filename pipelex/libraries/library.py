@@ -15,6 +15,8 @@ class Library(BaseModel):
     This represents a complete set of Pipelex definitions (domains, concepts, pipes)
     that can be loaded and used together, typically for a single pipeline run.
 
+    Limitations: It misses the Func Registry library and Class Registry library
+
     Each Library (except BASE) inherits native concepts and base pipes from the BASE library.
     """
 
@@ -42,7 +44,7 @@ class Library(BaseModel):
         self.validate_domain_library_with_libraries()
 
     def validate_pipe_library_with_libraries(self) -> None:
-        for pipe in self.pipe_library.root.values():
+        for pipe in self.pipe_library.get_pipes():
             # Validate concept dependencies exit
             for concept in [pipe.output, *pipe.inputs.concepts]:
                 try:
@@ -51,7 +53,7 @@ class Library(BaseModel):
                     msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
                     raise LibraryError(msg) from concept_error
 
-            # Validate pipe dependencies exit for pipe controllers
+            # Validate pipe dependencies exist for pipe controllers
             if isinstance(pipe, PipeController):
                 for sub_pipe_code in pipe.pipe_dependencies():
                     try:

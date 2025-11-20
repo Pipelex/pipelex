@@ -16,7 +16,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent

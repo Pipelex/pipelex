@@ -312,4 +312,3 @@ class LibraryManager(LibraryManagerAbstract):
     def _remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
         for blueprint in blueprints:
             self._remove_from_blueprint(library_id=library_id, blueprint=blueprint)
-

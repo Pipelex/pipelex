@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent

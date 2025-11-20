@@ -9,6 +9,7 @@ from pipelex.builder.builder import (
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
+from pipelex.config import get_config
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintFixableErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.hub import get_console, get_required_pipe
@@ -23,6 +24,7 @@ from pipelex.tools.misc.json_utils import save_as_json_to_path
 class BuilderLoop:
     async def build_and_fix(
         self,
+        builder_pipe: str,
         inputs: PipelineInputs | None = None,
         is_save_first_iteration_enabled: bool = True,
         is_save_second_iteration_enabled: bool = True,
@@ -30,7 +32,7 @@ class BuilderLoop:
     ) -> PipelexBundleSpec:
         try:
             pipe_output = await execute_pipeline(
-                pipe_code="pipe_builder",
+                pipe_code=builder_pipe,
                 library_path=str(Path(builder.__file__).parent),
                 inputs=inputs,
             )
@@ -60,7 +62,7 @@ class BuilderLoop:
             save_text_to_path(text=plx_content, path=first_iteration_path)
 
         bundle_blueprint = pipelex_bundle_spec.to_blueprint()
-        max_attempts = 10
+        max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts
         for attempt in range(1, max_attempts + 1):
             try:
                 if attempt == 1:

@@ -6,8 +6,8 @@ from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeInputNotFoundError
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError

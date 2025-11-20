@@ -72,11 +72,11 @@ class PipelexInterpreter(BaseModel):
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
             # Parse Pydantic validation errors into structured error data
-            validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
+            blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
             # Handle domain and source fields carefully for context
             domain_value: str | None = blueprint_dict.get("domain") if blueprint_dict else None
-            source_value: str | None = blueprint_dict.get("source") or bundle_path if blueprint_dict else bundle_path
+            source_value: str | None = blueprint_dict.get("source") if blueprint_dict else bundle_path
 
             for error in exc.errors():
                 loc = error.get("loc", ())
@@ -92,9 +92,9 @@ class PipelexInterpreter(BaseModel):
                     domain=error_domain,
                     source=error_source,
                 )
-                validation_errors.append(val_error)
+                blueprint_validation_errors.append(val_error)
 
             raise PipelexInterpreterError(
                 message=str(exc),
-                validation_errors=validation_errors,
+                validation_errors=blueprint_validation_errors,
             ) from exc
