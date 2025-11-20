@@ -44,8 +44,8 @@ def load_toml_from_path(path: str) -> dict[str, Any]:
 
     """
     try:
-        with open(path, "rb") as f:
-            return tomli.load(f)
+        with open(path, "rb") as file:
+            return tomli.load(file)
     except tomli.TOMLDecodeError as exc:
         msg = f"TOML parsing error in file '{path}': {exc.msg}"
         raise TomlError(message=msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
@@ -68,8 +68,8 @@ def load_toml_with_tomlkit(path: str) -> tomlkit.TOMLDocument:
         TOMLDocument that preserves formatting and comments
 
     """
-    with open(path, encoding="utf-8") as f:
-        return tomlkit.load(f)
+    with open(path, encoding="utf-8") as file:
+        return tomlkit.load(file)
 
 
 def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str) -> None:
@@ -80,5 +80,5 @@ def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str) ->
         path: Path where the TOML file should be saved
 
     """
-    with open(path, "w", encoding="utf-8") as f:
-        tomlkit.dump(data, f)  # type: ignore[arg-type]
+    with open(path, "w", encoding="utf-8") as file:
+        tomlkit.dump(data, file)  # type: ignore[arg-type]

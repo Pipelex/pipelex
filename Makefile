@@ -482,11 +482,11 @@ docs-deploy: env
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright mypy
+c: format lint pyright pylint mypy
 	@echo "> done: c = check"
 
 cc: cleanderived c
-	@echo "> done: cc = cleanderived format lint pyright mypy"
+	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
 
 check: cc check-unused-imports pylint ccs
 	@echo "> done: check"

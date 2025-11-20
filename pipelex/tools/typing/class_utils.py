@@ -53,16 +53,16 @@ def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
 
     fields: dict[str, FieldInfo] = class_1.model_fields  # type: ignore[attr-defined]
 
-    def _is_compatible(t: Any) -> bool:
+    def _is_compatible(type_param: Any) -> bool:
         # Unwrap Annotated[T, ...]
-        if get_origin(t) is Annotated:
-            t = get_args(t)[0]
+        if get_origin(type_param) is Annotated:
+            type_param = get_args(type_param)[0]
 
-        origin = get_origin(t)
+        origin = get_origin(type_param)
 
         # Handle unions, including PEP 604 (T | None)
         if origin in (Union, _UnionType):
-            for arg in get_args(t):
+            for arg in get_args(type_param):
                 if arg is _NoneType:
                     continue
                 if _is_compatible(arg):
@@ -71,7 +71,7 @@ def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
 
         # Base case: direct match / subclass
         try:
-            return t is class_2 or (isinstance(t, type) and issubclass(t, class_2))
+            return type_param is class_2 or (isinstance(type_param, type) and issubclass(type_param, class_2))
         except TypeError:
             # Not a class type (e.g., typing constructs you don't care about)
             return False

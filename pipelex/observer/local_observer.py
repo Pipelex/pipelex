@@ -26,8 +26,8 @@ class LocalObserver(ObserverProtocol):
         }
 
         file_path = os.path.join(self.storage_dir, f"{event_type}.jsonl")
-        with open(file_path, "a", encoding="utf-8") as f:
-            f.write(kajson.dumps(payload) + "\n")
+        with open(file_path, "a", encoding="utf-8") as file:
+            file.write(kajson.dumps(payload) + "\n")
 
     @override
     async def observe_before_run(self, payload: PayloadType) -> None:

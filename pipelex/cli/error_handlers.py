@@ -131,8 +131,8 @@ def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | 
     # Display bundle blueprint validation errors
     if exc.pipelex_bundle_blueprint_validation_errors:
         console.print("[bold cyan]Bundle Blueprint Validation Errors:[/bold cyan]\n")
-        for i, error in enumerate(exc.pipelex_bundle_blueprint_validation_errors, 1):
-            console.print(f"[bold yellow]{i}. {error.error_type.replace('_', ' ').title()}[/bold yellow]")
+        for idx, error in enumerate(exc.pipelex_bundle_blueprint_validation_errors, 1):
+            console.print(f"[bold yellow]{idx}. {error.error_type.replace('_', ' ').title()}[/bold yellow]")
 
             # Display entity context
             if error.pipe_code:
@@ -188,8 +188,8 @@ def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | 
     # Display pipe validation errors
     if exc.pipe_validation_error_data:
         console.print("[bold cyan]Pipe Validation Errors:[/bold cyan]\n")
-        for i, pipe_error in enumerate(exc.pipe_validation_error_data, 1):
-            console.print(f"[bold yellow]{i}. {pipe_error.error_type.replace('_', ' ').title()}[/bold yellow]")
+        for idx, pipe_error in enumerate(exc.pipe_validation_error_data, 1):
+            console.print(f"[bold yellow]{idx}. {pipe_error.error_type.replace('_', ' ').title()}[/bold yellow]")
 
             # Display key identification info
             if pipe_error.pipe_code:

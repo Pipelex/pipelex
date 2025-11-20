@@ -394,5 +394,21 @@ reports = false
 disable = ["all"]
 enable = [
     "W0101", # Unreachable code: Used when there is some code behind a "return" or "raise" statement, which will never be accessed.
+    "C0103",  # invalid-name (naming convention)
 ]
 ignore = [".venv", "__pycache__", "build", "dist", ".git"]
+
+[tool.pylint.basic]
+# Variables / attributes / arguments: snake_case, not length 1
+variable-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
+argument-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
+attr-rgx     = "^(?!.$)[a-z_][a-z0-9_]*$"
+
+# Functions / methods: snake_case, not length 1
+function-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
+method-rgx   = "^(?!.$)[a-z_][a-z0-9_]*$"
+
+# Classes: CapWords, not length 1
+class-rgx    = "^(?!.$)[A-Z_][a-zA-Z0-9_]*$"
+typevar-rgx = "^[A-Za-z_][A-Za-z0-9_]*$"
+good-names = ["_"]
