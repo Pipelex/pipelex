@@ -109,11 +109,11 @@ class PipeParallel(PipeController):
         return self
 
     @override
-    def validate_input_static(self):
+    def validate_inputs_static(self):
         pass
 
     @override
-    def validate_input_with_library(self):
+    def validate_inputs_with_library(self):
         pass
 
     @override

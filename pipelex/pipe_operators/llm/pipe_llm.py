@@ -72,13 +72,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return self
 
     @override
-    def validate_input_static(self):
+    def validate_inputs_static(self):
         if self.llm_choices:
             for llm_choice in self.llm_choices.list_choice_strings():
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
     @override
-    def validate_input_with_library(self):
+    def validate_inputs_with_library(self):
         pass
 
     @override

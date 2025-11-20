@@ -72,29 +72,29 @@ class PipeAbstract(ABC, BaseModel):
 
     @model_validator(mode="after")
     def validate_pipe(self) -> Self:
-        self.generic_validate_input_static()
+        self.generic_validate_inputs_static()
         self.generic_validate_output_static()
         return self
 
     @final
     def validate_with_libraries(self):
         try:
-            self.generic_validate_input_with_library()
+            self.generic_validate_inputs_with_library()
             self.generic_validate_output_with_library()
         except ModelChoiceNotFoundError as exc:
             msg = f"Model choice not found for pipe '{self.code}': {exc}"
             raise PipeAbstractValueError(msg) from exc
 
     @final
-    def generic_validate_input_static(self):
-        self.validate_input_static()
+    def generic_validate_inputs_static(self):
+        self.validate_inputs_static()
 
     @final
     def generic_validate_output_static(self):
         self.validate_output_static()
 
     @final
-    def generic_validate_input_with_library(self):
+    def generic_validate_inputs_with_library(self):
         # First validate required variables are in the inputs
         for required_variable_name in self.required_variables():
             if required_variable_name not in self.inputs.variables:
@@ -159,18 +159,18 @@ class PipeAbstract(ABC, BaseModel):
                     explanation=f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}",
                 )
 
-        self.validate_input_with_library()
+        self.validate_inputs_with_library()
 
     @final
     def generic_validate_output_with_library(self):
         self.validate_output_with_library()
 
     @abstractmethod
-    def validate_input_with_library(self):
+    def validate_inputs_with_library(self):
         pass
 
     @abstractmethod
-    def validate_input_static(self):
+    def validate_inputs_static(self):
         pass
 
     @abstractmethod

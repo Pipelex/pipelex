@@ -93,12 +93,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         return self
 
     @override
-    def validate_input_static(self):
+    def validate_inputs_static(self):
         if self.img_gen_choice:
             check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
 
     @override
-    def validate_input_with_library(self):
+    def validate_inputs_with_library(self):
         concept_library = get_concept_library()
         input_name = self.inputs.variables[0]
         input_requirement = self.inputs.get_required_input_requirement(input_name)
