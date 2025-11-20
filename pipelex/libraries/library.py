@@ -53,11 +53,11 @@ class Library(BaseModel):
 
             # Validate pipe dependencies exit for pipe controllers
             if isinstance(pipe, PipeController):
-                for pipe_code in pipe.pipe_dependencies():
+                for sub_pipe_code in pipe.pipe_dependencies():
                     try:
-                        self.pipe_library.get_required_pipe(pipe_code=pipe_code)
+                        self.pipe_library.get_required_pipe(pipe_code=sub_pipe_code)
                     except PipeLibraryError as pipe_error:
-                        msg = f"Error validating pipe '{pipe.code}' dependency pipe '{pipe_code}' because of: {pipe_error}"
+                        msg = f"Error validating pipe '{pipe.code}' dependency pipe '{sub_pipe_code}' because of: {pipe_error}"
                         raise LibraryError(msg) from pipe_error
 
         for pipe in self.pipe_library.root.values():

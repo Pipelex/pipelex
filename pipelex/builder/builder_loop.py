@@ -10,7 +10,7 @@ from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintFixableErrorType, PipeValidationErrorType
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
+from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.hub import get_console, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.exceptions import PipelineExecutionError
@@ -114,7 +114,7 @@ class BuilderLoop:
                 case PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH:
                     # Fix input requirement mismatch by updating the specific mismatched input(s)
                     # This applies to ALL pipe categories (operators and controllers)
-                    if not AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
+                    if not PipeCategory.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         continue
 
                     pipe = get_required_pipe(pipe_code=val_error.pipe_code)
@@ -156,7 +156,7 @@ class BuilderLoop:
 
                 case PipeValidationErrorType.MISSING_INPUT_VARIABLE | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE:
                     # Fix input variables for PipeController ONLY by copying all requirements from needed_inputs
-                    if not AllowedPipeCategories.is_controller_by_str(category_str=pipe_spec.pipe_category):
+                    if not PipeCategory.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         continue
 
                     pipe = get_required_pipe(pipe_code=val_error.pipe_code)

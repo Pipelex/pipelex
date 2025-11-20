@@ -14,7 +14,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeAbstractValueError, PipeRunInputsError
 from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
+from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -50,22 +50,22 @@ class PipeAbstract(ABC, BaseModel):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        if value not in AllowedPipeTypes.value_list():
-            msg = f"Invalid pipe type '{value}' for pipe '{cls.code}'. Must be one of: {AllowedPipeTypes.value_list()}"
+        if value not in PipeType.value_list():
+            msg = f"Invalid pipe type '{value}' for pipe '{cls.code}'. Must be one of: {PipeType.value_list()}"
             raise ValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
     @classmethod
     def validate_pipe_category(cls, value: Any) -> Any:
-        if value not in AllowedPipeCategories.value_list():
-            msg = f"Invalid pipe category '{value}' for pipe '{cls.code}'. Must be one of: {AllowedPipeCategories.value_list()}"
+        if value not in PipeCategory.value_list():
+            msg = f"Invalid pipe category '{value}' for pipe '{cls.code}'. Must be one of: {PipeCategory.value_list()}"
             raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
     def validate_pipe_category_based_on_type(self) -> Self:
-        if self.pipe_category != AllowedPipeTypes(self.type).category:
+        if self.pipe_category != PipeType(self.type).category:
             msg = f"Invalid pipe category '{self.pipe_category}' for pipe '{self.code}'. Must be one of: {self.type.category}"
             raise ValueError(msg)
         return self
@@ -132,7 +132,7 @@ class PipeAbstract(ABC, BaseModel):
                 )
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
-            if AllowedPipeCategories(self.pipe_category) == AllowedPipeCategories.PIPE_CONTROLLER:
+            if PipeCategory.is_controller_by_str(self.pipe_category):
                 # Compare the essential parts of InputRequirement (concept code + multiplicity)
                 # Skip validation if the needed requirement is Dynamic or Anything (flexible output types)
                 declared_requirement = self.inputs.root[var_name]

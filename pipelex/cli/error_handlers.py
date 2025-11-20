@@ -188,8 +188,8 @@ def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | 
     # Display pipe validation errors
     if exc.pipe_validation_error_data:
         console.print("[bold cyan]Pipe Validation Errors:[/bold cyan]\n")
-        for idx, pipe_error in enumerate(exc.pipe_validation_error_data, 1):
-            console.print(f"[bold yellow]{idx}. {pipe_error.error_type.replace('_', ' ').title()}[/bold yellow]")
+        for pipe_index, pipe_error in enumerate(exc.pipe_validation_error_data, 1):
+            console.print(f"[bold yellow]{pipe_index}. {pipe_error.error_type.replace('_', ' ').title()}[/bold yellow]")
 
             # Display key identification info
             if pipe_error.pipe_code:

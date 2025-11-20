@@ -10,7 +10,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.pipes.exceptions import PipeBlueprintValueError
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
+from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType, PipeBlueprint
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -39,12 +39,12 @@ class PipeSpec(StructuredContent):
     pipe_code: str = Field(description="Unique pipe identifier. Must be snake_case.")
     type: Any = Field(
         description=(
-            f"Pipe type. Validated at runtime, must be one of: {AllowedPipeTypes}. "
+            f"Pipe type. Validated at runtime, must be one of: {PipeType}. "
             "Examples: PipeLLM, PipeImgGen, PipeExtract, PipeSequence, PipeParallel."
         )
     )
     pipe_category: Any = Field(
-        description=(f"Pipe category. Validated at runtime, must be one of: {AllowedPipeCategories}. Either 'PipeController' or 'PipeOperator'.")
+        description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'.")
     )
     description: str | None = Field(description="Natural language description of the pipe's purpose and functionality.")
     inputs: dict[str, str] = Field(
@@ -71,8 +71,8 @@ class PipeSpec(StructuredContent):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        if value not in AllowedPipeTypes.value_list():
-            msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
+        if value not in PipeType.value_list():
+            msg = f"Invalid pipe type '{value}'. Must be one of: {PipeType.value_list()}"
             raise PipeBlueprintValueError(msg)
         return value
 

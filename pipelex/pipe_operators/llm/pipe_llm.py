@@ -87,6 +87,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def validate_output_with_library(self):
+        # TODO: generalize because there are other concepts PipeLLM can't generate, not just images, and PipeLLM is not the only one with this kind of constraints
         if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),

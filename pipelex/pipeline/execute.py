@@ -55,7 +55,9 @@ async def execute_pipeline(
     Parameters
     ----------
     library_id:
-        The library ID to use for the pipeline execution. If not provided, the current library ID is used.
+        The library ID to use for the pipeline execution. If not provided, the library_id will be set to the pipeline run ID.
+    library_path:
+        Path to the library directory to load.
     pipe_code:
         The code identifying the pipeline to execute.
     plx_content:

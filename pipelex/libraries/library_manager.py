@@ -96,7 +96,6 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def get_library(self, library_id: str | None = None) -> Library:
-        """Get the library with the given library_id. Returns the UNTITLED library if no library_id is provided."""
         if library_id is None:
             library_id = get_current_library_id()
         if library_id not in self._libraries:
@@ -168,10 +167,6 @@ class LibraryManager(LibraryManagerAbstract):
 
         self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
 
-    ############################################################
-    # Private helper methods
-    ############################################################
-
     @override
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
@@ -235,6 +230,10 @@ class LibraryManager(LibraryManagerAbstract):
         library.validate_library()
         return all_pipes
 
+    ############################################################
+    # Private helper methods
+    ############################################################
+
     def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> None:
         """Load PLX files into a specific library.
 
@@ -295,14 +294,6 @@ class LibraryManager(LibraryManagerAbstract):
         if blueprint.pipe is not None:
             library.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
 
-        # Remove concepts (they may depend on domain)
-        if blueprint.concept is not None:
-            concept_codes_to_remove = [
-                ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
-                for concept_code in blueprint.concept
-            ]
-            library.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)
-
     def _remove_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_library()
         if blueprint.concept is not None:
@@ -313,15 +304,12 @@ class LibraryManager(LibraryManagerAbstract):
             library.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)
 
     @override
-    def remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+    def _remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
         self._remove_pipes_from_blueprint(blueprint=blueprint)
         self._remove_concepts_from_blueprint(blueprint=blueprint)
 
     @override
-    def remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
+    def _remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
         for blueprint in blueprints:
-            self.remove_from_blueprint(library_id=library_id, blueprint=blueprint)
+            self._remove_from_blueprint(library_id=library_id, blueprint=blueprint)
 
-    @override
-    def get_loaded_plx_paths(self) -> list[str]:
-        return self.loaded_plx_paths

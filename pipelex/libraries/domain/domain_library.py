@@ -23,7 +23,7 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
 
     @classmethod
     def make_empty(cls) -> Self:
-        return cls(root=DomainLibraryRoot())
+        return cls(root={})
 
     @override
     def get_domain(self, domain: str) -> Domain | None:

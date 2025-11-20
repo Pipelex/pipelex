@@ -11,7 +11,7 @@ from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, PipeV
 from pipelex.types import Self, StrEnum
 
 
-class AllowedPipeCategories(StrEnum):
+class PipeCategory(StrEnum):
     PIPE_OPERATOR = "PipeOperator"
     PIPE_CONTROLLER = "PipeController"
 
@@ -22,9 +22,9 @@ class AllowedPipeCategories(StrEnum):
     @property
     def is_controller(self) -> bool:
         match self:
-            case AllowedPipeCategories.PIPE_CONTROLLER:
+            case PipeCategory.PIPE_CONTROLLER:
                 return True
-            case AllowedPipeCategories.PIPE_OPERATOR:
+            case PipeCategory.PIPE_OPERATOR:
                 return False
 
     @classmethod
@@ -36,7 +36,7 @@ class AllowedPipeCategories(StrEnum):
             return False
 
 
-class AllowedPipeTypes(StrEnum):
+class PipeType(StrEnum):
     # Pipe Operators
     PIPE_FUNC = "PipeFunc"
     PIPE_IMG_GEN = "PipeImgGen"
@@ -54,26 +54,26 @@ class AllowedPipeTypes(StrEnum):
         return list(cls)
 
     @property
-    def category(self) -> AllowedPipeCategories:
+    def category(self) -> PipeCategory:
         match self:
-            case AllowedPipeTypes.PIPE_FUNC:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_IMG_GEN:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_COMPOSE:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_LLM:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_EXTRACT:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_BATCH:
-                return AllowedPipeCategories.PIPE_CONTROLLER
-            case AllowedPipeTypes.PIPE_CONDITION:
-                return AllowedPipeCategories.PIPE_CONTROLLER
-            case AllowedPipeTypes.PIPE_PARALLEL:
-                return AllowedPipeCategories.PIPE_CONTROLLER
-            case AllowedPipeTypes.PIPE_SEQUENCE:
-                return AllowedPipeCategories.PIPE_CONTROLLER
+            case PipeType.PIPE_FUNC:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_IMG_GEN:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_COMPOSE:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_LLM:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_EXTRACT:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_BATCH:
+                return PipeCategory.PIPE_CONTROLLER
+            case PipeType.PIPE_CONDITION:
+                return PipeCategory.PIPE_CONTROLLER
+            case PipeType.PIPE_PARALLEL:
+                return PipeCategory.PIPE_CONTROLLER
+            case PipeType.PIPE_SEQUENCE:
+                return PipeCategory.PIPE_CONTROLLER
 
 
 class PipeBlueprint(ABC, BaseModel):
@@ -120,22 +120,22 @@ class PipeBlueprint(ABC, BaseModel):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        if value not in AllowedPipeTypes.value_list():
-            msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
+        if value not in PipeType.value_list():
+            msg = f"Invalid pipe type '{value}'. Must be one of: {PipeType.value_list()}"
             raise ValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
     @classmethod
     def validate_pipe_category(cls, value: Any) -> Any:
-        if value not in AllowedPipeCategories.value_list():
-            msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
+        if value not in PipeCategory.value_list():
+            msg = f"Invalid pipe category '{value}'. Must be one of: {PipeCategory.value_list()}"
             raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
     def validate_pipe_category_based_on_type(self) -> Self:
-        if self.pipe_category != AllowedPipeTypes(self.type).category:
+        if self.pipe_category != PipeType(self.type).category:
             msg = f"Invalid pipe category '{self.pipe_category}'. Must be one of: {self.type.category}"
             raise ValueError(msg)
         return self
