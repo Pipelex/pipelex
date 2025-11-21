@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -30,24 +30,6 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     type: Literal["PipeFunc"] = "PipeFunc"
     function_name: str
 
-    @field_validator("function_name", mode="before")
-    @classmethod
-    def validate_function_name(cls, function_name: str) -> str:
-        function = func_registry.get_function(function_name)
-        if not function:
-            msg = f"Function '{function_name}' not found in registry"
-            raise PipeDefinitionError(msg)
-
-        return_type = get_type_hints(function).get("return")
-
-        if return_type is None:
-            msg = f"Function '{function_name}' has no return type annotation"
-            raise PipeDefinitionError(msg)
-        if not issubclass(return_type, StuffContent):
-            msg = f"Function '{function_name}' return type {return_type} is not a subclass of StuffContent"
-            raise PipeDefinitionError(msg)
-        return function_name
-
     @override
     def required_variables(self) -> set[str]:
         return set()
@@ -56,8 +38,38 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         return self.inputs
 
+    @field_validator("function_name", mode="before")
+    @classmethod
+    def validate_function_name(cls, function_name: str) -> str:
+        function = func_registry.get_function(function_name)
+        if not function:
+            msg = f"Function '{function_name}' not found in registry"
+            raise ValueError(msg)
+
+        return_type = get_type_hints(function).get("return")
+
+        if return_type is None:
+            msg = f"Function '{function_name}' has no return type annotation"
+            raise ValueError(msg)
+        if not issubclass(return_type, StuffContent):
+            msg = f"Function '{function_name}' return type {return_type} is not a subclass of StuffContent"
+            raise TypeError(msg)
+        return function_name
+
     @override
-    def validate_output(self):
+    def validate_inputs_static(self):
+        pass
+
+    @override
+    def validate_inputs_with_library(self):
+        pass
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self):
         pass
 
     @override

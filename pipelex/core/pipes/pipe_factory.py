@@ -9,11 +9,11 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 PipeBlueprintType = TypeVar("PipeBlueprintType", bound="PipeBlueprint", contravariant=True)
-PipeType = TypeVar("PipeType", bound="PipeAbstract", covariant=True)
+PipeAbstractType = TypeVar("PipeAbstractType", bound="PipeAbstract", covariant=True)
 
 
 @runtime_checkable
-class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
+class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
     @classmethod
     def make_from_blueprint(
         cls,
@@ -21,7 +21,7 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeType]):
         pipe_code: str,
         blueprint: PipeBlueprintType,
         concept_codes_from_the_same_domain: list[str] | None = None,
-    ) -> PipeType: ...
+    ) -> PipeAbstractType: ...
 
 
 class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):

@@ -1,18 +1,17 @@
 import re
-from typing import Any
+from abc import ABC
+from typing import Any, final
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_string_or_code
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.validation import validate_input_name
-from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
-from pipelex.tools.misc.string_utils import is_snake_case
-from pipelex.types import StrEnum
+from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, PipeVariableMultiplicityError, parse_concept_with_multiplicity
+from pipelex.types import Self, StrEnum
 
 
-class AllowedPipeCategories(StrEnum):
+class PipeCategory(StrEnum):
     PIPE_OPERATOR = "PipeOperator"
     PIPE_CONTROLLER = "PipeController"
 
@@ -23,9 +22,9 @@ class AllowedPipeCategories(StrEnum):
     @property
     def is_controller(self) -> bool:
         match self:
-            case AllowedPipeCategories.PIPE_CONTROLLER:
+            case PipeCategory.PIPE_CONTROLLER:
                 return True
-            case AllowedPipeCategories.PIPE_OPERATOR:
+            case PipeCategory.PIPE_OPERATOR:
                 return False
 
     @classmethod
@@ -37,7 +36,7 @@ class AllowedPipeCategories(StrEnum):
             return False
 
 
-class AllowedPipeTypes(StrEnum):
+class PipeType(StrEnum):
     # Pipe Operators
     PIPE_FUNC = "PipeFunc"
     PIPE_IMG_GEN = "PipeImgGen"
@@ -55,29 +54,29 @@ class AllowedPipeTypes(StrEnum):
         return list(cls)
 
     @property
-    def category(self) -> AllowedPipeCategories:
+    def category(self) -> PipeCategory:
         match self:
-            case AllowedPipeTypes.PIPE_FUNC:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_IMG_GEN:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_COMPOSE:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_LLM:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_EXTRACT:
-                return AllowedPipeCategories.PIPE_OPERATOR
-            case AllowedPipeTypes.PIPE_BATCH:
-                return AllowedPipeCategories.PIPE_CONTROLLER
-            case AllowedPipeTypes.PIPE_CONDITION:
-                return AllowedPipeCategories.PIPE_CONTROLLER
-            case AllowedPipeTypes.PIPE_PARALLEL:
-                return AllowedPipeCategories.PIPE_CONTROLLER
-            case AllowedPipeTypes.PIPE_SEQUENCE:
-                return AllowedPipeCategories.PIPE_CONTROLLER
+            case PipeType.PIPE_FUNC:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_IMG_GEN:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_COMPOSE:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_LLM:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_EXTRACT:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_BATCH:
+                return PipeCategory.PIPE_CONTROLLER
+            case PipeType.PIPE_CONDITION:
+                return PipeCategory.PIPE_CONTROLLER
+            case PipeType.PIPE_PARALLEL:
+                return PipeCategory.PIPE_CONTROLLER
+            case PipeType.PIPE_SEQUENCE:
+                return PipeCategory.PIPE_CONTROLLER
 
 
-class PipeBlueprint(BaseModel):
+class PipeBlueprint(ABC, BaseModel):
     model_config = ConfigDict(extra="forbid")
     source: str | None = None
     pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
@@ -85,6 +84,14 @@ class PipeBlueprint(BaseModel):
     description: str | None = None
     inputs: dict[str, str] | None = None
     output: str
+
+    @property
+    def nb_inputs(self) -> int:
+        return len(self.inputs) if self.inputs else 0
+
+    @property
+    def input_names(self) -> list[str]:
+        return list(self.inputs.keys()) if self.inputs else []
 
     @property
     def pipe_dependencies(self) -> set[str]:
@@ -110,66 +117,97 @@ class PipeBlueprint(BaseModel):
         """
         return None
 
-    @field_validator("inputs", mode="after")
-    @classmethod
-    def validate_inputs(cls, inputs: dict[str, str] | None) -> dict[str, str] | None:
-        if inputs is None:
-            return None
-
-        # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-        multiplicity_pattern = MUTLIPLICITY_PATTERN
-
-        for input_name, concept_spec in inputs.items():
-            validate_input_name(input_name)
-
-            # Validate the concept spec format with optional multiplicity brackets
-            match = re.match(multiplicity_pattern, concept_spec)
-            if not match:
-                msg = (
-                    f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
-                    f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
-                )
-                raise PipeBlueprintValueError(msg)
-
-            # Extract the concept part (without multiplicity) and validate it
-            concept_string_or_code = match.group(1)
-            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
-
-        return inputs
-
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        """Validate that the pipe type is one of the allowed values."""
-        if value not in AllowedPipeTypes.value_list():
-            msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
-            raise PipeBlueprintValueError(msg)
+        if value not in PipeType.value_list():
+            msg = f"Invalid pipe type '{value}'. Must be one of: {PipeType.value_list()}"
+            raise ValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
     @classmethod
     def validate_pipe_category(cls, value: Any) -> Any:
-        """Validate that the pipe category is one of the allowed values."""
-        if value not in AllowedPipeCategories.value_list():
-            msg = f"Invalid pipe category '{value}'. Must be one of: {AllowedPipeCategories.value_list()}"
-            raise PipeBlueprintValueError(msg)
+        if value not in PipeCategory.value_list():
+            msg = f"Invalid pipe category '{value}'. Must be one of: {PipeCategory.value_list()}"
+            raise ValueError(msg)
         return value
 
-    @field_validator("output", mode="before")
-    @classmethod
-    def validate_output(cls, output: str) -> str:
+    @model_validator(mode="after")
+    def validate_pipe_category_based_on_type(self) -> Self:
+        try:
+            pipe_type = PipeType(self.type)
+        except ValueError as exc:
+            # If type is invalid, it should have been caught by the field validator
+            # but we handle it gracefully here
+            msg = f"Invalid pipe type '{self.type}'. Must be one of: {PipeType.value_list()}"
+            raise ValueError(msg) from exc
+
+        if self.pipe_category != pipe_type.category:
+            msg = (
+                f"Inconsistency detected: pipe_category '{self.pipe_category}' does not match the "
+                f"expected category '{pipe_type.category}' for type '{self.type}'"
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_inputs_blueprint(self) -> Self:
+        self.generic_validate_inputs()
+        self.generic_validate_output()
+        return self
+
+    def validate_inputs(self):
+        pass
+
+    def validate_output(self):
+        pass
+
+    @final
+    def generic_validate_inputs(self):
+        if self.inputs:
+            for input_name, concept_spec in self.inputs.items():
+                validate_input_name(input_name)
+
+                # Validate the concept spec format with optional multiplicity brackets
+                # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
+                match = re.match(MUTLIPLICITY_PATTERN, concept_spec)
+                if not match:
+                    msg = (
+                        f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
+                        f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
+                    )
+                    raise ValueError(msg)
+
+                # Extract the concept part (without multiplicity) and validate it
+                concept_string_or_code = match.group(1)
+                try:
+                    validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+                except ConceptStringError as exc:
+                    msg = f"Invalid concept string or code '{concept_string_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
+                    raise ValueError(msg) from exc
+
+            # Check that every input_name is unique
+            input_names = list(self.inputs.keys())
+            if len(input_names) != len(set(input_names)):
+                duplicates = [name for name in input_names if input_names.count(name) > 1]
+                msg = f"Duplicate input names found: {duplicates}. Input names must be unique."
+                raise ValueError(msg)
+
+        self.validate_inputs()
+
+    @final
+    def generic_validate_output(self):
         # Strip multiplicity brackets before validating
-        output_parse_result = parse_concept_with_multiplicity(output)
+        try:
+            output_parse_result = parse_concept_with_multiplicity(self.output)
+        except PipeVariableMultiplicityError as exc:
+            msg = f"Invalid concept specification syntax: '{self.output}'. {exc}"
+            raise ValueError(msg) from exc
         try:
             validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
         except ConceptStringError as exc:
             msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
-            raise PipeBlueprintValueError(msg) from exc
-        return output
+            raise ValueError(msg) from exc
 
-    @classmethod
-    def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
-        if not is_snake_case(pipe_code):
-            msg = f"Invalid pipe code syntax '{pipe_code}'. Must be in snake_case."
-            raise PipeBlueprintValueError(msg)
-        return pipe_code
+        self.validate_output()

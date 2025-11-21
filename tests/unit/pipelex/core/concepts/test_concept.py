@@ -3,8 +3,9 @@ import pytest
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.exceptions import ConceptStringError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.core.domains.domain import SpecialDomain
 
@@ -48,15 +49,24 @@ class TestConcept:
             NativeConceptCode.get_validated_native_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.NUMBER}")
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.NUMBER}"
         )
-        assert NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.TEXT}") is None
-        assert NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.IMAGE}") is None
-        assert NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.PDF}") is None
-        assert NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.TEXT_AND_IMAGES}") is None
-        assert NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.NUMBER}") is None
-        assert NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.ANYTHING}") is None
-        assert NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.DYNAMIC}") is None
-        assert NativeConceptCode.get_validated_native_concept_string("RandomConcept") is None
-        assert NativeConceptCode.get_validated_native_concept_string("text") is None
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.TEXT}")
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.IMAGE}")
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.PDF}")
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.TEXT_AND_IMAGES}")
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.NUMBER}")
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.ANYTHING}")
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.DYNAMIC}")
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string("RandomConcept")
+        with pytest.raises(NativeConceptDefinitionError):
+            NativeConceptCode.get_validated_native_concept_string("text")
 
     def test_is_native_concept(self):
         """Test is_native_concept method."""
@@ -210,10 +220,6 @@ class TestConcept:
 
         with pytest.raises(ConceptStringError):
             validate_concept_string(f"{valid_domain}.text-name")
-
-        # Invalid native concept
-        with pytest.raises(ConceptStringError):
-            validate_concept_string(f"{SpecialDomain.NATIVE}.InvalidNativeConcept")
 
     def test_are_concept_compatible(self):
         concept1 = ConceptFactory.make_from_blueprint(

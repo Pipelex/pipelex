@@ -1,6 +1,4 @@
-from pydantic import ValidationError
-
-from pipelex.core.interpreter import PLXDecodeError
+from pipelex.core.interpreter import PipelexInterpreterError, PLXDecodeError
 
 INVALID_PLX_SYNTAX = (
     "invalid_plx_syntax",
@@ -63,7 +61,7 @@ description = "Domain without domain field"
 [concept]
 TestConcept = "A test concept"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 INVALID_DOMAIN_NAME = (
@@ -74,7 +72,7 @@ description = "Domain with invalid characters"
 [concept]
 TestConcept = "A test concept"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 EMPTY_DOMAIN = (
@@ -85,7 +83,7 @@ description = "Domain with empty string"
 [concept]
 TestConcept = "A test concept"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 INVALID_ROOT_KEY = (
@@ -97,7 +95,7 @@ invalid_root_key = "This key should not be allowed at root level"
 [concept]
 TestConcept = "A test concept"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 MULTIPLE_INVALID_ROOT_KEYS = (
@@ -111,7 +109,7 @@ unknown_field = "Another unknown field"
 [concept]
 TestConcept = "A test concept"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 WRONG_TYPE_FOR_DOMAIN = (
@@ -133,7 +131,7 @@ description = 456
 [concept]
 TestConcept = "A test concept"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 WRONG_TYPE_FOR_CONCEPT_SECTION = (
@@ -142,7 +140,7 @@ WRONG_TYPE_FOR_CONCEPT_SECTION = (
 description = "Domain with wrong type for concept"
 concept = "should_be_dict_not_string"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 WRONG_TYPE_FOR_PIPE_SECTION = (
@@ -151,7 +149,7 @@ WRONG_TYPE_FOR_PIPE_SECTION = (
 description = "Domain with wrong type for pipe"
 pipe = "should_be_dict_not_string"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 INVALID_NESTED_SECTION = (
@@ -165,7 +163,7 @@ some_key = "This section is not allowed"
 [concept]
 TestConcept = "A test concept"
 """,
-    ValidationError,
+    PipelexInterpreterError,
 )
 
 INVALID_TABLE_SYNTAX = (

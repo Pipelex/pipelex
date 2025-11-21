@@ -1,7 +1,7 @@
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
@@ -31,15 +31,27 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             concept_string_or_code=output_parse_result.concept,
             concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
+        inputs = InputRequirementsFactory.make_from_blueprint(
+            domain=domain,
+            blueprint=blueprint.inputs or {},
+            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+        )
+
+        img_gen_prompt = blueprint.img_gen_prompt
+        img_gen_prompt_var_name = blueprint.img_gen_prompt_var_name
+
+        # If we have inputs, that means that the prompt is in the inputs.
+        # The blueprint already validated that there is only 1 input.
+        if blueprint.inputs:
+            img_gen_prompt_var_name = blueprint.input_names[0]
+        else:
+            img_gen_prompt = blueprint.img_gen_prompt
+
         return PipeImgGen(
             domain=domain,
             code=pipe_code,
             description=blueprint.description,
-            inputs=InputRequirementsFactory.make_from_blueprint(
-                domain=domain,
-                blueprint=blueprint.inputs or {},
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-            ),
+            inputs=inputs,
             output=get_required_concept(
                 concept_string=ConceptFactory.make_concept_string_with_domain(
                     domain=output_domain_and_code.domain,
@@ -47,8 +59,8 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
                 ),
             ),
             output_multiplicity=final_multiplicity,
-            img_gen_prompt=blueprint.img_gen_prompt,
-            img_gen_prompt_var_name=blueprint.img_gen_prompt_var_name,
+            img_gen_prompt=img_gen_prompt,
+            img_gen_prompt_var_name=img_gen_prompt_var_name,
             img_gen_choice=blueprint.model,
             aspect_ratio=blueprint.aspect_ratio,
             is_raw=blueprint.is_raw,

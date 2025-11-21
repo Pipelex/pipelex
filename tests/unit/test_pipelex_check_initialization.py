@@ -7,8 +7,8 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-from pipelex.config import ConfigPaths
 from pipelex.system.configuration.config_check import check_is_initialized
+from pipelex.system.configuration.configs import ConfigPaths
 
 
 class TestPipelexCheckInitialization:

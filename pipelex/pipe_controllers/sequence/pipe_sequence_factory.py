@@ -1,10 +1,13 @@
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.concepts.exceptions import ConceptFactoryError
+from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
+from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceFactoryError
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeFactory
@@ -20,13 +23,28 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
         blueprint: PipeSequenceBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeSequence:
-        # Parse output to strip multiplicity brackets
-        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
+        # Parse output to strip multiplicity brackets``
+        try:
+            output_parse_result = parse_concept_with_multiplicity(blueprint.output)
+        except PipeVariableMultiplicityError as exc:
+            msg = f"Error parsing concept with multiplicity for PipeSequence: {exc}"
+            raise PipeSequenceFactoryError(msg) from exc
 
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
-            concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+        try:
+            output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
+                domain=domain,
+                concept_string_or_code=output_parse_result.concept,
+                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+            )
+        except ConceptFactoryError as exc:
+            msg = f"Error making domain and concept code for PipeSequence: {exc}"
+            raise PipeSequenceFactoryError(msg) from exc
+
+        output = get_required_concept(
+            concept_string=ConceptFactory.make_concept_string_with_domain(
+                domain=output_domain_and_code.domain,
+                concept_code=output_domain_and_code.concept_code,
+            ),
         )
         return PipeSequence(
             domain=domain,
@@ -37,12 +55,7 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
                 blueprint=blueprint.inputs or {},
                 concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
-            output=get_required_concept(
-                concept_string=ConceptFactory.make_concept_string_with_domain(
-                    domain=output_domain_and_code.domain,
-                    concept_code=output_domain_and_code.concept_code,
-                ),
-            ),
+            output=output,
             sequential_sub_pipes=[
                 SubPipeFactory.make_from_blueprint(blueprint=step, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain)
                 for step in blueprint.steps

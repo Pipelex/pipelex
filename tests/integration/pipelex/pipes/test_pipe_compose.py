@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Callable, cast
 
 import pytest
 
@@ -6,9 +6,11 @@ from pipelex import pretty_print
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_pipe_router
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_native_concept, get_pipe_router
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -28,7 +30,9 @@ class TestPipeCompose:
         self,
         pipe_run_mode: PipeRunMode,
         template_source: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         pipe_compose_blueprint = PipeComposeBlueprint(
             description="Jinja2 test for any context",
             template=TemplateBlueprint(
@@ -57,8 +61,16 @@ class TestPipeCompose:
         self,
         pipe_run_mode: PipeRunMode,
         template_source: str,
+        load_empty_library: Callable[[], None],
     ):
-        working_memory = WorkingMemoryFactory.make_from_text(text="[some text from test_pipe_compose_for_stuff]", name="place_holder")
+        load_empty_library()
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=TextContent(text="[some text from test_pipe_compose_for_stuff]"),
+                name="place_holder",
+            ),
+        )
 
         pipe_compose_blueprint = PipeComposeBlueprint(
             description="Jinja2 test for stuff context",

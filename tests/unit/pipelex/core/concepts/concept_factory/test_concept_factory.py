@@ -7,7 +7,7 @@ from pipelex.core.concepts.concept_blueprint import (
 )
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import StructureClassError
+from pipelex.core.concepts.exceptions import ConceptFactoryError
 from tests.unit.pipelex.core.concepts.concept_factory.data import TestCases
 
 
@@ -126,7 +126,7 @@ class TestConceptFactory:
         """Test that make_from_blueprint raises StructureClassError for invalid structure class."""
         blueprint = ConceptBlueprint(description="A concept with invalid structure", structure="NonExistentStructureClass")
 
-        with pytest.raises(StructureClassError, match="is not a registered subclass of StuffContent"):
+        with pytest.raises(ConceptFactoryError, match="is not a registered subclass of StuffContent"):
             ConceptFactory.make_from_blueprint(
                 domain="my_domain",
                 concept_code="TestConcept",

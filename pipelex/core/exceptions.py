@@ -1,11 +1,12 @@
 from pydantic import BaseModel
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexException
-from pipelex.core.pipes.exceptions import StaticValidationErrorType
+from pipelex.base_exceptions import PipelexError
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData, PipeValidationErrorType
+from pipelex.tools.misc.toml_utils import TomlError
 
 
-class PipelexConfigurationError(PipelexException):
+class PipelexConfigurationError(PipelexError):
     """Raised when there are configuration issues with the PipelexInterpreter."""
 
 
@@ -29,11 +30,11 @@ class SyntaxErrorData(BaseModel):
         )
 
 
-class StaticValidationError(Exception):
+class PipeValidationError(ValueError):
     def __init__(
         self,
-        error_type: StaticValidationErrorType,
-        domain: str,
+        error_type: PipeValidationErrorType,
+        domain: str | None = None,
         pipe_code: str | None = None,
         variable_names: list[str] | None = None,
         required_concept_codes: list[str] | None = None,
@@ -70,3 +71,19 @@ class StaticValidationError(Exception):
     @override
     def __str__(self) -> str:
         return self.desc()
+
+
+class PLXDecodeError(TomlError):
+    """Raised when PLX decoding fails."""
+
+
+class PipelexInterpreterError(PipelexError):
+    """Raised when PipelexInterpreter fails."""
+
+    def __init__(
+        self,
+        message: str,
+        validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+    ):
+        self.validation_errors = validation_errors or []
+        super().__init__(message)

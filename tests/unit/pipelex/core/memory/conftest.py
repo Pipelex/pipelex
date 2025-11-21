@@ -5,7 +5,7 @@ from typing import ClassVar
 import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -13,6 +13,7 @@ from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -67,28 +68,36 @@ class TestWorkingMemoryData:
 @pytest.fixture
 def single_text_memory() -> WorkingMemory:
     """Create WorkingMemory with single text content."""
-    return WorkingMemoryFactory.make_from_text(
-        text=TestWorkingMemoryData.SAMPLE_TEXT, concept_string=SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT, name="sample_text"
+    return WorkingMemoryFactory.make_from_single_stuff(
+        stuff=StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+            name="sample_text",
+            content=TextContent(text=TestWorkingMemoryData.SAMPLE_TEXT),
+        ),
     )
 
 
 @pytest.fixture
 def single_image_memory() -> WorkingMemory:
     """Create WorkingMemory with single image content."""
-    return WorkingMemoryFactory.make_from_image(
-        image_url=TestWorkingMemoryData.SAMPLE_IMAGE_URL,
-        concept_string=SpecialDomain.NATIVE + "." + NativeConceptCode.IMAGE,
-        name="sample_image",
+    return WorkingMemoryFactory.make_from_single_stuff(
+        stuff=StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
+            name="sample_image",
+            content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
+        ),
     )
 
 
 @pytest.fixture
 def single_pdf_memory() -> WorkingMemory:
     """Create WorkingMemory with single PDF content."""
-    return WorkingMemoryFactory.make_from_pdf(
-        pdf_url=TestWorkingMemoryData.SAMPLE_PDF_URL,
-        concept_string=SpecialDomain.NATIVE + "." + NativeConceptCode.PDF,
-        name="pdf_document",
+    return WorkingMemoryFactory.make_from_single_stuff(
+        stuff=StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PDF),
+            name="pdf_document",
+            content=PDFContent(url=TestWorkingMemoryData.SAMPLE_PDF_URL),
+        ),
     )
 
 

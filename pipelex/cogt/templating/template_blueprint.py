@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
+from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 
 
@@ -17,5 +18,9 @@ class TemplateBlueprint(BaseModel):
 
     @model_validator(mode="after")
     def validate_template(self) -> "TemplateBlueprint":
-        check_jinja2_parsing(template_source=self.template, template_category=self.category)
+        try:
+            check_jinja2_parsing(template_source=self.template, template_category=self.category)
+        except Jinja2TemplateSyntaxError as exc:
+            msg = f"Could not parse template for TemplateBlueprint: {exc}"
+            raise ValueError(msg) from exc
         return self

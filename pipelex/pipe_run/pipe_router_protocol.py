@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import Protocol
 
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -76,6 +77,7 @@ class PipeRouterProtocol(Protocol):
 
         return pipe_output
 
+    @abstractmethod
     async def _run_pipe_job(
         self,
         pipe_job: PipeJob,

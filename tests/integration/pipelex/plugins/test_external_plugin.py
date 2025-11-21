@@ -1,3 +1,5 @@
+from typing import Callable
+
 import pytest
 from polyfactory.factories.pydantic_factory import ModelFactory
 from typing_extensions import override
@@ -10,7 +12,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.hub import get_inference_manager, get_pipe_router, get_report_delegate
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
@@ -65,7 +67,8 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestExternalPlugin:
-    async def test_external_llm_worker(self):
+    async def test_external_llm_worker(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         llm_worker = MockExternalLLMWorker(reporting_delegate=get_report_delegate())
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
@@ -85,7 +88,8 @@ class TestExternalPlugin:
         assert generated_object
         pretty_print(generated_object)
 
-    async def test_pipe_llm_with_external_llm_handle(self):
+    async def test_pipe_llm_with_external_llm_handle(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         llm_handle = EXTERNAL_PLUGIN_NAME
         get_inference_manager().set_llm_worker_from_external_plugin(
             llm_handle=llm_handle,

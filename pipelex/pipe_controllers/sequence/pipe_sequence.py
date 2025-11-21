@@ -1,30 +1,65 @@
 from typing import Literal
 
-from pydantic import model_validator
 from typing_extensions import override
 
-from pipelex import log
-from pipelex.config import StaticValidationReaction, get_config
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.exceptions import PipeInputNotFoundError
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import Self
 
 
 class PipeSequence(PipeController):
     type: Literal["PipeSequence"] = "PipeSequence"
     sequential_sub_pipes: list[SubPipe]
+
+    @override
+    def required_variables(self) -> set[str]:
+        return set()
+
+    @override
+    def validate_inputs_static(self):
+        pass
+
+    @override
+    def validate_inputs_with_library(self):
+        pass
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self):
+        """Validate the output for the pipe sequence.
+        The output of the pipe sequence should match the output of the last step.
+        """
+        last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
+        concept_of_last_step = last_step_output_pipe.output
+        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+            raise PipeValidationError(
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain=self.domain,
+                pipe_code=self.code,
+                provided_concept_code=concept_of_last_step.concept_string,
+                required_concept_codes=[self.output.concept_string],
+                explanation=(
+                    f"PipeSequence concept mismatch: the output concept '{concept_of_last_step.concept_string}' "
+                    f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}' of sequence pipe '{self.code}' "
+                    f"is not compatible with the output concept '{self.output.concept_string}' of the sequence."
+                ),
+            )
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
@@ -62,9 +97,7 @@ class PipeSequence(PipeController):
                             f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
                             f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
                         )
-                        raise PipeInputError(
-                            message=msg, pipe_code=self.code, variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name, concept_code=None
-                        ) from exc
+                        raise PipeSequenceValueError(msg) from exc
                     needed_inputs.add_requirement(
                         variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
                         concept=requirement.concept,
@@ -84,93 +117,6 @@ class PipeSequence(PipeController):
         return needed_inputs
 
     @override
-    def required_variables(self) -> set[str]:
-        return set()
-
-    @override
-    def validate_output(self):
-        """Validate the output for the pipe sequence.
-        The output of the pipe sequence should match the output of the last step.
-        """
-        last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
-        concept_of_last_step = last_step_output_pipe.output
-        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
-            msg = f"""PipeSequence concept mismatch:
-the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
-of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
-"""
-            raise PipeControllerOutputConceptMismatchError(
-                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
-            )
-
-    @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
-        if len(self.sequential_sub_pipes) == 0:
-            msg = f"Pipe'{self.code}'(PipeSequence) must have at least 1 step"
-            raise ValueError(msg)
-        return self
-
-    def _validate_output_multiplicity_support(self, pipe_run_params: PipeRunParams) -> None:
-        """Validate that the pipe supports the requested output multiplicity."""
-        if pipe_run_params.is_multiple_output_required:
-            msg = f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-            raise PipeRunParamsError(msg)
-
-    def _validate_inputs(self):
-        """Validate that the inputs declared for this PipeSequence match what is actually needed."""
-        static_validation_config = get_config().pipelex.static_validation_config
-        default_reaction = static_validation_config.default_reaction
-        reactions = static_validation_config.reactions
-
-        the_needed_inputs = self.needed_inputs()
-
-        # Check all required variables are in the inputs
-        for named_input_requirement in the_needed_inputs.named_input_requirements:
-            if named_input_requirement.variable_name not in self.inputs.variables:
-                missing_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[named_input_requirement.variable_name],
-                    required_concept_codes=[named_input_requirement.concept.code],
-                )
-                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(missing_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise missing_input_var_error
-
-        # Check that all declared inputs are actually needed
-        for input_name in self.inputs.variables:
-            if input_name not in the_needed_inputs.required_names:
-                log.verbose(f"the_needed_inputs.required_names: {the_needed_inputs.required_names}")
-                extraneous_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[input_name],
-                )
-                match reactions.get(
-                    StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    default_reaction,
-                ):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(extraneous_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise extraneous_input_var_error
-
-    @override
-    def _validate_with_libraries(self):
-        """Perform full validation after all libraries are loaded.
-        This is called after all pipes and concepts are available.
-        """
-        self._validate_inputs()
-
-    @override
     def pipe_dependencies(self) -> set[str]:
         return {sub_pipe.pipe_code for sub_pipe in self.sequential_sub_pipes}
 
@@ -183,7 +129,9 @@ of sequence pipe '{self.code}' is not compatible with the output concept '{self.
         output_name: str | None = None,
     ) -> PipeOutput:
         pipe_run_params.push_pipe_layer(pipe_code=self.code)
-        self._validate_output_multiplicity_support(pipe_run_params)
+        if pipe_run_params.is_multiple_output_required:
+            msg = f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
+            raise PipeRunParamsError(msg)
 
         evolving_memory = working_memory
 

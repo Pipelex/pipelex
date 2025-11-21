@@ -1,6 +1,8 @@
+from typing import Callable
+
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.hub import get_concept_library, get_pipe_library
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
@@ -12,7 +14,8 @@ from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 class TestPipeParallelValidation:
     """Tests for PipeParallel creation and basic structure"""
 
-    def test_pipe_parallel_with_real_pipe_structure(self):
+    def test_pipe_parallel_with_real_pipe_structure(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeParallel structure with a real pipe"""
         # Create a real PipeLLM that will infer inputs from the prompt template
         domain = "test_domain"
@@ -93,7 +96,8 @@ class TestPipeParallelValidation:
 
         concept_library.teardown()
 
-    def test_pipe_parallel_creation(self):
+    def test_pipe_parallel_creation(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test basic PipeParallel creation and structure"""
         # Create a simple PipeParallel with proper inputs
         domain = "test_domain"
@@ -146,7 +150,8 @@ class TestPipeParallelValidation:
 
         concept_library.teardown()
 
-    def test_pipe_parallel_needed_inputs_structure(self):
+    def test_pipe_parallel_needed_inputs_structure(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test that PipeParallel needed_inputs method can be called and returns expected structure"""
         domain = "test_domain"
         concept_library = get_concept_library()

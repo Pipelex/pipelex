@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
 from pipelex import log
-from pipelex.core.exceptions import StaticValidationError
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
@@ -19,7 +19,9 @@ class TestPipeParallelValidateInputs:
         self,
         test_id: str,
         blueprint: PipeParallelBlueprint,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
@@ -42,10 +44,12 @@ class TestPipeParallelValidateInputs:
         test_id: str,
         blueprint_dict: dict[str, Any],
         expected_error_message_fragment: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing error case: {test_id}")
 
-        with pytest.raises((StaticValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
+        with pytest.raises((PipeValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeParallelBlueprint.model_validate(blueprint_dict)
             PipeParallelFactory.make_from_blueprint(

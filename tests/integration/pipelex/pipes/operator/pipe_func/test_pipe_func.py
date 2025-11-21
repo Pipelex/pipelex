@@ -1,8 +1,10 @@
+from typing import Callable
+
 import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
@@ -33,7 +35,9 @@ class TestPipeFunc:
     async def test_wrap_lines_pipe_func(
         self,
         pipe_run_mode: PipeRunMode,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         # Sample source code to test with
         sample_code = """def hello_world():
     print("Hello, World!")

@@ -5,7 +5,7 @@ from pydantic import BaseModel, model_validator
 from pydantic.functional_validators import SkipValidation
 from typing_extensions import Annotated, runtime_checkable
 
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import DictPipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
@@ -65,7 +65,7 @@ class ApiResponse(BaseModel):
     error: str | None = None
 
 
-class PipelineRequestError(PipelexException):
+class PipelineRequestError(PipelexError):
     pass
 
 

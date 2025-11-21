@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
 from pipelex import log
-from pipelex.core.exceptions import StaticValidationError
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
@@ -19,7 +19,9 @@ class TestPipeConditionValidateInputs:
         self,
         test_id: str,
         blueprint: PipeConditionBlueprint,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
@@ -42,17 +44,19 @@ class TestPipeConditionValidateInputs:
         test_id: str,
         blueprint_dict: dict[str, Any],
         expected_error_message_fragment: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing error case: {test_id}")
 
-        with pytest.raises((StaticValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
+        with pytest.raises((PipeValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeConditionBlueprint.model_validate(blueprint_dict)
             PipeConditionFactory.make_from_blueprint(
                 domain="test_domain",
                 pipe_code=f"test_pipe_{test_id}",
                 blueprint=blueprint,
-            )
+            ).validate_with_libraries()
 
         error_str = str(exc_info.value)
         assert expected_error_message_fragment in error_str, (

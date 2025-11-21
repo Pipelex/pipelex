@@ -3,8 +3,6 @@ from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValueError
 from pipelex.core.concepts.exceptions import (
     ConceptBlueprintValueError,
     ConceptCodeError,
-    ConceptDefinitionError,
-    ConceptDefinitionErrorData,
     ConceptError,
     ConceptFactoryError,
     ConceptLibraryConceptNotFoundError,
@@ -13,11 +11,10 @@ from pipelex.core.concepts.exceptions import (
     ConceptStructureBlueprintValueError,
     ConceptStructureGeneratorError,
     ConceptStructureValidationError,
-    PipelexValidationExceptionAbstract,
     StructureClassError,
 )
-from pipelex.core.domains.exceptions import DomainCodeError, DomainDefinitionError
-from pipelex.core.exceptions import PipelexConfigurationError, StaticValidationError, SyntaxErrorData
+from pipelex.core.domains.exceptions import DomainCodeError
+from pipelex.core.exceptions import PipelexConfigurationError, PipeValidationError, SyntaxErrorData
 from pipelex.core.memory.exceptions import (
     WorkingMemoryConsistencyError,
     WorkingMemoryError,
@@ -34,7 +31,6 @@ from pipelex.core.pipes.exceptions import (
     PipeInputNotFoundError,
     PipeOperatorModelChoiceError,
     PipeRunInputsError,
-    StaticValidationErrorType,
 )
 from pipelex.core.stuffs.exceptions import (
     StuffArtefactError,
@@ -44,15 +40,10 @@ from pipelex.core.stuffs.exceptions import (
     StuffError,
 )
 from pipelex.libraries.exceptions import (
-    ConceptLibraryError,
     ConceptLoadingError,
-    DomainLibraryError,
     DomainLoadingError,
     LibraryError,
     LibraryLoadingError,
-    LibraryLoadingErrorData,
-    PipeLibraryError,
-    PipeLibraryPipeNotFoundError,
     PipeLoadingError,
 )
 from pipelex.pipe_controllers.exceptions import PipeControllerError, PipeControllerOutputConceptMismatchError
@@ -74,7 +65,7 @@ from pipelex.system.exceptions import (
     CredentialsError,
     FatalError,
     NestedKeyConflictError,
-    ToolException,
+    ToolError,
     TracebackMessageError,
 )
 
@@ -85,7 +76,6 @@ __all__ = [
     "PipelexBundleBlueprintValueError",
     # from pipelex.core.domains.exceptions
     "DomainCodeError",
-    "DomainDefinitionError",
     # from pipelex.core.concepts.exceptions
     "ConceptError",
     "ConceptBlueprintValueError",
@@ -97,20 +87,12 @@ __all__ = [
     "ConceptStringError",
     "ConceptRefineError",
     "ConceptLibraryConceptNotFoundError",
-    "ConceptDefinitionErrorData",
-    "ConceptDefinitionError",
     "ConceptStructureGeneratorError",
-    "PipelexValidationExceptionAbstract",
     # from pipelex.libraries.exceptions
     "LibraryError",
-    "LibraryLoadingErrorData",
     "LibraryLoadingError",
-    "DomainLibraryError",
-    "ConceptLibraryError",
     "ConceptLoadingError",
     "DomainLoadingError",
-    "PipeLibraryError",
-    "PipeLibraryPipeNotFoundError",
     "PipeLoadingError",
     # from pipelex.pipe_controllers.exceptions
     "PipeControllerError",
@@ -129,7 +111,6 @@ __all__ = [
     "PipeFactoryError",
     "PipeOperatorModelChoiceError",
     "PipeInputError",
-    "StaticValidationErrorType",
     "PipeRunInputsError",
     # from pipelex.core.stuffs.exceptions
     "StuffArtefactError",
@@ -140,7 +121,7 @@ __all__ = [
     # from pipelex.core.exceptions
     "PipelexConfigurationError",
     "SyntaxErrorData",
-    "StaticValidationError",
+    "PipeValidationError",
     # from pipelex.core.memory.exceptions
     "WorkingMemoryConsistencyError",
     "WorkingMemoryError",
@@ -159,7 +140,7 @@ __all__ = [
     # from pipelex.pipeline.track.exceptions
     "JobHistoryError",
     # from pipelex.system.exceptions
-    "ToolException",
+    "ToolError",
     "NestedKeyConflictError",
     "CredentialsError",
     "TracebackMessageError",

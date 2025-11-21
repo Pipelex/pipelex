@@ -1,12 +1,12 @@
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.system.exceptions import RootException
 from pipelex.types import StrEnum
 
 
-class CogtError(RootException):
+class CogtError(PipelexError):
     pass
 
 

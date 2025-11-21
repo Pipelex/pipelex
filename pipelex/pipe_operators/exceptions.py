@@ -1,8 +1,8 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
-class PipeOperatorModelAvailabilityError(PipelexException):
+class PipeOperatorModelAvailabilityError(PipelexError):
     def __init__(
         self,
         message: str,

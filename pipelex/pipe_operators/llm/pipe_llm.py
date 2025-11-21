@@ -13,15 +13,15 @@ from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config import get_config
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -62,39 +62,48 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     output_multiplicity: VariableMultiplicity | None = None
 
     @model_validator(mode="after")
-    def _validate_inputs(self) -> Self:
-        self.validate_inputs()
-        return self
-
-    @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
         if self.structuring_method is not None and self.output.structure_class_name == NativeConceptCode.TEXT:
             msg = (
                 f"Output concept '{self.output.code}' is considered a Text concept, "
                 f"so it cannot be structured. Maybe you forgot to add '{NativeConceptCode.TEXT}' to the class registry?"
             )
-            raise PipeDefinitionError(msg)
+            raise ValueError(msg)
         return self
 
     @override
-    def _validate_with_libraries(self):
-        self.validate_inputs()
-        self.llm_prompt_spec.validate_with_libraries()
+    def validate_inputs_static(self):
         if self.llm_choices:
             for llm_choice in self.llm_choices.list_choice_strings():
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
     @override
-    def validate_output(self):
+    def validate_inputs_with_library(self):
+        pass
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self):
+        # TODO: generalize because there are other concepts PipeLLM can't generate, not just images,
+        # and PipeLLM is not the only one with this kind of constraints
         if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
         ):
-            msg = (
-                f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
-                f"pipe '{self.code}' the output is '{self.output.concept_string}'"
+            explanation = (
+                f"The output of a LLM pipe cannot be compatible with the Image concept. "
+                f"Output concept is '{self.output.concept_string}'. "
+                "Use a PipeImgGen if you want to generate images. You can use a PipeLLM to generate the prompt for a PipeImgGen."
             )
-            raise PipeDefinitionError(msg)
+            raise PipeValidationError(
+                error_type=PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept_string,
+                explanation=explanation,
+            )
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
@@ -109,56 +118,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def required_variables(self) -> set[str]:
         """Required variables are the variables that are used in the current prompt template or system prompt"""
         return {variable_name for variable_name in self.llm_prompt_spec.required_variables() if not variable_name.startswith("_")}
-
-    def validate_inputs(self):
-        static_validation_config = get_config().pipelex.static_validation_config
-        default_reaction = static_validation_config.default_reaction
-        reactions = static_validation_config.reactions
-        # Those are the variables required in the prompt template or system prompt
-        required_variables = self.required_variables()
-
-        # 1: Check that all the required variables are actually in the inputs
-        for required_variable_name in required_variables:
-            if required_variable_name not in self.needed_inputs().variables:
-                missing_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[required_variable_name],
-                )
-                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(missing_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise missing_input_var_error
-
-        # 2: Check that all inputs are in the required variables
-        for input_name, requirement in self.needed_inputs().items:
-            if input_name not in required_variables:
-                explanation: str | None = None
-                if get_concept_library().is_image_concept(concept=requirement.concept):
-                    # We have an exraneous image input, the user probably forgot to add it into the prompt template
-                    explanation = (
-                        f"You have provided an image input named '{input_name}', but it is not referenced in the prompt template. "
-                        "Please add it to the prompt template."
-                    )
-
-                extraneous_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[input_name],
-                    explanation=explanation,
-                )
-                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(extraneous_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise extraneous_input_var_error
 
     @override
     async def _run_operator_pipe(

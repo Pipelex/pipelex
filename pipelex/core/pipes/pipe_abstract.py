@@ -1,19 +1,26 @@
 from abc import ABC, abstractmethod
 from typing import Any, final
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from pipelex import log
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
+from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.pipes.exceptions import PipeAbstractValueError, PipeRunInputsError
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.string_utils import is_snake_case
+from pipelex.types import Self
 
 
 class PipeAbstract(ABC, BaseModel):
@@ -34,29 +41,171 @@ class PipeAbstract(ABC, BaseModel):
     @field_validator("code", mode="before")
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:
-        PipeBlueprint.validate_pipe_code_syntax(pipe_code=code)
+        if not is_snake_case(code):
+            msg = f"Invalid pipe code syntax '{code}'. Must be in snake_case."
+            raise PipeDefinitionError(msg)
         return code
 
-    @abstractmethod
-    def validate_output(self):
-        """Validate the output for the pipe."""
+    @field_validator("type", mode="after")
+    @classmethod
+    def validate_pipe_type(cls, value: Any) -> Any:
+        if value not in PipeType.value_list():
+            msg = f"Invalid pipe type '{value}' for pipe '{cls.code}'. Must be one of: {PipeType.value_list()}"
+            raise ValueError(msg)
+        return value
+
+    @field_validator("pipe_category", mode="after")
+    @classmethod
+    def validate_pipe_category(cls, value: Any) -> Any:
+        if value not in PipeCategory.value_list():
+            msg = f"Invalid pipe category '{value}' for pipe '{cls.code}'. Must be one of: {PipeCategory.value_list()}"
+            raise ValueError(msg)
+        return value
+
+    @model_validator(mode="after")
+    def validate_pipe_category_based_on_type(self) -> Self:
+        try:
+            pipe_type = PipeType(self.type)
+        except ValueError as exc:
+            # If type is invalid, it should have been caught by the field validator
+            # but we handle it gracefully here
+            msg = f"Invalid pipe type '{self.type}' for pipe '{self.code}'. Must be one of: {PipeType.value_list()}"
+            raise ValueError(msg) from exc
+
+        if self.pipe_category != pipe_type.category:
+            msg = (
+                f"Inconsistency detected in pipe '{self.code}': pipe_category '{self.pipe_category}' "
+                f"does not match the expected category '{pipe_type.category}' for type '{self.type}'"
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_pipe(self) -> Self:
+        self.generic_validate_inputs_static()
+        self.generic_validate_output_static()
+        return self
 
     @final
     def validate_with_libraries(self):
-        """Validate the pipe with the libraries, after the static validation"""
         try:
-            self._validate_with_libraries()
+            self.generic_validate_inputs_with_library()
+            self.generic_validate_output_with_library()
         except ModelChoiceNotFoundError as exc:
-            raise PipeOperatorModelChoiceError(
-                message=exc.message,
-                pipe_type=self.pipe_type,
-                pipe_code=self.code,
-                model_type=exc.model_type,
-                model_choice=exc.model_choice,
-            ) from exc
+            msg = f"Model choice not found for pipe '{self.code}': {exc}"
+            raise PipeAbstractValueError(msg) from exc
 
-    def _validate_with_libraries(self):
-        """Validate the pipe with the libraries, after the static validation"""
+    @final
+    def generic_validate_inputs_static(self):
+        self.validate_inputs_static()
+
+    @final
+    def generic_validate_output_static(self):
+        self.validate_output_static()
+
+    @final
+    def generic_validate_inputs_with_library(self):
+        # First validate required variables are in the inputs
+        for required_variable_name in self.required_variables():
+            if required_variable_name not in self.inputs.variables:
+                raise PipeValidationError(
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[required_variable_name],
+                    explanation=(
+                        f"Required variable '{required_variable_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+                    ),
+                )
+
+        # Then validate that all inputs are actually needed and match requirements exactly
+        the_needed_inputs = self.needed_inputs()
+
+        # Check all required variables are in the inputs and match the required InputRequirement
+        for named_input_requirement in the_needed_inputs.named_input_requirements:
+            var_name = named_input_requirement.variable_name
+
+            if var_name not in self.inputs.variables:
+                raise PipeValidationError(
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[var_name],
+                    explanation=(f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"),
+                )
+
+            # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
+            if PipeCategory.is_controller_by_str(self.pipe_category):
+                # Compare the essential parts of InputRequirement (concept code + multiplicity)
+                # Skip validation if the needed requirement is Dynamic or Anything (flexible output types)
+                declared_requirement = self.inputs.root[var_name]
+                needed_requirement = the_needed_inputs.root[named_input_requirement.requirement_expression or var_name]
+
+                # Allow mismatch if the needed requirement is a flexible type (Dynamic or Anything)
+                if (
+                    needed_requirement.concept.code not in (NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING)
+                    and declared_requirement != needed_requirement
+                ):
+                    raise PipeValidationError(
+                        error_type=PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH,
+                        domain=self.domain,
+                        pipe_code=self.code,
+                        variable_names=[var_name],
+                        explanation=(
+                            f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'.\n"
+                            f"Declared: input requirement {declared_requirement}.\n"
+                            f"Required: input requirement {needed_requirement}"
+                        ),
+                    )
+
+        # Check that all declared inputs are actually needed
+        for input_name in self.inputs.variables:
+            if input_name not in the_needed_inputs.required_names:
+                raise PipeValidationError(
+                    error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                    domain=self.domain,
+                    pipe_code=self.code,
+                    variable_names=[input_name],
+                    explanation=f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}",
+                )
+
+        self.validate_inputs_with_library()
+
+    @final
+    def generic_validate_output_with_library(self):
+        self.validate_output_with_library()
+
+    @abstractmethod
+    def validate_inputs_with_library(self):
+        pass
+
+    @abstractmethod
+    def validate_inputs_static(self):
+        pass
+
+    @abstractmethod
+    def validate_output_with_library(self):
+        pass
+
+    @abstractmethod
+    def validate_output_static(self):
+        pass
+
+    def validate_before_run(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ): ...
+
+    def validate_after_run(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ): ...
 
     @abstractmethod
     def required_variables(self) -> set[str]:
@@ -82,31 +231,6 @@ class PipeAbstract(ABC, BaseModel):
 
         """
 
-    def pipe_dependencies(self) -> set[str]:
-        """Return the pipes that are dependencies of the pipe.
-        - PipeBatch: The pipe that is being batched
-        - PipeCondition: The pipes in the outcome_map
-        - PipeSequence: The pipes in the steps
-        """
-        return set()
-
-    def concept_dependencies(self) -> list[Concept]:
-        required_concepts: list[Concept] = [self.output]
-        required_concepts.extend(self.inputs.concepts)
-        required_concepts.append(self.output)
-        return required_concepts
-
-    @abstractmethod
-    async def run_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-        print_intermediate_outputs: bool | None = False,
-    ) -> PipeOutput:
-        pass
-
     def monitor_pipe_stack(self, pipe_run_params: PipeRunParams):
         pipe_stack = pipe_run_params.pipe_stack
         limit = pipe_run_params.pipe_stack_limit
@@ -129,6 +253,57 @@ class PipeAbstract(ABC, BaseModel):
         concept_code_label = f"[bold green]{self.output.code}[/bold green]"
         arrow = "[yellow]→[/yellow]"
         return f"{indent}{pipe_type_label} {pipe_code_label} {arrow} {concept_code_label}"
+
+    @abstractmethod
+    async def _run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        pass
+
+    @final
+    async def run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
+        self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
+
+        updated_metadata = JobMetadata(
+            pipe_job_ids=[self.code],
+        )
+        job_metadata.update(updated_metadata=updated_metadata)
+
+        # check we have the required inputs in the working memory
+        missing_inputs: dict[str, str] = {}
+        for required_stuff_name, requirement in self.needed_inputs().items:
+            if not working_memory.is_stuff_exists(name=required_stuff_name):
+                missing_inputs[required_stuff_name] = requirement.concept.code
+        if missing_inputs:
+            raise PipeRunInputsError(
+                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
+            )
+
+        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
+        if pipe_run_params.run_mode == PipeRunMode.LIVE:
+            log.info(pipe_run_info)
+
+        self.validate_before_run(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
+
+        pipe_output = await self._run_pipe(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
+
+        self.validate_after_run(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
+
+        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
+        return pipe_output
 
 
 PipeAbstractType = type[PipeAbstract]

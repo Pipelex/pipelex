@@ -1,5 +1,8 @@
 """Test simple pipe sequence functionality without batching."""
 
+from pathlib import Path
+from typing import Callable
+
 import pytest
 
 from pipelex import pretty_print
@@ -16,7 +19,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.dry_runnable
 @pytest.mark.inference
 @pytest.mark.asyncio
-async def test_simple_text_sequence(pipe_run_mode: PipeRunMode):
+async def test_simple_text_sequence(pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence/")])
     """Test simple text processing sequence without batching."""
     # Create test input
     raw_text_stuff = StuffFactory.make_stuff(

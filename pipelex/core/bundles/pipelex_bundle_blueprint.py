@@ -46,6 +46,7 @@ class PipelexBundleBlueprint(BaseModel):
     @field_validator("domain", mode="before")
     @classmethod
     def validate_domain_syntax(cls, domain: str) -> str:
+        # Then validate the domain code format
         try:
             validate_domain_code(code=domain)
         except DomainCodeError as exc:

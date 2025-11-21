@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex.client.protocol import PipelineInputs
@@ -11,6 +12,8 @@ from pipelex.hub import (
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
+    set_current_library,
+    teardown_current_library,
 )
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -22,7 +25,7 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.pipeline.validate_plx import validate_plx
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 
@@ -32,6 +35,8 @@ if TYPE_CHECKING:
 
 
 async def execute_pipeline(
+    library_id: str | None = None,
+    library_path: str | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
@@ -49,6 +54,10 @@ async def execute_pipeline(
 
     Parameters
     ----------
+    library_id:
+        The library ID to use for the pipeline execution. If not provided, the library_id will be set to the pipeline run ID.
+    library_path:
+        Path to the library directory to load.
     pipe_code:
         The code identifying the pipeline to execute.
     plx_content:
@@ -79,12 +88,24 @@ async def execute_pipeline(
         msg = "Either pipe_code or plx_content must be provided to the API execute_pipeline."
         raise ValueError(msg)
 
+    pipeline = get_pipeline_manager().add_new_pipeline()
+    pipeline_run_id = pipeline.pipeline_run_id
+
+    if not library_id:
+        library_id = pipeline_run_id
+
+    library_manager = get_library_manager()
+    set_current_library(library_id=library_id)
+    library_manager.open_library(library_id=library_id)
+
     pipe: PipeAbstract | None = None
     blueprint: PipelexBundleBlueprint | None = None
 
     if plx_content:
-        blueprint, _ = await validate_plx(plx_content=plx_content, remove_after_validation=False)
-
+        validate_bundle_result = await validate_bundle(plx_content=plx_content)
+        library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result.blueprints)
+        # For now, we only support one blueprint when given a plx_content. So blueprints is of length 1.
+        blueprint = validate_bundle_result.blueprints[0]
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
         elif blueprint.main_pipe:
@@ -93,6 +114,10 @@ async def execute_pipeline(
             msg = "No pipe code or main pipe in the PLX content provided to the API execute_pipeline."
             raise PipeExecutionError(message=msg)
     elif pipe_code:
+        if library_path:
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(library_path)])
+        else:
+            library_manager.load_libraries(library_id=library_id)
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
         msg = "Either provide pipe_code or plx_content to the API execute_pipeline. 'pipe_code' must be provided when 'plx_content' is None"
@@ -119,8 +144,7 @@ async def execute_pipeline(
         else:
             pipe_run_mode = PipeRunMode.LIVE
 
-    pipeline = get_pipeline_manager().add_new_pipeline()
-    get_report_delegate().open_registry(pipeline_run_id=pipeline.pipeline_run_id)
+    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
 
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline.pipeline_run_id,
@@ -157,8 +181,9 @@ async def execute_pipeline(
             pipe_stack=pipe_job.pipe_run_params.pipe_stack,
         ) from exc
     finally:
-        if plx_content and blueprint is not None:
-            get_library_manager().remove_from_blueprint(blueprint=blueprint)
+        library = get_library_manager().get_library(library_id=library_id)
+        library.teardown()
+        teardown_current_library()
     properties = {
         EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
         EventProperty.PIPE_TYPE: pipe.pipe_type,

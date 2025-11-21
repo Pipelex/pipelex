@@ -1,9 +1,8 @@
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar, final
 
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ModelNotFoundError, ModelWaterfallError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -16,6 +15,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 if TYPE_CHECKING:
     from pipelex.core.stuffs.list_content import ListContent
     from pipelex.core.stuffs.stuff_content import StuffContent
+
 PipeOperatorOutputType = TypeVar("PipeOperatorOutputType", bound=PipeOutput)
 
 
@@ -26,27 +26,15 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     def class_name(self) -> str:
         return self.__class__.__name__
 
+    @final
     @override
-    async def run_pipe(
+    async def _run_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        print_intermediate_outputs: bool | None = False,
     ) -> PipeOutput:
-        pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
-        self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
-
-        updated_metadata = JobMetadata(
-            pipe_job_ids=[self.code],
-        )
-        job_metadata.update(updated_metadata=updated_metadata)
-
-        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
-        # log.info(pipe_run_info)
-        if pipe_run_params.run_mode == PipeRunMode.LIVE:
-            log.info(pipe_run_info)
         try:
             match pipe_run_params.run_mode:
                 case PipeRunMode.LIVE:
@@ -95,8 +83,6 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                 model_handle=model_not_found_error.model_handle,
                 fallback_list=None,
             ) from model_not_found_error
-        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
-
         return pipe_output
 
     @abstractmethod
