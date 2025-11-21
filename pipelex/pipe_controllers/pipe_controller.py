@@ -33,7 +33,6 @@ class PipeController(PipeAbstract):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        print_intermediate_outputs: bool | None = False,
     ) -> PipeOutput:
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
