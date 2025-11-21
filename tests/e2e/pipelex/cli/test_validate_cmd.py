@@ -12,7 +12,7 @@ class TestValidateCommand:
         pipelex_path = shutil.which("pipelex")
         assert pipelex_path is not None, "pipelex executable not found in PATH"
 
-        result = subprocess.run(
+        result = subprocess.run( # noqa: S603
             [pipelex_path, "validate", "all"],
             check=False,
             capture_output=True,
