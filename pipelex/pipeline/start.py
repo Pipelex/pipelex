@@ -13,7 +13,7 @@ from pipelex.hub import (
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
-    set_current_library_id,
+    set_current_library,
 )
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -96,7 +96,7 @@ async def start_pipeline(
         library_id = pipeline_run_id
 
     library_manager = get_library_manager()
-    set_current_library_id(library_id=library_id)
+    set_current_library(library_id=library_id)
     library_manager.open_library(library_id=library_id)
 
     pipe: PipeAbstract | None = None

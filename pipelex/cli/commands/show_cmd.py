@@ -27,7 +27,7 @@ from pipelex.hub import (
     get_required_pipe,
     get_secrets_provider,
     get_telemetry_manager,
-    set_current_library_id,
+    set_current_library,
 )
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
@@ -203,7 +203,7 @@ def list_pipes_cmd() -> None:
 
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
-    set_current_library_id(library_id=library_id)
+    set_current_library(library_id=library_id)
     library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
 
     with get_telemetry_manager().telemetry_context():
@@ -231,7 +231,7 @@ def show_pipe_cmd(
 
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
-    set_current_library_id(library_id=library_id)
+    set_current_library(library_id=library_id)
     library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
 
     with get_telemetry_manager().telemetry_context():

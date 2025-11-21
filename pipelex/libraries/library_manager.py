@@ -19,7 +19,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
-from pipelex.hub import get_current_library_id
+from pipelex.hub import get_current_library
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -78,28 +78,31 @@ class LibraryManager(LibraryManagerAbstract):
     def open_library(self, library_id: str | None = None) -> tuple[str, Library]:
         if not library_id:
             library_id = self.generate_library_id()
-            self._libraries[library_id] = LibraryFactory.make_empty()
-        if library_id not in self._libraries:
-            self._libraries[library_id] = LibraryFactory.make_empty()
-        return library_id, self._libraries[library_id]
+
+        if library_id in self._libraries:
+            the_library = self._libraries[library_id]
+        else:
+            the_library = LibraryFactory.make_empty()
+            self._libraries[library_id] = the_library
+
+        return library_id, the_library
 
     ############################################################
     # Public library accessors
     ############################################################
 
     @override
-    def set_library(self, library_id: str, library: Library) -> None:
+    def get_library(self, library_id: str) -> Library:
         if library_id not in self._libraries:
             msg = f"Library '{library_id}' does not exist"
             raise LibraryError(msg)
-        self._libraries[library_id] = library
+        return self._libraries[library_id]
 
     @override
-    def get_library(self, library_id: str | None = None) -> Library:
-        if library_id is None:
-            library_id = get_current_library_id()
+    def get_current_library(self) -> Library:
+        library_id = get_current_library()
         if library_id not in self._libraries:
-            msg = f"Library '{library_id}' does not exist"
+            msg = f"No current library set. Library '{library_id}' does not exist"
             raise LibraryError(msg)
         return self._libraries[library_id]
 
@@ -290,12 +293,12 @@ class LibraryManager(LibraryManagerAbstract):
             ) from validation_error
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
-        library = self.get_library()
+        library = self.get_current_library()
         if blueprint.pipe is not None:
             library.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
 
     def _remove_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
-        library = self.get_library()
+        library = self.get_current_library()
         if blueprint.concept is not None:
             concept_codes_to_remove = [
                 ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)

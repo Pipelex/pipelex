@@ -268,7 +268,7 @@ class PipelexHub:
 
     def get_required_domain_library(self) -> DomainLibraryAbstract:
         if self._library_manager is not None:
-            return self._library_manager.get_library().domain_library
+            return self._library_manager.get_current_library().domain_library
         if self._domain_library is None:
             msg = "DomainLibrary is not initialized"
             raise RuntimeError(msg)
@@ -276,7 +276,7 @@ class PipelexHub:
 
     def get_required_concept_library(self) -> ConceptLibraryAbstract:
         if self._library_manager is not None:
-            return self._library_manager.get_library().concept_library
+            return self._library_manager.get_current_library().concept_library
         if self._concept_library is None:
             msg = "ConceptLibrary is not initialized"
             raise RuntimeError(msg)
@@ -284,7 +284,7 @@ class PipelexHub:
 
     def get_required_pipe_library(self) -> PipeLibraryAbstract:
         if self._library_manager is not None:
-            return self._library_manager.get_library().pipe_library
+            return self._library_manager.get_current_library().pipe_library
         if self._pipe_library is None:
             msg = "PipeLibrary is not initialized"
             raise RuntimeError(msg)
@@ -319,7 +319,7 @@ class PipelexHub:
 
     def get_library(self) -> Library:
         if self._library_manager is not None:
-            return self._library_manager.get_library()
+            return self._library_manager.get_current_library()
         msg = "Library is not initialized"
         raise RuntimeError(msg)
 
@@ -418,25 +418,21 @@ def get_secret(secret_id: str) -> str:
 _library_id: ContextVar[str | None] = ContextVar("library_id", default=None)
 
 
-def set_current_library_id(library_id: str) -> None:
+def set_current_library(library_id: str) -> None:
     """Set the library_id for the current async context."""
     _library_id.set(library_id)
 
 
-def get_optional_current_library_id() -> str | None:
-    return _library_id.get()
-
-
-def get_current_library_id() -> str:
+def get_current_library() -> str:
     """Get the library_id from the current async context."""
     library_id = _library_id.get()
     if library_id is None:
-        msg = "No library context set. Must call set_current_library_id() first."
+        msg = "No current library set. Must call set_current_library() first."
         raise RuntimeError(msg)
     return library_id
 
 
-def teardown_current_library_id() -> None:
+def teardown_current_library() -> None:
     """Teardown the library_id for the current async context."""
     _library_id.set(None)
 
