@@ -2,7 +2,6 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValueError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code

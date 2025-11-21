@@ -3,7 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from pipelex.core.concepts.exceptions import ConceptStructureBlueprintValueError
 from pipelex.types import Self, StrEnum
 
 

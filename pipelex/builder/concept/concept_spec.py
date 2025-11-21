@@ -11,7 +11,6 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import ConceptBlueprintValueError, ConceptStructureBlueprintValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable

@@ -1,7 +1,6 @@
 import os
 from typing import Any
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.system.configuration.config_root import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
@@ -12,10 +11,6 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_pa
 
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
-
-
-class ConfigError(PipelexError):
-    pass
 
 
 class ConfigLoader:

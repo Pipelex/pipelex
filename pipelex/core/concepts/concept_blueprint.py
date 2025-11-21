@@ -3,7 +3,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
-from pipelex.core.concepts.exceptions import ConceptBlueprintValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 

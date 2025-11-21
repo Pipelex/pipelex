@@ -41,10 +41,6 @@ class LLMSettingsValidationError(CogtError):
     pass
 
 
-class ImgGenSettingsValidationError(CogtError):
-    pass
-
-
 class ModelDeckValidatonError(CogtError):
     pass
 
@@ -116,10 +112,6 @@ class LLMAssignmentError(CogtError):
     pass
 
 
-class LLMPromptSpecError(CogtError):
-    pass
-
-
 class LLMPromptTemplateInputsError(CogtError):
     pass
 
@@ -173,15 +165,11 @@ class RoutingProfileLibraryNotFoundError(CogtError):
     pass
 
 
-class RoutingProfileBlueprintValueError(CogtError, ValueError):
+class InferenceModelSpecError(CogtError):
     pass
 
 
 class RoutingProfileLibraryError(CogtError):
-    pass
-
-
-class InferenceModelSpecError(CogtError):
     pass
 
 

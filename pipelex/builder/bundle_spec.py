@@ -5,7 +5,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError, PipelexBundleSpecValueError
+from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint

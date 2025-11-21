@@ -7,7 +7,6 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import Self
 
 
-
 class ImgGenSetting(ConfigModel):
     model: str
     quality: Quality | None = Field(default=None, strict=False)

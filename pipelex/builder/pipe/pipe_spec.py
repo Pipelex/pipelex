@@ -68,8 +68,8 @@ class PipeSpec(StructuredContent):
         try:
             return cls.validate_pipe_code_syntax(value)
         except PipeBlueprintValueError as exc:
-                msg = f"Invalid pipe code syntax '{value}'. Must be in snake_case."
-                raise ValueError(msg) from exc
+            msg = f"Invalid pipe code syntax '{value}'. Must be in snake_case."
+            raise ValueError(msg) from exc
 
     @field_validator("type", mode="after")
     @classmethod

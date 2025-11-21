@@ -17,10 +17,6 @@ class AzureCredentialsError(CredentialsError):
     pass
 
 
-class AzureImgGenConfigError(CogtError):
-    pass
-
-
 class AzureImgGenWorker(ImgGenWorkerAbstract):
     def __init__(
         self,
