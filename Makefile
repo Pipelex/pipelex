@@ -88,8 +88,6 @@ make test-extract             - Run unit tests only for extract (with prints)
 make te                       - Shorthand -> test-extract
 make test-img-gen             - Run unit tests only for img_gen (with prints)
 make test-g					  - Shorthand -> test-img-gen
-make test-validate-cmd        - Run pipelex validate all
-make tvc                      - Shorthand -> test-validate-cmd
 
 make check-unused-imports     - Check for unused imports without fixing
 make fix-unused-imports       - Fix unused imports with ruff
@@ -116,7 +114,7 @@ export HELP
 	format lint pyright mypy pylint \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
-	test-llm tl test-img-gen tg test-extract te test-validate-cmd tvc codex-tests gha-tests \
+	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
@@ -374,13 +372,6 @@ test-pipelex-api: env
 
 ta: test-pipelex-api
 	@echo "> done: ta = test-pipelex-api"
-
-test-validate-cmd: env
-	$(call PRINT_TITLE,"Validating all pipelines")
-	$(VENV_PIPELEX) validate all
-
-tvc: test-validate-cmd
-	@echo "> done: tvc = test-validate-cmd"
 
 cov: env
 	$(call PRINT_TITLE,"Unit testing with coverage")

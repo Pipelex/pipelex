@@ -32,8 +32,6 @@ COMMAND = "validate"
 
 
 def do_validate_all_libraries_and_dry_run() -> None:
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -54,8 +52,6 @@ def do_validate_all_libraries_and_dry_run() -> None:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
-    finally:
-        pipelex_instance.teardown()
 
 
 def validate_cmd(
@@ -81,9 +77,12 @@ def validate_cmd(
         pipelex validate --bundle my_bundle.plx --pipe my_pipe
         pipelex validate all
     """
+    pipelex_instance: Pipelex
     # Check for "all" keyword
     if target == "all" and not pipe and not bundle:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
         do_validate_all_libraries_and_dry_run()
+        pipelex_instance.teardown()
         return
 
     # Validate mutual exclusivity
@@ -156,8 +155,6 @@ def validate_cmd(
             typer.secho("Failed to validate: no pipe code or bundle specified", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
 
-    # Initialize Pipelex
-    pipelex_instance: Pipelex
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
