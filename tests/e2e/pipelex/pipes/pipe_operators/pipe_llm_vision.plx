@@ -1,15 +1,15 @@
-domain = "pipe_llm_vision"
+domain = "pipe_llm_vision_e2e"
 description = "Test PipeLLM with vision capabilities"
 
 [concept]
-VisionAnalysis = "Some analysis based on the image"
-BasicDescription = "Basic description of the image"
+VisionAnalysisE2E = "Some analysis based on the image"
+BasicDescriptionE2E = "Basic description of the image"
 
-[concept.Photo]
+[concept.PhotoE2E]
 description = "A photo"
 refines = "Image"
 
-[pipe.describe_image]
+[pipe.describe_image_e2e]
 type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image = "Image" }
@@ -20,22 +20,22 @@ Describe what you see in this image in 1-2 sentences, be concise.
 $image
 """
 
-[pipe.describe_image_number_1_only]
+[pipe.describe_image_number_1_only_e2e]
 type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image_a = "Image", image_b = "Image" }
-output = "BasicDescription"
+output = "BasicDescriptionE2E"
 model = "llm_for_diagram_to_text"
 prompt = """
 Describe what you see in $image_a only.
 Completely ignore $image_b.
 """
 
-[pipe.describe_image_number_2_only]
+[pipe.describe_image_number_2_only_e2e]
 type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image_a = "Image", image_b = "Image" }
-output = "BasicDescription"
+output = "BasicDescriptionE2E"
 model = "llm_for_diagram_to_text"
 prompt = """
 Describe what you see in $image_b only.
@@ -43,11 +43,11 @@ Completely ignore $image_a.
 """
 
 
-[pipe.vision_analysis]
+[pipe.vision_analysis_e2e]
 type = "PipeLLM"
 description = "Provide detailed analysis of the image"
-inputs = { image = "Photo" }
-output = "VisionAnalysis"
+inputs = { image = "PhotoE2E" }
+output = "VisionAnalysisE2E"
 model = "llm_for_diagram_to_text"
 system_prompt = "You are an expert image analyst. Provide detailed, accurate descriptions."
 prompt = """

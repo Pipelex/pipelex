@@ -88,7 +88,7 @@ class TestFlowFactory:
         flow = FlowFactory.make_from_plx_file(plx_file_path)
 
         # Find the sequence pipe
-        sequence_element = flow.flow_elements.get("write_discord_newsletter")
+        sequence_element = flow.flow_elements.get("write_discord_newsletter_flow")
         assert sequence_element is not None
         assert sequence_element.controller_blueprint is not None
         assert sequence_element.controller_blueprint.type == "PipeSequence"
@@ -111,7 +111,7 @@ class TestFlowFactory:
         flow = FlowFactory.make_from_plx_file(plx_file_path)
 
         # Find an operator pipe (LLM pipe) - converted to signature
-        operator_element = flow.flow_elements.get("summarize_discord_channel_update_for_new_members")
+        operator_element = flow.flow_elements.get("summarize_discord_channel_update_for_new_members_flow")
         assert operator_element is not None
         assert operator_element.operator_signature is not None
         assert isinstance(operator_element.operator_signature, PipeSignature)
