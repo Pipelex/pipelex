@@ -52,7 +52,7 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def setup(self) -> None:
-        self._libraries.clear()
+        pass
 
     @override
     def teardown(self, library_id: str | None = None) -> None:
