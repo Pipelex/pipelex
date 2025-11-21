@@ -30,7 +30,7 @@ class PipeSequenceBlueprint(PipeBlueprint):
     @field_validator("steps", mode="before")
     @classmethod
     def validate_steps(cls, steps: list[SubPipeBlueprint]) -> list[SubPipeBlueprint]:
-        if len(steps) == 0:
+        if not steps:
             msg = "PipeSequence must have at least 1 step"
             raise ValueError(msg)
         return steps

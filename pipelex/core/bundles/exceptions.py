@@ -6,7 +6,7 @@ from pipelex.types import StrEnum
 class PipeValidationErrorType(StrEnum):
     """Types of pipe validation errors.
 
-    These error types are raised during pipe validation (validate_input_with_library, validate_output_with_library).
+    These error types are raised during pipe validation (validate_inputs_with_library, validate_output_with_library).
     """
 
     MISSING_INPUT_VARIABLE = "missing_input_variable"

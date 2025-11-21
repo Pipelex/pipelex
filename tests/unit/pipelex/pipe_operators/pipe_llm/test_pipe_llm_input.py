@@ -28,5 +28,5 @@ class TestPipeLLMValidateInputs:
             blueprint=blueprint,
         )
 
-        pipe_llm.validate_input_static()
-        pipe_llm.validate_input_with_library()
+        pipe_llm.validate_inputs_static()
+        pipe_llm.validate_inputs_with_library()

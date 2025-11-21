@@ -6,7 +6,7 @@ import pytest
 from pipelex import log, pretty_print
 from pipelex.builder.flow_factory import FlowFactory
 from pipelex.builder.pipe.pipe_signature import PipeSignature
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeTypes
+from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, remove_folder
 from pipelex.tools.misc.json_utils import save_as_json_to_path
@@ -115,7 +115,7 @@ class TestFlowFactory:
         assert operator_element is not None
         assert operator_element.operator_signature is not None
         assert isinstance(operator_element.operator_signature, PipeSignature)
-        assert operator_element.operator_signature.type == AllowedPipeTypes.PIPE_LLM
+        assert operator_element.operator_signature.type == PipeType.PIPE_LLM
 
         # Verify it has the signature properties
         assert hasattr(operator_element.operator_signature, "code")

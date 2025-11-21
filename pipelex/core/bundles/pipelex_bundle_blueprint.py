@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -45,12 +45,7 @@ class PipelexBundleBlueprint(BaseModel):
 
     @field_validator("domain", mode="before")
     @classmethod
-    def validate_domain_syntax(cls, domain: Any) -> str:
-        # First ensure domain is a string
-        if not isinstance(domain, str):
-            msg = f"Domain code must be a string, got {type(domain).__name__}"
-            raise PipelexBundleBlueprintValueError(msg)
-
+    def validate_domain_syntax(cls, domain: str) -> str:
         # Then validate the domain code format
         try:
             validate_domain_code(code=domain)

@@ -10,18 +10,17 @@ class PipeImgGenTestCases:
         PipeImgGenSpec(
             pipe_code="img_generator",
             description="Generate an image",
-            inputs={},
-            output="GeneratedImage",
+            inputs={"my_prompt": "Text"},
+            output="native.Image",
             img_gen_skill=ImgGenSkill.GEN_IMAGE_BASIC,
         ),
         PipeImgGenBlueprint(
             description="Generate an image",
-            inputs=None,
-            output="GeneratedImage",
+            inputs={"my_prompt": "Text"},
+            output="native.Image",
             type="PipeImgGen",
             pipe_category="PipeOperator",
-            img_gen_prompt=None,
-            img_gen_prompt_var_name=None,
+            img_gen_prompt_var_name="my_prompt",
             model=ImgGenSkill.GEN_IMAGE_BASIC,
             aspect_ratio=None,
             background=None,
@@ -53,7 +52,7 @@ class PipeImgGenTestCases:
             output_format=None,
             is_raw=None,
             seed=None,
-            img_gen_prompt_var_name=None,
+            img_gen_prompt_var_name="description",
         ),
     )
 

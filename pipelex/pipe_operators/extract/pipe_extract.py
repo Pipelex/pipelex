@@ -16,7 +16,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -67,7 +67,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         return self
 
     @override
-    def validate_input_static(self):
+    def validate_inputs_static(self):
         if self.extract_choice:
             try:
                 check_extract_choice_with_deck(extract_choice=self.extract_choice)
@@ -76,7 +76,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
                 raise ValueError(msg) from exc
 
     @override
-    def validate_input_with_library(self):
+    def validate_inputs_with_library(self):
         pass
 
     @override

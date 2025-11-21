@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
-from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent

@@ -3,8 +3,8 @@ from typing import Callable
 import pytest
 
 from pipelex.core.concepts.exceptions import ConceptStringError
-from pipelex.core.pipes.input_requirements import InputRequirement
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactoryError
+from pipelex.core.pipes.inputs.input_requirements import InputRequirement
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactoryError
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from tests.unit.pipelex.core.pipes.data import (
     CONCEPT_CODE_RESOLUTION_TEST_CASES,

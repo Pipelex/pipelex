@@ -27,8 +27,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def setup(self):
-        all_native_concepts = ConceptFactory.make_all_native_concepts()
-        self.add_concepts(concepts=all_native_concepts)
+        pass
 
     @override
     def teardown(self):
@@ -39,10 +38,19 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         self.teardown()
         self.setup()
 
+    # TODO: Rethink the make_empty of libraries. It makes sense with the setup and teardown methods
     @classmethod
     def make_empty(cls) -> Self:
         library = cls(root={})
         library.setup()
+        return library
+
+    @classmethod
+    def make_empty_with_native_concepts(cls) -> Self:
+        library = cls(root={})
+        library.setup()
+        all_native_concepts = ConceptFactory.make_all_native_concepts()
+        library.add_concepts(concepts=all_native_concepts)
         return library
 
     @override
@@ -147,3 +155,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                     msg = f"Multiple concepts found for '{concept_string_or_code}': {found_concepts}. Please specify the domain."
                     raise ConceptLibraryConceptNotFoundError(msg)
                 return found_concepts[0]
+
+    def is_concept_exists(self, concept_string: str) -> bool:
+        return concept_string in self.root

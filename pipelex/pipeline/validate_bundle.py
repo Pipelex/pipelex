@@ -9,7 +9,7 @@ from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, P
 from pipelex.core.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeValidationErrorData
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import get_library_manager, set_current_library_id
+from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 
 
@@ -133,7 +133,7 @@ async def validate_bundle(
 
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
-    set_current_library_id(library_id=library_id)
+    set_current_library(library_id=library_id)
 
     loaded_pipes: list[PipeAbstract] | None = None
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None

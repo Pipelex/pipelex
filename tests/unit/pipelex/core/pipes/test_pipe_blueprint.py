@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 
 
 class ConcretePipeBlueprint(PipeBlueprint):
@@ -10,7 +10,7 @@ class ConcretePipeBlueprint(PipeBlueprint):
 
 class TestPipeBlueprintValidation:
     def test_validate_pipe_type_correct(self):
-        for pipe_type_enum in AllowedPipeTypes:
+        for pipe_type_enum in PipeType:
             pipe_type = pipe_type_enum.value
             match pipe_type:
                 case "PipeFunc" | "PipeImgGen" | "PipeCompose" | "PipeLLM" | "PipeExtract":
@@ -36,7 +36,7 @@ class TestPipeBlueprintValidation:
             assert "Invalid pipe type" in str(exc_info.value)
 
     def test_validate_pipe_category_correct(self):
-        for category_enum in AllowedPipeCategories:
+        for category_enum in PipeCategory:
             category = category_enum.value
             match category:
                 case "PipeOperator":

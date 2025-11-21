@@ -38,9 +38,9 @@ class PipelexInterpreter(BaseModel):
 
         try:
             # Read the first few lines to check for "domain ="
-            with open(file_path, encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as file:
                 # Read first 100 characters (should be enough to find domain)
-                content = f.read(100)
+                content = file.read(100)
                 # Remove leading whitespace and check if it starts with "domain ="
                 stripped_content = content.lstrip()
                 return stripped_content.startswith("domain =")
@@ -50,16 +50,16 @@ class PipelexInterpreter(BaseModel):
 
     @classmethod
     def make_pipelex_bundle_blueprint(cls, bundle_path: str | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:
-        if bundle_path is None and plx_content is None:
-            msg = "Either 'bundle_path' or 'plx_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
-            raise PipelexInterpreterError(msg)
-        blueprint_dict: dict[str, Any] | None = None
+        blueprint_dict: dict[str, Any]
         try:
             if bundle_path is not None:
                 blueprint_dict = load_toml_from_path(path=bundle_path)
                 blueprint_dict.update(source=bundle_path)
             elif plx_content is not None:
                 blueprint_dict = load_toml_from_content(content=plx_content)
+            else:
+                msg = "Either 'bundle_path' or 'plx_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
+                raise PipelexInterpreterError(msg)
         except TomlError as exc:
             raise PLXDecodeError(message=exc.message, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
 
@@ -72,11 +72,11 @@ class PipelexInterpreter(BaseModel):
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
             # Parse Pydantic validation errors into structured error data
-            validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
+            blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
             # Handle domain and source fields carefully for context
             domain_value: str | None = blueprint_dict.get("domain") if blueprint_dict else None
-            source_value: str | None = blueprint_dict.get("source") or bundle_path if blueprint_dict else bundle_path
+            source_value: str | None = blueprint_dict.get("source") if blueprint_dict else bundle_path
 
             for error in exc.errors():
                 loc = error.get("loc", ())
@@ -92,9 +92,9 @@ class PipelexInterpreter(BaseModel):
                     domain=error_domain,
                     source=error_source,
                 )
-                validation_errors.append(val_error)
+                blueprint_validation_errors.append(val_error)
 
             raise PipelexInterpreterError(
                 message=str(exc),
-                validation_errors=validation_errors,
+                validation_errors=blueprint_validation_errors,
             ) from exc

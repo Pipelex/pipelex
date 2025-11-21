@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -57,11 +57,11 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         return function_name
 
     @override
-    def validate_input_static(self):
+    def validate_inputs_static(self):
         pass
 
     @override
-    def validate_input_with_library(self):
+    def validate_inputs_with_library(self):
         pass
 
     @override

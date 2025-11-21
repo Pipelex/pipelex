@@ -212,8 +212,8 @@ def extract_vars_from_strings_recursive(data: Any) -> set[str]:
         """Recursively traverse the data structure."""
         if isinstance(value, dict):
             dict_value: dict[Any, Any] = cast("dict[Any, Any]", value)
-            for v in dict_value.values():
-                traverse(v)
+            for the_value in dict_value.values():
+                traverse(the_value)
         elif isinstance(value, list):
             list_value: list[Any] = cast("list[Any]", value)
             for item in list_value:

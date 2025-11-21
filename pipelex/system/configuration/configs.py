@@ -123,6 +123,7 @@ class ScanConfig(ConfigModel):
 
 
 class BuilderConfig(ConfigModel):
+    fix_loop_max_attempts: int
     default_output_dir: str
     default_bundle_file_name: str
     default_directory_base_name: str

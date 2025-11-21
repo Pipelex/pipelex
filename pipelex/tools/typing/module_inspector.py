@@ -134,12 +134,12 @@ def find_class_names_in_file(file_path: str, base_class_names: list[str] | None 
 
     try:
         # Read and parse the file
-        with open(file_path, encoding="utf-8") as f:
-            source = f.read()
+        with open(file_path, encoding="utf-8") as file:
+            source = file.read()
         tree = ast.parse(source, filename=file_path)
-    except Exception as e:
-        msg = f"Failed to parse {file_path}: {e}"
-        raise ModuleFileError(msg) from e
+    except Exception as exc:
+        msg = f"Failed to parse {file_path}: {exc}"
+        raise ModuleFileError(msg) from exc
 
     class_names: list[str] = []
 
@@ -198,12 +198,12 @@ def find_decorated_function_names_in_file(
 
     try:
         # Read and parse the file
-        with open(file_path, encoding="utf-8") as f:
-            source = f.read()
+        with open(file_path, encoding="utf-8") as file:
+            source = file.read()
         tree = ast.parse(source, filename=file_path)
-    except Exception as e:
-        msg = f"Failed to parse {file_path}: {e}"
-        raise ModuleFileError(msg) from e
+    except Exception as exc:
+        msg = f"Failed to parse {file_path}: {exc}"
+        raise ModuleFileError(msg) from exc
 
     function_names: list[str] = []
 

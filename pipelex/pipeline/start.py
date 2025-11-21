@@ -13,7 +13,7 @@ from pipelex.hub import (
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
-    set_current_library_id,
+    set_current_library,
 )
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -55,7 +55,7 @@ async def start_pipeline(
     Parameters
     ----------
     library_id:
-        The library ID to use for the pipeline execution. If not provided, the current library ID is used.
+        The library ID to use for the pipeline execution. If not provided, the library_id will be set to the pipeline run ID.
     library_path:
         Path to the library directory to load.
     pipe_code:
@@ -96,7 +96,7 @@ async def start_pipeline(
         library_id = pipeline_run_id
 
     library_manager = get_library_manager()
-    set_current_library_id(library_id=library_id)
+    set_current_library(library_id=library_id)
     library_manager.open_library(library_id=library_id)
 
     pipe: PipeAbstract | None = None

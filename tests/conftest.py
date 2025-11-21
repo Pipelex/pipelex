@@ -3,7 +3,9 @@ from pathlib import Path
 import pytest
 
 from pipelex import log
-from pipelex.hub import get_library_manager, set_current_library_id
+from pipelex.config import get_config
+from pipelex.hub import get_console, get_library_manager, get_report_delegate, set_current_library
+from pipelex.libraries.library_ids import SpecialLibraryId
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 
@@ -27,7 +29,6 @@ def routing_profile_setup(request: pytest.FixtureRequest):  # noqa: ARG001  # py
 @pytest.fixture(scope="module", autouse=True)
 def reset_pipelex_config_fixture(routing_profile_setup: str | None):  # noqa: ARG001
     pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.PYTEST)
-
     yield
     pipelex_instance.teardown()
 
@@ -40,7 +41,7 @@ def load_test_library():
         nonlocal library_id
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
-        set_current_library_id(library_id=library_id)
+        set_current_library(library_id=library_id)
 
         library_manager.load_libraries(
             library_id=library_id,
@@ -65,7 +66,7 @@ def load_empty_library():
         nonlocal library_id
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
-        set_current_library_id(library_id=library_id)
+        set_current_library(library_id=library_id)
 
         log.verbose(f"Opened empty library: {library_id}")
 

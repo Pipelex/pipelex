@@ -92,7 +92,6 @@ def find_plx_files_in_dir(dir_path: str, pattern: str, is_recursive: bool) -> li
 def get_pipelex_plx_files_from_dirs(dirs: set[Path]) -> list[Path]:
     """Get all valid Pipelex PLX files from the given directories."""
     all_plx_paths: list[Path] = []
-    seen_files: set[str] = set()  # Track by absolute path to avoid duplicates
 
     for dir_path in dirs:
         if not dir_path.exists():
@@ -108,16 +107,8 @@ def get_pipelex_plx_files_from_dirs(dirs: set[Path]) -> list[Path]:
 
         # Filter to only include valid Pipelex files
         for plx_file in plx_files:
-            absolute_path = str(plx_file.resolve())
-
-            # Skip if already seen
-            if absolute_path in seen_files:
-                log.debug(f"Skipping duplicate PLX file: {plx_file}")
-                continue
-
             if PipelexInterpreter.is_pipelex_file(plx_file):
                 all_plx_paths.append(plx_file)
-                seen_files.add(absolute_path)
             else:
                 log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")
 

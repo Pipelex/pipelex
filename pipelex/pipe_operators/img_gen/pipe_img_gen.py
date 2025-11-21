@@ -19,8 +19,8 @@ from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import UnexpectedPipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeInputError
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
@@ -90,15 +90,32 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         if self.img_gen_prompt_var_name is not None and self.img_gen_prompt is not None:
             msg = "Either 'img_gen_prompt' or 'img_gen_prompt_var_name' must be provided, but not both"
             raise ValueError(msg)
+
+        # If img_gen_prompt is None, validate that inputs are properly configured
+        if self.img_gen_prompt is None:
+            # Must have exactly one input
+            if not self.inputs or len(self.inputs.items) != 1:
+                msg = "When 'img_gen_prompt' is not provided, there must be exactly one input"
+                raise ValueError(msg)
+
+            # The img_gen_prompt_var_name must match the key of the single input
+            input_name, _ = self.inputs.items[0]
+            if self.img_gen_prompt_var_name != input_name:
+                msg = (
+                    f"When 'img_gen_prompt' is not provided, 'img_gen_prompt_var_name' must match the input name. "
+                    f"Expected '{input_name}', got '{self.img_gen_prompt_var_name}'"
+                )
+                raise ValueError(msg)
+
         return self
 
     @override
-    def validate_input_static(self):
+    def validate_inputs_static(self):
         if self.img_gen_choice:
             check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
 
     @override
-    def validate_input_with_library(self):
+    def validate_inputs_with_library(self):
         concept_library = get_concept_library()
         input_name = self.inputs.variables[0]
         input_requirement = self.inputs.get_required_input_requirement(input_name)

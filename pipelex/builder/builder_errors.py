@@ -17,9 +17,5 @@ class PipeSpecError(PipelexError):
     """Details of a single pipe failure during dry run."""
 
 
-class ValidateDryRunError(PipelexError):
-    """Raised when validating the dry run of a pipe."""
-
-
 class PipelexBundleUnexpectedError(PipelexError):
     """Raised when an unexpected error occurs during validation."""
