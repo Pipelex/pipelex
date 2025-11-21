@@ -3,9 +3,7 @@ from pathlib import Path
 import pytest
 
 from pipelex import log
-from pipelex.config import get_config
-from pipelex.hub import get_console, get_library_manager, get_report_delegate, set_current_library
-from pipelex.libraries.library_ids import SpecialLibraryId
+from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 
