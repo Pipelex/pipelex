@@ -10,6 +10,7 @@ description = "Domain with extract pipe"
 [pipe.extract_text]
 type = "PipeExtract"
 description = "Extract text from document"
+inputs = { document = "PDF" }
 output = "Page[]"
 model = "extract_text_from_pdf"
 """,
@@ -20,6 +21,9 @@ model = "extract_text_from_pdf"
             "extract_text": PipeExtractBlueprint(
                 type="PipeExtract",
                 description="Extract text from document",
+                inputs={
+                    "document": NativeConceptCode.PDF,
+                },
                 output=NativeConceptCode.PAGE.as_output_multiple_indeterminate,
                 model="extract_text_from_pdf",
             ),

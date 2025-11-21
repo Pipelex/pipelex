@@ -22,6 +22,7 @@ excluded_dirs = [
 ]
 
 [pipelex.builder_config]
+fix_loop_max_attempts = 10
 default_output_dir = "."
 default_bundle_file_name = "bundle"
 default_directory_base_name = "pipeline"

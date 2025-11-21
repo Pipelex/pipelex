@@ -19,7 +19,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library_id
+from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
@@ -42,7 +42,7 @@ def do_validate_all_libraries_and_dry_run() -> None:
 
             library_manager = get_library_manager()
             library_id, library = library_manager.open_library()
-            set_current_library_id(library_id=library_id)
+            set_current_library(library_id=library_id)
             library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
             pipes = library.get_pipe_library().get_pipes()
 

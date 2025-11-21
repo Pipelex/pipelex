@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
@@ -14,6 +15,8 @@ class Library(BaseModel):
 
     This represents a complete set of Pipelex definitions (domains, concepts, pipes)
     that can be loaded and used together, typically for a single pipeline run.
+
+    Limitations: It lacks the Func Registry library and Class Registry library
 
     Each Library (except BASE) inherits native concepts and base pipes from the BASE library.
     """
@@ -42,22 +45,29 @@ class Library(BaseModel):
         self.validate_domain_library_with_libraries()
 
     def validate_pipe_library_with_libraries(self) -> None:
-        for pipe in self.pipe_library.root.values():
-            # Validate concept dependencies exit
+        for pipe in self.pipe_library.get_pipes():
+            # Validate concept dependencies exist
+            # Note: This should NEVER fail as concepts are validated during pipe construction via get_required_concept()
+            # TODO: Make this non mandatory in production, or a test
             for concept in [pipe.output, *pipe.inputs.concepts]:
                 try:
-                    self.concept_library.get_required_concept(concept_string=concept.concept_string)
+                    self.concept_library.is_concept_exists(concept_string=concept.concept_string)
                 except ConceptLibraryError as concept_error:
-                    msg = f"Error validating pipe '{pipe.code}' dependency concept '{concept.concept_string}' because of: {concept_error}"
-                    raise LibraryError(msg) from concept_error
+                    msg = (
+                        f"INTERNAL ERROR: Pipe '{pipe.code}' references concept '{concept.concept_string}' "
+                        f"which doesn't exist in the concept library. This should be impossible as concepts are "
+                        f"validated during pipe construction (via get_required_concept() in pipe factories). "
+                        f"This indicates a bug in the system. Original error: {concept_error}"
+                    )
+                    raise PipelexUnexpectedError(msg) from concept_error
 
-            # Validate pipe dependencies exit for pipe controllers
+            # Validate pipe dependencies exist for pipe controllers
             if isinstance(pipe, PipeController):
-                for pipe_code in pipe.pipe_dependencies():
+                for sub_pipe_code in pipe.pipe_dependencies():
                     try:
-                        self.pipe_library.get_required_pipe(pipe_code=pipe_code)
+                        self.pipe_library.get_required_pipe(pipe_code=sub_pipe_code)
                     except PipeLibraryError as pipe_error:
-                        msg = f"Error validating pipe '{pipe.code}' dependency pipe '{pipe_code}' because of: {pipe_error}"
+                        msg = f"Error validating pipe '{pipe.code}' dependency pipe '{sub_pipe_code}' because of: {pipe_error}"
                         raise LibraryError(msg) from pipe_error
 
         for pipe in self.pipe_library.root.values():

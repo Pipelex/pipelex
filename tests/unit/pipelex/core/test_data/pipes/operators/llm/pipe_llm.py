@@ -98,6 +98,7 @@ description = "Domain with pipe definitions"
 [pipe.expert_analysis]
 type = "PipeLLM"
 description = "Expert analysis with system prompt"
+inputs = { extracted_text = "Text" }
 output = "Text"
 prompt = """
 Extract all articles/items from this invoice text: $extracted_text. For each item find: item name, quantity, unit price, total price, description, and product code if
@@ -111,6 +112,9 @@ Extract all articles/items from this invoice text: $extracted_text. For each ite
             "expert_analysis": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Expert analysis with system prompt",
+                inputs={
+                    "extracted_text": NativeConceptCode.TEXT,
+                },
                 output=NativeConceptCode.TEXT,
                 prompt="""Extract all articles/items from this invoice text: $extracted_text. For each item find: item name, quantity, unit price, total price, description, and product code if
  available. Return each article as separate structured data.

@@ -9,8 +9,8 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.exceptions import PipeInputNotFoundError
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
@@ -109,11 +109,11 @@ class PipeParallel(PipeController):
         return self
 
     @override
-    def validate_input_static(self):
+    def validate_inputs_static(self):
         pass
 
     @override
-    def validate_input_with_library(self):
+    def validate_inputs_with_library(self):
         pass
 
     @override

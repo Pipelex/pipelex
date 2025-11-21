@@ -19,8 +19,8 @@ class PipeExtractBlueprint(PipeBlueprint):
     def validate_inputs(self):
         nb_inputs = self.nb_inputs
         msg = (
-            "Only one input must be provided for the PipeExtract, and it must be a pdf or an image or a concept that refines one of them."
-            f"Only {nb_inputs} inputs were provided."
+            "Exactly one input must be provided for the PipeExtract, and it must be a pdf or an image or a concept that refines one of them."
+            f"{nb_inputs} inputs were provided."
         )
         if self.inputs is None:
             raise ValueError(msg)

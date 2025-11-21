@@ -38,9 +38,9 @@ def read_file_content(working_memory: WorkingMemory) -> ListContent[CodebaseFile
             with open(file_path.path, encoding="utf-8") as file:
                 content = file.read()
                 codebase_files.append(CodebaseFileContent(file_path=file_path.path, file_content=content))
-        except Exception as e:
+        except Exception as exc:
             codebase_files.append(
-                CodebaseFileContent(file_path=file_path.path, file_content=f"# File not found or unreadable: {file_path.path}\n# Error: {e!s}"),
+                CodebaseFileContent(file_path=file_path.path, file_content=f"# File not found or unreadable: {file_path.path}\n# Error: {exc!s}"),
             )
 
     return ListContent[CodebaseFileContent](items=codebase_files)

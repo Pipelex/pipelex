@@ -1,7 +1,7 @@
 from typing_extensions import override
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
@@ -42,7 +42,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
 
         # If we have inputs, that means that the prompt is in the inputs.
         # The blueprint already validated that there is only 1 input.
-        if blueprint.inputs and len(blueprint.inputs) != 0:
+        if blueprint.inputs:
             img_gen_prompt_var_name = blueprint.input_names[0]
         else:
             img_gen_prompt = blueprint.img_gen_prompt

@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
