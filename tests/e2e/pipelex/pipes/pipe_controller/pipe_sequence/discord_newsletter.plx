@@ -1,37 +1,37 @@
-domain = "discord_newsletter"
+domain = "discord_newsletter_e2e"
 description = "Create newsletters from Discord channel content by summarizing messages and organizing them according to newsletter format"
 
 [concept]
-DiscordChannelUpdate = "A Discord channel with its messages for newsletter generation"
-ChannelSummary = "A summarized Discord channel for newsletter inclusion"
-HtmlNewsletter = "The final newsletter content in html format with organized channel summaries"
+DiscordChannelUpdateE2E = "A Discord channel with its messages for newsletter generation"
+ChannelSummaryE2E = "A summarized Discord channel for newsletter inclusion"
+HtmlNewsletterE2E = "The final newsletter content in html format with organized channel summaries"
 
-[pipe.write_discord_newsletter]
+[pipe.write_discord_newsletter_e2e]
 type = "PipeSequence"
 description = "Create a newsletter from Discord articles by summarizing channels and organizing content"
-inputs = { discord_channel_updates = "DiscordChannelUpdate[]" }
-output = "HtmlNewsletter"
+inputs = { discord_channel_updates = "DiscordChannelUpdateE2E[]" }
+output = "HtmlNewsletterE2E"
 steps = [
-   { pipe = "summarize_discord_channel_update", batch_over = "discord_channel_updates", batch_as = "discord_channel_update", result = "channel_summaries" },
-   { pipe = "write_weekly_summary", result = "weekly_summary" },
-   { pipe = "format_html_newsletter", result = "html_newsletter" },
+   { pipe = "summarize_discord_channel_update_e2e", batch_over = "discord_channel_updates", batch_as = "discord_channel_update", result = "channel_summaries" },
+   { pipe = "write_weekly_summary_e2e", result = "weekly_summary" },
+   { pipe = "format_html_newsletter_e2e", result = "html_newsletter" },
 ]
 
 
-[pipe.summarize_discord_channel_update]
+[pipe.summarize_discord_channel_update_e2e]
 type = "PipeCondition"
 description = "Select the appropriate summary pipe based on the channel name"
-inputs = { discord_channel_update = "DiscordChannelUpdate" }
-output = "ChannelSummary"
+inputs = { discord_channel_update = "DiscordChannelUpdateE2E" }
+output = "ChannelSummaryE2E"
 expression = "discord_channel_update.name"
-outcomes = { "Introduce-Yourself" = "summarize_discord_channel_update_for_new_members" }
-default_outcome = "summarize_discord_channel_update_general"
+outcomes = { "Introduce-Yourself" = "summarize_discord_channel_update_for_new_members_e2e" }
+default_outcome = "summarize_discord_channel_update_general_e2e"
 
-[pipe.summarize_discord_channel_update_for_new_members]
+[pipe.summarize_discord_channel_update_for_new_members_e2e]
 type = "PipeLLM"
 description = "Summarize the new member announcements"
-inputs = { discord_channel_update = "DiscordChannelUpdate" }
-output = "ChannelSummary"
+inputs = { discord_channel_update = "DiscordChannelUpdateE2E" }
+output = "ChannelSummaryE2E"
 system_prompt = "You are a newsletter editor who creates engaging summaries of Discord channel content. You extract key information, preserve important links, and write in a clear, concise style suitable for newsletter readers."
 prompt = """
 Analyze this Discord channel update and create a newsletter-friendly summary.
@@ -42,11 +42,11 @@ Channel Information:
 Summarize with one bullet point for each new member
 """
 
-[pipe.summarize_discord_channel_update_general]
+[pipe.summarize_discord_channel_update_general_e2e]
 type = "PipeLLM"
 description = "Summarize a Discord channel's messages into newsletter-friendly content"
-inputs = { discord_channel_update = "DiscordChannelUpdate" }
-output = "ChannelSummary"
+inputs = { discord_channel_update = "DiscordChannelUpdateE2E" }
+output = "ChannelSummaryE2E"
 system_prompt = "You are a newsletter editor who creates engaging summaries of Discord channel content. You extract key information, preserve important links, and write in a clear, concise style suitable for newsletter readers."
 prompt = """
 Analyze this Discord channel update and create a newsletter-friendly summary.
@@ -61,10 +61,10 @@ Each summary item should be in plain text, no bullet points. You can make some p
 Make sure to preserve the channel name and position from the input for proper ordering in the newsletter.
 """
 
-[pipe.write_weekly_summary]
+[pipe.write_weekly_summary_e2e]
 type = "PipeLLM"
 description = "Combine channel summaries into a short summary of the week's Share channel content (200 characters)"
-inputs = { channel_summaries = "ChannelSummary" }
+inputs = { channel_summaries = "ChannelSummaryE2E" }
 output = "Text"
 prompt = """
 Write a single overall summary of the week's content based on the following Share channel summaries:
@@ -76,13 +76,13 @@ Write a single overall summary of the week's content based on the following Shar
 Keep it short: 200 characters.
 """
 
-[pipe.format_html_newsletter]
+[pipe.format_html_newsletter_e2e]
 type = "PipeCompose"
 description = "Combine weekly and channel summaries into a complete newsletter following specific formatting requirements"
-inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummary" }
-output = "HtmlNewsletter"
+inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummaryE2E" }
+output = "HtmlNewsletterE2E"
 
-[pipe.format_html_newsletter.template]
+[pipe.format_html_newsletter_e2e.template]
 category = "html"
 template = """
 <!-- Weekly Summary -->
