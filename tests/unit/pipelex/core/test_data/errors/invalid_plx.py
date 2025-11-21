@@ -120,7 +120,7 @@ description = "Domain should be string, not number"
 [concept]
 TestConcept = "A test concept"
 """,
-    PipelexInterpreterError,
+    TypeError,
 )
 
 WRONG_TYPE_FOR_DEFINITION = (
