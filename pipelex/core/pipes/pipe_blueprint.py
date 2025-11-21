@@ -135,8 +135,19 @@ class PipeBlueprint(ABC, BaseModel):
 
     @model_validator(mode="after")
     def validate_pipe_category_based_on_type(self) -> Self:
-        if self.pipe_category != PipeType(self.type).category:
-            msg = f"Invalid pipe category '{self.pipe_category}'. Must be one of: {self.type.category}"
+        try:
+            pipe_type = PipeType(self.type)
+        except ValueError as exc:
+            # If type is invalid, it should have been caught by the field validator
+            # but we handle it gracefully here
+            msg = f"Invalid pipe type '{self.type}'. Must be one of: {PipeType.value_list()}"
+            raise ValueError(msg) from exc
+
+        if self.pipe_category != pipe_type.category:
+            msg = (
+                f"Inconsistency detected: pipe_category '{self.pipe_category}' does not match the "
+                f"expected category '{pipe_type.category}' for type '{self.type}'"
+            )
             raise ValueError(msg)
         return self
 
