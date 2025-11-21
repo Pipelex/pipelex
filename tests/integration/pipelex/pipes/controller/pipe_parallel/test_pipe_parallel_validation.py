@@ -22,19 +22,18 @@ class TestPipeParallelValidation:
             domain=domain,
             concept_code="Document",
             blueprint=concept_blueprint,
-            concept_codes_from_the_same_domain=["Document"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Context",
             blueprint=concept_blueprint,
-            concept_codes_from_the_same_domain=["Context"],
+            concept_codes_from_the_same_domain=[concept_1.code],
         )
         concept_3 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Analysis",
             blueprint=concept_blueprint,
-            concept_codes_from_the_same_domain=["Analysis"],
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code],
         )
         concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
 
@@ -52,6 +51,7 @@ class TestPipeParallelValidation:
             domain=domain,
             pipe_code="analyze_document",
             blueprint=pipe_llm_blueprint,
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
         )
 
         pipe_library = get_pipe_library()
@@ -79,6 +79,7 @@ class TestPipeParallelValidation:
             domain=domain,
             pipe_code="parallel_document_processor",
             blueprint=pipe_parallel_blueprint,
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
         )
 
         # Verify the PipeParallel structure is correct

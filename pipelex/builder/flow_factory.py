@@ -53,7 +53,7 @@ class FlowFactory:
 
         if bundle_blueprint.pipe:
             for pipe_code, pipe_blueprint in bundle_blueprint.pipe.items():
-                if pipe_blueprint.pipe_category == PipeCategory.PIPE_CONTROLLER:
+                if PipeCategory.is_controller_by_str(pipe_blueprint.pipe_category):
                     # Keep controllers as-is (they are already blueprints which match spec structure)
                     # Type check to ensure we only assign controller blueprints
                     if isinstance(
