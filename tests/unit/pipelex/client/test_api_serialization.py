@@ -13,9 +13,18 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from tests.test_pipelines.concepts.datetime import DateTimeEvent
+
+
+class DateTimeEvent(StructuredContent):
+    """Test model for datetime content."""
+
+    event_name: str
+    start_time: datetime
+    end_time: datetime
+    created_at: datetime
 
 
 # Test models for complex scenarios

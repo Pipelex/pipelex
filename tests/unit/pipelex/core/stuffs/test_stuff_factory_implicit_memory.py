@@ -1,5 +1,6 @@
 import os
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 
 import pytest
 
@@ -15,7 +16,8 @@ from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_
 
 
 @pytest.fixture(scope="class")
-def setup_test_concept():
+def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
+    load_test_library([Path(__file__).parent])
     # Register the class in the class registry
     ClassRegistryUtils.register_classes_in_file(
         file_path=os.path.join(os.path.dirname(__file__), "data.py"),

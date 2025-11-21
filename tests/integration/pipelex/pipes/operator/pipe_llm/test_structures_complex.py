@@ -4,7 +4,7 @@ from pydantic import Field
 
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from tests.test_pipelines.concepts.test_structures_basic import ConceptWithOptionals, ConceptWithSimpleStructure
+from tests.integration.pipelex.pipes.operator.pipe_llm.test_structures_basic import ConceptWithOptionals, ConceptWithSimpleStructure
 
 
 class ConceptWithDicts(StructuredContent):

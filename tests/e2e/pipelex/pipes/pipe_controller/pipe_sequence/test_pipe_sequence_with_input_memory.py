@@ -4,7 +4,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.pipeline.execute import execute_pipeline
-from tests.test_pipelines.test_tweet import OptimizedTweet
+from tests.e2e.pipelex.pipes.pipe_controller.pipe_sequence.test_tweet import OptimizedTweet
 
 SAMPLE_DRAFT_TWEET = """
 Local high school basketball star Maria Rodriguez was the talk of Division I scouts - 6'2",
@@ -93,6 +93,7 @@ class TestPipeSequenceWithInputMemory:
         """Test the optimize_tweet_sequence pipeline using inputs parameter."""
         # Execute the pipeline using inputs
         pipe_output = await execute_pipeline(
+            library_path="tests/e2e/pipelex/pipes/pipe_controller/pipe_sequence/",
             pipe_code="optimize_tweet_sequence",
             inputs={
                 "draft_tweet": {

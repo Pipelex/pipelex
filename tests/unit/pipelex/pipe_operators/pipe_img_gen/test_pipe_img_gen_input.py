@@ -1,3 +1,5 @@
+from typing import Callable
+
 import pytest
 
 from pipelex import log
@@ -17,7 +19,9 @@ class TestPipeImgGenValidateInputs:
         self,
         test_id: str,
         blueprint: PipeImgGenBlueprint,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing valid case: {test_id}")
 
         pipe_img_gen = PipeImgGenFactory.make_from_blueprint(
@@ -39,7 +43,9 @@ class TestPipeImgGenValidateInputs:
         test_id: str,
         blueprint: PipeImgGenBlueprint,
         expected_error_type: PipeValidationErrorType,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing error case: {test_id}")
 
         with pytest.raises(PipeValidationError) as exc_info:

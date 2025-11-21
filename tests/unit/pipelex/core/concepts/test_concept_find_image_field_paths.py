@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 
@@ -14,8 +15,8 @@ if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
 
 
-@pytest.fixture(scope="module", autouse=True)
-def register_test_concepts():
+@pytest.fixture(scope="class", autouse=True)
+def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
     """Register test concepts for the module.
 
     This fixture:
@@ -26,6 +27,7 @@ def register_test_concepts():
 
     The cleanup ensures test isolation between modules.
     """
+    load_test_library([Path(__file__).parent])
     concept_library = get_concept_library()
 
     # Register the test structure classes

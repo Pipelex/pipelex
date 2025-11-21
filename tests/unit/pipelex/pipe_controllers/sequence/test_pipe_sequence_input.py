@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
@@ -19,7 +19,9 @@ class TestPipeSequenceValidateInputs:
         self,
         test_id: str,
         blueprint: PipeSequenceBlueprint,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
@@ -42,7 +44,9 @@ class TestPipeSequenceValidateInputs:
         test_id: str,
         blueprint_dict: dict[str, Any],
         expected_error_message_fragment: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing error case: {test_id}")
 
         with pytest.raises((PipeValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012

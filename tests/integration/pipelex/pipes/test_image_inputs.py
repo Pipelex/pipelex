@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Callable
+
 import pytest
 from pytest import FixtureRequest
 
@@ -17,7 +20,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import ImageTestCases
-from tests.test_pipelines.misc_tests.test_structures import Article
+from tests.integration.pipelex.pipes.pipelines.test_structures import Article
 
 
 @pytest.mark.dry_runnable
@@ -31,8 +34,9 @@ class TestImageInputs:
         self,
         request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
     ) -> None:
-        """Test that an image is indeed given to the LLM, and that it can extract extact whats on the image."""
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.IMAGE),
@@ -62,10 +66,8 @@ class TestImageInputs:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-    async def test_describe_page(self, request: FixtureRequest, pipe_run_mode: PipeRunMode) -> None:
-        """Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes,
-        But also accepts basic objects
-        """
+    async def test_describe_page(self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]) -> None:
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         # Create the page content
         # image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
         image_content = ImageContent(url=f"file://{ImageTestCases.IMAGE_FILE_PATH_PNG}")
@@ -107,10 +109,8 @@ class TestImageInputs:
         assert pipe_output.main_stuff is not None
 
     @pytest.mark.usefixtures("request")
-    async def test_image_input_within_concept_with_text(self) -> None:
-        """Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes,
-        But also accepts basic objects
-        """
+    async def test_image_input_within_concept_with_text(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         pipe_llm_blueprint = PipeLLMBlueprint(
             description="Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes",
             inputs={"page": "Page"},
