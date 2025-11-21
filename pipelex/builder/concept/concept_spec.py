@@ -95,7 +95,7 @@ class ConceptStructureSpec(StructuredContent):
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
-        raise ConceptStructureBlueprintValueError(msg)
+        raise ValueError(msg)
 
     def to_blueprint(self) -> ConceptStructureBlueprint:
         # Convert the type enum value - self.type is already a ConceptStructureBlueprintFieldType enum
@@ -183,7 +183,7 @@ class ConceptSpec(StructuredContent):
         if refines is not None:
             if not NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refines):
                 msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
-                raise ConceptBlueprintValueError(msg)
+                raise ValueError(msg)
         return refines
 
     @model_validator(mode="before")

@@ -65,14 +65,18 @@ class PipeSpec(StructuredContent):
     @field_validator("pipe_code", mode="before")
     @classmethod
     def validate_pipe_code(cls, value: str) -> str:
-        return cls.validate_pipe_code_syntax(value)
+        try:
+            return cls.validate_pipe_code_syntax(value)
+        except PipeBlueprintValueError as exc:
+                msg = f"Invalid pipe code syntax '{value}'. Must be in snake_case."
+                raise ValueError(msg) from exc
 
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
         if value not in PipeType.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {PipeType.value_list()}"
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
         return value
 
     @field_validator("output", mode="after")
@@ -92,7 +96,7 @@ class PipeSpec(StructuredContent):
         for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
-                raise PipeBlueprintValueError(msg)
+                raise ValueError(msg)
 
             # Validate the concept spec format with optional multiplicity brackets
             # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
@@ -102,7 +106,7 @@ class PipeSpec(StructuredContent):
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
                     f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
                 )
-                raise PipeBlueprintValueError(msg)
+                raise ValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)

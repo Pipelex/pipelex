@@ -20,7 +20,7 @@ class RoutingProfileBlueprint(ConfigModel):
         for pattern in self.optional_routes:
             if pattern in self.routes:
                 msg = f"Pattern '{pattern}' is both in routes and optional_routes"
-                raise RoutingProfileBlueprintValueError(msg)
+                raise ValueError(msg)
         return self
 
 

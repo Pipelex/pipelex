@@ -26,7 +26,7 @@ class ConceptBlueprint(BaseModel):
                 NativeConceptCode.validate_native_concept_string_or_code(concept_string_or_code=refines)
             except NativeConceptDefinitionError as exc:
                 msg = f"Could not validate refine '{refines}': {exc}"
-                raise ConceptBlueprintValueError(msg) from exc
+                raise ValueError(msg) from exc
         return refines
 
     @model_validator(mode="before")
@@ -37,5 +37,5 @@ class ConceptBlueprint(BaseModel):
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
                 f"and `{values.get('structure')}` for concept that has the definition `{values.get('description')}`"
             )
-            raise ConceptBlueprintValueError(msg)
+            raise ValueError(msg)
         return values

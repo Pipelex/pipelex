@@ -7,9 +7,6 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import Self
 
 
-class ImgGenSettingValueError(ValueError):
-    pass
-
 
 class ImgGenSetting(ConfigModel):
     model: str
@@ -26,7 +23,7 @@ class ImgGenSetting(ConfigModel):
                 "ImgGenSetting cannot have both 'quality' and 'nb_steps' specified. Use one or the other."
                 f"Quality: {self.quality}, nb_steps: {self.nb_steps}"
             )
-            raise ImgGenSettingValueError(msg)
+            raise ValueError(msg)
         return self
 
     def desc(self) -> str:
