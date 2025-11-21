@@ -165,14 +165,13 @@ class PipeBlueprint(ABC, BaseModel):
 
     @final
     def generic_validate_inputs(self):
-        # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-        multiplicity_pattern = MUTLIPLICITY_PATTERN
         if self.inputs:
             for input_name, concept_spec in self.inputs.items():
                 validate_input_name(input_name)
 
                 # Validate the concept spec format with optional multiplicity brackets
-                match = re.match(multiplicity_pattern, concept_spec)
+                # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
+                match = re.match(MUTLIPLICITY_PATTERN, concept_spec)
                 if not match:
                     msg = (
                         f"Invalid input syntax for '{input_name}': '{concept_spec}'. "

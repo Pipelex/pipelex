@@ -89,16 +89,14 @@ class PipeSpec(StructuredContent):
         if inputs is None:
             return None
 
-        # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-        multiplicity_pattern = MUTLIPLICITY_PATTERN
-
         for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
                 raise PipeBlueprintValueError(msg)
 
             # Validate the concept spec format with optional multiplicity brackets
-            match = re.match(multiplicity_pattern, concept_spec)
+            # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
+            match = re.match(MUTLIPLICITY_PATTERN, concept_spec)
             if not match:
                 msg = (
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "

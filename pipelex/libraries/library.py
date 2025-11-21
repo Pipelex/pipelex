@@ -16,7 +16,7 @@ class Library(BaseModel):
     This represents a complete set of Pipelex definitions (domains, concepts, pipes)
     that can be loaded and used together, typically for a single pipeline run.
 
-    Limitations: It misses the Func Registry library and Class Registry library
+    Limitations: It lacks the Func Registry library and Class Registry library
 
     Each Library (except BASE) inherits native concepts and base pipes from the BASE library.
     """
