@@ -82,9 +82,6 @@ EXPLICIT_DOMAIN_IN_STRING_TEST_CASES: list[tuple[str, str, str, int | bool | Non
     ("my_domain", "native.Text", "native.Text", None),
     ("accounting", "native.Image[3]", "native.Image", 3),
     ("test_domain", "native.PDF[]", "native.PDF", True),
-    # Explicitly using implicit domain creates implicit concepts
-    ("my_domain", "implicit.OtherConcept[2]", "implicit.OtherConcept", 2),
-    ("test_domain", "implicit.LineItem", "implicit.LineItem", None),
 ]
 
 # Format: (domain, requirement_str, expected_concept_string, expected_multiplicity)

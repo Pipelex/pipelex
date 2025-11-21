@@ -9,7 +9,6 @@ from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_code, validate_concept_string
-from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
@@ -31,15 +30,6 @@ class Concept(BaseModel):
     @property
     def concept_string(self) -> str:
         return f"{self.domain}.{self.code}"
-
-    @classmethod
-    def is_implicit_concept(cls, concept_string: str) -> bool:
-        try:
-            validate_concept_string(concept_string=concept_string)
-        except ConceptStringError as exc:
-            msg = f"Concept string '{concept_string}' is not a valid concept string for concept '{cls.concept_string}'"
-            raise ConceptValueError(msg) from exc
-        return concept_string.startswith(SpecialDomain.IMPLICIT)
 
     @field_validator("code")
     @classmethod

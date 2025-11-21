@@ -303,7 +303,7 @@ prompt = """
 [pipe.write_bundle_header]
 type = "PipeLLM"
 description = "Write the bundle header."
-inputs = { brief = "UserBrief", pipe_signatures = "PipeSignature" }
+inputs = { brief = "UserBrief", pipe_signatures = "pipe_design.PipeSignature" }
 output = "BundleHeaderSpec"
 model = "llm_to_engineer"
 prompt = """

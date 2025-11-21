@@ -52,15 +52,6 @@ class ConceptFactory:
         return normalized
 
     @classmethod
-    def make_implicit_concept(cls, concept_code: str) -> Concept:
-        return Concept(
-            code=concept_code,
-            domain=SpecialDomain.IMPLICIT,
-            description=concept_code,
-            structure_class_name=TextContent.__name__,
-        )
-
-    @classmethod
     def make(cls, concept_code: str, domain: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
         return Concept(
             code=concept_code,
@@ -169,11 +160,13 @@ class ConceptFactory:
         if "." in concept_string_or_code:
             domain_code, concept_code = concept_string_or_code.rsplit(".")
             return DomainAndConceptCode(domain=domain_code, concept_code=concept_code)
-        if (
+        elif (
             concept_codes_from_the_same_domain and concept_string_or_code in concept_codes_from_the_same_domain
         ):  # Is a concept code from the same domain
             return DomainAndConceptCode(domain=domain, concept_code=concept_string_or_code)
-        return DomainAndConceptCode(domain=SpecialDomain.IMPLICIT, concept_code=concept_string_or_code)
+        else:
+            msg = f"Concept string or code '{concept_string_or_code}' is not declared in domain '{domain}'"
+            raise ConceptFactoryError(msg)
 
     @classmethod
     def make_concept_string_with_domain(cls, domain: str, concept_code: str) -> str:

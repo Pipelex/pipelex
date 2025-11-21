@@ -91,9 +91,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         """`concept_string` can have the domain or not. If it doesn't have the domain, it is assumed to be native.
         If it is not native and doesnt have a domain, it should raise an error
         """
-        if Concept.is_implicit_concept(concept_string=concept_string):
-            return ConceptFactory.make_implicit_concept(concept_code=concept_string.split(".")[1])
-
         if not is_concept_string_valid(concept_string=concept_string):
             msg = f"Concept string '{concept_string}' is not a valid concept string"
             raise ConceptLibraryError(msg)
