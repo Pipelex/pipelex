@@ -56,7 +56,7 @@ async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> Pipelex
         PipelexBundleSpec: The constructed pipeline spec.
 
     """
-    # The working memory actually contains ConceptSpec objects (not ConceptSpecDraft)
+    # The working memory actually contains ConceptSpec objects
     # but they may have been deserialized incorrectly
     try:
         concept_specs = working_memory.get_stuff_as_list(

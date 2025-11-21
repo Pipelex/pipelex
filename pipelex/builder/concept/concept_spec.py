@@ -111,18 +111,6 @@ class ConceptStructureSpec(StructuredContent):
         )
 
 
-class ConceptSpecDraft(StructuredContent):
-    the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
-    description: str = Field(description="Description of the concept, in natural language.")
-    structure: str = Field(
-        description="Description of a dict with fieldnames as keys, and values being a dict with: description, type, required, default_value",
-    )
-    refines: str | None = Field(
-        default=None,
-        description="The native concept this concept extends (Text, Image, PDF, TextAndImages, Number, Page) "
-        "in PascalCase format. Cannot be used together with 'structure'.",
-    )
-
 
 class ConceptSpec(StructuredContent):
     """Spec structuring a concept: a conceptual data type that can either define its own structure or refine an existing native concept.
