@@ -16,11 +16,11 @@ class PipeImgGenTestCases:
         ),
         PipeImgGenBlueprint(
             description="Generate an image",
-            inputs=None,
+            inputs={},
+            img_gen_prompt="A beautiful landscape",
             output="GeneratedImage",
             type="PipeImgGen",
             pipe_category="PipeOperator",
-            img_gen_prompt=None,
             img_gen_prompt_var_name=None,
             model=ImgGenSkill.GEN_IMAGE_BASIC,
             aspect_ratio=None,
