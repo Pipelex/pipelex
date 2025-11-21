@@ -1,4 +1,3 @@
-import importlib.resources
 import os
 import shutil
 from pathlib import Path
@@ -116,91 +115,6 @@ def copy_file(source_path: str, target_path: str, overwrite: bool = True) -> Non
 
     if not os.path.exists(target_path) or overwrite:
         shutil.copy2(source_path, target_path)
-
-
-def copy_file_from_package(
-    package_name: str,
-    file_path_in_package: str,
-    target_path: str,
-    overwrite: bool = True,
-) -> None:
-    """Copies a file from a package to a target directory."""
-    file_path = str(importlib.resources.files(package_name).joinpath(file_path_in_package))
-    copy_file(
-        source_path=file_path,
-        target_path=target_path,
-        overwrite=overwrite,
-    )
-
-
-def copy_folder_from_package(
-    package_name: str,
-    folder_path_in_package: str,
-    target_dir: str,
-    overwrite: bool = True,
-    non_overwrite_files: list[str] | None = None,
-) -> None:
-    """Copies a folder from a package to a target directory.
-
-    This function walks through the specified folder in the package and copies
-    all files and directories to the target directory, preserving the directory
-    structure.
-
-    Args:
-        package_name (str): The name of the package to copy from.
-        folder_path_in_package (str): The path to the folder in the package to copy.
-        target_dir (str): The target directory to copy the folder to.
-        overwrite (bool, optional): Whether to overwrite existing files. Defaults to True.
-        non_overwrite_files (Optional[List[str]], optional): List of files to not overwrite. Defaults to None.
-
-    """
-    os.makedirs(target_dir, exist_ok=True)
-
-    # Use importlib.resources to get the path to the package resource
-    data_dir_str = str(importlib.resources.files(package_name).joinpath(folder_path_in_package))
-
-    copied_files: list[str] = []
-
-    # Walk through all directories and files recursively
-    for root, _, files in os.walk(data_dir_str):
-        # Create the corresponding subdirectory in the target directory
-        rel_path = os.path.relpath(root, data_dir_str)
-        target_subdir = os.path.join(target_dir, rel_path) if rel_path != "." else target_dir
-        os.makedirs(target_subdir, exist_ok=True)
-
-        if non_overwrite_files is None:
-            non_overwrite_files = []
-
-        # Copy all files in the current directory
-        for file in files:
-            src_file = os.path.join(root, file)
-            dest_file = os.path.join(target_subdir, file)
-
-            # Check if the file exists and respect the overwrite parameter
-            if not Path(dest_file).exists() or (overwrite and file not in non_overwrite_files):
-                copy_file(
-                    source_path=src_file,
-                    target_path=dest_file,
-                    overwrite=overwrite,
-                )
-                copied_files.append(dest_file)
-
-
-def remove_file(file_path: str):
-    """Removes a file if it exists at the specified path.
-
-    This function checks if a file exists before attempting to remove it,
-    preventing errors from trying to remove non-existent files.
-
-    Args:
-        file_path (str): The path to the file to be removed.
-
-    Note:
-        This function silently succeeds if the file doesn't exist.
-
-    """
-    if path_exists(file_path):
-        Path(file_path).unlink()
 
 
 def remove_folder(folder_path: str) -> None:

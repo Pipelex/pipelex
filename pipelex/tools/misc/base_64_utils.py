@@ -40,11 +40,6 @@ def strip_base_64_str_if_needed(base64_str: str) -> str:
     return base64_str
 
 
-def prefixed_base64_str_from_base64_bytes(b64_bytes: bytes) -> str:
-    file_type = detect_file_type_from_base64(b64_bytes)
-    return f"data:{file_type.mime};base64,{base64.b64encode(b64_bytes).decode('utf-8')}"
-
-
 def prefixed_base64_str_from_base64_str(b64_str: str) -> str:
     """Create a data URL from an already base64-encoded string.
 

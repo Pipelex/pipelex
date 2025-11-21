@@ -17,9 +17,6 @@ class ListContent(StuffContent, Generic[StuffContentType]):
     def nb_items(self) -> int:
         return len(self.items)
 
-    def get_items(self, item_type: type[StuffContent]) -> list[StuffContent]:
-        return [item for item in self.items if isinstance(item, item_type)]
-
     @property
     @override
     def short_desc(self) -> str:

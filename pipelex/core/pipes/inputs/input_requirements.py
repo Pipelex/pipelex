@@ -63,13 +63,6 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
 
         return transformed_dict
 
-    def set_default_domain(self, domain: str):
-        for input_name, requirement in self.root.items():
-            input_concept_code = requirement.concept.code
-            if "." not in input_concept_code:
-                requirement.concept.code = f"{domain}.{input_concept_code}"
-                self.root[input_name] = requirement
-
     def get_required_input_requirement(self, variable_name: str) -> InputRequirement:
         requirement = self.root.get(variable_name)
         if not requirement:

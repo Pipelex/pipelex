@@ -205,6 +205,3 @@ class PipeRunParams(BaseModel):
         if self.pipe_layers and self.pipe_layers[-1] == pipe_code:
             return
         self.pipe_layers.append(pipe_code)
-
-    def pop_pipe_code(self) -> str:
-        return self.pipe_layers.pop()

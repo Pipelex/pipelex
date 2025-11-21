@@ -33,19 +33,8 @@ class ConfigLoader:
         return os.path.join(self.pipelex_root_dir, CONFIG_NAME)
 
     @property
-    def local_root_dir(self) -> str:
-        """Get the root directory of the project using pipelex.
-        This is the directory from where the command is being run.
-        """
-        return os.getcwd()
-
-    @property
     def pipelex_config_dir(self) -> str:
         return os.path.join(os.getcwd(), CONFIG_DIR_NAME)
-
-    @property
-    def pipelex_specific_config_file_path(self) -> str:
-        return os.path.join(self.pipelex_config_dir, CONFIG_NAME)
 
     def get_pipelex_config(self) -> dict[str, Any]:
         """Get the pipelex configuration from pipelex.toml.

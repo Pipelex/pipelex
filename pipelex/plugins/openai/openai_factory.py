@@ -123,21 +123,6 @@ class OpenAIFactory:
             raise LLMPromptParameterError(msg)
         return openai_image_url
 
-    @staticmethod
-    def make_openai_error_info(exception: Exception) -> str:
-        error_mapping: dict[type, str] = {
-            openai.BadRequestError: "OpenAI API request was invalid.",
-            openai.InternalServerError: "OpenAI is having trouble. Please try again later.",
-            openai.RateLimitError: "OpenAI API request exceeded rate limit.",
-            openai.AuthenticationError: "OpenAI API request was not authorized.",
-            openai.PermissionDeniedError: "OpenAI API request was not permitted.",
-            openai.NotFoundError: "Requested resource not found.",
-            openai.APITimeoutError: "OpenAI API request timed out.",
-            openai.APIConnectionError: "OpenAI API request failed to connect.",
-            openai.APIError: "OpenAI API returned an API Error.",
-        }
-        return error_mapping.get(type(exception), "An unexpected error occurred with the OpenAI API.")
-
     # reference:
     # https://help.openai.com/en/articles/5247780-using-logit-bias-to-define-token-probability
     # https://platform.openai.com/tokenizer

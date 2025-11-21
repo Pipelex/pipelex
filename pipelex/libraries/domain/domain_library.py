@@ -40,12 +40,6 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
         for domain in domains:
             self.add_domain(domain=domain)
 
-    def remove_domain_by_code(self, domain_code: str) -> None:
-        if domain_code not in self.root:
-            msg = f"Trying to remove domain '{domain_code}' from domain library but it does not exist"
-            raise DomainLibraryError(msg)
-        del self.root[domain_code]
-
     @override
     def get_required_domain(self, domain: str) -> Domain:
         """Get a domain by code from this library, raising an error if not found."""

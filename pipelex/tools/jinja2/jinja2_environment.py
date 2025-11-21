@@ -1,4 +1,4 @@
-from jinja2 import BaseLoader, Environment, PackageLoader
+from jinja2 import BaseLoader, Environment
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 
@@ -43,20 +43,6 @@ def make_jinja2_env_from_loader(
         trim_blocks=trim_blocks,
         lstrip_blocks=lstrip_blocks,
     )
-
-
-def make_jinja2_env_from_package(
-    template_category: TemplateCategory,
-    package_name: str,
-    package_path: str,
-) -> tuple[Environment, BaseLoader]:
-    full_package_path = f"{package_path}/jinja2_{template_category}"
-    loader = PackageLoader(
-        package_name=package_name,
-        package_path=full_package_path,
-    )
-    jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)
-    return jinja2_env, loader
 
 
 def make_jinja2_env_without_loader(

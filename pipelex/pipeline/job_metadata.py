@@ -53,8 +53,3 @@ class JobMetadata(BaseModel):
             self.started_at = updated_metadata.started_at
         if updated_metadata.completed_at:
             self.completed_at = updated_metadata.completed_at
-
-    def copy_with_update(self, updated_metadata: "JobMetadata") -> "JobMetadata":
-        new_metadata = self.model_copy()
-        new_metadata.update(updated_metadata=updated_metadata)
-        return new_metadata

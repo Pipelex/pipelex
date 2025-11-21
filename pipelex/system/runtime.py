@@ -124,9 +124,5 @@ class RuntimeManager(BaseModel):
             case RunMode.CI_TEST:
                 return True
 
-    @property
-    def should_check_intermediate_configs(self) -> bool:
-        return self.is_unit_testing
-
 
 runtime_manager = RuntimeManager()

@@ -83,20 +83,8 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         return isinstance(self.content, ListContent)
 
     @property
-    def is_image(self) -> bool:
-        return isinstance(self.content, ImageContent)
-
-    @property
-    def is_pdf(self) -> bool:
-        return isinstance(self.content, PDFContent)
-
-    @property
     def is_text(self) -> bool:
         return isinstance(self.content, TextContent)
-
-    @property
-    def is_number(self) -> bool:
-        return isinstance(self.content, NumberContent)
 
     def content_as(self, content_type: type[StuffContentType]) -> StuffContentType:
         """Get content with proper typing if it's of the expected type."""
@@ -158,11 +146,6 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
     def as_text(self) -> TextContent:
         """Get content as TextContent if applicable."""
         return self.content_as(content_type=TextContent)
-
-    @property
-    def as_str(self) -> str:
-        """Get content as string if applicable."""
-        return self.as_text.text
 
     @property
     def as_image(self) -> ImageContent:

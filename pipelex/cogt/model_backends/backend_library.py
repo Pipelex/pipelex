@@ -45,14 +45,6 @@ if TYPE_CHECKING:
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
 
 
-class BackendCredentialStatus(ConfigModel):
-    """Status of a single credential variable."""
-
-    var_name: str
-    is_set: bool
-    is_placeholder: bool  # True if value exists but is a placeholder like "${VAR}"
-
-
 class BackendCredentialsReport(ConfigModel):
     """Report of credential status for a backend."""
 
@@ -264,16 +256,6 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backend_reports=backend_reports,
             all_backends_valid=all_backends_valid,
         )
-
-    def list_backend_names(self) -> list[str]:
-        return list(self.root.keys())
-
-    def list_all_model_names(self) -> list[str]:
-        """List the names of all models in all backends."""
-        all_model_names: set[str] = set()
-        for backend in self.root.values():
-            all_model_names.update(backend.list_model_names())
-        return sorted(all_model_names)
 
     def get_all_models_and_possible_backends(self) -> dict[str, list[str]]:
         """Get a dictionary of all models and their possible backends."""

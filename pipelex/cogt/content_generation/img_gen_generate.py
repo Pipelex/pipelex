@@ -32,9 +32,3 @@ async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[Gener
     )
     log.verbose(f"generated_image_list:\n{generated_image_list}")
     return generated_image_list
-
-
-async def img_gen_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImage | list[GeneratedImage]:
-    if img_gen_assignment.nb_images > 1:
-        return await img_gen_image_list(img_gen_assignment)
-    return await img_gen_single_image(img_gen_assignment)

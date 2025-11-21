@@ -227,11 +227,3 @@ class AnthropicFactory:
             TokenCategory.OUTPUT: usage.output_tokens,
         }
         return nb_tokens_by_category
-
-    @staticmethod
-    def make_nb_tokens_by_category_from_nb(nb_input: int, nb_output: int) -> NbTokensByCategoryDict:
-        nb_tokens_by_category: NbTokensByCategoryDict = {
-            TokenCategory.INPUT: nb_input,
-            TokenCategory.OUTPUT: nb_output,
-        }
-        return nb_tokens_by_category

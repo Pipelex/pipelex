@@ -9,7 +9,6 @@ from pipelex.cogt.exceptions import (
     LLMSettingsValidationError,
     ModelChoiceNotFoundError,
     ModelDeckPresetValidatonError,
-    ModelDeckValidatonError,
     ModelNotFoundError,
     ModelWaterfallError,
 )
@@ -139,16 +138,6 @@ class ModelDeck(ConfigModel):
             return ImgGenSetting(model=img_gen_choice)
         msg = f"Image generation choice '{img_gen_choice}' was not found in the model deck"
         raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.IMG_GEN, model_choice=img_gen_choice)
-
-    @classmethod
-    def final_validate(cls, deck: Self):
-        for llm_preset_id, llm_setting in deck.llm_presets.items():
-            inference_model = deck.get_required_inference_model(model_handle=llm_setting.model)
-            try:
-                cls._validate_llm_setting(llm_setting=llm_setting, inference_model=inference_model)
-            except ConfigValidationError as exc:
-                msg = f"LLM preset '{llm_preset_id}' is invalid: {exc}"
-                raise ModelDeckValidatonError(msg) from exc
 
     ############################################################
     #### ModelDeck validations

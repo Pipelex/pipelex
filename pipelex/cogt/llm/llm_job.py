@@ -15,10 +15,6 @@ class LLMJob(InferenceJobAbstract):
     job_config: LLMJobConfig
     job_report: LLMJobReport = LLMJobReport()
 
-    @property
-    def params_desc(self) -> str:
-        return f"temp={self.job_params.temperature}, max_tokens={self.job_params.max_tokens}"
-
     @override
     def validate_before_execution(self):
         self.llm_prompt.validate_before_execution()

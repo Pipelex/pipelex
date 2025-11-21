@@ -424,34 +424,3 @@ def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: b
             dict_string = json.dumps(data, indent=indent, default=str)
         pure_dict = json.loads(dict_string)
     return pure_dict, dict_string
-
-
-def pure_json_str(data: Any, indent: int | None = None, is_warning_enabled: bool = True) -> str:
-    """Converts any Python object directly to its JSON string representation.
-
-    This is a convenience wrapper around purify_json that returns only the string
-    representation, discarding the intermediate data structure. It inherits all the
-    type handling capabilities of purify_json.
-
-    Args:
-        data (Any): The data to convert to a JSON string. Can be any type supported
-            by purify_json.
-        indent (int | None, optional): Number of spaces for JSON formatting indentation.
-            Defaults to None.
-        is_warning_enabled (bool, optional): If True, wraps non-serializable data in a
-            warning object. Defaults to True.
-
-    Returns:
-        str: The JSON string representation of the data.
-
-    Example:
-        >>> model = SomeModel(name="test")
-        >>> json_str = pure_json_str(model, indent=2)
-        >>> print(json_str)
-        '{
-          "name": "test"
-        }'
-
-    """
-    _, json_string = purify_json(data, indent=indent, is_warning_enabled=is_warning_enabled)
-    return json_string

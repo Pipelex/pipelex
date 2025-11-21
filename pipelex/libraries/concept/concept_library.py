@@ -112,10 +112,6 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             raise ConceptLibraryConceptNotFoundError(msg)
         return the_native_concept
 
-    def get_native_concepts(self) -> list[Concept]:
-        """Create all native concepts from the hardcoded data"""
-        return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptCode.values_list()]
-
     @override
     def get_required_concept_from_concept_string_or_code(self, concept_string_or_code: str, search_domains: list[str] | None = None) -> Concept:
         try:

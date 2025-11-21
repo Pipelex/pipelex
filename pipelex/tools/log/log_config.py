@@ -23,10 +23,6 @@ class HighlighterName(StrEnum):
     REPR = "repr"
 
 
-class ProblemIds(StrEnum):
-    AZURE_OPENAI_NO_STREAM_OPTIONS = "Azure OpenAI no stream_options"
-
-
 class CallerInfoTemplate(Enum):
     FILE_LINE = "file_line"
     FILE_LINE_FUNC = "file_line_func"

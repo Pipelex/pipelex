@@ -56,13 +56,6 @@ class LLMAssignment(BaseModel):
             llm_prompt=llm_prompt,
         )
 
-    def clone_with_new_prompt(self, new_prompt: LLMPrompt) -> "LLMAssignment":
-        return LLMAssignment(
-            job_metadata=self.job_metadata,
-            llm_setting=self.llm_setting,
-            llm_prompt=new_prompt,
-        )
-
     @property
     def desc(self) -> str:
         description = "LLMAssignment:"

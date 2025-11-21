@@ -113,9 +113,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     def is_stuff_code_used(self, stuff_code: str) -> bool:
         return any(stuff.concept.code == stuff_code for stuff in self.root.values())
 
-    def remove_stuff(self, name: str):
-        self.root.pop(name, None)
-
     def remove_main_stuff(self):
         if MAIN_STUFF_NAME in self.root:
             del self.root[MAIN_STUFF_NAME]
@@ -183,10 +180,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     def remove_alias_to_main_stuff(self) -> None:
         """Remove the alias pointing to the main stuff if it exists."""
         self.remove_alias(alias=MAIN_STUFF_NAME)
-
-    def get_aliases_for(self, target: str) -> list[str]:
-        """Get all aliases pointing to a target name."""
-        return [alias for alias, t in self.aliases.items() if t == target]
 
     def list_keys(self) -> list[str]:
         return list(self.root.keys()) + list(self.aliases.keys())
@@ -343,10 +336,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         If the items are of possibly various types, use item_type=StuffContent.
         """
         return self.get_stuff_as_list(name=MAIN_STUFF_NAME, item_type=item_type)
-
-    def main_list_stuff_first_item_as(self, item_type: type[StuffContentType]) -> StuffContentType:
-        """Get main stuff content as first list item of type StuffContentType."""
-        return self.get_list_stuff_first_item_as(name=MAIN_STUFF_NAME, item_type=item_type)
 
     @property
     def main_stuff_as_text(self) -> TextContent:

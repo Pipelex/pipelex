@@ -1,5 +1,3 @@
-from typing import TypeVar
-
 from pydantic import BaseModel, Field
 
 from pipelex.core.memory.working_memory import DictWorkingMemory, WorkingMemory
@@ -80,6 +78,3 @@ class PipeOutput(BaseModel):
     def main_stuff_as_mermaid(self) -> MermaidContent:
         """Get main stuff content as MermaidContent if applicable."""
         return self.working_memory.main_stuff_as_mermaid
-
-
-PipeOutputType = TypeVar("PipeOutputType", bound=PipeOutput)

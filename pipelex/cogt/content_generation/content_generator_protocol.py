@@ -1,4 +1,4 @@
-from collections.abc import Awaitable, Callable, Coroutine
+from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, Protocol, TypeVar
 
@@ -16,7 +16,6 @@ from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
-F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 P = ParamSpec("P")
 R = TypeVar("R")
 

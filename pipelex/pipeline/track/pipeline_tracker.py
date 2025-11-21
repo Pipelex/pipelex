@@ -51,14 +51,6 @@ class PipelineTracker(PipelineTrackerProtocol):
         self.teardown()
         self.setup()
 
-    def _get_node_name(self, node: str) -> str | None:
-        node_attributes = self.nx_graph.nodes[node]
-        node_name = node_attributes[NodeAttributeKey.NAME]
-        if isinstance(node_name, str):
-            return node_name
-        msg = f"Node name is not a string: {node_name}"
-        raise JobHistoryError(msg)
-
     def _pipe_layer_to_subgraph_name(self, pipe_layer: list[str]) -> str:
         return "-".join(pipe_layer)
 

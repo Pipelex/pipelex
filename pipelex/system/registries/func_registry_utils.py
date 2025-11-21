@@ -1,6 +1,4 @@
-import importlib
 import inspect
-import pkgutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -16,49 +14,6 @@ from pipelex.tools.typing.module_inspector import (
 
 
 class FuncRegistryUtils:
-    @classmethod
-    def register_pipe_funcs_from_package(cls, package_name: str, package: Any) -> int:
-        """Register all @pipe_func decorated functions from a package.
-
-        Args:
-            package_name: Full name of the package (e.g. "pipelex.builder")
-            package: The imported package object
-
-        Returns:
-            Number of functions registered
-
-        """
-        functions_registered = 0
-
-        if not hasattr(package, "__path__"):
-            log.warning(f"Package {package_name} has no __path__ attribute, cannot walk modules")
-            return 0
-
-        log.verbose(f"Walking package {package_name} at {package.__path__}")
-
-        for _importer, modname, _ispkg in pkgutil.walk_packages(
-            path=package.__path__,
-            prefix=f"{package_name}.",
-            onerror=lambda _: None,
-        ):
-            # Import the module
-            module = importlib.import_module(modname)
-            log.verbose(f"Imported {modname}")
-
-            # Find @pipe_func decorated functions in this module
-            functions_to_register = cls._find_functions_in_module(module)
-
-            for func in functions_to_register:
-                func_name = cls._get_function_registration_name(func)
-                func_registry.register_function(
-                    func=func,
-                    name=func_name,
-                )
-                functions_registered += 1
-                log.verbose(f"Registered @pipe_func: {func_name} from {modname}")
-
-        return functions_registered
-
     @classmethod
     def register_funcs_in_folder(
         cls,

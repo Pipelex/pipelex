@@ -63,7 +63,3 @@ class PipelexBundleBlueprint(BaseModel):
     @property
     def nb_pipes(self) -> int:
         return len(self.pipe) if self.pipe else 0
-
-    @property
-    def nb_concepts(self) -> int:
-        return len(self.concept) if self.concept else 0

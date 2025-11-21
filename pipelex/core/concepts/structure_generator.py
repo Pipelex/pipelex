@@ -244,56 +244,6 @@ class StructureGenerator:
                     pass
                 return f"Dict[{key_type}, {value_type}]"
 
-    def _generate_field(self, field_name: str, field_def: dict[str, Any] | str) -> str:
-        """Generate a single field definition.
-
-        Args:
-            field_name: Name of the field
-            field_def: Field definition (dict or string for simple types)
-
-        Returns:
-            Generated field code
-
-        """
-        # Handle simple string definitions (just the definition text)
-        if isinstance(field_def, str):
-            field_def = {"type": ConceptStructureBlueprintFieldType.TEXT, "description": field_def}
-
-        field_type = field_def.get("type", ConceptStructureBlueprintFieldType.TEXT)
-        description = field_def.get("description", f"{field_name} field")
-        required = field_def.get("required", False)
-        default_value = field_def.get("default")
-        choices = field_def.get("choices")  # For inline enum-like choices
-
-        # Determine Python type
-        if choices:
-            # Inline choices - use Literal type
-            python_type = f"Literal[{', '.join(repr(c) for c in choices)}]"
-        else:
-            # Handle complex types or enum references
-            python_type = self._get_python_type(field_type, field_def)
-
-        # Make optional if not required
-        if not required:
-            python_type = f"Optional[{python_type}]"
-
-        # Generate Field parameters
-        field_params = [f"description={self._escape_string_for_python(description)}"]
-
-        if required:
-            if default_value is not None:
-                field_params.insert(0, f"default={self._format_default_value(default_value)}")
-            else:
-                field_params.insert(0, "...")
-        elif default_value is not None:
-            field_params.insert(0, f"default={self._format_default_value(default_value)}")
-        else:
-            field_params.insert(0, "default=None")
-
-        field_call = f"Field({', '.join(field_params)})"
-
-        return f"    {field_name}: {python_type} = {field_call}"
-
     def _get_python_type(self, field_type: Any, field_def: dict[str, Any]) -> str:
         """Convert high-level type to Python type annotation.
 

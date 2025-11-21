@@ -5,7 +5,6 @@ from pydantic import Field, field_validator
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import Self
 
 
 class LLMSetting(ConfigModel):
@@ -50,14 +49,3 @@ class LLMSettingChoices(ConfigModel):
 
     def list_choice_strings(self) -> set[str]:
         return {c for c in (self.for_text, self.for_object) if isinstance(c, str)}
-
-    @classmethod
-    def make_completed_with_defaults(
-        cls,
-        for_text: LLMModelChoice | None = None,
-        for_object: LLMModelChoice | None = None,
-    ) -> Self:
-        return cls(
-            for_text=for_text,
-            for_object=for_object,
-        )

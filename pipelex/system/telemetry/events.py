@@ -50,9 +50,6 @@ class EventProperty(StrEnum):
     NB_PIPES = "nb_pipes"
     PIPE_RUN_OUTCOME = "pipe_run_outcome"
 
-    # Bundle
-    NB_CONCEPTS = "nb_concepts"
-
 
 class Outcome(StrEnum):
     SUCCESS = "success"

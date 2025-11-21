@@ -8,8 +8,6 @@ from pipelex.cogt.image.prompt_image import (
 )
 from pipelex.tools.misc.base_64_utils import (
     encode_to_base64_async,
-    load_binary_as_base64_async,
-    load_binary_async,
     strip_base_64_str_if_needed,
 )
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
@@ -53,31 +51,3 @@ class PromptImageFactory:
     ) -> PromptImageBinary:
         raw_image_bytes = await fetch_file_from_url_httpx_async(prompt_image_url.url)
         return PromptImageBinary(binary=raw_image_bytes)
-
-    @classmethod
-    async def promptimage_to_b64_async(cls, prompt_image: PromptImage) -> bytes:
-        match prompt_image:
-            case PromptImagePath():
-                return await load_binary_as_base64_async(prompt_image.file_path)
-            case PromptImageBase64():
-                return prompt_image.base_64
-            case PromptImageUrl():
-                image_bytes = await cls.make_promptimagebase64_from_url_async(prompt_image)
-                return image_bytes.base_64
-            case _:
-                msg = f"Unknown PromptImage type: {prompt_image}"
-                raise PromptImageFactoryError(msg)
-
-    @classmethod
-    async def promptimage_to_bytes_async(cls, prompt_image: PromptImage) -> bytes:
-        match prompt_image:
-            case PromptImagePath():
-                return await load_binary_async(prompt_image.file_path)
-            case PromptImageBase64():
-                return prompt_image.get_decoded_bytes()
-            case PromptImageUrl():
-                image_bytes = await cls.make_promptimagebinary_from_url_async(prompt_image)
-                return image_bytes.binary
-            case _:
-                msg = f"Unknown PromptImage type: {prompt_image}"
-                raise PromptImageFactoryError(msg)

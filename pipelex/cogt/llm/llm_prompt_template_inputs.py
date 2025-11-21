@@ -53,16 +53,6 @@ class LLMPromptTemplateInputs(RootModel[LLMPromptTemplateInputsDict]):
             all_template_inputs.update(additional_template_inputs.root)
         return LLMPromptTemplateInputs(root=all_template_inputs)
 
-    def complemented_by_dict(self, additional_inputs_dict: LLMPromptTemplateInputsDict | None) -> LLMPromptTemplateInputs:
-        all_template_inputs = self.root.copy()
-        if additional_inputs_dict:
-            all_template_inputs.update(additional_inputs_dict)
-        return LLMPromptTemplateInputs(root=all_template_inputs)
-
     @override
     def __str__(self) -> str:
         return json_str(self.root, title="llm_prompt_template_inputs", is_spaced=True)
-
-    @staticmethod
-    def from_args(**template_inputs: Any) -> LLMPromptTemplateInputs:
-        return LLMPromptTemplateInputs(root=template_inputs)
