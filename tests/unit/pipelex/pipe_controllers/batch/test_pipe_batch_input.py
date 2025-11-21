@@ -1,3 +1,5 @@
+from typing import Callable
+
 import pytest
 
 from pipelex import log
@@ -15,7 +17,9 @@ class TestPipeBatchValidateInputs:
         self,
         test_id: str,
         blueprint: PipeBatchBlueprint,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator

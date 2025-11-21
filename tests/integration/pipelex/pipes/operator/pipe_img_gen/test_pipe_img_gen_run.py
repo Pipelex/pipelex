@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Callable, cast
 
 import pytest
 
@@ -28,7 +28,9 @@ class TestPipeImgGenRun:
         img_gen_handle: str,
         topic: str,
         image_desc: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
             description="Image generation test",
             img_gen_prompt=image_desc,

@@ -1,3 +1,5 @@
+from typing import Callable
+
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -6,7 +8,8 @@ from pipelex.hub import get_native_concept
 
 
 class TestConceptLibrary:
-    def test_is_image_concept(self):
+    def test_is_image_concept(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         native_image_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE)
 
         concept_1 = ConceptFactory.make_from_blueprint(

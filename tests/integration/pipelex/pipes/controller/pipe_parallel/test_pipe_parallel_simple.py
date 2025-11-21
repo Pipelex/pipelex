@@ -1,4 +1,5 @@
-from typing import cast
+from pathlib import Path
+from typing import Callable, cast
 
 import pytest
 from pytest import FixtureRequest
@@ -21,8 +22,9 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeParallelSimple:
-    async def test_parallel_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
+    async def test_parallel_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test PipeParallel running three text analysis pipes in parallel."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
         # Create PipeParallel instance - pipes are loaded from PLX files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline",
@@ -137,8 +139,11 @@ class TestPipeParallelSimple:
         assert isinstance(final_result.content, TextContent)
         assert final_result.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
 
-    async def test_parallel_short_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
+    async def test_parallel_short_text_analysis(
+        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeParallel with shorter text to verify consistent behavior."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
         # Create PipeParallel instance
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline for short text",

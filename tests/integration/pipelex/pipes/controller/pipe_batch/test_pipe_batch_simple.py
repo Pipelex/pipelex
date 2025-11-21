@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from typing import cast
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from pytest import FixtureRequest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -28,9 +32,13 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestPipeBatchSimple:
     """Simple integration test for PipeBatch controller."""
 
-    async def test_simple_batch_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
-        """Test PipeBatch with a simple batch processing scenario."""
-        # Create PipeBatch instance - it will call the uppercase_transformer pipe from the PLX
+    async def test_simple_batch_processing(
+        self,
+        request: FixtureRequest,
+        pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
+    ):
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_batch")])
         domain = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",

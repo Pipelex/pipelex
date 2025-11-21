@@ -110,13 +110,6 @@ class PipeTestCases:
         concept_string="answer.Question",
         content=USER_TEXT_TRICKY_2,
     )
-    BLUEPRINT_AND_PIPE: ClassVar[list[tuple[str, StuffBlueprint, str]]] = [  # topic, blueprint, pipe
-        (
-            "Tricky question conclude",
-            TRICKY_QUESTION_BLUEPRINT,
-            "conclude_tricky_question_by_steps",
-        ),
-    ]
     NO_INPUT: ClassVar[list[tuple[str, str]]] = [  # topic, pipe
         (
             "Test with no input",
@@ -158,15 +151,6 @@ class PipeTestCases:
             PipeRouterError,
             "Exceeded pipe stack limit",
         ),
-    ]
-
-
-class LibraryTestCases:
-    TEST_PIPELINES_DIR_PATH = "tests/test_pipelines"
-    KNOWN_CONCEPTS_AND_PIPES: ClassVar[list[tuple[str, str]]] = [  # concept, pipe
-        ("cars.CarDescription", "generate_car_description"),
-        ("animals.AnimalDescription", "generate_animal_description"),
-        ("flowers.FlowerDescription", "generate_flower_description"),
     ]
 
 

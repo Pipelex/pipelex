@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Callable
+
 import pytest
 from pytest import FixtureRequest
 
@@ -28,7 +31,9 @@ class TestPipeRunningVariants:
         topic: str,
         stuff: Stuff,
         pipe_code: str,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(stuff, title=f"{topic}: start from '{stuff.stuff_name}', run pipe '{pipe_code}'")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
         _ = await get_pipe_router().run(
@@ -47,7 +52,9 @@ class TestPipeRunningVariants:
         request: FixtureRequest,
         topic: str,
         pipe_code: str,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
@@ -71,7 +78,9 @@ class TestPipeRunningVariants:
         topic: str,
         pipe_code: str,
         output_multiplicity: VariableMultiplicity | None,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
@@ -98,15 +107,9 @@ class TestPipeRunningVariants:
         pipe_code: str,
         exception: type[Exception],
         expected_error_message: str,
+        load_test_library: Callable[[list[Path]], None],
     ):
-        # failing_pipelines_file_paths = get_config().pipelex.library_config.failing_pipelines_file_paths
-        # library_manager = get_library_manager()
-        # Reset library to avoid pipe name collisions from previous test runs
-        # library_manager.reset()
-        # library_manager.load_libraries(
-        #     library_file_paths=[Path(failing_pipeline_file_path) for failing_pipeline_file_path in failing_pipelines_file_paths],
-        # )
-
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
         with pytest.raises(PipeStackOverflowError) as exc:
             await get_pipe_router().run(

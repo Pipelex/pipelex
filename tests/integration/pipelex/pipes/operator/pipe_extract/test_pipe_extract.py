@@ -1,3 +1,5 @@
+from typing import Callable
+
 import pytest
 
 from pipelex import pretty_print
@@ -23,8 +25,12 @@ from tests.integration.pipelex.test_data import PipeExtractTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeExtract:
-    @pytest.fixture(scope="class", autouse=True)
-    def setup(self):
+    @pytest.fixture(
+        scope="class",
+        autouse=True,
+    )
+    def setup(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         concept_library = get_concept_library()
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="PageScan",

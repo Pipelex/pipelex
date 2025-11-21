@@ -1,6 +1,7 @@
 """Simple integration test for PipeSequence controller."""
 
-from typing import cast
+from pathlib import Path
+from typing import Callable, cast
 
 import pytest
 from pytest import FixtureRequest
@@ -27,8 +28,11 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestPipeSequenceSimple:
     """Simple integration test for PipeSequence controller."""
 
-    async def test_simple_sequence_processing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
+    async def test_simple_sequence_processing(
+        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
         domain = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",

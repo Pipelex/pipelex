@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Callable, cast
 
 import pytest
 
@@ -30,7 +30,9 @@ class TestPipeCompose:
         self,
         pipe_run_mode: PipeRunMode,
         template_source: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         pipe_compose_blueprint = PipeComposeBlueprint(
             description="Jinja2 test for any context",
             template=TemplateBlueprint(
@@ -59,7 +61,9 @@ class TestPipeCompose:
         self,
         pipe_run_mode: PipeRunMode,
         template_source: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.TEXT),
