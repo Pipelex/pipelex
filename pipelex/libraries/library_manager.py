@@ -67,7 +67,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         for library in self._libraries.values():
             library.teardown()
-        self._libraries.clear()
+        self._libraries = {}
 
     @override
     def reset(self) -> None:

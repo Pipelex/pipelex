@@ -111,7 +111,6 @@ class ConceptStructureSpec(StructuredContent):
         )
 
 
-
 class ConceptSpec(StructuredContent):
     """Spec structuring a concept: a conceptual data type that can either define its own structure or refine an existing native concept.
 
