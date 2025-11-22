@@ -47,7 +47,6 @@ def _demote_headings(md_content: str, levels: int) -> str:
     return re.sub(pattern, demote_match, md_content, flags=re.MULTILINE)
 
 
-# TODO: fix bug which makes it not idempotent (because heading 1 gets deleted)
 def build_merged_rules(idx: KitIndex, agent_set: str | None = None) -> str:
     """Build merged agent documentation from ordered files.
 
@@ -156,8 +155,22 @@ def update_single_file_agent_rules(
         span = find_span(before, target.marker_begin, target.marker_end)
 
         if span:
-            # Markers exist - replace content between them
-            wrapped_block = wrap(target.marker_begin, target.marker_end, merged_rules)
+            # Markers exist - need to check if we should preserve heading_1
+            # Check if the entire file (outside markers) has an H1 heading
+            before_markers = before[: span[0]]
+            after_markers = before[span[1] :]
+            outside_content = before_markers + after_markers
+
+            h1_pattern = r"^#\s+.+$"
+            has_h1_outside = bool(re.search(h1_pattern, outside_content, flags=re.MULTILINE))
+
+            # Add heading_1 if it's configured and there's no H1 outside markers
+            if target.heading_1 and not has_h1_outside:
+                content_with_heading = f"{target.heading_1}\n\n{merged_rules}"
+                wrapped_block = wrap(target.marker_begin, target.marker_end, content_with_heading)
+            else:
+                wrapped_block = wrap(target.marker_begin, target.marker_end, merged_rules)
+
             after = replace_span(before, span, wrapped_block)
         else:
             # No markers - insert with markers
