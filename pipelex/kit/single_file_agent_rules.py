@@ -131,7 +131,7 @@ def _diff(before: str, after: str, path: str) -> str:
     )
 
 
-def update_targets(
+def update_single_file_agent_rules(
     repo_root: Path,
     merged_rules: str,
     targets: dict[str, Target],
@@ -139,7 +139,7 @@ def update_targets(
     diff: bool,
     backup: str | None,
 ) -> None:
-    """Update target files with merged agent documentation.
+    """Update single-file agent rules targets with merged agent documentation.
 
     Args:
         repo_root: Repository root directory

@@ -45,10 +45,10 @@ ConceptName = "Description of the concept"
 - Use PascalCase for concept names
 - Never use plurals (no "Stories", use "Story") - lists are handled implicitly by Pipelex
 - Avoid circumstantial adjectives (no "LargeText", use "Text") - focus on the essence of what the concept represents
-- Don't redefine native concepts (Text, Image, PDF, TextAndImages, Number, Page)
+- Don't redefine native concepts (Text, Image, PDF, TextAndImages, Number, Page, JSON)
 
 **Native Concepts:**
-Pipelex provides built-in native concepts: `Text`, `Image`, `PDF`, `TextAndImages`, `Number`, `Page`. Use these directly or refine them when appropriate.
+Pipelex provides built-in native concepts: `Text`, `Image`, `PDF`, `TextAndImages`, `Number`, `Page`, `JSON`. Use these directly or refine them when appropriate.
 
 **Refining Native Concepts:**
 To create a concept that specializes a native concept without adding fields:

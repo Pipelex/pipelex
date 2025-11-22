@@ -2,14 +2,11 @@ from pathlib import Path
 
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.markers import find_span
-from pipelex.kit.targets_update import build_merged_rules, update_targets
+from pipelex.kit.single_file_agent_rules import build_merged_rules, update_single_file_agent_rules
 
 
-class TestTargetsUpdate:
-    """Test target file updating functionality."""
-
-    def test_update_targets_dry_run(self, tmp_path: Path):
-        """Test updating targets in dry-run mode."""
+class TestUpdateSingleFileAgentRules:
+    def test_update_single_file_agent_rules_dry_run(self, tmp_path: Path, agent_set: str):
         idx = load_index()
 
         # Create a temporary repo root with a target file
@@ -18,7 +15,7 @@ class TestTargetsUpdate:
         target_file = repo_root / "test_target.md"
         target_file.write_text("# Test\n\nOriginal content\n", encoding="utf-8")
 
-        merged_rules = build_merged_rules(idx)
+        merged_rules = build_merged_rules(idx, agent_set=agent_set)
 
         # Create a test target
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
@@ -26,12 +23,12 @@ class TestTargetsUpdate:
         original_content = target_file.read_text(encoding="utf-8")
 
         # Dry run should not modify file
-        update_targets(repo_root, merged_rules, test_targets, dry_run=True, diff=False, backup=None)
+        update_single_file_agent_rules(repo_root, merged_rules, test_targets, dry_run=True, diff=False, backup=None)
 
         assert target_file.read_text(encoding="utf-8") == original_content
 
-    def test_update_targets_inserts_with_markers(self, tmp_path: Path):
-        """Test that update_targets inserts content with markers."""
+    def test_update_single_file_agent_rules_inserts_with_markers(self, tmp_path: Path, agent_set: str):
+        """Test that agent rules update inserts content with markers."""
         idx = load_index()
 
         repo_root = tmp_path / "repo"
@@ -39,11 +36,11 @@ class TestTargetsUpdate:
         target_file = repo_root / "test_target.md"
         target_file.write_text("# Test\n\nOriginal content\n", encoding="utf-8")
 
-        merged_rules = build_merged_rules(idx)
+        merged_rules = build_merged_rules(idx, agent_set=agent_set)
 
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 
-        update_targets(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=None)
+        update_single_file_agent_rules(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=None)
 
         updated_content = target_file.read_text(encoding="utf-8")
         target = test_targets["test"]
@@ -56,8 +53,8 @@ class TestTargetsUpdate:
         span = find_span(updated_content, target.marker_begin, target.marker_end)
         assert span is not None
 
-    def test_update_targets_replaces_existing_markers(self, tmp_path: Path):
-        """Test that update_targets replaces content between existing markers."""
+    def test_update_single_file_agent_rules_replaces_existing_markers(self, tmp_path: Path, agent_set: str):
+        """Test that agent rules update replaces content between existing markers."""
         idx = load_index()
 
         repo_root = tmp_path / "repo"
@@ -70,7 +67,7 @@ class TestTargetsUpdate:
         initial_content = f"# Test\n\n{marker_begin}\nOld content\n{marker_end}\n"
         target_file.write_text(initial_content, encoding="utf-8")
 
-        merged_rules = build_merged_rules(idx)
+        merged_rules = build_merged_rules(idx, agent_set=agent_set)
 
         test_targets = {
             "test": idx.agent_rules.targets["agents"].model_copy(
@@ -82,7 +79,7 @@ class TestTargetsUpdate:
             )
         }
 
-        update_targets(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=None)
+        update_single_file_agent_rules(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=None)
 
         updated_content = target_file.read_text(encoding="utf-8")
 
@@ -93,8 +90,8 @@ class TestTargetsUpdate:
         # Verify old content is replaced
         assert "Old content" not in updated_content
 
-    def test_update_targets_creates_backup(self, tmp_path: Path):
-        """Test that update_targets creates backup files when requested."""
+    def test_update_single_file_agent_rules_creates_backup(self, tmp_path: Path, agent_set: str):
+        """Test that agent rules update creates backup files when requested."""
         idx = load_index()
 
         repo_root = tmp_path / "repo"
@@ -103,11 +100,11 @@ class TestTargetsUpdate:
         original_content = "# Test\n\nOriginal content\n"
         target_file.write_text(original_content, encoding="utf-8")
 
-        merged_rules = build_merged_rules(idx)
+        merged_rules = build_merged_rules(idx, agent_set=agent_set)
 
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 
-        update_targets(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=".bak")
+        update_single_file_agent_rules(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=".bak")
 
         # Verify backup exists
         backup_file = target_file.with_suffix(target_file.suffix + ".bak")

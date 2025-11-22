@@ -6,6 +6,7 @@ from typing import Any
 import typer
 import yaml
 
+from pipelex.kit.exceptions import KitError
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.paths import get_kit_agents_dir
 
@@ -24,40 +25,50 @@ def _iter_agent_files(agents_dir: Traversable) -> Iterable[tuple[str, str]]:
             yield child.name, child.read_text(encoding="utf-8")
 
 
-def _front_matter_for(name: str, idx: KitIndex) -> dict[str, Any]:
+def _front_matter_for(name: str, kit_index: KitIndex) -> dict[str, Any]:
     """Build front-matter for a specific file.
 
     Args:
         name: Filename (e.g., "pytest_standards.md")
-        idx: Kit index configuration
+        kit_index: Kit index configuration
 
     Returns:
         Merged front-matter dictionary
     """
-    base = idx.agent_rules.cursor.front_matter.copy()
+    base = kit_index.agent_rules.cursor.front_matter.copy()
     key = name.removesuffix(".md")
-    if key in idx.agent_rules.cursor.files:
-        base |= idx.agent_rules.cursor.files[key].front_matter
+    if key in kit_index.agent_rules.cursor.files:
+        base |= kit_index.agent_rules.cursor.files[key].front_matter
     # Remove globs if it's an empty list
     if "globs" in base and base["globs"] == []:
         del base["globs"]
     return base
 
 
-def export_cursor_rules(repo_root: Path, idx: KitIndex, dry_run: bool = False) -> None:
-    """Export agent markdown files to Cursor .mdc files with YAML front-matter.
+def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str, dry_run: bool = False) -> None:
+    """Update Cursor .mdc rule files from agent markdown with YAML front-matter.
 
     Args:
         repo_root: Repository root directory
-        idx: Kit index configuration
+        kit_index: Kit index configuration
+        agent_set: Agent set to limit exported files
         dry_run: If True, only print what would be done
     """
     agents_dir = get_kit_agents_dir()
     out_dir = repo_root / ".cursor" / "rules"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    allowed_files: set[str] | None = None
+    rules_set = kit_index.agent_rules.sets.get(agent_set)
+    if not rules_set:
+        msg = f"Agent set '{agent_set}' not found in index.toml. Available sets: {list(kit_index.agent_rules.sets.keys())}"
+        raise KitError(msg)
+    allowed_files = set(rules_set)
+
     for fname, body in _iter_agent_files(agents_dir):
-        fm = _front_matter_for(fname, idx)
+        if fname not in allowed_files:
+            continue
+        fm = _front_matter_for(fname, kit_index)
         yaml_block = "---\n" + yaml.safe_dump(fm, sort_keys=False).rstrip() + "\n---\n"
         mdc = yaml_block + body
         out_path = out_dir / (fname.removesuffix(".md") + ".mdc")
