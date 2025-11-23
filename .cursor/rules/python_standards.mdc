@@ -1,3 +1,9 @@
+---
+alwaysApply: false
+description: Python coding standards and best practices
+globs:
+- '**/*.py'
+---
 # Coding Standards & Best Practices for Python Code
 
 This document outlines the core coding standards, best practices, and quality control procedures for the codebase.

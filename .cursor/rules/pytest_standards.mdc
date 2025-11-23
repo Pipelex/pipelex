@@ -1,3 +1,9 @@
+---
+alwaysApply: false
+description: Guidelines for writing unit tests
+globs:
+- tests/**/*.py
+---
 # Writing tests
 
 ## Unit test generalities

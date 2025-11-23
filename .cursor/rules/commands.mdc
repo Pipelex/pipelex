@@ -1,3 +1,7 @@
+---
+alwaysApply: true
+description: Guidelines for running commands
+---
 # Commands
   
 ## Prerequisites: Virtual Environment

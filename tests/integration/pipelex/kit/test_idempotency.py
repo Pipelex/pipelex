@@ -87,7 +87,7 @@ class TestIdempotency:
         first_result = target_file.read_text(encoding="utf-8")
 
         # Verify no heading_1 was added inside markers (since file already has H1)
-        assert first_result.count("# Pipelex Rules") == 0, "Should not add heading_1 when file already has H1"
+        assert first_result.count("# Pipelex Coding Rules") == 0, "Should not add heading_1 when file already has H1"
         assert first_result.count("# My Existing Heading") == 1, "Original H1 should be preserved"
 
         # Second update (should be identical)

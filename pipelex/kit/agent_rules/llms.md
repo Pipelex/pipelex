@@ -49,7 +49,7 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 Examples:
 ```toml
 llm_to_engineer = { model = "base-claude", temperature = 1 }
-llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
+llm_to_extract_invoice = { model = "claude-4.5-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 
 The interest is that these presets can be used to set the LLM choice in a PipeLLM, like this:
