@@ -54,6 +54,7 @@ make lint                     - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
 
+make rules                    - Install agent rules for contributing to Pipelex
 make up-kit-configs           - Update kit configs from .pipelex/
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
@@ -112,6 +113,7 @@ export HELP
 .PHONY: \
 	all help env lock install update build \
 	format lint pyright mypy pylint \
+	rules up-kit-configs ukc check-config-sync ccs \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
@@ -119,7 +121,6 @@ export HELP
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
-	up-kit-configs ukc check-config-sync ccs \
 	test-count check-test-badge
 
 all help:
@@ -173,6 +174,10 @@ validate: env
 build: env
 	$(call PRINT_TITLE,"Building the wheels")
 	@uv build
+
+rules: env
+	$(call PRINT_TITLE,"Installing agent rules for contributing to Pipelex")
+	$(VENV_PIPELEX) kit rules --set coding_standards
 
 up-kit-configs:
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
