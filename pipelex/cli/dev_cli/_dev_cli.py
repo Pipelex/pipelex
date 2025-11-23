@@ -8,6 +8,7 @@ from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
+from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -18,7 +19,7 @@ class PipelexDevCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["check-config-sync"]
+        return ["check-config-sync", "check-rules"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -68,3 +69,11 @@ def check_config_sync_command(
 ) -> None:
     """Verify that .pipelex and pipelex/kit/configs are in sync."""
     check_config_sync_cmd(show_diff=show_diff, leading=leading)
+
+
+@app.command(name="check-rules", help="Verify that installed agent rules match kit templates")
+def check_rules_command(
+    show_diff: Annotated[bool, typer.Option("--show-diff/--no-diff", help="Show differences if found")] = True,
+) -> None:
+    """Verify that installed agent rules match kit templates."""
+    check_rules_sync_cmd(show_diff=show_diff)

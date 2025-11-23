@@ -58,6 +58,7 @@ make rules                    - Install agent rules for contributing to Pipelex
 make up-kit-configs           - Update kit configs from .pipelex/
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
+make check-rules              - Verify installed agent rules match kit templates
 make ccs                      - Shorthand -> check-config-sync
 
 make cleanenv                 - Remove virtual env and lock files
@@ -113,7 +114,7 @@ export HELP
 .PHONY: \
 	all help env lock install update build \
 	format lint pyright mypy pylint \
-	rules up-kit-configs ukc check-config-sync ccs \
+        rules up-kit-configs ukc check-config-sync check-rules ccs \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
@@ -192,6 +193,10 @@ check-config-sync: env
 
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"
+
+check-rules: env
+	$(call PRINT_TITLE,"Checking installed agent rules against templates")
+	$(VENV_PIPELEX_DEV) check-rules
 
 ##############################################################################################
 ############################      Cleaning                        ############################
