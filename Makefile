@@ -58,6 +58,7 @@ make rules                    - Install agent rules for contributing to Pipelex
 make up-kit-configs           - Update kit configs from .pipelex/
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
+make check-rules              - Verify installed agent rules match kit templates
 make ccs                      - Shorthand -> check-config-sync
 
 make cleanenv                 - Remove virtual env and lock files
@@ -113,7 +114,7 @@ export HELP
 .PHONY: \
 	all help env lock install update build \
 	format lint pyright mypy pylint \
-	rules up-kit-configs ukc check-config-sync ccs \
+    rules up-kit-configs ukc check-config-sync check-rules ccs \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
@@ -179,6 +180,10 @@ rules: env
 	$(call PRINT_TITLE,"Installing agent rules for contributing to Pipelex")
 	$(VENV_PIPELEX) kit rules --set coding_standards
 
+check-rules: env
+	$(call PRINT_TITLE,"Checking installed agent rules against templates")
+	$(VENV_PIPELEX_DEV) check-rules --quiet
+
 up-kit-configs:
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
 	@rsync -av --delete .pipelex/ pipelex/kit/configs/
@@ -188,7 +193,7 @@ ukc: up-kit-configs
 
 check-config-sync: env
 	$(call PRINT_TITLE,"Checking config sync between .pipelex and pipelex/kit/configs")
-	$(VENV_PIPELEX_DEV) check-config-sync
+	$(VENV_PIPELEX_DEV) check-config-sync --quiet
 
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"
@@ -232,7 +237,7 @@ cleanall: cleanderived cleanenv cleanconfig
 codex-tests: env
 	$(call PRINT_TITLE,"Unit testing for Codex")
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
-	$(VENV_PYTEST) --exitfirst -m "(dry_runnable or not inference) and not (needs_output or pipelex_api or codex_disabled)" || [ $$? = 5 ]
+	$(VENV_PYTEST) --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
@@ -493,7 +498,7 @@ c: format lint pyright mypy
 cc: cleanderived c
 	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
 
-check: cc check-unused-imports pylint ccs
+check: cc check-unused-imports ccs check-rules pylint
 	@echo "> done: check"
 
 v: validate
