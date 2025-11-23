@@ -157,7 +157,7 @@ class PrettyPrinter:
             console_width=console_width,
         )
 
-        Console(width=console_width).print("", panel, "")
+        Console(width=console_width).print("", panel, "", sep="\n")
 
     @classmethod
     def pretty_width(cls, width: int | None = None, depth: int | None = None) -> int:
