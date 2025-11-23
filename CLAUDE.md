@@ -29,16 +29,6 @@
    # If some test failes, re-run it with `-s -vv` to see more details
    ```
 
-**Special rule for running tests in Codex Cloud**:
-
-   To test everything that can be tested from within the Codex Cloud sandbox, run this:
-
-   ```bash
-   make codex-tests
-   # It's equivalent to running pytest with `-m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)"`
-   # If some test fails, re-run it with `-s -vv` to see more details
-   ```
-
 ### Running Tests with Prints
 
    If anything when wrong, you can run the tests with prints to see the error:

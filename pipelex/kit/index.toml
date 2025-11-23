@@ -67,6 +67,15 @@ marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
 marker_end = "<!-- END_PIPELEX_RULES -->"
 heading_1 = "# Pipelex Coding Rules"
 
+[agent_rules.targets.agents.sets]
+coding_standards = [
+    "codex_commands.md",
+    "python_standards.md",
+    "pytest_standards.md",
+    "docs.md",
+    "tdd.md",
+]
+
 [agent_rules.targets.claude]
 path = "CLAUDE.md"
 marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"

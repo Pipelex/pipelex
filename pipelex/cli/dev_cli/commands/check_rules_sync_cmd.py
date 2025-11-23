@@ -23,12 +23,20 @@ def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
     """
     console = get_console()
     kit_index = load_index()
-    merged_rules = build_merged_rules(kit_index, agent_set="coding_standards")
+    agent_set = "coding_standards"
 
     missing_targets: list[Path] = []
     mismatches: list[tuple[Path, str, str]] = []
 
     for target in kit_index.agent_rules.targets.values():
+        # Check if this target has its own set override for the agent_set
+        target_file_list: list[str] | None = None
+        if target.sets and agent_set in target.sets:
+            target_file_list = target.sets[agent_set]
+
+        # Build merged rules for this specific target (with override if applicable)
+        merged_rules = build_merged_rules(kit_index, agent_set=agent_set, file_list=target_file_list)
+
         target_path = Path(target.path)
 
         if not target_path.exists():

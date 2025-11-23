@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.markers import find_span
-from pipelex.kit.single_file_agent_rules import build_merged_rules, update_single_file_agent_rules
+from pipelex.kit.single_file_agent_rules import update_single_file_agent_rules
 
 
 class TestUpdateSingleFileAgentRules:
@@ -15,15 +15,15 @@ class TestUpdateSingleFileAgentRules:
         target_file = repo_root / "test_target.md"
         target_file.write_text("# Test\n\nOriginal content\n", encoding="utf-8")
 
-        merged_rules = build_merged_rules(idx, agent_set=agent_set)
-
         # Create a test target
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 
         original_content = target_file.read_text(encoding="utf-8")
 
         # Dry run should not modify file
-        update_single_file_agent_rules(repo_root, merged_rules, test_targets, dry_run=True, diff=False, backup=None)
+        update_single_file_agent_rules(
+            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=True, diff=False, backup=None
+        )
 
         assert target_file.read_text(encoding="utf-8") == original_content
 
@@ -36,11 +36,11 @@ class TestUpdateSingleFileAgentRules:
         target_file = repo_root / "test_target.md"
         target_file.write_text("# Test\n\nOriginal content\n", encoding="utf-8")
 
-        merged_rules = build_merged_rules(idx, agent_set=agent_set)
-
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 
-        update_single_file_agent_rules(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=None)
+        update_single_file_agent_rules(
+            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=None
+        )
 
         updated_content = target_file.read_text(encoding="utf-8")
         target = test_targets["test"]
@@ -67,8 +67,6 @@ class TestUpdateSingleFileAgentRules:
         initial_content = f"# Test\n\n{marker_begin}\nOld content\n{marker_end}\n"
         target_file.write_text(initial_content, encoding="utf-8")
 
-        merged_rules = build_merged_rules(idx, agent_set=agent_set)
-
         test_targets = {
             "test": idx.agent_rules.targets["agents"].model_copy(
                 update={
@@ -79,7 +77,9 @@ class TestUpdateSingleFileAgentRules:
             )
         }
 
-        update_single_file_agent_rules(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=None)
+        update_single_file_agent_rules(
+            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=None
+        )
 
         updated_content = target_file.read_text(encoding="utf-8")
 
@@ -100,11 +100,11 @@ class TestUpdateSingleFileAgentRules:
         original_content = "# Test\n\nOriginal content\n"
         target_file.write_text(original_content, encoding="utf-8")
 
-        merged_rules = build_merged_rules(idx, agent_set=agent_set)
-
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 
-        update_single_file_agent_rules(repo_root, merged_rules, test_targets, dry_run=False, diff=False, backup=".bak")
+        update_single_file_agent_rules(
+            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=".bak"
+        )
 
         # Verify backup exists
         backup_file = target_file.with_suffix(target_file.suffix + ".bak")

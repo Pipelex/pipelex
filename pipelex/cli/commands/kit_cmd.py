@@ -10,7 +10,7 @@ from pipelex.kit.cursor_rules import remove_cursor_rules, update_cursor_rules
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.migrations_export import export_migration_instructions
-from pipelex.kit.single_file_agent_rules import build_merged_rules, remove_from_targets, update_single_file_agent_rules
+from pipelex.kit.single_file_agent_rules import remove_from_targets, update_single_file_agent_rules
 
 kit_app = typer.Typer(no_args_is_help=True)
 
@@ -34,13 +34,12 @@ def _sync_agent_rules(
         update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set, dry_run=dry_run)
 
     if single_files:
-        typer.echo("📝 Building merged agent documentation...")
-        merged_rules = build_merged_rules(loaded_kit_index, agent_set=agent_set)
         typer.echo("📝 Updating target files...")
         update_single_file_agent_rules(
-            resolved_repo_root,
-            merged_rules,
-            loaded_kit_index.agent_rules.targets,
+            repo_root=resolved_repo_root,
+            kit_index=loaded_kit_index,
+            agent_set=agent_set,
+            targets=loaded_kit_index.agent_rules.targets,
             dry_run=dry_run,
             diff=diff,
             backup=backup,
