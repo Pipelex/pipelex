@@ -5,6 +5,8 @@
 
 ### Linting
 
+   After making code changes, you must always lint using `make check`.
+
    ```bash
    make check
    # If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
@@ -19,15 +21,17 @@
 
 ### Running Tests
 
+   After you're finished making code changes, you must always run tests using `make test-xdist`.
+
    ```bash
    make test-xdist
    # If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
    # If some test failes, re-run it with `-s -vv` to see more details
    ```
 
-**Special rule for Codex**:
+**Special rule for running tests in Codex Cloud**:
 
-   To test everything that works in the Codex sandbox, run this:
+   To test everything that can be tested from within the Codex Cloud sandbox, run this:
 
    ```bash
    make codex-tests
