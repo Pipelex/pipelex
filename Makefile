@@ -182,7 +182,7 @@ rules: env
 
 check-rules: env
 	$(call PRINT_TITLE,"Checking installed agent rules against templates")
-	$(VENV_PIPELEX_DEV) check-rules
+	$(VENV_PIPELEX_DEV) check-rules --quiet
 
 up-kit-configs:
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
@@ -193,7 +193,7 @@ ukc: up-kit-configs
 
 check-config-sync: env
 	$(call PRINT_TITLE,"Checking config sync between .pipelex and pipelex/kit/configs")
-	$(VENV_PIPELEX_DEV) check-config-sync
+	$(VENV_PIPELEX_DEV) check-config-sync --quiet
 
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"

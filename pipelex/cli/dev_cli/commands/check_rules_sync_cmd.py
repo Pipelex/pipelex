@@ -14,8 +14,13 @@ from pipelex.kit.markers import find_span, replace_span, wrap
 from pipelex.kit.single_file_agent_rules import build_merged_rules, insert_block_with_markers, unified_diff
 
 
-def check_rules_sync_cmd(show_diff: bool = True) -> None:
-    """Verify that installed agent rules match kit templates."""
+def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
+    """Verify that installed agent rules match kit templates.
+
+    Args:
+        show_diff: If True, display the differences when found
+        quiet: If True, output only a single validation line (for use in Make targets)
+    """
     console = get_console()
     kit_index = load_index()
     merged_rules = build_merged_rules(kit_index, agent_set="coding_standards")
@@ -58,50 +63,57 @@ def check_rules_sync_cmd(show_diff: bool = True) -> None:
         if current_content != expected_content:
             mismatches.append((target_path, current_content, expected_content))
 
-    console.print()
-    console.print("[bold]Checking agent rules synchronization...[/bold]")
-    console.print("  Set: [cyan]coding_standards[/cyan]")
-    console.print()
-
     if not missing_targets and not mismatches:
-        success_panel = Panel(
-            "[green]✓[/green] Agent rules are in sync!\n\n[dim]Installed targets match templates from pipelex/kit/agent_rules.[/dim]",
-            title="[bold green]Agent Rules Sync Check: PASSED[/bold green]",
-            border_style="green",
+        if quiet:
+            console.print("[green]✓ Agent rules sync check: PASSED[/green]")
+        else:
+            console.print()
+            console.print("[bold]Checking agent rules synchronization...[/bold]")
+            console.print("  Set: [cyan]coding_standards[/cyan]")
+            console.print()
+            success_panel = Panel(
+                "[green]✓[/green] Agent rules are in sync!\n\n[dim]Installed targets match templates from pipelex/kit/agent_rules.[/dim]",
+                title="[bold green]Agent Rules Sync Check: PASSED[/bold green]",
+                border_style="green",
+                padding=(1, 2),
+            )
+            console.print(success_panel)
+            console.print()
+    else:
+        console.print()
+        console.print("[bold]Checking agent rules synchronization...[/bold]")
+        console.print("  Set: [cyan]coding_standards[/cyan]")
+        console.print()
+        error_panel = Panel(
+            (
+                "[red]✗[/red] Agent rules are [bold]NOT[/bold] in sync!\n\n"
+                "[dim]Installed targets differ from templates in pipelex/kit/agent_rules.[/dim]"
+            ),
+            title="[bold red]Agent Rules Sync Check: FAILED[/bold red]",
+            border_style="red",
             padding=(1, 2),
         )
-        console.print(success_panel)
-        console.print()
-        sys.exit(0)
-
-    error_panel = Panel(
-        "[red]✗[/red] Agent rules are [bold]NOT[/bold] in sync!\n\n[dim]Installed targets differ from templates in pipelex/kit/agent_rules.[/dim]",
-        title="[bold red]Agent Rules Sync Check: FAILED[/bold red]",
-        border_style="red",
-        padding=(1, 2),
-    )
-    console.print(error_panel)
-    console.print()
-
-    if missing_targets:
-        console.print("[bold yellow]Missing targets:[/bold yellow]")
-        for missing_path in missing_targets:
-            console.print(f"  • [cyan]{missing_path}[/cyan]")
+        console.print(error_panel)
         console.print()
 
-    if mismatches:
-        console.print("[bold yellow]Mismatched targets:[/bold yellow]")
-        for mismatched_path, current_content, expected_content in mismatches:
-            console.print(f"  • [cyan]{mismatched_path}[/cyan]")
-            if show_diff:
-                diff_output = unified_diff(current_content, expected_content, str(mismatched_path))
-                if diff_output:
-                    console.print()
-                    console.print(diff_output)
-                    console.print()
+        if missing_targets:
+            console.print("[bold yellow]Missing targets:[/bold yellow]")
+            for missing_path in missing_targets:
+                console.print(f"  • [cyan]{missing_path}[/cyan]")
+            console.print()
 
-    console.print("[bold yellow]Recommended Actions:[/bold yellow]")
-    console.print("  • Run [cyan]make rules[/cyan] to sync agent rules")
-    console.print()
+        if mismatches:
+            console.print("[bold yellow]Mismatched targets:[/bold yellow]")
+            for mismatched_path, current_content, expected_content in mismatches:
+                console.print(f"  • [cyan]{mismatched_path}[/cyan]")
+                if show_diff:
+                    diff_output = unified_diff(current_content, expected_content, str(mismatched_path))
+                    if diff_output:
+                        console.print()
+                        console.print(diff_output)
+                        console.print()
 
-    sys.exit(1)
+        console.print("[bold yellow]Recommended Actions:[/bold yellow]")
+        console.print("  • Run [cyan]make rules[/cyan] to sync agent rules")
+        console.print()
+        sys.exit(1)
