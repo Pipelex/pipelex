@@ -11,7 +11,7 @@ from rich.panel import Panel
 from pipelex.hub import get_console
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.markers import find_span, replace_span, wrap
-from pipelex.kit.single_file_agent_rules import _diff, _insert_block_with_markers, build_merged_rules
+from pipelex.kit.single_file_agent_rules import build_merged_rules, insert_block_with_markers, unified_diff
 
 
 def check_rules_sync_cmd(show_diff: bool = True) -> None:
@@ -48,7 +48,7 @@ def check_rules_sync_cmd(show_diff: bool = True) -> None:
 
             expected_content = replace_span(current_content, span, wrapped_block)
         else:
-            expected_content = _insert_block_with_markers(
+            expected_content = insert_block_with_markers(
                 current_content,
                 merged_rules,
                 target.heading_1,
@@ -94,7 +94,7 @@ def check_rules_sync_cmd(show_diff: bool = True) -> None:
         for mismatched_path, current_content, expected_content in mismatches:
             console.print(f"  • [cyan]{mismatched_path}[/cyan]")
             if show_diff:
-                diff_output = _diff(current_content, expected_content, mismatched_path)
+                diff_output = unified_diff(current_content, expected_content, str(mismatched_path))
                 if diff_output:
                     console.print()
                     console.print(diff_output)

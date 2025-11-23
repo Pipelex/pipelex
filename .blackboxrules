@@ -35,6 +35,56 @@ source .venv/bin/activate  # On macOS/Linux
 
 If the installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
 
+### Instructions
+
+After making changes to the code, always run the following command to validate the code:
+
+#### Linting
+
+```bash
+make check
+```
+
+This runs multiple code quality tools:
+- Pyright: Static type checking
+- Ruff: Fast Python linter  
+- Mypy: Static type checker
+
+Always fix any issues reported by these tools before proceeding.
+
+If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
+
+#### Running Tests
+
+```bash
+make test-xdist
+```
+
+If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
+
+#### Running Tests with Prints
+
+If anything when wrong, you can run the tests with prints to see the error:
+
+```bash
+make test-with-prints
+```
+
+If the current system doesn't have the `make` command, lookup the "test-with-prints" target in the Makefile and run the command manually.
+
+#### Running specific Tests
+
+   ```bash
+   make tp TEST=TestClassName
+   # or
+   make tp TEST=test_function_name
+   ```
+   Note: Matches names starting with the provided string.
+
+#### Make targets NOT to run
+
+**Important**: Never run `make ti`, `make test-inference`, `make te`, `make test-extract`, `make tg`, or `make test-img-gen` - these use costly inference.
+
 ## Coding Standards & Best Practices for Python Code
 
 This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
@@ -162,46 +212,6 @@ This document outlines the core coding standards, best practices, and quality co
        Provides methods for resizing, converting, and optimizing images.
        """
    ```
-
-### Code Quality Checks
-
-#### Linting and Type Checking
-
-Before finalizing a task, run:
-```bash
-make fix-unused-imports
-make check
-```
-
-This runs multiple code quality tools:
-- Pyright: Static type checking
-- Ruff: Fast Python linter  
-- Mypy: Static type checker
-
-Always fix any issues reported by these tools before proceeding.
-
-#### Running Tests
-
-1. **Quick Test Run** (no LLM/image generation):
-   ```bash
-   make tp
-   ```
-   Runs tests with markers: `(dry_runnable or not (inference or llm or img_gen or extract)) and not (needs_output or pipelex_api)`
-
-2. **Specific Tests**:
-   ```bash
-   make tp TEST=TestClassName
-   # or
-   make tp TEST=test_function_name
-   ```
-   Note: Matches names starting with the provided string.
-
-**Important**: Never run `make ti`, `make test-inference`, `make te`, `make test-extract`, `make tg`, or `make test-img-gen` - these use costly inference.
-
-### Project Structure
-
-- **Tests**: `tests/` directory
-- **Documentation**: `docs/` directory
 
 ## Writing tests
 

@@ -76,7 +76,7 @@ def build_merged_rules(idx: KitIndex, agent_set: str | None = None) -> str:
     return ("\n\n".join(parts)).strip() + "\n"
 
 
-def _insert_block_with_markers(target_md: str, block_md: str, main_title: str | None, markers: tuple[str, str]) -> str:
+def insert_block_with_markers(target_md: str, block_md: str, main_title: str | None, markers: tuple[str, str]) -> str:
     """Insert block into target markdown using marker-based logic.
 
     Args:
@@ -109,7 +109,7 @@ def _insert_block_with_markers(target_md: str, block_md: str, main_title: str | 
     return target_md.rstrip() + "\n\n" + wrapped_block + "\n"
 
 
-def _diff(before: str, after: str, path: str) -> str:
+def unified_diff(before: str, after: str, path: str) -> str:
     """Generate unified diff between before and after.
 
     Args:
@@ -174,7 +174,7 @@ def update_single_file_agent_rules(
             after = replace_span(before, span, wrapped_block)
         else:
             # No markers - insert with markers
-            after = _insert_block_with_markers(
+            after = insert_block_with_markers(
                 before,
                 merged_rules,
                 target.heading_1,
@@ -184,7 +184,7 @@ def update_single_file_agent_rules(
         if dry_run:
             typer.echo(f"[DRY] update {target_path}")
             if diff:
-                diff_output = _diff(before, after, str(target_path))
+                diff_output = unified_diff(before, after, str(target_path))
                 if diff_output:
                     typer.echo(diff_output)
         else:
@@ -198,7 +198,7 @@ def update_single_file_agent_rules(
             typer.echo(f"✅ Updated {target_path}")
 
             if diff:
-                diff_output = _diff(before, after, str(target_path))
+                diff_output = unified_diff(before, after, str(target_path))
                 if diff_output:
                     typer.echo(diff_output)
 
@@ -277,7 +277,7 @@ def remove_from_targets(
             if dry_run:
                 typer.echo(f"[DRY] remove marked section from {target_path}")
                 if diff:
-                    diff_output = _diff(before, after, str(target_path))
+                    diff_output = unified_diff(before, after, str(target_path))
                     if diff_output:
                         typer.echo(diff_output)
             else:
@@ -290,6 +290,6 @@ def remove_from_targets(
                 typer.echo(f"✅ Removed marked section from {target_path}")
 
                 if diff:
-                    diff_output = _diff(before, after, str(target_path))
+                    diff_output = unified_diff(before, after, str(target_path))
                     if diff_output:
                         typer.echo(diff_output)

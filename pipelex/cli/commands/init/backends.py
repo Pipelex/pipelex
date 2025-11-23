@@ -62,8 +62,12 @@ def get_selected_backend_keys(backends_toml_path: str) -> list[str]:
     return selected_backends
 
 
-def customize_backends_config() -> None:
-    """Interactively customize which inference backends are enabled in backends.toml."""
+def customize_backends_config(is_first_time_setup: bool = False) -> None:
+    """Interactively customize which inference backends are enabled in backends.toml.
+
+    Args:
+        is_first_time_setup: Whether this is the first time backends.toml is being set up.
+    """
     console = get_console()
     backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
     template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
@@ -80,9 +84,9 @@ def customize_backends_config() -> None:
         # Get currently enabled backends to show user their current selection
         currently_enabled = get_currently_enabled_backends(backends_toml_path, backend_options)
 
-        # If all backends are enabled, treat this as a fresh copy (not a meaningful selection)
-        # In this case, don't use currently_enabled as the default to avoid selecting everything
-        if currently_enabled and len(currently_enabled) == len(backend_options):
+        # If this is first-time setup, ignore what's in the template (all enabled)
+        # and use only pipelex_inference as the default
+        if is_first_time_setup or (currently_enabled and len(currently_enabled) == len(backend_options)):
             currently_enabled = []
 
         # Load the backends.toml file
@@ -90,8 +94,8 @@ def customize_backends_config() -> None:
         console.print()
 
         # UI: Display panel and get user selection
-        console.print(build_backend_selection_panel(backend_options, currently_enabled))
-        selected_indices = prompt_backend_indices(console, backend_options, currently_enabled)
+        console.print(build_backend_selection_panel(backend_options, currently_enabled, is_first_time_setup))
+        selected_indices = prompt_backend_indices(console, backend_options, currently_enabled, is_first_time_setup)
 
         # Business logic: Update TOML
         update_backends_in_toml(toml_doc, selected_indices, backend_options)
