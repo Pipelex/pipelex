@@ -2,80 +2,80 @@
   
 ## Prerequisites: Virtual Environment
 
-**CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST activate the appropriate Python virtual environment. Without proper venv activation, these commands will not work:
+   **CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST activate the appropriate Python virtual environment. Without proper venv activation, these commands will not work:
 
-Do this:
+   Do this:
 
-```bash
-source .venv/bin/activate
-pytest -s -v -k test_render_jinja2_from_text
-pipelex validate all
-```
+   ```bash
+   source .venv/bin/activate
+   pytest -s -v -k test_render_jinja2_from_text
+   pipelex validate all
+   ```
 
-or do that:
+   or do that:
 
-```bash
-.venv/bin/python -m pytest -s -v -k test_render_jinja2_from_text
-.venv/bin/pipelex validate all
-```
+   ```bash
+   .venv/bin/python -m pytest -s -v -k test_render_jinja2_from_text
+   .venv/bin/pipelex validate all
+   ```
 
-(adapt the above command to the OS and available virtual environment name)
+   (adapt the above command to the OS and available virtual environment name)
 
-For standard installations, the virtual environment is named `.venv`. Always check this first:
+   For standard installations, the virtual environment is named `.venv`. Always check this first:
 
-```bash
-# Activate the virtual environment (standard installation)
-source .venv/bin/activate  # On macOS/Linux
-# or
-.venv\Scripts\activate  # On Windows
-```
+   ```bash
+   # Activate the virtual environment (standard installation)
+   source .venv/bin/activate  # On macOS/Linux
+   # or
+   .venv\Scripts\activate  # On Windows
+   ```
 
-If the installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
+   If the installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
 
 ## Instructions
 
-After making changes to the code, always run the following command to validate the code:
+   After making changes to the code, always run the following command to validate the code:
 
 ### Linting
 
-```bash
-make check
-# If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
-```
+   ```bash
+   make check
+   # If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
+   ```
 
-This runs multiple code quality tools:
-- Pyright: Static type checking
-- Ruff: Fast Python linter  
-- Mypy: Static type checker
+   This runs multiple code quality tools:
+   - Pyright: Static type checking
+   - Ruff: Fast Python linter  
+   - Mypy: Static type checker
 
-Always fix any issues reported by these tools before proceeding.
+   Always fix any issues reported by these tools before proceeding.
 
 ### Running Tests
 
-```bash
-make test-xdist
-# If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
-# If some test failes, re-run it with `-s -vv` to see more details
-```
+   ```bash
+   make test-xdist
+   # If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
+   # If some test failes, re-run it with `-s -vv` to see more details
+   ```
 
 **Special rule for Codex**:
 
-To test everything that works in the Codex sandbox, run this:
+   To test everything that works in the Codex sandbox, run this:
 
-```bash
-make codex-tests
-# It's equivalent to running pytest with `-m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)"`
-# If some test failes, re-run it with `-s -vv` to see more details
-```
+   ```bash
+   make codex-tests
+   # It's equivalent to running pytest with `-m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)"`
+   # If some test failes, re-run it with `-s -vv` to see more details
+   ```
 
 ### Running Tests with Prints
 
-If anything when wrong, you can run the tests with prints to see the error:
+   If anything when wrong, you can run the tests with prints to see the error:
 
-```bash
-make test-with-prints
-# If the current system doesn't have the `make` command, lookup the "test-with-prints" target in the Makefile and run the command manually.
-```
+   ```bash
+   make test-with-prints
+   # If the current system doesn't have the `make` command, lookup the "test-with-prints" target in the Makefile and run the command manually.
+   ```
 
 ### Running specific Tests
 
@@ -101,3 +101,11 @@ make test-with-prints
 ### Make targets NOT to run
 
 **Important**: Never run `make ti`, `make test-inference`, `make te`, `make test-extract`, `make tg`, or `make test-img-gen` - these use costly inference.
+
+### Pipeline validation
+
+If you made changes to specific pipelines or any Pipelex bundle (.plx file) then you must also run our validation tool:
+
+   ```bash
+   .venv/bin/pipelex validate all
+   ```
