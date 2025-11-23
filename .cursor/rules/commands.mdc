@@ -44,6 +44,7 @@ After making changes to the code, always run the following command to validate t
 
 ```bash
 make check
+# If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
 ```
 
 This runs multiple code quality tools:
@@ -53,15 +54,23 @@ This runs multiple code quality tools:
 
 Always fix any issues reported by these tools before proceeding.
 
-If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
-
 ### Running Tests
 
 ```bash
 make test-xdist
+# If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
+# If some test failes, re-run it with `-s -vv` to see more details
 ```
 
-If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
+**Special rule for Codex**:
+
+To test everything that works in the Codex sandbox, run this:
+
+```bash
+make codex-tests
+# It's equivalent to running pytest with `-m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)"`
+# If some test failes, re-run it with `-s -vv` to see more details
+```
 
 ### Running Tests with Prints
 
@@ -69,9 +78,8 @@ If anything when wrong, you can run the tests with prints to see the error:
 
 ```bash
 make test-with-prints
+# If the current system doesn't have the `make` command, lookup the "test-with-prints" target in the Makefile and run the command manually.
 ```
-
-If the current system doesn't have the `make` command, lookup the "test-with-prints" target in the Makefile and run the command manually.
 
 ### Running specific Tests
 
@@ -81,6 +89,18 @@ If the current system doesn't have the `make` command, lookup the "test-with-pri
    make tp TEST=test_function_name
    ```
    Note: Matches names starting with the provided string.
+
+### Running Last Failed Tests
+
+   To rerun only the tests that failed in the previous run, use:
+
+   ```bash
+   make tp TEST=LF
+   # or with any test target
+   make test TEST=LF
+   make t TEST=LF
+   ```
+   Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
 
 ### Make targets NOT to run
 

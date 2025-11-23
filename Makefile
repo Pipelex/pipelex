@@ -237,7 +237,7 @@ cleanall: cleanderived cleanenv cleanconfig
 codex-tests: env
 	$(call PRINT_TITLE,"Unit testing for Codex")
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
-	$(VENV_PYTEST) --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
@@ -263,7 +263,11 @@ test: env
 	$(call PRINT_TITLE,"Unit testing without prints but displaying logs via pytest for WARNING level and above")
 	@echo "• Running unit tests"
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) -o log_cli=true -o log_level=WARNING -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) -o log_cli=true -o log_level=WARNING --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) -o log_cli=true -o log_level=WARNING -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) -o log_cli=true -o log_level=WARNING $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -272,7 +276,11 @@ test-xdist: env
 	$(call PRINT_TITLE,"Unit testing without prints but displaying logs via pytest for WARNING level and above")
 	@echo "• Running unit tests"
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -284,7 +292,11 @@ test-quiet: env
 	$(call PRINT_TITLE,"Unit testing without prints but displaying logs via pytest for WARNING level and above")
 	@echo "• Running unit tests"
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) -m $(USUAL_PYTEST_MARKERS) -o log_cli=true -o log_level=WARNING -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) -m $(USUAL_PYTEST_MARKERS) -o log_cli=true -o log_level=WARNING --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) -m $(USUAL_PYTEST_MARKERS) -o log_cli=true -o log_level=WARNING -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) -m $(USUAL_PYTEST_MARKERS) -o log_cli=true -o log_level=WARNING $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -296,7 +308,11 @@ test-with-prints: env
 	$(call PRINT_TITLE,"Unit testing with prints and our rich logs")
 	@echo "• Running unit tests"
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) -s -m $(USUAL_PYTEST_MARKERS) $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -312,7 +328,11 @@ tb: env
 test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -320,7 +340,11 @@ test-inference-with-prints: env
 test-inference-fast: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -334,7 +358,11 @@ ti: test-inference-fast
 ti-dry: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference" -s -rfE -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) --pipe-run-mode dry --exitfirst -m "inference" -s -rfE $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -342,7 +370,11 @@ ti-dry: env
 test-llm: env
 	$(call PRINT_TITLE,"Unit testing LLM")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "llm" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "llm" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "llm" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "llm" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -353,7 +385,11 @@ tl: test-llm
 test-extract: env
 	$(call PRINT_TITLE,"Unit testing Extract")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "extract" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "extract" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "extract" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "extract" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -364,7 +400,11 @@ te: test-extract
 test-img-gen: env
 	$(call PRINT_TITLE,"Unit testing Image Generation")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -375,7 +415,11 @@ tg: test-img-gen
 test-pipelex-api: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --exitfirst -m "pipelex_api" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --exitfirst -m "pipelex_api" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) --exitfirst -m "pipelex_api" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
 	else \
 		$(VENV_PYTEST) --exitfirst -m "pipelex_api" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
 	fi
@@ -387,7 +431,11 @@ cov: env
 	$(call PRINT_TITLE,"Unit testing with coverage")
 	@echo "• Running unit tests with coverage"
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) --lf $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+		else \
+			$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+		fi; \
 	else \
 		$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
@@ -396,7 +444,11 @@ cov-missing: env
 	$(call PRINT_TITLE,"Unit testing with coverage and missing lines")
 	@echo "• Running unit tests with coverage and missing lines"
 	@if [ -n "$(TEST)" ]; then \
-		$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) --cov-report=term-missing -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) --cov-report=term-missing --lf $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+		else \
+			$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) --cov-report=term-missing -k "$(TEST)" $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
+		fi; \
 	else \
 		$(VENV_PYTEST) --cov=$(if $(PKG),$(PKG),pipelex) --cov-report=term-missing $(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,-v)); \
 	fi
