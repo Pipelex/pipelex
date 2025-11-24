@@ -1,5 +1,4 @@
 import sys
-from enum import Enum
 from typing import cast
 
 from pydantic import Field, field_validator
@@ -27,7 +26,7 @@ class ProblemIds(StrEnum):
     AZURE_OPENAI_NO_STREAM_OPTIONS = "Azure OpenAI no stream_options"
 
 
-class CallerInfoTemplate(Enum):
+class CallerInfoTemplate(StrEnum):
     FILE_LINE = "file_line"
     FILE_LINE_FUNC = "file_line_func"
     FUNC = "func"
@@ -38,16 +37,21 @@ class CallerInfoTemplate(Enum):
 
     @classmethod
     def for_template_key(cls, key: "CallerInfoTemplate") -> str:
-        templates: dict[CallerInfoTemplate, str] = {
-            cls.FILE_LINE: "{file}:{line}",
-            cls.FILE_LINE_FUNC: "{file}:{line} {func}",
-            cls.FUNC: "{func}",
-            cls.FILE_FUNC: "{file} {func}",
-            cls.FUNC_LINE: "{func} {line}",
-            cls.FUNC_MODULE: "{func} {module}",
-            cls.FUNC_MODULE_LINE: "{func} {module} {line}",
-        }
-        return templates.get(key, "")
+        match key:
+            case cls.FILE_LINE:
+                return "{file}:{line}"
+            case cls.FILE_LINE_FUNC:
+                return "{file}:{line} {func}"
+            case cls.FUNC:
+                return "{func}"
+            case cls.FILE_FUNC:
+                return "{file} {func}"
+            case cls.FUNC_LINE:
+                return "{func} {line}"
+            case cls.FUNC_MODULE:
+                return "{func} {module}"
+            case cls.FUNC_MODULE_LINE:
+                return "{func} {module} {line}"
 
 
 class RichLogConfig(ConfigModel):

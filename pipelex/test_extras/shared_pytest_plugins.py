@@ -5,8 +5,8 @@ from pytest import FixtureRequest, Parser
 
 from pipelex.hub import get_console
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
-from pipelex.system.environment import is_env_var_set, set_env
-from pipelex.system.runtime import RunMode, runtime_manager
+from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_env
+from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder
 
 # List of environment variables that may need placeholders in CI
@@ -41,6 +41,9 @@ ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI = [
 def set_run_mode():
     if is_env_var_set(key="GITHUB_ACTIONS") or is_env_var_set(key="CI"):
         runtime_manager.set_run_mode(run_mode=RunMode.CI_TEST)
+    elif is_env_var_truthy(key=CODEX_CLOUD_ENV_VAR_KEY):
+        # we're in codex cloud and this fixture is called by pytest, so we are testing in codex cloud
+        runtime_manager.set_run_mode(run_mode=RunMode.CODEX_CLOUD_TEST)
     else:
         runtime_manager.set_run_mode(run_mode=RunMode.UNIT_TEST)
 

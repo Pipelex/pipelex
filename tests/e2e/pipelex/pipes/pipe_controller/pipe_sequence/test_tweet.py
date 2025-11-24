@@ -1,7 +1,10 @@
-from pipelex.core.stuffs.text_content import TextContent
+from pydantic import Field
+
+from pipelex.core.stuffs.structured_content import StructuredContent
 
 
-class OptimizedTweet(TextContent):
+class OptimizedTweet(StructuredContent):
     """A tweet optimized for Twitter/X engagement following best practices."""
 
-    # TBD
+    lead_tweet: str
+    follow_up_tweets: list[str] | None = Field(default_factory=list[str])

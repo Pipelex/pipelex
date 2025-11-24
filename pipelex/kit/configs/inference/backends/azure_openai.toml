@@ -97,24 +97,28 @@ model_id = "gpt-5-mini-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.0 }
+constraints = ["temperature_must_be_1"]
 
 [gpt-5-nano]
 model_id = "gpt-5-nano-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.4 }
+constraints = ["temperature_must_be_1"]
 
 [gpt-5-chat]
 model_id = "gpt-5-chat-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
+constraints = ["temperature_must_be_1"]
 
 [gpt-5]
 model_id = "gpt-5-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
+constraints = ["temperature_must_be_1"]
 
 ################################################################################
 # IMAGE GENERATION MODELS

@@ -3,7 +3,7 @@
 import pytest
 
 from pipelex.kit.index_loader import load_index
-from pipelex.kit.targets_update import build_merged_rules
+from pipelex.kit.single_file_agent_rules import build_merged_rules
 
 
 class TestMergedRules:

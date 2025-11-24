@@ -205,9 +205,9 @@ typeCheckingMode = "strict"
 minversion = "9.0"
 addopts = [
     "--import-mode=importlib",
-    "-ra",                                                                         # Show all test outcomes (including skips)
+    "-ra",                                                         # Show all test outcomes (including skips)
     "-m",
-    "not (inference or llm or img_gen or extract or needs_output or pipelex_api)",
+    "not (inference or llm or img_gen or extract or pipelex_api)",
 ]
 asyncio_default_fixture_loop_scope = "session"
 xfail_strict = true
@@ -220,7 +220,6 @@ filterwarnings = [
     "ignore:Use.*Types instead",
 ]
 markers = [
-    "needs_output: tests that need output to be displayed",
     "inference: slow and costly due to inference calls",
     "llm: slow and costly due to llm inference calls",
     "img_gen: slow and costly due to image generation inference calls",
@@ -394,7 +393,7 @@ reports = false
 disable = ["all"]
 enable = [
     "W0101", # Unreachable code: Used when there is some code behind a "return" or "raise" statement, which will never be accessed.
-    "C0103",  # invalid-name (naming convention)
+    "C0103", # invalid-name (naming convention)
 ]
 ignore = [".venv", "__pycache__", "build", "dist", ".git"]
 
@@ -402,13 +401,13 @@ ignore = [".venv", "__pycache__", "build", "dist", ".git"]
 # Variables / attributes / arguments: snake_case, not length 1
 variable-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
 argument-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
-attr-rgx     = "^(?!.$)[a-z_][a-z0-9_]*$"
+attr-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
 
 # Functions / methods: snake_case, not length 1
 function-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
-method-rgx   = "^(?!.$)[a-z_][a-z0-9_]*$"
+method-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
 
 # Classes: CapWords, not length 1
-class-rgx    = "^(?!.$)[A-Z_][a-zA-Z0-9_]*$"
+class-rgx = "^(?!.$)[A-Z_][a-zA-Z0-9_]*$"
 typevar-rgx = "^[A-Za-z_][A-Za-z0-9_]*$"
 good-names = ["_"]

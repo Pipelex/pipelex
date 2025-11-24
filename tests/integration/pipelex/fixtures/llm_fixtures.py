@@ -2,6 +2,7 @@
 
 import pytest
 
+from pipelex import log
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.hub import get_model_deck
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
@@ -16,6 +17,25 @@ def is_llm_handle_supported(llm_handle: str) -> bool:
 def is_llm_handle_supported_by_enabled_backends(llm_handle: str) -> bool:
     """Check if an LLM handle is supported by at least one enabled backend."""
     return any(check_backend_supports_model(backend, llm_handle) for backend in ALL_BACKENDS)
+
+
+def is_llm_preset_supported(llm_preset_id: str) -> bool:
+    """Check if an LLM preset is supported by at least one enabled backend."""
+    llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
+    model_handle = llm_setting.model
+    model_deck = get_model_deck()
+    inference_model = model_deck.get_optional_inference_model(model_handle=model_handle)
+    if inference_model is None:
+        return False
+    log.debug(f"Inference model found!! {inference_model}")
+    return True
+
+
+def is_llm_preset_supported_by_enabled_backends(llm_preset_id: str) -> bool:
+    """Check if an LLM preset is supported by at least one enabled backend."""
+    llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
+    # return is_llm_handle_supported_by_enabled_backends(llm_setting.model)
+    return any(check_backend_supports_model(backend, llm_setting.model) for backend in ALL_BACKENDS)
 
 
 # ================================================================================================
@@ -161,18 +181,6 @@ ALL_LLM_HANDLES = [
 
 @pytest.fixture(
     params=[
-        # "llm_for_testing_gen_text",
-        # "llm_for_testing_gen_object",
-        "llm_for_creative_writing",
-    ],
-)
-def llm_preset_id(request: pytest.FixtureRequest) -> str:
-    assert isinstance(request.param, str)
-    return request.param
-
-
-@pytest.fixture(
-    params=[
         LLMJobParams(
             temperature=0.5,
             max_tokens=None,
@@ -196,6 +204,23 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
     if not is_llm_handle_supported_by_enabled_backends(llm_handle_param):
         pytest.skip(f"LLM handle '{llm_handle_param}' not supported by any enabled backend")
     return llm_handle_param
+
+
+@pytest.fixture(
+    params=[
+        # "llm_for_testing_gen_text",
+        # "llm_for_testing_gen_object",
+        "llm_for_creative_writing",
+    ],
+)
+def llm_preset_id(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
+    llm_preset_id_param = request.param
+    if not is_llm_preset_supported(llm_preset_id=llm_preset_id_param):
+        pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported by any enabled backend")
+    # if not is_llm_preset_supported_by_enabled_backends(llm_preset_id=llm_preset_id_param):
+    #     pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported by any enabled backend")
+    return llm_preset_id_param
 
 
 @pytest.fixture(

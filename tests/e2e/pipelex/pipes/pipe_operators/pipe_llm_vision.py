@@ -9,9 +9,10 @@ class BasicDescription(StructuredContent):
     description: str = Field(description="Concise description of the image")
 
 
-class VisionAnalysis(StructuredContent):
+class VisionAnalysisE2E(StructuredContent):
     """Structured analysis of visual content from an image."""
 
     main_subject: str = Field(description="The primary subject or focus of the image")
     category: str = Field(description="The category of the image")
     description: str = Field(description="Concise description of the image")
+    time_scale: str = Field(description="The time scale of gant chart: 'days', 'weeks', 'months', 'years' or something else")
