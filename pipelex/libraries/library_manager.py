@@ -2,7 +2,6 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -11,14 +10,12 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
-from pipelex.core.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipe_concept_validation_error_categorizer import categorize_pipe_concept_validation_error
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_current_library
 from pipelex.libraries.exceptions import (
     LibraryError,
@@ -34,7 +31,6 @@ from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
 if TYPE_CHECKING:
-    from pipelex.core.bundles.exceptions import PipesConceptValidationErrorData
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.domains.domain import Domain
 
@@ -270,25 +266,7 @@ class LibraryManager(LibraryManagerAbstract):
             blueprints.append(blueprint)
 
         self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
-
-        # Load all blueprints into the library
-        try:
-            self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-        except ValidationError as validation_error:
-            # Categorize and forward Pydantic PIPE/CONCEPT validation errors
-            # (These come from Pipe or Concept class validation, NOT blueprint validation)
-            pipe_concept_errors: list[PipesConceptValidationErrorData] = []
-            for error in validation_error.errors():
-                # Let the categorizer handle all extraction from the error
-                val_error = categorize_pipe_concept_validation_error(error=error)
-                pipe_concept_errors.append(val_error)
-
-            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-            msg = f"Could not load blueprints because of: {validation_error_msg}"
-            raise LibraryLoadingError(
-                message=msg,
-                pipe_concept_validation_errors=pipe_concept_errors,
-            ) from validation_error
+        self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

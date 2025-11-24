@@ -1,12 +1,15 @@
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError, PLXDecodeError
-from pipelex.core.validation_error_categorizer import categorize_blueprint_validation_error
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.validation_error_categorizer import categorize_blueprint_validation_error
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
+
+if TYPE_CHECKING:
+    from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 
 
 class PipelexInterpreter(BaseModel):
@@ -71,12 +74,12 @@ class PipelexInterpreter(BaseModel):
             return PipelexBundleBlueprint.model_validate(blueprint_dict)
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
-            # Parse Pydantic validation errors into structured error data
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
             for error in exc.errors():
-                # Categorize BLUEPRINT validation errors (not pipe validation errors)
-                blueprint_validation_errors.append(categorize_blueprint_validation_error(blueprint_dict=blueprint_dict, error=error))
+                categorized_error = categorize_blueprint_validation_error(blueprint_dict=blueprint_dict, error=error)
+                if categorized_error:
+                    blueprint_validation_errors.append(categorized_error)
 
             raise PipelexInterpreterError(
                 message=str(exc),

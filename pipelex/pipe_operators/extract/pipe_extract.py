@@ -13,9 +13,9 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSett
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.image_content import ImageContent

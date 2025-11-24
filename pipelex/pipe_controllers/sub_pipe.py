@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError
+from pipelex.core.pipes.exceptions import PipeInputNotFoundError
+from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent

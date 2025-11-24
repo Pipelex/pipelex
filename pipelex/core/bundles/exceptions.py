@@ -24,7 +24,7 @@ class PipeValidationErrorType(StrEnum):
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
 
 
-class PipesConceptValidationErrorData(BaseModel):
+class PipesAndConceptValidationErrorData(BaseModel):
     """Structured validation error data for Pipe/Concept validation errors.
 
     This model captures validation errors raised by Pipe or Concept classes during

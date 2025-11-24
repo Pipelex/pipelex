@@ -1,6 +1,5 @@
 from pipelex.base_exceptions import PipelexError
-from pipelex.core.bundles.exceptions import PipesConceptValidationErrorData
-from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 
 
 class LibraryError(PipelexError):
@@ -28,7 +27,7 @@ class LibraryLoadingError(LibraryError):
         self,
         message: str,
         blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
-        pipe_concept_validation_errors: list[PipesConceptValidationErrorData] | None = None,
+        pipe_concept_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
     ):
         """Initialize LibraryLoadingError.
 

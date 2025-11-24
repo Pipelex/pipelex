@@ -3,8 +3,8 @@ from typing import Any, Callable
 import pytest
 
 from pipelex import log
-from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
 from tests.unit.pipelex.pipe_controllers.sequence.data import PipeSequenceInputTestCases

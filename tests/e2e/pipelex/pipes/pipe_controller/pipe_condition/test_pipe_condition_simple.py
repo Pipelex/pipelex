@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.exceptions import PipeRunInputsError
+from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory

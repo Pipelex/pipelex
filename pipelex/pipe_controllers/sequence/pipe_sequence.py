@@ -3,9 +3,8 @@ from typing import Literal
 from typing_extensions import override
 
 from pipelex.core.bundles.exceptions import PipeValidationErrorType
-from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeInputNotFoundError
+from pipelex.core.pipes.exceptions import PipeInputNotFoundError, PipeValidationError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput

@@ -7,9 +7,9 @@ from pipelex import log
 from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeRunInputsError
+from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput

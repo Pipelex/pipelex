@@ -7,115 +7,14 @@ from pipelex.core.bundles.exceptions import (
     PipelexBundleBlueprintFixableErrorType,
     PipelexBundleBlueprintValidationErrorData,
 )
-from pipelex.types import StrEnum
-
-
-class ValidationErrorScope(StrEnum):
-    """Scope of validation errors based on loc[0]."""
-
-    PIPE = "pipe"
-    CONCEPT = "concept"
-    DOMAIN = "domain"
-    MAIN_PIPE = "main_pipe"
-    BUNDLE = "bundle"
-
-    @classmethod
-    def is_pipe_scope(cls, scope: str) -> bool:
-        match cls(scope):
-            case ValidationErrorScope.PIPE:
-                return True
-            case ValidationErrorScope.CONCEPT:
-                return False
-            case ValidationErrorScope.DOMAIN:
-                return False
-            case ValidationErrorScope.MAIN_PIPE:
-                return False
-            case ValidationErrorScope.BUNDLE:
-                return False
-
-    @classmethod
-    def is_concept_scope(cls, scope: str) -> bool:
-        match cls(scope):
-            case ValidationErrorScope.PIPE:
-                return False
-            case ValidationErrorScope.CONCEPT:
-                return True
-            case ValidationErrorScope.DOMAIN:
-                return False
-            case ValidationErrorScope.MAIN_PIPE:
-                return False
-            case ValidationErrorScope.BUNDLE:
-                return False
-
-    @classmethod
-    def is_domain_scope(cls, scope: str) -> bool:
-        match cls(scope):
-            case ValidationErrorScope.PIPE:
-                return False
-            case ValidationErrorScope.CONCEPT:
-                return False
-            case ValidationErrorScope.DOMAIN:
-                return True
-            case ValidationErrorScope.MAIN_PIPE:
-                return False
-            case ValidationErrorScope.BUNDLE:
-                return False
-
-    @classmethod
-    def is_main_pipe_scope(cls, scope: str) -> bool:
-        match cls(scope):
-            case ValidationErrorScope.PIPE:
-                return False
-            case ValidationErrorScope.CONCEPT:
-                return False
-            case ValidationErrorScope.DOMAIN:
-                return False
-            case ValidationErrorScope.MAIN_PIPE:
-                return True
-            case ValidationErrorScope.BUNDLE:
-                return False
-
-    @classmethod
-    def is_bundle_scope(cls, scope: str) -> bool:
-        match cls(scope):
-            case ValidationErrorScope.PIPE:
-                return False
-            case ValidationErrorScope.CONCEPT:
-                return False
-            case ValidationErrorScope.DOMAIN:
-                return False
-            case ValidationErrorScope.MAIN_PIPE:
-                return False
-            case ValidationErrorScope.BUNDLE:
-                return True
-
-
-def _get_error_scope(loc: tuple[int | str, ...]) -> ValidationErrorScope:
-    if not loc:
-        return ValidationErrorScope.BUNDLE
-
-    first = str(loc[0])
-
-    if ValidationErrorScope.is_pipe_scope(scope=first):
-        return ValidationErrorScope.PIPE
-    elif ValidationErrorScope.is_concept_scope(scope=first):
-        return ValidationErrorScope.CONCEPT
-    elif ValidationErrorScope.is_domain_scope(scope=first):
-        return ValidationErrorScope.DOMAIN
-    elif ValidationErrorScope.is_main_pipe_scope(scope=first):
-        return ValidationErrorScope.MAIN_PIPE
-    elif ValidationErrorScope.is_bundle_scope(scope=first):
-        return ValidationErrorScope.BUNDLE
-    else:
-        msg = f"Unexpected validation error scope: {first}"
-        raise PipelexUnexpectedError(msg)
+from pipelex.core.interpreter.helpers import ValidationErrorScope, get_error_scope
 
 
 def categorize_blueprint_validation_error(
     blueprint_dict: dict[str, Any],
     error: ErrorDetails,
-) -> PipelexBundleBlueprintValidationErrorData:
-    """Categorize a BLUEPRINT validation error and create structured error data.
+) -> PipelexBundleBlueprintValidationErrorData | None:
+    """Categorize a BLUEPRINT validation error and create structured error data or return None if the error is not expected.
 
     Args:
         blueprint_dict: The blueprint dict being validated (for context extraction)
@@ -127,16 +26,12 @@ def categorize_blueprint_validation_error(
     Raises:
         PipelexUnexpectedError: If the error is not expected
     """
-    # Extract domain and source from blueprint_dict
     domain = blueprint_dict.get("domain") if blueprint_dict else None
     source = blueprint_dict.get("source") if blueprint_dict else None
 
     loc = error.get("loc", ())
+    error_scope = get_error_scope(loc)
 
-    # Extract error scope from loc[0]
-    error_scope = _get_error_scope(loc)
-
-    # Redirect to scope-specific handlers based on error scope
     if ValidationErrorScope.is_pipe_scope(scope=error_scope):
         return _handle_pipe_errors(
             error=error,
@@ -144,20 +39,7 @@ def categorize_blueprint_validation_error(
             source=source,
             error_scope=error_scope,
         )
-    elif ValidationErrorScope.is_concept_scope(scope=error_scope):
-        return _handle_concept_errors(
-            error=error,
-        )
-    else:
-        # Domain, Main Pipe, or Bundle errors are not auto-fixed
-        msg = error.get("msg", "Unknown validation error")
-        pydantic_type = error.get("type", "")
-        field_path = " → ".join(str(item) for item in loc)
-        msg = (
-            f"Unexpected validation error that cannot be auto-fixed: "
-            f"type='{pydantic_type}', scope='{error_scope}', path='{field_path}', message='{msg}'"
-        )
-        raise PipelexUnexpectedError(msg)
+    return None
 
 
 def _handle_pipe_errors(
@@ -218,47 +100,6 @@ def _handle_pipe_errors(
     msg = (
         f"Unexpected PIPE validation error that cannot be auto-fixed: "
         f"type='{pydantic_type}', pipe_code='{pipe_code}', path='{field_path}', message='{message}'"
-    )
-    raise PipelexUnexpectedError(msg)
-
-
-def _handle_concept_errors(
-    error: ErrorDetails,
-) -> PipelexBundleBlueprintValidationErrorData:
-    """Handle all CONCEPT scope validation errors.
-
-    Extracts concept_code and all other necessary context from error,
-    then processes the specific error type.
-
-    Currently NO concept errors are auto-fixed in the builder loop, so this
-    always raises an exception.
-
-    Args:
-        error: Pydantic error details
-        domain: Domain where error occurred
-        source: Source file path
-        error_scope: The error scope (CONCEPT)
-
-    Raises:
-        PipelexUnexpectedError: Always, since no concept errors are auto-fixed
-    """
-    # Extract data from error
-    loc = error.get("loc", ())
-    message = error.get("msg", "Unknown validation error")
-    pydantic_type = error.get("type", "")
-    field_path = " → ".join(str(item) for item in loc)
-
-    # Extract concept_code from loc[1]
-    concept_code = str(loc[1]) if len(loc) >= 2 else None
-
-    # Extract field_name from loc[2] if present
-    field_name = str(loc[2]) if len(loc) >= 3 else None
-
-    # No concept errors are currently auto-fixed
-    msg = (
-        f"Unexpected CONCEPT validation error that cannot be auto-fixed: "
-        f"type='{pydantic_type}', concept_code='{concept_code}', field_name='{field_name}', "
-        f"path='{field_path}', message='{message}'"
     )
     raise PipelexUnexpectedError(msg)
 
