@@ -5,7 +5,7 @@ from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 
 
-class TestExtractSkill:
+class TestSkillPresetsExtract:
     """Test that all ExtractSkill enum values are valid ExtractModelChoice values in the model deck."""
 
     def test_all_extract_skills_are_valid_extract_choices(self):
