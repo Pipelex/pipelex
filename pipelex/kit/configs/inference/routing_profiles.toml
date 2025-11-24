@@ -94,10 +94,6 @@ default = "openai"
 description = "Use Pipelex Inference backend for all its supported models"
 default = "pipelex_inference"
 
-[profiles.all_vertexai]
-description = "Use Vertex AI backend for all its supported models"
-default = "vertexai"
-
 [profiles.all_xai]
 description = "Use xAI backend for all its supported models"
 default = "xai"

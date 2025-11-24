@@ -48,7 +48,7 @@ from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtoco
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
-from pipelex.system.environment import get_optional_env
+from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
@@ -269,9 +269,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     self.telemetry_manager = TelemetryManagerNoOp()
                     log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
                 case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
-                    if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
+                    if telemetry_config.respect_dnt and is_env_var_truthy(DO_NOT_TRACK_ENV_VAR_KEY):
                         self.telemetry_manager = TelemetryManagerNoOp()
-                        log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
+                        log.debug(f"Telemetry is disabled by env var '{DO_NOT_TRACK_ENV_VAR_KEY}'")
                     else:
                         self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
         else:

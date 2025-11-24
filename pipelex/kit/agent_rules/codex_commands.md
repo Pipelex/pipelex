@@ -1,8 +1,4 @@
----
-alwaysApply: true
-description: Guidelines for running commands
----
-# Commands
+# Codex Cloud Commands
 
 ## Linting
 
@@ -20,45 +16,15 @@ description: Guidelines for running commands
 
    Always fix any issues reported by these tools before proceeding.
 
-## Running Tests
+## Running Tests in Codex Cloud
 
-   After you're finished making code changes, you must always run tests using `make test-xdist`.
+    To test everything that can be tested from within the Codex Cloud sandbox, run this:
 
-   ```bash
-   make test-xdist
-   # If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
-   # If some test failes, re-run it with `-s -vv` to see more details
-   ```
-
-## Running Tests with Prints
-
-   If anything went wrong, you can run the tests with prints to see the error:
-
-   ```bash
-   make test-with-prints
-   # If the current system doesn't have the `make` command, lookup the "test-with-prints" target in the Makefile and run the command manually.
-   ```
-
-## Running specific Tests
-
-   ```bash
-   make tp TEST=TestClassName
-   # or
-   make tp TEST=test_function_name
-   ```
-   Note: Matches names starting with the provided string.
-
-## Running Last Failed Tests
-
-   To rerun only the tests that failed in the previous run, use:
-
-   ```bash
-   make tp TEST=LF
-   # or with any test target
-   make test TEST=LF
-   make t TEST=LF
-   ```
-   Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
+    ```bash
+    make codex-tests
+    # It's equivalent to running pytest with `-m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)"`
+    # If some test fails, re-run it with `-s -vv` to see more details
+    ```
 
 ---
 
@@ -93,3 +59,4 @@ description: Guidelines for running commands
    ```
 
    If the installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
+

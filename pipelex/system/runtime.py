@@ -1,9 +1,10 @@
 from pydantic import BaseModel
 
-from pipelex.system.environment import get_optional_env
+from pipelex.system.environment import get_optional_env, is_env_var_truthy
 from pipelex.types import StrEnum
 
 RUN_MODE_ENV_VAR_KEY = "RUN_MODE"
+CODEX_CLOUD_ENV_VAR_KEY = "CODEX_CLOUD"
 
 
 class IntegrationMode(StrEnum):
@@ -37,12 +38,17 @@ class RunMode(StrEnum):
     NORMAL = "normal"
     UNIT_TEST = "unit_test"
     CI_TEST = "ci_test"
+    CODEX_CLOUD = "codex_cloud"
+    CODEX_CLOUD_TEST = "codex_cloud_test"
 
     @classmethod
     def get_from_env_var(cls) -> "RunMode":
         if mode_str := get_optional_env(RUN_MODE_ENV_VAR_KEY):
             return RunMode(mode_str)
-        return RunMode.NORMAL
+        elif is_env_var_truthy(key=CODEX_CLOUD_ENV_VAR_KEY):
+            return RunMode.CODEX_CLOUD
+        else:
+            return RunMode.NORMAL
 
 
 class WorkerMode(StrEnum):
@@ -109,9 +115,13 @@ class RuntimeManager(BaseModel):
         match self.run_mode:
             case RunMode.NORMAL:
                 return False
+            case RunMode.CODEX_CLOUD:
+                return False
             case RunMode.UNIT_TEST:
                 return True
             case RunMode.CI_TEST:
+                return True
+            case RunMode.CODEX_CLOUD_TEST:
                 return True
 
     @property
@@ -119,14 +129,14 @@ class RuntimeManager(BaseModel):
         match self.run_mode:
             case RunMode.NORMAL:
                 return False
+            case RunMode.CODEX_CLOUD:
+                return False
             case RunMode.UNIT_TEST:
                 return False
             case RunMode.CI_TEST:
                 return True
-
-    @property
-    def should_check_intermediate_configs(self) -> bool:
-        return self.is_unit_testing
+            case RunMode.CODEX_CLOUD_TEST:
+                return True
 
 
 runtime_manager = RuntimeManager()
