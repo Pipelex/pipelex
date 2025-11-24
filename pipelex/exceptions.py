@@ -18,12 +18,11 @@ from pipelex.core.memory.exceptions import (
     WorkingMemoryVariableError,
 )
 from pipelex.core.pipes.exceptions import (
-    PipeBlueprintValueError,
     PipeFactoryError,
-    PipeInputNotFoundError,
     PipeOperatorModelChoiceError,
     PipeValidationError,
 )
+from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
 from pipelex.core.stuffs.exceptions import (
     StuffArtefactError,
     StuffArtefactReservedFieldError,
@@ -93,7 +92,6 @@ __all__ = [
     "PipeRouterError",
     "PipeRunError",
     # from pipelex.core.pipes.exceptions
-    "PipeBlueprintValueError",
     "PipeInputNotFoundError",
     "PipeFactoryError",
     "PipeOperatorModelChoiceError",

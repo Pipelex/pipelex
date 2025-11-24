@@ -1,5 +1,5 @@
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.tools.misc.string_utils import is_snake_case
+from pipelex.types import StrEnum
 
 
 def is_valid_input_name(input_name: str) -> bool:
@@ -59,7 +59,7 @@ def validate_input_name(input_name: str) -> None:
         input_name: The input name to validate
 
     Raises:
-        PipeBlueprintValueError: If the input name is invalid
+        ValueError: If the input name is invalid
 
     """
     if not is_valid_input_name(input_name):
@@ -69,4 +69,25 @@ def validate_input_name(input_name: str) -> None:
             "Nested field access is allowed using dots (e.g., 'my_input.field_name'), "
             "where each part must also be in snake_case."
         )
-        raise PipeBlueprintValueError(msg)
+        raise ValueError(msg)
+
+
+class PipeValidationErrorType(StrEnum):
+    """Types of pipe validation errors.
+
+    These error types are raised during pipe validation from Pipe/Concept classes.
+    Only some are auto-fixed in the builder loop (marked below).
+    """
+
+    # Errors that are auto-fixed in builder_loop.py
+    MISSING_INPUT_VARIABLE = "missing_input_variable"  # AUTO-FIXED
+    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"  # AUTO-FIXED
+    INPUT_REQUIREMENT_MISMATCH = "input_requirement_mismatch"  # AUTO-FIXED
+    INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"  # AUTO-FIXED
+
+    # Errors that are raised but NOT auto-fixed (will fail validation)
+    LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
+    IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE = "img_gen_input_not_text_compatible"
+
+    # Generic fallback for unexpected validation errors
+    UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"

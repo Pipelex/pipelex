@@ -4,7 +4,6 @@ from typing import Any, final
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex import log
-from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -13,6 +12,7 @@ from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
@@ -102,14 +102,13 @@ class PipeAbstract(ABC, BaseModel):
         # First validate required variables are in the inputs
         for required_variable_name in self.required_variables():
             if required_variable_name not in self.inputs.variables:
+                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
                 raise PipeValidationError(
+                    message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[required_variable_name],
-                    explanation=(
-                        f"Required variable '{required_variable_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
-                    ),
                 )
 
         # Then validate that all inputs are actually needed and match requirements exactly
@@ -120,12 +119,13 @@ class PipeAbstract(ABC, BaseModel):
             var_name = named_input_requirement.variable_name
 
             if var_name not in self.inputs.variables:
+                msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
                 raise PipeValidationError(
+                    message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[var_name],
-                    explanation=(f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"),
                 )
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
@@ -140,27 +140,29 @@ class PipeAbstract(ABC, BaseModel):
                     needed_requirement.concept.code not in (NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING)
                     and declared_requirement != needed_requirement
                 ):
+                    msg = (
+                        f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'.\n"
+                        f"Declared: input requirement {declared_requirement}.\n"
+                        f"Required: input requirement {needed_requirement}"
+                    )
                     raise PipeValidationError(
+                        message=msg,
                         error_type=PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH,
                         domain=self.domain,
                         pipe_code=self.code,
                         variable_names=[var_name],
-                        explanation=(
-                            f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'.\n"
-                            f"Declared: input requirement {declared_requirement}.\n"
-                            f"Required: input requirement {needed_requirement}"
-                        ),
                     )
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
             if input_name not in the_needed_inputs.required_names:
+                msg = f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}"
                 raise PipeValidationError(
+                    message=msg,
                     error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
                     domain=self.domain,
                     pipe_code=self.code,
                     variable_names=[input_name],
-                    explanation=f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}",
                 )
 
         self.validate_inputs_with_library()

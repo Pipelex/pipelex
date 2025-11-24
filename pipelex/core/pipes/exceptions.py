@@ -5,22 +5,10 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.core.bundles.exceptions import PipeValidationErrorType
-
-
-class PipeBlueprintValueError(ValueError):
-    pass
-
-
-class PipeInputNotFoundError(PipelexError):
-    pass
+from pipelex.core.pipes.validation import PipeValidationErrorType
 
 
 class PipeFactoryError(PipelexError):
-    pass
-
-
-class PipeAbstractValueError(ValueError):
     pass
 
 
@@ -74,6 +62,7 @@ class PipeDryRunError(PipeRunError):
 class PipeValidationError(ValueError):
     def __init__(
         self,
+        message: str,
         error_type: PipeValidationErrorType,
         domain: str | None = None,
         pipe_code: str | None = None,
@@ -91,7 +80,7 @@ class PipeValidationError(ValueError):
         self.provided_concept_code = provided_concept_code
         self.file_path = file_path
         self.explanation = explanation
-        super().__init__()
+        super().__init__(message)
 
     def desc(self) -> str:
         msg = f"{self.error_type} • domain='{self.domain}'"
@@ -108,7 +97,3 @@ class PipeValidationError(ValueError):
         if self.explanation:
             msg += f" • explanation='{self.explanation}'"
         return msg
-
-    @override
-    def __str__(self) -> str:
-        return self.desc()

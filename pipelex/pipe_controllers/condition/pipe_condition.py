@@ -5,7 +5,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
@@ -15,6 +14,7 @@ from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.exceptions import PipeConditionRunError
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
@@ -139,16 +139,17 @@ class PipeCondition(PipeController):
                 NativeConceptCode.DYNAMIC.concept_string,
                 NativeConceptCode.ANYTHING.concept_string,
             ):
+                msg = (
+                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is not "
+                    f"matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"
+                )
                 raise PipeValidationError(
+                    message=msg,
                     error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                     domain=self.domain,
                     pipe_code=self.code,
                     provided_concept_code=pipe.output.concept_string,
                     required_concept_codes=[self.output.concept_string],
-                    explanation=(
-                        f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is not "
-                        f"matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"
-                    ),
                 )
 
     async def _evaluate_expression(

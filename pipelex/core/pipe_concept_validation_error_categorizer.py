@@ -4,10 +4,8 @@ from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundles.exceptions import (
-    PipesAndConceptValidationErrorData,
-    PipeValidationErrorType,
-)
+from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.pipes.validation import PipeValidationErrorType
 
 
 class ModelScope(str, Enum):

@@ -14,7 +14,6 @@ from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingC
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.config import get_config
-from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -23,6 +22,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -93,16 +93,16 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
         ):
-            explanation = (
+            msg = (
                 f"The output of a LLM pipe cannot be compatible with the Image concept. "
                 f"Output concept is '{self.output.concept_string}'. "
                 "Use a PipeImgGen if you want to generate images. You can use a PipeLLM to generate the prompt for a PipeImgGen."
             )
             raise PipeValidationError(
+                message=msg,
                 error_type=PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept_string,
-                explanation=explanation,
             )
 
     @override

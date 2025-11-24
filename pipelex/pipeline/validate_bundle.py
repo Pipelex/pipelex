@@ -1,8 +1,9 @@
 from pydantic import BaseModel, ValidationError
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipe_concept_validation_error_categorizer import categorize_pipe_concept_validation_error_from_validation_error

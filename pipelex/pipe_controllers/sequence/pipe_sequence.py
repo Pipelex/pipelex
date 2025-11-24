@@ -2,12 +2,13 @@ from typing import Literal
 
 from typing_extensions import override
 
-from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeInputNotFoundError, PipeValidationError
+from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
@@ -47,17 +48,18 @@ class PipeSequence(PipeController):
         last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
         concept_of_last_step = last_step_output_pipe.output
         if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+            msg = (
+                f"PipeSequence concept mismatch: the output concept '{concept_of_last_step.concept_string}' "
+                f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}' of sequence pipe '{self.code}' "
+                f"is not compatible with the output concept '{self.output.concept_string}' of the sequence."
+            )
             raise PipeValidationError(
+                message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain=self.domain,
                 pipe_code=self.code,
                 provided_concept_code=concept_of_last_step.concept_string,
                 required_concept_codes=[self.output.concept_string],
-                explanation=(
-                    f"PipeSequence concept mismatch: the output concept '{concept_of_last_step.concept_string}' "
-                    f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}' of sequence pipe '{self.code}' "
-                    f"is not compatible with the output concept '{self.output.concept_string}' of the sequence."
-                ),
             )
 
     @override
