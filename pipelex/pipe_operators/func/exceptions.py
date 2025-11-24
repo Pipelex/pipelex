@@ -1,2 +1,0 @@
-class PipeFuncValueError(ValueError):
-    pass

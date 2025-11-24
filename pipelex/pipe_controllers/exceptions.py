@@ -12,11 +12,3 @@ class PipeControllerOutputConceptMismatchError(PipeControllerError):
         self.wanted_concept = wanted_concept
         super().__init__(message)
 
-
-class SubPipeBlueprintValueError(ValueError):
-    pass
-
-
-class PipeValueError(PipelexError):
-    pipe: PipeAbstract
-    category: str
