@@ -76,8 +76,13 @@ def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str, dr
         if dry_run:
             typer.echo(f"[DRY] write {out_path}")
         else:
-            out_path.write_text(mdc, encoding="utf-8")
-            typer.echo(f"✅ Exported {out_path}")
+            # Only write and print if content changed
+            existing_content = out_path.read_text(encoding="utf-8") if out_path.exists() else None
+            if existing_content != mdc:
+                out_path.write_text(mdc, encoding="utf-8")
+                typer.echo(f"✅ Exported {out_path}")
+            else:
+                typer.echo(f"⚪ Unchanged {out_path}")
 
 
 def remove_cursor_rules(repo_root: Path, dry_run: bool = False) -> None:
