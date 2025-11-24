@@ -205,7 +205,8 @@ def update_single_file_agent_rules(
                 diff_output = unified_diff(before, after, str(target_path))
                 if diff_output:
                     typer.echo(diff_output)
-        else:
+        # Only write and print if content changed
+        elif before != after:
             if backup and target_path.exists():
                 backup_path = target_path.with_suffix(target_path.suffix + backup)
                 backup_path.write_text(before, encoding="utf-8")
@@ -219,6 +220,8 @@ def update_single_file_agent_rules(
                 diff_output = unified_diff(before, after, str(target_path))
                 if diff_output:
                     typer.echo(diff_output)
+        else:
+            typer.echo(f"⚪ Unchanged {target_path}")
 
 
 def remove_from_targets(
