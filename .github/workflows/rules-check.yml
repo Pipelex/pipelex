@@ -29,7 +29,8 @@ jobs:
 
       - name: Run pipelex kit rules command
         run: |
-          make rules
+          source .venv/bin/activate
+          pipelex kit rules
           # Check if any files were modified
           if ! git diff --exit-code > /dev/null 2>&1; then
             echo "::error::The 'pipelex kit rules' command modified files. Please run 'make rules' and commit the changes."
