@@ -32,11 +32,15 @@ jobs:
 
       - name: Check for uncommitted changes
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
+          # Check if any files were modified
+          if ! git diff --exit-code > /dev/null 2>&1; then
             echo "::error::The 'pipelex kit rules' command modified files. Please run 'make rules' and commit the changes."
             echo ""
             echo "Modified files:"
-            git status --porcelain
+            git diff --name-only
+            echo ""
+            echo "Diff summary:"
+            git diff --stat
             echo ""
             echo "To fix this, run the following commands:"
             echo "  make rules"
@@ -45,5 +49,21 @@ jobs:
             echo "  git push --force-with-lease    # if you amended"
             exit 1
           fi
+          
+          # Also check for untracked files
+          if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+            echo "::error::The 'pipelex kit rules' command created new files. Please commit them."
+            echo ""
+            echo "New files:"
+            git ls-files --others --exclude-standard
+            echo ""
+            echo "To fix this, run the following commands:"
+            echo "  make rules"
+            echo "  git add ."
+            echo "  git commit -m 'Update agent rules'"
+            echo "  git push"
+            exit 1
+          fi
+          
           echo "✅ Agent rules are up to date."
 
