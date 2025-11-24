@@ -28,10 +28,8 @@ jobs:
         run: PYTHON_VERSION=3.12 make install
 
       - name: Run pipelex kit rules command
-        run: make rules
-
-      - name: Check for uncommitted changes
         run: |
+          make rules
           # Check if any files were modified
           if ! git diff --exit-code > /dev/null 2>&1; then
             echo "::error::The 'pipelex kit rules' command modified files. Please run 'make rules' and commit the changes."
