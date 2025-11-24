@@ -107,3 +107,43 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
         multiplicity = int(bracket_content)
 
     return MultiplicityParseResult(concept=concept, multiplicity=multiplicity)
+
+
+def format_concept_with_multiplicity(concept_code_or_string: str, multiplicity: VariableMultiplicity | None) -> str:
+    """Format a concept code or string with multiplicity notation.
+
+    This is the reverse operation of parse_concept_with_multiplicity.
+
+    Args:
+        concept_code_or_string: The concept code or string (e.g., "ConceptName" or "domain.ConceptName")
+        multiplicity: The multiplicity value:
+            - None: single item (no brackets)
+            - True: variable-length list (empty brackets [])
+            - int: fixed-length list (brackets with number [N])
+
+    Returns:
+        Formatted concept specification string with multiplicity notation
+
+    Examples:
+        >>> format_concept_with_multiplicity("Text", None)
+        "Text"
+        >>> format_concept_with_multiplicity("Text", True)
+        "Text[]"
+        >>> format_concept_with_multiplicity("Text", 3)
+        "Text[3]"
+        >>> format_concept_with_multiplicity("domain.Text", None)
+        "domain.Text"
+        >>> format_concept_with_multiplicity("domain.Text", True)
+        "domain.Text[]"
+        >>> format_concept_with_multiplicity("domain.Text", 5)
+        "domain.Text[5]"
+    """
+    if multiplicity is None:
+        # Single item - no brackets
+        return concept_code_or_string
+    elif multiplicity is True:
+        # Variable-length list - empty brackets
+        return f"{concept_code_or_string}[]"
+    else:
+        # Fixed-length list - brackets with number
+        return f"{concept_code_or_string}[{multiplicity}]"

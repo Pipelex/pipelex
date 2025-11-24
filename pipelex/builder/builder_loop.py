@@ -13,6 +13,7 @@ from pipelex.config import get_config
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintFixableErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.validation import PipeValidationErrorType
+from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity
 from pipelex.hub import get_console, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.exceptions import PipelineExecutionError
@@ -127,24 +128,15 @@ class BuilderLoop:
                         for named_requirement in needed_inputs.named_input_requirements:
                             if named_requirement.variable_name == variable_name:
                                 old_value = new_inputs.get(variable_name, "NOT SET")
-                                concept_code = named_requirement.concept.code
-
-                                # Add multiplicity brackets if required
-                                if named_requirement.multiplicity is not None:
-                                    if named_requirement.multiplicity is True:
-                                        # Variable-length list []
-                                        concept_code = f"{concept_code}[]"
-                                    else:
-                                        # Fixed-length list [N] where N is an int
-                                        concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
-                                # If multiplicity is None, concept_code stays without brackets
-                                # This effectively removes multiplicity if it was present in old_value
-
-                                new_inputs[variable_name] = concept_code
+                                concept_code_with_multiplicity = format_concept_with_multiplicity(
+                                    concept_code_or_string=named_requirement.concept.code,
+                                    multiplicity=named_requirement.multiplicity,
+                                )
+                                new_inputs[variable_name] = concept_code_with_multiplicity
                                 # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
                                 log.info(
                                     f"🔧 Fixed input requirement mismatch for pipe '{val_error.pipe_code}': input '{variable_name}' \
-                                        changed from '{old_value}' → '{concept_code}'"
+                                        changed from '{old_value}' → '{concept_code_with_multiplicity}'"
                                 )
                                 break
 
@@ -161,16 +153,11 @@ class BuilderLoop:
                     old_inputs = dict(pipe_spec.inputs) if pipe_spec.inputs else {}
                     fixed_inputs: dict[str, str] = {}
                     for named_requirement in needed_inputs.named_input_requirements:
-                        concept_code = named_requirement.concept.code
-                        # Preserve multiplicity brackets
-                        if named_requirement.multiplicity is not None:
-                            if named_requirement.multiplicity is True:
-                                # Variable-length list []
-                                concept_code = f"{concept_code}[]"
-                            else:
-                                # Fixed-length list [N] where N is an int
-                                concept_code = f"{concept_code}[{named_requirement.multiplicity}]"
-                        fixed_inputs[named_requirement.variable_name] = concept_code
+                        concept_code_with_multiplicity = format_concept_with_multiplicity(
+                            concept_code_or_string=named_requirement.concept.code,
+                            multiplicity=named_requirement.multiplicity,
+                        )
+                        fixed_inputs[named_requirement.variable_name] = concept_code_with_multiplicity
 
                     # Only apply fix if it actually changes something (avoid infinite loops)
                     if fixed_inputs != old_inputs:
