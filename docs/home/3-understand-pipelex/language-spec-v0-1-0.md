@@ -8,9 +8,9 @@ The Pipelex Language (PLX) uses a TOML-based syntax to define deterministic, rep
 
 ## Core Idea
 
-Pipelex is a workflow declaration language that gets interpreted into a runtime. Each `.plx` file represents a **domain** (named in snake_case) and declares a complete workflow. The workflow is interpreted and executed by a runtime—currently, the only available runtime is Python (see [github.com/pipelex/pipelex](https://github.com/pipelex/pipelex)).
+Pipelex is a workflow declaration language that gets interpreted into a runtime—currently, the only available runtime is Python (see [github.com/pipelex/pipelex](https://github.com/pipelex/pipelex)).
 
-Pipelex lets you declare **what** your AI workflow should accomplish and **how** to execute it step by step. You define:
+Pipelex lets you declare **what** your AI workflow should accomplish and **how** to execute it step by step. Each `.plx` file represents a **domain** (named in snake_case) where you define:
 
 - **Concepts** (PascalCase): the structured or unstructured data flowing through your system
 - **Pipes** (snake_case): operations or orchestrators that define your workflow
