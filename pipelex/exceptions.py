@@ -1,5 +1,4 @@
 from pipelex.client.exceptions import ClientAuthenticationError
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValueError
 from pipelex.core.concepts.exceptions import (
     ConceptBlueprintValueError,
     ConceptCodeError,
@@ -72,8 +71,6 @@ from pipelex.system.exceptions import (
 __all__ = [
     # from pipelex.client.exceptions
     "ClientAuthenticationError",
-    # from pipelex.core.bundles.exceptions
-    "PipelexBundleBlueprintValueError",
     # from pipelex.core.domains.exceptions
     "DomainCodeError",
     # from pipelex.core.concepts.exceptions

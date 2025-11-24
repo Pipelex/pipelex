@@ -11,14 +11,14 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
-from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError
+from pipelex.core.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.pipe_concept_validation_error_categorizer import categorize_pipe_concept_validation_error
 from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
-from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
 from pipelex.hub import get_current_library
 from pipelex.libraries.exceptions import (
     LibraryError,
@@ -34,6 +34,7 @@ from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
 if TYPE_CHECKING:
+    from pipelex.core.bundles.exceptions import PipesConceptValidationErrorData
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.domains.domain import Domain
 
@@ -257,11 +258,11 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not find PLX bundle at '{plx_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
             except PipelexInterpreterError as interpreter_error:
-                # Forward categorized validation errors from interpreter
+                # Forward BLUEPRINT validation errors from interpreter
                 msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {interpreter_error.message}"
                 raise LibraryLoadingError(
                     message=msg,
-                    validation_errors=interpreter_error.validation_errors,
+                    blueprint_validation_errors=interpreter_error.validation_errors,
                 ) from interpreter_error
             except PipeDefinitionError as pipe_def_error:
                 msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {pipe_def_error}"
@@ -274,22 +275,19 @@ class LibraryManager(LibraryManagerAbstract):
         try:
             self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
         except ValidationError as validation_error:
-            # Categorize and forward Pydantic validation errors
-            validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
+            # Categorize and forward Pydantic PIPE/CONCEPT validation errors
+            # (These come from Pipe or Concept class validation, NOT blueprint validation)
+            pipe_concept_errors: list[PipesConceptValidationErrorData] = []
             for error in validation_error.errors():
-                val_error = categorize_and_create_error_data(
-                    error=error,
-                    blueprint_dict=None,
-                    domain=None,
-                    source=None,
-                )
-                validation_errors.append(val_error)
+                # Let the categorizer handle all extraction from the error
+                val_error = categorize_pipe_concept_validation_error(error=error)
+                pipe_concept_errors.append(val_error)
 
             validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
             msg = f"Could not load blueprints because of: {validation_error_msg}"
             raise LibraryLoadingError(
                 message=msg,
-                validation_errors=validation_errors,
+                pipe_concept_validation_errors=pipe_concept_errors,
             ) from validation_error
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:

@@ -4,14 +4,12 @@ from typing import Any, final
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex import log
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.core.bundles.exceptions import PipeValidationErrorType
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.exceptions import PipeAbstractValueError, PipeRunInputsError
+from pipelex.core.pipes.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -43,7 +41,7 @@ class PipeAbstract(ABC, BaseModel):
     def validate_pipe_code_syntax(cls, code: str) -> str:
         if not is_snake_case(code):
             msg = f"Invalid pipe code syntax '{code}'. Must be in snake_case."
-            raise PipeDefinitionError(msg)
+            raise ValueError(msg)
         return code
 
     @field_validator("type", mode="after")
@@ -88,12 +86,8 @@ class PipeAbstract(ABC, BaseModel):
 
     @final
     def validate_with_libraries(self):
-        try:
-            self.generic_validate_inputs_with_library()
-            self.generic_validate_output_with_library()
-        except ModelChoiceNotFoundError as exc:
-            msg = f"Model choice not found for pipe '{self.code}': {exc}"
-            raise PipeAbstractValueError(msg) from exc
+        self.generic_validate_inputs_with_library()
+        self.generic_validate_output_with_library()
 
     @final
     def generic_validate_inputs_static(self):

@@ -1,4 +1,5 @@
 from pipelex.base_exceptions import PipelexError
+from pipelex.core.bundles.exceptions import PipesConceptValidationErrorData
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 
 
@@ -9,20 +10,35 @@ class LibraryError(PipelexError):
 class LibraryLoadingError(LibraryError):
     """Error raised when loading library components fails.
 
-    This error aggregates all validation errors from:
-    - Factory errors (Domain, Concept, Pipe)
-    - Validation errors (Pydantic ValidationError from validators)
-    - Interpreter errors (blueprint parsing)
+    This error aggregates TWO types of validation errors:
+    1. Blueprint validation errors (from PipelexBundleBlueprint.model_validate())
+       - Stored in: blueprint_validation_errors
+       - Example: PIPE_SEQUENCE_OUTPUT_MISMATCH
 
-    All errors are categorized and stored in validation_errors.
+    2. Pipe/Concept validation errors (from Pipe or Concept class validation)
+       - Stored in: pipe_concept_validation_errors
+       - Example: MISSING_INPUT_VARIABLE, INPUT_REQUIREMENT_MISMATCH
+
+    Also handles:
+    - Factory errors (Domain, Concept, Pipe)
+    - Interpreter errors (blueprint parsing)
     """
 
     def __init__(
         self,
         message: str,
-        validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        pipe_concept_validation_errors: list[PipesConceptValidationErrorData] | None = None,
     ):
-        self.validation_errors = validation_errors or []
+        """Initialize LibraryLoadingError.
+
+        Args:
+            message: Error message
+            blueprint_validation_errors: Blueprint validation errors (from PipelexBundleBlueprint validation)
+            pipe_concept_validation_errors: Pipe/Concept validation errors (from Pipe/Concept validation)
+        """
+        self.blueprint_validation_errors = blueprint_validation_errors or []
+        self.pipe_concept_validation_errors = pipe_concept_validation_errors or []
         super().__init__(message)
 
 

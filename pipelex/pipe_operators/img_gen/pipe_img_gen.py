@@ -17,8 +17,6 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.exceptions import PipeValidationError
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import UnexpectedPipeDefinitionError
-from pipelex.core.pipes.exceptions import PipeInputError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -28,6 +26,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
+from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenRunError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -179,6 +178,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         )
         applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
 
+        # TODO: move this to the factory
         log.verbose("Getting image generation prompt from context")
         if self.img_gen_prompt:
             img_gen_prompt_text = self.img_gen_prompt
@@ -186,19 +186,23 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             try:
                 img_gen_prompt_text = working_memory.get_stuff_as_str(stuff_name)
             except WorkingMemoryStuffNotFoundError as stuff_not_found_error:
-                msg = f"Could not find a valid image generation prompt named '{stuff_name}' in the working_memory: {stuff_not_found_error}"
-                raise PipeInputError(
-                    message=msg,
-                    pipe_code=self.code,
-                    variable_name=stuff_name,
-                    concept_code=None,
-                ) from stuff_not_found_error
+                msg = (
+                    f"While runnning the PipeImgGen '{self.code}' an error occurred: "
+                    f"Could not find a valid image generation prompt named '{stuff_name}' in the working_memory: {stuff_not_found_error}"
+                )
+                raise PipeImgGenRunError(message=msg) from stuff_not_found_error
             except StuffContentTypeError as stuff_content_type_error:
-                msg = f"The image generation prompt named '{stuff_name}' is not of the right type: {stuff_content_type_error}"
-                raise PipeInputError(message=msg, pipe_code=self.code, variable_name=stuff_name, concept_code=None) from stuff_content_type_error
+                msg = (
+                    f"While runnning the PipeImgGen '{self.code}' an error occurred: "
+                    f"The image generation prompt named '{stuff_name}' is not of the right type: {stuff_content_type_error}"
+                )
+                raise PipeImgGenRunError(message=msg) from stuff_content_type_error
         else:
-            msg = "You must provide an image gen prompt either as attribute of the pipe or as a single text input"
-            raise UnexpectedPipeDefinitionError(msg)
+            msg = (
+                f"While runnning the PipeImgGen '{self.code}' an error occurred: "
+                "You must provide an image gen prompt either as attribute of the pipe or as a single text input"
+            )
+            raise PipeImgGenRunError(msg)
 
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_param_defaults = img_gen_config.img_gen_param_defaults

@@ -98,3 +98,11 @@ class PipeValidationErrorData(BaseModel):
     provided_concept_code: str | None = Field(None, description="The provided concept code")
     file_path: str | None = Field(None, description="The file path where the error occurred")
     explanation: str | None = Field(None, description="Additional explanation of the error")
+
+
+class PipeRunError(PipelexError):
+    pass
+
+
+class PipeDryRunError(PipeRunError):
+    pass

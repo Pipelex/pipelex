@@ -5,7 +5,7 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError, PLXDecodeError
-from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
+from pipelex.core.validation_error_categorizer import categorize_blueprint_validation_error
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
 
 
@@ -75,20 +75,8 @@ class PipelexInterpreter(BaseModel):
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
             for error in exc.errors():
-                loc = error.get("loc", ())
-
-                # Don't use domain/source from blueprint if they're the fields that failed
-                error_domain = loc[0] 
-                error_source = bundle_path if (loc and loc[0] == "source")
-
-                # Categorize error and create structured error data
-                val_error = categorize_and_create_error_data(
-                    error=error,
-                    blueprint_dict=blueprint_dict,
-                    domain=error_domain,
-                    source=error_source,
-                )
-                blueprint_validation_errors.append(val_error)
+                # Categorize BLUEPRINT validation errors (not pipe validation errors)
+                blueprint_validation_errors.append(categorize_blueprint_validation_error(blueprint_dict=blueprint_dict, error=error))
 
             raise PipelexInterpreterError(
                 message=str(exc),

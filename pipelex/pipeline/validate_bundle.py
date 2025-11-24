@@ -14,72 +14,29 @@ from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 
 
 def categorize_pipe_validation_error_data(error_dict: dict[str, Any], pipe_code: str | None = None) -> PipeValidationErrorData:
-    """Categorize a Pydantic ValidationError into structured PipeValidationErrorData.
+    """Convert a Pydantic ValidationError into structured PipeValidationErrorData.
 
-    Analyzes the error location, type, and message to determine the appropriate error category.
+    Note: This function does NOT categorize errors into specific types because the errors
+    that are auto-fixed in the builder loop (INPUT_REQUIREMENT_MISMATCH, MISSING_INPUT_VARIABLE,
+    EXTRANEOUS_INPUT_VARIABLE, INADEQUATE_OUTPUT_CONCEPT) come from PipeValidationError exceptions,
+    not from generic Pydantic ValidationErrors. This function is only used for unexpected
+    validation errors that don't have a specific category.
 
     Args:
         error_dict: The error dictionary from Pydantic ValidationError.errors()
         pipe_code: Optional pipe code to associate with the error
 
     Returns:
-        PipeValidationErrorData with appropriate error_type categorization
+        PipeValidationErrorData with UNKNOWN_VALIDATION_ERROR type
     """
-    error_type_str: str = str(error_dict.get("type", ""))
     error_msg: str = str(error_dict.get("msg", ""))
     error_loc: tuple[Any, ...] = error_dict.get("loc", ())
 
     # Convert location tuple to field path string
     field_path = ".".join(str(loc) for loc in error_loc) if error_loc else None
 
-    # Determine error type based on patterns in the message and error type
-    categorized_error_type: PipeValidationErrorType = PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
-
-    # Pattern matching on error messages to categorize
-    error_msg_lower: str = error_msg.lower()
-
-    # PipeParallel: requires either add_each_output or combined_output
-    if "requires either add_each_output or combined_output" in error_msg_lower:
-        categorized_error_type = PipeValidationErrorType.PIPE_PARALLEL_OUTPUT_CONFIG_ERROR
-
-    # PipeParallel: duplicate output names
-    elif "output name" in error_msg_lower and ("already used" in error_msg_lower or "duplicate" in error_msg_lower):
-        categorized_error_type = PipeValidationErrorType.DUPLICATE_OUTPUT_NAME
-
-    # PipeExtract: must provide either pdf or image
-    elif "must provide either" in error_msg_lower and ("pdf" in error_msg_lower or "image" in error_msg_lower):
-        categorized_error_type = PipeValidationErrorType.FIELD_REQUIRED
-
-    # Model not found in deck (Extract, ImgGen, LLM)
-    elif "was not found in the model deck" in error_msg_lower or "not found in deck" in error_msg_lower:
-        categorized_error_type = PipeValidationErrorType.MODEL_NOT_IN_DECK
-
-    # PipeFunc: function not found in registry
-    elif "not found in registry" in error_msg_lower:
-        categorized_error_type = PipeValidationErrorType.FUNCTION_NOT_FOUND
-
-    # PipeFunc: invalid return type
-    elif "has no return type annotation" in error_msg_lower or "is not a subclass of" in error_msg_lower:
-        categorized_error_type = PipeValidationErrorType.INVALID_RETURN_TYPE
-
-    # PipeLLM: output concept inconsistency with structuring
-    elif "cannot be structured" in error_msg_lower or ("output concept" in error_msg_lower and "text concept" in error_msg_lower):
-        categorized_error_type = PipeValidationErrorType.OUTPUT_CONCEPT_INCONSISTENCY
-
-    # PipeImgGen: mutually exclusive fields
-    elif "either" in error_msg_lower and "or" in error_msg_lower and "but not both" in error_msg_lower:
-        categorized_error_type = PipeValidationErrorType.MUTUALLY_EXCLUSIVE_FIELDS
-
-    # Pydantic standard error types
-    elif error_type_str in ("missing", "missing_required"):
-        categorized_error_type = PipeValidationErrorType.FIELD_MISSING
-
-    elif error_type_str == "value_error" and not categorized_error_type:
-        # Generic value error - keep as unknown unless we caught it above
-        categorized_error_type = PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
-
     return PipeValidationErrorData(
-        error_type=categorized_error_type,
+        error_type=PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR,
         domain=None,
         pipe_code=pipe_code,
         variable_names=[str(loc) for loc in error_loc] if error_loc else None,

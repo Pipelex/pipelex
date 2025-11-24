@@ -8,16 +8,15 @@ from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.pipe_operators.func.exceptions import PipeFuncDryRunError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.exceptions import DryRunMissingInputsError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 
@@ -137,23 +136,21 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
                 missing_input_names.append(named_input_requirement.variable_name)
         if missing_input_names:
-            msg = f"Dry run failed for PipeFunc (function '{self.function_name}'): missing required inputs: {missing_input_names}"
-            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
-            raise DryRunMissingInputsError(
-                message=msg,
-                pipe_type=self.__class__.__name__,
-                pipe_code=self.code,
-                missing_inputs=missing_input_names,
-            )
+            msg = f"Dry run failed for pipe '{self.code}' (PipeFunc): missing required inputs: {missing_input_names}"
+            log.error(msg)
+            raise PipeFuncDryRunError(msg)
 
         return_type = get_type_hints(function).get("return")
 
         if return_type is None:
-            msg = f"Function '{self.function_name}' has no return type annotation"
-            raise PipeDefinitionError(msg)
+            msg = f"Dry run failed for pipe '{self.code}' (PipeFunc): function '{self.function_name}' has no return type annotation"
+            raise PipeFuncDryRunError(msg)
         if not issubclass(return_type, StuffContent):
-            msg = f"Function '{self.function_name}' return type {return_type} is not a subclass of StuffContent"
-            raise PipeDefinitionError(msg)
+            msg = (
+                f"Dry run failed for pipe '{self.code}' (PipeFunc): "
+                f"function '{self.function_name}' return type {return_type} is not a subclass of StuffContent"
+            )
+            raise PipeFuncDryRunError(msg)
 
         # TODO: Support PipeFunc returning with multiplicity. Create an equivalent of TypedNamedInputRequirement for outputs.
         requirement = TypedNamedInputRequirement(
