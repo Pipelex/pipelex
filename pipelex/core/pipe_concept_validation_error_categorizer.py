@@ -5,6 +5,7 @@ from pydantic_core import ErrorDetails
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.validation import PipeValidationErrorType
 
 
@@ -206,4 +207,36 @@ def _handle_concept_errors(
         message=message,
         field_path=field_path,
         variable_names=variable_names,
+    )
+
+
+def categorize_pipe_validation_error(
+    pipe_error: PipeValidationError,
+) -> PipesAndConceptValidationErrorData:
+    """Categorize a PipeValidationError and create structured error data.
+
+    PipeValidationError is a custom exception raised by Pipe validation logic
+    that already contains structured information about the error.
+
+    Args:
+        pipe_error: PipeValidationError with structured error information
+
+    Returns:
+        PipesAndConceptValidationErrorData with all relevant fields populated
+    """
+    # Build a comprehensive message from the explanation and additional context
+    message = pipe_error.explanation or str(pipe_error)
+    if pipe_error.required_concept_codes and pipe_error.provided_concept_code:
+        message += f" (required: {pipe_error.required_concept_codes}, provided: {pipe_error.provided_concept_code})"
+
+    return PipesAndConceptValidationErrorData(
+        error_type=pipe_error.error_type,
+        domain=pipe_error.domain,
+        source=pipe_error.file_path or None,
+        pipe_code=pipe_error.pipe_code,
+        concept_code=None,  # This is a pipe error, not a concept error
+        field_name=None,  # Field name is not provided in PipeValidationError
+        message=message,
+        field_path=pipe_error.file_path or "",
+        variable_names=pipe_error.variable_names,
     )

@@ -149,17 +149,7 @@ def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | 
             # Display the error message
             console.print(f"   [cyan]→[/cyan] {error.message}")
 
-            # Display context-specific details grouped by category
-            # Concept-related
-            if error.concept_refines or error.provided_concept or error.required_concept:
-                if error.concept_refines:
-                    console.print(f"   [cyan]Refines:[/cyan] [green]{error.concept_refines}[/green]")
-                if error.provided_concept:
-                    console.print(f"   [cyan]Provided:[/cyan] [yellow]{error.provided_concept}[/yellow]")
-                if error.required_concept:
-                    console.print(f"   [cyan]Required:[/cyan] [green]{error.required_concept}[/green]")
-
-            # Pipe sequence-related
+            # Display context-specific details for pipe sequence errors
             if error.last_step_pipe_code or error.last_step_output_concept or error.expected_output_concept:
                 if error.last_step_pipe_code:
                     console.print(f"   [cyan]Last Step:[/cyan] [yellow]{error.last_step_pipe_code}[/yellow]")
@@ -167,17 +157,6 @@ def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | 
                     console.print(f"   [cyan]Last Step Output:[/cyan] [green]{error.last_step_output_concept}[/green]")
                 if error.expected_output_concept:
                     console.print(f"   [cyan]Expected Output:[/cyan] [green]{error.expected_output_concept}[/green]")
-
-            # Variable-related
-            if error.variable_name:
-                console.print(f"   [cyan]Variable:[/cyan] [yellow]{error.variable_name}[/yellow]")
-
-            # Type-related
-            if error.expected_type or error.actual_type:
-                if error.expected_type:
-                    console.print(f"   [cyan]Expected Type:[/cyan] [green]{error.expected_type}[/green]")
-                if error.actual_type:
-                    console.print(f"   [cyan]Actual Type:[/cyan] [yellow]{error.actual_type}[/yellow]")
 
             # Field path as secondary info
             if error.field_path:
@@ -194,29 +173,26 @@ def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | 
             # Display key identification info
             if pipe_error.pipe_code:
                 console.print(f"   [cyan]Pipe:[/cyan] [yellow]{pipe_error.pipe_code}[/yellow]")
+            if pipe_error.concept_code:
+                console.print(f"   [cyan]Concept:[/cyan] [yellow]{pipe_error.concept_code}[/yellow]")
             if pipe_error.domain:
                 console.print(f"   [cyan]Domain:[/cyan] [green]{pipe_error.domain}[/green]")
+
+            # Field name if present
+            if pipe_error.field_name:
+                console.print(f"   [cyan]Field:[/cyan] [yellow]{pipe_error.field_name}[/yellow]")
 
             # Variables
             if pipe_error.variable_names:
                 variables_str = ", ".join([f"[yellow]{v}[/yellow]" for v in pipe_error.variable_names])
                 console.print(f"   [cyan]Variables:[/cyan] {variables_str}")
 
-            # Concept information
-            if pipe_error.required_concept_codes or pipe_error.provided_concept_code:
-                if pipe_error.required_concept_codes:
-                    required_str = ", ".join([f"[green]{c}[/green]" for c in pipe_error.required_concept_codes])
-                    console.print(f"   [cyan]Required:[/cyan] {required_str}")
-                if pipe_error.provided_concept_code:
-                    console.print(f"   [cyan]Provided:[/cyan] [yellow]{pipe_error.provided_concept_code}[/yellow]")
+            # Error message
+            console.print(f"   [cyan]→[/cyan] {pipe_error.message}")
 
-            # Explanation with better formatting
-            if pipe_error.explanation:
-                console.print(f"   [cyan]→[/cyan] {pipe_error.explanation}")
-
-            # File path as secondary info
-            if pipe_error.file_path:
-                console.print(f"   [dim]└─ Path: {pipe_error.file_path}[/dim]")
+            # Field path as secondary info
+            if pipe_error.field_path:
+                console.print(f"   [dim]└─ Path: {pipe_error.field_path}[/dim]")
 
             console.print()
 

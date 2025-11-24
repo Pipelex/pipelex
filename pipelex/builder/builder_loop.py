@@ -10,8 +10,9 @@ from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintFixableErrorType, PipeValidationErrorType
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintFixableErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
+from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.hub import get_console, get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.exceptions import PipelineExecutionError
@@ -95,15 +96,8 @@ class BuilderLoop:
         pipelex_bundle_spec: PipelexBundleSpec,
         is_save_second_iteration_enabled: bool,
     ) -> PipelexBundleSpec:
-        """Fix validation errors in the bundle spec.
-
-        Currently supports fixing:
-        - MISSING_INPUT_VARIABLE / EXTRANEOUS_INPUT_VARIABLE / INPUT_REQUIREMENT_MISMATCH (for PipeController only)
-        - PIPE_SEQUENCE_OUTPUT_MISMATCH
-        """
         fixed_pipes: list[PipeSpecUnion] = []
 
-        # Process pipe validation error data (MISSING_INPUT_VARIABLE / EXTRANEOUS_INPUT_VARIABLE for PipeController)
         for val_error in bundle_error.pipe_validation_error_data:
             if not val_error.pipe_code or not pipelex_bundle_spec.pipe:
                 continue
@@ -147,6 +141,7 @@ class BuilderLoop:
                                 # This effectively removes multiplicity if it was present in old_value
 
                                 new_inputs[variable_name] = concept_code
+                                # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
                                 log.info(
                                     f"🔧 Fixed input requirement mismatch for pipe '{val_error.pipe_code}': input '{variable_name}' \
                                         changed from '{old_value}' → '{concept_code}'"
@@ -208,49 +203,53 @@ class BuilderLoop:
                     # Set the sequence output to match the last step's output
                     pipe_spec.output = new_output
                     fixed_pipes.append(pipe_spec)
+                    # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
                     log.info(
                         f"🔧 Fixed output concept for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
                             '{new_output}' (matching last step '{last_step_pipe_code}')"
                     )
 
-                case _:
-                    # Other error types not handled for pipe validation errors
+                case (
+                    PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                    | PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE
+                    | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+                ):
                     continue
 
-        # Process pipelex bundle blueprint validation errors (PIPE_SEQUENCE_OUTPUT_MISMATCH)
+        # Process pipelex bundle blueprint validation errors
         for blueprint_error in bundle_error.pipelex_bundle_blueprint_validation_errors:
-            if blueprint_error.error_type != PipelexBundleBlueprintFixableErrorType.PIPE_SEQUENCE_OUTPUT_MISMATCH:
-                continue
+            match blueprint_error.error_type:
+                case PipelexBundleBlueprintFixableErrorType.PIPE_SEQUENCE_OUTPUT_MISMATCH:
+                    if not blueprint_error.pipe_code or not pipelex_bundle_spec.pipe:
+                        continue
 
-            if not blueprint_error.pipe_code or not pipelex_bundle_spec.pipe:
-                continue
+                    pipe_spec = pipelex_bundle_spec.pipe.get(blueprint_error.pipe_code)
+                    if not pipe_spec or not isinstance(pipe_spec, PipeSequenceSpec):
+                        continue
 
-            pipe_spec = pipelex_bundle_spec.pipe.get(blueprint_error.pipe_code)
-            if not pipe_spec or not isinstance(pipe_spec, PipeSequenceSpec):
-                continue
+                    # Get the last step's output
+                    if not pipe_spec.steps:
+                        continue
 
-            # Get the last step's output
-            if not pipe_spec.steps:
-                continue
+                    last_step = pipe_spec.steps[-1]
+                    last_step_pipe_code = last_step.pipe_code
 
-            last_step = pipe_spec.steps[-1]
-            last_step_pipe_code = last_step.pipe_code
+                    # Get the last step's pipe spec to retrieve its output
+                    last_step_pipe_spec = pipelex_bundle_spec.pipe.get(last_step_pipe_code)
+                    if not last_step_pipe_spec:
+                        continue
 
-            # Get the last step's pipe spec to retrieve its output
-            last_step_pipe_spec = pipelex_bundle_spec.pipe.get(last_step_pipe_code)
-            if not last_step_pipe_spec:
-                continue
+                    old_output = pipe_spec.output
+                    new_output = last_step_pipe_spec.output
 
-            old_output = pipe_spec.output
-            new_output = last_step_pipe_spec.output
-
-            # Set the sequence output to match the last step's output
-            pipe_spec.output = new_output
-            fixed_pipes.append(pipe_spec)
-            log.info(
-                f"🔧 Fixed sequence output mismatch for pipe '{blueprint_error.pipe_code}': output changed from '{old_output}' → \
-                    '{new_output}' (from last step '{last_step_pipe_code}')"
-            )
+                    # Set the sequence output to match the last step's output
+                    pipe_spec.output = new_output
+                    fixed_pipes.append(pipe_spec)
+                    # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
+                    log.info(
+                        f"🔧 Fixed sequence output mismatch for pipe '{blueprint_error.pipe_code}': "
+                        f"output changed from '{old_output}' → '{new_output}' (from last step '{last_step_pipe_code}')"
+                    )
 
         # Reconstruct bundle if we made changes
         if fixed_pipes:

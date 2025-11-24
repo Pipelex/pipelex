@@ -6,7 +6,10 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.core.pipe_concept_validation_error_categorizer import categorize_pipe_concept_validation_error_from_validation_error
+from pipelex.core.pipe_concept_validation_error_categorizer import (
+    categorize_pipe_concept_validation_error_from_validation_error,
+    categorize_pipe_validation_error,
+)
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
@@ -18,24 +21,46 @@ class ValidateBundleError(PipelexError):
     """Raised when bundle validation fails.
 
     This error aggregates validation errors from different stages:
-    - Interpreter errors (blueprint validation)
-    - Library loading errors (factory and validation errors)
+    - Blueprint validation errors (from interpreter)
+    - Pipe validation errors (from PipeValidationError exceptions)
+    - Pipe/Concept instantiation errors (from Pydantic ValidationError during factory instantiation)
     - Dry run errors
 
-    All errors are categorized and stored in validation_errors.
+    All errors are categorized and stored in their respective lists.
     """
 
     def __init__(
         self,
         message: str,
         pipelex_bundle_blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
-        pipe_validation_error_data: list[PipesAndConceptValidationErrorData] | None = None,
+        pipe_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
+        pipe_concept_instantiation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         dry_run_error_message: str | None = None,
     ):
+        # Blueprint validation errors (e.g., PIPE_SEQUENCE_OUTPUT_MISMATCH)
         self.pipelex_bundle_blueprint_validation_errors = pipelex_bundle_blueprint_validation_errors or []
-        self.pipe_validation_error_data = pipe_validation_error_data or []
+
+        # Pipe validation errors from PipeValidationError exceptions
+        # (e.g., MISSING_INPUT_VARIABLE, EXTRANEOUS_INPUT_VARIABLE, INPUT_REQUIREMENT_MISMATCH, INADEQUATE_OUTPUT_CONCEPT)
+        self.pipe_validation_errors = pipe_validation_errors or []
+
+        # Pipe/Concept instantiation errors from Pydantic ValidationError
+        # These occur during factory instantiation of Pipe or Concept classes
+        # TODO: Currently not caught, but structure is prepared for future implementation
+        self.pipe_concept_instantiation_errors = pipe_concept_instantiation_errors or []
+
+        # Dry run errors
         self.dry_run_error_message = dry_run_error_message
+
         super().__init__(message)
+
+    @property
+    def pipe_validation_error_data(self) -> list[PipesAndConceptValidationErrorData]:
+        """Backwards compatibility: combine pipe validation and instantiation errors.
+
+        This property provides the old interface for accessing all pipe/concept validation errors.
+        """
+        return self.pipe_validation_errors + self.pipe_concept_instantiation_errors
 
 
 class ValidateBundleResult(BaseModel):
@@ -84,26 +109,12 @@ async def validate_bundle(
             pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
         ) from interpreter_error
     except PipeValidationError as pipe_error:
-        # Convert PipeValidationError to PipesAndConceptValidationErrorData
-        # Build a comprehensive message from the explanation and additional context
-        message = pipe_error.explanation or "Pipe validation error"
-        if pipe_error.required_concept_codes and pipe_error.provided_concept_code:
-            message += f" (required: {pipe_error.required_concept_codes}, provided: {pipe_error.provided_concept_code})"
+        # Categorize PipeValidationError using the dedicated categorizer
+        pipe_error_data = categorize_pipe_validation_error(pipe_error=pipe_error)
 
-        pipe_error_data = PipesAndConceptValidationErrorData(
-            error_type=pipe_error.error_type,
-            domain=pipe_error.domain,
-            source=None,  # Not available in PipeValidationError
-            pipe_code=pipe_error.pipe_code,
-            concept_code=None,  # This is a pipe error, not a concept error
-            field_name=None,  # Not available in PipeValidationError
-            message=message,
-            field_path=pipe_error.file_path or "",
-            variable_names=pipe_error.variable_names,
-        )
         raise ValidateBundleError(
             message=f"Pipe validation failed: {pipe_error}",
-            pipe_validation_error_data=[pipe_error_data],
+            pipe_validation_errors=[pipe_error_data],
         ) from pipe_error
     except ValidationError as validation_error:
         pipe_concept_errors = categorize_pipe_concept_validation_error_from_validation_error(validation_error=validation_error)
@@ -112,7 +123,7 @@ async def validate_bundle(
         msg = f"Could not load blueprints because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,
-            pipe_validation_error_data=pipe_concept_errors,
+            pipe_concept_instantiation_errors=pipe_concept_errors,
         ) from validation_error
     except DryRunError as dry_run_error:
         raise ValidateBundleError(
