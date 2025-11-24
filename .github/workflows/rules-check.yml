@@ -18,14 +18,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Check UV installation
-        run: make check-uv
-
-      - name: Verify UV installation
-        run: uv --version
-
-      - name: Install dependencies
-        run: PYTHON_VERSION=3.12 make install
+      - name: Install
+        run: make install
 
       - name: Run pipelex kit rules command
         run: |
@@ -33,19 +27,13 @@ jobs:
           pipelex kit rules
           # Check if any files were modified
           if ! git diff --exit-code > /dev/null 2>&1; then
-            echo "::error::The 'pipelex kit rules' command modified files. Please run 'make rules' and commit the changes."
+            echo "::error::The 'pipelex kit rules' command modified files. Please run 'pipelex kit rules' and commit the changes."
             echo ""
             echo "Modified files:"
             git diff --name-only
             echo ""
             echo "Diff summary:"
             git diff --stat
-            echo ""
-            echo "To fix this, run the following commands:"
-            echo "  make rules"
-            echo "  git add ."
-            echo "  git commit --amend --no-edit  # or create a new commit"
-            echo "  git push --force-with-lease    # if you amended"
             exit 1
           fi
           
@@ -55,12 +43,6 @@ jobs:
             echo ""
             echo "New files:"
             git ls-files --others --exclude-standard
-            echo ""
-            echo "To fix this, run the following commands:"
-            echo "  make rules"
-            echo "  git add ."
-            echo "  git commit -m 'Update agent rules'"
-            echo "  git push"
             exit 1
           fi
           
