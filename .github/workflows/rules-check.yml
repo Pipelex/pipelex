@@ -1,0 +1,49 @@
+name: Rules check
+
+on:
+  pull_request:
+
+jobs:
+  rules:
+    name: Check agent rules are up to date
+    runs-on: ubuntu-latest
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Check UV installation
+        run: make check-uv
+
+      - name: Verify UV installation
+        run: uv --version
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.12 make install
+
+      - name: Run pipelex kit rules command
+        run: make rules
+
+      - name: Check for uncommitted changes
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::The 'pipelex kit rules' command modified files. Please run 'make rules' and commit the changes."
+            echo ""
+            echo "Modified files:"
+            git status --porcelain
+            echo ""
+            echo "To fix this, run the following commands:"
+            echo "  make rules"
+            echo "  git add ."
+            echo "  git commit --amend --no-edit  # or create a new commit"
+            echo "  git push --force-with-lease    # if you amended"
+            exit 1
+          fi
+          echo "✅ Agent rules are up to date."
+
