@@ -98,10 +98,10 @@ Common keys for all pipes include:
 
 Each operator type supports additional fields:
 
-- **PipeLLM**: `model`, `prompt`, optional `format_mode`, `temperature`, `top_p`, `max_output_tokens`, and `working_memory` hints.
-- **PipeExtract**: `model`, optional `page_images`, `page_views`, `page_views_dpi`, and `page_image_captions` controls for OCR outputs.
-- **PipeImgGen**: `model`, `prompt`, `image_count`, and optional image sizing controls.
-- **PipeFunc**: `function_name` registered in the function registry and an `output` concept for the return value.
+- **PipeLLM**: Required `prompt` and optional `system_prompt`, `model`, `model_to_structure`, and `structuring_method` for controlling structured output generation.
+- **PipeExtract**: Optional `model`, plus boolean flags `page_images`, `page_views`, and `page_image_captions`, and integer `page_views_dpi` for controlling OCR detail level.
+- **PipeImgGen**: Required `img_gen_prompt` (or text input) and optional `model`, `aspect_ratio`, `seed` (integer or `"auto"`), `is_raw`, `background`, and `output_format`. Use bracket notation in `output` to generate multiple images (for example `"Image[3]"`).
+- **PipeFunc**: Required `function_name` that references a function decorated with `@pipe_func()` and registered in the function registry.
 
 Place long prompts inside triple-quoted strings to preserve formatting.
 
@@ -154,7 +154,7 @@ default = "extract_generic"
 
 ## Working memory
 
-Pipe outputs are automatically added to working memory under their `result` names (or the pipe code when `result` is omitted). Later pipes can refer to any available variable, including list items produced by `PipeBatch`. Keep result names consistent and descriptive to avoid collisions.
+Pipe outputs are automatically added to working memory under their `result` names (or as `main_stuff` if `result` is omitted). Later pipes can refer to any available variable, including list items produced by `PipeBatch`. Keep result names consistent and descriptive to avoid collisions.
 
 ## Validation rules
 
