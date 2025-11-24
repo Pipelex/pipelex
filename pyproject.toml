@@ -82,6 +82,7 @@ dev = [
     "types-markdown>=3.6.0.20240316",
     "types-networkx>=3.3.0.20241020",
     "types-PyYAML>=6.0.12.20250326",
+    "vulture>=2.14"
 ]
 
 [project.scripts]
