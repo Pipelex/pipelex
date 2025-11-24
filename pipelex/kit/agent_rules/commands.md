@@ -28,7 +28,7 @@
 
 ## Running Tests with Prints
 
-   If anything when wrong, you can run the tests with prints to see the error:
+   If anything went wrong, you can run the tests with prints to see the error:
 
    ```bash
    make test-with-prints
