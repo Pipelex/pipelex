@@ -1,4 +1,4 @@
-### This is our manifesto, this is why we built [Pipelex](https://pipelex.com).
+### This is our viewpoint, this is why we built [Pipelex](https://pipelex.com).
 
 Web version: https://knowhowgraph.com/
 
