@@ -31,7 +31,3 @@ class PipeDefinitionError(PipelexError):
         if self.source:
             details += f" • source='{self.source}'"
         return details
-
-
-class UnexpectedPipeDefinitionError(PipeDefinitionError):
-    pass
