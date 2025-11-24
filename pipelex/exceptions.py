@@ -1,13 +1,11 @@
 from pipelex.client.exceptions import ClientAuthenticationError
 from pipelex.core.concepts.exceptions import (
-    ConceptBlueprintValueError,
     ConceptCodeError,
     ConceptError,
     ConceptFactoryError,
     ConceptLibraryConceptNotFoundError,
     ConceptRefineError,
     ConceptStringError,
-    ConceptStructureBlueprintValueError,
     ConceptStructureGeneratorError,
     ConceptStructureValidationError,
     StructureClassError,
@@ -75,8 +73,6 @@ __all__ = [
     "DomainCodeError",
     # from pipelex.core.concepts.exceptions
     "ConceptError",
-    "ConceptBlueprintValueError",
-    "ConceptStructureBlueprintValueError",
     "ConceptStructureValidationError",
     "ConceptFactoryError",
     "StructureClassError",

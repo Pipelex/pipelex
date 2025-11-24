@@ -6,6 +6,7 @@ from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.types import StrEnum
 
@@ -34,22 +35,29 @@ class PipeLLMBlueprint(PipeBlueprint):
 
         if self.prompt:
             preprocessed_template = preprocess_template(self.prompt)
-            required_variables.update(
-                detect_jinja2_required_variables(
-                    template_category=TemplateCategory.LLM_PROMPT,
-                    template_source=preprocessed_template,
+            try:
+                required_variables.update(
+                    detect_jinja2_required_variables(
+                        template_category=TemplateCategory.LLM_PROMPT,
+                        template_source=preprocessed_template,
+                    )
                 )
-            )
+            except Jinja2DetectVariablesError as exc:
+                msg = f"Could not detect required variables in prompt for PipeLLM: {exc}"
+                raise ValueError(msg) from exc
 
         if self.system_prompt:
             preprocessed_system_template = preprocess_template(self.system_prompt)
-            required_variables.update(
-                detect_jinja2_required_variables(
-                    template_category=TemplateCategory.LLM_PROMPT,
-                    template_source=preprocessed_system_template,
+            try:
+                required_variables.update(
+                    detect_jinja2_required_variables(
+                        template_category=TemplateCategory.LLM_PROMPT,
+                        template_source=preprocessed_system_template,
+                    )
                 )
-            )
-
+            except Jinja2DetectVariablesError as exc:
+                msg = f"Could not detect required variables in system prompt for PipeLLM: {exc}"
+                raise ValueError(msg) from exc
         # Filter out internal variables that start with underscore and special variables
         # TODO: replace magic strings by StrEnum and also, make this check clearer and more readable
         required_variables = {var for var in required_variables if not var.startswith("_") and var not in ("preliminary_text", "place_holder")}

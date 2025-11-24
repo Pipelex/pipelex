@@ -11,7 +11,6 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import ConceptBlueprintValueError, ConceptStructureBlueprintValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -95,7 +94,7 @@ class ConceptStructureSpec(StructuredContent):
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
-        raise ConceptStructureBlueprintValueError(msg)
+        raise ValueError(msg)
 
     def to_blueprint(self) -> ConceptStructureBlueprint:
         # Convert the type enum value - self.type is already a ConceptStructureBlueprintFieldType enum
@@ -183,7 +182,7 @@ class ConceptSpec(StructuredContent):
         if refines is not None:
             if not NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refines):
                 msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
-                raise ConceptBlueprintValueError(msg)
+                raise ValueError(msg)
         return refines
 
     @model_validator(mode="before")
