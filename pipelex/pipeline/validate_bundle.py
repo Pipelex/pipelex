@@ -111,7 +111,6 @@ async def validate_bundle(
     except PipeValidationError as pipe_error:
         # Categorize PipeValidationError using the dedicated categorizer
         pipe_error_data = categorize_pipe_validation_error(pipe_error=pipe_error)
-
         raise ValidateBundleError(
             message=f"Pipe validation failed: {pipe_error}",
             pipe_validation_errors=[pipe_error_data],

@@ -2,7 +2,6 @@ from typing import Any
 
 from pydantic_core import ErrorDetails
 
-from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundles.exceptions import (
     PipelexBundleBlueprintFixableErrorType,
     PipelexBundleBlueprintValidationErrorData,
@@ -14,17 +13,14 @@ def categorize_blueprint_validation_error(
     blueprint_dict: dict[str, Any],
     error: ErrorDetails,
 ) -> PipelexBundleBlueprintValidationErrorData | None:
-    """Categorize a BLUEPRINT validation error and create structured error data or return None if the error is not expected.
+    """Categorize a BLUEPRINT validation error and create structured error data or return None if the error cannot be categorized.
 
     Args:
         blueprint_dict: The blueprint dict being validated (for context extraction)
         error: Pydantic error from PipelexBundleBlueprint.model_validate()
 
     Returns:
-        PipelexBundleBlueprintValidationErrorData with all relevant fields populated
-
-    Raises:
-        PipelexUnexpectedError: If the error is not expected
+        PipelexBundleBlueprintValidationErrorData with all relevant fields populated, or None if error cannot be categorized
     """
     domain = blueprint_dict.get("domain") if blueprint_dict else None
     source = blueprint_dict.get("source") if blueprint_dict else None
@@ -47,7 +43,7 @@ def _handle_pipe_errors(
     domain: str | None,
     source: str | None,
     error_scope: ValidationErrorScope,
-) -> PipelexBundleBlueprintValidationErrorData:
+) -> PipelexBundleBlueprintValidationErrorData | None:
     """Handle all PIPE scope validation errors.
 
     Extracts pipe_code and all other necessary context from error,
@@ -63,22 +59,18 @@ def _handle_pipe_errors(
         error_scope: The error scope (PIPE)
 
     Returns:
-        PipelexBundleBlueprintValidationErrorData with all context populated
-
-    Raises:
-        PipelexUnexpectedError: If the error is not a PIPE_SEQUENCE_OUTPUT_MISMATCH
+        PipelexBundleBlueprintValidationErrorData with all context populated, or None if error cannot be categorized
     """
     # Extract data from error
     loc = error.get("loc", ())
     message = error.get("msg", "Unknown validation error")
     pydantic_type = error.get("type", "")
-    field_path = " → ".join(str(item) for item in loc)
 
     # Extract pipe_code from loc[1]
     pipe_code = str(loc[1]) if len(loc) >= 2 else None
     if not pipe_code:
-        msg = f"PIPE error without pipe_code: path='{field_path}', message='{message}'"
-        raise PipelexUnexpectedError(msg)
+        # Cannot categorize without pipe_code
+        return None
 
     # Extract field_name from loc[2] if present
     field_name = str(loc[2]) if len(loc) >= 3 else None
@@ -90,18 +82,14 @@ def _handle_pipe_errors(
                 pipe_code=pipe_code,
                 field_name=field_name,
                 message=message,
-                field_path=field_path,
+                field_path=" → ".join(str(item) for item in loc),
                 domain=domain,
                 source=source,
                 error_scope=error_scope.value,
             )
 
-    # Any other pipe error is unexpected
-    msg = (
-        f"Unexpected PIPE validation error that cannot be auto-fixed: "
-        f"type='{pydantic_type}', pipe_code='{pipe_code}', path='{field_path}', message='{message}'"
-    )
-    raise PipelexUnexpectedError(msg)
+    # Cannot categorize this error - return None to let it propagate as regular validation error
+    return None
 
 
 def _handle_pipe_sequence_output_mismatch(

@@ -1,10 +1,7 @@
-from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.types import StrEnum
 
 
 class ValidationErrorScope(StrEnum):
-    """Scope of validation errors based on loc[0]."""
-
     PIPE = "pipe"
     CONCEPT = "concept"
     DOMAIN = "domain"
@@ -13,7 +10,11 @@ class ValidationErrorScope(StrEnum):
 
     @classmethod
     def is_pipe_scope(cls, scope: str) -> bool:
-        match cls(scope):
+        try:
+            scope_enum = cls(scope)
+        except ValueError:
+            return False
+        match scope_enum:
             case ValidationErrorScope.PIPE:
                 return True
             case ValidationErrorScope.CONCEPT:
@@ -27,7 +28,11 @@ class ValidationErrorScope(StrEnum):
 
     @classmethod
     def is_concept_scope(cls, scope: str) -> bool:
-        match cls(scope):
+        try:
+            scope_enum = cls(scope)
+        except ValueError:
+            return False
+        match scope_enum:
             case ValidationErrorScope.PIPE:
                 return False
             case ValidationErrorScope.CONCEPT:
@@ -41,7 +46,11 @@ class ValidationErrorScope(StrEnum):
 
     @classmethod
     def is_domain_scope(cls, scope: str) -> bool:
-        match cls(scope):
+        try:
+            scope_enum = cls(scope)
+        except ValueError:
+            return False
+        match scope_enum:
             case ValidationErrorScope.PIPE:
                 return False
             case ValidationErrorScope.CONCEPT:
@@ -55,7 +64,11 @@ class ValidationErrorScope(StrEnum):
 
     @classmethod
     def is_main_pipe_scope(cls, scope: str) -> bool:
-        match cls(scope):
+        try:
+            scope_enum = cls(scope)
+        except ValueError:
+            return False
+        match scope_enum:
             case ValidationErrorScope.PIPE:
                 return False
             case ValidationErrorScope.CONCEPT:
@@ -69,7 +82,11 @@ class ValidationErrorScope(StrEnum):
 
     @classmethod
     def is_bundle_scope(cls, scope: str) -> bool:
-        match cls(scope):
+        try:
+            scope_enum = cls(scope)
+        except ValueError:
+            return False
+        match scope_enum:
             case ValidationErrorScope.PIPE:
                 return False
             case ValidationErrorScope.CONCEPT:
@@ -83,6 +100,14 @@ class ValidationErrorScope(StrEnum):
 
 
 def get_error_scope(loc: tuple[int | str, ...]) -> ValidationErrorScope:
+    """Get the scope of a validation error from its location tuple.
+
+    Args:
+        loc: Location tuple from Pydantic validation error
+
+    Returns:
+        ValidationErrorScope - defaults to BUNDLE if scope cannot be determined
+    """
     if not loc:
         return ValidationErrorScope.BUNDLE
 
@@ -99,5 +124,4 @@ def get_error_scope(loc: tuple[int | str, ...]) -> ValidationErrorScope:
     elif ValidationErrorScope.is_bundle_scope(scope=first):
         return ValidationErrorScope.BUNDLE
     else:
-        msg = f"Unexpected validation error scope: {first}"
-        raise PipelexUnexpectedError(msg)
+        return ValidationErrorScope.BUNDLE
