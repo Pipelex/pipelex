@@ -8,12 +8,13 @@ The Pipelex Language (PLX) uses a TOML-based syntax to define deterministic, rep
 
 ## Core Idea
 
-Pipelex is a workflow declaration language that gets interpreted into a runtime—currently, the only available runtime is Python (see [github.com/pipelex/pipelex](https://github.com/pipelex/pipelex)).
+Pipelex is a workflow declaration language that gets interpreted at runtime, we already have a Python runtime (see [github.com/pipelex/pipelex](https://github.com/pipelex/pipelex)).
 
-Pipelex lets you declare **what** your AI workflow should accomplish and **how** to execute it step by step. Each `.plx` file represents a **domain** (named in snake_case) where you define:
+Pipelex lets you declare **what** your AI workflow should accomplish and **how** to execute it step by step. Each `.plx` file represents a bundle where you define:
 
 - **Concepts** (PascalCase): the structured or unstructured data flowing through your system
 - **Pipes** (snake_case): operations or orchestrators that define your workflow
+- **Domain** (named in snake_case): the topic or field of work this bundle is about
 
 Write once in `.plx` files. Run anywhere. Get the same results every time.
 
@@ -26,7 +27,7 @@ Pipelex workflows are **declarative and deterministic**:
 - Pipes are evaluated based on their dependencies, not declaration order
 - Controllers explicitly define execution flow (sequential, parallel, or conditional)
 
-All concepts are strongly typed. All pipes declare their inputs and outputs. The runtime validates that data flowing between pipes matches the declared types before execution.
+All concepts are strongly typed. All pipes declare their inputs and outputs. The runtime validates that data flowing between pipes matches the declared types before execution. Concepts are also conceptually defined, adding meaning on top of the technical typing.
 
 ---
 
@@ -36,11 +37,10 @@ All concepts are strongly typed. All pipes declare their inputs and outputs. The
 
 - Deterministic workflow execution and outputs
 - Strong typing with validation before runtime
-- Self-contained bundles (one domain per file)
 
 **Not supported in v0.1.0:**
 
-- Pipes per domain
+- Pipe namespaces per domain
 
 **More:**
 
@@ -176,10 +176,9 @@ Evaluate how well this candidate matches the job requirements.
 
 **What happens:**
 
-1. **Extract** – The `PipeLLM` reads the PDF and produces structured `Invoice` data
-2. **Validate** – Another `PipeLLM` checks if line items match the total and produces a `ValidationReport`
-3. **Visualize** – `PipeImgGen` creates a summary image using both results
-4. **Orchestrate** – `PipeSequence` runs all three steps in order, passing data through working memory
-
-Every run with the same PDF produces the same extracted data, validation, and summary image.
+- Extracts and structures job requirements from a job offer PDF using document extraction + LLM
+- Processes all candidate CVs in parallel (batch processing)
+- Each CV is extracted and analyzed against the structured job requirements using an LLM
+- Produces a scored match analysis for each candidate with strengths, weaknesses, and hiring recommendations
+- Demonstrates sequential orchestration, parallel processing, nested workflows, and strong typing
 
