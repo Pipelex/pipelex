@@ -93,8 +93,9 @@ nav:
       - The Pipe Builder: home/2-get-started/pipe-builder.md
       - Write Workflows Manually: home/2-get-started/write-workflows-manually.md
     - Understand Pipelex:
-      - The Knowledge Pipeline Manifesto: home/3-understand-pipelex/manifesto.md
+      - The Know-How Graph: home/3-understand-pipelex/viewpoint.md
       - The Pipelex Paradigm: home/3-understand-pipelex/pipelex-paradigm/index.md
+      - Pipelex Language Spec v0.1.0: home/3-understand-pipelex/language-spec-v0-1-0.md
     - Cookbook Examples:
       - Overview: home/4-cookbook-examples/index.md
       - Hello World: home/4-cookbook-examples/hello-world.md
