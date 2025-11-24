@@ -74,16 +74,12 @@ class PipelexInterpreter(BaseModel):
             # Parse Pydantic validation errors into structured error data
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
-            # Handle domain and source fields carefully for context
-            domain_value: str | None = blueprint_dict.get("domain") if blueprint_dict else None
-            source_value: str | None = blueprint_dict.get("source") if blueprint_dict else bundle_path
-
             for error in exc.errors():
                 loc = error.get("loc", ())
 
                 # Don't use domain/source from blueprint if they're the fields that failed
-                error_domain = None if (loc and loc[0] == "domain") else domain_value
-                error_source = bundle_path if (loc and loc[0] == "source") else source_value
+                error_domain = loc[0] 
+                error_source = bundle_path if (loc and loc[0] == "source")
 
                 # Categorize error and create structured error data
                 val_error = categorize_and_create_error_data(

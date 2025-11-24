@@ -62,10 +62,6 @@ class PipelexBundleBlueprintFixableErrorType(StrEnum):
     DISCRIMINATOR_MISSING = "discriminator_missing"  # Union discriminator field missing
     ENUM_INVALID_VALUE = "enum_invalid_value"  # Invalid enum value
 
-    # Fallback
-    UNKNOWN = "unknown"  # Could not categorize error
-
-
 class PipelexBundleBlueprintValueError(ValueError):
     pass
 
