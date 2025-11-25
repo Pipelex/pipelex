@@ -1,6 +1,4 @@
 import asyncio
-from pathlib import Path
-from typing import TYPE_CHECKING
 
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory

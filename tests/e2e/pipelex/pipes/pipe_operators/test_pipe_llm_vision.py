@@ -1,7 +1,5 @@
 """E2E test for PipeLLM with vision capabilities."""
 
-from pathlib import Path
-
 import pytest
 
 from pipelex import pretty_print, pretty_print_md
