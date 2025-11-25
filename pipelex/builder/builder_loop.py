@@ -14,7 +14,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path

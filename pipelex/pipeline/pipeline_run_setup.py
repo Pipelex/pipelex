@@ -45,40 +45,52 @@ async def pipeline_run_setup(
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
-    This function handles all the common setup logic for both execute_pipeline
-    and start_pipeline, including library setup, pipe loading, working memory
+    This function handles all the common setup logic for both ``execute_pipeline``
+    and ``start_pipeline``, including library setup, pipe loading, working memory
     initialization, and pipe job creation.
 
     Parameters
     ----------
     library_id:
-        The library ID to use for the pipeline execution. If not provided, the library_id will be set to the pipeline run ID.
+        Unique identifier for the library instance. If not provided, defaults to the
+        auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
+        multiple library instances or maintain library state across executions.
     library_dirs:
-        List of library directories to load. If not provided, the current working directory will be used.
+        List of directory paths to load pipe definitions from. If not provided, loads
+        from the current working directory (the directory from which the Python script
+        is executed). Ignored when ``plx_content`` is provided.
     pipe_code:
-        The code identifying the pipeline to execute.
+        Code identifying the pipe to execute. Required when ``plx_content`` is not
+        provided. When both ``plx_content`` and ``pipe_code`` are provided, the
+        specified pipe from the PLX content will be executed (overriding any
+        ``main_pipe`` defined in the content).
     plx_content:
-        Content of the pipeline bundle to execute.
+        Complete PLX file content as a string. When provided, only this content is
+        loaded into the library, creating an isolated execution environment. The pipe
+        to execute is determined by ``pipe_code`` (if provided) or the ``main_pipe``
+        property in the PLX content.
     inputs:
-        Inputs passed to the pipeline.
+        Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
+        or a ``WorkingMemory`` instance.
     output_name:
         Name of the output slot to write to.
     output_multiplicity:
-        Output multiplicity.
+        Output multiplicity specification.
     dynamic_output_concept_code:
         Override the dynamic output concept code.
     pipe_run_mode:
-        Pipe run mode: if specified, it must be ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``.
-        If not specified, the pipe run mode is inferred from the environment variable
-        ``PIPELEX_FORCE_DRY_RUN_MODE``. If the environment variable is not set,
-        the pipe run mode is ``PipeRunMode.LIVE``.
+        Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
+        inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
+        to ``PipeRunMode.LIVE`` if the environment variable is not set.
     search_domains:
-        List of domains to search for pipes.
+        List of domains to search for pipes. The executed pipe's domain is automatically
+        added if not already present.
 
     Returns:
     -------
-    tuple[PipeJob, str]
-        A tuple containing the pipe job ready for execution and the pipeline run ID.
+    tuple[PipeJob, str, str]
+        A tuple containing the pipe job ready for execution, the pipeline run ID,
+        and the library ID.
 
     """
     if not plx_content and not pipe_code:

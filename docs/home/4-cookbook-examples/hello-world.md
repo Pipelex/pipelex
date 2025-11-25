@@ -19,7 +19,7 @@ import asyncio
 
 from pipelex import pretty_print
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 
 
 async def hello_world():

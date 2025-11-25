@@ -41,7 +41,7 @@ Create a Python file to execute the pipeline:
 
 `character.py`
 ```python
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipelex import Pipelex
 
 # Initialize pipelex to load your pipeline libraries
@@ -229,7 +229,7 @@ Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliabl
 
 `run_pipe.py`
 ```python
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipelex import Pipelex
 
 from character_model import CharacterMetadata
@@ -284,7 +284,7 @@ class CharacterMetadata(StructuredContent):
 
 `run_pipe.py`
 ```python
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipelex import Pipelex
 
 from character_model import CharacterMetadata

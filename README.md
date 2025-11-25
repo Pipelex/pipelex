@@ -257,7 +257,7 @@ Create an `inputs.json` file with your PDF URLs:
 ```python
 import asyncio
 import json
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipelex import Pipelex
 
 async def run_pipeline():

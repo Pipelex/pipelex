@@ -7,7 +7,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 
 
 @pytest.mark.dry_runnable

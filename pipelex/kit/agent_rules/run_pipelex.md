@@ -7,7 +7,7 @@ import asyncio
 
 from pipelex import pretty_print
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 
 
 async def hello_world() -> str:
@@ -36,7 +36,7 @@ import asyncio
 
 from pipelex import pretty_print
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline import execute_pipeline
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.core.stuffs.image_content import ImageContent
 
 from my_project.gantt.gantt_struct import GanttChart

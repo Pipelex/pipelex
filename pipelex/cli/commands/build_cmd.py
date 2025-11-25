@@ -26,8 +26,8 @@ from pipelex.hub import get_console, get_report_delegate, get_required_pipe, get
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
-from pipelex.pipeline import execute_pipeline
 from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
