@@ -37,6 +37,7 @@ from pipelex.libraries.exceptions import (
     LibraryLoadingError,
     PipeLoadingError,
 )
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.exceptions import PipeControllerError, PipeControllerOutputConceptMismatchError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.exceptions import BatchParamsError, PipeRouterError, PipeRunError, PipeRunParamsError
@@ -55,7 +56,6 @@ from pipelex.system.exceptions import (
     ToolError,
     TracebackMessageError,
 )
-from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 
 __all__ = [
     # from pipelex.client.exceptions
