@@ -42,7 +42,7 @@ async def pipeline_run_setup(
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domains: list[str] | None = None,
-) -> tuple[PipeJob, str]:
+) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
     This function handles all the common setup logic for both execute_pipeline
@@ -167,4 +167,4 @@ async def pipeline_run_setup(
     }
     get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
 
-    return pipe_job, pipeline_run_id
+    return pipe_job, pipeline_run_id, library_id

@@ -61,7 +61,7 @@ async def start_pipeline(
         can be awaited to get the pipe output.
 
     """
-    pipe_job, pipeline_run_id = await pipeline_run_setup(
+    pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
         library_id=library_id,
         library_dirs=library_dirs,
         pipe_code=pipe_code,
@@ -74,7 +74,6 @@ async def start_pipeline(
         search_domains=search_domains,
     )
 
-    # Launch execution without awaiting the result.
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))
 
     return pipeline_run_id, task

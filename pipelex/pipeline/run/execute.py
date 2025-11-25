@@ -65,7 +65,7 @@ async def execute_pipeline(
         The pipe output from the execution.
 
     """
-    pipe_job, pipeline_run_id = await pipeline_run_setup(
+    pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
         library_id=library_id,
         library_dirs=library_dirs,
         pipe_code=pipe_code,
@@ -77,9 +77,6 @@ async def execute_pipeline(
         pipe_run_mode=pipe_run_mode,
         search_domains=search_domains,
     )
-
-    if not library_id:
-        library_id = pipeline_run_id
 
     try:
         pipe_output = await get_pipe_router().run(pipe_job)
@@ -96,7 +93,7 @@ async def execute_pipeline(
         library.teardown()
         teardown_current_library()
     properties = {
-        EventProperty.PIPELINE_RUN_ID: pipe_job.job_metadata.pipeline_run_id,
+        EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
         EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
         EventProperty.PIPELINE_EXECUTE_OUTCOME: Outcome.SUCCESS,
     }
