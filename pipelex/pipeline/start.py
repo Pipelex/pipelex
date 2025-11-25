@@ -4,38 +4,16 @@ from typing import TYPE_CHECKING
 
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import (
-    get_library_manager,
-    get_pipe_router,
-    get_pipeline_manager,
-    get_report_delegate,
-    get_required_pipe,
-    get_telemetry_manager,
-    set_current_library,
-)
-from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.hub import get_pipe_router
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_run.pipe_run_params import (
-    FORCE_DRY_RUN_MODE_ENV_KEY,
-    VariableMultiplicity,
-)
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.exceptions import PipeExecutionError
-from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.system.environment import get_optional_env
-from pipelex.system.telemetry.events import EventName, EventProperty
-
-if TYPE_CHECKING:
-    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-    from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
+from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 
 
 async def start_pipeline(
     library_id: str | None = None,
-    library_path: str | None = None,
+    library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
@@ -47,131 +25,68 @@ async def start_pipeline(
 ) -> tuple[str, asyncio.Task[PipeOutput]]:
     """Start a pipeline in the background.
 
-    This function mirrors *execute_pipeline* but returns immediately with the
+    This function mirrors ``execute_pipeline`` but returns immediately with the
     ``pipeline_run_id`` and a task instead of waiting for the pipe run to complete.
-    The actual execution is scheduled on the current event-loop using
-    :pyfunc:`asyncio.create_task`.
+    The actual execution is scheduled on the current event loop using
+    ``asyncio.create_task``.
 
     Parameters
     ----------
     library_id:
-        The library ID to use for the pipeline execution. If not provided, the library_id will be set to the pipeline run ID.
-    library_path:
-        Path to the library directory to load.
+        Unique identifier for the library instance. If not provided, defaults to the
+        auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
+        multiple library instances or maintain library state across executions.
+    library_dirs:
+        List of directory paths to load pipe definitions from. If not provided, loads
+        from the current working directory (the directory from which the Python script
+        is executed). Ignored when ``plx_content`` is provided.
     pipe_code:
-        The code identifying the pipeline to execute.
+        Code identifying the pipe to execute. Required when ``plx_content`` is not
+        provided. When both ``plx_content`` and ``pipe_code`` are provided, the
+        specified pipe from the PLX content will be executed (overriding any
+        ``main_pipe`` defined in the content).
     plx_content:
-        Content of the pipeline bundle to execute.
+        Complete PLX file content as a string. When provided, only this content is
+        loaded into the library, creating an isolated execution environment. The pipe
+        to execute is determined by ``pipe_code`` (if provided) or the ``main_pipe``
+        property in the PLX content.
     inputs:
-        Inputs passed to the pipeline.
+        Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
+        or a ``WorkingMemory`` instance.
     output_name:
         Name of the output slot to write to.
     output_multiplicity:
-        Output multiplicity.
+        Output multiplicity specification.
     dynamic_output_concept_code:
         Override the dynamic output concept code.
     pipe_run_mode:
-        Pipe run mode: if specified, it must be ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``.
-        If not specified, the pipe run mode is inferred from the environment variable
-        ``PIPELEX_FORCE_DRY_RUN_MODE``. If the environment variable is not set,
-        the pipe run mode is ``PipeRunMode.LIVE``.
+        Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
+        inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
+        to ``PipeRunMode.LIVE`` if the environment variable is not set.
     search_domains:
-        List of domains to search for pipes.
+        List of domains to search for pipes. The executed pipe's domain is automatically
+        added if not already present.
 
     Returns:
     -------
-    Tuple[str, asyncio.Task[PipeOutput]]
+    tuple[str, asyncio.Task[PipeOutput]]
         The ``pipeline_run_id`` of the newly started pipeline and a task that
         can be awaited to get the pipe output.
 
     """
-    if not plx_content and not pipe_code:
-        msg = "Either pipe_code or plx_content must be provided to the API start_pipeline."
-        raise ValueError(msg)
-
-    pipeline = get_pipeline_manager().add_new_pipeline()
-    pipeline_run_id = pipeline.pipeline_run_id
-
-    if not library_id:
-        library_id = pipeline_run_id
-
-    library_manager = get_library_manager()
-    set_current_library(library_id=library_id)
-    library_manager.open_library(library_id=library_id)
-
-    pipe: PipeAbstract | None = None
-    blueprint: PipelexBundleBlueprint | None = None
-
-    if plx_content:
-        validate_bundle_result = await validate_bundle(plx_content=plx_content)
-        library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result.blueprints)
-        # For now, we only support one blueprint when given a plx_content. So blueprints is of length 1.
-        blueprint = validate_bundle_result.blueprints[0]
-        if pipe_code:
-            pipe = get_required_pipe(pipe_code=pipe_code)
-        elif blueprint.main_pipe:
-            pipe = get_required_pipe(pipe_code=blueprint.main_pipe)
-        else:
-            msg = "No pipe code or main pipe in the PLX content provided to the API start_pipeline."
-            raise PipeExecutionError(message=msg)
-    elif pipe_code:
-        if library_path:
-            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(library_path)])
-        else:
-            library_manager.load_libraries(library_id=library_id)
-        pipe = get_required_pipe(pipe_code=pipe_code)
-    else:
-        msg = "Either provide pipe_code or plx_content to the API start_pipeline. 'pipe_code' must be provided when 'plx_content' is None"
-        raise PipeExecutionError(message=msg)
-
-    search_domains = search_domains or []
-    if pipe.domain not in search_domains:
-        search_domains.insert(0, pipe.domain)
-
-    working_memory: WorkingMemory | None = None
-
-    if inputs:
-        if isinstance(inputs, WorkingMemory):
-            working_memory = inputs
-        else:
-            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-                pipeline_inputs=inputs,
-                search_domains=search_domains,
-            )
-
-    if pipe_run_mode is None:
-        if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
-            pipe_run_mode = PipeRunMode(run_mode_from_env)
-        else:
-            pipe_run_mode = PipeRunMode.LIVE
-
-    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-
-    job_metadata = JobMetadata(
-        pipeline_run_id=pipeline.pipeline_run_id,
-    )
-
-    pipe_run_params = PipeRunParamsFactory.make_run_params(
+    pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+        library_id=library_id,
+        library_dirs=library_dirs,
+        pipe_code=pipe_code,
+        plx_content=plx_content,
+        inputs=inputs,
+        output_name=output_name,
         output_multiplicity=output_multiplicity,
         dynamic_output_concept_code=dynamic_output_concept_code,
         pipe_run_mode=pipe_run_mode,
+        search_domains=search_domains,
     )
 
-    pipe_job = PipeJobFactory.make_pipe_job(
-        pipe=pipe,
-        pipe_run_params=pipe_run_params,
-        job_metadata=job_metadata,
-        working_memory=working_memory,
-        output_name=output_name,
-    )
-
-    properties = {
-        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
-        EventProperty.PIPE_TYPE: pipe.pipe_type,
-    }
-    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
-
-    # Launch execution without awaiting the result.
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))
 
-    return pipeline.pipeline_run_id, task
+    return pipeline_run_id, task

@@ -128,6 +128,7 @@ nav:
         - Refining Concepts: home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
       - Design and Run Pipelines:
         - Overview: home/6-build-reliable-ai-workflows/pipes/index.md
+        - Libraries: home/6-build-reliable-ai-workflows/libraries.md
         - Executing Pipelines: home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md
         - Providing Inputs to Pipelines: home/6-build-reliable-ai-workflows/pipes/provide-inputs.md
         - Working Memory: home/6-build-reliable-ai-workflows/pipes/working-memory.md

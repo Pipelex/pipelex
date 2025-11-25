@@ -22,7 +22,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code="describe_image_e2e",
-            library_path=str(Path("tests/e2e/pipelex/pipes/pipe_operators")),
+            library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"],
             inputs={
                 "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING),
             },
@@ -57,7 +57,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
-            library_path=str(Path("tests/e2e/pipelex/pipes/pipe_operators")),
+            library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"],
             inputs={
                 "image_a": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING),
                 "image_b": ImageContent(url=PipeTestCases.URL_IMG_FASHION_PHOTO_1),
