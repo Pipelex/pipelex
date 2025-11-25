@@ -9,7 +9,6 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
 )
 
-from pipelex import log
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
@@ -130,7 +129,6 @@ class AnthropicFactory:
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
         if prepped_user_images is not None:
-            log.verbose(prepped_user_images)
             images_block_params: list[ImageBlockParam] = []
             for prepped_image in prepped_user_images:
                 image_block_param_in_loop: ImageBlockParam
