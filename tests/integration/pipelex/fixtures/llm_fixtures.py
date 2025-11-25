@@ -63,6 +63,7 @@ ANTHROPIC_MODELS = [
     "claude-4.5-haiku",
     "claude-4.5-sonnet",
     "claude-opus-4",
+    "claude-4.5-opus",
 ]
 
 # --- DeepSeek Models ----------------------------------------------------------------------------
@@ -78,6 +79,7 @@ GOOGLE_MODELS = [
     "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
     "gemini-flash-1.5-8b",
+    "gemini-3.0-pro",
 ]
 
 # --- Groq Models --------------------------------------------------------------------------------
@@ -138,6 +140,8 @@ OPENAI_MODELS = [
     "gpt-5-chat",
     "gpt-5-mini",
     "gpt-5-nano",
+    "gpt-5.1",
+    "gpt-5.1-chat",
     "o1",
     "o1-mini",
     "o3",
