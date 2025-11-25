@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Refactor
+
+- Migrated all the linters/formatters/typecheckers configuration to their own files, and updated the Makefile accordingly.
+- Removed the `pyproject.toml` file from the build. 
+
 ## [v0.16.0] - 2025-11-25
 
 ### Fixed
