@@ -9,10 +9,13 @@
     ".venv",
     ".git",
     "build",
-    "dist"
-  ],
-  "extraPaths": [
-    "./tests"
+    "dist",
+    "site",
+    "temp",
+    "results",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
   ],
   "analyzeUnannotatedFunctions": true,
   "deprecateTypingAliases": false,

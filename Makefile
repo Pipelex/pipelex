@@ -466,7 +466,7 @@ lint: env
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	@bash -c 'TIMEFORMAT="⏱️  pyright completed in %Rs"; time { $(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON); }'
+	@bash -c 'TIMEFORMAT="⏱️  pyright completed in %Rs"; time { $(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON);  }'
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
