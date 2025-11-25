@@ -148,25 +148,26 @@ class PipeCondition(PipeController):
                     required_concept_codes=[self.output.concept_string],
                 )
 
-    @override
-    async def validate_before_run(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ):
-        evaluated_expression = await get_content_generator().make_templated_text(
-            context=working_memory.generate_context(),
-            template=self.expression,
-            template_category=TemplateCategory.EXPRESSION,
-        )
-        if not evaluated_expression or evaluated_expression == "None":
-            error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
-            raise PipeRunError(
-                message=error_msg,
-                run_mode=pipe_run_params.run_mode,
-            )
+    # TODO: Restore this validation. The problem lies with needed_inputs that construct Anything concepts.
+    # @override
+    # async def validate_before_run(
+    #     self,
+    #     job_metadata: JobMetadata,
+    #     working_memory: WorkingMemory,
+    #     pipe_run_params: PipeRunParams,
+    #     output_name: str | None = None,
+    # ):
+    #     evaluated_expression = await get_content_generator().make_templated_text(
+    #         context=working_memory.generate_context(),
+    #         template=self.expression,
+    #         template_category=TemplateCategory.EXPRESSION,
+    #     )
+    #     if not evaluated_expression or evaluated_expression == "None":
+    #         error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
+    #         raise PipeRunError(
+    #             message=error_msg,
+    #             run_mode=pipe_run_params.run_mode,
+    #         )
 
     async def _evaluate_expression(
         self,
