@@ -6,16 +6,14 @@ from pipelex.builder.builder import (
     PipeSpecUnion,
     reconstruct_bundle_with_pipe_fixes,
 )
-from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity
-from pipelex.hub import get_console, get_required_pipe
+from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
-from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
@@ -31,17 +29,11 @@ class BuilderLoop:
         is_save_second_iteration_enabled: bool = True,
         is_save_working_memory_enabled: bool = True,
     ) -> PipelexBundleSpec:
-        try:
-            pipe_output = await execute_pipeline(
-                pipe_code=builder_pipe,
-                library_path=str(Path(builder.__file__).parent),
-                inputs=inputs,
-            )
-        except PipelineExecutionError as exc:
-            msg = f"Builder loop: Failed to execute pipeline: {exc}."
-            console = get_console()
-            console.print_exception()
-            raise PipeBuilderError(message=msg) from exc
+        pipe_output = await execute_pipeline(
+            pipe_code=builder_pipe,
+            library_path=str(Path(builder.__file__).parent),
+            inputs=inputs,
+        )
 
         if is_save_working_memory_enabled:
             working_memory_path = get_incremental_file_path(

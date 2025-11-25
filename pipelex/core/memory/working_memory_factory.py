@@ -160,5 +160,4 @@ class WorkingMemoryFactory(BaseModel):
                     code=shortuuid.uuid()[:5],
                 )
                 working_memory.add_new_stuff(name=requirement.variable_name, stuff=fallback_stuff)
-
         return working_memory

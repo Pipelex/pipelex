@@ -7,6 +7,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
 from pipelex.core.interpreter.validation_error_categorizer import categorize_blueprint_validation_error
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
@@ -82,6 +83,6 @@ class PipelexInterpreter(BaseModel):
                     blueprint_validation_errors.append(categorized_error)
 
             raise PipelexInterpreterError(
-                message=str(exc),
+                message=format_pydantic_validation_error(exc),
                 validation_errors=blueprint_validation_errors,
             ) from exc

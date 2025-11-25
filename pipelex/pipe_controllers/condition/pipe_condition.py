@@ -109,7 +109,6 @@ class PipeCondition(PipeController):
 
             for input_name, requirement in pipe_needed_inputs.items:
                 needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
-
         return needed_inputs
 
     @override
@@ -163,7 +162,7 @@ class PipeCondition(PipeController):
             template_category=TemplateCategory.EXPRESSION,
         )
         if not evaluated_expression or evaluated_expression == "None":
-            error_msg = f"Conditional expression returned no result in pipe '{self.code}'"
+            error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
             raise PipeRunError(
                 message=error_msg,
                 run_mode=pipe_run_params.run_mode,

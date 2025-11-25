@@ -1,6 +1,6 @@
 from typing import Literal, cast
 
-from pydantic import model_validator
+from pydantic import ValidationError, model_validator
 from typing_extensions import override
 
 from pipelex import log
@@ -45,6 +45,7 @@ from pipelex.pipe_run.pipe_run_params import (
     output_multiplicity_to_apply,
 )
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tools.typing.structure_printer import StructurePrinter
 from pipelex.types import Self
 
@@ -217,7 +218,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 )
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                msg = f"Error generating text with LLM {location}: {exc}"
+                error_details = self._format_llm_error(exc)
+                msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
             the_content = TextContent(
@@ -331,7 +333,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    msg = f"Error generating list of objects with text then object {location}: {exc}"
+                    error_details = self._format_llm_error(exc)
+                    msg = f"Error generating list of objects with text then object {location}: {error_details}"
                     raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             else:
                 # We're generating a list of objects directly
@@ -347,7 +350,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    msg = f"Error generating list of objects with direct method {location}: {exc}"
+                    error_details = self._format_llm_error(exc)
+                    msg = f"Error generating list of objects with direct method {location}: {error_details}"
                     raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
             the_content = ListContent(items=generated_objects)
@@ -371,7 +375,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    msg = f"Error generating single object with text then object {location}: {exc}"
+                    error_details = self._format_llm_error(exc)
+                    msg = f"Error generating single object with text then object {location}: {error_details}"
                     raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             else:
                 # We're generating a single object directly
@@ -386,7 +391,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    msg = f"Error generating single object with direct method {location}: {exc}"
+                    error_details = self._format_llm_error(exc)
+                    msg = f"Error generating single object with direct method {location}: {error_details}"
                     raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             the_content = generated_object
 
@@ -394,6 +400,17 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
+
+    def _format_llm_error(self, exc: LLMCompletionError) -> str:
+        """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
+        error_details = str(exc)
+        current_exc: BaseException | None = exc
+        while current_exc is not None:
+            if isinstance(current_exc, ValidationError):
+                error_details = format_pydantic_validation_error(current_exc)
+                break
+            current_exc = current_exc.__cause__
+        return error_details
 
     @override
     async def _dry_run_operator_pipe(
