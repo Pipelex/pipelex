@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [v0.16.0] - 2025-11-25
 
 ### Fixed
 
@@ -25,6 +25,7 @@
 - Refactored the pipe builder validation loop.
 - Reorganized the unit tests, and added new ones.
 - Reorganized the config files.
+- Refactored methods `execute_pipeline` and `start_pipeline`.
 - Moved `dev_cli` to `cli.dev_cli`.
 
 ## [v0.15.7] - 2025-11-18
