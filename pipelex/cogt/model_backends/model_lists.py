@@ -66,7 +66,7 @@ class ModelLister:
         for sdk in models_by_sdk:
             try:
                 match sdk:
-                    case "openai" | "azure_openai":
+                    case "openai" | "azure_openai" | "openai_responses" | "azure_openai_responses":
                         await cls._list_openai_models(
                             sdk=sdk,
                             backend_name=backend_name,

@@ -5,7 +5,7 @@
    After making code changes, you must always lint using `make check`.
 
    ```bash
-   make check
+   make format lint pyright mypy check-unused-imports check-config-sync check-rules pylint
    # If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
    ```
 
@@ -13,6 +13,7 @@
    - Pyright: Static type checking
    - Ruff: Fast Python linter  
    - Mypy: Static type checker
+   - Other checks
 
    Always fix any issues reported by these tools before proceeding.
 

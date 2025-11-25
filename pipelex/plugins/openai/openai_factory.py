@@ -27,7 +27,9 @@ class OpenAIFactoryError(CogtError):
 
 class OpenAISdkVariant(StrEnum):
     AZURE_OPENAI = "azure_openai"
+    AZURE_OPENAI_RESPONSES = "azure_openai_responses"
     OPENAI = "openai"
+    OPENAI_RESPONSES = "openai_responses"
     OPENAI_ALT_IMG_GEN = "openai_alt_img_gen"
 
 
@@ -56,7 +58,7 @@ class OpenAIFactory:
 
         the_client: openai.AsyncOpenAI
         match sdk_variant:
-            case OpenAISdkVariant.AZURE_OPENAI:
+            case OpenAISdkVariant.AZURE_OPENAI | OpenAISdkVariant.AZURE_OPENAI_RESPONSES:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 if backend.endpoint is None:
                     msg = "Azure OpenAI endpoint is not set"
@@ -66,7 +68,7 @@ class OpenAIFactory:
                     api_key=api_key,
                     api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
                 )
-            case OpenAISdkVariant.OPENAI:
+            case OpenAISdkVariant.OPENAI | OpenAISdkVariant.OPENAI_RESPONSES:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=api_key,

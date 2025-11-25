@@ -22,7 +22,7 @@
 
 [defaults]
 model_type = "llm"
-sdk = "openai"
+sdk = "openai_responses"
 prompting_target = "anthropic"
 structure_method = "instructor/openai_tools"
 
