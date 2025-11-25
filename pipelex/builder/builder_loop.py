@@ -29,6 +29,7 @@ class BuilderLoop:
         is_save_second_iteration_enabled: bool = True,
         is_save_working_memory_enabled: bool = True,
     ) -> PipelexBundleSpec:
+        # TODO: Doesn't make sense to be able to put a builder_pipe code but hardcoding the Path to the builder pipe.
         pipe_output = await execute_pipeline(
             pipe_code=builder_pipe,
             library_dirs=[str(Path(builder.__file__).parent)],

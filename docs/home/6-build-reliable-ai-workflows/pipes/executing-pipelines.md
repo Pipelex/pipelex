@@ -36,7 +36,7 @@ When using `execute_pipeline` or `start_pipeline`, you can control library behav
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 
-- **`library_dirs`**: A list of directory paths to load pipe definitions from. If not specified, Pipelex will load from the current working directory (the directory from which your Python script is executed).
+- **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.plx` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex will load from the current working directory (the directory from which your Python script is executed).
 
 - **`plx_content`**: When provided, Pipelex will load only this PLX content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
 
@@ -47,6 +47,9 @@ The loading behavior depends on which parameters you provide:
 1. **Using `pipe_code` only** (Option 2.1 below): Pipelex loads all pipe definitions from `library_dirs` (or current directory if not specified), then looks up the pipe by its code.
 
 2. **Using `plx_content`** (Option 2.2 below): Pipelex loads only the provided PLX content into the library, creating an isolated execution environment.
+
+!!! info "Python Structure Classes"
+    If your concepts use Python `StructuredContent` classes instead of inline structures, those Python files must be in the directories specified by `library_dirs`. Pipelex auto-discovers and registers these classes during library loading. Learn more about [Python StructuredContent Classes](../concepts/python-classes.md).
 
 !!! info "Learn More About Libraries"
     For a comprehensive understanding of libraries, including their structure, uniqueness rules, lifecycle, and best practices, see [Libraries](../libraries.md).

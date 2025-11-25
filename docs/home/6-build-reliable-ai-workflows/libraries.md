@@ -130,19 +130,6 @@ After loading, the library validates:
 - All pipe dependencies (for pipe controllers) exist in the pipe library
 - Domain and concept definitions are consistent
 
-### 4. Library Teardown
-
-After pipeline execution completes, the library is automatically torn down, cleaning up resources.
-
-## Library Inheritance
-
-Each library (except the BASE library) inherits:
-
-- **Native concepts**: Built-in concepts available to all libraries
-- **Base pipes**: Core pipe definitions from the BASE library
-
-This inheritance ensures that essential functionality is always available.
-
 ## Working with Multiple Libraries
 
 You can manage multiple libraries simultaneously by using different `library_id` values:
@@ -178,21 +165,7 @@ pipe_output = await execute_pipeline(
 )
 ```
 
-### 2. Organize Pipes by Domain
-
-Structure your library directories to reflect domain boundaries:
-
-```
-./pipelines/
-├── marketing/
-│   └── content_generation.plx
-├── analytics/
-│   └── data_analysis.plx
-└── customer_service/
-    └── support_automation.plx
-```
-
-### 3. Use PLX Content for Dynamic Pipelines
+### 2. Use PLX Content for Dynamic Pipelines
 
 When generating or modifying pipelines dynamically, use `plx_content`:
 
@@ -206,7 +179,9 @@ pipe_output = await execute_pipeline(
 )
 ```
 
-### 4. Reuse Library IDs for Related Executions
+A temporary library will be created holding the Pipelex bundle, and the library_id will be pipeline_run_id.
+
+### 3. Reuse Library IDs for Related Executions
 
 If multiple pipeline runs should share the same library context:
 
