@@ -1,29 +1,33 @@
 """Test simple pipe condition functionality with dry run validation."""
 
+from pathlib import Path
+from typing import Callable
+
 import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.exceptions import PipeRunInputsError
-from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
+from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
+from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.exceptions import DryRunMissingInputsError
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
+from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition import CategoryInput
 
 
 @pytest.mark.dry_runnable
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeConditionSimple:
-    async def test_direct_pipe_condition_should_fail(self):
+    async def test_direct_pipe_condition_should_fail(self, load_test_library: Callable[[list[Path]], None]):
         """Test a PipeCondition created directly in code that should FAIL dry run."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create a PipeCondition directly in Python that requires an input
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Test condition that should fail",
@@ -56,8 +60,9 @@ class TestPipeConditionSimple:
         assert "user_category" in error.missing_inputs
         assert "Missing required inputs" in str(error)
 
-    async def test_direct_pipe_condition_should_succeed(self):
+    async def test_direct_pipe_condition_should_succeed(self, load_test_library: Callable[[list[Path]], None]):
         """Test a PipeCondition created directly in code that should SUCCEED dry run."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create a PipeCondition directly in Python
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Test condition that should succeed",
@@ -103,7 +108,7 @@ class TestPipeConditionSimple:
             log.info("✅ Direct PipeCondition SUCCEEDED completely!")
             pretty_print(pipe_output)
 
-        except DryRunMissingInputsError as exc:
+        except PipeRunError as exc:
             msg_exc = str(exc)
             # If it fails, it should NOT be due to missing inputs
             assert "missing required inputs" not in str(msg_exc)

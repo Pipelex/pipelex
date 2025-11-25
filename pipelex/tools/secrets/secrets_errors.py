@@ -1,5 +1,5 @@
-from pipelex.system.exceptions import ToolException
+from pipelex.system.exceptions import ToolError
 
 
-class SecretNotFoundError(ToolException):
+class SecretNotFoundError(ToolError):
     pass

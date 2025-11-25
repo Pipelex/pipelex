@@ -1,4 +1,5 @@
 import sys
+from contextvars import ContextVar
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -15,13 +16,14 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_library_abstract import ConceptLibraryAbstract
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import Domain
-from pipelex.core.domains.domain_library_abstract import DomainLibraryAbstract
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_library_abstract import PipeLibraryAbstract
+from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
+from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
+from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
+from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.pipeline import Pipeline
@@ -62,11 +64,11 @@ class PipelexHub:
         self._content_generator: ContentGeneratorProtocol | None = None
 
         # pipelex
+        self._library_manager: LibraryManagerAbstract | None = None
         self._domain_library: DomainLibraryAbstract | None = None
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
-        self._library_manager: LibraryManagerAbstract | None = None
 
         # pipeline
         self._pipeline_tracker: PipelineTrackerProtocol | None = None
@@ -180,9 +182,6 @@ class PipelexHub:
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
 
-    def set_library_manager(self, library_manager: LibraryManagerAbstract):
-        self._library_manager = library_manager
-
     def set_observer(self, observer: ObserverProtocol):
         self._observer = observer
 
@@ -268,18 +267,24 @@ class PipelexHub:
     # pipelex
 
     def get_required_domain_library(self) -> DomainLibraryAbstract:
+        if self._library_manager is not None:
+            return self._library_manager.get_current_library().domain_library
         if self._domain_library is None:
             msg = "DomainLibrary is not initialized"
             raise RuntimeError(msg)
         return self._domain_library
 
     def get_required_concept_library(self) -> ConceptLibraryAbstract:
+        if self._library_manager is not None:
+            return self._library_manager.get_current_library().concept_library
         if self._concept_library is None:
             msg = "ConceptLibrary is not initialized"
             raise RuntimeError(msg)
         return self._concept_library
 
     def get_required_pipe_library(self) -> PipeLibraryAbstract:
+        if self._library_manager is not None:
+            return self._library_manager.get_current_library().pipe_library
         if self._pipe_library is None:
             msg = "PipeLibrary is not initialized"
             raise RuntimeError(msg)
@@ -303,17 +308,20 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._pipeline_manager
 
-    def get_required_library_manager(self) -> LibraryManagerAbstract:
+    def get_library_manager(self) -> LibraryManagerAbstract:
         if self._library_manager is None:
-            msg = "Library manager is not set. You must initialize Pipelex first."
+            msg = "LibraryManager is not initialized"
             raise RuntimeError(msg)
         return self._library_manager
 
-    def get_observer(self) -> ObserverProtocol:
-        if self._observer is None:
-            msg = "Observer is not set. You must initialize Pipelex first."
-            raise RuntimeError(msg)
-        return self._observer
+    def set_library_manager(self, library_manager: LibraryManagerAbstract):
+        self._library_manager = library_manager
+
+    def get_library(self) -> Library:
+        if self._library_manager is not None:
+            return self._library_manager.get_current_library()
+        msg = "Library is not initialized"
+        raise RuntimeError(msg)
 
 
 # Shorthand functions for accessing the singleton
@@ -404,6 +412,31 @@ def get_secret(secret_id: str) -> str:
     return get_secrets_provider().get_secret(secret_id=secret_id)
 
 
+# libraries
+
+
+_library_id: ContextVar[str | None] = ContextVar("library_id", default=None)
+
+
+def set_current_library(library_id: str) -> None:
+    """Set the library_id for the current async context."""
+    _library_id.set(library_id)
+
+
+def get_current_library() -> str:
+    """Get the library_id from the current async context."""
+    library_id = _library_id.get()
+    if library_id is None:
+        msg = "No current library set. Must call set_current_library() first."
+        raise RuntimeError(msg)
+    return library_id
+
+
+def teardown_current_library() -> None:
+    """Teardown the library_id for the current async context."""
+    _library_id.set(None)
+
+
 def get_required_domain(domain: str) -> Domain:
     return get_pipelex_hub().get_required_domain_library().get_required_domain(domain=domain)
 
@@ -429,11 +462,11 @@ def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
 
 
 def get_concept_library() -> ConceptLibraryAbstract:
-    return get_pipelex_hub().get_required_concept_library()
+    return get_pipelex_hub().get_library().concept_library
 
 
 def get_required_concept(concept_string: str) -> Concept:
-    return get_pipelex_hub().get_required_concept_library().get_required_concept(concept_string=concept_string)
+    return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_string=concept_string)
 
 
 def get_pipe_router() -> PipeRouterProtocol:
@@ -453,11 +486,11 @@ def get_pipeline(pipeline_run_id: str) -> Pipeline:
 
 
 def get_library_manager() -> LibraryManagerAbstract:
-    return get_pipelex_hub().get_required_library_manager()
+    return get_pipelex_hub().get_library_manager()
 
 
-def get_observer() -> ObserverProtocol:
-    return get_pipelex_hub().get_observer()
+def get_library() -> Library:
+    return get_pipelex_hub().get_library()
 
 
 def get_native_concept(native_concept: NativeConceptCode) -> Concept:

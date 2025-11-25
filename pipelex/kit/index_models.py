@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import Field
 
-from pipelex.config import ConfigModel
+from pipelex.system.configuration.config_model import ConfigModel
 
 
 class CursorFileOverride(ConfigModel):
@@ -25,6 +25,9 @@ class Target(ConfigModel):
     marker_begin: str = Field(description="Beginning marker for content insertion")
     marker_end: str = Field(description="Ending marker for content insertion")
     heading_1: str | None = Field(default=None, description="Main title (H1) to add when inserting into empty file or file with no H1 headings")
+    sets: dict[str, list[str]] | None = Field(
+        default=None, description="Target-specific named sets overrides for agent_rules files (e.g., coding_standards, pipelex_language, all)"
+    )
 
 
 class AgentRules(ConfigModel):

@@ -1,27 +1,32 @@
 """E2E test for PipeLLM with vision capabilities."""
 
+from pathlib import Path
+
 import pytest
 
-from pipelex import pretty_print
+from pipelex import pretty_print, pretty_print_md
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
+from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm_vision import VisionAnalysisE2E
 from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
+from tests.integration.pipelex.test_data import PipeTestCases
 
 
 @pytest.mark.llm
 @pytest.mark.inference
+@pytest.mark.dry_runnable
 @pytest.mark.asyncio
 class TestPipeLLMVision:
-    """Test PipeLLM with vision capabilities."""
-
-    async def test_describe_image(self):
-        """Test the describe_image pipeline with a simple image."""
+    async def test_describe_image_single(self, pipe_run_mode: PipeRunMode):
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
-            pipe_code="describe_image",
+            pipe_code="describe_image_e2e",
+            library_path=str(Path("tests/e2e/pipelex/pipes/pipe_operators")),
             inputs={
-                "image": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
+                "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING),
             },
+            pipe_run_mode=pipe_run_mode,
         )
 
         # Get the result as text
@@ -43,37 +48,39 @@ class TestPipeLLMVision:
     @pytest.mark.parametrize(
         "pipe_code",
         [
-            "describe_image_number_1_only",
-            "describe_image_number_2_only",
+            "describe_image_number_1_only_e2e",
+            "describe_image_number_2_only_e2e",
         ],
     )
-    async def test_describe_images_discriminate(self, pipe_code: str):
+    async def test_describe_images_multiple(self, pipe_run_mode: PipeRunMode, pipe_code: str):
         """Test the describe_image pipeline with multiple images to discriminate."""
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
+            library_path=str(Path("tests/e2e/pipelex/pipes/pipe_operators")),
             inputs={
-                "image_a": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
-                "image_b": ImageContent(url=LLMVisionTestCases.PATH_IMG_JPEG_3),
+                "image_a": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING),
+                "image_b": ImageContent(url=PipeTestCases.URL_IMG_FASHION_PHOTO_1),
             },
+            pipe_run_mode=pipe_run_mode,
         )
 
-        result = pipe_output.main_stuff
-        pretty_print(result, title=f"Image Description ({pipe_code})")
+        description = pipe_output.main_stuff_as_str
+        pretty_print_md(description, title=f"Image Description ({pipe_code})")
 
-    async def test_structured_analysis_of_image_with_gantt_chart(self):
+    async def test_structured_analysis_of_image_with_gantt_chart(self, pipe_run_mode: PipeRunMode):
         """Test vision with a more complex image (Gantt chart)."""
         # Execute the pipeline with a complex image
         pipe_output = await execute_pipeline(
-            pipe_code="vision_analysis",
+            pipe_code="vision_analysis_e2e",
             inputs={
-                "image": ImageContent(url=LLMVisionTestCases.PATH_IMG_GANTT_1),
+                "image": ImageContent(url=PipeTestCases.URL_IMG_GANTT_1),
             },
+            pipe_run_mode=pipe_run_mode,
         )
 
         # Get the result as text
-        # result = pipe_output.main_stuff_as(content_type=VisionAnalysis)
-        result = pipe_output.main_stuff
+        result = pipe_output.main_stuff_as(content_type=VisionAnalysisE2E)
 
         # Log output
         pretty_print(result, title="Gantt Chart Description")

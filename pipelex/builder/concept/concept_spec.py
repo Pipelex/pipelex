@@ -8,10 +8,10 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
-from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.exceptions import ConceptBlueprintValueError, ConceptStructureBlueprintValueError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
@@ -26,7 +26,7 @@ class ConceptStructureSpecFieldType(StrEnum):
     DATE = "date"
 
 
-class ConceptSpecError(Exception):
+class ConceptSpecError(PipelexError):
     pass
 
 
@@ -94,7 +94,7 @@ class ConceptStructureSpec(StructuredContent):
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
-        raise ConceptStructureBlueprintValueError(msg)
+        raise ValueError(msg)
 
     def to_blueprint(self) -> ConceptStructureBlueprint:
         # Convert the type enum value - self.type is already a ConceptStructureBlueprintFieldType enum
@@ -108,19 +108,6 @@ class ConceptStructureSpec(StructuredContent):
             required=self.required,
             default_value=self.default_value,
         )
-
-
-class ConceptSpecDraft(StructuredContent):
-    the_concept_code: str = Field(description="Concept code. Must be PascalCase.")
-    description: str = Field(description="Description of the concept, in natural language.")
-    structure: str = Field(
-        description="Description of a dict with fieldnames as keys, and values being a dict with: description, type, required, default_value",
-    )
-    refines: str | None = Field(
-        default=None,
-        description="The native concept this concept extends (Text, Image, PDF, TextAndImages, Number, Page) "
-        "in PascalCase format. Cannot be used together with 'structure'.",
-    )
 
 
 class ConceptSpec(StructuredContent):
@@ -195,7 +182,7 @@ class ConceptSpec(StructuredContent):
         if refines is not None:
             if not NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refines):
                 msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
-                raise ConceptBlueprintValueError(msg)
+                raise ValueError(msg)
         return refines
 
     @model_validator(mode="before")
@@ -204,7 +191,7 @@ class ConceptSpec(StructuredContent):
         if values.get("refines") and values.get("structure"):
             msg = (
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the description `{values.get('description')}`",
+                f"and `{values.get('structure')}` for concept that has the description `{values.get('description')}`"
             )
             raise ConceptSpecError(msg)
         return values

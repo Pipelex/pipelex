@@ -1,5 +1,6 @@
 from typing import Literal
 
+from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -25,3 +26,19 @@ class PipeSequenceBlueprint(PipeBlueprint):
         For sequences, the order of steps matters, so we preserve it.
         """
         return [step.pipe for step in self.steps]
+
+    @field_validator("steps", mode="before")
+    @classmethod
+    def validate_steps(cls, steps: list[SubPipeBlueprint]) -> list[SubPipeBlueprint]:
+        if not steps:
+            msg = "PipeSequence must have at least 1 step"
+            raise ValueError(msg)
+        return steps
+
+    @override
+    def validate_inputs(self):
+        pass
+
+    @override
+    def validate_output(self):
+        pass

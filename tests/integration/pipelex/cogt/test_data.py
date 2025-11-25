@@ -90,6 +90,7 @@ class LLMVisionTestCases:
 
 class LLMTestConstants:
     USER_TEXT_SHORT = "In one sentence, who is Bill Gates?"
+    USER_TEXT_TO_EXTRACT_PERSON = "It's Robert, the nice plumber, he turns 57 next week."
     # USER_TEXT_SHORT = "What's the biggest football match tonight in Europe?"
     PROMPT_TEMPLATE_TEXT = "Can you give one example of flower which is {color} in color ?"
     PROMPT_COLOR_EXAMPLES: ClassVar[list[str]] = [
@@ -125,14 +126,14 @@ How tall do you think he was when he was 12? and at 15?
         [
             ("name: John, age: 30", Person(name="John", age=30)),
             # ("Betty Draper, 51", Person(name="Betty Draper", age=51)),
-            ("Whiskers, the cat", Pet(species=PetSpecies.CAT, name="Whiskers")),
-            ("Whiskers, the dog", Pet(species=PetSpecies.DOG, name="Whiskers")),
+            ("Whiskers, a very nice cat", Pet(species=PetSpecies.CAT, name="Whiskers")),
+            ("Whiskers, a cute little dog", Pet(species=PetSpecies.DOG, name="Whiskers")),
         ],
         [
             # ("name: Alice, age: 25", Person(name="Alice", age=25)),
             ("My sister's plumber, Bob Smith, is 42", Employee(name="Bob Smith", age=42, job="plumber")),
-            ("Fluffy, the hamster", Pet(species=PetSpecies.HAMSTER, name="Fluffy")),
-            ("Rex, the dog", Pet(species=PetSpecies.DOG, name="Rex")),
+            ("Fluffy is a funny hamster", Pet(species=PetSpecies.HAMSTER, name="Fluffy")),
+            ("Rex is a big black dog", Pet(species=PetSpecies.DOG, name="Rex")),
         ],
     ]
 

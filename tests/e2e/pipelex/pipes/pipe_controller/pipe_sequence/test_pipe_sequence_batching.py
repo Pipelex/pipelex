@@ -1,26 +1,28 @@
 """Test pipe sequence functionality with batching operations."""
 
-from typing import cast
+from pathlib import Path
+from typing import Callable, cast
 
 import pytest
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.test_pipelines.pipe_controllers.pipe_sequence.pipe_sequence import Document, ProductRating
+from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence import Document, ProductRating
 
 
 @pytest.mark.dry_runnable
 @pytest.mark.inference
 @pytest.mark.asyncio
-async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode):
+async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
     """Test customer review analysis sequence with batching."""
     # Create test input - a document with reviews
     if pipe_run_mode == PipeRunMode.DRY:

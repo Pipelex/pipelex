@@ -2,22 +2,19 @@ import asyncio
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 import shortuuid
-from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.core.pipes.exceptions import PipeInputError, PipeInputNotFoundError, PipeRunInputsError
-from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -31,37 +28,6 @@ class PipeBatch(PipeController):
 
     branch_pipe_code: str
     batch_params: BatchParams
-
-    @override
-    def pipe_dependencies(self) -> set[str]:
-        return {self.branch_pipe_code}
-
-    @override
-    def validate_output(self):
-        pass
-
-    @model_validator(mode="after")
-    def validate_required_variables(self) -> Self:
-        # Skip for now
-        return self
-
-    @override
-    def _validate_with_libraries(self):
-        self._validate_required_variables()
-
-    def _validate_required_variables(self) -> Self:
-        # Now check that the required variables ARE in the inputs of the pipe
-        required_variables = self.required_variables()
-        for variable_name in required_variables:
-            if variable_name == self.batch_params.input_item_stuff_name:
-                continue
-            if variable_name not in self.inputs.root:
-                msg = (
-                    f"Input '{variable_name}' required by branch pipe '{self.branch_pipe_code}' "
-                    f"of PipeBatch '{self.code}', is not listed in its inputs"
-                )
-                raise PipeInputError(message=msg, pipe_code=self.code, variable_name=variable_name, concept_code=None)
-        return self
 
     @override
     def required_variables(self) -> set[str]:
@@ -80,24 +46,46 @@ class PipeBatch(PipeController):
         return self.inputs
 
     @override
-    def _validate_inputs_in_memory(self, working_memory: WorkingMemory) -> None:
-        try:
-            required_concept_code = self.inputs.get_required_input_requirement(variable_name=self.batch_params.input_list_stuff_name).concept.code
-        except PipeInputNotFoundError as exc:
-            msg = (
-                f"Batch input list named '{self.batch_params.input_list_stuff_name}' is not in "
-                f"PipeBatch '{self.code}' input requirements: {self.inputs}"
-            )
-            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=self.batch_params.input_list_stuff_name, concept_code=None) from exc
+    def pipe_dependencies(self) -> set[str]:
+        return {self.branch_pipe_code}
 
-        required_stuff_name = self.batch_params.input_list_stuff_name
-        try:
-            working_memory.get_stuff(required_stuff_name)
-        except WorkingMemoryStuffNotFoundError as exc:
-            variable_name: str = exc.variable_name or required_stuff_name
-            missing_inputs: dict[str, str] = {variable_name: exc.concept_code or required_concept_code}
-            msg = f"Missing required inputs for pipe '{self.code}': {missing_inputs}"
-            raise PipeRunInputsError(message=msg, pipe_code=self.code, missing_inputs=missing_inputs) from exc
+    @override
+    def validate_inputs_static(self):
+        pass
+
+    @override
+    def validate_inputs_with_library(self):
+        pass
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self):
+        pass
+
+    @override
+    async def validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ) -> None:
+        batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
+        input_list_stuff_name = batch_params.input_list_stuff_name
+        if not self.inputs.is_variable_existing(variable_name=input_list_stuff_name):
+            msg = f"Batch input list named '{input_list_stuff_name}' is not in PipeBatch '{self.code}' input requirements: {self.inputs}"
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+
+        if not working_memory.is_stuff_exists(input_list_stuff_name):
+            msg = f"Input list stuff '{input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory"
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+
+        input_stuff = working_memory.get_stuff(input_list_stuff_name)
+        if not isinstance(input_stuff.content, ListContent):
+            msg = (
+                f"Input list stuff '{input_list_stuff_name}' of PipeBatch '{self.code}' must be ListContent, "
+                f"got {input_stuff.stuff_name or 'unnamed'} = {type(input_stuff.content)}. stuff: {input_stuff}"
+            )
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
 
     async def _run_batch_pipe(
         self,
@@ -110,34 +98,15 @@ class PipeBatch(PipeController):
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_item_stuff_name = batch_params.input_item_stuff_name
         input_list_stuff_name = batch_params.input_list_stuff_name
-        try:
-            input_requirement = self.inputs.get_required_input_requirement(input_list_stuff_name)
-        except PipeInputNotFoundError as exc:
-            msg = f"Batch input item list named '{input_list_stuff_name}' is not in this PipeBatch '{self.code}' input requirements: {self.inputs}"
-            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=input_list_stuff_name, concept_code=None) from exc
 
         if pipe_run_params.final_stuff_code:
             method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "_run_controller_pipe"
             pipe_run_params.final_stuff_code = None
 
         pipe_run_params.push_pipe_layer(pipe_code=self.branch_pipe_code)
-        try:
-            input_stuff = working_memory.get_stuff(batch_params.input_list_stuff_name)
-        except WorkingMemoryStuffNotFoundError as exc:
-            msg = (
-                f"Input list stuff '{batch_params.input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory: {exc}"
-            )
-            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=batch_params.input_list_stuff_name, concept_code=None) from exc
 
-        input_stuff_code = input_stuff.stuff_code
-        input_content = input_stuff.content
-        if not isinstance(input_content, ListContent):
-            msg = (
-                f"Input of PipeBatch '{self.code}' must be ListContent, "
-                f"got {input_stuff.stuff_name or 'unnamed'} = {type(input_content)}. stuff: {input_stuff}"
-            )
-            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=batch_params.input_list_stuff_name, concept_code=None)
-        input_content = cast("ListContent[StuffContent]", input_content)
+        input_stuff = working_memory.get_stuff(input_list_stuff_name)
+        input_content = cast("ListContent[StuffContent]", input_stuff.content)
 
         # TODO: Make commented code work when inputing images named "a.b.c"
         sub_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
@@ -153,10 +122,10 @@ class PipeBatch(PipeController):
             branch_output_item_codes.append(branch_output_item_code)
             if nb_history_items_limit and branch_index >= nb_history_items_limit:
                 break
-            branch_input_item_code = f"{input_stuff_code}-branch-{branch_index}"
+            branch_input_item_code = f"{input_stuff.stuff_code}-branch-{branch_index}"
             item_input_stuff = StuffFactory.make_stuff(
                 code=branch_input_item_code,
-                concept=input_requirement.concept,
+                concept=self.inputs.get_required_input_requirement(input_list_stuff_name).concept,
                 content=item,
                 name=input_item_stuff_name,
             )
@@ -166,7 +135,7 @@ class PipeBatch(PipeController):
 
             required_variables = sub_pipe.required_variables()
             required_stuffs = branch_memory.get_existing_stuffs(names=required_variables)
-            required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff_code]
+            required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff.stuff_code]
             required_stuff_lists.append(required_stuffs)
             branch_pipe_run_params = pipe_run_params.deep_copy_with_final_stuff_code(final_stuff_code=branch_output_item_code)
 
@@ -257,7 +226,6 @@ class PipeBatch(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        """Run a pipe in batch mode for each item in the input list."""
         return await self._run_batch_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
@@ -273,7 +241,6 @@ class PipeBatch(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        """Dry run a pipe in batch mode for each item in the input list."""
         return await self._run_batch_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,

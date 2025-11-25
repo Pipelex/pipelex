@@ -2,9 +2,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
-from pipelex.core.concepts.exceptions import ConceptBlueprintValueError
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 
 
 class ConceptBlueprint(BaseModel):
@@ -21,9 +21,11 @@ class ConceptBlueprint(BaseModel):
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
         if refines is not None:
-            if not NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refines):
-                msg = f"Refine '{refines}' is not a native concept and we currently can only refine native concepts"
-                raise ConceptBlueprintValueError(msg)
+            try:
+                NativeConceptCode.validate_native_concept_string_or_code(concept_string_or_code=refines)
+            except NativeConceptDefinitionError as exc:
+                msg = f"Could not validate refine '{refines}': {exc}"
+                raise ValueError(msg) from exc
         return refines
 
     @model_validator(mode="before")
@@ -34,5 +36,5 @@ class ConceptBlueprint(BaseModel):
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
                 f"and `{values.get('structure')}` for concept that has the definition `{values.get('description')}`"
             )
-            raise ConceptBlueprintValueError(msg)
+            raise ValueError(msg)
         return values

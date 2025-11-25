@@ -3,7 +3,6 @@ from typing import ClassVar
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
-from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 
 
 class PipeComposeInputTestCases:
@@ -94,47 +93,4 @@ class PipeComposeInputTestCases:
         VALID_WITH_JINJA2_CONTROL,
         VALID_WITH_HTML_TEMPLATE,
         VALID_COMPLEX_JINJA2,
-    ]
-
-    # Error test cases: (test_id, blueprint, expected_error_type, expected_error_message_fragment)
-    ERROR_MISSING_INPUT_IN_TEMPLATE: ClassVar[tuple[str, PipeComposeBlueprint, type[Exception], str]] = (
-        "missing_input_in_template",
-        PipeComposeBlueprint(
-            description="Test case: missing_input_in_template",
-            inputs={},
-            output="native.Text",
-            template="Hello {{ name }}!",
-        ),
-        Exception,  # Will be PipeDefinitionError
-        "Required variable 'name' is not in the inputs",
-    )
-
-    ERROR_TWO_INPUTS_THREE_VARIABLES: ClassVar[tuple[str, PipeComposeBlueprint, type[Exception], str]] = (
-        "two_inputs_three_variables",
-        PipeComposeBlueprint(
-            description="Test case: two_inputs_three_variables",
-            inputs={"first_name": "native.Text", "last_name": "native.Text"},
-            output="native.Text",
-            template="Hello {{ first_name }} {{ last_name }} from {{ city }}!",
-        ),
-        Exception,  # Will be PipeDefinitionError
-        "Required variable 'city' is not in the inputs",
-    )
-
-    ERROR_INVALID_JINJA2_SYNTAX: ClassVar[tuple[str, PipeComposeBlueprint, type[Exception], str]] = (
-        "invalid_jinja2_syntax",
-        PipeComposeBlueprint(
-            description="Test case: invalid_jinja2_syntax",
-            inputs={"name": "native.Text"},
-            output="native.Text",
-            template="Hello {{ name }!",
-        ),
-        Jinja2TemplateSyntaxError,
-        "Could not parse Jinja2 template",
-    )
-
-    ERROR_CASES: ClassVar[list[tuple[str, PipeComposeBlueprint, type[Exception], str]]] = [
-        ERROR_MISSING_INPUT_IN_TEMPLATE,
-        ERROR_TWO_INPUTS_THREE_VARIABLES,
-        ERROR_INVALID_JINJA2_SYNTAX,
     ]

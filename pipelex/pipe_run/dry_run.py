@@ -1,14 +1,12 @@
-import asyncio
-import functools
 import time
-from concurrent.futures import ThreadPoolExecutor
 
 from pydantic import BaseModel
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -20,7 +18,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import StrEnum
 
 
-class DryRunError(Exception):
+class DryRunError(PipelexError):
     """Raised when a dry run fails due to missing inputs or other validation issues."""
 
 
@@ -44,12 +42,8 @@ class DryRunOutput(BaseModel):
 
 
 async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
-    """Dry run a single pipe directly without parallelization."""
-    allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
-    # TODO: fail and raise properly
     try:
         needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
-
         working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
         pipe.validate_with_libraries()
         await pipe.run_pipe(
@@ -58,7 +52,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
     except PipeStackOverflowError as exc:
-        if pipe.code in allowed_to_fail_pipes:
+        if pipe.code in get_config().pipelex.dry_run_config.allowed_to_fail_pipes:
             error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"
             return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
         elif raise_on_failure:
@@ -70,7 +64,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
-async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True, raise_on_failure: bool = True) -> dict[str, DryRunOutput]:
+async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True) -> dict[str, DryRunOutput]:
     """Dry run pipes with optional parallelization.
 
     Args:
@@ -94,37 +88,8 @@ async def dry_run_pipes(pipes: list[PipeAbstract], run_in_parallel: bool = True,
     results: dict[str, DryRunOutput] = {}
     allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
-    if run_in_parallel:
-
-        def run_pipe_in_thread(pipe: PipeAbstract) -> DryRunOutput:
-            """Parallel execution using ThreadPoolExecutor"""
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(dry_run_pipe(pipe, raise_on_failure=raise_on_failure))
-            finally:
-                loop.close()
-
-        with ThreadPoolExecutor() as executor:
-            futures = [asyncio.get_running_loop().run_in_executor(executor, functools.partial(run_pipe_in_thread, pipe)) for pipe in pipes]
-            for future in asyncio.as_completed(futures):
-                try:
-                    output = await future
-                    results[output.pipe_code] = output
-                except Exception as exc:
-                    # If raise_on_failure is True, re-raise the first exception encountered
-                    # Otherwise, this shouldn't happen as dry_run_pipe should return a DryRunOutput
-                    if raise_on_failure:
-                        # Cancel remaining futures
-                        for f in futures:
-                            if not f.done():
-                                f.cancel()
-                        raise
-                    # This path shouldn't normally be reached, but handle it gracefully
-                    log.error(f"Unexpected exception in dry run: {exc}")
-    else:
-        for pipe in pipes:
-            results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
+    for pipe in pipes:
+        results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
 
     successful_pipes: list[str] = []
     failed_pipes: list[str] = []

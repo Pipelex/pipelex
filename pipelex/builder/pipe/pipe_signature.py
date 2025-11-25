@@ -7,8 +7,7 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes
+from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 
@@ -31,8 +30,8 @@ class PipeSignature(StructuredContent):
     """
 
     code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.")
-    type: AllowedPipeTypes | str = Field(description="Pipe type.")
-    pipe_category: SkipJsonSchema[AllowedPipeCategories] = Field(description="Pipe category set according to its type.")
+    type: PipeType | str = Field(description="Pipe type.")
+    pipe_category: SkipJsonSchema[PipeCategory] = Field(description="Pipe category set according to its type.")
     description: str = Field(description="What the pipe does")
     inputs: dict[str, str] = Field(
         description=(
@@ -57,16 +56,16 @@ class PipeSignature(StructuredContent):
             type_str = values["type"]
         except TypeError as exc:
             msg = f"Invalid type for '{values}': could not get subscript, required for 'type'"
-            raise PipeBlueprintValueError(msg) from exc
-        # we need to convert the type string to the AllowedPipeTypes enum because it arrives as a str implictly converted to enum but not yet
-        the_type = AllowedPipeTypes(type_str)
+            raise ValueError(msg) from exc
+        # we need to convert the type string to the PipeType enum because it arrives as a str implictly converted to enum but not yet
+        the_type = PipeType(type_str)
         values["pipe_category"] = the_type.category
         return values
 
     @field_validator("type", mode="before")
     @classmethod
-    def validate_type(cls, type_value: str) -> AllowedPipeTypes:
-        return AllowedPipeTypes(type_value)
+    def validate_type(cls, type_value: str) -> PipeType:
+        return PipeType(type_value)
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
@@ -74,7 +73,7 @@ class PipeSignature(StructuredContent):
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))
         pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{self.code}[/red]\n", style="bold"))
-        pipe_type = self.type.value if isinstance(self.type, AllowedPipeTypes) else str(self.type)
+        pipe_type = self.type.value if isinstance(self.type, PipeType) else str(self.type)
         pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{pipe_type}[/bold magenta] ({self.pipe_category.value})\n"))
         pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{self.description}[/yellow italic]\n"))
 

@@ -1,0 +1,27 @@
+name: package-check
+
+on:
+  pull_request:
+
+jobs:
+  uv-lock-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Check if uv.lock is up to date
+        run: |
+          uv lock --locked
+          if ! git diff --exit-code uv.lock; then
+            echo "❌ uv.lock is out of date!"
+            echo "Please run 'uv lock' to update the lock file."
+            exit 1
+          else
+            echo "✅ uv.lock is up to date!"
+          fi

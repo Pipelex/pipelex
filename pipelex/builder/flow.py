@@ -1,6 +1,6 @@
 from pydantic import ConfigDict, Field, model_validator
 
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.builder.pipe.pipe_signature import PipeSignature
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -11,7 +11,7 @@ from pipelex.tools.typing.validation_utils import has_exactly_one_among_attribut
 from pipelex.types import Self
 
 
-class FlowElementError(PipelexException):
+class FlowElementError(PipelexError):
     """Exception raised by FlowElement."""
 
 

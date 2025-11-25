@@ -1,5 +1,7 @@
 """Integration tests for bracket notation in controller pipe factories."""
 
+from typing import Callable
+
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.hub import get_concept_library
@@ -15,7 +17,8 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallel
 class TestBracketNotationInControllers:
     """Test that controller factories correctly handle bracket notation in inputs and outputs."""
 
-    def test_pipe_parallel_with_bracket_notation(self):
+    def test_pipe_parallel_with_bracket_notation(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeParallel factory with bracket notation."""
         domain = "test"
         concept_library = get_concept_library()
@@ -47,7 +50,8 @@ class TestBracketNotationInControllers:
 
         concept_library.teardown()
 
-    def test_pipe_condition_with_bracket_notation(self):
+    def test_pipe_condition_with_bracket_notation(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeCondition factory with bracket notation."""
         domain = "test"
         concept_library = get_concept_library()
@@ -86,7 +90,8 @@ class TestBracketNotationInControllers:
 
         concept_library.teardown()
 
-    def test_pipe_batch_with_bracket_notation(self):
+    def test_pipe_batch_with_bracket_notation(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test PipeBatch factory with bracket notation."""
         domain = "test"
         concept_library = get_concept_library()

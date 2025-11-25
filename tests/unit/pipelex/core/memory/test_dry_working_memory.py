@@ -2,12 +2,12 @@ import pytest
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_content import TextContent
-from tests.test_pipelines.tricky_questions import ThoughtfulAnswer
+from tests.unit.pipelex.core.memory.tricky_questions import ThoughtfulAnswer
 
 
 @pytest.mark.dry_runnable

@@ -1,76 +1,20 @@
-from typing import Any
-
 import shortuuid
 from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.client.protocol import PipelineInputs
-from pipelex.core.concepts.concept import SpecialDomain
-from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
-from pipelex.core.pipes.input_requirements import TypedNamedInputRequirement
-from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_required_concept
 
 
 class WorkingMemoryFactory(BaseModel):
-    @classmethod
-    def make_from_text(
-        cls,
-        text: str,
-        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT,
-        name: str | None = "text",
-    ) -> WorkingMemory:
-        validate_concept_string(concept_string=concept_string)
-        return cls.make_from_single_stuff(
-            stuff=StuffFactory.make_stuff(
-                concept=get_required_concept(concept_string=concept_string),
-                content=TextContent(text=text),
-                name=name,
-            ),
-        )
-
-    @classmethod
-    def make_from_image(
-        cls,
-        image_url: str,
-        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptCode.IMAGE,
-        name: str | None = "image",
-    ) -> WorkingMemory:
-        # TODO: validate that the concept is compatible with an image concept
-        validate_concept_string(concept_string=concept_string)
-        stuff = StuffFactory.make_stuff(
-            concept=get_required_concept(concept_string=concept_string),
-            content=ImageContent(url=image_url),
-            name=name,
-        )
-        return cls.make_from_single_stuff(stuff=stuff)
-
-    @classmethod
-    def make_from_pdf(
-        cls,
-        pdf_url: str,
-        concept_string: str = SpecialDomain.NATIVE + "." + NativeConceptCode.PDF,
-        name: str | None = "pdf",
-    ) -> WorkingMemory:
-        validate_concept_string(concept_string=concept_string)
-        return cls.make_from_single_stuff(
-            stuff=StuffFactory.make_stuff(
-                concept=get_required_concept(concept_string=concept_string),
-                content=PDFContent(url=pdf_url),
-                name=name,
-            ),
-        )
-
     @classmethod
     def make_from_single_stuff(cls, stuff: Stuff) -> WorkingMemory:
         if not stuff.stuff_name:
@@ -102,22 +46,6 @@ class WorkingMemoryFactory(BaseModel):
             else:
                 aliases[MAIN_STUFF_NAME] = next(iter(stuff_dict.keys()))
         return WorkingMemory(root=stuff_dict, aliases=aliases)
-
-    @classmethod
-    def make_from_strings_from_dict(cls, input_dict: dict[str, Any]) -> WorkingMemory:
-        # TODO: Add unit tests for this method
-        stuff_dict: StuffDict = {}
-        for name, content in input_dict.items():
-            if not isinstance(content, str):
-                continue
-            text_content = TextContent(text=content)
-            stuff_dict[name] = StuffFactory.make_stuff(
-                concept=get_required_concept(concept_string=SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT),
-                content=text_content,
-                name=name,
-                code="",
-            )
-        return WorkingMemory(root=stuff_dict)
 
     @classmethod
     def make_empty(cls) -> WorkingMemory:
@@ -232,5 +160,4 @@ class WorkingMemoryFactory(BaseModel):
                     code=shortuuid.uuid()[:5],
                 )
                 working_memory.add_new_stuff(name=requirement.variable_name, stuff=fallback_stuff)
-
         return working_memory

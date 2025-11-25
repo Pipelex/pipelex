@@ -109,3 +109,12 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
+
+["claude-4.5-opus"]
+sdk = "bedrock_anthropic"
+model_id = "global.anthropic.claude-opus-4-5-20251101-v1:0"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }

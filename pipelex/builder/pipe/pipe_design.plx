@@ -22,7 +22,7 @@ PipeFailure = "Details of a single pipe failure during dry run."
 [pipe.detail_pipe_spec]
 type = "PipeCondition"
 description = "Route by signature.type to the correct spec emitter."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "ConceptSpec" }
+inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "Anything"
 expression = "pipe_signature.type"
 default_outcome = "fail"

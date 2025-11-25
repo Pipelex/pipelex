@@ -8,16 +8,15 @@ from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.input_requirements import InputRequirements, TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.exceptions import DryRunMissingInputsError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 
@@ -30,24 +29,6 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     type: Literal["PipeFunc"] = "PipeFunc"
     function_name: str
 
-    @field_validator("function_name", mode="before")
-    @classmethod
-    def validate_function_name(cls, function_name: str) -> str:
-        function = func_registry.get_function(function_name)
-        if not function:
-            msg = f"Function '{function_name}' not found in registry"
-            raise PipeDefinitionError(msg)
-
-        return_type = get_type_hints(function).get("return")
-
-        if return_type is None:
-            msg = f"Function '{function_name}' has no return type annotation"
-            raise PipeDefinitionError(msg)
-        if not issubclass(return_type, StuffContent):
-            msg = f"Function '{function_name}' return type {return_type} is not a subclass of StuffContent"
-            raise PipeDefinitionError(msg)
-        return function_name
-
     @override
     def required_variables(self) -> set[str]:
         return set()
@@ -56,8 +37,38 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         return self.inputs
 
+    @field_validator("function_name", mode="before")
+    @classmethod
+    def validate_function_name(cls, function_name: str) -> str:
+        function = func_registry.get_function(function_name)
+        if not function:
+            msg = f"Function '{function_name}' not found in registry"
+            raise ValueError(msg)
+
+        return_type = get_type_hints(function).get("return")
+
+        if return_type is None:
+            msg = f"Function '{function_name}' has no return type annotation"
+            raise ValueError(msg)
+        if not issubclass(return_type, StuffContent):
+            msg = f"Function '{function_name}' return type {return_type} is not a subclass of StuffContent"
+            raise TypeError(msg)
+        return function_name
+
     @override
-    def validate_output(self):
+    def validate_inputs_static(self):
+        pass
+
+    @override
+    def validate_inputs_with_library(self):
+        pass
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self):
         pass
 
     @override
@@ -125,23 +136,20 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
                 missing_input_names.append(named_input_requirement.variable_name)
         if missing_input_names:
-            msg = f"Dry run failed for PipeFunc (function '{self.function_name}'): missing required inputs: {missing_input_names}"
-            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
-            raise DryRunMissingInputsError(
-                message=msg,
-                pipe_type=self.__class__.__name__,
-                pipe_code=self.code,
-                missing_inputs=missing_input_names,
-            )
+            msg = f"Dry run failed for pipe '{self.code}' (PipeFunc): missing required inputs: {missing_input_names}"
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
 
         return_type = get_type_hints(function).get("return")
 
         if return_type is None:
-            msg = f"Function '{self.function_name}' has no return type annotation"
-            raise PipeDefinitionError(msg)
+            msg = f"Dry run failed for pipe '{self.code}' (PipeFunc): function '{self.function_name}' has no return type annotation"
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
         if not issubclass(return_type, StuffContent):
-            msg = f"Function '{self.function_name}' return type {return_type} is not a subclass of StuffContent"
-            raise PipeDefinitionError(msg)
+            msg = (
+                f"Dry run failed for pipe '{self.code}' (PipeFunc): "
+                f"function '{self.function_name}' return type {return_type} is not a subclass of StuffContent"
+            )
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
 
         # TODO: Support PipeFunc returning with multiplicity. Create an equivalent of TypedNamedInputRequirement for outputs.
         requirement = TypedNamedInputRequirement(

@@ -20,6 +20,10 @@ This document outlines the core coding standards, best practices, and quality co
     - When defining enums related to string values, always inherit from `StrEnum`
     - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
     - As our match/case constructs over enums are always exhaustive, NEVER add a default `case _: ...`. Otherwise, you won't pass linting.
+    - `StrEnum` must be imported from `pipelex.types` (handles python retrocompatibility):
+    ```python
+    from pipelex.types import StrEnum
+    ```
 
 ## Imports
 
@@ -82,17 +86,17 @@ This document outlines the core coding standards, best practices, and quality co
 
 ## Factory Pattern
 
-    - Use Factory Pattern for object creation when dealing with multiple implementations
+    - Use factory pattern for object creation when dealing with multiple implementations
     - Our factory methods are named `make_from_...` and such
 
 ## Error Handling
 
     - Always catch exceptions at the place where you can add useful context to it.
     - Use try/except blocks with specific exceptions
-    - Convert third-party exceptions to our custom ones
+    - Convert third-party exceptions to our custom ones except in pydantic validators where you can raise a ValueError or a TypeError
     - NEVER catch the generic Exception, only catch specific exceptions, except at the root of CLI commands
-    - NEVER raise generic exceptions like ValueError or TypeError, create new error classes and raise them instead
-    - Always add `from exc` to the exception
+    - Always add `from exc` to the exception raise statements
+    - Always write the error message as a variable before raising it, for cleaner error traces
    
    ```python
    try:
@@ -101,8 +105,6 @@ This document outlines the core coding standards, best practices, and quality co
        msg = "The routing library could not be found, please call `pipelex init config` to create it"
        raise PipelexSetupError(msg) from exc
    ```
-
-   **Note**: Following Ruff rules, we set the error message as a variable before raising it, for cleaner error traces.
 
 ## Documentation
 
@@ -129,48 +131,3 @@ This document outlines the core coding standards, best practices, and quality co
        Provides methods for resizing, converting, and optimizing images.
        """
    ```
-
-## Code Quality Checks
-
-### Linting and Type Checking
-
-Before finalizing a task, run:
-```bash
-make fix-unused-imports
-make check
-```
-
-This runs multiple code quality tools:
-- Pyright: Static type checking
-- Ruff: Fast Python linter  
-- Mypy: Static type checker
-
-Always fix any issues reported by these tools before proceeding.
-
-### Running Tests
-
-1. **Quick Test Run** (no LLM/image generation):
-   ```bash
-   make tp
-   ```
-   Runs tests with markers: `(dry_runnable or not (inference or llm or img_gen or extract)) and not (needs_output or pipelex_api)`
-
-2. **Specific Tests**:
-   ```bash
-   make tp TEST=TestClassName
-   # or
-   make tp TEST=test_function_name
-   ```
-   Note: Matches names starting with the provided string.
-
-**Important**: Never run `make ti`, `make test-inference`, `make te`, `make test-extract`, `make tg`, or `make test-img-gen` - these use costly inference.
-
-## Pipelines
-
-- Always validate pipelines after creation/edit with `make validate`.
-  Iterate if there are errors.
-
-## Project Structure
-
-- **Tests**: `tests/` directory
-- **Documentation**: `docs/` directory

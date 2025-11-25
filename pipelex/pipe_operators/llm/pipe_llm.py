@@ -1,6 +1,6 @@
 from typing import Literal, cast
 
-from pydantic import model_validator
+from pydantic import ValidationError, model_validator
 from typing_extensions import override
 
 from pipelex import log
@@ -13,15 +13,14 @@ from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -39,13 +38,14 @@ from pipelex.hub import (
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import (
     PipeRunParamKey,
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.pipeline.exceptions import PipeRunError
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tools.typing.structure_printer import StructurePrinter
 from pipelex.types import Self
 
@@ -62,39 +62,53 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     output_multiplicity: VariableMultiplicity | None = None
 
     @model_validator(mode="after")
-    def _validate_inputs(self) -> Self:
-        self.validate_inputs()
-        return self
-
-    @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
         if self.structuring_method is not None and self.output.structure_class_name == NativeConceptCode.TEXT:
             msg = (
                 f"Output concept '{self.output.code}' is considered a Text concept, "
                 f"so it cannot be structured. Maybe you forgot to add '{NativeConceptCode.TEXT}' to the class registry?"
             )
-            raise PipeDefinitionError(msg)
+            raise ValueError(msg)
         return self
 
     @override
-    def _validate_with_libraries(self):
-        self.validate_inputs()
-        self.llm_prompt_spec.validate_with_libraries()
+    def validate_inputs_static(self):
         if self.llm_choices:
             for llm_choice in self.llm_choices.list_choice_strings():
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
     @override
-    def validate_output(self):
+    def validate_inputs_with_library(self):
+        pass
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self):
+        # TODO: generalize because there are other concepts PipeLLM can't generate, not just images,
+        # and PipeLLM is not the only one with this kind of constraints
+
+        # Allow Dynamic output concept as it's flexible and can represent anything
+        if NativeConceptCode.is_dynamic_concept(concept_code=self.output.code):
+            return
+
         if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
         ):
             msg = (
-                f"The output of a LLM pipe cannot be compatible with the Image concept. In the "
-                f"pipe '{self.code}' the output is '{self.output.concept_string}'"
+                f"The output of the PipeLLM '{self.code}' cannot be compatible with the Image concept. "
+                f"The output concept is '{self.output.concept_string}'. "
+                "Use a PipeImgGen if you want to generate images. You can use a PipeLLM to generate the prompt for a PipeImgGen."
             )
-            raise PipeDefinitionError(msg)
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept_string,
+            )
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
@@ -109,56 +123,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def required_variables(self) -> set[str]:
         """Required variables are the variables that are used in the current prompt template or system prompt"""
         return {variable_name for variable_name in self.llm_prompt_spec.required_variables() if not variable_name.startswith("_")}
-
-    def validate_inputs(self):
-        static_validation_config = get_config().pipelex.static_validation_config
-        default_reaction = static_validation_config.default_reaction
-        reactions = static_validation_config.reactions
-        # Those are the variables required in the prompt template or system prompt
-        required_variables = self.required_variables()
-
-        # 1: Check that all the required variables are actually in the inputs
-        for required_variable_name in required_variables:
-            if required_variable_name not in self.needed_inputs().variables:
-                missing_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[required_variable_name],
-                )
-                match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(missing_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise missing_input_var_error
-
-        # 2: Check that all inputs are in the required variables
-        for input_name, requirement in self.needed_inputs().items:
-            if input_name not in required_variables:
-                explanation: str | None = None
-                if get_concept_library().is_image_concept(concept=requirement.concept):
-                    # We have an exraneous image input, the user probably forgot to add it into the prompt template
-                    explanation = (
-                        f"You have provided an image input named '{input_name}', but it is not referenced in the prompt template. "
-                        "Please add it to the prompt template."
-                    )
-
-                extraneous_input_var_error = StaticValidationError(
-                    error_type=StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain=self.domain,
-                    pipe_code=self.code,
-                    variable_names=[input_name],
-                    explanation=explanation,
-                )
-                match reactions.get(StaticValidationErrorType.EXTRANEOUS_INPUT_VARIABLE, default_reaction):
-                    case StaticValidationReaction.IGNORE:
-                        pass
-                    case StaticValidationReaction.LOG:
-                        log.error(extraneous_input_var_error.desc())
-                    case StaticValidationReaction.RAISE:
-                        raise extraneous_input_var_error
 
     @override
     async def _run_operator_pipe(
@@ -259,8 +223,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 )
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                msg = f"Error generating text with LLM {location}: {exc}"
-                raise PipeRunError(msg) from exc
+                error_details = self._format_llm_error(exc)
+                msg = f"Error generating text with LLM {location}: {error_details}"
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
             the_content = TextContent(
                 text=generated_text,
@@ -373,8 +338,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    msg = f"Error generating list of objects with text then object {location}: {exc}"
-                    raise PipeRunError(msg) from exc
+                    error_details = self._format_llm_error(exc)
+                    msg = f"Error generating list of objects with text then object {location}: {error_details}"
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             else:
                 # We're generating a list of objects directly
                 method_desc = "object_direct"
@@ -389,8 +355,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    msg = f"Error generating list of objects with direct method {location}: {exc}"
-                    raise PipeRunError(msg) from exc
+                    error_details = self._format_llm_error(exc)
+                    msg = f"Error generating list of objects with direct method {location}: {error_details}"
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
             the_content = ListContent(items=generated_objects)
         else:
@@ -413,8 +380,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    msg = f"Error generating single object with text then object {location}: {exc}"
-                    raise PipeRunError(msg) from exc
+                    error_details = self._format_llm_error(exc)
+                    msg = f"Error generating single object with text then object {location}: {error_details}"
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             else:
                 # We're generating a single object directly
                 method_desc = "object_direct"
@@ -428,14 +396,26 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    msg = f"Error generating single object with direct method {location}: {exc}"
-                    raise PipeRunError(msg) from exc
+                    error_details = self._format_llm_error(exc)
+                    msg = f"Error generating single object with direct method {location}: {error_details}"
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             the_content = generated_object
 
         return the_content
 
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
+
+    def _format_llm_error(self, exc: LLMCompletionError) -> str:
+        """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
+        error_details = str(exc)
+        current_exc: BaseException | None = exc
+        while current_exc is not None:
+            if isinstance(current_exc, ValidationError):
+                error_details = format_pydantic_validation_error(current_exc)
+                break
+            current_exc = current_exc.__cause__
+        return error_details
 
     @override
     async def _dry_run_operator_pipe(

@@ -25,8 +25,8 @@ def save_bytes_to_binary_file(file_path: str, byte_data: bytes, create_directory
     if create_directory:
         ensure_directory_exists(os.path.dirname(file_path))
 
-    with open(file_path, "wb") as f:
-        f.write(byte_data)
+    with open(file_path, "wb") as file:
+        file.write(byte_data)
     return file_path
 
 

@@ -1,6 +1,7 @@
 import os
 from typing import Any
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.system.configuration.config_root import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
@@ -13,7 +14,7 @@ CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
 
 
-class ConfigError(Exception):
+class ConfigError(PipelexError):
     pass
 
 
@@ -96,20 +97,19 @@ class ConfigLoader:
                 deep_update(pipelex_config, local_config)
 
         #################### 3. Load overrides for the current project ####################
-        list_of_overrides = [
+        list_of_overrides: list[str] = [
             *CONFIG_BASE_OVERRIDES_BEFORE_ENV,
             runtime_manager.environment,
             runtime_manager.run_mode,
             *CONFIG_BASE_OVERRIDES_AFTER_ENV,
         ]
         for override in list_of_overrides:
-            if override:
-                if override == runtime_manager.run_mode.UNIT_TEST:
-                    override_path = os.path.join(os.getcwd(), "tests", f"pipelex_{override}.toml")
-                else:
-                    override_path = os.path.join(os.getcwd(), "pipelex" if self.is_in_pipelex_config else "", f"pipelex_{override}.toml")
-                if override_dict := load_toml_from_path_if_exists(override_path):
-                    deep_update(pipelex_config, override_dict)
+            if override == runtime_manager.run_mode and runtime_manager.is_unit_testing:
+                override_path = os.path.join(os.getcwd(), "tests", f"pipelex_{override}.toml")
+            else:
+                override_path = os.path.join(os.getcwd(), "pipelex" if self.is_in_pipelex_config else "", f"pipelex_{override}.toml")
+            if override_dict := load_toml_from_path_if_exists(override_path):
+                deep_update(pipelex_config, override_dict)
 
         return pipelex_config
 

@@ -123,6 +123,9 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     def set_stuff(self, name: str, stuff: Stuff):
         self.root[name] = stuff
 
+    def is_stuff_exists(self, name: str) -> bool:
+        return name in self.root or name in self.aliases
+
     def add_new_stuff(self, name: str, stuff: Stuff, aliases: list[str] | None = None):
         # TODO: Add unit tests for this method
         if self.is_stuff_code_used(stuff_code=stuff.stuff_code):
