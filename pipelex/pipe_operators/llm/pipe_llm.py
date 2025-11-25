@@ -89,13 +89,18 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def validate_output_with_library(self):
         # TODO: generalize because there are other concepts PipeLLM can't generate, not just images,
         # and PipeLLM is not the only one with this kind of constraints
+
+        # Allow Dynamic output concept as it's flexible and can represent anything
+        if NativeConceptCode.is_dynamic_concept(concept_code=self.output.code):
+            return
+
         if get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
         ):
             msg = (
-                f"The output of a LLM pipe cannot be compatible with the Image concept. "
-                f"Output concept is '{self.output.concept_string}'. "
+                f"The output of the PipeLLM '{self.code}' cannot be compatible with the Image concept. "
+                f"The output concept is '{self.output.concept_string}'. "
                 "Use a PipeImgGen if you want to generate images. You can use a PipeLLM to generate the prompt for a PipeImgGen."
             )
             raise PipeValidationError(

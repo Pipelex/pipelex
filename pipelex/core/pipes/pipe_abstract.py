@@ -139,10 +139,21 @@ class PipeAbstract(ABC, BaseModel):
                     needed_requirement.concept.code not in (NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING)
                     and declared_requirement != needed_requirement
                 ):
+                    # Identify the specific mismatched field(s)
+                    mismatch_details: list[str] = []
+                    if declared_requirement.concept != needed_requirement.concept:
+                        mismatch_details.append(f"concept: declared='{declared_requirement.concept}' vs required='{needed_requirement.concept}'")
+                    if declared_requirement.multiplicity != needed_requirement.multiplicity:
+                        mismatch_details.append(
+                            f"multiplicity: declared='{declared_requirement.multiplicity}' vs required='{needed_requirement.multiplicity}'"
+                        )
+
+                    mismatch_summary = ", ".join(mismatch_details)
                     msg = (
-                        f"Input variable '{var_name}' requirement mismatch in pipe '{self.code}'.\n"
-                        f"Declared: input requirement {declared_requirement}.\n"
-                        f"Required: input requirement {needed_requirement}"
+                        f"In the pipe '{self.code}', the input variable '{var_name}' has a requirement mismatch.\n"
+                        f"Mismatched field(s): {mismatch_summary}\n"
+                        f"Declared: {declared_requirement}\n"
+                        f"Required: {needed_requirement}"
                     )
                     raise PipeValidationError(
                         message=msg,

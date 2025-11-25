@@ -55,6 +55,7 @@ from pipelex.system.exceptions import (
     ToolError,
     TracebackMessageError,
 )
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 
 __all__ = [
     # from pipelex.client.exceptions
@@ -77,6 +78,8 @@ __all__ = [
     "ConceptLoadingError",
     "DomainLoadingError",
     "PipeLoadingError",
+    # from pipelex.libraries.pipe.exceptions
+    "PipeNotFoundError",
     # from pipelex.pipe_controllers.exceptions
     "PipeControllerError",
     "PipeControllerOutputConceptMismatchError",
