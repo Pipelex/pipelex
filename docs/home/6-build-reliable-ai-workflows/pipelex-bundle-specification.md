@@ -201,6 +201,8 @@ Reconcile this payment with the invoice...
 
 One of Pipelex's strengths is how bundles can reference and build upon each other, creating modular, reusable pipeline architectures.
 
+When you execute pipelines, multiple bundles are loaded together into a **Library** - a runtime collection that provides access to all domains, concepts, and pipes from the loaded bundles. This library system enables bundle composition and ensures proper isolation between different pipeline runs. Learn more about how libraries work in [Libraries](libraries.md).
+
 ### Calling Pipes from Other Bundles
 
 A pipe in one bundle can call a pipe from another bundle using the full pipe identifier:
