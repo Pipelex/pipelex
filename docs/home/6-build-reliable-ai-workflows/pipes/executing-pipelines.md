@@ -32,7 +32,7 @@ This requires your pipelex file to be in the current directory, that means it wi
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline import execute_pipeline
 
 # First, initialize Pipelex (this loads all pipeline definitions)
 Pipelex.make()
@@ -55,7 +55,7 @@ You can directly pass to the `execute_pipeline` method the content of your pipel
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline import execute_pipeline
 
 my_pipe_content = """
 domain = "marketing"
@@ -101,7 +101,7 @@ For more complex scenarios where you need asynchronous control, use `start_pipel
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.start import start_pipeline
+from pipelex.pipeline import start_pipeline
 
 Pipelex.make()
 

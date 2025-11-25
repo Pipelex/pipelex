@@ -4,7 +4,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline import execute_pipeline
 from tests.e2e.pipelex.pipes.pipe_controller.pipe_sequence.test_tweet import OptimizedTweet
 
 SAMPLE_DRAFT_TWEET = """
@@ -95,7 +95,7 @@ class TestPipeSequenceWithInputMemory:
         """Test the optimize_tweet_sequence pipeline using inputs parameter."""
         # Execute the pipeline using inputs
         pipe_output = await execute_pipeline(
-            library_path="tests/e2e/pipelex/pipes/pipe_controller/pipe_sequence/",
+            library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_sequence/"],
             pipe_code="optimize_tweet_sequence",
             inputs={
                 "draft_tweet": {

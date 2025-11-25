@@ -372,7 +372,7 @@ Use fixed input multiplicity when:
 When a pipe produces multiple outputs, Pipelex automatically wraps them in a `ListContent` container. This container maintains the type information:
 
 ```python
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline import execute_pipeline
 
 # Execute a pipe with multiple outputs
 pipe_output = await execute_pipeline(

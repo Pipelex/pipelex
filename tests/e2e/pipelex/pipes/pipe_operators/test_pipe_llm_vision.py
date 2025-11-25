@@ -1,13 +1,11 @@
 """E2E test for PipeLLM with vision capabilities."""
 
-from pathlib import Path
-
 import pytest
 
 from pipelex import pretty_print, pretty_print_md
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline import execute_pipeline
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm_vision import VisionAnalysisE2E
 from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -22,7 +20,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code="describe_image_e2e",
-            library_path=str(Path("tests/e2e/pipelex/pipes/pipe_operators")),
+            library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"],
             inputs={
                 "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING),
             },
@@ -57,7 +55,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with an image
         pipe_output = await execute_pipeline(
             pipe_code=pipe_code,
-            library_path=str(Path("tests/e2e/pipelex/pipes/pipe_operators")),
+            library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"],
             inputs={
                 "image_a": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING),
                 "image_b": ImageContent(url=PipeTestCases.URL_IMG_FASHION_PHOTO_1),

@@ -54,7 +54,7 @@ import asyncio
 
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline import execute_pipeline
 
 
 async def run_my_pipe():
@@ -321,7 +321,7 @@ def generate_runner_code(pipe: PipeAbstract) -> str:
     import_lines.extend(
         [
             "from pipelex.pipelex import Pipelex",
-            "from pipelex.pipeline.execute import execute_pipeline",
+            "from pipelex.pipeline import execute_pipeline",
         ]
     )
 

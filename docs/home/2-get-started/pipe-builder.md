@@ -52,7 +52,7 @@ This requires having the `.plx` file or your pipe inside the directory where the
 
 ```python
 import json
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline import execute_pipeline
 from pipelex.pipelex import Pipelex
 
 # Initialize Pipelex

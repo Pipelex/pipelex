@@ -1,20 +1,18 @@
-import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import (
     get_library_manager,
-    get_pipe_router,
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
     set_current_library,
 )
+from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import (
@@ -33,9 +31,9 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 
-async def start_pipeline(
+async def pipeline_run_setup(
     library_id: str | None = None,
-    library_path: str | None = None,
+    library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
@@ -44,20 +42,19 @@ async def start_pipeline(
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domains: list[str] | None = None,
-) -> tuple[str, asyncio.Task[PipeOutput]]:
-    """Start a pipeline in the background.
+) -> tuple[PipeJob, str]:
+    """Set up a pipeline for execution.
 
-    This function mirrors *execute_pipeline* but returns immediately with the
-    ``pipeline_run_id`` and a task instead of waiting for the pipe run to complete.
-    The actual execution is scheduled on the current event-loop using
-    :pyfunc:`asyncio.create_task`.
+    This function handles all the common setup logic for both execute_pipeline
+    and start_pipeline, including library setup, pipe loading, working memory
+    initialization, and pipe job creation.
 
     Parameters
     ----------
     library_id:
         The library ID to use for the pipeline execution. If not provided, the library_id will be set to the pipeline run ID.
-    library_path:
-        Path to the library directory to load.
+    library_dirs:
+        List of library directories to load. If not provided, the current working directory will be used.
     pipe_code:
         The code identifying the pipeline to execute.
     plx_content:
@@ -80,13 +77,12 @@ async def start_pipeline(
 
     Returns:
     -------
-    Tuple[str, asyncio.Task[PipeOutput]]
-        The ``pipeline_run_id`` of the newly started pipeline and a task that
-        can be awaited to get the pipe output.
+    tuple[PipeJob, str]
+        A tuple containing the pipe job ready for execution and the pipeline run ID.
 
     """
     if not plx_content and not pipe_code:
-        msg = "Either pipe_code or plx_content must be provided to the API start_pipeline."
+        msg = "Either pipe_code or plx_content must be provided to the pipeline API."
         raise ValueError(msg)
 
     pipeline = get_pipeline_manager().add_new_pipeline()
@@ -112,16 +108,16 @@ async def start_pipeline(
         elif blueprint.main_pipe:
             pipe = get_required_pipe(pipe_code=blueprint.main_pipe)
         else:
-            msg = "No pipe code or main pipe in the PLX content provided to the API start_pipeline."
+            msg = "No pipe code or main pipe in the PLX content provided to the pipeline API."
             raise PipeExecutionError(message=msg)
     elif pipe_code:
-        if library_path:
-            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(library_path)])
+        if library_dirs:
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(library_dir) for library_dir in library_dirs])
         else:
-            library_manager.load_libraries(library_id=library_id)
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
-        msg = "Either provide pipe_code or plx_content to the API start_pipeline. 'pipe_code' must be provided when 'plx_content' is None"
+        msg = "Either provide pipe_code or plx_content to the pipeline API. 'pipe_code' must be provided when 'plx_content' is None"
         raise PipeExecutionError(message=msg)
 
     search_domains = search_domains or []
@@ -171,7 +167,4 @@ async def start_pipeline(
     }
     get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
 
-    # Launch execution without awaiting the result.
-    task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))
-
-    return pipeline.pipeline_run_id, task
+    return pipe_job, pipeline_run_id
