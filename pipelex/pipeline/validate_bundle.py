@@ -60,6 +60,7 @@ class ValidateBundleError(PipelexError):
 
         This property provides the old interface for accessing all pipe/concept validation errors.
         """
+        # TODO refactor so we don't need this anymore?
         return self.pipe_validation_errors + self.pipe_concept_instantiation_errors
 
 

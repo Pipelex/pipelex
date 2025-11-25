@@ -1,5 +1,6 @@
 from typing import Literal
 
+from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -26,6 +27,14 @@ class PipeSequence(PipeController):
     @override
     def required_variables(self) -> set[str]:
         return set()
+
+    @field_validator("sequential_sub_pipes", mode="after")
+    @classmethod
+    def validate_sequential_sub_pipes(cls, value: list[SubPipe]) -> list[SubPipe]:
+        if not value:
+            msg = f"PipeSequence '{cls.code}' requires at least one sub-pipe"
+            raise ValueError(msg)
+        return value
 
     @override
     def validate_inputs_static(self):
