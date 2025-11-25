@@ -12,6 +12,7 @@
 - Improved pipe builder by auto-fixing errors, forcing consistency in the inputs and outputs of the pipes.
 - PipeCondition:
   - Moved the expression/expression_template choosing to the factory.
+- Methods `execute_pipeline` and `start_pipeline`: the functions migrated to `pipelex.pipeline.run` package. Those functions can be imported from `pipelex.pipeline` instead of `pipelex.pipeline.run`.
 
 ### Feature
 
