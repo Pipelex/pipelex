@@ -10,7 +10,7 @@ A Library is composed of three core components:
 - **ConceptLibrary**: Manages all concept definitions across domains
 - **PipeLibrary**: Manages all pipe definitions
 
-These three components together form what we call a **Pipelex Bundle** (the content you define in `.plx` files). Learn more about bundle structure and syntax in the [Pipelex Bundle Specification](pipelex-bundle-specification.md).
+These three components together form what we call a **Pipelex Bundle** (the content you define in `.plx` files). Learn more about bundle structure and syntax in the [Pipelex Bundle Specification](./pipelex-bundle-specification.md).
 
 ## Understanding Library Scope
 
@@ -233,7 +233,7 @@ output2 = await execute_pipeline(
 ## Related Documentation
 
 - [Executing Pipelines](pipes/executing-pipelines.md) - Learn how to execute pipelines with different library configurations
-- [Pipelex Bundle Specification](pipes/pipelex-bundle-specification.md) - Understand the structure of PLX files
-- [Domains](domains.md) - Learn about organizing pipes into domains
-- [Concepts](concepts.md) - Understand how concepts work within libraries
+- [Pipelex Bundle Specification](./pipelex-bundle-specification.md) - Understand the structure of PLX files
+- [Domains](./domain.md) - Learn about organizing pipes into domains
+- [Concepts](./concepts/define_your_concepts.md) - Understand how concepts work within libraries
 
