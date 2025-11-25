@@ -1,6 +1,5 @@
 import pytest
 
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.validation import is_valid_input_name, validate_input_name
 
 
@@ -90,13 +89,13 @@ class TestInputNameValidation:
         ],
     )
     def test_validate_input_name_invalid(self, invalid_input_name: str):
-        """Test validate_input_name raises PipeBlueprintValueError for invalid input names."""
-        with pytest.raises(PipeBlueprintValueError, match="Invalid input name syntax"):
+        """Test validate_input_name raises ValueError for invalid input names."""
+        with pytest.raises(ValueError, match="Invalid input name syntax"):
             validate_input_name(invalid_input_name)
 
     def test_validate_input_name_error_message(self):
         """Test that the error message is helpful and descriptive."""
-        with pytest.raises(PipeBlueprintValueError) as exc_info:
+        with pytest.raises(ValueError, match="Invalid input name syntax") as exc_info:
             validate_input_name("myInput.fieldName")
 
         error_message = str(exc_info.value)

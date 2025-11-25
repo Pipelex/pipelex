@@ -8,10 +8,10 @@ from pipelex.core.concepts.exceptions import (
     ConceptFactoryError,
     ConceptRefineError,
     ConceptStringError,
-    ConceptStructureGeneratorError,
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.structure_generator import StructureGenerator
+from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
+from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.concepts.validation import is_concept_code_valid, validate_concept_string_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent

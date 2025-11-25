@@ -42,6 +42,7 @@ def do_validate_all_libraries_and_dry_run() -> None:
             library_id, library = library_manager.open_library()
             set_current_library(library_id=library_id)
             library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+
             pipes = library.get_pipe_library().get_pipes()
 
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
@@ -141,13 +142,16 @@ def validate_cmd(
             except ValidateBundleError as bundle_error:
                 handle_validate_bundle_error(bundle_error, bundle_path=bundle_path)
         elif pipe_code:
-            # Validate a single pipe by code
             typer.echo(f"Validating pipe '{pipe_code}'...")
-            get_telemetry_manager().track_event(
-                EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: get_required_pipe(pipe_code=pipe_code).type}
-            )
+            library_manager = get_library_manager()
+            library_id, _ = library_manager.open_library()
+            set_current_library(library_id=library_id)
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+
+            pipe = get_required_pipe(pipe_code=pipe_code)
+            get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
             await dry_run_pipe(
-                get_required_pipe(pipe_code=pipe_code),
+                pipe,
                 raise_on_failure=True,
             )
             typer.secho(f"✅ Successfully validated pipe '{pipe_code}'", fg=typer.colors.GREEN)

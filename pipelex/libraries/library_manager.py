@@ -2,7 +2,6 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -11,14 +10,11 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
-from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError
-from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.core.validation import report_validation_error
-from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
 from pipelex.hub import get_current_library
 from pipelex.libraries.exceptions import (
     LibraryError,
@@ -257,40 +253,16 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Could not find PLX bundle at '{plx_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
             except PipelexInterpreterError as interpreter_error:
-                # Forward categorized validation errors from interpreter
+                # Forward BLUEPRINT validation errors from interpreter
                 msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {interpreter_error.message}"
                 raise LibraryLoadingError(
                     message=msg,
-                    validation_errors=interpreter_error.validation_errors,
+                    blueprint_validation_errors=interpreter_error.validation_errors,
                 ) from interpreter_error
-            except PipeDefinitionError as pipe_def_error:
-                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {pipe_def_error}"
-                raise LibraryLoadingError(msg) from pipe_def_error
             blueprints.append(blueprint)
 
         self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
-
-        # Load all blueprints into the library
-        try:
-            self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
-        except ValidationError as validation_error:
-            # Categorize and forward Pydantic validation errors
-            validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
-            for error in validation_error.errors():
-                val_error = categorize_and_create_error_data(
-                    error=error,
-                    blueprint_dict=None,
-                    domain=None,
-                    source=None,
-                )
-                validation_errors.append(val_error)
-
-            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-            msg = f"Could not load blueprints because of: {validation_error_msg}"
-            raise LibraryLoadingError(
-                message=msg,
-                validation_errors=validation_errors,
-            ) from validation_error
+        self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

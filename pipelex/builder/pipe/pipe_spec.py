@@ -9,7 +9,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.validation import validate_concept_string_or_code
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -72,7 +71,7 @@ class PipeSpec(StructuredContent):
     def validate_pipe_type(cls, value: Any) -> Any:
         if value not in PipeType.value_list():
             msg = f"Invalid pipe type '{value}'. Must be one of: {PipeType.value_list()}"
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
         return value
 
     @field_validator("output", mode="after")
@@ -92,7 +91,7 @@ class PipeSpec(StructuredContent):
         for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
-                raise PipeBlueprintValueError(msg)
+                raise ValueError(msg)
 
             # Validate the concept spec format with optional multiplicity brackets
             # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
@@ -102,7 +101,7 @@ class PipeSpec(StructuredContent):
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
                     f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
                 )
-                raise PipeBlueprintValueError(msg)
+                raise ValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
@@ -120,7 +119,7 @@ class PipeSpec(StructuredContent):
 
         if not is_snake_case(normalized_pipe_code):
             msg = f"Invalid pipe code syntax '{normalized_pipe_code}'. Must be in snake_case."
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
         return normalized_pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:

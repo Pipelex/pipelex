@@ -2,7 +2,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.interpreter import PipelexInterpreter
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from tests.unit.pipelex.core.test_data import InterpreterTestCases
 
 
