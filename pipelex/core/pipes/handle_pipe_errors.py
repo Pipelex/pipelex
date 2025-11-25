@@ -3,8 +3,8 @@ from enum import Enum
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.interpreter.validation_error_categorizer import ErrorCatKey
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 
 
@@ -38,7 +38,8 @@ def categorize_pipe_validation_error(
     if errors:
         # Check first error's field name to determine model type
         first_error = errors[0]
-        loc = first_error.get("loc", ())
+        loc = first_error.get(ErrorCatKey.LOC.value, ())
+        # TODO: Refactor how to determine model scope (use error codes)
         if loc:
             field_name = str(loc[0])
             # Concept-specific fields
@@ -62,16 +63,22 @@ def categorize_pipe_validation_error(
                 pipe_code=None,  # We don't have the code at this point
             )
         else:
-            # Unexpected scope for pipe/concept validation
-            message = error.get("msg", "Unknown validation error")
-            pydantic_type = error.get("type", "")
-            loc = error.get("loc", ())
-            field_path = " → ".join(str(item) for item in loc)
-            msg = (
-                f"Unexpected model scope for pipe/concept validation: "
-                f"type='{pydantic_type}', scope='{model_scope}', path='{field_path}', message='{message}'"
+            loc = error.get(ErrorCatKey.LOC.value, ())
+            message = error.get(ErrorCatKey.MSG.value, "Unknown validation error")
+            field_path_str = " → ".join(str(item) for item in loc)
+            unknown_field_name = str(loc[0]) if len(loc) >= 1 else None
+
+            categorized_error = PipesAndConceptValidationErrorData(
+                domain=None,
+                source=None,
+                pipe_code=None,
+                concept_code=None,  # We don't have the code at this point
+                field_name=unknown_field_name,
+                error_type=PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR,
+                message=message,
+                field_path=field_path_str,
+                variable_names=None,
             )
-            raise PipelexUnexpectedError(msg)
         categorized_errors.append(categorized_error)
     return categorized_errors
 
@@ -92,9 +99,9 @@ def _handle_pipe_errors(
         PipesAndConceptValidationErrorData with all context populated
     """
     # Extract data from error
-    loc = error.get("loc", ())
-    message = error.get("msg", "Unknown validation error")
-    pydantic_type = error.get("type", "")
+    loc = error.get(ErrorCatKey.LOC.value, ())
+    message = error.get(ErrorCatKey.MSG.value, "Unknown validation error")
+    pydantic_type = error.get(ErrorCatKey.TYPE.value, "")
     field_path = " → ".join(str(item) for item in loc)
 
     # Extract field_name from loc[0] (direct field on Pipe model)
