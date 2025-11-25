@@ -1,0 +1,48 @@
+[MAIN]
+# Files or directories to be skipped. They should be base names, not paths.
+ignore=.venv,__pycache__,build,dist,.git
+
+# Minimum supported python version
+py-version = 3.11
+
+[MESSAGES CONTROL]
+# Disable everything first, then enable specific checks
+disable=all
+
+# Enable only these specific checks
+enable=
+    W0101,  # Unreachable code: Used when there is some code behind a "return" or "raise" statement, which will never be accessed.
+    C0103,  # invalid-name (naming convention)
+
+[REPORTS]
+# Tells whether to display a full report or only the messages
+reports=no
+
+[BASIC]
+# Good variable names which should always be accepted, separated by a comma
+good-names=_
+
+# Regular expression matching correct variable names
+# Variables / attributes / arguments: snake_case, not length 1
+variable-rgx=^(?!.$)[a-z_][a-z0-9_]*$
+
+# Regular expression matching correct argument names
+argument-rgx=^(?!.$)[a-z_][a-z0-9_]*$
+
+# Regular expression matching correct attribute names
+attr-rgx=^(?!.$)[a-z_][a-z0-9_]*$
+
+# Regular expression matching correct function names
+# Functions / methods: snake_case, not length 1
+function-rgx=^(?!.$)[a-z_][a-z0-9_]*$
+
+# Regular expression matching correct method names
+method-rgx=^(?!.$)[a-z_][a-z0-9_]*$
+
+# Regular expression matching correct class names
+# Classes: CapWords, not length 1
+class-rgx=^(?!.$)[A-Z_][a-zA-Z0-9_]*$
+
+# Regular expression which can overwrite the naming style set by typevar-naming-style.
+typevar-rgx=^[A-Za-z_][A-Za-z0-9_]*$
+

@@ -458,23 +458,23 @@ cm: cov-missing
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	@bash -c 'TIMEFORMAT="⏱️  format completed in %Rs"; time { $(VENV_RUFF) format . --config pyproject.toml; }'
+	@bash -c 'TIMEFORMAT="⏱️  format completed in %Rs"; time { $(VENV_RUFF) format .; }'
 
 lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
-	@bash -c 'TIMEFORMAT="⏱️  lint completed in %Rs"; time { $(VENV_RUFF) check . --fix --config pyproject.toml; }'
+	@bash -c 'TIMEFORMAT="⏱️  lint completed in %Rs"; time { $(VENV_RUFF) check . --fix; }'
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	@bash -c 'TIMEFORMAT="⏱️  pyright completed in %Rs"; time { $(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml; }'
+	@bash -c 'TIMEFORMAT="⏱️  pyright completed in %Rs"; time { $(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON); }'
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	@bash -c 'TIMEFORMAT="⏱️  mypy completed in %Rs"; time { $(VENV_MYPY) --config-file pyproject.toml; }'
+	@bash -c 'TIMEFORMAT="⏱️  mypy completed in %Rs"; time { $(VENV_MYPY); }'
 
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
-	@bash -c 'TIMEFORMAT="⏱️  pylint completed in %Rs"; time { $(VENV_PYLINT) --rcfile pyproject.toml pipelex tests; }'
+	@bash -c 'TIMEFORMAT="⏱️  pylint completed in %Rs"; time { $(VENV_PYLINT) pipelex tests; }'
 
 
 ##########################################################################################
@@ -483,11 +483,11 @@ pylint: env
 
 merge-check-ruff-format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	$(VENV_RUFF) format --check . --config pyproject.toml
+	$(VENV_RUFF) format --check .
 
 merge-check-ruff-lint: env check-unused-imports
 	$(call PRINT_TITLE,"Linting with ruff without fixing files")
-	$(VENV_RUFF) check . --config pyproject.toml
+	$(VENV_RUFF) check .
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
@@ -495,11 +495,11 @@ merge-check-pyright: env
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	$(VENV_MYPY)
 
 merge-check-pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
-	$(VENV_PYLINT) --rcfile pyproject.toml .
+	$(VENV_PYLINT) .
 
 ##########################################################################################
 ### MISCELLANEOUS
