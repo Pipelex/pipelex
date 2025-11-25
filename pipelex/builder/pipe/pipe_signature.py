@@ -7,7 +7,6 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -57,7 +56,7 @@ class PipeSignature(StructuredContent):
             type_str = values["type"]
         except TypeError as exc:
             msg = f"Invalid type for '{values}': could not get subscript, required for 'type'"
-            raise PipeBlueprintValueError(msg) from exc
+            raise ValueError(msg) from exc
         # we need to convert the type string to the PipeType enum because it arrives as a str implictly converted to enum but not yet
         the_type = PipeType(type_str)
         values["pipe_category"] = the_type.category

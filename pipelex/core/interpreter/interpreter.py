@@ -1,12 +1,16 @@
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipelexInterpreterError, PLXDecodeError
-from pipelex.core.validation_error_categorizer import categorize_and_create_error_data
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.validation_error_categorizer import categorize_blueprint_validation_error
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 
 
 class PipelexInterpreter(BaseModel):
@@ -71,30 +75,14 @@ class PipelexInterpreter(BaseModel):
             return PipelexBundleBlueprint.model_validate(blueprint_dict)
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
-            # Parse Pydantic validation errors into structured error data
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []
 
-            # Handle domain and source fields carefully for context
-            domain_value: str | None = blueprint_dict.get("domain") if blueprint_dict else None
-            source_value: str | None = blueprint_dict.get("source") if blueprint_dict else bundle_path
-
             for error in exc.errors():
-                loc = error.get("loc", ())
-
-                # Don't use domain/source from blueprint if they're the fields that failed
-                error_domain = None if (loc and loc[0] == "domain") else domain_value
-                error_source = bundle_path if (loc and loc[0] == "source") else source_value
-
-                # Categorize error and create structured error data
-                val_error = categorize_and_create_error_data(
-                    error=error,
-                    blueprint_dict=blueprint_dict,
-                    domain=error_domain,
-                    source=error_source,
-                )
-                blueprint_validation_errors.append(val_error)
+                categorized_error = categorize_blueprint_validation_error(blueprint_dict=blueprint_dict, error=error)
+                if categorized_error:
+                    blueprint_validation_errors.append(categorized_error)
 
             raise PipelexInterpreterError(
-                message=str(exc),
+                message=format_pydantic_validation_error(exc),
                 validation_errors=blueprint_validation_errors,
             ) from exc

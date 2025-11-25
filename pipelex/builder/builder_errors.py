@@ -13,9 +13,5 @@ class ConceptSpecError(PipelexError):
     """Details of a single concept failure during dry run."""
 
 
-class PipeSpecError(PipelexError):
-    """Details of a single pipe failure during dry run."""
-
-
 class PipelexBundleUnexpectedError(PipelexError):
     """Raised when an unexpected error occurs during validation."""
