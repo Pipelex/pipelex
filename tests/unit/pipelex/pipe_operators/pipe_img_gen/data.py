@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
-from pipelex.core.pipes.validation import PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
 

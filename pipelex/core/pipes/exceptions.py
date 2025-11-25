@@ -5,7 +5,7 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.core.pipes.validation import PipeValidationErrorType
+from pipelex.types import StrEnum
 
 
 class PipeFactoryError(PipelexError):
@@ -51,19 +51,34 @@ class PipeOperatorModelChoiceError(PipelexError):
         return self.desc()
 
 
-class PipeRunError(PipelexError):
-    pass
+class PipeValidationErrorType(StrEnum):
+    """Types of pipe validation errors.
 
+    These error types are raised during pipe validation from Pipe/Concept classes.
+    Only some are auto-fixed in the builder loop (marked below).
+    """
 
-class PipeDryRunError(PipeRunError):
-    pass
+    # Errors that are auto-fixed in builder_loop.py
+    MISSING_INPUT_VARIABLE = "missing_input_variable"  # AUTO-FIXED
+    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"  # AUTO-FIXED
+    INPUT_REQUIREMENT_MISMATCH = "input_requirement_mismatch"  # AUTO-FIXED
+    INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"  # AUTO-FIXED
+
+    CIRCULAR_DEPENDENCY_ERROR = "circular_dependency_error"
+
+    # Errors that are raised but NOT auto-fixed (will fail validation)
+    LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
+    IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE = "img_gen_input_not_text_compatible"
+
+    # Generic fallback for unexpected validation errors
+    UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
 
 
 class PipeValidationError(ValueError):
     def __init__(
         self,
         message: str,
-        error_type: PipeValidationErrorType,
+        error_type: PipeValidationErrorType | None = None,
         domain: str | None = None,
         pipe_code: str | None = None,
         variable_names: list[str] | None = None,

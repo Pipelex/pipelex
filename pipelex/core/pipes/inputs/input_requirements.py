@@ -77,6 +77,9 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
             raise PipeInputNotFoundError(msg)
         return requirement
 
+    def is_variable_existing(self, variable_name: str) -> bool:
+        return variable_name in self.root
+
     def add_requirement(self, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
         self.root[variable_name] = InputRequirement(concept=concept, multiplicity=multiplicity)
 

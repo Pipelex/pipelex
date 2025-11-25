@@ -1,12 +1,23 @@
-from typing import Any
+from typing import Any, cast
 
 from pydantic_core import ErrorDetails
 
+from pipelex import log
 from pipelex.core.bundles.exceptions import (
-    PipelexBundleBlueprintFixableErrorType,
     PipelexBundleBlueprintValidationErrorData,
 )
-from pipelex.core.interpreter.helpers import ValidationErrorScope, get_error_scope
+from pipelex.core.interpreter.helpers import get_error_scope
+from pipelex.types import StrEnum
+
+
+class ErrorCatKey(StrEnum):
+    LOC = "loc"
+    MSG = "msg"
+    TYPE = "type"
+
+
+PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
+PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 
 
 def categorize_blueprint_validation_error(
@@ -22,145 +33,11 @@ def categorize_blueprint_validation_error(
     Returns:
         PipelexBundleBlueprintValidationErrorData with all relevant fields populated, or None if error cannot be categorized
     """
-    domain = blueprint_dict.get("domain") if blueprint_dict else None
-    source = blueprint_dict.get("source") if blueprint_dict else None
+    domain = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD)) if blueprint_dict else None
+    source = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD)) if blueprint_dict else None
 
-    loc = error.get("loc", ())
+    loc = error.get(ErrorCatKey.LOC.value, ())
     error_scope = get_error_scope(loc)
+    log.warning(f"Pipelex bundle blueprint validation error that is not categorized: {error_scope} - {source} - {domain}")
 
-    if ValidationErrorScope.is_pipe_scope(scope=error_scope):
-        return _handle_pipe_errors(
-            error=error,
-            domain=domain,
-            source=source,
-            error_scope=error_scope,
-        )
     return None
-
-
-def _handle_pipe_errors(
-    error: ErrorDetails,
-    domain: str | None,
-    source: str | None,
-    error_scope: ValidationErrorScope,
-) -> PipelexBundleBlueprintValidationErrorData | None:
-    """Handle all PIPE scope validation errors.
-
-    Extracts pipe_code and all other necessary context from error,
-    then processes the specific error type.
-
-    Currently only handles PIPE_SEQUENCE_OUTPUT_MISMATCH which is the only
-    pipe error that is auto-fixed in the builder loop.
-
-    Args:
-        error: Pydantic error details
-        domain: Domain where error occurred
-        source: Source file path
-        error_scope: The error scope (PIPE)
-
-    Returns:
-        PipelexBundleBlueprintValidationErrorData with all context populated, or None if error cannot be categorized
-    """
-    # Extract data from error
-    loc = error.get("loc", ())
-    message = error.get("msg", "Unknown validation error")
-    pydantic_type = error.get("type", "")
-
-    # Extract pipe_code from loc[1]
-    pipe_code = str(loc[1]) if len(loc) >= 2 else None
-    if not pipe_code:
-        # Cannot categorize without pipe_code
-        return None
-
-    # Extract field_name from loc[2] if present
-    field_name = str(loc[2]) if len(loc) >= 3 else None
-
-    # Detect specific error type: PIPE_SEQUENCE_OUTPUT_MISMATCH
-    if pydantic_type == "value_error":
-        if "concept mismatch" in message.lower() or "not compatible with the output concept" in message:
-            return _handle_pipe_sequence_output_mismatch(
-                pipe_code=pipe_code,
-                field_name=field_name,
-                message=message,
-                field_path=" → ".join(str(item) for item in loc),
-                domain=domain,
-                source=source,
-                error_scope=error_scope.value,
-            )
-
-    # Cannot categorize this error - return None to let it propagate as regular validation error
-    return None
-
-
-def _handle_pipe_sequence_output_mismatch(
-    pipe_code: str,
-    field_name: str | None,
-    message: str,
-    field_path: str,
-    domain: str | None,
-    source: str | None,
-    error_scope: str,
-) -> PipelexBundleBlueprintValidationErrorData:
-    """Handle PIPE_SEQUENCE_OUTPUT_MISMATCH error and extract all relevant context.
-
-    This is the ONLY error type that is auto-fixed in the builder loop.
-
-    Args:
-        pipe_code: The pipe code where the error occurred
-        field_name: Field name if applicable
-        message: Error message from Pydantic
-        field_path: Full field path
-        domain: Domain where error occurred
-        source: Source file path
-        error_scope: Scope of the error
-
-    Returns:
-        PipelexBundleBlueprintValidationErrorData with all context populated
-    """
-    # Extract all context from the message in one go
-    last_step_pipe_code: str | None = None
-    last_step_output_concept: str | None = None
-    expected_output_concept: str | None = None
-
-    if "last step" in message:
-        # Extract: "of the last step 'my_pipe'"
-        try:
-            if "last step '" in message:
-                start = message.index("last step '") + len("last step '")
-                end = message.index("'", start)
-                last_step_pipe_code = message[start:end]
-        except (ValueError, IndexError):
-            pass
-
-        # Extract: "the output concept 'Text' of the last step"
-        try:
-            if "output concept '" in message:
-                start = message.index("output concept '") + len("output concept '")
-                end = message.index("'", start)
-                last_step_output_concept = message[start:end]
-        except (ValueError, IndexError):
-            pass
-
-        # Extract: "with the output concept 'Image' of the sequence"
-        try:
-            if "with the output concept '" in message:
-                start = message.index("with the output concept '") + len("with the output concept '")
-                end = message.index("'", start)
-                expected_output_concept = message[start:end]
-        except (ValueError, IndexError):
-            pass
-
-    return PipelexBundleBlueprintValidationErrorData(
-        domain=domain,
-        source=source,
-        pipe_code=pipe_code,
-        concept_code=None,
-        field_name=field_name,
-        error_type=PipelexBundleBlueprintFixableErrorType.PIPE_SEQUENCE_OUTPUT_MISMATCH,
-        error_scope=error_scope,
-        message=message,
-        field_path=field_path,
-        last_step_pipe_code=last_step_pipe_code,
-        last_step_output_concept=last_step_output_concept,
-        expected_output_concept=expected_output_concept,
-    )

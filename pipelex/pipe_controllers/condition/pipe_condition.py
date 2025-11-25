@@ -9,20 +9,17 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.core.pipes.inputs.exceptions import PipeInputError
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
-from pipelex.pipe_controllers.condition.exceptions import PipeConditionRunError
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.exceptions import DryRunMissingInputsError, DryRunMissingPipesError, DryRunTemplatingError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -152,6 +149,26 @@ class PipeCondition(PipeController):
                     required_concept_codes=[self.output.concept_string],
                 )
 
+    @override
+    async def validate_before_run(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ):
+        evaluated_expression = await get_content_generator().make_templated_text(
+            context=working_memory.generate_context(),
+            template=self.expression,
+            template_category=TemplateCategory.EXPRESSION,
+        )
+        if not evaluated_expression or evaluated_expression == "None":
+            error_msg = f"Conditional expression returned no result in pipe '{self.code}'"
+            raise PipeRunError(
+                message=error_msg,
+                run_mode=pipe_run_params.run_mode,
+            )
+
     async def _evaluate_expression(
         self,
         working_memory: WorkingMemory,
@@ -163,27 +180,13 @@ class PipeCondition(PipeController):
 
         Returns:
             The evaluated expression
-
-        Raises:
-            PipeConditionError: If expression evaluation fails or no matching pipe is found
         """
-        content_generator = get_content_generator()
-
-        # Evaluate the expression using templating
-        evaluated_expression = await content_generator.make_templated_text(
+        evaluated_expression = await get_content_generator().make_templated_text(
             context=working_memory.generate_context(),
             template=self.expression,
             template_category=TemplateCategory.EXPRESSION,
         )
 
-        # Validate the evaluated expression
-        if not evaluated_expression or evaluated_expression == "None":
-            error_msg = f"Conditional expression returned no result in pipe {self.code}:"
-            error_msg += f"\n\nExpression: {self.expression}"
-            raise PipeConditionRunError(error_msg)
-        log.verbose(f"evaluated_expression: '{evaluated_expression}'")
-
-        # Add alias if configured
         log.verbose(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
         if self.add_alias_from_expression_to:
             working_memory.add_alias(
@@ -218,7 +221,7 @@ class PipeCondition(PipeController):
 
         if SpecialOutcome.is_fail(outcome):
             msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
-            raise PipeConditionRunError(msg)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
 
         chosen_pipe = get_required_pipe(pipe_code=outcome)
 
@@ -238,7 +241,7 @@ class PipeCondition(PipeController):
             pipe_condition_path_str = ".".join(pipe_condition_path)
             error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
             msg = f"Some required stuff(s) not found: {error_details}"
-            raise PipeInputError(message=msg, pipe_code=self.code, variable_name=exc.variable_name, concept_code=None) from exc
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
         # Track condition steps
         for required_stuff in required_stuffs:
@@ -283,7 +286,6 @@ class PipeCondition(PipeController):
         Validates that all required inputs are present, expression is valid, and target pipes exist.
         """
         log.verbose(f"PipeCondition: dry run controller pipe: {self.code}")
-
         # 1. Validate that all required inputs are present in the working memory
         needed_inputs = self.needed_inputs()
         missing_input_names: list[str] = []
@@ -294,11 +296,9 @@ class PipeCondition(PipeController):
 
         if missing_input_names:
             log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
-            raise DryRunMissingInputsError(
+            raise PipeRunError(
                 message=f"Dry run failed for pipe '{self.code}' (PipeCondition): missing required inputs: {', '.join(missing_input_names)}",
-                pipe_type=self.__class__.__name__,
-                pipe_code=self.code,
-                missing_inputs=missing_input_names,
+                run_mode=pipe_run_params.run_mode,
             )
 
         # 2. Validate that the expression template is valid
@@ -314,13 +314,7 @@ class PipeCondition(PipeController):
                 f"Dry run failed for pipe '{self.code}' (PipeCondition): could not detect required variables "
                 f"from expression template: {exc}\nTemplate:\n'{self.expression}'"
             )
-            raise DryRunTemplatingError(
-                message=msg,
-                pipe_type=self.__class__.__name__,
-                pipe_code=self.code,
-                template_category=TemplateCategory.EXPRESSION,
-                template=self.expression,
-            ) from exc
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
         # 3. Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
         all_pipe_codes = set(self.outcome_map.values())
@@ -335,7 +329,7 @@ class PipeCondition(PipeController):
                 f"Dry run failed for PipeCondition '{self.code}': missing pipes: {', '.join(missing_pipes)}. "
                 f"Pipe map: {self.outcome_map}, default: {self.default_outcome}"
             )
-            raise DryRunMissingPipesError(message=msg, pipe_type=self.__class__.__name__, pipe_code=self.code, missing_pipes=missing_pipes)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
 
         # Here, it should launch the dry run of all the pipes in the outcomes map
         for pipe_code in self.mapped_pipe_codes:

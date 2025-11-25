@@ -18,11 +18,10 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -39,12 +38,12 @@ from pipelex.hub import (
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import (
     PipeRunParamKey,
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.pipeline.exceptions import PipeRunError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.structure_printer import StructurePrinter
 from pipelex.types import Self
@@ -219,7 +218,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 msg = f"Error generating text with LLM {location}: {exc}"
-                raise PipeRunError(msg) from exc
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
             the_content = TextContent(
                 text=generated_text,
@@ -333,7 +332,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     msg = f"Error generating list of objects with text then object {location}: {exc}"
-                    raise PipeRunError(msg) from exc
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             else:
                 # We're generating a list of objects directly
                 method_desc = "object_direct"
@@ -349,7 +348,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     msg = f"Error generating list of objects with direct method {location}: {exc}"
-                    raise PipeRunError(msg) from exc
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
             the_content = ListContent(items=generated_objects)
         else:
@@ -373,7 +372,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     msg = f"Error generating single object with text then object {location}: {exc}"
-                    raise PipeRunError(msg) from exc
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             else:
                 # We're generating a single object directly
                 method_desc = "object_direct"
@@ -388,7 +387,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     msg = f"Error generating single object with direct method {location}: {exc}"
-                    raise PipeRunError(msg) from exc
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             the_content = generated_object
 
         return the_content

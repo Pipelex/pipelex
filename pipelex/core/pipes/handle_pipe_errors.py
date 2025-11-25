@@ -5,8 +5,7 @@ from pydantic_core import ErrorDetails
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.core.pipes.validation import PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 
 
 class ModelScope(str, Enum):
@@ -16,16 +15,16 @@ class ModelScope(str, Enum):
     CONCEPT = "concept"
 
 
-def categorize_pipe_concept_validation_error_from_validation_error(
+def categorize_pipe_validation_error(
     validation_error: ValidationError,
 ) -> list[PipesAndConceptValidationErrorData]:
-    """Categorize all errors from a ValidationError for Pipe or Concept instantiation.
+    """Categorize all errors from a ValidationError for Pipe instantiation.
 
     This function determines the model scope (PIPE or CONCEPT) from the ValidationError
     and processes all errors accordingly.
 
     Args:
-        validation_error: Pydantic ValidationError from Pipe or Concept model validation
+        validation_error: Pydantic ValidationError from Pipe model validation
 
     Returns:
         List of PipesAndConceptValidationErrorData for all errors
@@ -57,55 +56,24 @@ def categorize_pipe_concept_validation_error_from_validation_error(
     # Process all errors
     categorized_errors: list[PipesAndConceptValidationErrorData] = []
     for error in errors:
-        categorized_error = categorize_pipe_concept_validation_error(
-            error=error,
-            model_scope=model_scope,
-            model_code=None,  # We don't have the code at this point
-        )
+        if model_scope == ModelScope.PIPE:
+            categorized_error = _handle_pipe_errors(
+                error=error,
+                pipe_code=None,  # We don't have the code at this point
+            )
+        else:
+            # Unexpected scope for pipe/concept validation
+            message = error.get("msg", "Unknown validation error")
+            pydantic_type = error.get("type", "")
+            loc = error.get("loc", ())
+            field_path = " → ".join(str(item) for item in loc)
+            msg = (
+                f"Unexpected model scope for pipe/concept validation: "
+                f"type='{pydantic_type}', scope='{model_scope}', path='{field_path}', message='{message}'"
+            )
+            raise PipelexUnexpectedError(msg)
         categorized_errors.append(categorized_error)
-
     return categorized_errors
-
-
-def categorize_pipe_concept_validation_error(
-    error: ErrorDetails,
-    model_scope: ModelScope,
-    model_code: str | None = None,
-) -> PipesAndConceptValidationErrorData:
-    """Categorize a PIPE or CONCEPT validation error and create structured error data.
-
-    Args:
-        error: Pydantic error from Pipe or Concept model validation
-        model_scope: Whether this is a PIPE or CONCEPT validation
-        model_code: The pipe_code or concept_code being validated (if known)
-
-    Returns:
-        PipesAndConceptValidationErrorData with all relevant fields populated
-
-    Raises:
-        PipelexUnexpectedError: If the model scope is unexpected
-    """
-    if model_scope == ModelScope.PIPE:
-        return _handle_pipe_errors(
-            error=error,
-            pipe_code=model_code,
-        )
-    elif model_scope == ModelScope.CONCEPT:
-        return _handle_concept_errors(
-            error=error,
-            concept_code=model_code,
-        )
-    else:
-        # Unexpected scope for pipe/concept validation
-        message = error.get("msg", "Unknown validation error")
-        pydantic_type = error.get("type", "")
-        loc = error.get("loc", ())
-        field_path = " → ".join(str(item) for item in loc)
-        msg = (
-            f"Unexpected model scope for pipe/concept validation: "
-            f"type='{pydantic_type}', scope='{model_scope}', path='{field_path}', message='{message}'"
-        )
-        raise PipelexUnexpectedError(msg)
 
 
 def _handle_pipe_errors(
@@ -161,76 +129,24 @@ def _handle_pipe_errors(
     )
 
 
-def _handle_concept_errors(
-    error: ErrorDetails,
-    concept_code: str | None,
-) -> PipesAndConceptValidationErrorData:
-    """Handle all CONCEPT validation errors.
-
-    Extracts all necessary context from error and categorizes the error type.
-
-    Args:
-        error: Pydantic error details
-        concept_code: The concept code being validated (if known)
-
-    Returns:
-        PipesAndConceptValidationErrorData with all context populated
-    """
-    # Extract data from error
-    loc = error.get("loc", ())
-    message = error.get("msg", "Unknown validation error")
-    pydantic_type = error.get("type", "")
-    field_path = " → ".join(str(item) for item in loc)
-
-    # Extract field_name from loc[0] (direct field on Concept model)
-    field_name = str(loc[0]) if len(loc) >= 1 else None
-
-    # Extract variable names from loc (for input/output errors)
-    variable_names = [str(item) for item in loc]
-
-    # Determine error type - default to UNKNOWN_VALIDATION_ERROR
-    error_type = PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
-
-    # Try to categorize based on error message patterns
-    message_lower = message.lower()
-
-    if "missing" in message_lower or "required" in pydantic_type or "extra" in message_lower or "forbidden" in pydantic_type:
-        error_type = PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
-
-    return PipesAndConceptValidationErrorData(
-        domain=None,
-        source=None,
-        pipe_code=None,
-        concept_code=concept_code,
-        field_name=field_name,
-        error_type=error_type,
-        message=message,
-        field_path=field_path,
-        variable_names=variable_names,
-    )
-
-
-def categorize_pipe_validation_error(
+def categorize_pipe_validation_with_libraries_error(
     pipe_error: PipeValidationError,
 ) -> PipesAndConceptValidationErrorData:
-    """Categorize a PipeValidationError and create structured error data.
-
-    PipeValidationError is a custom exception raised by Pipe validation logic
-    that already contains structured information about the error.
+    """Categorize a PipeValidationError with libraries and create structured error data.
 
     Args:
-        pipe_error: PipeValidationError with structured error information
+        pipe_error: PipeValidationError with libraries and structured error information
 
     Returns:
         PipesAndConceptValidationErrorData with all relevant fields populated
     """
-    # Build a comprehensive message from the explanation and additional context
     message = pipe_error.explanation or str(pipe_error)
     if pipe_error.required_concept_codes and pipe_error.provided_concept_code:
         message += f" (required: {pipe_error.required_concept_codes}, provided: {pipe_error.provided_concept_code})"
 
+    error_type = pipe_error.error_type or PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
     return PipesAndConceptValidationErrorData(
-        error_type=pipe_error.error_type,
+        error_type=error_type,
         domain=pipe_error.domain,
         source=pipe_error.file_path or None,
         pipe_code=pipe_error.pipe_code,

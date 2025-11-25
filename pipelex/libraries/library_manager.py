@@ -12,7 +12,6 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.core.pipe_errors import PipeDefinitionError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -260,9 +259,6 @@ class LibraryManager(LibraryManagerAbstract):
                     message=msg,
                     blueprint_validation_errors=interpreter_error.validation_errors,
                 ) from interpreter_error
-            except PipeDefinitionError as pipe_def_error:
-                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {pipe_def_error}"
-                raise LibraryLoadingError(msg) from pipe_def_error
             blueprints.append(blueprint)
 
         self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])

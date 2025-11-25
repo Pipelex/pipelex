@@ -3,8 +3,7 @@ from typing import Callable
 import pytest
 
 from pipelex import log
-from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.core.pipes.validation import PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
 from tests.unit.pipelex.pipe_operators.pipe_img_gen.data import PipeImgGenInputTestCases

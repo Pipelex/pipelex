@@ -7,12 +7,11 @@ from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
@@ -187,7 +186,7 @@ class PipeAbstract(ABC, BaseModel):
     def validate_output_static(self):
         pass
 
-    def validate_before_run(
+    async def validate_before_run(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -195,7 +194,7 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
     ): ...
 
-    def validate_after_run(
+    async def validate_after_run(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -290,13 +289,17 @@ class PipeAbstract(ABC, BaseModel):
         if pipe_run_params.run_mode == PipeRunMode.LIVE:
             log.info(pipe_run_info)
 
-        self.validate_before_run(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
+        await self.validate_before_run(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
 
         pipe_output = await self._run_pipe(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
 
-        self.validate_after_run(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name)
+        await self.validate_after_run(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
         return pipe_output

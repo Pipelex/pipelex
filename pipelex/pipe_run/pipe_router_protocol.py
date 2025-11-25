@@ -5,7 +5,6 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
 from pipelex.pipe_run.exceptions import PipeRouterError, PipeRunError
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.pipeline.exceptions import DryRunMissingInputsError
 
 
 class PipeRouterProtocol(Protocol):
@@ -53,16 +52,6 @@ class PipeRouterProtocol(Protocol):
 
         try:
             pipe_output = await self._run_pipe_job(pipe_job)
-        except DryRunMissingInputsError as exc:
-            await self._after_failing_run(pipe_job, exc)
-            raise PipeRouterError(
-                message=exc.message,
-                run_mode=pipe_job.pipe_run_params.run_mode,
-                pipe_code=pipe_job.pipe.code,
-                output_name=pipe_job.output_name,
-                pipe_stack=pipe_job.pipe_run_params.pipe_stack,
-                missing_inputs=exc.missing_inputs,
-            ) from exc
         except PipeRunError as exc:
             await self._after_failing_run(pipe_job, exc)
             raise PipeRouterError(

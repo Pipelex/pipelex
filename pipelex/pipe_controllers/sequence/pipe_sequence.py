@@ -3,19 +3,18 @@ from typing import Literal
 from typing_extensions import override
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.exceptions import PipeRunParamsError
+from pipelex.pipe_run.exceptions import PipeRunError, PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -45,12 +44,13 @@ class PipeSequence(PipeController):
         """Validate the output for the pipe sequence.
         The output of the pipe sequence should match the output of the last step.
         """
-        last_step_output_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
-        concept_of_last_step = last_step_output_pipe.output
-        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+        last_step_pipe_code = self.sequential_sub_pipes[-1].pipe_code
+        last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
+        last_step_output_concept = last_step_pipe.output
+        if not get_concept_library().is_compatible(tested_concept=last_step_output_concept, wanted_concept=self.output):
             msg = (
-                f"PipeSequence concept mismatch: the output concept '{concept_of_last_step.concept_string}' "
-                f"of the last step '{self.sequential_sub_pipes[-1].pipe_code}' of sequence pipe '{self.code}' "
+                f"PipeSequence concept mismatch: the output concept '{last_step_output_concept.concept_string}' "
+                f"of the last step '{last_step_pipe_code}' of sequence pipe '{self.code}' "
                 f"is not compatible with the output concept '{self.output.concept_string}' of the sequence."
             )
             raise PipeValidationError(
@@ -58,7 +58,7 @@ class PipeSequence(PipeController):
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain=self.domain,
                 pipe_code=self.code,
-                provided_concept_code=concept_of_last_step.concept_string,
+                provided_concept_code=last_step_output_concept.concept_string,
                 required_concept_codes=[self.output.concept_string],
             )
 
@@ -164,7 +164,7 @@ class PipeSequence(PipeController):
     ) -> PipeOutput:
         if not pipe_run_params.run_mode.is_dry:
             msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
-            raise PipeRunParamsError(msg)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
         # Verify the output of this pipe is matching the output of the last step.
         concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output
         # if self.output.concept_string != concept_string_of_last_step:

@@ -13,11 +13,9 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSett
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.validation import PipeValidationErrorType
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -30,6 +28,7 @@ from pipelex.hub import (
     get_native_concept,
 )
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -209,7 +208,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         log.verbose(f"PipeExtract: dry run operator pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
             msg = f"Running pipe '{self.code}' (PipeExtract) _dry_run_operator_pipe() in non-dry mode is not allowed."
-            raise PipeDefinitionError(msg)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
 
         content_generator_dry = ContentGeneratorDry()
         return await self._run_operator_pipe(

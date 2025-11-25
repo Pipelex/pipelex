@@ -7,7 +7,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.core.pipes.validation import PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.language.plx_config import PlxConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
 from pipelex.system.configuration.config_model import ConfigModel

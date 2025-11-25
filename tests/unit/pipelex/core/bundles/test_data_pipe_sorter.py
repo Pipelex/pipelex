@@ -3,7 +3,7 @@
 from typing import ClassVar
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
-from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -367,7 +367,7 @@ class PipeSorterTestCases:
         ("multiple_chains", MULTIPLE_CHAINS_PIPES, MULTIPLE_CHAINS_EXPECTED, None),
         ("pipe_batch", PIPE_BATCH_PIPES, PIPE_BATCH_EXPECTED, None),
         ("pipe_condition", PIPE_CONDITION_PIPES, PIPE_CONDITION_EXPECTED, None),
-        ("circular_dependency", CIRCULAR_PIPES, None, PipeDefinitionError),
+        ("circular_dependency", CIRCULAR_PIPES, None, PipeValidationError),
         ("missing_dependency", MISSING_DEPENDENCY_PIPES, MISSING_DEPENDENCY_EXPECTED, None),
         ("image_inversion", IMAGE_INVERSION_PIPES, IMAGE_INVERSION_EXPECTED, None),
         ("complex_nested", COMPLEX_NESTED_PIPES, COMPLEX_NESTED_EXPECTED, None),

@@ -41,10 +41,6 @@ from pipelex.pipe_controllers.exceptions import PipeControllerError, PipeControl
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.exceptions import BatchParamsError, PipeRouterError, PipeRunError, PipeRunParamsError
 from pipelex.pipeline.exceptions import (
-    DryRunError,
-    DryRunMissingInputsError,
-    DryRunMissingPipesError,
-    DryRunTemplatingError,
     PipeExecutionError,
     PipelineExecutionError,
     PipeStackOverflowError,
@@ -112,10 +108,6 @@ __all__ = [
     "WorkingMemoryVariableError",
     # pipelex.pipeline.exceptions
     "PipeStackOverflowError",
-    "DryRunTemplatingError",
-    "DryRunMissingPipesError",
-    "DryRunMissingInputsError",
-    "DryRunError",
     "PipelineExecutionError",
     "PipeExecutionError",
     # from pipelex.pipeline.track.exceptions

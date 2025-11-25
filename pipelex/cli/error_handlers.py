@@ -127,43 +127,6 @@ def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | 
 
     if bundle_path:
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{bundle_path}[/yellow]\n")
-
-    # Display bundle blueprint validation errors
-    if exc.pipelex_bundle_blueprint_validation_errors:
-        console.print("[bold cyan]Bundle Blueprint Validation Errors:[/bold cyan]\n")
-        for idx, error in enumerate(exc.pipelex_bundle_blueprint_validation_errors, 1):
-            console.print(f"[bold yellow]{idx}. {error.error_type.replace('_', ' ').title()}[/bold yellow]")
-
-            # Display entity context
-            if error.pipe_code:
-                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{error.pipe_code}[/yellow]")
-            if error.concept_code:
-                console.print(f"   [cyan]Concept:[/cyan] [yellow]{error.concept_code}[/yellow]")
-            if error.domain:
-                console.print(f"   [cyan]Domain:[/cyan] [green]{error.domain}[/green]")
-
-            # Field name if present
-            if error.field_name:
-                console.print(f"   [cyan]Field:[/cyan] [yellow]{error.field_name}[/yellow]")
-
-            # Display the error message
-            console.print(f"   [cyan]→[/cyan] {error.message}")
-
-            # Display context-specific details for pipe sequence errors
-            if error.last_step_pipe_code or error.last_step_output_concept or error.expected_output_concept:
-                if error.last_step_pipe_code:
-                    console.print(f"   [cyan]Last Step:[/cyan] [yellow]{error.last_step_pipe_code}[/yellow]")
-                if error.last_step_output_concept:
-                    console.print(f"   [cyan]Last Step Output:[/cyan] [green]{error.last_step_output_concept}[/green]")
-                if error.expected_output_concept:
-                    console.print(f"   [cyan]Expected Output:[/cyan] [green]{error.expected_output_concept}[/green]")
-
-            # Field path as secondary info
-            if error.field_path:
-                console.print(f"   [dim]└─ Path: {error.field_path}[/dim]")
-
-            console.print()
-
     # Display pipe validation errors
     if exc.pipe_validation_error_data:
         console.print("[bold cyan]Pipe Validation Errors:[/bold cyan]\n")

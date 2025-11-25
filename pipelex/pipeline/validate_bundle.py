@@ -6,11 +6,11 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.core.pipe_concept_validation_error_categorizer import (
-    categorize_pipe_concept_validation_error_from_validation_error,
-    categorize_pipe_validation_error,
-)
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.handle_pipe_errors import (
+    categorize_pipe_validation_error,
+    categorize_pipe_validation_with_libraries_error,
+)
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_library_manager, set_current_library
@@ -103,26 +103,23 @@ async def validate_bundle(
 
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
     except PipelexInterpreterError as interpreter_error:
-        # Forward categorized validation errors from interpreter
         raise ValidateBundleError(
             message=interpreter_error.message,
             pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
         ) from interpreter_error
     except PipeValidationError as pipe_error:
-        # Categorize PipeValidationError using the dedicated categorizer
-        pipe_error_data = categorize_pipe_validation_error(pipe_error=pipe_error)
+        pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
         raise ValidateBundleError(
             message=f"Pipe validation failed: {pipe_error}",
             pipe_validation_errors=[pipe_error_data],
         ) from pipe_error
     except ValidationError as validation_error:
-        pipe_concept_errors = categorize_pipe_concept_validation_error_from_validation_error(validation_error=validation_error)
-
+        pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
         validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
         msg = f"Could not load blueprints because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,
-            pipe_concept_instantiation_errors=pipe_concept_errors,
+            pipe_validation_errors=pipe_validation_errors,
         ) from validation_error
     except DryRunError as dry_run_error:
         raise ValidateBundleError(
