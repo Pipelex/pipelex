@@ -35,7 +35,7 @@ define PRINT_TITLE
     $(eval PADDING := $(shell printf '%*s' $(PADDING_LENGTH) '' | tr ' ' '='))
     $(eval PADDED_TITLE := $(FULL_TITLE)$(PADDING))
     @echo ""
-    @echo "$(PADDED_TITLE)"
+    @echo "\033[36m$(PADDED_TITLE)\033[0m"
 endef
 
 define HELP
@@ -133,7 +133,6 @@ all help:
 ##########################################################################################
 
 check-uv:
-	$(call PRINT_TITLE,"Ensuring uv ≥ $(UV_MIN_VERSION)")
 	@command -v uv >/dev/null 2>&1 || { \
 		echo "uv not found – installing latest …"; \
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
@@ -142,14 +141,11 @@ check-uv:
 
 
 env: check-uv
-	$(call PRINT_TITLE,"Creating virtual environment")
 	@if [ ! -d "$(VIRTUAL_ENV)" ]; then \
 		echo "Creating Python virtual env in \`${VIRTUAL_ENV}\`"; \
 		uv venv "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
-	else \
-		echo "Python virtual env already exists in \`${VIRTUAL_ENV}\`"; \
 	fi
-	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(readlink $(VENV_PYTHON) 2>/dev/null || echo $(VENV_PYTHON))"
+	@echo "Using $$($(VENV_PYTHON) --version) from $$(readlink $(VENV_PYTHON) 2>/dev/null || echo $(VENV_PYTHON))"
 
 install: env
 	$(call PRINT_TITLE,"Installing dependencies")
@@ -462,23 +458,23 @@ cm: cov-missing
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
-	$(VENV_RUFF) format . --config pyproject.toml
+	@bash -c 'TIMEFORMAT="⏱️  format completed in %Rs"; time { $(VENV_RUFF) format . --config pyproject.toml; }'
 
 lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
-	$(VENV_RUFF) check . --fix --config pyproject.toml
+	@bash -c 'TIMEFORMAT="⏱️  lint completed in %Rs"; time { $(VENV_RUFF) check . --fix --config pyproject.toml; }'
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml
+	@bash -c 'TIMEFORMAT="⏱️  pyright completed in %Rs"; time { $(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml; }'
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	@bash -c 'TIMEFORMAT="⏱️  mypy completed in %Rs"; time { $(VENV_MYPY) --config-file pyproject.toml; }'
 
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
-	$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests
+	@bash -c 'TIMEFORMAT="⏱️  pylint completed in %Rs"; time { $(VENV_PYLINT) --rcfile pyproject.toml pipelex tests; }'
 
 
 ##########################################################################################
@@ -544,8 +540,10 @@ docs-deploy: env
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright mypy
-	@echo "> done: c = check"
+c:
+	$(call PRINT_TITLE,"Running all checks: format/lint/pyright/mypy")
+	@echo ""
+	@bash -c 'TIMEFORMAT="⏱️  make c completed in %Rs"; time { $(MAKE) format && $(MAKE) lint && $(MAKE) pyright && $(MAKE) mypy; }'
 
 cc: cleanderived c
 	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
