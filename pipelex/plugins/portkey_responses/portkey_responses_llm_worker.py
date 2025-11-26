@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class PortkeyOpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
+class PortkeyResponsesLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
         sdk_instance: Any,

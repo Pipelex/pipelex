@@ -137,6 +137,8 @@ model_id = "claude-4.5-sonnet"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3, output = 15 }
+sdk = "portkey_completions"
+structure_method = "instructor/anthropic_tools"
 
 ["claude-4.5-haiku"]
 model_id = "claude-4.5-haiku"

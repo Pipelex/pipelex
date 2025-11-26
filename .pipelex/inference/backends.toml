@@ -13,6 +13,7 @@
 [pipelex_gateway]
 display_name = "⭐ Pipelex Gateway"
 enabled = true
+debug = true
 endpoint = "https://api.portkey.ai/v1"
 api_key = "${PIPELEX_GATEWAY_API_KEY}"
 

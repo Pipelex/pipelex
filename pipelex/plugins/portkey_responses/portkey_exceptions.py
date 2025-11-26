@@ -1,5 +1,5 @@
 from pipelex.cogt.exceptions import CogtError
 
 
-class PortkeyResponsesFactoryError(CogtError):
+class PortkeyFactoryError(CogtError):
     pass
