@@ -40,7 +40,7 @@ class TestLLMInference:
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
                 system_text=None,
-                user_text=LLMTestConstants.USER_TEXT_SHORT,
+                user_text=LLMTestConstants.USER_TEXT_TO_EXTRACT_PERSON,
             ),
             llm_job_params=llm_job_params,
         )

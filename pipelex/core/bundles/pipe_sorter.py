@@ -1,7 +1,7 @@
 """Topological sorting utilities for pipe dependencies."""
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
-from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 
 
 def sort_pipes_by_dependencies(
@@ -21,7 +21,7 @@ def sort_pipes_by_dependencies(
         For PipeSequence, dependencies follow step order. For others, alphabetical order.
 
     Raises:
-        PipeDefinitionError: If circular dependencies are detected among pipes
+        PipeValidationError: If circular dependencies are detected among pipes
 
     Example:
         >>> pipes = {
@@ -50,7 +50,7 @@ def sort_pipes_by_dependencies(
             return
         if pipe_code in visiting:
             msg = f"Circular dependency detected involving pipe: {pipe_code}"
-            raise PipeDefinitionError(message=msg)
+            raise PipeValidationError(message=msg, pipe_code=pipe_code, error_type=PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR)
         if pipe_code not in pipes:
             # Dependency not in this bundle, skip it
             return

@@ -7,7 +7,6 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.builder.pipe.pipe_spec_exceptions import PipeParallelSpecError
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
 from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -50,11 +49,7 @@ class PipeParallelSpec(PipeSpec):
                 "PipeParallel requires either add_each_output to be True or combined_output to be set, "
                 "or both, otherwise the pipe won't output anything"
             )
-            raise PipeParallelSpecError(
-                message=msg,
-                pipe_code=self.pipe_code,
-                description=self.description,
-            )
+            raise ValueError(msg)
         return self
 
     @override

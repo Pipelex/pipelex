@@ -42,3 +42,9 @@ def any_env_var_is_placeholder(keys: list[str]) -> bool:
 
 def set_env(key: str, value: str) -> None:
     os.environ[key] = value
+
+
+def is_env_var_truthy(key: str) -> bool:
+    """Return True if the env var is set and not a falsy sentinel ("false" or "0")."""
+    value = get_optional_env(key)
+    return (value is not None) and (value.lower() not in ["false", "0"])

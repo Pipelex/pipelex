@@ -11,7 +11,9 @@ class BatchParamsError(PipelexError):
 
 
 class PipeRunError(PipelexError):
-    pass
+    def __init__(self, message: str, run_mode: PipeRunMode):
+        self.run_mode = run_mode
+        super().__init__(message)
 
 
 class PipeRouterError(PipelexError):

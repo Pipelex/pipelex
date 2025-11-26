@@ -38,7 +38,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         self.teardown()
         self.setup()
 
-    # TODO: Rethink the make_empty of libraries. It makes sense with the setup and teardown methods
+    # TODO: Rethink the make_empty of libraries. It doesn't makes sense to call the setup inside the make_empty method.
     @classmethod
     def make_empty(cls) -> Self:
         library = cls(root={})

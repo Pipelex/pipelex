@@ -14,6 +14,7 @@ from tests.cases import ImageTestCases, PDFTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 @pytest.mark.usefixtures("routing_profile_override")
+@pytest.mark.filterwarnings("ignore:Accessing the 'model_fields' attribute on the instance is deprecated:DeprecationWarning")
 class TestExtract:
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
     async def test_extract_pdf_path(self, extract_handle: str, file_path: str):

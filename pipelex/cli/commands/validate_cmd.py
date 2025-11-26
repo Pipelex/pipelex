@@ -32,8 +32,6 @@ COMMAND = "validate"
 
 
 def do_validate_all_libraries_and_dry_run() -> None:
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -44,6 +42,7 @@ def do_validate_all_libraries_and_dry_run() -> None:
             library_id, library = library_manager.open_library()
             set_current_library(library_id=library_id)
             library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+
             pipes = library.get_pipe_library().get_pipes()
 
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
@@ -54,8 +53,6 @@ def do_validate_all_libraries_and_dry_run() -> None:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
-    finally:
-        pipelex_instance.teardown()
 
 
 def validate_cmd(
@@ -81,9 +78,12 @@ def validate_cmd(
         pipelex validate --bundle my_bundle.plx --pipe my_pipe
         pipelex validate all
     """
+    pipelex_instance: Pipelex
     # Check for "all" keyword
     if target == "all" and not pipe and not bundle:
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
         do_validate_all_libraries_and_dry_run()
+        pipelex_instance.teardown()
         return
 
     # Validate mutual exclusivity
@@ -142,13 +142,16 @@ def validate_cmd(
             except ValidateBundleError as bundle_error:
                 handle_validate_bundle_error(bundle_error, bundle_path=bundle_path)
         elif pipe_code:
-            # Validate a single pipe by code
             typer.echo(f"Validating pipe '{pipe_code}'...")
-            get_telemetry_manager().track_event(
-                EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: get_required_pipe(pipe_code=pipe_code).type}
-            )
+            library_manager = get_library_manager()
+            library_id, _ = library_manager.open_library()
+            set_current_library(library_id=library_id)
+            library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+
+            pipe = get_required_pipe(pipe_code=pipe_code)
+            get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
             await dry_run_pipe(
-                get_required_pipe(pipe_code=pipe_code),
+                pipe,
                 raise_on_failure=True,
             )
             typer.secho(f"✅ Successfully validated pipe '{pipe_code}'", fg=typer.colors.GREEN)
@@ -156,8 +159,6 @@ def validate_cmd(
             typer.secho("Failed to validate: no pipe code or bundle specified", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
 
-    # Initialize Pipelex
-    pipelex_instance: Pipelex
     try:
         pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:

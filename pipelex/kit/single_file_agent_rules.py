@@ -47,37 +47,44 @@ def _demote_headings(md_content: str, levels: int) -> str:
     return re.sub(pattern, demote_match, md_content, flags=re.MULTILINE)
 
 
-# TODO: fix bug which makes it not idempotent (because heading 1 gets deleted)
-def build_merged_rules(idx: KitIndex, agent_set: str | None = None) -> str:
+def build_merged_rules(kit_index: KitIndex, agent_set: str | None = None, file_list: list[str] | None = None) -> str:
     """Build merged agent documentation from ordered files.
 
     Args:
-        idx: Kit index configuration
-        agent_set: Name of the agent set to use (defaults to idx.agents.default_set)
+        kit_index: Kit index configuration
+        agent_set: Name of the agent set to use (defaults to kit_index.agents.default_set)
+        file_list: Optional explicit list of files to merge (overrides agent_set lookup)
 
     Returns:
         Merged markdown content with demoted headings
     """
     agents_dir = get_kit_agents_dir()
 
-    if agent_set is None:
-        agent_set = idx.agent_rules.default_set
+    # If explicit file list provided, use it
+    if file_list is not None:
+        files_to_merge = file_list
+    else:
+        # Otherwise, look up the agent set
+        if agent_set is None:
+            agent_set = kit_index.agent_rules.default_set
 
-    if agent_set not in idx.agent_rules.sets:
-        msg = f"Agent set '{agent_set}' not found in index.toml. Available sets: {list(idx.agent_rules.sets.keys())}"
-        raise ValueError(msg)
+        if agent_set not in kit_index.agent_rules.sets:
+            msg = f"Agent set '{agent_set}' not found in index.toml. Available sets: {list(kit_index.agent_rules.sets.keys())}"
+            raise ValueError(msg)
+
+        files_to_merge = kit_index.agent_rules.sets[agent_set]
 
     parts: list[str] = []
 
-    for name in idx.agent_rules.sets[agent_set]:
+    for name in files_to_merge:
         md = _read_agent_file(agents_dir, name)
-        demoted = _demote_headings(md, idx.agent_rules.demote)
+        demoted = _demote_headings(md, kit_index.agent_rules.demote)
         parts.append(demoted.rstrip())
 
     return ("\n\n".join(parts)).strip() + "\n"
 
 
-def _insert_block_with_markers(target_md: str, block_md: str, main_title: str | None, markers: tuple[str, str]) -> str:
+def insert_block_with_markers(target_md: str, block_md: str, main_title: str | None, markers: tuple[str, str]) -> str:
     """Insert block into target markdown using marker-based logic.
 
     Args:
@@ -110,7 +117,7 @@ def _insert_block_with_markers(target_md: str, block_md: str, main_title: str | 
     return target_md.rstrip() + "\n\n" + wrapped_block + "\n"
 
 
-def _diff(before: str, after: str, path: str) -> str:
+def unified_diff(before: str, after: str, path: str) -> str:
     """Generate unified diff between before and after.
 
     Args:
@@ -131,37 +138,61 @@ def _diff(before: str, after: str, path: str) -> str:
     )
 
 
-def update_targets(
+def update_single_file_agent_rules(
     repo_root: Path,
-    merged_rules: str,
+    kit_index: KitIndex,
+    agent_set: str,
     targets: dict[str, Target],
     dry_run: bool,
     diff: bool,
     backup: str | None,
 ) -> None:
-    """Update target files with merged agent documentation.
+    """Update single-file agent rules targets with merged agent documentation.
 
     Args:
         repo_root: Repository root directory
-        merged_rules: Merged markdown content to insert
+        kit_index: Kit index configuration
+        agent_set: Default agent set to use (can be overridden by target.sets)
         targets: Dictionary of target file configurations keyed by ID
         dry_run: If True, only print what would be done
         diff: If True, show unified diff
         backup: Backup suffix (e.g., ".bak"), or None for no backup
     """
     for target in targets.values():
+        # Check if this target has its own set override for the given agent_set
+        target_file_list: list[str] | None = None
+        if target.sets and agent_set in target.sets:
+            target_file_list = target.sets[agent_set]
+
+        # Build merged rules for this specific target (with override if applicable)
+        merged_rules = build_merged_rules(kit_index, agent_set=agent_set, file_list=target_file_list)
+
         target_path = repo_root / target.path
         before = target_path.read_text(encoding="utf-8") if target_path.exists() else ""
 
         span = find_span(before, target.marker_begin, target.marker_end)
 
         if span:
-            # Markers exist - replace content between them
-            wrapped_block = wrap(target.marker_begin, target.marker_end, merged_rules)
+            # Markers exist - need to check if we should preserve heading_1
+            # Check if the entire file (outside markers) has an H1 heading
+            before_markers = before[: span[0]]
+            after_markers = before[span[1] :]
+            outside_content = before_markers + after_markers
+
+            h1_pattern = r"^#\s+.+$"
+            has_h1_outside = bool(re.search(h1_pattern, outside_content, flags=re.MULTILINE))
+
+            # Add heading_1 if it's configured and there's no H1 outside markers
+            if target.heading_1 and not has_h1_outside:
+                content_with_heading = f"{target.heading_1}\n\n{merged_rules}"
+                wrapped_block = wrap(target.marker_begin, target.marker_end, content_with_heading)
+            else:
+                wrapped_block = wrap(target.marker_begin, target.marker_end, merged_rules)
+
             after = replace_span(before, span, wrapped_block)
         else:
             # No markers - insert with markers
-            after = _insert_block_with_markers(
+            after = insert_block_with_markers(
                 before,
                 merged_rules,
                 target.heading_1,
@@ -171,10 +202,11 @@ def update_targets(
         if dry_run:
             typer.echo(f"[DRY] update {target_path}")
             if diff:
-                diff_output = _diff(before, after, str(target_path))
+                diff_output = unified_diff(before, after, str(target_path))
                 if diff_output:
                     typer.echo(diff_output)
-        else:
+        # Only write and print if content changed
+        elif before != after:
             if backup and target_path.exists():
                 backup_path = target_path.with_suffix(target_path.suffix + backup)
                 backup_path.write_text(before, encoding="utf-8")
@@ -185,9 +217,11 @@ def update_targets(
             typer.echo(f"✅ Updated {target_path}")
 
             if diff:
-                diff_output = _diff(before, after, str(target_path))
+                diff_output = unified_diff(before, after, str(target_path))
                 if diff_output:
                     typer.echo(diff_output)
+        else:
+            typer.echo(f"⚪ Unchanged {target_path}")
 
 
 def remove_from_targets(
@@ -264,7 +298,7 @@ def remove_from_targets(
             if dry_run:
                 typer.echo(f"[DRY] remove marked section from {target_path}")
                 if diff:
-                    diff_output = _diff(before, after, str(target_path))
+                    diff_output = unified_diff(before, after, str(target_path))
                     if diff_output:
                         typer.echo(diff_output)
             else:
@@ -277,6 +311,6 @@ def remove_from_targets(
                 typer.echo(f"✅ Removed marked section from {target_path}")
 
                 if diff:
-                    diff_output = _diff(before, after, str(target_path))
+                    diff_output = unified_diff(before, after, str(target_path))
                     if diff_output:
                         typer.echo(diff_output)

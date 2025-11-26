@@ -1,4 +1,3 @@
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
 from pipelex.tools.misc.string_utils import is_snake_case
 
 
@@ -59,7 +58,7 @@ def validate_input_name(input_name: str) -> None:
         input_name: The input name to validate
 
     Raises:
-        PipeBlueprintValueError: If the input name is invalid
+        ValueError: If the input name is invalid
 
     """
     if not is_valid_input_name(input_name):
@@ -69,4 +68,4 @@ def validate_input_name(input_name: str) -> None:
             "Nested field access is allowed using dots (e.g., 'my_input.field_name'), "
             "where each part must also be in snake_case."
         )
-        raise PipeBlueprintValueError(msg)
+        raise ValueError(msg)

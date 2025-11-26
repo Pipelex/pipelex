@@ -56,7 +56,7 @@ Pipelex solves these problems by:
 Ready to get started?
 
 - [:material-rocket-launch: Get Started](./home/2-get-started/pipe-builder.md){ .md-button .md-button--primary }
-- [:material-book-open: Read the Manifesto](./home/3-understand-pipelex/manifesto.md){ .md-button }
+- [:material-book-open: Read the Know-How Graph](./home/3-understand-pipelex/viewpoint.md){ .md-button }
 - [:material-lightbulb: Explore the Paradigm](./home/3-understand-pipelex/pipelex-paradigm/index.md){ .md-button }
 
 **Explore Examples:**

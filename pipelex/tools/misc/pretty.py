@@ -4,10 +4,10 @@ from io import StringIO
 from typing import Any, ClassVar
 
 from kajson import kajson
-from rich import print as rich_print
 from rich.console import Console, Group
 from rich.json import JSON
 from rich.markdown import Markdown
+from rich.measure import Measurement
 from rich.panel import Panel
 from rich.pretty import Pretty
 from rich.style import StyleType
@@ -73,8 +73,17 @@ def pretty_print(
     inner_title: str | None = None,
     border_style: StyleType | None = None,
     width: int | None = None,
+    console_width: int | None = None,
 ):
-    PrettyPrinter.pretty_print(content=content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
+    PrettyPrinter.pretty_print(
+        content=content,
+        title=title,
+        subtitle=subtitle,
+        inner_title=inner_title,
+        border_style=border_style,
+        width=width,
+        console_width=console_width,
+    )
 
 
 def pretty_print_md(
@@ -84,10 +93,19 @@ def pretty_print_md(
     inner_title: str | None = None,
     border_style: StyleType | None = None,
     width: int | None = None,
+    console_width: int | None = None,
 ):
     width = width or PrettyPrinter.pretty_width()
     md_content = Markdown(content)
-    PrettyPrinter.pretty_print(content=md_content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width)
+    PrettyPrinter.pretty_print(
+        content=md_content,
+        title=title,
+        subtitle=subtitle,
+        inner_title=inner_title,
+        border_style=border_style,
+        width=width,
+        console_width=console_width,
+    )
 
 
 class PrettyPrinter:
@@ -102,6 +120,7 @@ class PrettyPrinter:
         inner_title: str | None = None,
         border_style: StyleType | None = None,
         width: int | None = None,
+        console_width: int | None = None,
     ):
         match cls.mode:
             case PrettyPrintMode.RICH:
@@ -112,9 +131,10 @@ class PrettyPrinter:
                     inner_title=inner_title,
                     border_style=border_style,
                     width=width,
+                    console_width=console_width,
                 )
             case PrettyPrintMode.POOR:
-                cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle, inner_title=inner_title)
+                cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle, inner_title=inner_title, console_width=console_width)
 
     @classmethod
     def pretty_print_using_rich(
@@ -125,12 +145,19 @@ class PrettyPrinter:
         inner_title: str | None = None,
         border_style: StyleType | None = None,
         width: int | None = None,
+        console_width: int | None = None,
     ):
         panel = cls.make_pretty_panel(
-            content=content, title=title, subtitle=subtitle, inner_title=inner_title, border_style=border_style, width=width
+            content=content,
+            title=title,
+            subtitle=subtitle,
+            inner_title=inner_title,
+            border_style=border_style,
+            width=width,
+            console_width=console_width,
         )
 
-        rich_print("", panel, "", sep="\n")
+        Console(width=console_width).print("", panel, "", sep="\n")
 
     @classmethod
     def pretty_width(cls, width: int | None = None, depth: int | None = None) -> int:
@@ -153,8 +180,19 @@ class PrettyPrinter:
         inner_title: str | None = None,
         border_style: StyleType | None = None,
         width: int | None = None,
+        console_width: int | None = None,
     ) -> Panel:
         pretty = cls.make_pretty(content, inner_title=inner_title, depth=0)
+        # When width is not specified, measure the content to determine optimal console width
+        if width is None:
+            # Create a console to measure the panel
+            measure_console = Console(width=console_width)
+            measurement = Measurement.get(measure_console, measure_console.options, pretty)
+            # Use the maximum width that fits the content, with some buffer for panel border rendering
+            width = measurement.maximum + 4
+            # print(f"width: {width}")
+        if console_width is not None:
+            width = min(width, console_width)
         return cls.wrap_in_panel(pretty=pretty, title=title, subtitle=subtitle, border_style=border_style, width=width)
 
     @classmethod
@@ -256,6 +294,8 @@ class PrettyPrinter:
         title: TextType | None = None,
         subtitle: TextType | None = None,
         inner_title: str | None = None,
+        width: int | None = None,
+        console_width: int | None = None,
     ):
         if isinstance(content, str) and content.startswith(("http://", "https://")):
             cls.pretty_print_url_without_rich(content=content, title=title, subtitle=subtitle)
@@ -265,7 +305,7 @@ class PrettyPrinter:
             title_str += f"\n{subtitle!s}"
         if inner_title:
             title_str += f"\n{inner_title}"
-        terminal_width = shutil.get_terminal_size().columns
+        terminal_width = console_width or shutil.get_terminal_size().columns
         content_str = f"{content}"
 
         # Split title into lines if it contains newlines
@@ -274,6 +314,8 @@ class PrettyPrinter:
         # Calculate max content width based on longest title line
         max_title_len = max(len(line) for line in title_lines) if title_lines else 0
         max_content_width = terminal_width - max_title_len - 8  # Accounting for frame and padding
+        if width:
+            max_content_width = min(max_content_width, width)
         wrapped_lines: list[str] = []
         for line in content_str.splitlines():
             while len(line) > max_content_width:

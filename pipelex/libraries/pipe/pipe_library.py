@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.types import Self
 
@@ -59,7 +59,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
             msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in plx file in an imported package."
-            raise PipeLibraryError(msg)
+            raise PipeNotFoundError(msg)
         return the_pipe
 
     @override

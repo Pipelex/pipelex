@@ -5,7 +5,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError, PipelexBundleSpecValueError
+from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
@@ -65,14 +65,14 @@ class PipelexBundleSpec(StructuredContent):
             validate_domain_code(code=domain)
         except DomainCodeError as exc:
             msg = f"Error when trying to validate pipelex bundle spec: domain '{domain}' is not a valid domain code: {exc}"
-            raise PipelexBundleSpecValueError(msg) from exc
+            raise ValueError(msg) from exc
         return domain
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleSpec":
         if not self.pipe or (self.main_pipe not in self.pipe):
             msg = f"Main pipe '{self.main_pipe}' could not be found in bundle spec"
-            raise PipelexBundleSpecValueError(msg)
+            raise ValueError(msg)
         return self
 
     def to_blueprint(self) -> PipelexBundleBlueprint:

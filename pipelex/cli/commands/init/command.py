@@ -158,6 +158,7 @@ def execute_initialization(
     check_routing: bool,
     backends_toml_path: str,
     telemetry_config_path: str,
+    is_first_time_backends_setup: bool,
 ):
     """Execute the initialization steps.
 
@@ -172,8 +173,12 @@ def execute_initialization(
         check_routing: Whether routing was in focus.
         backends_toml_path: Path to backends.toml file.
         telemetry_config_path: Path to telemetry config file.
+        is_first_time_backends_setup: Whether backends.toml didn't exist before this run.
 
     """
+    # Track if backends were just copied during config initialization
+    backends_just_copied_during_config = False
+
     # Step 1: Initialize config if needed
     if needs_config:
         # Check if backends.toml exists before copying
@@ -184,15 +189,18 @@ def execute_initialization(
 
         # If backends.toml was just created (freshly copied), always prompt for backend selection
         backends_exists_now = path_exists(backends_toml_path)
-        backends_just_copied = not backends_existed_before and backends_exists_now
+        backends_just_copied_during_config = not backends_existed_before and backends_exists_now
 
-        if backends_just_copied or (check_inference and backends_exists_now):
+        if backends_just_copied_during_config or (check_inference and backends_exists_now):
             needs_inference = True
+
+    # Determine if this is truly a first-time setup (either tracked from before or just copied now)
+    first_time_setup = is_first_time_backends_setup or backends_just_copied_during_config
 
     # Step 2: Set up inference backends if needed
     if needs_inference:
         console.print()
-        customize_backends_config()
+        customize_backends_config(is_first_time_setup=first_time_setup)
 
         # Automatically set up routing after backends (unless routing is the specific focus)
         if not check_routing:
@@ -253,6 +261,9 @@ def init_cmd(
     check_routing = focus == InitFocus.ROUTING
     check_telemetry = focus in (InitFocus.ALL, InitFocus.TELEMETRY)
 
+    # Track if backends.toml existed before we start
+    is_first_time_backends_setup = not path_exists(backends_toml_path)
+
     # Check what needs to be initialized
     needs_config, needs_inference, needs_routing, needs_telemetry = determine_needs(
         reset=reset,
@@ -312,6 +323,7 @@ def init_cmd(
             check_routing=check_routing,
             backends_toml_path=backends_toml_path,
             telemetry_config_path=telemetry_config_path,
+            is_first_time_backends_setup=is_first_time_backends_setup,
         )
 
     except typer.Exit:

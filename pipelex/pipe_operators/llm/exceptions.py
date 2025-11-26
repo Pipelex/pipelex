@@ -5,9 +5,5 @@ class LLMPromptBlueprintValueError(ValueError):
     pass
 
 
-class PipeLLMValueError(ValueError):
-    pass
-
-
 class PipeLLMFactoryError(PipelexError):
     pass

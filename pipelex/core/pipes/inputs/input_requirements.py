@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, RootModel, field_validator
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.exceptions import PipeInputNotFoundError
+from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 
@@ -76,6 +76,9 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
             msg = f"Variable '{variable_name}' not found the input requirements"
             raise PipeInputNotFoundError(msg)
         return requirement
+
+    def is_variable_existing(self, variable_name: str) -> bool:
+        return variable_name in self.root
 
     def add_requirement(self, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
         self.root[variable_name] = InputRequirement(concept=concept, multiplicity=multiplicity)

@@ -1,4 +1,4 @@
-from pipelex.core.interpreter import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.interpreter import PipelexInterpreterError, PLXDecodeError
 
 INVALID_PLX_SYNTAX = (
     "invalid_plx_syntax",

@@ -202,7 +202,9 @@ Shape of the contract for PipeOperator is:
 **PipeCondition:**
 - jinja2_expression_template: Jinja2 expression to evaluate.
 - outcomes: Mapping dict[str, str] of expression results to pipe codes.
-- default_outcome: Fallback pipe_code or "fail"/"continue" if no match.
+- default_outcome: Add a default outcome to the outcomes map. 
+Becareful, the outputs "fail" and "continue" are special outcomes, they are not pipe codes. 
+-> "continue" is a special outcome that allows to continue the sequence, "fail" is a special outcome that fails the whole pipeline. To use with caution.
 
 ## More rules:
 - For each pipe: give a unique snake_case pipe_code, based on a verb, and craft description of what the pipe does.

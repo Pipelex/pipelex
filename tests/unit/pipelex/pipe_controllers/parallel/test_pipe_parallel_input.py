@@ -3,8 +3,7 @@ from typing import Any, Callable
 import pytest
 
 from pipelex import log
-from pipelex.core.exceptions import PipeValidationError
-from pipelex.core.pipe_errors import PipeDefinitionError
+from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from tests.unit.pipelex.pipe_controllers.parallel.data import PipeParallelInputTestCases
@@ -49,7 +48,7 @@ class TestPipeParallelValidateInputs:
         load_empty_library()
         log.verbose(f"Testing error case: {test_id}")
 
-        with pytest.raises((PipeValidationError, ValueError, PipeDefinitionError)) as exc_info:  # noqa: PT012
+        with pytest.raises((PipeValidationError, ValueError)) as exc_info:  # noqa: PT012
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeParallelBlueprint.model_validate(blueprint_dict)
             PipeParallelFactory.make_from_blueprint(

@@ -6,7 +6,7 @@ from pipelex.system.configuration.config_root import (
     CONFIG_BASE_OVERRIDES_AFTER_ENV,
     CONFIG_BASE_OVERRIDES_BEFORE_ENV,
 )
-from pipelex.system.runtime import RunMode, runtime_manager
+from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
 
@@ -104,12 +104,8 @@ class ConfigLoader:
             *CONFIG_BASE_OVERRIDES_AFTER_ENV,
         ]
         for override in list_of_overrides:
-            if override == runtime_manager.run_mode:
-                match runtime_manager.run_mode:
-                    case RunMode.NORMAL:
-                        continue
-                    case RunMode.UNIT_TEST | RunMode.CI_TEST:
-                        override_path = os.path.join(os.getcwd(), "tests", f"pipelex_{override}.toml")
+            if override == runtime_manager.run_mode and runtime_manager.is_unit_testing:
+                override_path = os.path.join(os.getcwd(), "tests", f"pipelex_{override}.toml")
             else:
                 override_path = os.path.join(os.getcwd(), "pipelex" if self.is_in_pipelex_config else "", f"pipelex_{override}.toml")
             if override_dict := load_toml_from_path_if_exists(override_path):

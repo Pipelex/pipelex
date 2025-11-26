@@ -27,10 +27,6 @@ class Concept(BaseModel):
     structure_class_name: str
     refines: str | None = None
 
-    @property
-    def concept_string(self) -> str:
-        return f"{self.domain}.{self.code}"
-
     @field_validator("code")
     @classmethod
     def validate_code(cls, code: str) -> str:
@@ -62,6 +58,19 @@ class Concept(BaseModel):
             msg = f"Refines '{refines}' is not a valid concept string for concept '{cls.concept_string}'"
             raise ConceptValueError(msg) from exc
         return refines
+
+    @property
+    def concept_string(self) -> str:
+        return f"{self.domain}.{self.code}"
+
+    @classmethod
+    def is_implicit_concept(cls, concept_string: str) -> bool:
+        try:
+            validate_concept_string(concept_string=concept_string)
+        except ConceptStringError as exc:
+            msg = f"Concept string '{concept_string}' is not a valid concept string for concept '{cls.concept_string}'"
+            raise ConceptValueError(msg) from exc
+        return concept_string.startswith(SpecialDomain.IMPLICIT)
 
     @classmethod
     def sentence_from_concept(cls, concept: "Concept") -> str:
