@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 
 
 class TestConceptCompactMemory:

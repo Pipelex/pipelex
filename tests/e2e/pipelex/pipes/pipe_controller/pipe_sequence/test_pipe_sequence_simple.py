@@ -1,5 +1,8 @@
 """Test simple pipe sequence functionality without batching."""
 
+from pathlib import Path
+from typing import Callable
+
 import pytest
 
 from pipelex import pretty_print
@@ -16,21 +19,22 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.dry_runnable
 @pytest.mark.inference
 @pytest.mark.asyncio
-async def test_simple_text_sequence(pipe_run_mode: PipeRunMode):
-    """Test simple text processing sequence without batching."""
-    # Create test input
-    raw_text_stuff = StuffFactory.make_stuff(
-        name="raw_text",
-        concept=ConceptFactory.make(
-            concept_code="RawText",
-            domain="simple_text_processing",
-            description="simple_text_processing.RawText",
-            structure_class_name="TextContent",
-        ),
-        content=TextContent(text="This is  some  messy    text with bad spacing."),
-    )
+class TestPipeSequenceSimple:
+    async def test_simple_text_sequence(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence/")])
+        """Test simple text processing sequence without batching."""
+        # Create test input
+        raw_text_stuff = StuffFactory.make_stuff(
+            name="raw_text",
+            concept=ConceptFactory.make(
+                concept_code="RawText",
+                domain="simple_text_processing",
+                description="simple_text_processing.RawText",
+                structure_class_name="TextContent",
+            ),
+            content=TextContent(text="This is  some  messy    text with bad spacing."),
+        )
 
-    if pipe_run_mode == PipeRunMode.DRY:
         # Create working memory with the required input for dry run
         working_memory = WorkingMemoryFactory.make_from_multiple_stuffs([raw_text_stuff])
 

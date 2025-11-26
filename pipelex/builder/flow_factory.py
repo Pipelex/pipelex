@@ -2,20 +2,20 @@ from pathlib import Path
 from typing import Any
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.flow import Flow, FlowElement
 from pipelex.builder.pipe.pipe_signature import PipeSignature
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.interpreter import PipelexInterpreter
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
 
-class FlowFactoryError(PipelexException):
+class FlowFactoryError(PipelexError):
     """Exception raised by FlowFactory."""
 
 
@@ -36,8 +36,7 @@ class FlowFactory:
         Returns:
             Flow with controllers preserved and operators as signatures.
         """
-        plx_path = Path(plx_file_path) if isinstance(plx_file_path, str) else plx_file_path
-        bundle_blueprint = PipelexInterpreter(file_path=plx_path).make_pipelex_bundle_blueprint()
+        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=str(plx_file_path))
         return FlowFactory.make_from_bundle_blueprint(bundle_blueprint)
 
     @staticmethod
@@ -54,7 +53,7 @@ class FlowFactory:
 
         if bundle_blueprint.pipe:
             for pipe_code, pipe_blueprint in bundle_blueprint.pipe.items():
-                if pipe_blueprint.pipe_category == AllowedPipeCategories.PIPE_CONTROLLER:
+                if PipeCategory.is_controller_by_str(pipe_blueprint.pipe_category):
                     # Keep controllers as-is (they are already blueprints which match spec structure)
                     # Type check to ensure we only assign controller blueprints
                     if isinstance(

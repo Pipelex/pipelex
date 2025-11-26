@@ -7,6 +7,10 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import Self
 
 
+class ImgGenSettingValueError(ValueError):
+    pass
+
+
 class ImgGenSetting(ConfigModel):
     model: str
     quality: Quality | None = Field(default=None, strict=False)
@@ -18,8 +22,11 @@ class ImgGenSetting(ConfigModel):
     @model_validator(mode="after")
     def validate_quality_or_nb_steps(self) -> Self:
         if self.quality is not None and self.nb_steps is not None:
-            msg = "ImgGenSetting cannot have both 'quality' and 'nb_steps' specified. Use one or the other."
-            raise ValueError(msg)
+            msg = (
+                "ImgGenSetting cannot have both 'quality' and 'nb_steps' specified. Use one or the other."
+                f"Quality: {self.quality}, nb_steps: {self.nb_steps}"
+            )
+            raise ImgGenSettingValueError(msg)
         return self
 
     def desc(self) -> str:

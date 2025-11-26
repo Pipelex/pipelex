@@ -63,7 +63,7 @@ class TestLLMGenObject:
             pytest.skip(f"'{llm_worker.desc}' does not support object generation")
         expected_class = expected_instance.__class__
         output = await llm_worker.gen_object(llm_job=llm_job, schema=expected_class)
-        pretty_print(output)
+        pretty_print(output, title=f"Output from {llm_preset_id}")
         assert isinstance(output, expected_class)
         assert output.model_dump(serialize_as_any=True) == expected_instance.model_dump(serialize_as_any=True)
 

@@ -1,6 +1,9 @@
-class PipeSequenceBlueprintError(Exception):
+from pipelex.base_exceptions import PipelexError
+
+
+class PipeSequenceValueError(ValueError):
     pass
 
 
-class PipeSequenceError(Exception):
+class PipeSequenceFactoryError(PipelexError):
     pass

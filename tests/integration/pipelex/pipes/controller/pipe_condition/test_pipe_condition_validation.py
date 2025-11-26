@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Callable
+
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
 from pipelex.hub import get_concept_library
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
@@ -8,8 +11,9 @@ from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 class TestPipeConditionValidation:
     """Tests for PipeCondition validate_inputs method"""
 
-    def test_pipe_condition_creation(self):
+    def test_pipe_condition_creation(self, load_test_library: Callable[[list[Path]], None]):
         """Test basic PipeCondition creation"""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         domain = "test_domain"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept",
@@ -44,13 +48,14 @@ class TestPipeConditionValidation:
         assert pipe_condition.code == "test_condition"
         assert pipe_condition.domain == domain
         assert len(pipe_condition.outcome_map) == 2
-        assert pipe_condition.expression == "input_var"
+        assert pipe_condition.expression == "{{ input_var }}"
         assert pipe_condition.default_outcome == "default_pipe"
 
         concept_library.teardown()
 
-    def test_pipe_condition_expression_template_vs_expression(self):
+    def test_pipe_condition_expression_template_vs_expression(self, load_test_library: Callable[[list[Path]], None]):
         """Test that both expression_template and expression formats work"""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Test with expression_template
         domain = "test_domain"
         concept_library = get_concept_library()
@@ -100,6 +105,6 @@ class TestPipeConditionValidation:
         )
 
         # Both should have the same applied expression template format
-        assert pipe_condition_template.applied_expression_template == "{{ var }}"
-        assert pipe_condition_expr.applied_expression_template == "{{ var }}"
+        assert pipe_condition_template.expression == "{{ var }}"
+        assert pipe_condition_expr.expression == "{{ var }}"
         concept_library.teardown()

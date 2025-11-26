@@ -6,12 +6,49 @@ import typer
 from typing_extensions import Annotated
 
 from pipelex.cli.exceptions import PipelexCLIError
-from pipelex.kit.cursor_export import export_cursor_rules, remove_cursor_rules
+from pipelex.kit.cursor_rules import remove_cursor_rules, update_cursor_rules
 from pipelex.kit.index_loader import load_index
+from pipelex.kit.index_models import KitIndex
 from pipelex.kit.migrations_export import export_migration_instructions
-from pipelex.kit.targets_update import build_merged_rules, remove_from_targets, update_targets
+from pipelex.kit.single_file_agent_rules import remove_from_targets, update_single_file_agent_rules
 
 kit_app = typer.Typer(no_args_is_help=True)
+
+
+def _sync_agent_rules(
+    repo_root: Path | None,
+    cursor: bool,
+    single_files: bool,
+    dry_run: bool,
+    diff: bool,
+    backup: str | None,
+    agent_set: str | None,
+    kit_index: KitIndex | None = None,
+) -> None:
+    resolved_repo_root = repo_root if repo_root is not None else Path()
+    loaded_kit_index = load_index() if kit_index is None else kit_index
+    agent_set = agent_set or loaded_kit_index.agent_rules.default_set
+
+    if cursor:
+        typer.echo("📤 Updating Cursor rules...")
+        update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set, dry_run=dry_run)
+
+    if single_files:
+        typer.echo("📝 Updating target files...")
+        update_single_file_agent_rules(
+            repo_root=resolved_repo_root,
+            kit_index=loaded_kit_index,
+            agent_set=agent_set,
+            targets=loaded_kit_index.agent_rules.targets,
+            dry_run=dry_run,
+            diff=diff,
+            backup=backup,
+        )
+
+    if dry_run:
+        typer.echo("✅ Dry run completed - no changes made")
+    else:
+        typer.echo("✅ Kit sync completed successfully")
 
 
 @kit_app.command("rules", help="Export Pipelex Cursor rules and merge Pipelex marked sections into other agent rules files")
@@ -22,27 +59,18 @@ def agent_rules(
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would be done without making changes")] = False,
     diff: Annotated[bool, typer.Option("--diff", help="Show unified diff of changes")] = False,
     backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
+    agent_set: Annotated[str | None, typer.Option("--set", help="Agent rule set to sync (use 'pipelex' for Pipelex repo)")] = None,
 ) -> None:
     try:
-        if repo_root is None:
-            repo_root = Path()
-
-        idx = load_index()
-
-        if cursor:
-            typer.echo("📤 Exporting Cursor rules...")
-            export_cursor_rules(repo_root, idx, dry_run=dry_run)
-
-        if single_files:
-            typer.echo("📝 Building merged agent documentation...")
-            merged_md = build_merged_rules(idx)
-            typer.echo("📝 Updating target files...")
-            update_targets(repo_root, merged_md, idx.agent_rules.targets, dry_run=dry_run, diff=diff, backup=backup)
-
-        if dry_run:
-            typer.echo("✅ Dry run completed - no changes made")
-        else:
-            typer.echo("✅ Kit sync completed successfully")
+        _sync_agent_rules(
+            repo_root=repo_root,
+            cursor=cursor,
+            single_files=single_files,
+            dry_run=dry_run,
+            diff=diff,
+            backup=backup,
+            agent_set=agent_set,
+        )
 
     except Exception as exc:
         msg = f"Failed to sync kit assets for agent rules: {exc}"

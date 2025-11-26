@@ -1,8 +1,12 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+
+if TYPE_CHECKING:
+    from pipelex.libraries.library import Library
 
 
 class LibraryManagerAbstract(ABC):
@@ -11,7 +15,7 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def teardown(self) -> None:
+    def teardown(self, library_id: str | None = None) -> None:
         pass
 
     @abstractmethod
@@ -19,21 +23,34 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def validate_libraries(self) -> None:
+    def open_library(self, library_id: str | None = None) -> tuple[str, "Library"]:
+        """Open a library with the given library_id. Creates it if it doesn't exist. If no library_id is provided, it creates one."""
+
+    @abstractmethod
+    def get_library(self, library_id: str) -> "Library":
+        """Get the Library object for a specific library_id."""
+
+    @abstractmethod
+    def get_current_library(self) -> "Library":
+        """Get the Library object for the current library."""
+
+    @abstractmethod
+    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         pass
 
     @abstractmethod
-    def get_loaded_plx_paths(self) -> list[str]:
+    def _remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
         pass
 
     @abstractmethod
-    def load_libraries(self, library_dirs: list[Path] | None = None, library_file_paths: list[Path] | None = None) -> None:
+    def _remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
         pass
 
     @abstractmethod
-    def load_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> list[PipeAbstract]:
-        pass
-
-    @abstractmethod
-    def remove_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
+    def load_libraries(
+        self,
+        library_id: str,
+        library_dirs: list[Path] | None = None,
+        library_file_paths: list[Path] | None = None,
+    ) -> None:
         pass

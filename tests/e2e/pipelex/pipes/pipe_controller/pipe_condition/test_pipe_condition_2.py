@@ -1,3 +1,6 @@
+from pathlib import Path
+from typing import Callable
+
 import pytest
 from pytest import FixtureRequest
 
@@ -10,7 +13,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition import CategoryInput
+from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition import CategoryInput
 
 
 @pytest.mark.llm
@@ -27,7 +30,9 @@ class TestPipeConditionExpression:
         request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
         category: str,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition/")])
         """Test that PipeCondition routes to the correct pipe based on expression."""
         # Create input data
         category_input = CategoryInput(category=category)

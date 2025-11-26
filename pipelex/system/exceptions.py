@@ -1,19 +1,19 @@
 import logging
 from typing import ClassVar
 
-from pipelex.base_exceptions import RootException
+from pipelex.base_exceptions import PipelexError
 from pipelex.types import StrEnum
 
 
-class ToolException(RootException):
+class ToolError(PipelexError):
     pass
 
 
-class NestedKeyConflictError(ToolException):
+class NestedKeyConflictError(ToolError):
     """Raised when attempting to create nested keys under a non-dict value."""
 
 
-class CredentialsError(RootException):
+class CredentialsError(PipelexError):
     pass
 
 
@@ -22,7 +22,7 @@ class TracebackMessageErrorMode(StrEnum):
     EXCEPTION = "exception"
 
 
-class TracebackMessageError(RootException):
+class TracebackMessageError(PipelexError):
     error_mode: ClassVar[TracebackMessageErrorMode] = TracebackMessageErrorMode.EXCEPTION
 
     def __init__(self, message: str):

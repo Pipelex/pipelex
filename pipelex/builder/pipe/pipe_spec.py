@@ -9,8 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.validation import validate_concept_string_or_code
-from pipelex.core.pipes.exceptions import PipeBlueprintValueError
-from pipelex.core.pipes.pipe_blueprint import AllowedPipeCategories, AllowedPipeTypes, PipeBlueprint
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -39,12 +38,11 @@ class PipeSpec(StructuredContent):
     pipe_code: str = Field(description="Unique pipe identifier. Must be snake_case.")
     type: Any = Field(
         description=(
-            f"Pipe type. Validated at runtime, must be one of: {AllowedPipeTypes}. "
-            "Examples: PipeLLM, PipeImgGen, PipeExtract, PipeSequence, PipeParallel."
+            f"Pipe type. Validated at runtime, must be one of: {PipeType}. Examples: PipeLLM, PipeImgGen, PipeExtract, PipeSequence, PipeParallel."
         )
     )
     pipe_category: Any = Field(
-        description=(f"Pipe category. Validated at runtime, must be one of: {AllowedPipeCategories}. Either 'PipeController' or 'PipeOperator'.")
+        description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'.")
     )
     description: str | None = Field(description="Natural language description of the pipe's purpose and functionality.")
     inputs: dict[str, str] = Field(
@@ -71,9 +69,9 @@ class PipeSpec(StructuredContent):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        if value not in AllowedPipeTypes.value_list():
-            msg = f"Invalid pipe type '{value}'. Must be one of: {AllowedPipeTypes.value_list()}"
-            raise PipeBlueprintValueError(msg)
+        if value not in PipeType.value_list():
+            msg = f"Invalid pipe type '{value}'. Must be one of: {PipeType.value_list()}"
+            raise ValueError(msg)
         return value
 
     @field_validator("output", mode="after")
@@ -90,22 +88,20 @@ class PipeSpec(StructuredContent):
         if inputs is None:
             return None
 
-        # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-        multiplicity_pattern = MUTLIPLICITY_PATTERN
-
         for input_name, concept_spec in inputs.items():
             if not is_snake_case(input_name):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
-                raise PipeBlueprintValueError(msg)
+                raise ValueError(msg)
 
             # Validate the concept spec format with optional multiplicity brackets
-            match = re.match(multiplicity_pattern, concept_spec)
+            # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
+            match = re.match(MUTLIPLICITY_PATTERN, concept_spec)
             if not match:
                 msg = (
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
                     f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
                 )
-                raise PipeBlueprintValueError(msg)
+                raise ValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
             concept_string_or_code = match.group(1)
@@ -123,7 +119,7 @@ class PipeSpec(StructuredContent):
 
         if not is_snake_case(normalized_pipe_code):
             msg = f"Invalid pipe code syntax '{normalized_pipe_code}'. Must be in snake_case."
-            raise PipeBlueprintValueError(msg)
+            raise ValueError(msg)
         return normalized_pipe_code
 
     def to_blueprint(self) -> PipeBlueprint:

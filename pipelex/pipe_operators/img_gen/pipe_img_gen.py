@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import Field, field_validator, model_validator
-from typing_extensions import override
+from pydantic import Field, model_validator
+from typing_extensions import Self, override
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
@@ -10,16 +10,14 @@ from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background,
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
-from pipelex.config import StaticValidationReaction, get_config
+from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
-from pipelex.core.exceptions import StaticValidationError, StaticValidationErrorType
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipe_errors import PipeDefinitionError, UnexpectedPipeDefinitionError
-from pipelex.core.pipes.exceptions import PipeInputError
-from pipelex.core.pipes.input_requirements import InputRequirements
-from pipelex.core.pipes.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
@@ -27,13 +25,13 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
+from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenRunError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
@@ -55,9 +53,6 @@ class PipeImgGenOutput(PipeOutput):
         return the_urls
 
 
-DEFAULT_PROMPT_VAR_NAME = "prompt"
-
-
 class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     img_gen_prompt: str | None = None
@@ -65,6 +60,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     img_gen_choice: ImgGenModelChoice | None = None
 
+    # One-time settings (not in ImgGenSetting)
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
@@ -72,27 +68,81 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     output_format: OutputFormat | None = Field(default=None, strict=False)
     output_multiplicity: VariableMultiplicity
 
-    @field_validator("img_gen_prompt_var_name")
-    @classmethod
-    def validate_input_var_name_not_provided_as_attribute(cls, value: str | None) -> str | None:
-        if value is not None:
-            msg = "img_gen_prompt_var_name must be None before input validation"
-            raise PipeDefinitionError(msg)
-        return value
+    @override
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+        needed_inputs = InputRequirementsFactory.make_empty()
+        if not self.img_gen_prompt:
+            input_name, requirement = self.inputs.items[0]  # We know there is only one input because of the validation
+            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
+        return needed_inputs
+
+    @override
+    def required_variables(self) -> set[str]:
+        if self.img_gen_prompt_var_name:
+            return {self.img_gen_prompt_var_name}
+        return set()
 
     @model_validator(mode="after")
-    def validate_inputs(self) -> Self:
-        self._validate_inputs()
+    def validate_fields(self) -> Self:
+        # Either we have img_gen_prompt or img_gen_prompt_var_name, but not both
+        if self.img_gen_prompt_var_name is not None and self.img_gen_prompt is not None:
+            msg = "Either 'img_gen_prompt' or 'img_gen_prompt_var_name' must be provided, but not both"
+            raise ValueError(msg)
+
+        # If img_gen_prompt is None, validate that inputs are properly configured
+        if self.img_gen_prompt is None:
+            # Must have exactly one input
+            if not self.inputs or len(self.inputs.items) != 1:
+                msg = "When 'img_gen_prompt' is not provided, there must be exactly one input"
+                raise ValueError(msg)
+
+            # The img_gen_prompt_var_name must match the key of the single input
+            input_name, _ = self.inputs.items[0]
+            if self.img_gen_prompt_var_name != input_name:
+                msg = (
+                    f"When 'img_gen_prompt' is not provided, 'img_gen_prompt_var_name' must match the input name. "
+                    f"Expected '{input_name}', got '{self.img_gen_prompt_var_name}'"
+                )
+                raise ValueError(msg)
+
         return self
 
     @override
-    def _validate_with_libraries(self):
-        self._validate_inputs()
+    def validate_inputs_static(self):
         if self.img_gen_choice:
             check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
 
     @override
-    def validate_output(self):
+    def validate_inputs_with_library(self):
+        concept_library = get_concept_library()
+        input_name = self.inputs.variables[0]
+        input_requirement = self.inputs.get_required_input_requirement(input_name)
+
+        if not concept_library.is_compatible(
+            tested_concept=input_requirement.concept,
+            wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+            strict=True,
+        ):
+            msg = (
+                f"The input of a PipeImgGen must be compatible with the Text concept (or refine it). "
+                f"Input '{input_name}' has concept '{input_requirement.concept.concept_string}'. "
+                "Image generation requires a text prompt. Use native.Text or a concept that refines it."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE,
+                pipe_code=self.code,
+                variable_names=[input_name],
+                required_concept_codes=["native.Text"],
+                provided_concept_code=input_requirement.concept.concept_string,
+            )
+
+    @override
+    def validate_output_static(self):
+        pass
+
+    @override
+    def validate_output_with_library(self):
         if not get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
@@ -102,97 +152,14 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 f"The output of a ImgGen pipe must be compatible with the Image concept. "
                 f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
             )
-            raise PipeDefinitionError(msg)
-
-    @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
-        needed_inputs = InputRequirementsFactory.make_empty()
-        if self.img_gen_prompt:
-            needed_inputs.add_requirement(
-                variable_name="img_gen_prompt",
-                concept=ConceptFactory.make_native_concept(
-                    native_concept_code=NativeConceptCode.TEXT,
-                ),
-            )
-        else:
-            for input_name, requirement in self.inputs.items:
-                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
-        return needed_inputs
-
-    @override
-    def required_variables(self) -> set[str]:
-        if self.img_gen_prompt_var_name:
-            return {self.img_gen_prompt_var_name}
-        return {DEFAULT_PROMPT_VAR_NAME}
-
-    def _validate_inputs(self):
-        concept_library = get_concept_library()
-        static_validation_config = get_config().pipelex.static_validation_config
-        default_reaction = static_validation_config.default_reaction
-        reactions = static_validation_config.reactions
-        # check that we have either an img_gen_prompt passed as attribute or as a single text input
-        nb_inputs = self.inputs.nb_inputs
-        if self.img_gen_prompt:
-            if nb_inputs > 0:
-                msg = "There must be no inputs if img_gen_prompt is provided"
-                raise PipeDefinitionError(msg)
-            # we're good with the prompt provided as attribute
-            return
-
-        if nb_inputs > 1:
-            too_many_candidate_inputs_error = StaticValidationError(
-                error_type=StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS,
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain=self.domain,
                 pipe_code=self.code,
-                variable_names=self.inputs.variables,
-                explanation="Only one text input can be provided for image gen prompt",
+                provided_concept_code=self.output.concept_string,
+                required_concept_codes=[NativeConceptCode.IMAGE.concept_string],
             )
-            match reactions.get(StaticValidationErrorType.TOO_MANY_CANDIDATE_INPUTS, default_reaction):
-                case StaticValidationReaction.IGNORE:
-                    pass
-                case StaticValidationReaction.LOG:
-                    log.error(too_many_candidate_inputs_error.desc())
-                case StaticValidationReaction.RAISE:
-                    raise too_many_candidate_inputs_error
-        elif nb_inputs < 1:
-            missing_input_var_error = StaticValidationError(
-                error_type=StaticValidationErrorType.MISSING_INPUT_VARIABLE,
-                domain=self.domain,
-                pipe_code=self.code,
-                explanation="You must provide an image gen prompt either as attribute of the pipe or as a single text input",
-            )
-            match reactions.get(StaticValidationErrorType.MISSING_INPUT_VARIABLE, default_reaction):
-                case StaticValidationReaction.IGNORE:
-                    pass
-                case StaticValidationReaction.LOG:
-                    log.error(missing_input_var_error.desc())
-                case StaticValidationReaction.RAISE:
-                    raise missing_input_var_error
-
-        # We have confirmed right above that we have exactly one input
-        # get input_name, requirement from single item in inputs
-        input_name, requirement = self.inputs.items[0]
-        if concept_library.is_compatible(
-            tested_concept=requirement.concept,
-            wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
-        ):
-            self.img_gen_prompt_var_name = input_name
-        else:
-            inadequate_input_concept_error = StaticValidationError(
-                error_type=StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT,
-                domain=self.domain,
-                pipe_code=self.code,
-                variable_names=[input_name],
-                provided_concept_code=requirement.concept.code,
-                explanation="For PipeImgGen you must provide a text input or a concept that refines text",
-            )
-            match reactions.get(StaticValidationErrorType.INADEQUATE_INPUT_CONCEPT, default_reaction):
-                case StaticValidationReaction.IGNORE:
-                    pass
-                case StaticValidationReaction.LOG:
-                    log.error(inadequate_input_concept_error.desc())
-                case StaticValidationReaction.RAISE:
-                    raise inadequate_input_concept_error
 
     @override
     async def _run_operator_pipe(
@@ -211,6 +178,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         )
         applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
 
+        # TODO: move this to the factory
         log.verbose("Getting image generation prompt from context")
         if self.img_gen_prompt:
             img_gen_prompt_text = self.img_gen_prompt
@@ -218,19 +186,23 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             try:
                 img_gen_prompt_text = working_memory.get_stuff_as_str(stuff_name)
             except WorkingMemoryStuffNotFoundError as stuff_not_found_error:
-                msg = f"Could not find a valid image generation prompt named '{stuff_name}' in the working_memory: {stuff_not_found_error}"
-                raise PipeInputError(
-                    message=msg,
-                    pipe_code=self.code,
-                    variable_name=stuff_name,
-                    concept_code=None,
-                ) from stuff_not_found_error
+                msg = (
+                    f"While runnning the PipeImgGen '{self.code}' an error occurred: "
+                    f"Could not find a valid image generation prompt named '{stuff_name}' in the working_memory: {stuff_not_found_error}"
+                )
+                raise PipeImgGenRunError(message=msg) from stuff_not_found_error
             except StuffContentTypeError as stuff_content_type_error:
-                msg = f"The image generation prompt named '{stuff_name}' is not of the right type: {stuff_content_type_error}"
-                raise PipeInputError(message=msg, pipe_code=self.code, variable_name=stuff_name, concept_code=None) from stuff_content_type_error
+                msg = (
+                    f"While runnning the PipeImgGen '{self.code}' an error occurred: "
+                    f"The image generation prompt named '{stuff_name}' is not of the right type: {stuff_content_type_error}"
+                )
+                raise PipeImgGenRunError(message=msg) from stuff_content_type_error
         else:
-            msg = "You must provide an image gen prompt either as attribute of the pipe or as a single text input"
-            raise UnexpectedPipeDefinitionError(msg)
+            msg = (
+                f"While runnning the PipeImgGen '{self.code}' an error occurred: "
+                "You must provide an image gen prompt either as attribute of the pipe or as a single text input"
+            )
+            raise PipeImgGenRunError(msg)
 
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_param_defaults = img_gen_config.img_gen_param_defaults

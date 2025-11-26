@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pipelex.builder.runner_code import generate_compact_memory_entry, value_to_python_code
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 
 
 class TestValueToPythonCode:

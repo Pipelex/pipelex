@@ -33,6 +33,7 @@ class TestPipeSequenceMultiplicity:
 
         # Execute the pipeline
         pipe_output = await execute_pipeline(
+            library_dirs=["tests/integration/pipelex/pipes/controller/pipe_sequence/"],
             pipe_code="creative_ideation_sequence",
             inputs=working_memory,
             pipe_run_mode=pipe_run_mode,

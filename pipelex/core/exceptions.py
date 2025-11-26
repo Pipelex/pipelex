@@ -1,72 +1,36 @@
-from pydantic import BaseModel
-from typing_extensions import override
+from pydantic import BaseModel, Field
 
-from pipelex.base_exceptions import PipelexException
-from pipelex.core.pipes.exceptions import StaticValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationErrorType
 
 
-class PipelexConfigurationError(PipelexException):
-    """Raised when there are configuration issues with the PipelexInterpreter."""
+class PipesAndConceptValidationErrorData(BaseModel):
+    """Structured validation error data for Pipe/Concept validation errors.
 
+    This model captures validation errors raised by Pipe or Concept classes during
+    their validation (NOT blueprint validation errors).
 
-class SyntaxErrorData(BaseModel):
-    message: str
-    lineno: int | None = None
-    offset: int | None = None
-    text: str | None = None
-    end_lineno: int | None = None
-    end_offset: int | None = None
+    These errors come from:
+    - PipeAbstract and its subclasses (PipeLLM, PipeExtract, etc.)
+    - Concept validation
+    """
 
-    @classmethod
-    def from_syntax_error(cls, syntax_error: SyntaxError) -> "SyntaxErrorData":
-        return cls(
-            message=syntax_error.msg,
-            lineno=syntax_error.lineno,
-            offset=syntax_error.offset,
-            text=syntax_error.text,
-            end_lineno=syntax_error.end_lineno,
-            end_offset=syntax_error.end_offset,
-        )
+    # === Source Context ===
+    domain: str | None = Field(None, description="Domain where error occurred")
+    source: str | None = Field(None, description="Source file path")
 
+    # === Entity Context (what failed) ===
+    pipe_code: str | None = Field(None, description="Pipe code if error is in a pipe")
+    concept_code: str | None = Field(None, description="Concept code if error is in a concept")
+    field_name: str | None = Field(None, description="Specific field that failed")
 
-class StaticValidationError(Exception):
-    def __init__(
-        self,
-        error_type: StaticValidationErrorType,
-        domain: str,
-        pipe_code: str | None = None,
-        variable_names: list[str] | None = None,
-        required_concept_codes: list[str] | None = None,
-        provided_concept_code: str | None = None,
-        file_path: str | None = None,
-        explanation: str | None = None,
-    ):
-        self.error_type = error_type
-        self.domain = domain
-        self.pipe_code = pipe_code
-        self.variable_names = variable_names
-        self.required_concept_codes = required_concept_codes
-        self.provided_concept_code = provided_concept_code
-        self.file_path = file_path
-        self.explanation = explanation
-        super().__init__()
+    # === Error Classification ===
+    error_type: PipeValidationErrorType = Field(
+        description="Type of pipe/concept validation error",
+    )
 
-    def desc(self) -> str:
-        msg = f"{self.error_type} • domain='{self.domain}'"
-        if self.pipe_code:
-            msg += f" • pipe='{self.pipe_code}'"
-        if self.variable_names:
-            msg += f" • variable='{self.variable_names}'"
-        if self.required_concept_codes:
-            msg += f" • required_concept_codes='{self.required_concept_codes}'"
-        if self.provided_concept_code:
-            msg += f" • provided_concept_code='{self.provided_concept_code}'"
-        if self.file_path:
-            msg += f" • file='{self.file_path}'"
-        if self.explanation:
-            msg += f" • explanation='{self.explanation}'"
-        return msg
+    # === Error Details ===
+    message: str = Field(description="Human-readable error message")
+    field_path: str = Field(description="Path to field in dot notation")
 
-    @override
-    def __str__(self) -> str:
-        return self.desc()
+    # === Variable names for input/output errors ===
+    variable_names: list[str] | None = Field(None, description="Variable names (for input errors)")

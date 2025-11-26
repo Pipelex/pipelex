@@ -1,5 +1,7 @@
 """Complex integration test for PipeCondition controller with multiple inputs and nested conditions."""
 
+from collections.abc import Callable
+from pathlib import Path
 from typing import Literal, cast
 
 import pytest
@@ -8,7 +10,7 @@ from pytest import FixtureRequest
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.exceptions import PipeRunInputsError
+from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_pipe_router, get_required_pipe
@@ -16,7 +18,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition_complex import (
+from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition_complex import (
     DocumentRequest,
     UserProfile,
 )
@@ -27,8 +29,11 @@ from tests.test_pipelines.pipe_controllers.pipe_condition.pipe_condition_complex
 @pytest.mark.llm
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeConditionComplex:
-    async def test_technical_urgent_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
+    async def test_technical_urgent_routing(
+        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test technical document with urgent priority routing."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create complex input data
         doc_request = DocumentRequest(document_type="technical", priority="urgent", language="english", complexity="high")
         user_profile = UserProfile(user_level="expert", department="technical")
@@ -77,8 +82,11 @@ class TestPipeConditionComplex:
         if pipe_run_mode != PipeRunMode.DRY:
             assert "URGENT_TECHNICAL_PROCESSED" in final_result.content.text
 
-    async def test_business_finance_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
+    async def test_business_finance_routing(
+        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test business document for finance department routing."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="business", priority="normal", language="english", complexity="medium")
         user_profile = UserProfile(user_level="intermediate", department="finance")
 
@@ -122,8 +130,9 @@ class TestPipeConditionComplex:
             assert isinstance(final_result.content, TextContent)
             assert "FINANCE_BUSINESS_PROCESSED" in final_result.content.text
 
-    async def test_legal_complex_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
+    async def test_legal_complex_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test complex legal document routing."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="legal", priority="normal", language="spanish", complexity="high")
         user_profile = UserProfile(user_level="expert", department="legal")
 
@@ -167,8 +176,11 @@ class TestPipeConditionComplex:
             assert isinstance(final_result.content, TextContent)
             assert "COMPLEX_LEGAL_PROCESSED" in final_result.content.text
 
-    async def test_technical_expert_high_complexity_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode):
+    async def test_technical_expert_high_complexity_routing(
+        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test technical document with expert user and high complexity."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(
             document_type="technical",
             priority="normal",  # Not urgent, so should check user level + complexity
@@ -221,8 +233,9 @@ class TestPipeConditionComplex:
             assert "EXPERT_TECHNICAL_PROCESSED" in final_result.content.text
 
     # DRY RUN TESTS
-    async def test_complex_pipeline_dry_run_success(self, request: FixtureRequest):
+    async def test_complex_pipeline_dry_run_success(self, request: FixtureRequest, load_test_library: Callable[[list[Path]], None]):
         """Test complex pipeline dry run with valid inputs - should succeed."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="business", priority="urgent", language="english", complexity="low")
         user_profile = UserProfile(user_level="beginner", department="marketing")
 
@@ -263,8 +276,9 @@ class TestPipeConditionComplex:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
 
-    async def test_complex_pipeline_dry_run_missing_inputs(self, request: FixtureRequest):
+    async def test_complex_pipeline_dry_run_missing_inputs(self, request: FixtureRequest, load_test_library: Callable[[list[Path]], None]):
         """Test complex pipeline dry run with missing inputs - should fail with PipeRouterError."""
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="technical", priority="urgent", language="english", complexity="high")
 
         doc_stuff = StuffFactory.make_stuff(
@@ -322,7 +336,9 @@ class TestPipeConditionComplex:
         expected_output_contains: str,
         request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(
             document_type=doc_type,
             priority=priority,

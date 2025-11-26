@@ -1,4 +1,4 @@
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.text_content import TextContent

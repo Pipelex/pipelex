@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from pytest import MonkeyPatch
 
-from pipelex.config import ConfigPaths
 from pipelex.hub import get_console
+from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
 # ================================================================================================

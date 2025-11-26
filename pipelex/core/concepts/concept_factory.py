@@ -3,17 +3,16 @@ from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import (
-    ConceptDefinitionError,
     ConceptFactoryError,
     ConceptRefineError,
-    ConceptStructureGeneratorError,
-    StructureClassError,
+    ConceptStringError,
 )
-from pipelex.core.concepts.structure_generator import StructureGenerator
-from pipelex.core.concepts.validation import is_concept_code_valid, is_concept_string_valid, validate_refine
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
+from pipelex.core.concepts.structure_generation.generator import StructureGenerator
+from pipelex.core.concepts.validation import is_concept_code_valid, validate_concept_string_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
 
@@ -53,14 +52,11 @@ class ConceptFactory:
         return normalized
 
     @classmethod
-    def make_implicit_concept(cls, concept_string: str) -> Concept:
-        if not is_concept_string_valid(concept_string=concept_string):
-            msg = f"Concept string '{concept_string}' is not a valid concept string"
-            raise ConceptFactoryError(msg)
+    def make_implicit_concept(cls, concept_code: str) -> Concept:
         return Concept(
-            code=concept_string.split(".")[1],
+            code=concept_code,
             domain=SpecialDomain.IMPLICIT,
-            description=concept_string,
+            description=concept_code,
             structure_class_name=TextContent.__name__,
         )
 
@@ -160,13 +156,19 @@ class ConceptFactory:
         concept_string_or_code: str,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> DomainAndConceptCode:
-        # At this point, the concept_string_or_code is already validated
+        try:
+            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+        except ConceptStringError as exc:
+            msg = f"Concept string or code '{concept_string_or_code}' is not a valid concept string or code"
+            raise ConceptFactoryError(msg) from exc
+
+        if NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
+            natice_concept_string = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code)
+            return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=natice_concept_string.split(".")[1])
+
         if "." in concept_string_or_code:
-            # Is a concept string.
-            parts = concept_string_or_code.rsplit(".")
-            return DomainAndConceptCode(domain=parts[0], concept_code=parts[1])
-        if NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code):
-            return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=concept_string_or_code)
+            domain_code, concept_code = concept_string_or_code.rsplit(".")
+            return DomainAndConceptCode(domain=domain_code, concept_code=concept_code)
         if (
             concept_codes_from_the_same_domain and concept_string_or_code in concept_codes_from_the_same_domain
         ):  # Is a concept code from the same domain
@@ -209,19 +211,7 @@ class ConceptFactory:
             ConceptFactoryError: If the refine is invalid
 
         """
-        try:
-            validate_refine(refine=refine)
-        except ConceptRefineError as exc:
-            msg = f"Could not validate refine '{refine}': {exc}"
-            raise ConceptFactoryError(msg) from exc
-
-        # Normalize the refine string (adds native domain if missing)
-        normalized_refine = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
-        if normalized_refine is None:
-            msg = f"Could not normalize refine '{refine}' to a native concept string"
-            raise ConceptFactoryError(msg)
-
-        return normalized_refine
+        return NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
 
     @classmethod
     def make_from_blueprint_or_description(
@@ -266,7 +256,7 @@ class ConceptFactory:
                         f"Structure class '{blueprint.structure}' set for concept '{concept_code}' in domain '{domain}' "
                         "is not a registered subclass of StuffContent"
                     )
-                    raise StructureClassError(msg)
+                    raise ConceptFactoryError(msg)
                 structure_class_name = blueprint.structure
             else:
                 # Structure is defined as a ConceptStructureBlueprint - run the structure generator and put it in the class registry
@@ -280,14 +270,8 @@ class ConceptFactory:
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain}': {exc}"
-                    raise ConceptDefinitionError(
+                    raise ConceptFactoryError(
                         msg,
-                        domain_code=domain,
-                        concept_code=concept_code,
-                        description=blueprint.description,
-                        structure_class_python_code=exc.structure_class_python_code,
-                        structure_class_syntax_error_data=exc.syntax_error_data,
-                        source=blueprint.source,
                     ) from exc
 
                 # Register the generated class
@@ -305,16 +289,12 @@ class ConceptFactory:
                     f"Concept '{concept_code}' in domain '{domain}' has refines but also has a structure class registered. "
                     "A concept cannot have both structure and refines."
                 )
-                raise ConceptDefinitionError(
-                    msg, domain_code=domain, concept_code=concept_code, description=blueprint.description, source=blueprint.source
-                )
+                raise ConceptFactoryError(msg)
             try:
                 current_refine = cls.make_refine(refine=blueprint.refines)
             except ConceptRefineError as exc:
                 msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain}': {exc}"
-                raise ConceptDefinitionError(
-                    msg, domain_code=domain, concept_code=concept_code, description=blueprint.description, source=blueprint.source
-                ) from exc
+                raise ConceptFactoryError(msg) from exc
             structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
         # Handle neither structure nor refines - check the class registry
         # If there is a class, use it. structure_class_name is then the concept_code

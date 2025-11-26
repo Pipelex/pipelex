@@ -1,20 +1,22 @@
-from pipelex.base_exceptions import PipelexException
+from pipelex.base_exceptions import PipelexError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
-class PipeRunParamsError(PipelexException):
+class PipeRunParamsError(PipelexError):
     pass
 
 
-class BatchParamsError(PipelexException):
+class BatchParamsError(PipelexError):
     pass
 
 
-class PipeRunError(PipelexException):
-    pass
+class PipeRunError(PipelexError):
+    def __init__(self, message: str, run_mode: PipeRunMode):
+        self.run_mode = run_mode
+        super().__init__(message)
 
 
-class PipeRouterError(PipelexException):
+class PipeRouterError(PipelexError):
     def __init__(
         self,
         message: str,

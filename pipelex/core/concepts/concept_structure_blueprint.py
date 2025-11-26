@@ -3,7 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from pipelex.core.concepts.exceptions import ConceptStructureBlueprintValueError
 from pipelex.types import Self, StrEnum
 
 
@@ -35,16 +34,16 @@ class ConceptStructureBlueprint(BaseModel):
         # If type is None (array), choices must not be None
         if self.type is None and not self.choices:
             msg = f"When type is None (array), choices must not be empty. Actual type: {self.type}, choices: {self.choices}"
-            raise ConceptStructureBlueprintValueError(msg)
+            raise ValueError(msg)
 
         # If type is "dict", key_type and value_type must not be empty
         if self.type == ConceptStructureBlueprintFieldType.DICT:
             if not self.key_type:
                 msg = f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty. Actual key_type: {self.key_type}"
-                raise ConceptStructureBlueprintValueError(msg)
+                raise ValueError(msg)
             if not self.value_type:
                 msg = f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty. Actual value_type: {self.value_type}"
-                raise ConceptStructureBlueprintValueError(msg)
+                raise ValueError(msg)
 
         # Check when default_value is not None, type is not None (except for choice fields)
         if self.default_value is not None and self.type is None and not self.choices:
@@ -52,7 +51,7 @@ class ConceptStructureBlueprint(BaseModel):
                 f"When default_value is not None, type must be specified (unless choices are provided). Actual type: {self.type},"
                 f"default_value: {self.default_value}, choices: {self.choices}"
             )
-            raise ConceptStructureBlueprintValueError(msg)
+            raise ValueError(msg)
 
         # Check default_value type is the same as type
         if self.default_value is not None and self.type is not None:
@@ -62,7 +61,7 @@ class ConceptStructureBlueprint(BaseModel):
         if self.default_value is not None and self.type is None and self.choices:
             if self.default_value not in self.choices:
                 msg = f"default_value must be one of the valid choices. Got '{self.default_value}', valid choices: {self.choices}"
-                raise ConceptStructureBlueprintValueError(msg)
+                raise ValueError(msg)
 
         return self
 
@@ -95,4 +94,4 @@ class ConceptStructureBlueprint(BaseModel):
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
-        raise ConceptStructureBlueprintValueError(msg)
+        raise ValueError(msg)

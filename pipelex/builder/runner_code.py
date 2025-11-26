@@ -89,7 +89,7 @@ import json
 from typing import Any, cast
 
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 

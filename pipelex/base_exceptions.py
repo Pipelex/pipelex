@@ -1,20 +1,16 @@
-class RootException(Exception):
+class PipelexError(Exception):
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
 
-class PipelexException(RootException):
+class PipelexUnexpectedError(PipelexError):
     pass
 
 
-class PipelexUnexpectedError(PipelexException):
+class PipelexConfigError(PipelexError):
     pass
 
 
-class PipelexConfigError(PipelexException):
-    pass
-
-
-class PipelexSetupError(PipelexException):
+class PipelexSetupError(PipelexError):
     pass

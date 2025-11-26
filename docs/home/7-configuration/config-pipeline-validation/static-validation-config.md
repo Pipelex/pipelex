@@ -1,18 +1,18 @@
-# Static Validation Configuration
+# Validation Error Configuration
 
-The `StaticValidationConfig` class controls how Pipelex handles validation errors during static analysis.
+The `ValidationErrorConfig` class controls how Pipelex handles validation errors during static analysis.
 
 ## Configuration Options
 
 ```python
-class StaticValidationReaction(StrEnum):
+class ValidationErrorReaction(StrEnum):
     RAISE = "raise"    # Raise an exception
     LOG = "log"        # Log the error but continue
     IGNORE = "ignore"  # Silently ignore the error
 
-class StaticValidationConfig(ConfigModel):
-    default_reaction: StaticValidationReaction
-    reactions: Dict[StaticValidationErrorType, StaticValidationReaction]
+class ValidationErrorConfig(ConfigModel):
+    default_reaction: ValidationErrorReaction
+    reactions: dict[PipeValidationErrorType, ValidationErrorReaction]
 ```
 
 ### Fields
@@ -31,10 +31,10 @@ Each validation error type can be configured to have one of three reactions:
 ## Example Configuration
 
 ```toml
-[pipelex.static_validation_config]
+[pipelex.validation_error_config]
 default_reaction = "raise"
 
-[pipelex.static_validation_config.reactions]
+[pipelex.validation_error_config.reactions]
 # Enable one of these to tolerate some static validation errors, like you would for pyright or some linters
 # missing_input_variable = "log"
 # extraneous_input_variable = "log"

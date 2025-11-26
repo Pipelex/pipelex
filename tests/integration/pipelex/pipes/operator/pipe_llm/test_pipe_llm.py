@@ -1,10 +1,15 @@
+from pathlib import Path
+from typing import Callable
+
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.hub import get_class_registry, get_pipe_library, get_pipe_router
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry, get_native_concept, get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -17,11 +22,13 @@ from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, Pi
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-class TestPipeLLM:
+class TestPipeLLMBasic:
     async def test_pipe_llm_simple(
         self,
         pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         pipe_llm_blueprint = PipeLLMBlueprint(
             description="LLM test for basic text generation",
             output=NativeConceptCode.TEXT,
@@ -77,10 +84,18 @@ class TestPipeLLM:
         pipe_run_mode: PipeRunMode,
         llm: str,
         llm_to_structure: str,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         # TODO: Add assertion on generated objects vs expected results
         pretty_print(data, title="data")
-        working_memory = WorkingMemoryFactory.make_from_text(text=data, name="data")
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=TextContent(text=data),
+                name="data",
+            ),
+        )
 
         # Create pipe blueprint
         pipe_llm_blueprint = PipeLLMBlueprint(
@@ -136,7 +151,9 @@ class TestPipeLLM:
         stuff: Stuff,
         attribute_paths: list[str],
         pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
     ):
+        load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         for attribute_path in attribute_paths:
             stuff_name = attribute_path
             if not stuff_name:

@@ -6,8 +6,8 @@ from pipelex.core.concepts.concept_blueprint import (
     ConceptStructureBlueprint,
 )
 from pipelex.core.concepts.concept_factory import DomainAndConceptCode
-from pipelex.core.concepts.concept_native import NativeConceptCode
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 
 

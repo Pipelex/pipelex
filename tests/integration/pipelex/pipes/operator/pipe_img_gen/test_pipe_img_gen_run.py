@@ -1,9 +1,9 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Callable, cast
 
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
@@ -28,7 +28,9 @@ class TestPipeImgGenRun:
         img_gen_handle: str,
         topic: str,
         image_desc: str,
+        load_empty_library: Callable[[], None],
     ):
+        load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
             description="Image generation test",
             img_gen_prompt=image_desc,

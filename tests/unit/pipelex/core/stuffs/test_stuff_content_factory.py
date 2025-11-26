@@ -1,10 +1,11 @@
-from typing import Any, ClassVar
+from pathlib import Path
+from typing import Any, Callable, ClassVar
 
 import pytest
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffContentFactory
@@ -143,8 +144,9 @@ class TestStuffContentFactory:
         ("test_name", "blueprint"),
         TestCases.TEST_BLUEPRINTS,
     )
-    def test_blueprint_scenarios(self, test_name: str, blueprint: dict[str, Any]):
+    def test_blueprint_scenarios(self, test_name: str, blueprint: dict[str, Any], load_test_library: Callable[[list[Path]], None]):
         """Test various blueprint scenarios with parametrized test cases."""
+        load_test_library([Path("tests/unit/pipelex/core/stuffs")])
         content = blueprint["content"]
 
         if test_name.startswith("text_"):

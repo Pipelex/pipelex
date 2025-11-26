@@ -1,15 +1,16 @@
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn
 
 import typer
-from rich.syntax import Syntax
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.core.concepts.exceptions import PipelexValidationExceptionAbstract
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
+
+if TYPE_CHECKING:
+    from pipelex.pipeline.validate_bundle import ValidateBundleError
 
 
 class ErrorContext(StrEnum):
@@ -114,61 +115,58 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
     raise typer.Exit(1) from exc
 
 
-def handle_validation_error(exc: PipelexValidationExceptionAbstract, context: ErrorContext) -> NoReturn:
-    """Handle and display validation errors with formatted output.
+def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | None = None) -> NoReturn:
+    """Handle and display ValidateBundleError with formatted output.
 
     Args:
-        exc: The validation error exception (implements ValidationErrorDetailsProtocol)
-        context: Context for the error message
+        exc: The bundle validation error exception
+        bundle_path: Optional path to the bundle file being validated
     """
     console = get_console()
-    console.print(f"\n[bold red]❌ {context} failed due to validation error[/bold red]\n")
-    console.print(f"[bold red]Error:[/bold red]        {exc}\n")
+    console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
 
-    # Display concept definition errors with syntax highlighting
-    concept_definition_errors = exc.get_concept_definition_errors()
-    if concept_definition_errors:
-        console.print("[bold cyan]Concept Definition Errors:[/bold cyan]\n")
-        for concept_definition_error in concept_definition_errors:
-            syntax_error_data = concept_definition_error.structure_class_syntax_error_data
-            if not syntax_error_data:
-                continue
+    if bundle_path:
+        console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{bundle_path}[/yellow]\n")
+    # Display pipe validation errors
+    if exc.pipe_validation_error_data:
+        console.print("[bold cyan]Pipe Validation Errors:[/bold cyan]\n")
+        for pipe_index, pipe_error in enumerate(exc.pipe_validation_error_data, 1):
+            console.print(f"[bold yellow]{pipe_index}. {pipe_error.error_type.replace('_', ' ').title()}[/bold yellow]")
 
-            message = concept_definition_error.message
-            code = concept_definition_error.structure_class_python_code or ""
-            highlight_lines: set[int] | None = None
-            if syntax_error_data.lineno:
-                highlight_lines = {syntax_error_data.lineno}
+            # Display key identification info
+            if pipe_error.pipe_code:
+                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{pipe_error.pipe_code}[/yellow]")
+            if pipe_error.concept_code:
+                console.print(f"   [cyan]Concept:[/cyan] [yellow]{pipe_error.concept_code}[/yellow]")
+            if pipe_error.domain:
+                console.print(f"   [cyan]Domain:[/cyan] [green]{pipe_error.domain}[/green]")
 
-            syntax = Syntax(
-                code=code,
-                lexer="python",
-                line_numbers=True,
-                word_wrap=False,
-                theme="ansi_dark",
-                line_range=None,
-                highlight_lines=highlight_lines,
-            )
+            # Field name if present
+            if pipe_error.field_name:
+                console.print(f"   [cyan]Field:[/cyan] [yellow]{pipe_error.field_name}[/yellow]")
 
-            # Build pretty error location
-            pretty_range = ""
-            if syntax_error_data.lineno and syntax_error_data.end_lineno:
-                pretty_range = f"lines {syntax_error_data.lineno} to {syntax_error_data.end_lineno}"
-            elif syntax_error_data.lineno:
-                pretty_range = f"line {syntax_error_data.lineno}"
-            if syntax_error_data.offset and syntax_error_data.end_offset:
-                pretty_range += f", column {syntax_error_data.offset} to {syntax_error_data.end_offset}"
-            elif syntax_error_data.offset:
-                pretty_range += f", column {syntax_error_data.offset}"
+            # Variables
+            if pipe_error.variable_names:
+                variables_str = ", ".join([f"[yellow]{v}[/yellow]" for v in pipe_error.variable_names])
+                console.print(f"   [cyan]Variables:[/cyan] {variables_str}")
 
-            console.print(f"[yellow]{message}[/yellow]")
-            if pretty_range:
-                console.print(f"[dim]Generated code error at {pretty_range}[/dim]")
-            console.print(syntax)
+            # Error message
+            console.print(f"   [cyan]→[/cyan] {pipe_error.message}")
+
+            # Field path as secondary info
+            if pipe_error.field_path:
+                console.print(f"   [dim]└─ Path: {pipe_error.field_path}[/dim]")
+
             console.print()
 
+    # Display dry run error message
+    if exc.dry_run_error_message:
+        console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
+        console.print(f"[yellow]{exc.dry_run_error_message}[/yellow]\n")
+
+    # Display helpful tips
     console.print(
-        "[bold green]💡 Tip:[/bold green] Review the error message above and check your pipeline configuration. "
+        "[bold green]💡 Tip:[/bold green] Review the error messages above and check your pipeline configuration. "
         "Make sure all required fields are present and correctly formatted."
     )
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")

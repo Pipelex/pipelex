@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
@@ -12,7 +12,8 @@ if TYPE_CHECKING:
 
 
 class TestWorkingMemoryFactory:
-    def test_make_from_compact_memory_with_text_content(self):
+    def test_make_from_compact_memory_with_text_content(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         pipeline_inputs: PipelineInputs = {
             "text_item": {
                 "concept": NativeConceptCode.TEXT,
@@ -30,7 +31,8 @@ class TestWorkingMemoryFactory:
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == "Hello, world!"
 
-    def test_make_from_compact_memory_with_complex_nested_content(self):
+    def test_make_from_compact_memory_with_complex_nested_content(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test deserialization of compact memory with complex nested structured content."""
         pipeline_inputs: PipelineInputs = {
             "complex_page": {
@@ -111,7 +113,8 @@ class TestWorkingMemoryFactory:
         assert page_view.url == "mock_url"
         assert page_view.caption == "Full page screenshot"
 
-    def test_make_from_compact_memory_empty(self):
+    def test_make_from_compact_memory_empty(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test deserialization of empty compact memory."""
         pipeline_inputs: PipelineInputs = {}
 
@@ -120,7 +123,8 @@ class TestWorkingMemoryFactory:
         assert working_memory is not None
         assert len(working_memory.root) == 0
 
-    def test_make_from_compact_memory_multiple_items(self):
+    def test_make_from_compact_memory_multiple_items(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
         """Test deserialization of compact memory with multiple items."""
         pipeline_inputs: PipelineInputs = {
             "text1": {

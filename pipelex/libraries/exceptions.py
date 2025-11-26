@@ -1,62 +1,45 @@
-from pydantic import BaseModel, Field
-from typing_extensions import override
-
-from pipelex.base_exceptions import PipelexException
-from pipelex.core.concepts.exceptions import ConceptDefinitionError, ConceptDefinitionErrorData, PipelexValidationExceptionAbstract
-from pipelex.core.pipes.exceptions import PipeDefinitionErrorData
+from pipelex.base_exceptions import PipelexError
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
+from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 
 
-class LibraryError(PipelexException):
+class LibraryError(PipelexError):
     pass
 
 
-class LibraryLoadingErrorData(BaseModel):
-    """Structured data for LibraryLoadingError."""
+class LibraryLoadingError(LibraryError):
+    """Error raised when loading library components fails.
 
-    message: str = Field(description="The main error message")
-    concept_definition_errors: list[ConceptDefinitionErrorData] | None = Field(None, description="List of concept definition errors")
-    pipe_definition_errors: list[PipeDefinitionErrorData] | None = Field(None, description="List of pipe definition errors")
+    This error aggregates TWO types of validation errors:
+    1. Blueprint validation errors (from PipelexBundleBlueprint.model_validate())
+       - Stored in: blueprint_validation_errors
+       - Example: PIPE_SEQUENCE_OUTPUT_MISMATCH
 
+    2. Pipe/Concept validation errors (from Pipe or Concept class validation)
+       - Stored in: pipe_concept_validation_errors
+       - Example: MISSING_INPUT_VARIABLE, INPUT_REQUIREMENT_MISMATCH
 
-class LibraryLoadingError(LibraryError, PipelexValidationExceptionAbstract):
-    """Error raised when loading library components fails."""
+    Also handles:
+    - Factory errors (Domain, Concept, Pipe)
+    - Interpreter errors (blueprint parsing)
+    """
 
     def __init__(
         self,
         message: str,
-        concept_definition_errors: list[ConceptDefinitionErrorData] | None = None,
-        pipe_definition_errors: list[PipeDefinitionErrorData] | None = None,
+        blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        pipe_concept_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
     ):
-        self.concept_definition_errors = concept_definition_errors
-        self.pipe_definition_errors = pipe_definition_errors
+        """Initialize LibraryLoadingError.
+
+        Args:
+            message: Error message
+            blueprint_validation_errors: Blueprint validation errors (from PipelexBundleBlueprint validation)
+            pipe_concept_validation_errors: Pipe/Concept validation errors (from Pipe/Concept validation)
+        """
+        self.blueprint_validation_errors = blueprint_validation_errors or []
+        self.pipe_concept_validation_errors = pipe_concept_validation_errors or []
         super().__init__(message)
-
-    def as_structured_content(self) -> LibraryLoadingErrorData:
-        return LibraryLoadingErrorData(
-            message=str(self),
-            concept_definition_errors=self.concept_definition_errors,
-            pipe_definition_errors=self.pipe_definition_errors,
-        )
-
-    @override
-    def get_concept_definition_errors(self) -> list[ConceptDefinitionErrorData]:
-        return self.concept_definition_errors or []
-
-
-class DomainLibraryError(LibraryError):
-    pass
-
-
-class ConceptLibraryError(LibraryError):
-    pass
-
-
-class PipeLibraryError(LibraryError):
-    pass
-
-
-class PipeLibraryPipeNotFoundError(PipeLibraryError):
-    pass
 
 
 class DomainLoadingError(LibraryLoadingError):
@@ -69,19 +52,31 @@ class DomainLoadingError(LibraryLoadingError):
 
 class ConceptLoadingError(LibraryLoadingError):
     def __init__(
-        self, message: str, concept_definition_error: ConceptDefinitionError, concept_code: str, description: str, source: str | None = None
+        self,
+        message: str,
+        concept_code: str,
+        description: str,
+        source: str | None = None,
+        original_error: Exception | None = None,
     ):
-        self.concept_definition_error = concept_definition_error
         self.concept_code = concept_code
         self.description = description
         self.source = source
+        self.original_error = original_error
         super().__init__(message)
 
 
 class PipeLoadingError(LibraryLoadingError):
-    def __init__(self, message: str, pipe_definition_error: PipeDefinitionErrorData, pipe_code: str, description: str, source: str | None = None):
-        self.pipe_definition_error = pipe_definition_error
+    def __init__(
+        self,
+        message: str,
+        pipe_code: str,
+        description: str,
+        source: str | None = None,
+        original_error: Exception | None = None,
+    ):
         self.pipe_code = pipe_code
         self.description = description
         self.source = source
+        self.original_error = original_error
         super().__init__(message)

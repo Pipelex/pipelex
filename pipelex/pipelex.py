@@ -25,14 +25,12 @@ from pipelex.cogt.exceptions import (
 from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config import ConfigPaths, PipelexConfig, get_config
-from pipelex.core.concepts.concept_library import ConceptLibrary
-from pipelex.core.domains.domain_library import DomainLibrary
-from pipelex.core.pipes.pipe_library import PipeLibrary
+from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import PipelexHub, set_pipelex_hub
-from pipelex.libraries.library_manager_factory import LibraryManagerFactory
+from pipelex.libraries.library_manager import LibraryManager
+from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.local_observer import LocalObserver
 from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverProtocol
@@ -49,7 +47,8 @@ from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.system.environment import get_optional_env
+from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
+from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
@@ -108,25 +107,11 @@ class Pipelex(metaclass=MetaSingleton):
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
 
-        # pipelex libraries
-        domain_library = DomainLibrary.make_empty()
-        concept_library = ConceptLibrary.make_empty()
-        pipe_library = PipeLibrary.make_empty()
-        self.pipelex_hub.set_domain_library(domain_library=domain_library)
-        self.pipelex_hub.set_concept_library(concept_library=concept_library)
-        self.pipelex_hub.set_pipe_library(pipe_library=pipe_library)
-
-        self.library_manager = LibraryManagerFactory.make(
-            domain_library=domain_library,
-            concept_library=concept_library,
-            pipe_library=pipe_library,
-        )
-        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
-
         self.reporting_delegate: ReportingProtocol | None = None
         self.telemetry_manager: TelemetryManagerAbstract | None = None
         # pipeline
         self.pipeline_tracker: PipelineTrackerProtocol | None = None
+        self.library_manager: LibraryManagerAbstract | None = None
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
@@ -173,6 +158,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
+        library_manager: LibraryManagerAbstract | None = None,
         **kwargs: Any,
     ):
         if kwargs:
@@ -185,6 +171,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         secrets_provider = secrets_provider or EnvSecretsProvider()
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         self.pipelex_hub.set_storage_provider(storage_provider)
+
+        self.library_manager = library_manager or LibraryManager()
+        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         # cogt
         self.plugin_manager.setup()
@@ -242,6 +231,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
+        self.library_manager = library_manager or LibraryManager()
+        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
+
         # reporting
         if get_config().pipelex.feature_config.is_reporting_enabled:
             self.reporting_delegate = reporting_delegate or ReportingManager()
@@ -277,9 +269,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     self.telemetry_manager = TelemetryManagerNoOp()
                     log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
                 case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
-                    if telemetry_config.respect_dnt and (dnt := get_optional_env(DO_NOT_TRACK_ENV_VAR_KEY)) and dnt.lower() not in ["false", "0"]:
+                    if telemetry_config.respect_dnt and is_env_var_truthy(DO_NOT_TRACK_ENV_VAR_KEY):
                         self.telemetry_manager = TelemetryManagerNoOp()
-                        log.debug(f"Telemetry is disabled by env var 'DO_NOT_TRACK' which is set to {dnt}")
+                        log.debug(f"Telemetry is disabled by env var '{DO_NOT_TRACK_ENV_VAR_KEY}'")
                     else:
                         self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
         else:
@@ -297,25 +289,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_observer(observer=multi_observer)
         self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
 
-        # pipeline
         self.pipeline_tracker.setup()
         self.pipeline_manager.setup()
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
-
-    def setup_libraries(self):
-        self.library_manager.setup()
-        self.library_manager.load_libraries()
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup libraries done")
-
-    def validate_libraries(self):
-        try:
-            self.library_manager.validate_libraries()
-        except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-            msg = f"Could not validate libraries because of: {validation_error_msg}"
-            raise PipelexSetupError(msg) from validation_error
-        log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} validate libraries done")
 
     def teardown(self):
         # pipelex
@@ -324,7 +301,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             self.pipeline_tracker.teardown()
         if self.telemetry_manager:
             self.telemetry_manager.teardown()
-        self.library_manager.teardown()
 
         # cogt
         self.inference_manager.teardown()
@@ -418,7 +394,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             observers=observers,
             **kwargs,
         )
-        pipelex_instance.setup_libraries()
         pipelex_instance.models_manager.validate_model_deck()
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance

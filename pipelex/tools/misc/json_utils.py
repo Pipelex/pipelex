@@ -5,18 +5,18 @@ from typing import Any, Union, cast
 from kajson import kajson
 from pydantic import BaseModel
 
-from pipelex.system.exceptions import ToolException
+from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.file_utils import save_text_to_path
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 JsonContent = Union[dict[str, Any], list[Any]]
 
 
-class ArgumentTypeError(ToolException):
+class ArgumentTypeError(ToolError):
     pass
 
 
-class JsonTypeError(ToolException):
+class JsonTypeError(ToolError):
     pass
 
 

@@ -44,6 +44,7 @@ excluded_dirs = [
 ]
 
 [pipelex.builder_config]
+fix_loop_max_attempts = 10
 # Uncomment to change where the generated pipelines are saved
 # default_output_dir = "."
 # default_bundle_file_name = "bundle"

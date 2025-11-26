@@ -1,12 +1,12 @@
-from pipelex.base_exceptions import PipelexException
-from pipelex.tools.misc.context_provider_abstract import ContextProviderException
+from pipelex.base_exceptions import PipelexError
+from pipelex.tools.misc.context_provider_abstract import ContextProviderError
 
 
-class WorkingMemoryFactoryError(PipelexException):
+class WorkingMemoryFactoryError(PipelexError):
     pass
 
 
-class WorkingMemoryError(PipelexException):
+class WorkingMemoryError(PipelexError):
     pass
 
 
@@ -14,7 +14,7 @@ class WorkingMemoryConsistencyError(WorkingMemoryError):
     pass
 
 
-class WorkingMemoryVariableError(WorkingMemoryError, ContextProviderException):
+class WorkingMemoryVariableError(WorkingMemoryError, ContextProviderError):
     pass
 
 

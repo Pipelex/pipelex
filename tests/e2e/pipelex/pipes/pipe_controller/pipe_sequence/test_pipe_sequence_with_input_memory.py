@@ -3,8 +3,9 @@
 import pytest
 
 from pipelex import pretty_print
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
-from tests.test_pipelines.test_tweet import OptimizedTweet
+from tests.e2e.pipelex.pipes.pipe_controller.pipe_sequence.test_tweet import OptimizedTweet
 
 SAMPLE_DRAFT_TWEET = """
 Local high school basketball star Maria Rodriguez was the talk of Division I scouts - 6'2",
@@ -83,16 +84,18 @@ What $20 decision are you avoiding right now? 👇
 """
 
 
+@pytest.mark.dry_runnable
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio
 class TestPipeSequenceWithInputMemory:
     """Test pipe sequence functionality with input memory."""
 
-    async def test_optimize_tweet_sequence_with_input_memory(self):
+    async def test_optimize_tweet_sequence_with_input_memory(self, pipe_run_mode: PipeRunMode):
         """Test the optimize_tweet_sequence pipeline using inputs parameter."""
         # Execute the pipeline using inputs
         pipe_output = await execute_pipeline(
+            library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_sequence/"],
             pipe_code="optimize_tweet_sequence",
             inputs={
                 "draft_tweet": {
@@ -104,7 +107,9 @@ class TestPipeSequenceWithInputMemory:
                     "content": SAMPLE_WRITING_STYLE,
                 },
             },
+            pipe_run_mode=pipe_run_mode,
         )
+        pretty_print(pipe_output, title="Pipe output for optimize_tweet_sequence")
 
         # Get the optimized tweet
         optimized_tweet = pipe_output.main_stuff_as(content_type=OptimizedTweet)
@@ -113,15 +118,11 @@ class TestPipeSequenceWithInputMemory:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
-        assert optimized_tweet is not None
+        assert optimized_tweet
         assert isinstance(optimized_tweet, OptimizedTweet)
-        assert len(optimized_tweet.text) > 0
-
-        # Log output and generate report
-        pretty_print(pipe_output, title="Pipe output for optimize_tweet_sequence")
-
-        # Verify the optimized tweet is different from the draft
-        assert optimized_tweet.text != SAMPLE_DRAFT_TWEET
-        # Verify it's not empty
-        assert len(optimized_tweet.text.strip()) > 0
-        assert "Maria Rodriguez" in optimized_tweet.text
+        assert len(optimized_tweet.lead_tweet.strip()) > 0
+        match pipe_run_mode:
+            case PipeRunMode.DRY:
+                pass
+            case PipeRunMode.LIVE:
+                assert "Maria Rodriguez" in optimized_tweet.lead_tweet

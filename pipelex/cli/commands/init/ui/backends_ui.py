@@ -92,12 +92,15 @@ def get_currently_enabled_backends(backends_toml_path: str, backend_options: lis
     return sorted(currently_enabled)
 
 
-def build_backend_selection_panel(backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None) -> Panel:
+def build_backend_selection_panel(
+    backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
+) -> Panel:
     """Create a Rich Panel for backend selection with options table.
 
     Args:
         backend_options: List of tuples (backend_key, display_name).
         currently_enabled: Optional list of currently enabled backend indices (0-based).
+        is_first_time_setup: Whether this is the first time backends are being set up.
 
     Returns:
         A Panel containing the backend selection interface.
@@ -108,8 +111,8 @@ def build_backend_selection_panel(backend_options: list[tuple[str, str]], curren
     table.add_column(style="dim", width=15)
 
     for idx, (_, backend_name) in enumerate(backend_options, start=1):
-        # Mark currently enabled backends
-        status = "[green]✓ enabled[/green]" if currently_enabled and (idx - 1) in currently_enabled else ""
+        # Mark currently enabled backends (but not for first-time setup)
+        status = "[green]✓ enabled[/green]" if currently_enabled and (idx - 1) in currently_enabled and not is_first_time_setup else ""
         table.add_row(f"[{idx}]", backend_name, status)
 
     # Add special options at the end
@@ -117,7 +120,7 @@ def build_backend_selection_panel(backend_options: list[tuple[str, str]], curren
     table.add_row("[Q]", "[dim]quit - Exit without configuring[/dim]", "")
 
     # Update description based on whether we're showing current selection
-    if currently_enabled:
+    if currently_enabled and not is_first_time_setup:
         # Build current selection display with numbers and names
         current_items: list[str] = []
         for idx in sorted(currently_enabled):
@@ -147,13 +150,16 @@ def build_backend_selection_panel(backend_options: list[tuple[str, str]], curren
     )
 
 
-def prompt_backend_indices(console: Console, backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None) -> list[int]:
+def prompt_backend_indices(
+    console: Console, backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
+) -> list[int]:
     """Prompt user to select backend indices with validation.
 
     Args:
         console: Rich Console instance for user interaction.
         backend_options: List of available backend options.
         currently_enabled: Optional list of currently enabled backend indices (0-based).
+        is_first_time_setup: Whether this is the first time backends are being set up.
 
     Returns:
         List of validated backend indices (0-based) selected by the user.
@@ -161,11 +167,12 @@ def prompt_backend_indices(console: Console, backend_options: list[tuple[str, st
     Raises:
         typer.Exit: If user chooses to quit.
     """
-    # Determine default based on current selection or fallback to first option
-    if currently_enabled:
+    # Determine default based on current selection or fallback to first option (pipelex_inference)
+    if currently_enabled and not is_first_time_setup:
         default_indices = sorted(currently_enabled)
         default_str = ",".join(str(i + 1) for i in default_indices)
     else:
+        # For first-time setup or no current selection, default to pipelex_inference (index 0)
         default_indices = [0]
         default_str = "1"
 

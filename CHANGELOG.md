@@ -1,5 +1,31 @@
 # Changelog
 
+## [v0.16.0] - 2025-11-25
+
+**Highlights:** - Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
+You can run the same pipe at the same times as much as you want, with different inputs. 
+Side effets: Unit tests now run in 30s.
+
+### Fixed
+
+- Fixed some issues with inputs of pipes: The validation methods was not detecting misconceptions with implicit concepts.
+
+### Changed
+
+- Improved pipe builder by auto-fixing errors, forcing consistency in the inputs and outputs of the pipes.
+
+### Refactor
+
+- PipeCondition: Moved the expression/expression_template choosing to the factory.
+- Moved a lot of validation to blueprints instead of pipe instances.
+- Refactored the Blueprint validation errors, and validation functions.
+- Refactored the PipelexInterpreter validation errors.
+- Refactored the pipe builder validation loop.
+- Reorganized the unit tests, and added new ones.
+- Reorganized the config files.
+- Refactored methods `execute_pipeline` and `start_pipeline`.
+- Moved `dev_cli` to `cli.dev_cli`.
+
 ## [v0.15.7] - 2025-11-18
 
 ### Fixed
@@ -347,7 +373,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Changed `PipeLLMPromptTemplate.make_llm_prompt()` to private method `_make_llm_prompt()`
  - Updated pipe-builder prompts to include concept specs for better context
  - Updated `PipelexBundleSpec.to_blueprint()` to sort pipes by dependencies before creating bundle
- - Changed exception base class from `PipelexError` to `PipelexException` throughout codebase
+ - Changed exception base class from `PipelexError` to `PipelexError` throughout codebase
  - Updated Makefile pyright target to use `--pythonpath` flag correctly
  - Enhanced `LibraryManager` to use `importlib.resources` for reliable PLX file discovery across all installation modes (wheel, source, relative path)
  - Simplified `FuncRegistryUtils` to exclusively register functions with `@pipe_func` decorator (removed `decorator_names` and `require_decorator` parameters)

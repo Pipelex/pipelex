@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 # Basic PipeLLM with prompt_template
@@ -98,6 +98,7 @@ description = "Domain with pipe definitions"
 [pipe.expert_analysis]
 type = "PipeLLM"
 description = "Expert analysis with system prompt"
+inputs = { extracted_text = "Text" }
 output = "Text"
 prompt = """
 Extract all articles/items from this invoice text: $extracted_text. For each item find: item name, quantity, unit price, total price, description, and product code if
@@ -111,6 +112,9 @@ Extract all articles/items from this invoice text: $extracted_text. For each ite
             "expert_analysis": PipeLLMBlueprint(
                 type="PipeLLM",
                 description="Expert analysis with system prompt",
+                inputs={
+                    "extracted_text": NativeConceptCode.TEXT,
+                },
                 output=NativeConceptCode.TEXT,
                 prompt="""Extract all articles/items from this invoice text: $extracted_text. For each item find: item name, quantity, unit price, total price, description, and product code if
  available. Return each article as separate structured data.
