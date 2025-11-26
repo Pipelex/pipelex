@@ -74,6 +74,7 @@ class SubPipe(BaseModel):
                 domain=sub_pipe.domain,
                 pipe_code=self.pipe_code,
                 blueprint=pipe_batch_blueprint,
+                concept_codes_from_the_same_domain=[concept.code for concept in sub_pipe.concept_dependencies],
             )
             pipe_output = await pipe_batch.run_pipe(
                 job_metadata=job_metadata,
