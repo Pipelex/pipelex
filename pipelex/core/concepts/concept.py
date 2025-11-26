@@ -64,15 +64,6 @@ class Concept(BaseModel):
         return f"{self.domain}.{self.code}"
 
     @classmethod
-    def is_implicit_concept(cls, concept_string: str) -> bool:
-        try:
-            validate_concept_string(concept_string=concept_string)
-        except ConceptStringError as exc:
-            msg = f"Concept string '{concept_string}' is not a valid concept string for concept '{cls.concept_string}'"
-            raise ConceptValueError(msg) from exc
-        return concept_string.startswith(SpecialDomain.IMPLICIT)
-
-    @classmethod
     def sentence_from_concept(cls, concept: "Concept") -> str:
         return pascal_case_to_sentence(name=concept.code)
 

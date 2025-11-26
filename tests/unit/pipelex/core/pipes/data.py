@@ -31,9 +31,6 @@ SINGLE_ITEM_NO_BRACKETS_TEST_CASES: list[tuple[str, str, str, int | bool | None]
     ("native", "native.Text", "native.Text", None),
     ("native", "native.Image", "native.Image", None),
     ("native", "native.PDF", "native.PDF", None),
-    # Implicit concept creation (unknown concept codes become implicit)
-    ("my_domain", "MyConcept", "implicit.MyConcept", None),
-    ("accounting", "Invoice", "implicit.Invoice", None),
 ]
 
 # Format: (domain, requirement_str, expected_concept_string)
@@ -41,9 +38,6 @@ MULTIPLE_ITEMS_EMPTY_BRACKETS_TEST_CASES: list[tuple[str, str, str]] = [
     # Native domain tests
     ("native", "native.Text[]", "native.Text"),
     ("native", "native.Image[]", "native.Image"),
-    # Implicit concept creation with empty brackets
-    ("my_domain", "MyConcept[]", "implicit.MyConcept"),
-    ("accounting", "Invoice[]", "implicit.Invoice"),
 ]
 
 # Format: (domain, requirement_str, expected_concept_string, expected_multiplicity)
@@ -52,10 +46,6 @@ FIXED_COUNT_TEST_CASES: list[tuple[str, str, str, int]] = [
     ("native", "native.Text[5]", "native.Text", 5),
     ("native", "native.Image[3]", "native.Image", 3),
     ("native", "native.PDF[10]", "native.PDF", 10),
-    # Implicit concept creation with fixed counts
-    ("my_domain", "MyConcept[7]", "implicit.MyConcept", 7),
-    ("accounting", "Invoice[2]", "implicit.Invoice", 2),
-    ("hr", "Employee[10]", "implicit.Employee", 10),
 ]
 
 # Format: (domain, requirement_str, concept_codes_from_same_domain, expected_concept_string, expected_multiplicity, description)
@@ -70,10 +60,6 @@ CONCEPT_CODE_RESOLUTION_TEST_CASES: list[tuple[str, str, list[str] | None, str, 
     ("my_domain", "Text", ["Text", "Document"], "native.Text", None, "Native Text takes precedence over custom domain"),
     ("my_domain", "Image[2]", ["Image", "Photo"], "native.Image", 2, "Native Image takes precedence"),
     ("accounting", "Text[3]", ["Invoice", "Receipt"], "native.Text", 3, "Native always wins"),
-    # Unknown concepts (not native, not in concept_codes_from_same_domain) create implicit concepts
-    ("my_domain", "UnknownConcept[5]", ["KnownConcept"], "implicit.UnknownConcept", 5, "Unknown concept with known list"),
-    ("my_domain", "UnknownConcept", None, "implicit.UnknownConcept", None, "Unknown concept without list"),
-    ("accounting", "UnknownInvoice[]", ["Invoice"], "implicit.UnknownInvoice", True, "Unknown with empty brackets"),
 ]
 
 # Format: (domain, requirement_str, expected_concept_string, expected_multiplicity)
@@ -92,9 +78,6 @@ VARIOUS_FIXED_COUNTS_TEST_CASES: list[tuple[str, str, str, int]] = [
     ("native", "native.Image[10]", "native.Image", 10),
     ("native", "native.Image[100]", "native.Image", 100),
     ("native", "native.Image[999]", "native.Image", 999),
-    # Implicit concepts with various counts (unknown concept codes)
-    ("my_domain", "CustomConcept[1]", "implicit.CustomConcept", 1),
-    ("accounting", "Transaction[50]", "implicit.Transaction", 50),
 ]
 
 # Format: (domain, requirement_str, expected_concept_string)
@@ -105,7 +88,4 @@ DIFFERENT_CONCEPT_CODES_TEST_CASES: list[tuple[str, str, str]] = [
     ("native", "native.PDF", "native.PDF"),
     ("native", "native.Number", "native.Number"),
     ("native", "native.Page", "native.Page"),
-    # Implicit concepts (unknown concept codes)
-    ("my_domain", "CustomConcept", "implicit.CustomConcept"),
-    ("accounting", "Invoice", "implicit.Invoice"),
 ]

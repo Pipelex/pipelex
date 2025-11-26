@@ -218,8 +218,7 @@ class TestMakeInputRequirementsFromString:
 
         This tests:
         1. Native concepts are always recognized regardless of domain parameter
-        2. Unknown concepts (not native, not in the domain) become implicit concepts
-        3. concept_codes_from_same_domain helps resolve ambiguous concept codes
+        2. concept_codes_from_same_domain helps resolve ambiguous concept codes
         """
         load_empty_library()
         result = InputRequirementsFactory.make_from_string(
