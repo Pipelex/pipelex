@@ -2,13 +2,12 @@ import importlib
 import inspect
 import pkgutil
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
 
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.system.registries.func_registry import func_registry, pipe_func
-from pipelex.tools.misc.file_utils import find_files_in_dir as base_find_files_in_dir
+from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.typing.module_inspector import (
     ModuleFileError,
     import_module_from_file_if_has_decorated_functions,
@@ -83,10 +82,11 @@ class FuncRegistryUtils:
             is_recursive: Whether to search recursively in subdirectories
 
         """
-        python_files = cls._find_files_in_dir(
+        python_files = find_files_in_dir(
             dir_path=folder_path,
             pattern="*.py",
             is_recursive=is_recursive,
+            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
         )
 
         for python_file in python_files:
@@ -188,30 +188,3 @@ class FuncRegistryUtils:
         """
         custom_name = getattr(func, "_pipe_func_name", None)
         return custom_name if custom_name is not None else func.__name__
-
-    @classmethod
-    def _find_files_in_dir(cls, dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
-        """Find files matching a pattern in a directory, excluding common build/cache directories.
-
-        Args:
-            dir_path: Directory path to search in
-            pattern: File pattern to match (e.g. "*.py")
-            is_recursive: Whether to search recursively in subdirectories
-
-        Returns:
-            List of matching Path objects, filtered to exclude problematic directories
-
-        """
-        # Get all files using the base utility
-        all_files = base_find_files_in_dir(dir_path, pattern, is_recursive)
-
-        # Filter out files in excluded directories
-        filtered_files: list[Path] = []
-        excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
-        for file_path in all_files:
-            # Check if any parent directory is in the exclude list
-            should_exclude = any(part in excluded_dirs for part in file_path.parts)
-            if not should_exclude:
-                filtered_files.append(file_path)
-
-        return filtered_files
