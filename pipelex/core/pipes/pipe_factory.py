@@ -50,8 +50,9 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
                         and stripped_input_concept_string_or_code not in concept_codes_from_the_same_domain
                     ):
                         msg = (
-                            f"Input '{input_name}' with concept '{stripped_input_concept_string_or_code}' in pipe '{pipe_code}' (domain '{domain}') "
-                            f"is invalid. The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix. "
+                            f"Input stuff '{input_name}' with concept '{stripped_input_concept_string_or_code}' "
+                            f"in pipe '{pipe_code}' (domain '{domain}') is invalid. "
+                            f"The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix. "
                             f"Declared concepts are: '{concept_codes_from_the_same_domain}'"
                         )
                         raise PipeFactoryError(msg)

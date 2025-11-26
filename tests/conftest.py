@@ -1,3 +1,4 @@
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
@@ -32,7 +33,7 @@ def reset_pipelex_config_fixture(routing_profile_setup: str | None):  # noqa: AR
 
 
 @pytest.fixture(scope="class")
-def load_test_library():
+def load_test_library() -> Generator[Callable[[list[Path]], None], None, None]:
     library_id = None
 
     def _load(library_dirs: list[Path]) -> None:
@@ -57,16 +58,17 @@ def load_test_library():
 
 
 @pytest.fixture(scope="class")
-def load_empty_library():
+def load_empty_library() -> Generator[Callable[[], str], None, None]:
     library_id = None
 
-    def _load() -> None:
+    def _load() -> str:
         nonlocal library_id
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
         set_current_library(library_id=library_id)
 
         log.verbose(f"Opened empty library: {library_id}")
+        return library_id
 
     yield _load
 

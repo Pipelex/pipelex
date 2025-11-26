@@ -23,12 +23,18 @@ class TestBracketNotationInControllers:
         domain = "test"
         concept_library = get_concept_library()
 
-        concept_1 = ConceptFactory.make_from_blueprint(
+        concept_data_item = ConceptFactory.make_from_blueprint(
             concept_code="DataItem",
             domain=domain,
             blueprint=ConceptBlueprint(description="Data item"),
         )
-        concept_library.add_concepts([concept_1])
+        concept_library.add_concepts([concept_data_item])
+        concept_processed_data = ConceptFactory.make_from_blueprint(
+            concept_code="ProcessedData",
+            domain=domain,
+            blueprint=ConceptBlueprint(description="Processed data"),
+        )
+        concept_library.add_concepts([concept_processed_data])
 
         blueprint = PipeParallelBlueprint(
             description="Process items in parallel",
@@ -93,12 +99,17 @@ class TestBracketNotationInControllers:
         domain = "test"
         concept_library = get_concept_library()
 
-        concept_1 = ConceptFactory.make_from_blueprint(
+        concept_item = ConceptFactory.make_from_blueprint(
             concept_code="Item",
             domain=domain,
             blueprint=ConceptBlueprint(description="Item"),
         )
-        concept_library.add_concepts([concept_1])
+        concept_processed_item = ConceptFactory.make_from_blueprint(
+            concept_code="ProcessedItem",
+            domain=domain,
+            blueprint=ConceptBlueprint(description="Processed item"),
+        )
+        concept_library.add_concepts([concept_item, concept_processed_item])
 
         blueprint = PipeBatchBlueprint(
             description="Batch process items",

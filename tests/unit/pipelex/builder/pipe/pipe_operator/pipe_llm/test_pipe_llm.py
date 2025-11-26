@@ -4,8 +4,10 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
+from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.hub import get_concept_library
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from tests.unit.pipelex.builder.pipe.pipe_operator.pipe_llm.test_data import PipeLLMTestCases
 
 
@@ -15,15 +17,24 @@ class TestPipeLLMBlueprintConversion:
         PipeLLMTestCases.TEST_CASES,
     )
     def test_pipe_llm_spec_to_blueprint(
-        self, test_name: str, pipe_spec: PipeLLMSpec, expected_blueprint: PipeLLMBlueprint, load_empty_library: Callable[[], None]
+        self, test_name: str, pipe_spec: PipeLLMSpec, expected_blueprint: PipeLLMBlueprint, load_empty_library: Callable[[], str]
     ):
         load_empty_library()
+        item_concept = ConceptFactory.make(concept_code="Item", domain="test_domain", description="Item", structure_class_name="Item")
+        data_concept = ConceptFactory.make(concept_code="Data", domain="test_domain", description="Data", structure_class_name="Data")
+        analysis_concept = ConceptFactory.make(concept_code="Analysis", domain="test_domain", description="Analysis", structure_class_name="Analysis")
+        concept_library = get_concept_library()
+        concept_library.add_new_concept(concept=item_concept)
+        concept_library.add_new_concept(concept=data_concept)
+        concept_library.add_new_concept(concept=analysis_concept)
+
         blueprint = pipe_spec.to_blueprint()
         assert blueprint == expected_blueprint
 
-        pipe_llm_from_blueprint = PipeLLMFactory.make_from_blueprint(
+        pipe_llm_from_blueprint = PipeFactory.make_from_blueprint(
             domain="test_domain",
             pipe_code=f"test_pipe_{test_name}",
             blueprint=blueprint,
+            concept_codes_from_the_same_domain=[data_concept.code, item_concept.code, analysis_concept.code],
         )
         pretty_print(pipe_llm_from_blueprint, title="PipeLLM from blueprint")
