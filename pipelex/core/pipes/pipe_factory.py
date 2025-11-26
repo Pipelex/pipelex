@@ -51,6 +51,7 @@ class PipeFactory(Generic[PipeAbstractType]):
         if concept_codes_from_the_same_domain is None:
             concept_codes_from_the_same_domain = []
 
+        # TODO: This test should move to the PipelexBlueprint validation.
         # Validate that the specified concepts are declared in the bundle, or are natives concepts.
         if blueprint.inputs is not None:
             for input_name, input_concept_string_or_code in blueprint.inputs.items():
