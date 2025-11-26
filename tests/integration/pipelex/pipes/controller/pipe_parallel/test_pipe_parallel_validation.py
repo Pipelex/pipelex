@@ -3,12 +3,13 @@ from typing import Callable
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_concept_library, get_pipe_library
+from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 
 
 class TestPipeParallelValidation:
@@ -16,7 +17,6 @@ class TestPipeParallelValidation:
 
     def test_pipe_parallel_with_real_pipe_structure(self, load_empty_library: Callable[[], None]):
         load_empty_library()
-        """Test PipeParallel structure with a real pipe"""
         # Create a real PipeLLM that will infer inputs from the prompt template
         domain = "test_domain"
         concept_library = get_concept_library()
@@ -48,10 +48,11 @@ class TestPipeParallelValidation:
             prompt="Analyze this document:  \n@context\n@document",
         )
 
-        real_pipe = PipeLLMFactory.make_from_blueprint(
+        real_pipe = PipeFactory[PipeLLM].make_from_blueprint(
             domain=domain,
             pipe_code="analyze_document",
             blueprint=pipe_llm_blueprint,
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
         )
 
         pipe_library = get_pipe_library()
@@ -75,10 +76,11 @@ class TestPipeParallelValidation:
             combined_output=None,
         )
 
-        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+        pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
             domain=domain,
             pipe_code="parallel_document_processor",
             blueprint=pipe_parallel_blueprint,
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
         )
 
         # Verify the PipeParallel structure is correct
@@ -126,10 +128,11 @@ class TestPipeParallelValidation:
             combined_output=None,
         )
 
-        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+        pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
             domain=domain,
             pipe_code="test_parallel",
             blueprint=pipe_parallel_blueprint,
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
         )
 
         # Verify the PipeParallel was created correctly
@@ -180,10 +183,11 @@ class TestPipeParallelValidation:
             combined_output=None,
         )
 
-        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+        pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
             domain=domain,
             pipe_code="parallel_document_processor",
             blueprint=pipe_parallel_blueprint,
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
         )
 
         # Test that needed_inputs method can be called

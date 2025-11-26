@@ -4,8 +4,9 @@ import pytest
 
 from pipelex import log
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
-from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
 from tests.unit.pipelex.pipe_controllers.sequence.data import PipeSequenceInputTestCases
 
 
@@ -24,7 +25,7 @@ class TestPipeSequenceValidateInputs:
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
-        pipe_sequence = PipeSequenceFactory.make_from_blueprint(
+        pipe_sequence = PipeFactory[PipeSequence].make_from_blueprint(
             domain="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
@@ -51,11 +52,12 @@ class TestPipeSequenceValidateInputs:
         with pytest.raises((PipeValidationError, ValueError)) as exc_info:  # noqa: PT012
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeSequenceBlueprint.model_validate(blueprint_dict)
-            PipeSequenceFactory.make_from_blueprint(
+            pipe_sequence = PipeFactory[PipeSequence].make_from_blueprint(
                 domain="test_domain",
                 pipe_code=f"test_pipe_{test_id}",
                 blueprint=blueprint,
-            ).validate_with_libraries()
+            )
+            pipe_sequence.validate_with_libraries()
 
         error_str = str(exc_info.value)
         assert expected_error_message_fragment in error_str, (

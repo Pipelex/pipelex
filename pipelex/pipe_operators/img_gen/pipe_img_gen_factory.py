@@ -1,10 +1,11 @@
+from typing import Any
+
 from typing_extensions import override
 
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
@@ -14,8 +15,13 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
     @override
     def make_from_blueprint(
         cls,
+        pipe_category: Any,
+        pipe_type: str,
+        code: str,
         domain: str,
-        pipe_code: str,
+        description: str | None,
+        inputs: InputRequirements,
+        output: Concept,
         blueprint: PipeImgGenBlueprint,
     ) -> PipeImgGen:
         # Parse output for multiplicity (may have brackets like "Image[]" or "Image[3]")
@@ -23,16 +29,6 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
 
         # Convert bracket notation to output_multiplicity (default to 1 if no brackets)
         final_multiplicity = output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, int) else 1
-
-        # Use concept without brackets for output concept resolution
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
-            concept_string_or_code=output_parse_result.concept,
-        )
-        inputs = InputRequirementsFactory.make_from_blueprint(
-            domain=domain,
-            blueprint=blueprint.inputs or {},
-        )
 
         img_gen_prompt = blueprint.img_gen_prompt
         img_gen_prompt_var_name = blueprint.img_gen_prompt_var_name
@@ -46,15 +42,10 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
 
         return PipeImgGen(
             domain=domain,
-            code=pipe_code,
-            description=blueprint.description,
+            code=code,
+            description=description,
             inputs=inputs,
-            output=get_required_concept(
-                concept_string=ConceptFactory.make_concept_string_with_domain(
-                    domain=output_domain_and_code.domain,
-                    concept_code=output_domain_and_code.concept_code,
-                ),
-            ),
+            output=output,
             output_multiplicity=final_multiplicity,
             img_gen_prompt=img_gen_prompt,
             img_gen_prompt_var_name=img_gen_prompt_var_name,

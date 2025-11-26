@@ -1,26 +1,22 @@
-from __future__ import annotations
-
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import Callable, cast
 
 import pytest
 from pytest import FixtureRequest
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_concept_library
+from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
-from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -64,7 +60,7 @@ class TestPipeBatchSimple:
             input_item_name="text_item",
         )
 
-        pipe_batch = PipeBatchFactory.make_from_blueprint(
+        pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
             domain=domain,
             pipe_code="simple_batch",
             blueprint=pipe_batch_blueprint,

@@ -1,5 +1,3 @@
-"""Test simple pipe condition functionality with dry run validation."""
-
 from pathlib import Path
 from typing import Callable
 
@@ -12,8 +10,9 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -38,7 +37,7 @@ class TestPipeConditionSimple:
             default_outcome="process_small",
         )
 
-        pipe_condition = PipeConditionFactory.make_from_blueprint(
+        pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
             domain="test_domain",
             pipe_code="test_condition_fail",
             blueprint=pipe_condition_blueprint,
@@ -73,7 +72,7 @@ class TestPipeConditionSimple:
             default_outcome="process_small",
         )
 
-        pipe_condition = PipeConditionFactory.make_from_blueprint(
+        pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
             domain="test_domain",
             pipe_code="test_condition_succeed",
             blueprint=pipe_condition_blueprint,

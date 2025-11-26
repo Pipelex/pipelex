@@ -4,8 +4,9 @@ import pytest
 
 from pipelex import log
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from tests.unit.pipelex.pipe_controllers.parallel.data import PipeParallelInputTestCases
 
 
@@ -24,7 +25,7 @@ class TestPipeParallelValidateInputs:
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
-        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+        pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
             domain="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
@@ -51,11 +52,12 @@ class TestPipeParallelValidateInputs:
         with pytest.raises((PipeValidationError, ValueError)) as exc_info:  # noqa: PT012
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeParallelBlueprint.model_validate(blueprint_dict)
-            PipeParallelFactory.make_from_blueprint(
+            pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
                 domain="test_domain",
                 pipe_code=f"test_pipe_{test_id}",
                 blueprint=blueprint,
             )
+            pipe_parallel.validate_with_libraries()
 
         error_str = str(exc_info.value)
         assert expected_error_message_fragment in error_str, (

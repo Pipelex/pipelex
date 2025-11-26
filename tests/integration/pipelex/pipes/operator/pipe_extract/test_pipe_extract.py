@@ -7,13 +7,14 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_pipe_router
+from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
-from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -63,7 +64,7 @@ class TestPipeExtract:
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeExtractFactory.make_from_blueprint(
+            pipe=PipeFactory[PipeExtract].make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_extract_from_image",
                 blueprint=pipe_extract_blueprint,
@@ -111,7 +112,7 @@ class TestPipeExtract:
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeExtractFactory.make_from_blueprint(
+            pipe=PipeFactory[PipeExtract].make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_extract_from_pdf",
                 blueprint=blueprint,

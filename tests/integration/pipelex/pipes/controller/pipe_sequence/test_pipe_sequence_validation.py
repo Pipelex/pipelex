@@ -2,9 +2,10 @@ from pathlib import Path
 from typing import Callable
 
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_concept_library
+from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
-from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 
 
@@ -35,7 +36,7 @@ class TestPipeSequenceValidation:
             steps=[SubPipeBlueprint(pipe="test_pipe_1", result="intermediate_result")],
         )
 
-        pipe_sequence = PipeSequenceFactory.make_from_blueprint(
+        pipe_sequence = PipeFactory[PipeSequence].make_from_blueprint(
             domain=domain,
             pipe_code="test_sequence",
             blueprint=pipe_sequence_blueprint,
@@ -73,7 +74,7 @@ class TestPipeSequenceValidation:
             steps=[SubPipeBlueprint(pipe="step_1", result="intermediate"), SubPipeBlueprint(pipe="step_2", result="final_output")],
         )
 
-        pipe_sequence = PipeSequenceFactory.make_from_blueprint(
+        pipe_sequence = PipeFactory[PipeSequence].make_from_blueprint(
             domain=domain,
             pipe_code="test_sequence",
             blueprint=pipe_sequence_blueprint,

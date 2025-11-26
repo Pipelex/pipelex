@@ -1,5 +1,3 @@
-"""Simple integration test for PipeCondition controller."""
-
 from pathlib import Path
 from typing import Callable, cast
 
@@ -12,11 +10,12 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -43,7 +42,7 @@ class TestPipeConditionSimple:
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
-        pipe_condition = PipeConditionFactory.make_from_blueprint(
+        pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
             domain="test_integration",
             pipe_code="text_length_condition",
             blueprint=pipe_condition_blueprint,
@@ -116,7 +115,7 @@ class TestPipeConditionSimple:
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
-        pipe_condition = PipeConditionFactory.make_from_blueprint(
+        pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
             domain="test_integration",
             pipe_code="text_length_condition",
             blueprint=pipe_condition_blueprint,

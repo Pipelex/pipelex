@@ -8,10 +8,11 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 from pipelex.pipe_controllers.sub_pipe_factory import SubPipeBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -39,7 +40,7 @@ class TestPipeParallelSimple:
             combined_output=None,
         )
 
-        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+        pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
             domain="test_integration",
             pipe_code="parallel_text_analyzer",
             blueprint=pipe_parallel_blueprint,
@@ -158,7 +159,7 @@ class TestPipeParallelSimple:
             combined_output=None,
         )
 
-        pipe_parallel = PipeParallelFactory.make_from_blueprint(
+        pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
             domain="test_integration",
             pipe_code="parallel_text_analyzer",
             blueprint=pipe_parallel_blueprint,

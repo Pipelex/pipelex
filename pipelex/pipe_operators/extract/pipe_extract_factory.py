@@ -1,12 +1,13 @@
+from typing import Any
+
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.hub import get_concept_library, get_native_concept, get_required_concept
+from pipelex.hub import get_concept_library, get_native_concept
 from pipelex.pipe_operators.extract.exceptions import PipeExtractFactoryError
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
@@ -17,18 +18,15 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
     @override
     def make_from_blueprint(
         cls,
+        pipe_category: Any,
+        pipe_type: str,
+        code: str,
         domain: str,
-        pipe_code: str,
+        description: str | None,
+        inputs: InputRequirements,
+        output: Concept,
         blueprint: PipeExtractBlueprint,
     ) -> PipeExtract:
-        # Parse output to strip multiplicity brackets
-        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
-
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
-            concept_string_or_code=output_parse_result.concept,
-        )
-
         image_stuff_name = None
         pdf_stuff_name = None
         concept_library = get_concept_library()
@@ -36,10 +34,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         if blueprint.inputs is None:
             msg = "For PipeExtract you must provide either a pdf or an image or a concept that refines one of them"
             raise PipeExtractFactoryError(msg)
-        inputs = InputRequirementsFactory.make_from_blueprint(
-            domain=domain,
-            blueprint=blueprint.inputs or {},
-        )
+
         # Already validated above that we have exactly one input
         input_name = blueprint.input_names[0]
         input_requirement = inputs.get_required_input_requirement(input_name)
@@ -66,14 +61,9 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
 
         return PipeExtract(
             domain=domain,
-            code=pipe_code,
-            description=blueprint.description,
-            output=get_required_concept(
-                concept_string=ConceptFactory.make_concept_string_with_domain(
-                    domain=output_domain_and_code.domain,
-                    concept_code=output_domain_and_code.concept_code,
-                ),
-            ),
+            code=code,
+            description=description,
+            output=output,
             inputs=inputs,
             extract_choice=blueprint.model,
             image_stuff_name=image_stuff_name,

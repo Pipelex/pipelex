@@ -3,8 +3,9 @@ from typing import Callable
 import pytest
 
 from pipelex import log
+from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
-from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from tests.unit.pipelex.pipe_controllers.batch.data import PipeBatchInputTestCases
 
 
@@ -23,7 +24,7 @@ class TestPipeBatchValidateInputs:
         log.verbose(f"Testing valid case: {test_id}")
 
         # Validation happens automatically during instantiation via model_validator
-        pipe_batch = PipeBatchFactory.make_from_blueprint(
+        pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
             domain="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,

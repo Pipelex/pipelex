@@ -1,13 +1,10 @@
+from typing import Any
+
 from typing_extensions import override
 
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.exceptions import ConceptFactoryError
-from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.hub import get_required_concept
-from pipelex.pipe_controllers.batch.exceptions import PipeBatchFactoryError
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_run.pipe_run_params import BatchParams
@@ -18,44 +15,23 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
     @override
     def make_from_blueprint(
         cls,
+        pipe_category: Any,
+        pipe_type: str,
+        code: str,
         domain: str,
-        pipe_code: str,
+        description: str | None,
+        inputs: InputRequirements,
+        output: Concept,
         blueprint: PipeBatchBlueprint,
     ) -> PipeBatch:
-        # Parse output to strip multiplicity brackets
-        try:
-            output_parse_result = parse_concept_with_multiplicity(blueprint.output)
-        except PipeVariableMultiplicityError as exc:
-            msg = f"Error parsing concept with multiplicity for PipeBatch: {exc}"
-            raise PipeBatchFactoryError(msg) from exc
-
-        try:
-            output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                concept_string_or_code=output_parse_result.concept,
-                domain=domain,
-            )
-        except ConceptFactoryError as exc:
-            msg = f"Error making domain and concept code for PipeBatch: {exc}"
-            raise PipeBatchFactoryError(msg) from exc
-
-        inputs = InputRequirementsFactory.make_from_blueprint(
-            domain=domain,
-            blueprint=blueprint.inputs or {},
-        )
-        output = get_required_concept(
-            concept_string=ConceptFactory.make_concept_string_with_domain(
-                domain=output_domain_and_code.domain,
-                concept_code=output_domain_and_code.concept_code,
-            ),
-        )
         batch_params = BatchParams.make_batch_params(
             input_list_name=blueprint.input_list_name,
             input_item_name=blueprint.input_item_name,
         )
         return PipeBatch(
             domain=domain,
-            code=pipe_code,
-            description=blueprint.description,
+            code=code,
+            description=description,
             inputs=inputs,
             output=output,
             branch_pipe_code=blueprint.branch_pipe_code,

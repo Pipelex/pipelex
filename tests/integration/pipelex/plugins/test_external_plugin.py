@@ -13,9 +13,10 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_inference_manager, get_pipe_router, get_report_delegate
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
@@ -109,7 +110,7 @@ class TestExternalPlugin:
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeLLMFactory.make_from_blueprint(
+            pipe=PipeFactory[PipeLLM].make_from_blueprint(
                 domain="generic",
                 pipe_code="adhoc_for_test_pipe_llm_with_external_llm_handle",
                 blueprint=pipe_llm_blueprint,

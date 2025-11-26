@@ -1,17 +1,16 @@
-"""Integration tests for bracket notation in controller pipe factories."""
-
 from typing import Callable
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_concept_library
+from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
-from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
+from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 
 
 class TestBracketNotationInControllers:
@@ -44,10 +43,11 @@ class TestBracketNotationInControllers:
             add_each_output=True,
         )
 
-        pipe = PipeParallelFactory.make_from_blueprint(
+        pipe = PipeFactory[PipeParallel].make_from_blueprint(
             domain=domain,
             pipe_code="test_parallel",
             blueprint=blueprint,
+            concept_codes_from_the_same_domain=[concept_data_item.code, concept_processed_data.code],
         )
 
         assert pipe.inputs.root["data"].multiplicity == 2
@@ -82,10 +82,11 @@ class TestBracketNotationInControllers:
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
-        pipe = PipeConditionFactory.make_from_blueprint(
+        pipe = PipeFactory[PipeCondition].make_from_blueprint(
             domain=domain,
             pipe_code="test_condition",
             blueprint=blueprint,
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code],
         )
 
         assert pipe.inputs.root["items"].multiplicity is True
@@ -120,10 +121,11 @@ class TestBracketNotationInControllers:
             input_item_name="item",
         )
 
-        pipe = PipeBatchFactory.make_from_blueprint(
+        pipe = PipeFactory[PipeBatch].make_from_blueprint(
             domain=domain,
             pipe_code="test_batch",
             blueprint=blueprint,
+            concept_codes_from_the_same_domain=[concept_item.code, concept_processed_item.code],
         )
 
         assert pipe.inputs.root["items"].multiplicity is True

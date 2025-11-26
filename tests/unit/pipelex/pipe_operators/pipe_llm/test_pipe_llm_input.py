@@ -3,8 +3,9 @@ from typing import Callable
 import pytest
 
 from pipelex import log
+from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from tests.unit.pipelex.pipe_operators.pipe_llm.data import PipeLLMInputTestCases
 
 
@@ -22,7 +23,7 @@ class TestPipeLLMValidateInputs:
         load_empty_library()
         log.verbose(f"Testing valid case: {test_id}")
 
-        pipe_llm = PipeLLMFactory.make_from_blueprint(
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
             domain="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,

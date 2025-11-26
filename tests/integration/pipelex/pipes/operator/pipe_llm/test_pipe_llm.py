@@ -6,12 +6,13 @@ import pytest
 from pipelex import log, pretty_print
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry, get_native_concept, get_pipe_library, get_pipe_router
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, StructuringMethod
-from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -35,7 +36,7 @@ class TestPipeLLMBasic:
             system_prompt=PipeTestCases.SYSTEM_PROMPT,
             prompt=PipeTestCases.USER_PROMPT,
         )
-        pipe = PipeLLMFactory.make_from_blueprint(
+        pipe = PipeFactory[PipeLLM].make_from_blueprint(
             domain="documents",
             pipe_code="adhoc_for_test_pipe_llm",
             blueprint=pipe_llm_blueprint,
@@ -110,7 +111,7 @@ class TestPipeLLMBasic:
 
         pipe_code = f"extract_{topic}_{concept}_{structuring_method}"
         pipe_code = pipe_code.lower().replace(" ", "_")
-        pipe = PipeLLMFactory.make_from_blueprint(
+        pipe = PipeFactory[PipeLLM].make_from_blueprint(
             domain="test_structured_generations",
             pipe_code=pipe_code,
             blueprint=pipe_llm_blueprint,
@@ -169,7 +170,7 @@ class TestPipeLLMBasic:
 
             pipe_job = PipeJobFactory.make_pipe_job(
                 working_memory=working_memory,
-                pipe=PipeLLMFactory.make_from_blueprint(
+                pipe=PipeFactory[PipeLLM].make_from_blueprint(
                     domain="generic",
                     pipe_code="adhoc_for_test_pipe_llm_image",
                     blueprint=pipe_llm_blueprint,

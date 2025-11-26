@@ -7,6 +7,7 @@ from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_concept_library
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from tests.unit.pipelex.builder.pipe.pipe_operator.pipe_llm.test_data import PipeLLMTestCases
 
@@ -31,10 +32,10 @@ class TestPipeLLMBlueprintConversion:
         blueprint = pipe_spec.to_blueprint()
         assert blueprint == expected_blueprint
 
-        pipe_llm_from_blueprint = PipeFactory.make_from_blueprint(
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
             domain="test_domain",
             pipe_code=f"test_pipe_{test_name}",
             blueprint=blueprint,
             concept_codes_from_the_same_domain=[data_concept.code, item_concept.code, analysis_concept.code],
         )
-        pretty_print(pipe_llm_from_blueprint, title="PipeLLM from blueprint")
+        pretty_print(pipe_llm, title="PipeLLM from blueprint")

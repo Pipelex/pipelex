@@ -2,9 +2,10 @@ from pathlib import Path
 from typing import Callable
 
 from pipelex.core.concepts.concept_factory import ConceptBlueprint, ConceptFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_concept_library
+from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 
 
@@ -37,7 +38,7 @@ class TestPipeConditionValidation:
             default_outcome="default_pipe",
         )
 
-        pipe_condition = PipeConditionFactory.make_from_blueprint(
+        pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
             domain=domain,
             pipe_code="test_condition",
             blueprint=pipe_condition_blueprint,
@@ -78,7 +79,7 @@ class TestPipeConditionValidation:
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
-        pipe_condition_template = PipeConditionFactory.make_from_blueprint(
+        pipe_condition_template = PipeFactory[PipeCondition].make_from_blueprint(
             domain=domain,
             pipe_code="test_condition_template",
             blueprint=pipe_condition_template_blueprint,
@@ -94,7 +95,7 @@ class TestPipeConditionValidation:
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
-        pipe_condition_expr = PipeConditionFactory.make_from_blueprint(
+        pipe_condition_expr = PipeFactory[PipeCondition].make_from_blueprint(
             domain=domain,
             pipe_code="test_condition_expr",
             blueprint=pipe_condition_expr_blueprint,
