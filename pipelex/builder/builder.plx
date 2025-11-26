@@ -324,7 +324,7 @@ The main pipe is the one that will carry out the main task of the pipeline, it s
 [pipe.assemble_pipelex_bundle_spec]
 type = "PipeFunc"
 description = "Compile the pipelex bundle spec."
-inputs = { pipe_specs = "PipeSpec", concept_specs = "ConceptSpec", bundle_header_spec = "BundleHeaderSpec" }
+inputs = { pipe_specs = "pipe_design.PipeSpec", concept_specs = "concept.ConceptSpec", bundle_header_spec = "BundleHeaderSpec" }
 output = "PipelexBundleSpec"
 function_name = "assemble_pipelex_bundle_spec"
 

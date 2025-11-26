@@ -22,7 +22,7 @@ PipeFailure = "Details of a single pipe failure during dry run."
 [pipe.detail_pipe_spec]
 type = "PipeCondition"
 description = "Route by signature.type to the correct spec emitter."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "Anything"
 expression = "pipe_signature.type"
 default_outcome = "fail"
@@ -43,7 +43,7 @@ PipeBatch     = "detail_pipe_batch"
 [pipe.detail_pipe_sequence]
 type = "PipeLLM"
 description = "Build a PipeSequenceSpec from the signature (children referenced by code)."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeSequenceSpec"
 model = "llm_to_engineer"
 prompt = """
@@ -67,7 +67,7 @@ Note:
 [pipe.detail_pipe_parallel]
 type = "PipeLLM"
 description = "Build a PipeParallelSpec from the signature."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeParallelSpec"
 model = "llm_to_engineer"
 prompt = """
@@ -88,7 +88,7 @@ Based on the pipe signature, build the PipeParallelSpec.
 [pipe.detail_pipe_condition]
 type = "PipeLLM"
 description = "Build a PipeConditionSpec from the signature (provide expression/outcome consistent with children)."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeConditionSpec"
 model = "llm_to_engineer"
 prompt = """
@@ -109,7 +109,7 @@ Based on the pipe signature, build the PipeConditionSpec.
 [pipe.detail_pipe_batch]
 type = "PipeLLM"
 description = "Build a PipeBatchSpec from the signature."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeBatchSpec"
 model = "llm_to_engineer"
 prompt = """
@@ -134,7 +134,7 @@ Based on the pipe signature, build the PipeComposeSpec.
 [pipe.detail_pipe_llm]
 type = "PipeLLM"
 description = "Build a PipeLLMSpec from the signature."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeLLMSpec"
 model = "llm_to_engineer"
 prompt = """
@@ -161,7 +161,7 @@ Notes:
 [pipe.detail_pipe_extract]
 type = "PipeLLM"
 description = "Build a PipeExtractSpec from the signature."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeExtractSpec"
 model = "llm_to_engineer"
 prompt = """
@@ -182,7 +182,7 @@ Based on the pipe signature, build the PipeExtractSpec.
 [pipe.detail_pipe_img_gen]
 type = "PipeLLM"
 description = "Build a PipeImgGenSpec from the signature."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeImgGenSpec"
 model = "llm_to_engineer"
 prompt = """
@@ -206,7 +206,7 @@ Notes:
 [pipe.detail_pipe_compose]
 type = "PipeLLM"
 description = "Build a PipeComposeSpec from the signature."
-inputs = { plan_draft = "PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "concept.ConceptSpec" }
 output = "pipe_design.PipeComposeSpec"
 model = "llm_to_engineer"
 prompt = """
