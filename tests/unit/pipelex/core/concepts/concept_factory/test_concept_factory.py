@@ -81,7 +81,7 @@ class TestConceptFactory:
         assert ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint2) == expected_structure2
 
     @pytest.mark.parametrize(
-        ("domain", "concept_string_or_code", "concept_codes_from_the_same_domain", "expected_result"),
+        ("domain", "concept_string_or_code", "expected_result"),
         TestCases.MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES,
     )
     def test_make_domain_and_concept_code_from_concept_string_or_code(
@@ -97,7 +97,7 @@ class TestConceptFactory:
         assert result == expected_result
 
     @pytest.mark.parametrize(
-        ("test_name", "domain", "concept_code", "blueprint", "concept_codes_from_the_same_domain", "expected_concept"),
+        ("test_name", "domain", "concept_code", "blueprint", "expected_concept"),
         TestCases.MAKE_FROM_BLUEPRINT_TEST_CASES,
     )
     def test_make_from_blueprint(

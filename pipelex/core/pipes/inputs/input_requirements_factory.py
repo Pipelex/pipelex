@@ -53,8 +53,6 @@ class InputRequirementsFactory:
         Args:
             domain: The domain to use for resolving concept codes without domain prefix
             requirement_str: String in the format "domain.ConceptCode" or "ConceptCode" with optional "[multiplicity]"
-            library_id: The library ID to use for resolving concepts
-            concept_codes_from_the_same_domain: List of concept codes from the same domain for resolution
 
         Returns:
             InputRequirement with the parsed concept and multiplicity

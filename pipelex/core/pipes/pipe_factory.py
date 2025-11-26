@@ -4,6 +4,7 @@ from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFou
 from kajson.kajson_manager import KajsonManager
 from typing_extensions import override, runtime_checkable
 
+from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_string_or_code
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeFactoryError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -40,25 +41,31 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
         # Validate that the specified concepts are declared in the bundle, or are natives concepts.
         if blueprint.inputs is not None:
             for input_name, input_concept_string_or_code in blueprint.inputs.items():
-                if "." not in input_concept_string_or_code:
+                stripped_input_concept_string_or_code = strip_multiplicity_from_concept_string_or_code(
+                    concept_string_or_code=input_concept_string_or_code
+                )
+                if "." not in stripped_input_concept_string_or_code:
                     if (
-                        not NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=input_concept_string_or_code)
-                        and input_concept_string_or_code not in concept_codes_from_the_same_domain
+                        not NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=stripped_input_concept_string_or_code)
+                        and stripped_input_concept_string_or_code not in concept_codes_from_the_same_domain
                     ):
                         msg = (
-                            f"Input '{input_name}' with concept '{input_concept_string_or_code}' in pipe '{pipe_code}' (domain '{domain}') "
-                            f"is invalid. The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix."
+                            f"Input '{input_name}' with concept '{stripped_input_concept_string_or_code}' in pipe '{pipe_code}' (domain '{domain}') "
+                            f"is invalid. The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix. "
+                            f"Declared concepts are: '{concept_codes_from_the_same_domain}'"
                         )
                         raise PipeFactoryError(msg)
 
         if "." not in blueprint.output:
+            stripped_output_concept_string_or_code = strip_multiplicity_from_concept_string_or_code(concept_string_or_code=blueprint.output)
             if (
-                not NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=blueprint.output)
-                and blueprint.output not in concept_codes_from_the_same_domain
+                not NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=stripped_output_concept_string_or_code)
+                and stripped_output_concept_string_or_code not in concept_codes_from_the_same_domain
             ):
                 msg = (
-                    f"Output concept '{blueprint.output}' in pipe '{pipe_code}' (domain '{domain}') is invalid. "
-                    f"The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix."
+                    f"Output concept '{stripped_output_concept_string_or_code}' in pipe '{pipe_code}' (domain '{domain}') is invalid. "
+                    f"The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix. "
+                    f"Declared concepts are: '{concept_codes_from_the_same_domain}'"
                 )
                 raise PipeFactoryError(msg)
 
