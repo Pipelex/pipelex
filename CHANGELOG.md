@@ -2,10 +2,16 @@
 
 ### Unreleased
 
+**Highlights:** - Previously, in the pipelex config `.pipelex/pipelex.toml`, when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
+
 ### Changed
 
 - Modified the GHA `version-check.yml` so that the check of the version is only applying to release branches.
 - Removed the `pyproject.toml` file from the build.
+
+### Refactored
+
+- The `find_files_in_dir` function was coded in 3 different places, now it's in `pipelex/tools/misc/file_utils.py`, and accepts `excluded_dirs`.
 
 ## [v0.16.0] - 2025-11-25
 

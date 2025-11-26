@@ -43,9 +43,17 @@ class TestClassRegistryUtilsUnit:
 
     def test_register_classes_in_folder_unit(self, mocker: MockerFixture):
         """Unit test for registering classes from a folder using mocks."""
+        # Mock get_config to return excluded_dirs
+        mock_config = mocker.MagicMock()
+        mock_config.pipelex.scan_config.excluded_dirs = ["__pycache__", ".git"]
+        mocker.patch("pipelex.system.registries.class_registry_utils.get_config", return_value=mock_config)
+
         # Mock the file finding and registration
         mock_files = [Path("/fake/file1.py"), Path("/fake/file2.py")]
-        mock_find_files = mocker.patch.object(ClassRegistryUtils, "find_files_in_dir", return_value=mock_files)
+        mock_find_files = mocker.patch(
+            "pipelex.system.registries.class_registry_utils.find_files_in_dir",
+            return_value=mock_files,
+        )
         mock_register_file = mocker.patch.object(ClassRegistryUtils, "register_classes_in_file")
 
         ClassRegistryUtils.register_classes_in_folder(
@@ -56,7 +64,12 @@ class TestClassRegistryUtilsUnit:
         )
 
         # Verify find_files_in_dir was called correctly
-        mock_find_files.assert_called_once_with(dir_path="/fake/folder", pattern="*.py", is_recursive=True)
+        mock_find_files.assert_called_once_with(
+            dir_path="/fake/folder",
+            pattern="*.py",
+            is_recursive=True,
+            excluded_dirs=["__pycache__", ".git"],
+        )
 
         # Verify register_classes_in_file was called for each file
         assert mock_register_file.call_count == 2
