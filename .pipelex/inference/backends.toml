@@ -10,11 +10,11 @@
 #
 ####################################################################################################
 
-[pipelex_inference]
-display_name = "⭐ Pipelex Inference"
+[pipelex_gateway]
+display_name = "⭐ Pipelex Gateway"
 enabled = true
-endpoint = "https://inference.pipelex.com/v1"
-api_key = "${PIPELEX_INFERENCE_API_KEY}"
+endpoint = "https://api.portkey.ai/v1"
+api_key = "${PIPELEX_GATEWAY_API_KEY}"
 
 [anthropic]
 enabled = true
@@ -84,3 +84,10 @@ api_key = "${XAI_API_KEY}"
 
 [internal] # software-only backend, runs internally, without AI
 enabled = true
+
+# Deprecated
+[pipelex_inference]
+display_name = "⭐ Pipelex Inference"
+enabled = true
+endpoint = "https://inference.pipelex.com/v1"
+api_key = "${PIPELEX_INFERENCE_API_KEY}"

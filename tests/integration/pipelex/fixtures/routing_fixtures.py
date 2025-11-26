@@ -18,7 +18,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_to
 
 ALL_BACKENDS = [
     # "anthropic",
-    # "azure_openai",
+    "azure_openai",
     # "bedrock",
     # "blackboxai",
     # "fal",
@@ -26,7 +26,8 @@ ALL_BACKENDS = [
     # "groq",
     # "mistral",
     # "ollama",
-    "openai",
+    # "openai",
+    # "pipelex_gateway",
     # "pipelex_inference",
     # "vertexai",
     # "xai",
