@@ -115,25 +115,22 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        input_items = OpenAIResponsesFactory.make_input_items(llm_job=llm_job)
         temperature = self._prepare_temperature(llm_job=llm_job)
         try:
             if not hasattr(self.instructor_for_objects, "responses"):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
                 raise LLMCompletionError(msg)
 
-            instructor_responses_client = cast("Any", self.instructor_for_objects.responses)
-            instructor_input = cast("list[ChatCompletionMessageParam] | str", input_items)
-
-            result_object, completion = await instructor_responses_client.create_with_completion(
-                input=instructor_input,
+            input_items = OpenAIResponsesFactory.make_input_items(llm_job=llm_job)
+            result_object, completion = await self.instructor_for_objects.responses.create_with_completion(  # pyright: ignore[reportUnknownMemberType]
+                input=cast("list[ChatCompletionMessageParam]", input_items),
                 response_model=schema,
                 max_retries=llm_job.job_config.max_retries,
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
                 temperature=temperature,
                 max_output_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-            )
+            )  # type: ignore[arg-type,misc]
         except InstructorRetryException as exc:
             msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
             raise LLMCompletionError(msg) from exc

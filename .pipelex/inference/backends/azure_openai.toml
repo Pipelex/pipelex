@@ -24,7 +24,7 @@
 model_type = "llm"
 sdk = "azure_openai_responses"
 prompting_target = "openai"
-structure_method = "instructor/openai_tools"
+structure_method = "instructor/openai_responses_tools"
 
 ################################################################################
 # LANGUAGE MODELS
