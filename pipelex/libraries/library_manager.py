@@ -203,7 +203,6 @@ class LibraryManager(LibraryManagerAbstract):
                     concept = ConceptFactory.make_from_blueprint_or_description(
                         domain=blueprint.domain,
                         concept_code=concept_code,
-                        concept_codes_from_the_same_domain=list(blueprint.concept.keys()),
                         concept_blueprint_or_description=concept_blueprint_or_description,
                     )
                     concepts.append(concept)

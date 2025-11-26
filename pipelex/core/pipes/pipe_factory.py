@@ -4,6 +4,7 @@ from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFou
 from kajson.kajson_manager import KajsonManager
 from typing_extensions import override, runtime_checkable
 
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeFactoryError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -20,7 +21,6 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
         domain: str,
         pipe_code: str,
         blueprint: PipeBlueprintType,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeAbstractType: ...
 
 
@@ -34,6 +34,34 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
         blueprint: PipeBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeAbstract:
+        if concept_codes_from_the_same_domain is None:
+            concept_codes_from_the_same_domain = []
+
+        # Validate that the specified concepts are declared in the bundle, or are natives concepts.
+        if blueprint.inputs is not None:
+            for input_name, input_concept_string_or_code in blueprint.inputs.items():
+                if "." not in input_concept_string_or_code:
+                    if (
+                        not NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=input_concept_string_or_code)
+                        and input_concept_string_or_code not in concept_codes_from_the_same_domain
+                    ):
+                        msg = (
+                            f"Input '{input_name}' with concept '{input_concept_string_or_code}' in pipe '{pipe_code}' (domain '{domain}') "
+                            f"is invalid. The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix."
+                        )
+                        raise PipeFactoryError(msg)
+
+        if "." not in blueprint.output:
+            if (
+                not NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=blueprint.output)
+                and blueprint.output not in concept_codes_from_the_same_domain
+            ):
+                msg = (
+                    f"Output concept '{blueprint.output}' in pipe '{pipe_code}' (domain '{domain}') is invalid. "
+                    f"The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix."
+                )
+                raise PipeFactoryError(msg)
+
         # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix
         factory_class_name = f"{blueprint.type}Factory"
         try:
@@ -52,6 +80,5 @@ class PipeFactory(PipeFactoryProtocol[PipeBlueprint, PipeAbstract]):
             domain=domain,
             pipe_code=pipe_code,
             blueprint=blueprint,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         return pipe_from_blueprint

@@ -49,17 +49,17 @@ FIXED_COUNT_TEST_CASES: list[tuple[str, str, str, int]] = [
 ]
 
 # Format: (domain, requirement_str, concept_codes_from_same_domain, expected_concept_string, expected_multiplicity, description)
-CONCEPT_CODE_RESOLUTION_TEST_CASES: list[tuple[str, str, list[str] | None, str, int | bool | None, str]] = [
+CONCEPT_CODE_RESOLUTION_TEST_CASES: list[tuple[str, str, str, int | bool | None, str]] = [
     # Native concepts resolved from concept code only (no multiplicity)
-    ("native", "Text", None, "native.Text", None, "Native Text without brackets"),
-    ("native", "Image[3]", None, "native.Image", 3, "Native Image with fixed count"),
-    ("native", "PDF[]", None, "native.PDF", True, "Native PDF with empty brackets"),
+    ("native", "Text", "native.Text", None, "Native Text without brackets"),
+    ("native", "Image[3]", "native.Image", 3, "Native Image with fixed count"),
+    ("native", "PDF[]", "native.PDF", True, "Native PDF with empty brackets"),
     # Native concepts with concept_codes_from_same_domain (native always takes precedence)
-    ("native", "Text[5]", ["Text", "Image", "PDF"], "native.Text", 5, "Native Text with concept codes list"),
+    ("native", "Text[5]", "native.Text", 5, "Native Text with concept codes list"),
     # Native concepts take precedence even when used with custom domain parameter
-    ("my_domain", "Text", ["Text", "Document"], "native.Text", None, "Native Text takes precedence over custom domain"),
-    ("my_domain", "Image[2]", ["Image", "Photo"], "native.Image", 2, "Native Image takes precedence"),
-    ("accounting", "Text[3]", ["Invoice", "Receipt"], "native.Text", 3, "Native always wins"),
+    ("my_domain", "Text", "native.Text", None, "Native Text takes precedence over custom domain"),
+    ("my_domain", "Image[2]", "native.Image", 2, "Native Image takes precedence"),
+    ("accounting", "Text[3]", "native.Text", 3, "Native always wins"),
 ]
 
 # Format: (domain, requirement_str, expected_concept_string, expected_multiplicity)

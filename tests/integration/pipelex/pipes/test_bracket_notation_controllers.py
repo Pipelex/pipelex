@@ -27,7 +27,6 @@ class TestBracketNotationInControllers:
             concept_code="DataItem",
             domain=domain,
             blueprint=ConceptBlueprint(description="Data item"),
-            concept_codes_from_the_same_domain=["DataItem"],
         )
         concept_library.add_concepts([concept_1])
 
@@ -60,13 +59,11 @@ class TestBracketNotationInControllers:
             concept_code="Category",
             domain=domain,
             blueprint=ConceptBlueprint(description="Category"),
-            concept_codes_from_the_same_domain=["Category"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             concept_code="Result",
             domain=domain,
             blueprint=ConceptBlueprint(description="Result"),
-            concept_codes_from_the_same_domain=["Result"],
         )
         concept_library.add_concepts([concept_1, concept_2])
 
@@ -100,7 +97,6 @@ class TestBracketNotationInControllers:
             concept_code="Item",
             domain=domain,
             blueprint=ConceptBlueprint(description="Item"),
-            concept_codes_from_the_same_domain=["Item"],
         )
         concept_library.add_concepts([concept_1])
 

@@ -36,7 +36,6 @@ class TestPipeExtract:
             concept_code="PageScan",
             domain="extract",
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
-            concept_codes_from_the_same_domain=["PageScan"],
         )
         concept_library.add_new_concept(concept=concept_1)
 

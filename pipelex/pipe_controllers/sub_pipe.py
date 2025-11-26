@@ -20,7 +20,6 @@ class SubPipe(BaseModel):
     output_name: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     batch_params: BatchParams | None = None
-    concept_codes_from_the_same_domain: list[str] | None = None
 
     async def run_pipe(
         self,
@@ -74,7 +73,6 @@ class SubPipe(BaseModel):
                 domain=sub_pipe.domain,
                 pipe_code=self.pipe_code,
                 blueprint=pipe_batch_blueprint,
-                concept_codes_from_the_same_domain=self.concept_codes_from_the_same_domain,
             )
             pipe_output = await pipe_batch.run_pipe(
                 job_metadata=job_metadata,

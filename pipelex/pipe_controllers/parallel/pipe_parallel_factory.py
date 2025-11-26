@@ -24,14 +24,13 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         domain: str,
         pipe_code: str,
         blueprint: PipeParallelBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeParallel:
         parallel_sub_pipes: list[SubPipe] = []
         for sub_pipe_blueprint in blueprint.parallels:
             if not sub_pipe_blueprint.result:
                 msg = f"Unexpected error in pipe '{pipe_code}': PipeParallel requires a result specified for each parallel sub pipe"
                 raise PipeParallelFactoryError(message=msg)
-            sub_pipe = SubPipeFactory.make_from_blueprint(sub_pipe_blueprint, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain)
+            sub_pipe = SubPipeFactory.make_from_blueprint(sub_pipe_blueprint)
             parallel_sub_pipes.append(sub_pipe)
         if not blueprint.add_each_output and not blueprint.combined_output:
             msg = (
@@ -49,7 +48,6 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
             combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                 domain=domain,
                 concept_string_or_code=output_parse_result.concept,
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
             combined_output = get_required_concept(
                 concept_string=ConceptFactory.make_concept_string_with_domain(
@@ -63,12 +61,10 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         inputs = InputRequirementsFactory.make_from_blueprint(
             domain=domain,
             blueprint=blueprint.inputs or {},
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
 
         output = get_required_concept(

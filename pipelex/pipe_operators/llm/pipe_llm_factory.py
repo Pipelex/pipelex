@@ -26,7 +26,6 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         domain: str,
         pipe_code: str,
         blueprint: PipeLLMBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeLLM:
         system_prompt = blueprint.system_prompt
         if not system_prompt and (domain_obj := get_optional_domain(domain=domain)):
@@ -68,7 +67,6 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                     domain=domain,
                     concept_string_or_code=input_parse_result.concept,
-                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
                 concept = get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(
@@ -110,7 +108,6 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         output_concept_domain, output_concept_code = output_domain_and_code.domain, output_domain_and_code.concept_code
         return PipeLLM(
@@ -120,7 +117,6 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             inputs=InputRequirementsFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_required_concept(
                 concept_string=ConceptFactory.make_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code),

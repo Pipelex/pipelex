@@ -21,7 +21,6 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
         domain: str,
         pipe_code: str,
         blueprint: PipeBatchBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeBatch:
         # Parse output to strip multiplicity brackets
         try:
@@ -32,9 +31,8 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
 
         try:
             output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                domain=domain,
                 concept_string_or_code=output_parse_result.concept,
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+                domain=domain,
             )
         except ConceptFactoryError as exc:
             msg = f"Error making domain and concept code for PipeBatch: {exc}"
@@ -43,7 +41,6 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
         inputs = InputRequirementsFactory.make_from_blueprint(
             domain=domain,
             blueprint=blueprint.inputs or {},
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         output = get_required_concept(
             concept_string=ConceptFactory.make_concept_string_with_domain(

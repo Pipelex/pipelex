@@ -20,7 +20,6 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
         domain: str,
         pipe_code: str,
         blueprint: PipeConditionBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeCondition:
         # Parse output to strip multiplicity brackets
         try:
@@ -33,7 +32,6 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
             output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
                 domain=domain,
                 concept_string_or_code=output_parse_result.concept,
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
         except ConceptFactoryError as exc:
             msg = f"Error making domain and concept code for PipeCondition: {exc}"
@@ -43,7 +41,6 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
             inputs = InputRequirementsFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
         except InputRequirementsFactoryError as exc:
             msg = f"Error making input requirements for PipeCondition: {exc}"

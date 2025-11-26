@@ -20,7 +20,6 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         domain: str,
         pipe_code: str,
         blueprint: PipeExtractBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeExtract:
         # Parse output to strip multiplicity brackets
         output_parse_result = parse_concept_with_multiplicity(blueprint.output)
@@ -28,7 +27,6 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
 
         image_stuff_name = None
@@ -41,7 +39,6 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         inputs = InputRequirementsFactory.make_from_blueprint(
             domain=domain,
             blueprint=blueprint.inputs or {},
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         # Already validated above that we have exactly one input
         input_name = blueprint.input_names[0]

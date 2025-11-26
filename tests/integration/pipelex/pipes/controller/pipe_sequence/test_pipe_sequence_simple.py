@@ -38,7 +38,6 @@ class TestPipeSequenceSimple:
             concept_code="TestConcept1",
             domain=domain,
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
-            concept_codes_from_the_same_domain=["TestConcept1"],
         )
         concept_library = get_concept_library()
         concept_library.add_concepts([concept_1])

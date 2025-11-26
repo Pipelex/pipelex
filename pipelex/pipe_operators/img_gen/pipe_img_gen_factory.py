@@ -17,7 +17,6 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         domain: str,
         pipe_code: str,
         blueprint: PipeImgGenBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeImgGen:
         # Parse output for multiplicity (may have brackets like "Image[]" or "Image[3]")
         output_parse_result = parse_concept_with_multiplicity(blueprint.output)
@@ -29,12 +28,10 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         inputs = InputRequirementsFactory.make_from_blueprint(
             domain=domain,
             blueprint=blueprint.inputs or {},
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
 
         img_gen_prompt = blueprint.img_gen_prompt

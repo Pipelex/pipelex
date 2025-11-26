@@ -17,7 +17,6 @@ class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
         domain: str,
         pipe_code: str,
         blueprint: PipeFuncBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeFunc:
         # Parse output to strip multiplicity brackets
         output_parse_result = parse_concept_with_multiplicity(blueprint.output)
@@ -25,7 +24,6 @@ class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
         output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         # TODO: make function_name into a callable in PipeFunc
         return PipeFunc(
@@ -35,7 +33,6 @@ class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
             inputs=InputRequirementsFactory.make_from_blueprint(
                 domain=domain,
                 blueprint=blueprint.inputs or {},
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             ),
             output=get_required_concept(
                 concept_string=ConceptFactory.make_concept_string_with_domain(

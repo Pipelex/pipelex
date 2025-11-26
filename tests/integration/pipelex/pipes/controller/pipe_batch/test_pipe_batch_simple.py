@@ -44,13 +44,11 @@ class TestPipeBatchSimple:
             concept_code="TestConcept1",
             domain=domain,
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
-            concept_codes_from_the_same_domain=["TestConcept1"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept2",
             domain=domain,
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
-            concept_codes_from_the_same_domain=["TestConcept2"],
         )
         concept_library = get_concept_library()
         concept_library.add_concepts([concept_1, concept_2])
@@ -70,7 +68,6 @@ class TestPipeBatchSimple:
             domain=domain,
             pipe_code="simple_batch",
             blueprint=pipe_batch_blueprint,
-            concept_codes_from_the_same_domain=["TestConcept1", "TestConcept2"],
         )
 
         # Create test data - list of text items

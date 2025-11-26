@@ -201,14 +201,13 @@ class TestMakeInputRequirementsFromString:
         assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
     @pytest.mark.parametrize(
-        ("domain", "requirement_str", "concept_codes_from_same_domain", "expected_concept_string", "expected_multiplicity", "description"),
+        ("domain", "requirement_str", "expected_concept_string", "expected_multiplicity", "description"),
         CONCEPT_CODE_RESOLUTION_TEST_CASES,
     )
     def test_concept_code_resolution(
         self,
         domain: str,
         requirement_str: str,
-        concept_codes_from_same_domain: list[str] | None,
         expected_concept_string: str,
         expected_multiplicity: int | bool | None,
         description: str,
@@ -224,7 +223,6 @@ class TestMakeInputRequirementsFromString:
         result = InputRequirementsFactory.make_from_string(
             domain=domain,
             requirement_str=requirement_str,
-            concept_codes_from_the_same_domain=concept_codes_from_same_domain,
         )
 
         assert isinstance(result, InputRequirement)
