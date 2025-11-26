@@ -33,72 +33,91 @@ structure_method = "instructor/openai_responses_tools"
 
 # --- OpenAI LLMs --------------------------------------------------------------
 [gpt-4o]
-model_id = "gpt-4o"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 2.75, output = 11.00 }
 
 [gpt-4o-mini]
-model_id = "gpt-4o-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.17, output = 0.66 }
 
 ["gpt-4.1"]
-model_id = "gpt-4.1"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
 
 ["gpt-4.1-mini"]
-model_id = "gpt-4.1-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.4, output = 1.6 }
 
 ["gpt-4.1-nano"]
-model_id = "gpt-4.1-nano"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
 
+[o3]
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+constraints = ["temperature_must_be_1"]
+
+[o3-mini]
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+constraints = ["temperature_must_be_1"]
+
+[o4]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 10.0, output = 40.0 }
+constraints = ["temperature_must_be_1"]
+
+[o4-mini]
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+constraints = ["temperature_must_be_1"]
+
 [gpt-5-nano]
-model_id = "gpt-5-nano"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.40 }
 
 [gpt-5-mini]
-model_id = "gpt-5-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.00 }
 constraints = ["temperature_must_be_1"]
 
 [gpt-5-chat]
-model_id = "gpt-5-chat"
 inputs = ["text", "images"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.00 }
 
 [gpt-5]
-model_id = "gpt-5"
 inputs = ["text", "images"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.00 }
 constraints = ["temperature_must_be_1"]
 
 ["gpt-5.1"]
-model_id = "gpt-5.1"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.00 }
 
 ["gpt-5.1-chat"]
-model_id = "gpt-5.1-chat"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.00 }
+
+["gpt-5.1-codex"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.00 }
+constraints = ["temperature_must_be_1"]
 
 # --- Claude LLMs --------------------------------------------------------------
 ["claude-4-sonnet"]
