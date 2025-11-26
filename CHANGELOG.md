@@ -1,5 +1,12 @@
 # Changelog
 
+### Unreleased
+
+### Changed
+
+- Modified the GHA `version-check.yml` so that the check of the version is only applying to release branches.
+- Removed the `pyproject.toml` file from the build.
+
 ## [v0.16.0] - 2025-11-25
 
 **Highlights:** - Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
