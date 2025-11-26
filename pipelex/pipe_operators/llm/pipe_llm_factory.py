@@ -23,7 +23,7 @@ from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,

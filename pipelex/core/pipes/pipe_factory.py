@@ -26,7 +26,7 @@ PipeAbstractType = TypeVar("PipeAbstractType", bound="PipeAbstract", covariant=T
 @runtime_checkable
 class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
     @classmethod
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,
@@ -108,7 +108,7 @@ class PipeFactory(Generic[PipeAbstractType]):
             msg = f"Pipe '{pipe_code}' couldn't be created: factory '{factory_class_name}' is not a subclass of {type(PipeFactoryProtocol)}."
             raise PipeFactoryError(msg) from factory_inheritance_error
 
-        pipe: PipeAbstractType = pipe_factory.make_from_blueprint(
+        pipe: PipeAbstractType = pipe_factory.make(
             pipe_category=pipe_category,
             pipe_type=blueprint.type,
             code=pipe_code,

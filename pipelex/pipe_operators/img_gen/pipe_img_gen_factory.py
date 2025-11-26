@@ -13,7 +13,7 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlue
 class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,

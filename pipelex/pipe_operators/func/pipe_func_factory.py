@@ -12,7 +12,7 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,

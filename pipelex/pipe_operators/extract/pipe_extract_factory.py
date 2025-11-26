@@ -16,7 +16,7 @@ from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlu
 class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,
@@ -27,13 +27,9 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         output: Concept,
         blueprint: PipeExtractBlueprint,
     ) -> PipeExtract:
+        concept_library = get_concept_library()
         image_stuff_name = None
         pdf_stuff_name = None
-        concept_library = get_concept_library()
-
-        if blueprint.inputs is None:
-            msg = "For PipeExtract you must provide either a pdf or an image or a concept that refines one of them"
-            raise PipeExtractFactoryError(msg)
 
         # Already validated above that we have exactly one input
         input_name = blueprint.input_names[0]
@@ -59,6 +55,8 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             )
             raise PipeExtractFactoryError(msg)
 
+        page_views_dpi = blueprint.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
+
         return PipeExtract(
             domain=domain,
             code=code,
@@ -71,5 +69,5 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             should_include_images=blueprint.page_images or False,
             should_caption_images=blueprint.page_image_captions or False,
             should_include_page_views=blueprint.page_views or False,
-            page_views_dpi=blueprint.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi,
+            page_views_dpi=page_views_dpi,
         )

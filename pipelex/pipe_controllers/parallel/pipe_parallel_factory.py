@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParallel]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,

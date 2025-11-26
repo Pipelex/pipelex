@@ -13,7 +13,7 @@ from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeCond
 class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondition]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,
@@ -25,6 +25,7 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
         blueprint: PipeConditionBlueprint,
     ) -> PipeCondition:
         # Compute expression from expression_template or expression in blueprint
+        expression: str | None = None
         if blueprint.expression_template:
             expression = blueprint.expression_template
         elif blueprint.expression:

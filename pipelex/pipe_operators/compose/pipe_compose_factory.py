@@ -16,7 +16,7 @@ from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,

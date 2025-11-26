@@ -13,7 +13,7 @@ from pipelex.pipe_run.pipe_run_params import BatchParams
 class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
         pipe_category: Any,
         pipe_type: str,
