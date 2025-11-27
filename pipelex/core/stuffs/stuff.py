@@ -43,11 +43,11 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
                 raise StuffArtefactReservedFieldError(message=msg)
             artefact_dict[key] = value
 
-        set_artefact_field("stuff_name", self.stuff_name)
-        set_artefact_field("content_class", self.content.__class__.__name__)
-        set_artefact_field("concept_code", self.concept.code)
-        set_artefact_field("stuff_code", self.stuff_code)
-        set_artefact_field("content", self.content)
+        set_artefact_field("_stuff_name", self.stuff_name)
+        set_artefact_field("_content_class", self.content.__class__.__name__)
+        set_artefact_field("_concept_code", self.concept.code)
+        set_artefact_field("_stuff_code", self.stuff_code)
+        set_artefact_field("_content", self.content)
         return StuffArtefact(artefact_dict)
 
     @classmethod

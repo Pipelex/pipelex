@@ -2,9 +2,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
+from pipelex.core.concepts.concept_structure_blueprint import RESERVED_FIELD_NAMES, ConceptStructureBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
+
+ConceptStructureBlueprintType = str | ConceptStructureBlueprint
 
 
 class ConceptBlueprint(BaseModel):
@@ -13,7 +15,7 @@ class ConceptBlueprint(BaseModel):
     source: str | None = None
     description: str
     # TODO (non-blockiing): define a type for Union[str, ConceptStructureBlueprint] (ConceptChoice to be consistent with LLMChoice)
-    structure: str | dict[str, str | ConceptStructureBlueprint] | None = None
+    structure: str | dict[str, ConceptStructureBlueprintType] | None = None
     # TODO: restore possibility of multiple refiles
     refines: str | None = None
 
@@ -27,6 +29,38 @@ class ConceptBlueprint(BaseModel):
                 msg = f"Could not validate refine '{refines}': {exc}"
                 raise ValueError(msg) from exc
         return refines
+
+    @field_validator("structure", mode="before")
+    @classmethod
+    def validate_structure_field_names(
+        cls, structure: str | dict[str, ConceptStructureBlueprintType] | None
+    ) -> str | dict[str, ConceptStructureBlueprintType] | None:
+        if isinstance(structure, dict):
+            # Check for reserved field names
+            reserved_fields_used = [field_name for field_name in structure if field_name in RESERVED_FIELD_NAMES]
+            if reserved_fields_used:
+                fields_word = "field" if len(reserved_fields_used) == 1 else "fields"
+                reserved_list = ", ".join(f"'{name}'" for name in sorted(reserved_fields_used))
+                reserved_names = ", ".join(f"'{name}'" for name in sorted(RESERVED_FIELD_NAMES))
+                msg = (
+                    f"Cannot use reserved {fields_word} in concept structure. "
+                    f"Problematic {fields_word}: {reserved_list}. "
+                    f"All reserved field names are: {reserved_names}"
+                )
+                raise ValueError(msg)
+
+            # Check for field names starting with underscore (reserved for internal use)
+            underscore_fields = [field_name for field_name in structure if field_name.startswith("_")]
+            if underscore_fields:
+                fields_word = "field" if len(underscore_fields) == 1 else "fields"
+                underscore_list = ", ".join(f"'{name}'" for name in sorted(underscore_fields))
+                msg = (
+                    f"Cannot use {fields_word} starting with underscore in concept structure. "
+                    f"Problematic {fields_word}: {underscore_list}. "
+                    "Field names starting with '_' are reserved for internal use by Pipelex."
+                )
+                raise ValueError(msg)
+        return structure
 
     @model_validator(mode="before")
     @classmethod
