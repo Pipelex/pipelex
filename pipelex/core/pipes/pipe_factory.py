@@ -85,7 +85,7 @@ class PipeFactory(Generic[PipeAbstractType]):
                 raise PipeFactoryError(msg)
 
         # Parse common attributes
-        parsed_output = cls._parse_output(domain=domain_code, pipe_code=pipe_code, output_string=blueprint.output)
+        parsed_output = cls._parse_output_concept_string(domain=domain_code, pipe_code=pipe_code, output_string=blueprint.output)
         parsed_inputs = InputRequirementsFactory.make_from_blueprint(
             domain=domain_code,
             blueprint=blueprint.inputs or {},
@@ -121,7 +121,7 @@ class PipeFactory(Generic[PipeAbstractType]):
         return pipe
 
     @classmethod
-    def _parse_output(
+    def _parse_output_concept_string(
         cls,
         domain: str,
         pipe_code: str,
