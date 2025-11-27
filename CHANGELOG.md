@@ -1,6 +1,6 @@
 # Changelog
 
-### Unreleased
+### [v0.17.0] - 2025-11-27
 
 **Highlights:** - Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
 
