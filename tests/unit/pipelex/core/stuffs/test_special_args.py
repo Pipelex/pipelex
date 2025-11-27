@@ -7,6 +7,7 @@ import pytest
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import (
+    RESERVED_FIELD_NAMES,
     ConceptStructureBlueprint,
     ConceptStructureBlueprintFieldType,
 )
@@ -27,26 +28,11 @@ class TestSpecialArgsStuff:
         "content",
     ]
 
-    # Reserved field names that should NOT be allowed in user-defined structures
-    RESERVED_FIELD_NAMES: ClassVar[list[str]] = [
-        # Pydantic BaseModel reserved attributes
-        "model_config",
-        "model_fields",
-        "model_computed_fields",
-        "model_dump",
-        "model_dump_json",
-        "model_validate",
-        "model_validate_json",
-        "model_copy",
-        "model_fields_set",
-        "model_extra",
-        # Internal metadata fields (with underscore prefix)
-        "_stuff_name",
-        "_content_class",
-        "_concept_code",
-        "_stuff_code",
-        "_content",
-        # Generic underscore-prefixed names (reserved for internal use)
+    # Examples of field names that should fail validation
+    # Includes the actual RESERVED_FIELD_NAMES plus additional examples for testing
+    FAILING_FIELD_NAMES: ClassVar[list[str]] = [
+        *RESERVED_FIELD_NAMES,
+        # Generic underscore-prefixed names (additional failing examples)
         "_internal",
         "_private",
         "_reserved",
@@ -103,7 +89,7 @@ class TestSpecialArgsStuff:
         # Calling make_artefact should work without errors
         stuff.make_artefact()
 
-    @pytest.mark.parametrize("field_name", RESERVED_FIELD_NAMES)
+    @pytest.mark.parametrize("field_name", FAILING_FIELD_NAMES)
     def test_reserved_field_names_raise_error(
         self,
         field_name: str,
