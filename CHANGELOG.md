@@ -4,6 +4,10 @@
 
 **Highlights:** - Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
 
+### Fixed
+
+- **Relaxed concept structure field naming restrictions**: Users can now use field names like `content`, `stuff_code`, `stuff_name`, and `concept` in their concept structures without conflicts. Internal metadata fields in stuff artefacts now use underscore prefixes (`_stuff_name`, `_content_class`, `_concept_code`, `_stuff_code`, `_content`) to avoid collisions with user-defined fields. Reserved field names (Pydantic BaseModel attributes like `model_config`, `model_fields`, etc.) and field names starting with underscore remain forbidden with improved error messages that clearly specify which fields are problematic.
+
 ### Changed
 
 - Modified the GHA `version-check.yml` so that the check of the version is only applying to release branches.

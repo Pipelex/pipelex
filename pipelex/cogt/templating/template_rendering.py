@@ -13,6 +13,7 @@ async def render_template(
     templating_style: TemplatingStyle | None = None,
 ) -> str:
     template_source = preprocess_template(template)
+
     return await render_jinja2(
         template_source=template_source,
         template_category=category,

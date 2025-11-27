@@ -60,8 +60,6 @@ class PipeBatchSpec(PipeSpec):
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
-            type=self.type,
-            pipe_category=self.pipe_category,
             branch_pipe_code=self.branch_pipe_code,
             input_list_name=self.input_list_name,
             input_item_name=self.input_item_name,
