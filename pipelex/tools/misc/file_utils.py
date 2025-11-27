@@ -25,8 +25,7 @@ def save_bytes_to_binary_file(file_path: str, byte_data: bytes, create_directory
     if create_directory:
         ensure_directory_exists(os.path.dirname(file_path))
 
-    with open(file_path, "wb") as file:
-        file.write(byte_data)
+    Path(file_path).write_bytes(byte_data)
     return file_path
 
 
@@ -51,8 +50,7 @@ def save_text_to_path(text: str, path: str, create_directory: bool = False):
         if directory:
             ensure_directory_exists(directory)
 
-    with open(path, "w", encoding="utf-8") as file:
-        file.write(text)
+    Path(path).write_text(text, encoding="utf-8")
 
 
 def load_text_from_path(path: str) -> str:
@@ -361,6 +359,7 @@ def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, ex
     """
     path = Path(dir_path)
     files: list[Path] = []
+    filtered_files: list[Path] = []
     if is_recursive:
         files = list(path.rglob(pattern))
     else:
@@ -368,5 +367,5 @@ def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, ex
 
     for file in files:
         if excluded_dirs is not None and any(part in excluded_dirs for part in file.parts):
-            files.remove(file)
-    return files
+            filtered_files.append(file)
+    return filtered_files
