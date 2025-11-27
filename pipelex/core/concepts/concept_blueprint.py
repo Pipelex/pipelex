@@ -40,11 +40,11 @@ class ConceptBlueprint(BaseModel):
             reserved_fields_used = [field_name for field_name in structure if field_name in RESERVED_FIELD_NAMES]
             if reserved_fields_used:
                 fields_word = "field" if len(reserved_fields_used) == 1 else "fields"
-                reserved_list = ", ".join(f"'{name}'" for name in sorted(reserved_fields_used))
+                reserved_fields_used_list = ", ".join(f"'{name}'" for name in sorted(reserved_fields_used))
                 reserved_names = ", ".join(f"'{name}'" for name in sorted(RESERVED_FIELD_NAMES))
                 msg = (
-                    f"Cannot use reserved {fields_word} in concept structure. "
-                    f"Problematic {fields_word}: {reserved_list}. "
+                    f"Cannot use reserved fields in concept structure. "
+                    f"Problematic fields: '{reserved_fields_used_list}'. "
                     f"All reserved field names are: {reserved_names}"
                 )
                 raise ValueError(msg)
@@ -55,8 +55,8 @@ class ConceptBlueprint(BaseModel):
                 fields_word = "field" if len(underscore_fields) == 1 else "fields"
                 underscore_list = ", ".join(f"'{name}'" for name in sorted(underscore_fields))
                 msg = (
-                    f"Cannot use {fields_word} starting with underscore in concept structure. "
-                    f"Problematic {fields_word}: {underscore_list}. "
+                    f"Cannot use '{fields_word}' starting with underscore in concept structure. "
+                    f"Problematic fields: '{underscore_list}'. "
                     "Field names starting with '_' are reserved for internal use by Pipelex."
                 )
                 raise ValueError(msg)
