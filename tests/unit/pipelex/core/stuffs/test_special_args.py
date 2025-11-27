@@ -30,13 +30,16 @@ class TestSpecialArgsStuff:
 
     # Examples of field names that should fail validation
     # Includes the actual RESERVED_FIELD_NAMES plus additional examples for testing
-    FAILING_FIELD_NAMES: ClassVar[list[str]] = [
-        *RESERVED_FIELD_NAMES,
-        # Generic underscore-prefixed names (additional failing examples)
-        "_internal",
-        "_private",
-        "_reserved",
-    ]
+    # Sorted to ensure consistent ordering across pytest-xdist workers
+    FAILING_FIELD_NAMES: ClassVar[list[str]] = sorted(
+        [
+            *RESERVED_FIELD_NAMES,
+            # Generic underscore-prefixed names (additional failing examples)
+            "_internal",
+            "_private",
+            "_reserved",
+        ]
+    )
 
     @pytest.mark.parametrize("field_name", ALLOWED_FIELD_NAMES)
     def test_make_artefact_with_allowed_field_names(
