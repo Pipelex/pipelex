@@ -40,7 +40,5 @@ class PipeFuncSpec(PipeSpec):
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
-            type=self.type,
-            pipe_category=self.pipe_category,
             function_name=self.function_name,
         )

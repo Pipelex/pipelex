@@ -1,10 +1,10 @@
+from typing import Any
+
 from typing_extensions import override
 
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.hub import get_required_concept
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 
@@ -12,36 +12,23 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
-        domain: str,
+        pipe_category: Any,
+        pipe_type: str,
         pipe_code: str,
+        domain_code: str,
+        description: str | None,
+        inputs: InputRequirements,
+        output: Concept,
         blueprint: PipeFuncBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeFunc:
-        # Parse output to strip multiplicity brackets
-        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
-
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
-            concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-        )
         # TODO: make function_name into a callable in PipeFunc
         return PipeFunc(
-            domain=domain,
+            domain=domain_code,
             code=pipe_code,
-            description=blueprint.description,
-            inputs=InputRequirementsFactory.make_from_blueprint(
-                domain=domain,
-                blueprint=blueprint.inputs or {},
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-            ),
-            output=get_required_concept(
-                concept_string=ConceptFactory.make_concept_string_with_domain(
-                    domain=output_domain_and_code.domain,
-                    concept_code=output_domain_and_code.concept_code,
-                ),
-            ),
+            description=description,
+            inputs=inputs,
+            output=output,
             function_name=blueprint.function_name,
         )

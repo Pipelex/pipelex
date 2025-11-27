@@ -51,7 +51,6 @@ class TestInlineStructureConcepts:
             domain="test_domain",
             concept_code="TestFeatureAnalysis",
             blueprint=blueprint,
-            concept_codes_from_the_same_domain=["TestFeatureAnalysis"],
         )
 
         # Verify concept properties
@@ -92,7 +91,6 @@ class TestInlineStructureConcepts:
             domain="test_domain",
             concept_code="TestStringRef",
             blueprint=blueprint,
-            concept_codes_from_the_same_domain=["TestStringRef"],
         )
 
         # Verify concept properties
@@ -111,7 +109,6 @@ class TestInlineStructureConcepts:
             domain="test_domain",
             concept_code="TestAutoDetect",
             blueprint=blueprint,
-            concept_codes_from_the_same_domain=["TestAutoDetect"],
         )
 
         # Should default to TextContent since TestAutoDetect is not a registered class
@@ -149,7 +146,6 @@ class TestInlineStructureConcepts:
             domain="test_domain",
             concept_code="ComplexDocument",
             blueprint=blueprint,
-            concept_codes_from_the_same_domain=["ComplexDocument"],
         )
 
         # Verify concept creation
@@ -188,7 +184,6 @@ not a registered subclass of StuffContent",
                 domain="test_domain",
                 concept_code="TestInvalidRef",
                 blueprint=ConceptBlueprint(description="Test invalid reference", structure="NonExistentClass"),
-                concept_codes_from_the_same_domain=["TestInvalidRef"],
             )
 
     def test_multiple_inline_structures_do_not_conflict(self):
@@ -204,7 +199,6 @@ not a registered subclass of StuffContent",
             domain="test_domain",
             concept_code="Person",
             blueprint=blueprint1,
-            concept_codes_from_the_same_domain=["Person"],
         )
 
         # Second structure with same field names but different context
@@ -218,7 +212,6 @@ not a registered subclass of StuffContent",
             domain="test_domain",
             concept_code="Product",
             blueprint=blueprint2,
-            concept_codes_from_the_same_domain=["Product"],
         )
 
         # Both should be created successfully
@@ -269,7 +262,6 @@ not a registered subclass of StuffContent",
             domain="test_domain",
             concept_code="AnimalInfo",
             blueprint=blueprint,
-            concept_codes_from_the_same_domain=["AnimalInfo"],
         )
 
         # Verify concept properties

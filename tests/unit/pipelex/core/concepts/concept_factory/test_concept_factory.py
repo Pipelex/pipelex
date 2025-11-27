@@ -81,26 +81,23 @@ class TestConceptFactory:
         assert ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint2) == expected_structure2
 
     @pytest.mark.parametrize(
-        ("domain", "concept_string_or_code", "concept_codes_from_the_same_domain", "expected_result"),
+        ("domain", "concept_string_or_code", "expected_result"),
         TestCases.MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES,
     )
     def test_make_domain_and_concept_code_from_concept_string_or_code(
         self,
         domain: str,
         concept_string_or_code: str,
-        concept_codes_from_the_same_domain: list[str] | None,
         expected_result: list[str],
     ):
-        """Test make_domain_and_concept_code_from_concept_string_or_code method with various inputs."""
         result = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
             domain=domain,
             concept_string_or_code=concept_string_or_code,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
         assert result == expected_result
 
     @pytest.mark.parametrize(
-        ("test_name", "domain", "concept_code", "blueprint", "concept_codes_from_the_same_domain", "expected_concept"),
+        ("test_name", "domain", "concept_code", "blueprint", "expected_concept"),
         TestCases.MAKE_FROM_BLUEPRINT_TEST_CASES,
     )
     def test_make_from_blueprint(
@@ -109,7 +106,6 @@ class TestConceptFactory:
         domain: str,
         concept_code: str,
         blueprint: ConceptBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None,
         expected_concept: Concept,
     ):
         """Test make_from_blueprint method with various blueprint configurations."""
@@ -117,7 +113,6 @@ class TestConceptFactory:
             domain=domain,
             concept_code=concept_code,
             blueprint=blueprint,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
 
         assert result == expected_concept, f"Concept mismatch for {test_name}"

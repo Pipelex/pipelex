@@ -9,7 +9,6 @@ class SubPipeFactory:
     def make_from_blueprint(
         cls,
         blueprint: SubPipeBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> SubPipe:
         """Create a SubPipe from a SubPipeBlueprint."""
         output_multiplicity = make_variable_multiplicity(
@@ -29,5 +28,4 @@ class SubPipeFactory:
             output_name=blueprint.result,
             output_multiplicity=output_multiplicity,
             batch_params=batch_params,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )

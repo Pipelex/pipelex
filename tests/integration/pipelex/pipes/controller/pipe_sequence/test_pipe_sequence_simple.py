@@ -1,5 +1,3 @@
-"""Simple integration test for PipeSequence controller."""
-
 from pathlib import Path
 from typing import Callable, cast
 
@@ -11,11 +9,12 @@ from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_concept_library, get_native_concept
+from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
-from pipelex.pipe_controllers.sequence.pipe_sequence_factory import PipeSequenceFactory
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -38,7 +37,6 @@ class TestPipeSequenceSimple:
             concept_code="TestConcept1",
             domain=domain,
             blueprint=ConceptBlueprint(description="Lorem Ipsum"),
-            concept_codes_from_the_same_domain=["TestConcept1"],
         )
         concept_library = get_concept_library()
         concept_library.add_concepts([concept_1])
@@ -55,8 +53,8 @@ class TestPipeSequenceSimple:
             ],
         )
 
-        pipe_sequence = PipeSequenceFactory.make_from_blueprint(
-            domain="test_integration",
+        pipe_sequence = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=domain,
             pipe_code="simple_sequence",
             blueprint=pipe_sequence_blueprint,
         )

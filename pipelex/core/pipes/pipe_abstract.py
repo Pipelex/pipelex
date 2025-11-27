@@ -35,6 +35,24 @@ class PipeAbstract(ABC, BaseModel):
     def pipe_type(self) -> str:
         return self.__class__.__name__
 
+    @property
+    def concept_dependencies(self) -> list[Concept]:
+        """Return all unique concept dependencies (output + inputs) without duplicates."""
+        seen_concept_strings: set[str] = set()
+        unique_concepts: list[Concept] = []
+
+        # Add output concept first
+        unique_concepts.append(self.output)
+        seen_concept_strings.add(self.output.concept_string)
+
+        # Add input concepts (avoiding duplicates)
+        for concept in self.inputs.concepts:
+            if concept.concept_string not in seen_concept_strings:
+                unique_concepts.append(concept)
+                seen_concept_strings.add(concept.concept_string)
+
+        return unique_concepts
+
     @field_validator("code", mode="before")
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:

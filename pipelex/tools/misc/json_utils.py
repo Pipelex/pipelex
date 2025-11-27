@@ -157,8 +157,8 @@ def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
     """Recursively updates a dictionary with values from another dictionary.
 
     This function performs a deep merge of two dictionaries, handling nested
-    dictionaries and lists. For dictionaries, it recursively updates values,
-    and for lists, it concatenates them.
+    dictionaries. For dictionaries, it recursively updates values. For all other
+    types (including lists), values from updates override the target values.
 
     Args:
         target_dict (Dict[str, Any]): The dictionary to update. This dictionary
@@ -170,14 +170,12 @@ def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
         >>> updates = {"b": {"y": 4, "z": 5}, "c": [3, 4]}
         >>> deep_update(base, updates)
         >>> print(base)
-        {'a': 1, 'b': {'x': 2, 'y': 4, 'z': 5}, 'c': [1, 2, 3, 4]}
+        {'a': 1, 'b': {'x': 2, 'y': 4, 'z': 5}, 'c': [3, 4]}
 
     """
     for key, value in updates.items():
         if isinstance(value, dict) and key in target_dict and isinstance(target_dict[key], dict):
             deep_update(target_dict[key], value)  # pyright: ignore[reportUnknownArgumentType]
-        elif isinstance(value, list) and key in target_dict and isinstance(target_dict[key], list):
-            target_dict[key] = list(target_dict[key] + value)
         else:
             target_dict[key] = value
 

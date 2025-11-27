@@ -78,6 +78,7 @@ class PipeType(StrEnum):
 
 class PipeBlueprint(ABC, BaseModel):
     model_config = ConfigDict(extra="forbid")
+
     source: str | None = None
     pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
     type: Any  # TODO: Find a better way to handle this.

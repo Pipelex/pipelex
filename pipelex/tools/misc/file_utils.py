@@ -347,19 +347,26 @@ def get_incremental_file_path(
 ########################################################
 
 
-def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool) -> list[Path]:
+def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, excluded_dirs: list[str] | None = None) -> list[Path]:
     """Find files matching a pattern in a directory.
 
     Args:
         dir_path: Directory path to search in
         pattern: File pattern to match (e.g. "*.py")
         is_recursive: Whether to search recursively in subdirectories
-
+        excluded_dirs: List of directories to exclude from the search
     Returns:
         List of matching Path objects
 
     """
     path = Path(dir_path)
+    files: list[Path] = []
     if is_recursive:
-        return list(path.rglob(pattern))
-    return list(path.glob(pattern))
+        files = list(path.rglob(pattern))
+    else:
+        files = list(path.glob(pattern))
+
+    for file in files:
+        if excluded_dirs is not None and any(part in excluded_dirs for part in file.parts):
+            files.remove(file)
+    return files

@@ -19,8 +19,6 @@ class PipeExtractTestCases:
             description="Extract text from image",
             inputs={"image": "Image"},
             output="Page[]",
-            type="PipeExtract",
-            pipe_category="PipeOperator",
             model=ExtractSkill.EXTRACT_TEXT_FROM_VISUALS,
         ),
     )
@@ -42,8 +40,6 @@ class PipeExtractTestCases:
             description="Extract with page options",
             inputs={"document": "PDF"},
             output="Page[]",
-            type="PipeExtract",
-            pipe_category="PipeOperator",
             model=ExtractSkill.EXTRACT_TEXT_FROM_PDF,
             page_images=True,
             page_image_captions=True,

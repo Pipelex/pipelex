@@ -3,7 +3,34 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex.pipe_run.pipe_run_params import PipeRunParamKey
 from pipelex.types import Self, StrEnum
+
+# Reserved field names that cannot be used in concept structures
+# These are either Pydantic BaseModel reserved attributes or internal metadata fields
+RESERVED_FIELD_NAMES = frozenset(
+    [
+        # Pipe run parameter keys (from PipeRunParamKey enum)
+        *PipeRunParamKey.value_list(),
+        # Pydantic BaseModel reserved attributes
+        "model_config",
+        "model_fields",
+        "model_computed_fields",
+        "model_dump",
+        "model_dump_json",
+        "model_validate",
+        "model_validate_json",
+        "model_copy",
+        "model_fields_set",
+        "model_extra",
+        # Internal metadata fields (with underscore prefix)
+        "_stuff_name",
+        "_content_class",
+        "_concept_code",
+        "_stuff_code",
+        "_content",
+    ]
+)
 
 
 class ConceptStructureBlueprintFieldType(StrEnum):

@@ -18,8 +18,6 @@ class PipeFuncTestCases:
             description="Execute a function",
             inputs={"data": "Data"},
             output="ProcessedData",
-            type="PipeFunc",
-            pipe_category="PipeOperator",
             function_name="process_data",
         ),
     )
@@ -37,8 +35,6 @@ class PipeFuncTestCases:
             description="Generate data",
             inputs=None,
             output="GeneratedData",
-            type="PipeFunc",
-            pipe_category="PipeOperator",
             function_name="generate_data",
         ),
     )

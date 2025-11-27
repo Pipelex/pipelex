@@ -71,8 +71,6 @@ class PipeImgGenSpec(PipeSpec):
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
-            type=self.type,
-            pipe_category=self.pipe_category,
             img_gen_prompt=None,
             img_gen_prompt_var_name=base_blueprint.input_names[0] if base_blueprint.input_names else None,
             model=img_gen_choice,

@@ -20,8 +20,6 @@ class PipeBatchTestCases:
             description="Batch with custom names",
             inputs={"data": "DataList"},
             output="Results",
-            type="PipeBatch",
-            pipe_category="PipeController",
             branch_pipe_code="transform_data",
             input_list_name="data_list",
             input_item_name="current_data",
