@@ -215,7 +215,7 @@ class LibraryManager(LibraryManagerAbstract):
             if blueprint.pipe is not None:
                 for pipe_name, pipe_blueprint in blueprint.pipe.items():
                     pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                        domain=blueprint.domain,
+                        domain_code=blueprint.domain,
                         pipe_code=pipe_name,
                         blueprint=pipe_blueprint,
                         concept_codes_from_the_same_domain=[the_concept.code for the_concept in all_concepts],

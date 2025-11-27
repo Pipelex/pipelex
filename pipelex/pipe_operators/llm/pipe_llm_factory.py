@@ -27,15 +27,15 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         cls,
         pipe_category: Any,
         pipe_type: str,
-        code: str,
-        domain: str,
+        pipe_code: str,
+        domain_code: str,
         description: str | None,
         inputs: InputRequirements,
         output: Concept,
         blueprint: PipeLLMBlueprint,
     ) -> PipeLLM:
         system_prompt = blueprint.system_prompt
-        if not system_prompt and (domain_obj := get_optional_domain(domain=domain)):
+        if not system_prompt and (domain_obj := get_optional_domain(domain=domain_code)):
             system_prompt = domain_obj.system_prompt
 
         system_prompt_jinja2_blueprint: TemplateBlueprint | None = None
@@ -47,8 +47,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 )
             except ValidationError as exc:
                 error_msg = (
-                    f"Template syntax error in system prompt for pipe '{code}'"
-                    f"in domain '{domain}': {exc}. Template source:\n{blueprint.system_prompt}"
+                    f"Template syntax error in system prompt for pipe '{pipe_code}'"
+                    f"in domain '{domain_code}': {exc}. Template source:\n{blueprint.system_prompt}"
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
@@ -61,7 +61,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 )
             except Jinja2TemplateSyntaxError as exc:
                 error_msg = (
-                    f"Template syntax error in user prompt for pipe '{code}' in domain '{domain}': {exc}. Template source:\n{blueprint.prompt}"
+                    f"Template syntax error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': "
+                    f"{exc}. Template source:\n{blueprint.prompt}"
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
@@ -72,7 +73,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 input_parse_result = parse_concept_with_multiplicity(requirement_str)
 
                 domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                    domain=domain,
+                    domain=domain_code,
                     concept_string_or_code=input_parse_result.concept,
                 )
                 concept = get_required_concept(
@@ -112,8 +113,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         )
 
         return PipeLLM(
-            domain=domain,
-            code=code,
+            domain=domain_code,
+            code=pipe_code,
             description=description,
             inputs=inputs,
             output=output,

@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeFactory[PipeFunc].make_from_blueprint(
-                domain="source_code",
+                domain_code="source_code",
                 pipe_code="wrap_lines",
                 blueprint=pipe_func_blueprint,
             ),

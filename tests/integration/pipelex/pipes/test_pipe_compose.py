@@ -44,7 +44,7 @@ class TestPipeCompose:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeFactory[PipeCompose].make_from_blueprint(
-                domain="generic",
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_compose_for_any",
                 blueprint=pipe_compose_blueprint,
             ),
@@ -83,7 +83,7 @@ class TestPipeCompose:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeFactory[PipeCompose].make_from_blueprint(
-                domain="generic",
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_compose",
                 blueprint=pipe_compose_blueprint,
             ),

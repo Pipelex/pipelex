@@ -49,7 +49,7 @@ class TestPipeParallelValidation:
         )
 
         real_pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="analyze_document",
             blueprint=pipe_llm_blueprint,
             concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
@@ -77,7 +77,7 @@ class TestPipeParallelValidation:
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="parallel_document_processor",
             blueprint=pipe_parallel_blueprint,
             concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
@@ -129,7 +129,7 @@ class TestPipeParallelValidation:
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="test_parallel",
             blueprint=pipe_parallel_blueprint,
             concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],
@@ -184,7 +184,7 @@ class TestPipeParallelValidation:
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="parallel_document_processor",
             blueprint=pipe_parallel_blueprint,
             concept_codes_from_the_same_domain=[concept_1.code, concept_2.code, concept_3.code],

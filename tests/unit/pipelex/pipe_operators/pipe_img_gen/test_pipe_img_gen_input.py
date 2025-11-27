@@ -25,7 +25,7 @@ class TestPipeImgGenValidateInputs:
         log.verbose(f"Testing valid case: {test_id}")
 
         pipe_img_gen = PipeFactory[PipeImgGen].make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
         )
@@ -49,7 +49,7 @@ class TestPipeImgGenValidateInputs:
         log.verbose(f"Testing error case: {test_id}")
 
         pipe_img_gen = PipeFactory[PipeImgGen].make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
         )

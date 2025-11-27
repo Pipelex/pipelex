@@ -111,7 +111,7 @@ class TestExternalPlugin:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeFactory[PipeLLM].make_from_blueprint(
-                domain="generic",
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_llm_with_external_llm_handle",
                 blueprint=pipe_llm_blueprint,
             ),

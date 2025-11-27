@@ -37,7 +37,7 @@ class TestPipeLLMBasic:
             prompt=PipeTestCases.USER_PROMPT,
         )
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain="documents",
+            domain_code="documents",
             pipe_code="adhoc_for_test_pipe_llm",
             blueprint=pipe_llm_blueprint,
         )
@@ -112,7 +112,7 @@ class TestPipeLLMBasic:
         pipe_code = f"extract_{topic}_{concept}_{structuring_method}"
         pipe_code = pipe_code.lower().replace(" ", "_")
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain="test_structured_generations",
+            domain_code="test_structured_generations",
             pipe_code=pipe_code,
             blueprint=pipe_llm_blueprint,
         )
@@ -171,7 +171,7 @@ class TestPipeLLMBasic:
             pipe_job = PipeJobFactory.make_pipe_job(
                 working_memory=working_memory,
                 pipe=PipeFactory[PipeLLM].make_from_blueprint(
-                    domain="generic",
+                    domain_code="generic",
                     pipe_code="adhoc_for_test_pipe_llm_image",
                     blueprint=pipe_llm_blueprint,
                 ),

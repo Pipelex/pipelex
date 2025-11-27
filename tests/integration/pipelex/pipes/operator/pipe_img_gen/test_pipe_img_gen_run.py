@@ -37,7 +37,7 @@ class TestPipeImgGenRun:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeFactory[PipeImgGen].make_from_blueprint(
-                domain="generic",
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_img_gen",
                 blueprint=pipe_img_gen_blueprint,
             ),

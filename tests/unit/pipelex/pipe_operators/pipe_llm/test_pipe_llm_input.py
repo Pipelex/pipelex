@@ -24,7 +24,7 @@ class TestPipeLLMValidateInputs:
         log.verbose(f"Testing valid case: {test_id}")
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
         )

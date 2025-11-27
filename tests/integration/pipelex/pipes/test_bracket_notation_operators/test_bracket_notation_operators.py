@@ -44,7 +44,7 @@ class TestBracketNotationInOperators:
         )
 
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain="test",
+            domain_code="test",
             pipe_code="test_llm",
             blueprint=blueprint,
         )
@@ -63,7 +63,7 @@ class TestBracketNotationInOperators:
         )
 
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain="test",
+            domain_code="test",
             pipe_code="test_llm",
             blueprint=blueprint,
         )
@@ -82,7 +82,7 @@ class TestBracketNotationInOperators:
         )
 
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain="test",
+            domain_code="test",
             pipe_code="test_llm",
             blueprint=blueprint,
         )
@@ -102,7 +102,7 @@ class TestBracketNotationInOperators:
         )
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(
-            domain="test",
+            domain_code="test",
             pipe_code="test_img_gen",
             blueprint=blueprint,
         )
@@ -121,7 +121,7 @@ class TestBracketNotationInOperators:
         )
 
         pipe = PipeFactory[PipeFunc].make_from_blueprint(
-            domain="test",
+            domain_code="test",
             pipe_code="test_func",
             blueprint=blueprint,
         )
@@ -140,7 +140,7 @@ class TestBracketNotationInOperators:
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
-            domain="test",
+            domain_code="test",
             pipe_code="test_compose",
             blueprint=blueprint,
         )
@@ -158,7 +158,7 @@ class TestBracketNotationInOperators:
         )
 
         pipe = PipeFactory[PipeExtract].make_from_blueprint(
-            domain="test",
+            domain_code="test",
             pipe_code="test_extract",
             blueprint=blueprint,
         )

@@ -44,7 +44,7 @@ class TestBracketNotationInControllers:
         )
 
         pipe = PipeFactory[PipeParallel].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="test_parallel",
             blueprint=blueprint,
             concept_codes_from_the_same_domain=[concept_data_item.code, concept_processed_data.code],
@@ -83,7 +83,7 @@ class TestBracketNotationInControllers:
         )
 
         pipe = PipeFactory[PipeCondition].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="test_condition",
             blueprint=blueprint,
             concept_codes_from_the_same_domain=[concept_1.code, concept_2.code],
@@ -122,7 +122,7 @@ class TestBracketNotationInControllers:
         )
 
         pipe = PipeFactory[PipeBatch].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="test_batch",
             blueprint=blueprint,
             concept_codes_from_the_same_domain=[concept_item.code, concept_processed_item.code],

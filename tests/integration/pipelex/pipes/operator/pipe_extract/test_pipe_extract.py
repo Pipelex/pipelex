@@ -65,7 +65,7 @@ class TestPipeExtract:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeFactory[PipeExtract].make_from_blueprint(
-                domain="generic",
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_extract_from_image",
                 blueprint=pipe_extract_blueprint,
             ),
@@ -113,7 +113,7 @@ class TestPipeExtract:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=PipeFactory[PipeExtract].make_from_blueprint(
-                domain="generic",
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_extract_from_pdf",
                 blueprint=blueprint,
             ),
