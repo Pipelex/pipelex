@@ -79,7 +79,7 @@ Keep it short: 200 characters.
 [pipe.format_html_newsletter_flow]
 type = "PipeCompose"
 description = "Combine weekly and channel summaries into a complete newsletter following specific formatting requirements"
-inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummaryFlow" }
+inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummaryFlow[]" }
 output = "HtmlNewsletterFlow"
 
 [pipe.format_html_newsletter_flow.template]
