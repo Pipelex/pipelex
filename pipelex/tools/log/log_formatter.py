@@ -15,7 +15,7 @@ def emoji_for_channel(channel_name: str) -> str | None:
     }
 
     emoji = channel_emojis.get(channel_name)
-    if emoji == "":
+    if not emoji:
         # blank emoji is OK
         return emoji
     elif emoji:
@@ -41,7 +41,7 @@ class EmojiLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord):
         log_fmt: str
         emoji = emoji_for_channel(record.name)
-        if emoji == "":
+        if not emoji:
             log_fmt = "%(message)s"
         elif emoji:
             log_fmt = f"{emoji}: %(message)s"
@@ -86,7 +86,7 @@ class LevelAndEmojiLogFormatter(logging.Formatter):
             log_fmt = f"{color}{tag}:%(name)s{RESET_FONT} %(message)s"
         formatter = logging.Formatter(log_fmt)
 
-        if record.levelno in [logging.WARNING, logging.ERROR, logging.CRITICAL]:
+        if record.levelno in {logging.WARNING, logging.ERROR, logging.CRITICAL}:
             record.msg = f"{color}{BOLD_FONT}{record.msg}{RESET_FONT}"
 
         return formatter.format(record)

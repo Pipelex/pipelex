@@ -256,10 +256,10 @@ def init_cmd(
     routing_profiles_toml_path = os.path.join(pipelex_config_dir, "inference", "routing_profiles.toml")
 
     # Determine what to check based on focus parameter
-    check_config = focus in (InitFocus.ALL, InitFocus.CONFIG)
-    check_inference = focus in (InitFocus.ALL, InitFocus.INFERENCE)
+    check_config = focus in {InitFocus.ALL, InitFocus.CONFIG}
+    check_inference = focus in {InitFocus.ALL, InitFocus.INFERENCE}
     check_routing = focus == InitFocus.ROUTING
-    check_telemetry = focus in (InitFocus.ALL, InitFocus.TELEMETRY)
+    check_telemetry = focus in {InitFocus.ALL, InitFocus.TELEMETRY}
 
     # Track if backends.toml existed before we start
     is_first_time_backends_setup = not path_exists(backends_toml_path)

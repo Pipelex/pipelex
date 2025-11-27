@@ -293,6 +293,7 @@ ignore = [
     "D415", # First line should end with a period, question mark, or exclamation point
 
     "DOC201", # `return` is not documented in docstring
+    "DOC202", # Docstring should not have a returns section because the function doesn't return anything
     "DOC402", # `yield` is not documented in docstring
     "DOC502", # Raised exception is not explicitly raised: `FileNotFoundError`
     "DOC501", # Raised exception `ModuleFileError` missing from docstring
@@ -309,6 +310,8 @@ ignore = [
     "FIX002", # Line contains TODO, consider resolving the issue
 
     "FURB101", # `open` and `read` should be replaced by `Path(file_path.path).read_text(encoding="utf-8")`
+
+    "LOG004", # `.exception()` call outside exception handlers
 
     "PLC0105", # `TypeVar` name "SomethingType" does not reflect its covariance; consider renaming it to "SomethingType_co"
 

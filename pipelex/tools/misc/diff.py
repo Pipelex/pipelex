@@ -85,7 +85,7 @@ def _generate_diff_summary(diff_content: str, left_is_newer: bool) -> str | None
     lines = diff_content.split("\n")
 
     # Skip header lines (---, +++, @@)
-    change_lines = [line for line in lines if line and line[0] in ("+", "-") and not line.startswith(("---", "+++"))]
+    change_lines = [line for line in lines if line and line[0] in {"+", "-"} and not line.startswith(("---", "+++"))]
 
     if not change_lines:
         return None
