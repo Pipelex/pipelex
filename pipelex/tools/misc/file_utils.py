@@ -25,7 +25,8 @@ def save_bytes_to_binary_file(file_path: str, byte_data: bytes, create_directory
     if create_directory:
         ensure_directory_exists(os.path.dirname(file_path))
 
-    Path(file_path).write_bytes(byte_data)
+    with open(file_path, "wb") as file:
+        file.write(byte_data)
     return file_path
 
 
@@ -50,7 +51,8 @@ def save_text_to_path(text: str, path: str, create_directory: bool = False):
         if directory:
             ensure_directory_exists(directory)
 
-    Path(path).write_text(text, encoding="utf-8")
+    with open(path, "w", encoding="utf-8") as file:
+        file.write(text)
 
 
 def load_text_from_path(path: str) -> str:
