@@ -361,12 +361,13 @@ def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, ex
     """
     path = Path(dir_path)
     files: list[Path] = []
+    filtered_files: list[Path] = []
     if is_recursive:
         files = list(path.rglob(pattern))
     else:
         files = list(path.glob(pattern))
 
     for file in files:
-        if excluded_dirs is not None and any(part in excluded_dirs for part in file.parts):
-            files.remove(file)
-    return files
+        if excluded_dirs is None or not any(part in excluded_dirs for part in file.parts):
+            filtered_files.append(file)
+    return filtered_files
