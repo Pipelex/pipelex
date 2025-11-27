@@ -67,7 +67,7 @@ class TestSpecialArgsConcept:
 
         # Make a PipeLLM using PipeFactory
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="test_pipe",
             blueprint=pipe_llm_blueprint,
             concept_codes_from_the_same_domain=[concept.code],
