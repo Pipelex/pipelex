@@ -122,17 +122,16 @@ class WorkingMemoryFactory(BaseModel):
 
                     working_memory.add_new_stuff(name=requirement.variable_name, stuff=mock_stuff)
                 else:
-                    # Create a ListContent of multiple items
-                    nb_items: int
+                    # Let's create a ListContent of multiple stuffs
+                    nb_stuffs: int
                     if isinstance(requirement.multiplicity, bool):
-                        # For bool multiplicity (array of unspecified length), create 1 item for dry run
-                        nb_items = 1
+                        # TODO: make this configurable or use existing config variable
+                        nb_stuffs = 3
                     else:
-                        # For int multiplicity, create exactly that many items
-                        nb_items = requirement.multiplicity
+                        nb_stuffs = requirement.multiplicity
 
                     items: list[StuffContent] = []
-                    for _ in range(nb_items):
+                    for _ in range(nb_stuffs):
                         item_mock_content = cls.create_mock_content(requirement)
                         items.append(item_mock_content)
 
