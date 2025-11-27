@@ -39,7 +39,7 @@ class TestPipeConditionValidation:
         )
 
         pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="test_condition",
             blueprint=pipe_condition_blueprint,
         )
@@ -80,7 +80,7 @@ class TestPipeConditionValidation:
         )
 
         pipe_condition_template = PipeFactory[PipeCondition].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="test_condition_template",
             blueprint=pipe_condition_template_blueprint,
         )
@@ -96,7 +96,7 @@ class TestPipeConditionValidation:
         )
 
         pipe_condition_expr = PipeFactory[PipeCondition].make_from_blueprint(
-            domain=domain,
+            domain_code=domain,
             pipe_code="test_condition_expr",
             blueprint=pipe_condition_expr_blueprint,
         )

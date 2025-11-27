@@ -25,7 +25,7 @@ class TestPipeBatchValidateInputs:
 
         # Validation happens automatically during instantiation via model_validator
         pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
         )

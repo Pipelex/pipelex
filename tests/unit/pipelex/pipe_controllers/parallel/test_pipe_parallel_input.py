@@ -26,7 +26,7 @@ class TestPipeParallelValidateInputs:
 
         # Validation happens automatically during instantiation via model_validator
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
         )
@@ -53,7 +53,7 @@ class TestPipeParallelValidateInputs:
             # Construct blueprint from dict at test time to trigger validation
             blueprint = PipeParallelBlueprint.model_validate(blueprint_dict)
             pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
-                domain="test_domain",
+                domain_code="test_domain",
                 pipe_code=f"test_pipe_{test_id}",
                 blueprint=blueprint,
             )

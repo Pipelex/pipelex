@@ -41,7 +41,7 @@ class TestPipeParallelSimple:
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
-            domain="test_integration",
+            domain_code="test_integration",
             pipe_code="parallel_text_analyzer",
             blueprint=pipe_parallel_blueprint,
         )
@@ -160,7 +160,7 @@ class TestPipeParallelSimple:
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
-            domain="test_integration",
+            domain_code="test_integration",
             pipe_code="parallel_text_analyzer",
             blueprint=pipe_parallel_blueprint,
         )

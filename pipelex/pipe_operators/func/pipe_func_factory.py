@@ -16,8 +16,8 @@ class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
         cls,
         pipe_category: Any,
         pipe_type: str,
-        code: str,
-        domain: str,
+        pipe_code: str,
+        domain_code: str,
         description: str | None,
         inputs: InputRequirements,
         output: Concept,
@@ -25,8 +25,8 @@ class PipeFuncFactory(PipeFactoryProtocol[PipeFuncBlueprint, PipeFunc]):
     ) -> PipeFunc:
         # TODO: make function_name into a callable in PipeFunc
         return PipeFunc(
-            domain=domain,
-            code=code,
+            domain=domain_code,
+            code=pipe_code,
             description=description,
             inputs=inputs,
             output=output,

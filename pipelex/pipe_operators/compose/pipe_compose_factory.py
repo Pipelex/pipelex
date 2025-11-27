@@ -20,8 +20,8 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         cls,
         pipe_category: Any,
         pipe_type: str,
-        code: str,
-        domain: str,
+        pipe_code: str,
+        domain_code: str,
         description: str | None,
         inputs: InputRequirements,
         output: Concept,
@@ -38,8 +38,8 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             raise PipeComposeFactoryError(msg) from exc
 
         return PipeCompose(
-            domain=domain,
-            code=code,
+            domain=domain_code,
+            code=pipe_code,
             description=description,
             inputs=inputs,
             output=output,

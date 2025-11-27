@@ -20,8 +20,8 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
         cls,
         pipe_category: Any,
         pipe_type: str,
-        code: str,
-        domain: str,
+        pipe_code: str,
+        domain_code: str,
         description: str | None,
         inputs: InputRequirements,
         output: Concept,
@@ -33,8 +33,8 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
             sequential_sub_pipes.append(sub_pipe)
 
         return PipeSequence(
-            domain=domain,
-            code=code,
+            domain=domain_code,
+            code=pipe_code,
             description=description,
             inputs=inputs,
             output=output,

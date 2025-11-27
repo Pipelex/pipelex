@@ -38,7 +38,7 @@ class TestPipeConditionSimple:
         )
 
         pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             pipe_code="test_condition_fail",
             blueprint=pipe_condition_blueprint,
         )
@@ -73,7 +73,7 @@ class TestPipeConditionSimple:
         )
 
         pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             pipe_code="test_condition_succeed",
             blueprint=pipe_condition_blueprint,
         )

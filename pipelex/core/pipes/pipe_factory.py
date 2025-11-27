@@ -30,8 +30,8 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
         cls,
         pipe_category: Any,
         pipe_type: str,
-        code: str,
-        domain: str,
+        pipe_code: str,
+        domain_code: str,
         description: str | None,
         inputs: InputRequirements,
         output: Concept,
@@ -43,7 +43,7 @@ class PipeFactory(Generic[PipeAbstractType]):
     @classmethod
     def make_from_blueprint(
         cls,
-        domain: str,
+        domain_code: str,
         pipe_code: str,
         blueprint: PipeBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,
@@ -65,8 +65,8 @@ class PipeFactory(Generic[PipeAbstractType]):
                     ):
                         msg = (
                             f"Input stuff '{input_name}' with concept '{stripped_input_concept_string_or_code}' "
-                            f"in pipe '{pipe_code}' (domain '{domain}') is invalid. "
-                            f"The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix. "
+                            f"in pipe '{pipe_code}' (domain '{domain_code}') is invalid. "
+                            f"The concept must be either native, declared in domain '{domain_code}', or fully qualified with a domain prefix. "
                             f"Declared concepts are: '{concept_codes_from_the_same_domain}'"
                         )
                         raise PipeFactoryError(msg)
@@ -78,16 +78,16 @@ class PipeFactory(Generic[PipeAbstractType]):
                 and stripped_output_concept_string_or_code not in concept_codes_from_the_same_domain
             ):
                 msg = (
-                    f"Output concept '{stripped_output_concept_string_or_code}' in pipe '{pipe_code}' (domain '{domain}') is invalid. "
-                    f"The concept must be either native, declared in domain '{domain}', or fully qualified with a domain prefix. "
+                    f"Output concept '{stripped_output_concept_string_or_code}' in pipe '{pipe_code}' (domain '{domain_code}') is invalid. "
+                    f"The concept must be either native, declared in domain '{domain_code}', or fully qualified with a domain prefix. "
                     f"Declared concepts are: '{concept_codes_from_the_same_domain}'"
                 )
                 raise PipeFactoryError(msg)
 
         # Parse common attributes
-        parsed_output = cls._parse_output(domain=domain, pipe_code=pipe_code, output_string=blueprint.output)
+        parsed_output = cls._parse_output_concept_string(domain=domain_code, pipe_code=pipe_code, output_string=blueprint.output)
         parsed_inputs = InputRequirementsFactory.make_from_blueprint(
-            domain=domain,
+            domain=domain_code,
             blueprint=blueprint.inputs or {},
         )
 
@@ -111,8 +111,8 @@ class PipeFactory(Generic[PipeAbstractType]):
         pipe: PipeAbstractType = pipe_factory.make(
             pipe_category=pipe_category,
             pipe_type=blueprint.type,
-            code=pipe_code,
-            domain=domain,
+            pipe_code=pipe_code,
+            domain_code=domain_code,
             description=blueprint.description,
             inputs=parsed_inputs,
             output=parsed_output,
@@ -121,7 +121,7 @@ class PipeFactory(Generic[PipeAbstractType]):
         return pipe
 
     @classmethod
-    def _parse_output(
+    def _parse_output_concept_string(
         cls,
         domain: str,
         pipe_code: str,

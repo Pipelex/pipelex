@@ -17,8 +17,8 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         cls,
         pipe_category: Any,
         pipe_type: str,
-        code: str,
-        domain: str,
+        pipe_code: str,
+        domain_code: str,
         description: str | None,
         inputs: InputRequirements,
         output: Concept,
@@ -41,8 +41,8 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             img_gen_prompt = blueprint.img_gen_prompt
 
         return PipeImgGen(
-            domain=domain,
-            code=code,
+            domain=domain_code,
+            code=pipe_code,
             description=description,
             inputs=inputs,
             output=output,

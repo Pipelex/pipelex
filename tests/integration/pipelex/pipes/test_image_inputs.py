@@ -120,7 +120,7 @@ class TestImageInputs:
         )
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
-            domain="test_pipes",
+            domain_code="test_pipes",
             pipe_code="test_image_input_within_concept_with_text",
             blueprint=pipe_llm_blueprint,
         )

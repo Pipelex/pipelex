@@ -43,7 +43,7 @@ class TestPipeConditionSimple:
         )
 
         pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
-            domain="test_integration",
+            domain_code="test_integration",
             pipe_code="text_length_condition",
             blueprint=pipe_condition_blueprint,
         )
@@ -116,7 +116,7 @@ class TestPipeConditionSimple:
         )
 
         pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
-            domain="test_integration",
+            domain_code="test_integration",
             pipe_code="text_length_condition",
             blueprint=pipe_condition_blueprint,
         )

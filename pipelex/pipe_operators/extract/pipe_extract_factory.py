@@ -20,8 +20,8 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         cls,
         pipe_category: Any,
         pipe_type: str,
-        code: str,
-        domain: str,
+        pipe_code: str,
+        domain_code: str,
         description: str | None,
         inputs: InputRequirements,
         output: Concept,
@@ -58,8 +58,8 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         page_views_dpi = blueprint.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
 
         return PipeExtract(
-            domain=domain,
-            code=code,
+            domain=domain_code,
+            code=pipe_code,
             description=description,
             output=output,
             inputs=inputs,

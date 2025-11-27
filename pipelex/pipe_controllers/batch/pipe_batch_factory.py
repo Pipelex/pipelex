@@ -17,8 +17,8 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
         cls,
         pipe_category: Any,
         pipe_type: str,
-        code: str,
-        domain: str,
+        pipe_code: str,
+        domain_code: str,
         description: str | None,
         inputs: InputRequirements,
         output: Concept,
@@ -29,8 +29,8 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
             input_item_name=blueprint.input_item_name,
         )
         return PipeBatch(
-            domain=domain,
-            code=code,
+            domain=domain_code,
+            code=pipe_code,
             description=description,
             inputs=inputs,
             output=output,

@@ -33,7 +33,7 @@ class TestPipeLLMBlueprintConversion:
         assert blueprint == expected_blueprint
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             pipe_code=f"test_pipe_{test_name}",
             blueprint=blueprint,
             concept_codes_from_the_same_domain=[data_concept.code, item_concept.code, analysis_concept.code],
