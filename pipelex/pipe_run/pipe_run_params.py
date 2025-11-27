@@ -15,6 +15,10 @@ class PipeRunParamKey(StrEnum):
     DYNAMIC_OUTPUT_CONCEPT = "_dynamic_output_concept"
     NB_OUTPUT = "_nb_output"
 
+    @classmethod
+    def value_list(cls) -> list[str]:
+        return [member.value for member in cls]
+
 
 FORCE_DRY_RUN_MODE_ENV_KEY = "PIPELEX_FORCE_DRY_RUN_MODE"
 

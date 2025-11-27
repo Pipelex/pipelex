@@ -3,12 +3,15 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex.pipe_run.pipe_run_params import PipeRunParamKey
 from pipelex.types import Self, StrEnum
 
 # Reserved field names that cannot be used in concept structures
 # These are either Pydantic BaseModel reserved attributes or internal metadata fields
 RESERVED_FIELD_NAMES = frozenset(
     [
+        # Pipe run parameter keys (from PipeRunParamKey enum)
+        *PipeRunParamKey.value_list(),
         # Pydantic BaseModel reserved attributes
         "model_config",
         "model_fields",
