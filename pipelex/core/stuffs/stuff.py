@@ -12,7 +12,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.pdf_content import PDFContent
-from pipelex.core.stuffs.stuff_artefact import StuffArtefact
+from pipelex.core.stuffs.stuff_artefact import BaseStuffArtefactField, StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -43,11 +43,11 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
                 raise StuffArtefactReservedFieldError(message=msg)
             artefact_dict[key] = value
 
-        set_artefact_field("_stuff_name", self.stuff_name)
-        set_artefact_field("_content_class", self.content.__class__.__name__)
-        set_artefact_field("_concept_code", self.concept.code)
-        set_artefact_field("_stuff_code", self.stuff_code)
-        set_artefact_field("_content", self.content)
+        set_artefact_field(BaseStuffArtefactField.STUFF_NAME, self.stuff_name)
+        set_artefact_field(BaseStuffArtefactField.CONTENT_CLASS, self.content.__class__.__name__)
+        set_artefact_field(BaseStuffArtefactField.CONCEPT_CODE, self.concept.code)
+        set_artefact_field(BaseStuffArtefactField.STUFF_CODE, self.stuff_code)
+        set_artefact_field(BaseStuffArtefactField.CONTENT, self.content)
         return StuffArtefact(artefact_dict)
 
     @classmethod

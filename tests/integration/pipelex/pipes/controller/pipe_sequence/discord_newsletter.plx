@@ -64,14 +64,11 @@ Make sure to preserve the channel name and position from the input for proper or
 [pipe.write_weekly_summary]
 type = "PipeLLM"
 description = "Combine channel summaries into a short summary of the week's Share channel content (200 characters)"
-inputs = { channel_summaries = "ChannelSummary" }
+inputs = { channel_summaries = "ChannelSummary[]" }
 output = "Text"
 prompt = """
 Write a single overall summary of the week's content based on the following Share channel summaries:
-
-{% for channel in channel_summaries.content.items if channel.category == "Share" %}
-{{ channel }}
-{% endfor %}
+@channel_summaries
 
 Keep it short: 200 characters.
 """
@@ -79,7 +76,7 @@ Keep it short: 200 characters.
 [pipe.format_html_newsletter]
 type = "PipeCompose"
 description = "Combine weekly and channel summaries into a complete newsletter following specific formatting requirements"
-inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummary" }
+inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummary[]" }
 output = "HtmlNewsletter"
 
 [pipe.format_html_newsletter.template]
@@ -92,12 +89,12 @@ $weekly_summary
 </p>
 
 <!-- New Members Section -->
-{% set introduce_channels = channel_summaries.content.items | selectattr('category', 'equalto', 'Introduce Yourself') | list %}
+{% set introduce_channels = channel_summaries.items | selectattr('channel_name', 'equalto', 'Introduce-Yourself') | list %}
 {% if introduce_channels %}
    <h2>🙌 New members</h2>
    <ul>
       {% for channel in introduce_channels %}
-         {% for item in channel.summary_items_as_html %}
+         {% for item in channel.summary_items %}
             <li>{{ item }}</li>
          {% endfor %}
       {% endfor %}
@@ -105,23 +102,23 @@ $weekly_summary
 {% endif %}
 
 <!-- Share Channel Section -->
-{% set regular_channels = channel_summaries.content.items | selectattr('category', 'equalto', 'Share') | list | sort(attribute='position') %}
+{% set regular_channels = channel_summaries.items | rejectattr('channel_name', 'equalto', 'Introduce-Yourself') | list | sort(attribute='position') %}
 {% if regular_channels %}
    {% for channel in regular_channels %}
    <h2>{{ channel.channel_name }}</h2>
-      {% for item in channel.summary_items_as_html %}
+      {% for item in channel.summary_items %}
          <p>{{ item }}</p>
       {% endfor %}
    {% endfor %}
 {% endif %}
 
 <!-- Geographic Hubs Section -->
-{% set geo_hubs = channel_summaries.content.items | selectattr('category', 'equalto', 'Geographic Hubs') | list | sort(attribute='position') %}
+{% set geo_hubs = [] %}
 {% if geo_hubs %}
    <h2>🌎 Geographic hubs</h2>
    {% for channel in geo_hubs %}
       <h3>{{ channel.channel_name }}</h3>
-      {% for item in channel.summary_items_as_html %}
+      {% for item in channel.summary_items %}
          <p>{{ item }}</p>
       {% endfor %}
    {% endfor %}
