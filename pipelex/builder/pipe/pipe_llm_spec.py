@@ -119,8 +119,6 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
         llm_choice: LLMModelChoice = self.llm_skill
 
         return PipeLLMBlueprint(
-            type="PipeLLM",
-            pipe_category="PipeOperator",
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,

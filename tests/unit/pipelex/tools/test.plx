@@ -1,6 +1,10 @@
 
 domain = "test"
 
+[concept]
+CodebaseFileContent = "The content of a codebase file"
+FilePath = "The path of a file"
+
 [pipe.read_doc_file]
 type = "PipeFunc"
 description = "Read the content of related codebase files"

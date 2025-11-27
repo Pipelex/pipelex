@@ -22,8 +22,6 @@ class PipeComposeTestCases:
             description="Render a template",
             inputs={"data": "Data"},
             output="RenderedText",
-            type="PipeCompose",
-            pipe_category="PipeOperator",
             template=TemplateBlueprint(
                 template="Hello {{ data.name }}!",
                 category=TemplateCategory.MARKDOWN,

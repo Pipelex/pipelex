@@ -49,7 +49,7 @@ class Library(BaseModel):
             # Validate concept dependencies exist
             # Note: This should NEVER fail as concepts are validated during pipe construction via get_required_concept()
             # TODO: Make this non mandatory in production, or a test
-            for concept in [pipe.output, *pipe.inputs.concepts]:
+            for concept in pipe.concept_dependencies:
                 try:
                     self.concept_library.is_concept_exists(concept_string=concept.concept_string)
                 except ConceptLibraryError as concept_error:

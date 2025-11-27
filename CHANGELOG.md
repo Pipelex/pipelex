@@ -8,10 +8,12 @@
 
 - Modified the GHA `version-check.yml` so that the check of the version is only applying to release branches.
 - Removed the `pyproject.toml` file from the build.
+- No more implicit concepts. A concept reference has a domain and a code. If there is no domain, it should be a native concept, or it is declared in the same bundle.
 
 ### Refactored
 
 - The `find_files_in_dir` function was coded in 3 different places, now it's in `pipelex/tools/misc/file_utils.py`, and accepts `excluded_dirs`.
+- Refactored the Pipe factories: Centralized everything in the `PipeFactory` class.
 
 ## [v0.16.0] - 2025-11-25
 

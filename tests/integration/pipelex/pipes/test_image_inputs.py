@@ -7,14 +7,15 @@ from pytest import FixtureRequest
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_native_concept, get_pipe_router, get_required_pipe
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -118,8 +119,8 @@ class TestImageInputs:
             prompt="Describe the page: @page",
         )
 
-        pipe_llm = PipeLLMFactory.make_from_blueprint(
-            domain="test_pipes",
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
             pipe_code="test_image_input_within_concept_with_text",
             blueprint=pipe_llm_blueprint,
         )
