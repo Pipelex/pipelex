@@ -8,20 +8,20 @@ from pipelex.system.registries.func_registry import pipe_func
 
 # Register test functions for validation tests
 @pipe_func(name="my_function")
-async def my_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
+def my_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001  # pyright: ignore[reportUnusedParameter]
     """Test function with no inputs."""
     return TextContent(text="test output")
 
 
 @pipe_func(name="process_text")
-async def process_text(working_memory: WorkingMemory) -> TextContent:
+def process_text(working_memory: WorkingMemory) -> TextContent:
     """Test function with single text input."""
     input_data = working_memory.get_stuff_as_str("input_data")
     return TextContent(text=f"processed: {input_data}")
 
 
 @pipe_func(name="combine_data")
-async def combine_data(working_memory: WorkingMemory) -> TextContent:
+def combine_data(working_memory: WorkingMemory) -> TextContent:
     """Test function with multiple inputs."""
     text_input = working_memory.get_stuff_as_str("text_input")
     number_input = working_memory.get_stuff_as_number("number_input")
@@ -29,14 +29,14 @@ async def combine_data(working_memory: WorkingMemory) -> TextContent:
 
 
 @pipe_func(name="process_image")
-async def process_image(working_memory: WorkingMemory) -> TextContent:
+def process_image(working_memory: WorkingMemory) -> TextContent:
     """Test function with image input."""
     image = working_memory.get_stuff_as_image("image")
     return TextContent(text=f"processed image: {image.url}")
 
 
 @pipe_func(name="process_all")
-async def process_all(working_memory: WorkingMemory) -> TextContent:
+def process_all(working_memory: WorkingMemory) -> TextContent:
     """Test function with mixed inputs."""
     text = working_memory.get_stuff_as_str("text")
     image = working_memory.get_stuff_as_image("image")

@@ -161,8 +161,8 @@ class TestCostRegistry:
         # Verify first row values (should have empty strings for missing fields)
         assert rows[0][LLMTokenCostReportField.LLM_NAME] == "model-standard"
         assert rows[0][LLMTokenCostReportField.NB_TOKENS_INPUT_CACHED] == "100"
-        assert rows[0]["nb_tokens_output_audio"] == ""  # Missing field = empty string
-        assert rows[0]["nb_tokens_output_reasoning"] == ""  # Missing field = empty string
+        assert not rows[0]["nb_tokens_output_audio"]  # Missing field = empty string
+        assert not rows[0]["nb_tokens_output_reasoning"]  # Missing field = empty string
 
         # Verify second row has its extra field
         assert rows[1][LLMTokenCostReportField.LLM_NAME] == "model-with-audio"

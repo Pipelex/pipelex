@@ -105,7 +105,7 @@ class TestPipeParallelSimple:
         assert isinstance(sentiment_result.content, TextContent)
         # Should return one of: positive, negative, neutral
         if pipe_run_mode != PipeRunMode.DRY:
-            assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]
+            assert sentiment_result.content.text.lower() in {"positive", "negative", "neutral"}
         assert f"{sentiment_result.concept.domain}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
 
         # Verify word count result
@@ -115,7 +115,7 @@ class TestPipeParallelSimple:
         # Should be a number (as text)
         word_count_text = word_count_result.content.text.strip()
         if pipe_run_mode != PipeRunMode.DRY:
-            assert word_count_text.isdigit() or word_count_text in ["12", "thirteen", "twelve"]  # Allow for some variation
+            assert word_count_text.isdigit() or word_count_text in {"12", "thirteen", "twelve"}  # Allow for some variation
         assert word_count_result.concept.code == "Text"
         assert word_count_result.concept.domain == "native"
 
@@ -212,8 +212,8 @@ class TestPipeParallelSimple:
         # For "Hello world" - word count should be around 2
         word_count_text = word_count_result.content.text.strip()
         if pipe_run_mode != PipeRunMode.DRY:
-            assert word_count_text in ["2", "two"] or word_count_text.isdigit()
+            assert word_count_text in {"2", "two"} or word_count_text.isdigit()
 
         # Sentiment should be one of the valid values
         if pipe_run_mode != PipeRunMode.DRY:
-            assert sentiment_result.content.text.lower() in ["positive", "negative", "neutral"]
+            assert sentiment_result.content.text.lower() in {"positive", "negative", "neutral"}

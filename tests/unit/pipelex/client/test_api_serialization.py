@@ -1,4 +1,5 @@
 import json
+import math
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -90,7 +91,7 @@ class TestApiSerialization:
 
     @pytest.fixture
     def number_content_memory(self) -> WorkingMemory:
-        number_content = NumberContent(number=3.14159)
+        number_content = NumberContent(number=math.pi)
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.NUMBER),
             name="pi_value",
@@ -162,4 +163,4 @@ class TestApiSerialization:
 
         number_dict_stuff = pipeline_inputs["pi_value"]
         assert number_dict_stuff["concept"] == "Number"
-        assert number_dict_stuff["content"] == {"number": 3.14159}
+        assert number_dict_stuff["content"] == {"number": math.pi}

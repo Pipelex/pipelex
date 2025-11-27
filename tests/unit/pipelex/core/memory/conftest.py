@@ -1,5 +1,6 @@
 """Shared fixtures and test data for WorkingMemory tests."""
 
+import math
 from typing import ClassVar
 
 import pytest
@@ -204,7 +205,7 @@ def html_content_memory() -> WorkingMemory:
 @pytest.fixture
 def number_content_memory() -> WorkingMemory:
     """Create WorkingMemory with number content."""
-    number_content = NumberContent(number=3.14159)
+    number_content = NumberContent(number=math.pi)
 
     stuff = StuffFactory.make_stuff(
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.NUMBER),
