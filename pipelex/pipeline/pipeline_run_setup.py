@@ -97,7 +97,7 @@ async def pipeline_run_setup(
         msg = "Either pipe_code or plx_content must be provided to the pipeline API."
         raise ValueError(msg)
 
-    pipeline = get_pipeline_manager().add_new_pipeline()
+    pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code)
     pipeline_run_id = pipeline.pipeline_run_id
 
     if not library_id:

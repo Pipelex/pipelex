@@ -52,18 +52,16 @@ AMAZON_MODELS = [
 
 # --- Anthropic Models (Claude) ------------------------------------------------------------------
 ANTHROPIC_MODELS = [
-    "claude-3-haiku",
-    "claude-3-opus",
-    "claude-3.5-haiku",
-    "claude-3.5-sonnet",
-    "claude-3.7-sonnet",
-    "claude-4-opus",
-    "claude-4-sonnet",
-    "claude-4.1-opus",
-    "claude-4.5-haiku",
+    # "claude-3-haiku",
+    # "claude-3-opus",
+    # "claude-3.7-sonnet",
+    # "claude-4-opus",
+    # "claude-4-sonnet",
+    # "claude-4.1-opus",
+    # "claude-4.5-haiku",
     "claude-4.5-sonnet",
-    "claude-opus-4",
-    "claude-4.5-opus",
+    # "claude-opus-4",
+    # "claude-4.5-opus",
 ]
 
 # --- DeepSeek Models ----------------------------------------------------------------------------
@@ -142,14 +140,21 @@ OPENAI_MODELS = [
     # "gpt-5-nano",
     # "gpt-5.1",
     # "gpt-5.1-chat",
+    # "gpt-5.1-codex",
     # "o1",
     # "o1-mini",
     # "o3",
     # "o3-mini",
     # "o4-mini",
+]
+
+# --- OpenAI OSS Models --------------------------------------------------------------------------
+OPENAI_OSS_MODELS = [
     # "openai/gpt-oss-120b",
     # "openai/gpt-oss-20b",
     # "openai/gpt-oss-safeguard-20b",
+    "gpt-oss-20b",
+    "gpt-oss-120b",
 ]
 
 # --- Qwen Models --------------------------------------------------------------------------------
@@ -170,14 +175,15 @@ XAI_MODELS = [
 # --- All LLM Handles ----------------------------------------------------------------------------
 ALL_LLM_HANDLES = [
     # *AMAZON_MODELS,
-    # *ANTHROPIC_MODELS,
+    *ANTHROPIC_MODELS,
     # *DEEPSEEK_MODELS,
     # *GOOGLE_MODELS,
     # *GROQ_MODELS,
     # *META_MODELS,
     # *MISTRAL_MODELS,
     # *MOONSHOT_MODELS,
-    *OPENAI_MODELS,
+    # *OPENAI_MODELS,
+    # *OPENAI_OSS_MODELS,
     # *QWEN_MODELS,
     # *XAI_MODELS,
 ]

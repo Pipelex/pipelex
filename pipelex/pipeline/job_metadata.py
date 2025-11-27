@@ -20,6 +20,18 @@ class UnitJobId(StrEnum):
     IMG_GEN_TEXT_TO_IMAGE = "img_gen_text_to_image"
     EXTRACT_PAGES = "extract_pages"
 
+    @property
+    def model_kind(self) -> str:
+        match self:
+            case UnitJobId.LLM_GEN_TEXT:
+                return "LLM"
+            case UnitJobId.LLM_GEN_OBJECT:
+                return "LLM"
+            case UnitJobId.IMG_GEN_TEXT_TO_IMAGE:
+                return "ImgGen"
+            case UnitJobId.EXTRACT_PAGES:
+                return "Extract"
+
 
 class JobMetadata(BaseModel):
     job_name: str | None = None
@@ -27,7 +39,7 @@ class JobMetadata(BaseModel):
     pipe_job_ids: list[str] | None = None
 
     content_generation_job_id: str | None = None
-    unit_job_id: str | None = None
+    unit_job_id: UnitJobId | None = None
     job_category: JobCategory | None = None
 
     started_at: datetime | None = Field(default_factory=lambda: datetime.now())

@@ -44,7 +44,7 @@ model_id = "gpt-4o-mini-2024-07-18"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
-x-portkey-config = "pc-pipele-af794a"
+x-portkey-config = "pc-openai-ba0fa7"
 
 ["gpt-4.1"]
 model_id = "gpt-4.1-2025-04-14"
@@ -126,7 +126,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 constraints = ["temperature_must_be_1"]
-x-portkey-config = "pc-pipele-af794a"
+x-portkey-config = "pc-openai-ba0fa7"
 
 ["gpt-5.1-chat"]
 model_id = "gpt-5.1-chat-2025-11-13"
@@ -208,6 +208,9 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "portkey_completions"
 structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-claude-aae09f"
+# x-portkey-trace-id = "pipe_builder"
+# x-portkey-span-id = "pipe_builder"
+# x-portkey-span-name = "Pipe builder"
 
 ["claude-4.5-haiku"]
 model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"

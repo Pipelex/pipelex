@@ -78,13 +78,14 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
                 )
                 temperature = 1
+            extra_headers = self._make_extra_headers(llm_job=llm_job, inference_model=self.inference_model, output_desc="Text")
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
                 temperature=temperature,
                 max_tokens=llm_job.job_params.max_tokens or omit,
                 seed=llm_job.job_params.seed,
                 messages=messages,
-                extra_headers=self.inference_model.extra_headers,
+                extra_headers=extra_headers,
             )
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
@@ -124,6 +125,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                 )
                 temperature = 1
             try:
+                extra_headers = self._make_extra_headers(llm_job=llm_job, inference_model=self.inference_model, output_desc=schema.__name__)
                 result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                     model=self.inference_model.model_id,
                     temperature=temperature,
@@ -132,7 +134,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     messages=messages,
                     response_model=schema,
                     max_retries=llm_job.job_config.max_retries,
-                    extra_headers=self.inference_model.extra_headers,
+                    extra_headers=extra_headers,
                 )
             except InstructorRetryException as exc:
                 msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
@@ -148,3 +150,19 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)
 
         return result_object
+
+    def _make_extra_headers(self, llm_job: LLMJob, inference_model: InferenceModelSpec, output_desc: str) -> dict[str, str]:
+        if llm_job.job_metadata.pipe_job_ids:
+            last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]
+        else:
+            last_pipe_job_id = "main"
+        extra_headers = self.inference_model.extra_headers or {}
+        extra_headers["x-portkey-trace-id"] = llm_job.job_metadata.pipeline_run_id
+        if not llm_job.job_metadata.unit_job_id:
+            msg = f"Unit job id is not set for LLM job: {llm_job}"
+            raise LLMCompletionError(msg)
+        model_kind = llm_job.job_metadata.unit_job_id.model_kind
+        span_id = f"{model_kind}({inference_model.name}) -> {output_desc}"
+        extra_headers["x-portkey-span-id"] = span_id
+        extra_headers["x-portkey-span-name"] = f"{last_pipe_job_id}: {span_id}"
+        return extra_headers
