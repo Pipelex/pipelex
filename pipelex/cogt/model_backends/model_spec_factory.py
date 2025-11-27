@@ -48,6 +48,7 @@ class InferenceModelSpecFactory(BaseModel):
         backend_name: str,
         name: str,
         blueprint: InferenceModelSpecBlueprint,
+        extra_headers: dict[str, str] | None = None,
     ) -> InferenceModelSpec:
         return InferenceModelSpec(
             backend_name=backend_name,
@@ -63,4 +64,5 @@ class InferenceModelSpecFactory(BaseModel):
             max_prompt_images=blueprint.max_prompt_images,
             prompting_target=blueprint.prompting_target,
             constraints=blueprint.constraints,
+            extra_headers=extra_headers,
         )

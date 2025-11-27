@@ -94,9 +94,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         # Create a partial function with the secrets provider bound
         substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider)
 
+        # We'll split the read settings into standard fields and extra config
+        backend_blueprint_standard_fields = InferenceBackendBlueprint.model_fields.keys()
+        model_spec_blueprint_standard_fields = InferenceModelSpecBlueprint.model_fields.keys()
         for backend_name, backend_dict in backends_dict.items():
-            # We'll split the read settings into standard fields and extra config
-            standard_fields = InferenceBackendBlueprint.model_fields.keys()
             extra_config: dict[str, Any] = {}
             inference_backend_blueprint_dict_raw = backend_dict.copy()
             enabled = inference_backend_blueprint_dict_raw.get("enabled", True)
@@ -138,9 +139,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     key_name=unknown_var_prefix_exc.var_name,
                 ) from unknown_var_prefix_exc
 
-            for key in backend_dict:
-                if key not in standard_fields:
-                    extra_config[key] = inference_backend_blueprint_dict.pop(key)
+            for backend_blueprint_key in backend_dict:
+                if backend_blueprint_key not in backend_blueprint_standard_fields:
+                    extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
             backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
 
             path_to_model_specs_toml = f"{backends_dir_path}/{backend_name}.toml"
@@ -166,11 +167,18 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     model_spec_blueprint_dict = defaults_dict.copy()
                     # Override with the attributes from the model spec dict
                     model_spec_blueprint_dict.update(model_spec_dict)
+
+                    # We'll split the read settings into standard fields and extra headers
+                    extra_headers: dict[str, str] = {}
+                    for model_spec_key in model_spec_dict:
+                        if model_spec_key not in model_spec_blueprint_standard_fields:
+                            extra_headers[model_spec_key] = model_spec_blueprint_dict.pop(model_spec_key)
                     model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_blueprint_dict)
                     model_spec = InferenceModelSpecFactory.make_inference_model_spec(
                         backend_name=backend_name,
                         name=model_spec_name,
                         blueprint=model_spec_blueprint,
+                        extra_headers=extra_headers,
                     )
                     backend_model_specs[model_spec_name] = model_spec
                 except ValidationError as validation_error:

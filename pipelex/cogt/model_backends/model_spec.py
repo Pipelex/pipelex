@@ -24,6 +24,7 @@ class InferenceModelSpec(ConfigModel):
     max_prompt_images: int | None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
     constraints: list[ModelConstraints] = Field(default_factory=empty_list_factory_of(ModelConstraints))
+    extra_headers: dict[str, str] | None = None
 
     @property
     def tag(self) -> str:

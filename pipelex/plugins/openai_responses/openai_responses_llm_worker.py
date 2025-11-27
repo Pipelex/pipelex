@@ -88,6 +88,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 temperature=temperature,
                 max_output_tokens=llm_job.job_params.max_tokens or omit,
                 input=input_items,
+                extra_headers=self.inference_model.extra_headers,
             )
         except NotFoundError as not_found_error:
             msg = (
@@ -130,6 +131,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 instructions=llm_job.llm_prompt.system_text,
                 temperature=temperature,
                 max_output_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
+                extra_headers=self.inference_model.extra_headers,
             )  # type: ignore[arg-type,misc]
         except InstructorRetryException as exc:
             msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"

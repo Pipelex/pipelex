@@ -84,6 +84,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                 max_tokens=llm_job.job_params.max_tokens or omit,
                 seed=llm_job.job_params.seed,
                 messages=messages,
+                extra_headers=self.inference_model.extra_headers,
             )
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
@@ -131,6 +132,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     messages=messages,
                     response_model=schema,
                     max_retries=llm_job.job_config.max_retries,
+                    extra_headers=self.inference_model.extra_headers,
                 )
             except InstructorRetryException as exc:
                 msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"

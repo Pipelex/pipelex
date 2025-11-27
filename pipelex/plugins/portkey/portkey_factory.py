@@ -6,7 +6,7 @@ import openai
 from portkey_ai import createHeaders  # type: ignore[reportUnknownVariableType]
 
 from pipelex import log
-from pipelex.plugins.portkey_responses.portkey_exceptions import PortkeyFactoryError
+from pipelex.plugins.portkey.portkey_exceptions import PortkeyFactoryError
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -42,8 +42,8 @@ class PortkeyFactory:
             case PortkeySdkVariant.PORTKEY_COMPLETIONS:
                 the_client = openai.AsyncOpenAI(
                     base_url=backend.endpoint,
+                    api_key="",
                     default_headers=createHeaders(
-                        provider="bedrock",
                         api_key=backend.api_key,
                         strict_open_ai_compliance=False,
                         debug=is_debug,
@@ -52,8 +52,8 @@ class PortkeyFactory:
             case PortkeySdkVariant.PORTKEY_RESPONSES:
                 the_client = openai.AsyncOpenAI(
                     base_url=backend.endpoint,
+                    api_key="",
                     default_headers=createHeaders(
-                        provider="openai",
                         api_key=backend.api_key,
                         debug=is_debug,
                     ),  # type: ignore[call-overload]

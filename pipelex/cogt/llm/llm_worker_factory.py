@@ -19,10 +19,9 @@ class LLMWorkerFactory:
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         llm_worker: LLMWorkerInternalAbstract
         match plugin.sdk:
-            case "portkey_responses" | "portkey_completions":
-                from pipelex.plugins.openai_responses.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
-                from pipelex.plugins.portkey_responses.portkey_factory import PortkeyFactory  # noqa: PLC0415
-                from pipelex.plugins.portkey_responses.portkey_responses_llm_worker import PortkeyResponsesLLMWorker  # noqa: PLC0415
+            case "portkey_completions":
+                from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker  # noqa: PLC0415
+                from pipelex.plugins.portkey.portkey_factory import PortkeyFactory  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -32,7 +31,23 @@ class LLMWorkerFactory:
                     ),
                 )
 
-                # llm_worker = PortkeyResponsesLLMWorker(
+                llm_worker = OpenAILLMWorker(
+                    sdk_instance=sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "portkey_responses":
+                from pipelex.plugins.openai_responses.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
+                from pipelex.plugins.portkey.portkey_factory import PortkeyFactory  # noqa: PLC0415
+
+                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=PortkeyFactory.make_portkey_openai_client(
+                        plugin=plugin,
+                        backend=backend,
+                    ),
+                )
+
                 llm_worker = OpenAIResponsesLLMWorker(
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
