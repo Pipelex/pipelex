@@ -137,7 +137,7 @@ class WorkingMemoryFactory(BaseModel):
 
                     mock_list_content = ListContent[StuffContent](items=items)
 
-                    # Create stuff with mock ListContent
+                    # Create stuff with mock content
                     mock_stuff = StuffFactory.make_stuff(
                         concept=requirement.concept,
                         content=mock_list_content,
