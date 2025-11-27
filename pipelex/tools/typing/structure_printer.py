@@ -39,9 +39,9 @@ class StructurePrinter:
                 return "Literal[\n        " + ",\n        ".join(values) + ",\n    ]"
             return f"Literal[{', '.join(values)}]"
 
-        if {origin is list or origin is list} and args:
+        if origin is list and args:
             return f"List[{self.pretty_type(args[0])}]"
-        if {origin is dict or origin is dict} and args:
+        if origin is dict and args:
             return f"Dict[{self.pretty_type(args[0])}, {self.pretty_type(args[1])}]"
         return str(tp)
 
@@ -106,9 +106,9 @@ class StructurePrinter:
                     return "Literal[\n        " + ",\n        ".join(lines) + ",\n    ]"
                 return f"Literal[{', '.join(values)}]"
 
-            if origin in {list, list}:
+            if origin is list:
                 return f"List[{format_type(args[0])}]"
-            if origin in {dict, dict}:
+            if origin is dict:
                 return f"Dict[{format_type(args[0])}, {format_type(args[1])}]"
             return str(tp)
 
