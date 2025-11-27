@@ -26,14 +26,12 @@ class InputRequirementsFactory:
         cls,
         domain: str,
         blueprint: dict[str, str],
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> InputRequirements:
         input_requirements_dict: dict[str, InputRequirement] = {}
         for var_name, requirement_str in blueprint.items():
             input_requirement = InputRequirementsFactory.make_from_string(
                 domain=domain,
                 requirement_str=requirement_str,
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
             )
             input_requirements_dict[var_name] = input_requirement
         return InputRequirements(root=input_requirements_dict)
@@ -43,7 +41,6 @@ class InputRequirementsFactory:
         cls,
         domain: str,
         requirement_str: str,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> InputRequirement:
         """Parse an input requirement string and return an InputRequirement.
 
@@ -56,8 +53,6 @@ class InputRequirementsFactory:
         Args:
             domain: The domain to use for resolving concept codes without domain prefix
             requirement_str: String in the format "domain.ConceptCode" or "ConceptCode" with optional "[multiplicity]"
-            library_id: The library ID to use for resolving concepts
-            concept_codes_from_the_same_domain: List of concept codes from the same domain for resolution
 
         Returns:
             InputRequirement with the parsed concept and multiplicity
@@ -88,7 +83,6 @@ class InputRequirementsFactory:
         concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
             domain=domain,
             concept_sring_or_code=concept_string_or_code,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
 
         # Determine multiplicity

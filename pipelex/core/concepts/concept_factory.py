@@ -52,15 +52,6 @@ class ConceptFactory:
         return normalized
 
     @classmethod
-    def make_implicit_concept(cls, concept_code: str) -> Concept:
-        return Concept(
-            code=concept_code,
-            domain=SpecialDomain.IMPLICIT,
-            description=concept_code,
-            structure_class_name=TextContent.__name__,
-        )
-
-    @classmethod
     def make(cls, concept_code: str, domain: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
         return Concept(
             code=concept_code,
@@ -152,10 +143,12 @@ class ConceptFactory:
     @classmethod
     def make_domain_and_concept_code_from_concept_string_or_code(
         cls,
-        domain: str,
         concept_string_or_code: str,
-        concept_codes_from_the_same_domain: list[str] | None = None,
+        domain: str | None = None,
     ) -> DomainAndConceptCode:
+        if "." not in concept_string_or_code and not domain:
+            msg = f"Not enough information to make a domain and concept code from '{concept_string_or_code}'"
+            raise ConceptFactoryError(msg)
         try:
             validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
         except ConceptStringError as exc:
@@ -169,24 +162,21 @@ class ConceptFactory:
         if "." in concept_string_or_code:
             domain_code, concept_code = concept_string_or_code.rsplit(".")
             return DomainAndConceptCode(domain=domain_code, concept_code=concept_code)
-        if (
-            concept_codes_from_the_same_domain and concept_string_or_code in concept_codes_from_the_same_domain
-        ):  # Is a concept code from the same domain
+        elif domain:
             return DomainAndConceptCode(domain=domain, concept_code=concept_string_or_code)
-        return DomainAndConceptCode(domain=SpecialDomain.IMPLICIT, concept_code=concept_string_or_code)
+        else:
+            msg = f"Not enough information to make a domain and concept code from '{concept_string_or_code}'"
+            raise ConceptFactoryError(msg)
 
     @classmethod
     def make_concept_string_with_domain(cls, domain: str, concept_code: str) -> str:
         return f"{domain}.{concept_code}"
 
     @classmethod
-    def make_concept_string_with_domain_from_concept_string_or_code(
-        cls, domain: str, concept_sring_or_code: str, concept_codes_from_the_same_domain: list[str] | None = None
-    ) -> str:
+    def make_concept_string_with_domain_from_concept_string_or_code(cls, domain: str, concept_sring_or_code: str) -> str:
         input_domain_and_code = cls.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
             concept_string_or_code=concept_sring_or_code,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+            domain=domain,
         )
 
         return cls.make_concept_string_with_domain(
@@ -219,7 +209,6 @@ class ConceptFactory:
         domain: str,
         concept_code: str,
         concept_blueprint_or_description: ConceptBlueprint | str,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> Concept:
         blueprint: ConceptBlueprint
         if isinstance(concept_blueprint_or_description, str):
@@ -230,7 +219,6 @@ class ConceptFactory:
             domain=domain,
             concept_code=concept_code,
             blueprint=blueprint,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
         )
 
     @classmethod
@@ -239,7 +227,6 @@ class ConceptFactory:
         domain: str,
         concept_code: str,
         blueprint: ConceptBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> Concept:
         if not is_concept_code_valid(concept_code=concept_code):
             msg = f"Concept code '{concept_code}' is not a valid concept code"
@@ -305,9 +292,8 @@ class ConceptFactory:
             structure_class_name = TextContent.__name__
 
         domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
             concept_string_or_code=concept_code,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+            domain=domain,
         )
 
         return Concept(

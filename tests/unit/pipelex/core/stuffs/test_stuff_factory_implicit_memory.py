@@ -169,7 +169,7 @@ class TestStuffFactoryImplicitMemoryErrors:
         expected_exception: type[Exception],
         error_match: str,
     ):
-        log.info(f"Testing error case: {test_name}")
+        log.verbose(f"Testing error case: {test_name}")
         log.verbose(f"setup_test_concept: {setup_test_concept}")
 
         with pytest.raises(expected_exception, match=error_match):

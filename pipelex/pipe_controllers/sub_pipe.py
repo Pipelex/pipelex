@@ -4,12 +4,13 @@ from pipelex import log
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.exceptions import PipeInputError, PipeInputNotFoundError
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
+from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
-from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -20,7 +21,6 @@ class SubPipe(BaseModel):
     output_name: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     batch_params: BatchParams | None = None
-    concept_codes_from_the_same_domain: list[str] | None = None
 
     async def run_pipe(
         self,
@@ -70,11 +70,11 @@ class SubPipe(BaseModel):
                 },
             )
 
-            pipe_batch = PipeBatchFactory.make_from_blueprint(
-                domain=sub_pipe.domain,
+            pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
+                domain_code=sub_pipe.domain,
                 pipe_code=self.pipe_code,
                 blueprint=pipe_batch_blueprint,
-                concept_codes_from_the_same_domain=self.concept_codes_from_the_same_domain,
+                concept_codes_from_the_same_domain=[concept.code for concept in sub_pipe.concept_dependencies],
             )
             pipe_output = await pipe_batch.run_pipe(
                 job_metadata=job_metadata,

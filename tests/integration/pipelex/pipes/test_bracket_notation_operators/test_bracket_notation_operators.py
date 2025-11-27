@@ -1,22 +1,21 @@
-"""Integration tests for bracket notation in operator pipe factories."""
-
 from pathlib import Path
 from typing import Callable
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
-from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
+from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
-from pipelex.pipe_operators.extract.pipe_extract_factory import PipeExtractFactory
+from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
-from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
+from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
-from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
+from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
 from pipelex.system.registries.func_registry import pipe_func
 
 
@@ -44,8 +43,8 @@ class TestBracketNotationInOperators:
             prompt="Generate items about $topic",
         )
 
-        pipe = PipeLLMFactory.make_from_blueprint(
-            domain="test",
+        pipe = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test",
             pipe_code="test_llm",
             blueprint=blueprint,
         )
@@ -63,8 +62,8 @@ class TestBracketNotationInOperators:
             prompt="Generate 5 items",
         )
 
-        pipe = PipeLLMFactory.make_from_blueprint(
-            domain="test",
+        pipe = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test",
             pipe_code="test_llm",
             blueprint=blueprint,
         )
@@ -82,8 +81,8 @@ class TestBracketNotationInOperators:
             prompt="Summarize @documents based on $query",
         )
 
-        pipe = PipeLLMFactory.make_from_blueprint(
-            domain="test",
+        pipe = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test",
             pipe_code="test_llm",
             blueprint=blueprint,
         )
@@ -102,8 +101,8 @@ class TestBracketNotationInOperators:
             output=f"{NativeConceptCode.IMAGE}[3]",
         )
 
-        pipe = PipeImgGenFactory.make_from_blueprint(
-            domain="test",
+        pipe = PipeFactory[PipeImgGen].make_from_blueprint(
+            domain_code="test",
             pipe_code="test_img_gen",
             blueprint=blueprint,
         )
@@ -121,8 +120,8 @@ class TestBracketNotationInOperators:
             function_name="process_function",
         )
 
-        pipe = PipeFuncFactory.make_from_blueprint(
-            domain="test",
+        pipe = PipeFactory[PipeFunc].make_from_blueprint(
+            domain_code="test",
             pipe_code="test_func",
             blueprint=blueprint,
         )
@@ -140,8 +139,8 @@ class TestBracketNotationInOperators:
             template="<ul>{% for item in items %}<li>{{ item }}</li>{% endfor %}</ul>",
         )
 
-        pipe = PipeComposeFactory.make_from_blueprint(
-            domain="test",
+        pipe = PipeFactory[PipeCompose].make_from_blueprint(
+            domain_code="test",
             pipe_code="test_compose",
             blueprint=blueprint,
         )
@@ -158,8 +157,8 @@ class TestBracketNotationInOperators:
             output=f"{NativeConceptCode.PAGE}[]",  # Extract returns list of pages
         )
 
-        pipe = PipeExtractFactory.make_from_blueprint(
-            domain="test",
+        pipe = PipeFactory[PipeExtract].make_from_blueprint(
+            domain_code="test",
             pipe_code="test_extract",
             blueprint=blueprint,
         )

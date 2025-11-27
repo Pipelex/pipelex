@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Callable, cast
+from typing import Callable, cast
 
 import pytest
 
@@ -8,18 +8,16 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_native_concept, get_pipe_router
+from pipelex.pipe_operators.compose.pipe_compose import PipeCompose, PipeComposeOutput
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
-from pipelex.pipe_operators.compose.pipe_compose_factory import PipeComposeFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from tests.cases import JINJA2TestCases
-
-if TYPE_CHECKING:
-    from pipelex.pipe_operators.compose.pipe_compose import PipeComposeOutput
 
 
 @pytest.mark.dry_runnable
@@ -45,8 +43,8 @@ class TestPipeCompose:
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeComposeFactory.make_from_blueprint(
-                domain="generic",
+            pipe=PipeFactory[PipeCompose].make_from_blueprint(
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_compose_for_any",
                 blueprint=pipe_compose_blueprint,
             ),
@@ -84,8 +82,8 @@ class TestPipeCompose:
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeComposeFactory.make_from_blueprint(
-                domain="generic",
+            pipe=PipeFactory[PipeCompose].make_from_blueprint(
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_compose",
                 blueprint=pipe_compose_blueprint,
             ),

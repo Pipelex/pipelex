@@ -1,17 +1,16 @@
-"""Integration tests for bracket notation in controller pipe factories."""
-
 from typing import Callable
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_concept_library
+from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
-from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
+from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.pipe_condition_factory import PipeConditionFactory
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
-from pipelex.pipe_controllers.parallel.pipe_parallel_factory import PipeParallelFactory
 
 
 class TestBracketNotationInControllers:
@@ -23,13 +22,18 @@ class TestBracketNotationInControllers:
         domain = "test"
         concept_library = get_concept_library()
 
-        concept_1 = ConceptFactory.make_from_blueprint(
+        concept_data_item = ConceptFactory.make_from_blueprint(
             concept_code="DataItem",
             domain=domain,
             blueprint=ConceptBlueprint(description="Data item"),
-            concept_codes_from_the_same_domain=["DataItem"],
         )
-        concept_library.add_concepts([concept_1])
+        concept_library.add_concepts([concept_data_item])
+        concept_processed_data = ConceptFactory.make_from_blueprint(
+            concept_code="ProcessedData",
+            domain=domain,
+            blueprint=ConceptBlueprint(description="Processed data"),
+        )
+        concept_library.add_concepts([concept_processed_data])
 
         blueprint = PipeParallelBlueprint(
             description="Process items in parallel",
@@ -39,10 +43,11 @@ class TestBracketNotationInControllers:
             add_each_output=True,
         )
 
-        pipe = PipeParallelFactory.make_from_blueprint(
-            domain=domain,
+        pipe = PipeFactory[PipeParallel].make_from_blueprint(
+            domain_code=domain,
             pipe_code="test_parallel",
             blueprint=blueprint,
+            concept_codes_from_the_same_domain=[concept_data_item.code, concept_processed_data.code],
         )
 
         assert pipe.inputs.root["data"].multiplicity == 2
@@ -60,13 +65,11 @@ class TestBracketNotationInControllers:
             concept_code="Category",
             domain=domain,
             blueprint=ConceptBlueprint(description="Category"),
-            concept_codes_from_the_same_domain=["Category"],
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             concept_code="Result",
             domain=domain,
             blueprint=ConceptBlueprint(description="Result"),
-            concept_codes_from_the_same_domain=["Result"],
         )
         concept_library.add_concepts([concept_1, concept_2])
 
@@ -79,10 +82,11 @@ class TestBracketNotationInControllers:
             default_outcome=SpecialOutcome.CONTINUE,
         )
 
-        pipe = PipeConditionFactory.make_from_blueprint(
-            domain=domain,
+        pipe = PipeFactory[PipeCondition].make_from_blueprint(
+            domain_code=domain,
             pipe_code="test_condition",
             blueprint=blueprint,
+            concept_codes_from_the_same_domain=[concept_1.code, concept_2.code],
         )
 
         assert pipe.inputs.root["items"].multiplicity is True
@@ -96,13 +100,17 @@ class TestBracketNotationInControllers:
         domain = "test"
         concept_library = get_concept_library()
 
-        concept_1 = ConceptFactory.make_from_blueprint(
+        concept_item = ConceptFactory.make_from_blueprint(
             concept_code="Item",
             domain=domain,
             blueprint=ConceptBlueprint(description="Item"),
-            concept_codes_from_the_same_domain=["Item"],
         )
-        concept_library.add_concepts([concept_1])
+        concept_processed_item = ConceptFactory.make_from_blueprint(
+            concept_code="ProcessedItem",
+            domain=domain,
+            blueprint=ConceptBlueprint(description="Processed item"),
+        )
+        concept_library.add_concepts([concept_item, concept_processed_item])
 
         blueprint = PipeBatchBlueprint(
             description="Batch process items",
@@ -113,10 +121,11 @@ class TestBracketNotationInControllers:
             input_item_name="item",
         )
 
-        pipe = PipeBatchFactory.make_from_blueprint(
-            domain=domain,
+        pipe = PipeFactory[PipeBatch].make_from_blueprint(
+            domain_code=domain,
             pipe_code="test_batch",
             blueprint=blueprint,
+            concept_codes_from_the_same_domain=[concept_item.code, concept_processed_item.code],
         )
 
         assert pipe.inputs.root["items"].multiplicity is True

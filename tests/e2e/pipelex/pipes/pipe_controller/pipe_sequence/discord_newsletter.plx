@@ -64,12 +64,12 @@ Make sure to preserve the channel name and position from the input for proper or
 [pipe.write_weekly_summary_e2e]
 type = "PipeLLM"
 description = "Combine channel summaries into a short summary of the week's Share channel content (200 characters)"
-inputs = { channel_summaries = "ChannelSummaryE2E" }
+inputs = { channel_summaries = "ChannelSummaryE2E[]" }
 output = "Text"
 prompt = """
 Write a single overall summary of the week's content based on the following Share channel summaries:
 
-{% for channel in channel_summaries.content.items if channel.category == "Share" %}
+{% for channel in channel_summaries.items if channel.category == "Share" %}
 {{ channel }}
 {% endfor %}
 
@@ -79,7 +79,7 @@ Keep it short: 200 characters.
 [pipe.format_html_newsletter_e2e]
 type = "PipeCompose"
 description = "Combine weekly and channel summaries into a complete newsletter following specific formatting requirements"
-inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummaryE2E" }
+inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummaryE2E[]" }
 output = "HtmlNewsletterE2E"
 
 [pipe.format_html_newsletter_e2e.template]
@@ -92,7 +92,7 @@ $weekly_summary
 </p>
 
 <!-- New Members Section -->
-{% set introduce_channels = channel_summaries.content.items | selectattr('category', 'equalto', 'Introduce Yourself') | list %}
+{% set introduce_channels = channel_summaries.items | selectattr('category', 'equalto', 'Introduce Yourself') | list %}
 {% if introduce_channels %}
    <h2>🙌 New members</h2>
    <ul>
@@ -105,7 +105,7 @@ $weekly_summary
 {% endif %}
 
 <!-- Share Channel Section -->
-{% set regular_channels = channel_summaries.content.items | selectattr('category', 'equalto', 'Share') | list | sort(attribute='position') %}
+{% set regular_channels = channel_summaries.items | selectattr('category', 'equalto', 'Share') | list | sort(attribute='position') %}
 {% if regular_channels %}
    {% for channel in regular_channels %}
    <h2>{{ channel.channel_name }}</h2>
@@ -116,7 +116,7 @@ $weekly_summary
 {% endif %}
 
 <!-- Geographic Hubs Section -->
-{% set geo_hubs = channel_summaries.content.items | selectattr('category', 'equalto', 'Geographic Hubs') | list | sort(attribute='position') %}
+{% set geo_hubs = channel_summaries.items | selectattr('category', 'equalto', 'Geographic Hubs') | list | sort(attribute='position') %}
 {% if geo_hubs %}
    <h2>🌎 Geographic hubs</h2>
    {% for channel in geo_hubs %}

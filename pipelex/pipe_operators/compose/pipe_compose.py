@@ -67,10 +67,11 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         }
 
     @override
+    # TODO: this needs testing!!!
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
         needed_inputs = InputRequirementsFactory.make_empty()
         for input_name, requirement in self.inputs.root.items():
-            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
+            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept, multiplicity=requirement.multiplicity)
         return needed_inputs
 
     @override

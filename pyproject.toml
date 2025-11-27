@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.16.0"
+version = "0.17.0"
 description = "The open standard for repeatable AI workflows. Write business logic, not API calls."
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -372,15 +372,10 @@ required-version = ">=0.7.2"
 packages = ["pipelex"]
 exclude = ["pipelex/cli/dev_cli"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"pyproject.toml" = "pipelex/pyproject.toml"
 
 [tool.hatch.build.targets.sdist]
 packages = ["pipelex"]
 exclude = ["pipelex/cli/dev_cli"]
-
-[tool.hatch.build.targets.sdist.force-include]
-"pyproject.toml" = "pipelex/pyproject.toml"
 
 [tool.hatch.metadata]
 allow-direct-references = true

@@ -203,7 +203,6 @@ class LibraryManager(LibraryManagerAbstract):
                     concept = ConceptFactory.make_from_blueprint_or_description(
                         domain=blueprint.domain,
                         concept_code=concept_code,
-                        concept_codes_from_the_same_domain=list(blueprint.concept.keys()),
                         concept_blueprint_or_description=concept_blueprint_or_description,
                     )
                     concepts.append(concept)
@@ -215,11 +214,11 @@ class LibraryManager(LibraryManagerAbstract):
             pipes: list[PipeAbstract] = []
             if blueprint.pipe is not None:
                 for pipe_name, pipe_blueprint in blueprint.pipe.items():
-                    pipe = PipeFactory.make_from_blueprint(
-                        domain=blueprint.domain,
+                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                        domain_code=blueprint.domain,
                         pipe_code=pipe_name,
                         blueprint=pipe_blueprint,
-                        concept_codes_from_the_same_domain=list(blueprint.concept.keys()) if blueprint.concept else None,
+                        concept_codes_from_the_same_domain=[the_concept.code for the_concept in all_concepts],
                     )
                     pipes.append(pipe)
             all_pipes.extend(pipes)

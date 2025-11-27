@@ -1,5 +1,24 @@
 # Changelog
 
+### [v0.17.0] - 2025-11-27
+
+**Highlights:** - Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
+
+### Fixed
+
+- **Relaxed concept structure field naming restrictions**: Users can now use field names like `content`, `stuff_code`, `stuff_name`, and `concept` in their concept structures without conflicts. Internal metadata fields in stuff artefacts now use underscore prefixes (`_stuff_name`, `_content_class`, `_concept_code`, `_stuff_code`, `_content`) to avoid collisions with user-defined fields. Reserved field names (Pydantic BaseModel attributes like `model_config`, `model_fields`, etc.) and field names starting with underscore remain forbidden with improved error messages that clearly specify which fields are problematic.
+
+### Changed
+
+- Modified the GHA `version-check.yml` so that the check of the version is only applying to release branches.
+- Removed the `pyproject.toml` file from the build.
+- No more implicit concepts. A concept reference has a domain and a code. If there is no domain, it should be a native concept, or it is declared in the same bundle.
+
+### Refactored
+
+- The `find_files_in_dir` function was coded in 3 different places, now it's in `pipelex/tools/misc/file_utils.py`, and accepts `excluded_dirs`.
+- Refactored the Pipe factories: Centralized everything in the `PipeFactory` class.
+
 ## [v0.16.0] - 2025-11-25
 
 **Highlights:** - Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.

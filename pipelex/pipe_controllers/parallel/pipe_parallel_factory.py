@@ -1,11 +1,11 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
 from pipelex.pipe_controllers.parallel.exceptions import PipeParallelFactoryError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
@@ -19,19 +19,23 @@ if TYPE_CHECKING:
 class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParallel]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
-        domain: str,
+        pipe_category: Any,
+        pipe_type: str,
         pipe_code: str,
+        domain_code: str,
+        description: str | None,
+        inputs: InputRequirements,
+        output: Concept,
         blueprint: PipeParallelBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeParallel:
         parallel_sub_pipes: list[SubPipe] = []
         for sub_pipe_blueprint in blueprint.parallels:
             if not sub_pipe_blueprint.result:
                 msg = f"Unexpected error in pipe '{pipe_code}': PipeParallel requires a result specified for each parallel sub pipe"
                 raise PipeParallelFactoryError(message=msg)
-            sub_pipe = SubPipeFactory.make_from_blueprint(sub_pipe_blueprint, concept_codes_from_the_same_domain=concept_codes_from_the_same_domain)
+            sub_pipe = SubPipeFactory.make_from_blueprint(sub_pipe_blueprint)
             parallel_sub_pipes.append(sub_pipe)
         if not blueprint.add_each_output and not blueprint.combined_output:
             msg = (
@@ -42,14 +46,11 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
                 message=msg,
             )
 
-        # Parse output to strip multiplicity brackets
-        output_parse_result = parse_concept_with_multiplicity(blueprint.output)
-
+        # Handle combined_output if specified
         if blueprint.combined_output:
             combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                domain=domain,
-                concept_string_or_code=output_parse_result.concept,
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
+                domain=domain_code,
+                concept_string_or_code=blueprint.combined_output,
             )
             combined_output = get_required_concept(
                 concept_string=ConceptFactory.make_concept_string_with_domain(
@@ -60,27 +61,10 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         else:
             combined_output = None
 
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
-            concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-        )
-        inputs = InputRequirementsFactory.make_from_blueprint(
-            domain=domain,
-            blueprint=blueprint.inputs or {},
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-        )
-
-        output = get_required_concept(
-            concept_string=ConceptFactory.make_concept_string_with_domain(
-                domain=output_domain_and_code.domain,
-                concept_code=output_domain_and_code.concept_code,
-            ),
-        )
         return PipeParallel(
-            domain=domain,
+            domain=domain_code,
             code=pipe_code,
-            description=blueprint.description,
+            description=description,
             inputs=inputs,
             output=output,
             parallel_sub_pipes=parallel_sub_pipes,

@@ -9,12 +9,17 @@ PipelexBundleSpec = "A Pipelex bundle spec."
 BundleHeaderSpec = "A domain information object."
 FlowDraft = "Draft of the flow of the pipeline."
 
+## Concepts
+ConceptStructureSpec = "A concept spec with structure but without full implementation."
+ConceptSpec = "A specification for a concept including its code, description, and a structure draft as plain text."
+
+
 [pipe]
 [pipe.pipe_builder]
 type = "PipeSequence"
 description = "This pipe is going to be the entry point for the builder. It will take a UserBrief and return a PipelexBundleSpec."
 inputs = { brief = "UserBrief" }
-output = "builder.PipelexBundleSpec"
+output = "PipelexBundleSpec"
 steps = [
     { pipe = "draft_the_plan", result = "plan_draft" },
     { pipe = "draft_the_concepts", result = "concept_drafts" },
@@ -127,7 +132,7 @@ List the concept drafts in Markdown format with a heading 3 for each, e.g. `### 
 type = "PipeLLM"
 description = "Structure the concept definitions."
 inputs = { concept_drafts = "ConceptDrafts" }
-output = "concept.ConceptSpec[]"
+output = "ConceptSpec[]"
 model = "llm_to_engineer"
 system_prompt = """
 You are an expert at data extraction and json formatting.
@@ -140,8 +145,8 @@ prompt = """
 [pipe.draft_flow]
 type = "PipeLLM"
 description = "Draft the flow of the pipeline."
-inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "concept.ConceptSpec" }
-output = "builder.FlowDraft"
+inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "ConceptSpec" }
+output = "FlowDraft"
 model = "llm_to_engineer"
 system_prompt = """
 You are a Senior engineer.
@@ -239,8 +244,8 @@ At the end, recap the list of variables used, with a super concise recap of what
 [pipe.review_flow]
 type = "PipeLLM"
 description = "Review a draft flow and make it consistent."
-inputs = { flow_draft = "builder.FlowDraft", brief = "UserBrief" }
-output = "builder.FlowDraft"
+inputs = { flow_draft = "FlowDraft", brief = "UserBrief" }
+output = "FlowDraft"
 model = "llm_to_engineer"
 system_prompt = """
 You are a Senior engineer.
@@ -268,7 +273,7 @@ Otherwise, state that it was fixed like "The flow has been checked and fixed:" a
 [pipe.design_pipe_signatures]
 type = "PipeLLM"
 description = "Write the pipe signatures for the plan."
-inputs = { prepared_flow = "builder.FlowDraft", brief = "UserBrief" }
+inputs = { prepared_flow = "FlowDraft", brief = "UserBrief" }
 output = "pipe_design.PipeSignature[]"
 model = "llm_to_engineer"
 system_prompt = """
@@ -305,7 +310,7 @@ prompt = """
 [pipe.write_bundle_header]
 type = "PipeLLM"
 description = "Write the bundle header."
-inputs = { brief = "UserBrief", pipe_signatures = "PipeSignature" }
+inputs = { brief = "UserBrief", pipe_signatures = "pipe_design.PipeSignature" }
 output = "BundleHeaderSpec"
 model = "llm_to_engineer"
 prompt = """
@@ -324,7 +329,6 @@ The main pipe is the one that will carry out the main task of the pipeline, it s
 [pipe.assemble_pipelex_bundle_spec]
 type = "PipeFunc"
 description = "Compile the pipelex bundle spec."
-inputs = { pipe_specs = "PipeSpec", concept_specs = "ConceptSpec", bundle_header_spec = "BundleHeaderSpec" }
+inputs = { pipe_specs = "pipe_design.PipeSpec", concept_specs = "ConceptSpec", bundle_header_spec = "BundleHeaderSpec" }
 output = "PipelexBundleSpec"
 function_name = "assemble_pipelex_bundle_spec"
-
