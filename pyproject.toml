@@ -315,6 +315,7 @@ ignore = [
     "LOG004", # `.exception()` call outside exception handlers
 
     "PLC0105", # `TypeVar` name "SomethingType" does not reflect its covariance; consider renaming it to "SomethingType_co"
+    "PLC1901", # Checks for comparisons to empty strings.
 
     "PLR0904", # Too many public methods ( > 20)
     "PLR0911", # Too many return statements (/6)

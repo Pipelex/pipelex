@@ -41,7 +41,7 @@ class EmojiLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord):
         log_fmt: str
         emoji = emoji_for_channel(record.name)
-        if emoji == "":  # noqa: PLC1901
+        if emoji == "":
             log_fmt = "%(message)s"
         elif emoji:
             log_fmt = f"{emoji}: %(message)s"
