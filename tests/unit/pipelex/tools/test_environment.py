@@ -44,7 +44,7 @@ class TestEnvironment:
     def test_get_optional_env_empty_string_returns_empty_string(self, mocker: MockerFixture):
         mocker.patch.dict(os.environ, {"EMPTY_VAR": ""})
         result = get_optional_env("EMPTY_VAR")
-        assert not result
+        assert result == ""
 
     def test_set_env_success(self):
         set_env("TEST_SET_VAR", "new_value")

@@ -122,7 +122,7 @@ class TestDiff:
 
             diff = diff_files(file1, file2)
 
-            assert not diff
+            assert diff == ""
 
     def test_make_diff_dirs_pretty_no_differences(self):
         """Test that identical directories return Text with no differences message."""

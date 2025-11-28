@@ -64,7 +64,7 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         template_inputs: LLMPromptTemplateInputs | None = None,
     ) -> LLMPrompt:
         if not is_none_or_has_text(system_text):
-            if not system_text:
+            if system_text == "":
                 log.warning(f"Prompt template system_text should be None or contain text. system_text = '{system_text}'")
             else:
                 msg = f"Prompt template system_text should be None or contain text. system_text = '{system_text}'"

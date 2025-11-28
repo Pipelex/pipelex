@@ -15,7 +15,7 @@ def emoji_for_channel(channel_name: str) -> str | None:
     }
 
     emoji = channel_emojis.get(channel_name)
-    if not emoji:
+    if emoji == "":
         # blank emoji is OK
         return emoji
     elif emoji:

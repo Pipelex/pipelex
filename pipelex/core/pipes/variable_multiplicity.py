@@ -99,7 +99,7 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
     if bracket_content is None:
         # No brackets - single item
         multiplicity = None
-    elif not bracket_content:
+    elif bracket_content == "":
         # Empty brackets [] - variable list
         multiplicity = True
     else:

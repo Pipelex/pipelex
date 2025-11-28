@@ -146,7 +146,7 @@ class TestClarifyPathOrUrl:
 
     def test_clarify_empty_string(self):
         file_path, url = clarify_path_or_url("")
-        assert not file_path
+        assert file_path == ""
         assert url is None
 
     def test_clarify_base_64_raises_not_implemented(self, mocker: MockerFixture):

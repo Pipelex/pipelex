@@ -88,7 +88,7 @@ class InputRequirementsFactory:
         # Determine multiplicity
         multiplicity: VariableMultiplicity | None = None
         if multiplicity_str is not None:  # Brackets were present
-            if not multiplicity_str:  # Empty brackets []
+            if multiplicity_str == "":  # Empty brackets []
                 multiplicity = True
             else:  # Number in brackets [5]
                 multiplicity = int(multiplicity_str)

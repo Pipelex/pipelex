@@ -20,7 +20,7 @@ class LLMPrompt(BaseModel):
                 pass
             case ProblemReaction.RAISE:
                 if not is_none_or_has_text(text=self.system_text):
-                    if not self.system_text:
+                    if self.system_text == "":
                         log.warning(f"system_text should be None or contain text. system_text = '{self.system_text}'")
                     else:
                         msg = "system_text should be None or contain text"
@@ -30,7 +30,7 @@ class LLMPrompt(BaseModel):
                     raise LLMPromptParameterError(msg)
             case ProblemReaction.LOG:
                 if not is_none_or_has_text(text=self.system_text):
-                    if not self.system_text:
+                    if self.system_text == "":
                         log.warning(f"system_text should be None or contain text. system_text = '{self.system_text}'")
                     else:
                         log.error(f"Prompt template system_text should be None or contain text. system_text = '{self.system_text}'")
