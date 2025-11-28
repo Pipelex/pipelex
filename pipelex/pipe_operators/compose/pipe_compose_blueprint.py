@@ -61,7 +61,7 @@ class PipeComposeBlueprint(PipeBlueprint):
                 template_category=self.template_category,
                 template_source=preprocessed_template,
             )
-            if not variable_name.startswith("_") and variable_name not in ("preliminary_text", "place_holder")
+            if not variable_name.startswith("_") and variable_name not in {"preliminary_text", "place_holder"}
         }
         for required_variable_name in required_variables:
             if required_variable_name not in self.input_names:

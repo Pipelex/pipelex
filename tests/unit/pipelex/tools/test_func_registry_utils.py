@@ -229,7 +229,7 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
 
     def test_eligibility_check_directly(self):
         # Valid async function
-        async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+        async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
             return TextContent(text="test")
 
         # Valid sync function
@@ -244,7 +244,7 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
         func_registry.teardown()
 
         # Valid async function
-        async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+        async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
             return TextContent(text="valid")
 
         # Valid sync function
@@ -262,7 +262,7 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
         # Test register_functions method as well
         func_registry.teardown()
 
-        async def another_valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+        async def another_valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
             return TextContent(text="another_valid_async")
 
         def another_valid_sync_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]

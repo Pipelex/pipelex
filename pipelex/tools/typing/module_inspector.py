@@ -134,8 +134,7 @@ def find_class_names_in_file(file_path: str, base_class_names: list[str] | None 
 
     try:
         # Read and parse the file
-        with open(file_path, encoding="utf-8") as file:
-            source = file.read()
+        source = Path(file_path).read_text(encoding="utf-8")
         tree = ast.parse(source, filename=file_path)
     except Exception as exc:
         msg = f"Failed to parse {file_path}: {exc}"
@@ -198,8 +197,7 @@ def find_decorated_function_names_in_file(
 
     try:
         # Read and parse the file
-        with open(file_path, encoding="utf-8") as file:
-            source = file.read()
+        source = Path(file_path).read_text(encoding="utf-8")
         tree = ast.parse(source, filename=file_path)
     except Exception as exc:
         msg = f"Failed to parse {file_path}: {exc}"

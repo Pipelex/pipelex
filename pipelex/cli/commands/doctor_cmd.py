@@ -355,7 +355,6 @@ def display_health_report(
     """Display a comprehensive health report.
 
     Args:
-        console: Rich Console instance for output
         config_healthy: Whether config files check passed
         config_message: Message about config files status
         config_missing_count: Number of missing config files
