@@ -10,19 +10,19 @@ class PipeBatchTestCases:
         PipeBatchSpec(
             pipe_code="named_batch",
             description="Batch with custom names",
-            inputs={"data": "DataList"},
+            inputs={"widgets": "Widget[]"},
             output="Results",
             branch_pipe_code="transform_data",
-            input_list_name="data_list",
-            input_item_name="current_data",
+            input_list_name="widgets",
+            input_item_name="widget",
         ),
         PipeBatchBlueprint(
             description="Batch with custom names",
-            inputs={"data": "DataList"},
+            inputs={"widgets": "Widget[]"},
             output="Results",
             branch_pipe_code="transform_data",
-            input_list_name="data_list",
-            input_item_name="current_data",
+            input_list_name="widgets",
+            input_item_name="widget",
         ),
     )
 
