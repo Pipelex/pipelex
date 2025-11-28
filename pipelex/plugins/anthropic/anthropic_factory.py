@@ -198,7 +198,7 @@ class AnthropicFactory:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
-        #### System message ####
+        # System message ####
         if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
 
@@ -209,10 +209,10 @@ class AnthropicFactory:
         else:
             prepped_user_images = None
 
-        #### Concatenation ####
+        # Concatenation ####
         messages.append(
             AnthropicFactory.openai_typed_user_message(
-                user_content_txt=llm_prompt.user_text if llm_prompt.user_text else "",
+                user_content_txt=llm_prompt.user_text or "",
                 prepped_user_images=prepped_user_images,
             ),
         )

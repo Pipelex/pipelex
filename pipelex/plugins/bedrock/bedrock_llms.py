@@ -7,7 +7,7 @@ from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.aws.aws_config import AwsCredentialsError
 
 
-async def bedrock_list_available_models(
+def bedrock_list_available_models(
     plugin: Plugin,  # noqa: ARG001
     backend: InferenceBackend,  # noqa: ARG001
 ) -> list[dict[str, Any]]:

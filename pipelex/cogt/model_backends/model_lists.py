@@ -326,7 +326,7 @@ class ModelLister:
 
         try:
             # List available models using the plugin-specific function
-            bedrock_models_list = await bedrock_list_available_models(
+            bedrock_models_list = bedrock_list_available_models(
                 plugin=plugin,
                 backend=backend,
             )

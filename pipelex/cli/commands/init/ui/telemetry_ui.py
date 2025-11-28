@@ -68,7 +68,7 @@ def prompt_telemetry_mode(console: Console) -> TelemetryMode:
         choice_input = choice_str.lower().strip()
 
         # Handle quit option
-        if choice_input in ("q", "quit"):
+        if choice_input in {"q", "quit"}:
             console.print("\n[yellow]Exiting without configuring telemetry.[/yellow]")
             raise typer.Exit(code=0)
 

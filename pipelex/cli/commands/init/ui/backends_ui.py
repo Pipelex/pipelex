@@ -182,12 +182,12 @@ def prompt_backend_indices(
         choice_input = choice_str.strip().lower()
 
         # Handle quit option
-        if choice_input in ("q", "quit"):
+        if choice_input in {"q", "quit"}:
             console.print("\n[yellow]Exiting without configuring backends.[/yellow]")
             raise typer.Exit(code=0)
 
         # Handle all option
-        if choice_input in ("a", "all"):
+        if choice_input in {"a", "all"}:
             selected_indices = list(range(len(backend_options)))
             break
 

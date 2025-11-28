@@ -147,7 +147,7 @@ class MistralFactory:
             top_left_y=mistral_ocr_image_obj.top_left_y,
             bottom_right_x=mistral_ocr_image_obj.bottom_right_x,
             bottom_right_y=mistral_ocr_image_obj.bottom_right_y,
-            base_64=mistral_ocr_image_obj.image_base64 if mistral_ocr_image_obj.image_base64 else None,
+            base_64=mistral_ocr_image_obj.image_base64 or None,
         )
 
     #########################################################

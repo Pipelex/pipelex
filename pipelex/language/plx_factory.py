@@ -47,7 +47,7 @@ class PlxFactory:
             if strings_config.ensure_leading_blank_line and not normalized.startswith("\n"):
                 normalized = "\n" + normalized
             if strings_config.ensure_trailing_newline and not normalized.endswith("\n"):
-                normalized = normalized + "\n"
+                normalized += "\n"
 
         use_literal = strings_config.prefer_literal and ("'''" not in normalized)
         return tomlkit_string(normalized, multiline=needs_multiline, literal=use_literal)

@@ -66,7 +66,7 @@ def app_callback(ctx: typer.Context) -> None:
 """
     )
     # Skip checks if no command is being run (e.g., just --help) or if running init/doctor command
-    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in ("init", "doctor"):
+    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"init", "doctor"}:
         return
 
     # Check system readiness (dependencies and venv for dev installs)

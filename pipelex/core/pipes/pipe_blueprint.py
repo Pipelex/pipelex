@@ -188,13 +188,6 @@ class PipeBlueprint(ABC, BaseModel):
                     msg = f"Invalid concept string or code '{concept_string_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
                     raise ValueError(msg) from exc
 
-            # Check that every input_name is unique
-            input_names = list(self.inputs.keys())
-            if len(input_names) != len(set(input_names)):
-                duplicates = [name for name in input_names if input_names.count(name) > 1]
-                msg = f"Duplicate input names found: {duplicates}. Input names must be unique."
-                raise ValueError(msg)
-
         self.validate_inputs()
 
     @final

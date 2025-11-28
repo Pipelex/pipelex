@@ -55,7 +55,7 @@ def search_for_nested_image_fields(
             current_field_type = potential_field_types[idx]
 
             # Check if it's a list or tuple generic type (e.g., list[ImageContent], tuple[ImageContent, ...])
-            if hasattr(field_specific_type, "__origin__") and field_specific_type.__origin__ in (list, tuple):  # type: ignore[union-attr]
+            if hasattr(field_specific_type, "__origin__") and field_specific_type.__origin__ in {list, tuple}:  # type: ignore[union-attr]
                 # Check if this container or its nested contents have images
                 if check_generic_container_for_images(field_specific_type):
                     paths.append(field_path)
@@ -144,7 +144,7 @@ def check_generic_container_for_images(container_type: Any) -> bool:
     container_args = getattr(container_type, "__args__", ())
     for arg_type in container_args:
         # Check if arg_type is itself a generic (nested list/tuple) - recurse!
-        if hasattr(arg_type, "__origin__") and arg_type.__origin__ in (list, tuple):  # type: ignore[union-attr]
+        if hasattr(arg_type, "__origin__") and arg_type.__origin__ in {list, tuple}:  # type: ignore[union-attr]
             if check_generic_container_for_images(arg_type):
                 return True
         # Check if it's a regular type
