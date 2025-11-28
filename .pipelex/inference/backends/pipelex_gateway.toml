@@ -250,6 +250,9 @@ model_id = "gemini-2.5-flash"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.30, output = 2.50 }
+sdk = "portkey_completions"
+structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-google-b19ef8"
 
 ["gemini-2.5-flash-lite"]
 model_id = "gemini-2.5-flash-lite"

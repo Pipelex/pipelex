@@ -72,12 +72,12 @@ DEEPSEEK_MODELS = [
 
 # --- Google Models (Gemini) ---------------------------------------------------------------------
 GOOGLE_MODELS = [
-    "gemini-2.0-flash",
+    # "gemini-2.0-flash",
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-pro",
-    "gemini-flash-1.5-8b",
-    "gemini-3.0-pro",
+    # "gemini-2.5-flash-lite",
+    # "gemini-2.5-pro",
+    # "gemini-flash-1.5-8b",
+    # "gemini-3.0-pro",
 ]
 
 # --- Groq Models --------------------------------------------------------------------------------
@@ -175,9 +175,9 @@ XAI_MODELS = [
 # --- All LLM Handles ----------------------------------------------------------------------------
 ALL_LLM_HANDLES = [
     # *AMAZON_MODELS,
-    *ANTHROPIC_MODELS,
+    # *ANTHROPIC_MODELS,
     # *DEEPSEEK_MODELS,
-    # *GOOGLE_MODELS,
+    *GOOGLE_MODELS,
     # *GROQ_MODELS,
     # *META_MODELS,
     # *MISTRAL_MODELS,
