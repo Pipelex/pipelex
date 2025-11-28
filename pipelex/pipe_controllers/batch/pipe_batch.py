@@ -36,6 +36,9 @@ class PipeBatch(PipeController):
         branch_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
         required_variables.update(branch_pipe.inputs.variables)
         # 2. Check that the input_list_stuff_name is in the inputs of the pipe
+        if self.batch_params.input_item_stuff_name not in required_variables:
+            msg = f"Input item name '{self.batch_params.input_item_stuff_name}' not found in inputs of branch pipe '{self.branch_pipe_code}'"
+            raise ValueError(msg)
         required_variables.remove(self.batch_params.input_item_stuff_name)
         required_variables.add(self.batch_params.input_list_stuff_name)
         return required_variables
@@ -54,7 +57,7 @@ class PipeBatch(PipeController):
 
     @override
     def validate_inputs_with_library(self):
-        # Check tha the item name is in the inputs of the branch_pipe
+        # Check that the item name is in the inputs of the branch_pipe
         branch_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
         if self.batch_params.input_item_stuff_name not in branch_pipe.inputs.variables:
             msg = f"Input item name '{self.batch_params.input_item_stuff_name}' not found in inputs of branch pipe '{self.branch_pipe_code}'"
