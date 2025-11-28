@@ -1,4 +1,3 @@
-import math
 from typing import Any
 
 import pytest
@@ -138,7 +137,7 @@ class TestDictUtils:
 
     def test_apply_to_strings_in_list_nested_lists(self) -> None:
         """Test apply_to_strings_in_list with nested lists."""
-        data = ["outer ${VAR}", [1, "inner ${NESTED}", ["deep ${DEEP}", math.pi]], "final ${END}"]
+        data = ["outer ${VAR}", [1, "inner ${NESTED}", ["deep ${DEEP}", 3.14]], "final ${END}"]
 
         def transform(s: str) -> str:
             return s.replace("${VAR}", "variable").replace("${NESTED}", "nested").replace("${DEEP}", "deep").replace("${END}", "end")
@@ -149,7 +148,7 @@ class TestDictUtils:
         assert result[1][0] == 1
         assert result[1][1] == "inner nested"
         assert result[1][2][0] == "deep deep"
-        assert result[1][2][1] == math.pi
+        assert result[1][2][1] == 3.14
         assert result[2] == "final end"
 
     def test_apply_to_strings_in_list_with_dictionaries(self) -> None:

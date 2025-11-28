@@ -22,7 +22,8 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
             converted_value = convert_to_markdown(data=_value, level=level + 1, key=_key)
             converted_value_nb_lines = len(converted_value.split("\n"))
             if converted_value_nb_lines > 1:
-                dict_result_lines.extend([converted_line, converted_value])
+                dict_result_lines.append(converted_line)  # noqa: FURB113
+                dict_result_lines.append(converted_value)
             else:
                 dict_result_lines.append(f"{converted_line}: {converted_value}")
         return "\n\n".join(line for line in dict_result_lines if line.strip())

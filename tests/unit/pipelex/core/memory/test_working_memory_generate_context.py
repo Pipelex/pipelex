@@ -1,5 +1,3 @@
-import math
-
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -225,7 +223,7 @@ class TestWorkingMemoryGenerateContext:
         assert isinstance(artefact[BaseStuffArtefactField.CONTENT], NumberContent)
 
         # Verify actual content value
-        assert artefact[BaseStuffArtefactField.CONTENT].number == math.pi
+        assert artefact[BaseStuffArtefactField.CONTENT].number == 3.14159
 
     def test_generate_context_artefact_independence(self, multiple_stuff_memory: WorkingMemory):
         """Test that each stuff generates independent artefacts."""

@@ -1,6 +1,5 @@
 """Template constants for testing."""
 
-import math
 from typing import Any, ClassVar
 
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
@@ -126,7 +125,7 @@ Format filter html:
     ANY_OBJECT: ClassVar[list[tuple[str, Any]]] = [  # topic, any_object
         ("string", "test_string"),
         ("integer", 42),
-        ("float", math.pi),
+        ("float", 3.14),
         ("boolean", True),
         ("list", ["item1", "item2", "item3"]),
         ("dict", {"key1": "value1", "key2": "value2"}),

@@ -1,5 +1,4 @@
 import json
-import math
 
 from pipelex.core.stuffs.json_content import JSONContent
 
@@ -39,7 +38,7 @@ class TestJSONContentEdgeCases:
         """Test JSONContent with various number types."""
         json_obj = {
             "integer": 42,
-            "float": math.pi,
+            "float": 3.14159,
             "negative": -10,
             "zero": 0,
             "scientific": 1.23e-4,

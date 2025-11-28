@@ -1,7 +1,5 @@
 """Tests for ConceptStructureBlueprint validation logic."""
 
-import math
-
 import pytest
 from pydantic import ValidationError
 
@@ -35,10 +33,8 @@ class TestConceptStructureBlueprintValidation:
         assert number_blueprint.default_value == 42
 
         # Valid number field with float default
-        float_blueprint = ConceptStructureBlueprint(
-            description="A number field", type=ConceptStructureBlueprintFieldType.NUMBER, default_value=math.pi
-        )
-        assert float_blueprint.default_value == math.pi
+        float_blueprint = ConceptStructureBlueprint(description="A number field", type=ConceptStructureBlueprintFieldType.NUMBER, default_value=3.14)
+        assert float_blueprint.default_value == 3.14
 
         # Valid list field with default
         list_blueprint = ConceptStructureBlueprint(

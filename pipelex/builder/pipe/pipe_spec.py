@@ -125,7 +125,7 @@ class PipeSpec(StructuredContent):
     def to_blueprint(self) -> PipeBlueprint:
         return PipeBlueprint(
             description=self.description,
-            inputs=self.inputs or None,
+            inputs=self.inputs,
             output=self.output,
             type=self.type,
             pipe_category=self.pipe_category,
