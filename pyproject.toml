@@ -310,6 +310,7 @@ ignore = [
     "FIX002", # Line contains TODO, consider resolving the issue
 
     "FURB101", # `open` and `read` should be replaced by `Path(file_path.path).read_text(encoding="utf-8")`
+    "FURB113", # Checks for consecutive calls to append.
     "FURB152", # Checks for literals that are similar to constants in math module.
 
     "LOG004", # `.exception()` call outside exception handlers

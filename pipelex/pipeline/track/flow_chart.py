@@ -197,7 +197,7 @@ class PipelineFlowChart:
             if subgraph_name == "root":
                 subgraph_lines.extend(_indent_line(mermaid_line, 2) for mermaid_line in node_lines)
             else:
-                subgraph_lines.append(_indent_line(f'subgraph "{subgraph_name}"', 1))  # noqa: FURB113
+                subgraph_lines.append(_indent_line(f'subgraph "{subgraph_name}"', 1))
                 subgraph_lines.append(_indent_line("direction LR", 1))
                 subgraph_lines.extend(_indent_line(mermaid_line, 2) for mermaid_line in node_lines)
                 subgraph_lines.append(_indent_line("end", 1))
