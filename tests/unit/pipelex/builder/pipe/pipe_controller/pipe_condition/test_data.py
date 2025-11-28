@@ -24,8 +24,6 @@ class PipeConditionTestCases:
             description="Conditional with template",
             inputs={"item": "Item"},
             output="native.Anything",
-            type="PipeCondition",
-            pipe_category="PipeController",
             expression=None,
             expression_template="{{ item.category }}",
             outcomes={

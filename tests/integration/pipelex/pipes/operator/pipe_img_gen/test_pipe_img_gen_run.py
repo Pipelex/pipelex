@@ -1,19 +1,17 @@
-from typing import TYPE_CHECKING, Callable, cast
+from typing import Callable, cast
 
 import pytest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_pipe_router
+from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen, PipeImgGenOutput
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
-from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from tests.integration.pipelex.test_data import ImageGenTestCases
-
-if TYPE_CHECKING:
-    from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGenOutput
 
 
 @pytest.mark.dry_runnable
@@ -38,8 +36,8 @@ class TestPipeImgGenRun:
         )
 
         pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=PipeImgGenFactory.make_from_blueprint(
-                domain="generic",
+            pipe=PipeFactory[PipeImgGen].make_from_blueprint(
+                domain_code="generic",
                 pipe_code="adhoc_for_test_pipe_img_gen",
                 blueprint=pipe_img_gen_blueprint,
             ),

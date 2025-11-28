@@ -4,8 +4,9 @@ from typing import Callable
 import pytest
 
 from pipelex import log
+from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
-from pipelex.pipe_operators.func.pipe_func_factory import PipeFuncFactory
 from tests.unit.pipelex.pipe_operators.pipe_func.data import PipeFuncInputTestCases
 
 
@@ -30,8 +31,8 @@ class TestPipeFuncValidation:
         """Test that PipeFunc works correctly with valid, registered functions."""
         log.verbose(f"Testing valid case: {test_id}")
 
-        pipe_func = PipeFuncFactory.make_from_blueprint(
-            domain="test_domain",
+        pipe_func = PipeFactory[PipeFunc].make_from_blueprint(
+            domain_code="test_domain",
             pipe_code=f"test_pipe_{test_id}",
             blueprint=blueprint,
         )

@@ -83,7 +83,6 @@ class TestConcept:
                     concept_code=NativeConceptCode.TEXT,
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(description=valid_definition),
-                    concept_codes_from_the_same_domain=["RandomConcept"],
                 ),
             )
             is True
@@ -104,7 +103,6 @@ class TestConcept:
                     concept_code=NativeConceptCode.IMAGE,
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(description=valid_definition),
-                    concept_codes_from_the_same_domain=["RandomConcept"],
                 ),
             )
             is True
@@ -115,7 +113,6 @@ class TestConcept:
                     concept_code=NativeConceptCode.PDF,
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(description=valid_definition),
-                    concept_codes_from_the_same_domain=["RandomConcept"],
                 ),
             )
             is True
@@ -126,7 +123,6 @@ class TestConcept:
                     concept_code=NativeConceptCode.TEXT_AND_IMAGES,
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(description=valid_definition),
-                    concept_codes_from_the_same_domain=["RandomConcept"],
                 ),
             )
             is True
@@ -137,7 +133,6 @@ class TestConcept:
                     concept_code=NativeConceptCode.NUMBER,
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(description=valid_definition),
-                    concept_codes_from_the_same_domain=["RandomConcept"],
                 ),
             )
             is True
@@ -148,7 +143,6 @@ class TestConcept:
                     concept_code=NativeConceptCode.ANYTHING,
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(description=valid_definition),
-                    concept_codes_from_the_same_domain=["RandomConcept"],
                 ),
             )
             is True
@@ -159,7 +153,6 @@ class TestConcept:
                     concept_code="RandomConcept",
                     domain=valid_domain,
                     blueprint=ConceptBlueprint(description=valid_definition),
-                    concept_codes_from_the_same_domain=["RandomConcept"],
                 ),
             )
             is False
@@ -226,25 +219,21 @@ class TestConcept:
             concept_code="Code1",
             domain="domain1",
             blueprint=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
-            concept_codes_from_the_same_domain=["Code1"],
         )
         concept2 = ConceptFactory.make_from_blueprint(
             concept_code="Code2",
             domain="domain1",
             blueprint=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
-            concept_codes_from_the_same_domain=["Code1"],
         )
         concept3 = ConceptFactory.make_from_blueprint(
             concept_code="Code3",
             domain="domain2",
             blueprint=ConceptBlueprint(description="Lorem Ipsum", structure="TextContent"),
-            concept_codes_from_the_same_domain=["Code1"],
         )
         concept4 = ConceptFactory.make_from_blueprint(
             concept_code="Code4",
             domain="domain1",
             blueprint=ConceptBlueprint(description="Lorem Ipsum", structure="ImageContent"),
-            concept_codes_from_the_same_domain=["Code1"],
         )
 
         concept_5 = ConceptFactory.make_native_concept(

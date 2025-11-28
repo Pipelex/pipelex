@@ -29,7 +29,7 @@ class DiscordMessage(StructuredContent):
     link: str = Field(..., description="Link to the message")
 
 
-class DiscordChannelUpdate(StructuredContent):
+class DiscordChannelUpdateE2E(StructuredContent):
     """Represents a Discord channel with its messages"""
 
     name: str = Field(..., description="Name of the Discord channel")
@@ -37,19 +37,21 @@ class DiscordChannelUpdate(StructuredContent):
     messages: list[DiscordMessage] = Field(default_factory=empty_list_factory_of(DiscordMessage), description="List of messages in the channel")
 
 
-class ChannelSummary(StructuredContent):
+class ChannelSummaryE2E(StructuredContent):
     """Represents a summarized Discord channel for newsletter inclusion"""
 
     channel_name: str = Field(..., description="Name of the Discord channel")
     summary_items: list[str] = Field(..., description="Well-written summaries of the channel's activity")
 
 
-class Newsletter(StructuredContent):
+class NewsletterE2E(StructuredContent):
     """Represents the final newsletter content"""
 
     weekly_summary: str = Field(..., description="200 character summary of weekly Share channel content")
     new_members: list[str] = Field(default_factory=empty_list_factory_of(str), description="New member introductions in bullet points")
-    channel_sections: list[ChannelSummary] = Field(default_factory=empty_list_factory_of(ChannelSummary), description="Ordered channel summaries")
-    geographic_hubs: list[ChannelSummary] = Field(
-        default_factory=empty_list_factory_of(ChannelSummary), description="Geographic hub channels grouped at end"
+    channel_sections: list[ChannelSummaryE2E] = Field(
+        default_factory=empty_list_factory_of(ChannelSummaryE2E), description="Ordered channel summaries"
+    )
+    geographic_hubs: list[ChannelSummaryE2E] = Field(
+        default_factory=empty_list_factory_of(ChannelSummaryE2E), description="Geographic hub channels grouped at end"
     )

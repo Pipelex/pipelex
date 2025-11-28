@@ -96,8 +96,6 @@ class PipeExtractSpec(PipeSpec):
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
-            type=self.type,
-            pipe_category=self.pipe_category,
             model=extract_model_choice,
             page_images=self.page_images,
             page_image_captions=self.page_image_captions,

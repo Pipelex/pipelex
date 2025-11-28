@@ -4,7 +4,6 @@ from pipelex.types import StrEnum
 
 
 class SpecialDomain(StrEnum):
-    IMPLICIT = "implicit"
     NATIVE = "native"
 
     @classmethod
@@ -17,8 +16,6 @@ class SpecialDomain(StrEnum):
         match enum_value:
             case SpecialDomain.NATIVE:
                 return True
-            case SpecialDomain.IMPLICIT:
-                return False
 
 
 class Domain(BaseModel):

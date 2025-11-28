@@ -24,8 +24,6 @@ class PipeSequenceTestCases:
             description="A sequence of operations",
             inputs={"input_data": "Text"},
             output="ProcessedData",
-            type="PipeSequence",
-            pipe_category="PipeController",
             steps=[
                 SubPipeBlueprint(pipe="step1", result="result1"),
                 SubPipeBlueprint(pipe="step2", result="result2"),

@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.dry_runnable
+@pytest.mark.llm
+@pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeSequenceDryRun:
     async def test_discord_newsletter_dry_run_working_memory(

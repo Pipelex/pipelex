@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import ValidationError
 from typing_extensions import override
 
@@ -7,7 +9,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
@@ -21,15 +23,19 @@ from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
     @classmethod
     @override
-    def make_from_blueprint(
+    def make(
         cls,
-        domain: str,
+        pipe_category: Any,
+        pipe_type: str,
         pipe_code: str,
+        domain_code: str,
+        description: str | None,
+        inputs: InputRequirements,
+        output: Concept,
         blueprint: PipeLLMBlueprint,
-        concept_codes_from_the_same_domain: list[str] | None = None,
     ) -> PipeLLM:
         system_prompt = blueprint.system_prompt
-        if not system_prompt and (domain_obj := get_optional_domain(domain=domain)):
+        if not system_prompt and (domain_obj := get_optional_domain(domain=domain_code)):
             system_prompt = domain_obj.system_prompt
 
         system_prompt_jinja2_blueprint: TemplateBlueprint | None = None
@@ -42,7 +48,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             except ValidationError as exc:
                 error_msg = (
                     f"Template syntax error in system prompt for pipe '{pipe_code}'"
-                    f"in domain '{domain}': {exc}. Template source:\n{blueprint.system_prompt}"
+                    f"in domain '{domain_code}': {exc}. Template source:\n{blueprint.system_prompt}"
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
@@ -55,7 +61,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 )
             except Jinja2TemplateSyntaxError as exc:
                 error_msg = (
-                    f"Template syntax error in user prompt for pipe '{pipe_code}' in domain '{domain}': {exc}. Template source:\n{blueprint.prompt}"
+                    f"Template syntax error in user prompt for pipe '{pipe_code}' in domain '{domain_code}': "
+                    f"{exc}. Template source:\n{blueprint.prompt}"
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
@@ -66,9 +73,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 input_parse_result = parse_concept_with_multiplicity(requirement_str)
 
                 domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                    domain=domain,
+                    domain=domain_code,
                     concept_string_or_code=input_parse_result.concept,
-                    concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
                 )
                 concept = get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(
@@ -106,25 +112,12 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             multiple_items=output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, bool) else None,
         )
 
-        # Use concept without brackets for output concept resolution
-        output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
-            concept_string_or_code=output_parse_result.concept,
-            concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-        )
-        output_concept_domain, output_concept_code = output_domain_and_code.domain, output_domain_and_code.concept_code
         return PipeLLM(
-            domain=domain,
+            domain=domain_code,
             code=pipe_code,
-            description=blueprint.description,
-            inputs=InputRequirementsFactory.make_from_blueprint(
-                domain=domain,
-                blueprint=blueprint.inputs or {},
-                concept_codes_from_the_same_domain=concept_codes_from_the_same_domain,
-            ),
-            output=get_required_concept(
-                concept_string=ConceptFactory.make_concept_string_with_domain(domain=output_concept_domain, concept_code=output_concept_code),
-            ),
+            description=description,
+            inputs=inputs,
+            output=output,
             llm_prompt_spec=llm_prompt_spec,
             llm_choices=llm_choices,
             structuring_method=blueprint.structuring_method,
