@@ -61,7 +61,7 @@ def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
         origin = get_origin(type_param)
 
         # Handle unions, including PEP 604 (T | None)
-        if origin in (Union, _UnionType):
+        if origin in {Union, _UnionType}:
             for arg in get_args(type_param):
                 if arg is _NoneType:
                     continue

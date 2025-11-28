@@ -69,7 +69,6 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
 
     Args:
         pipes: List of pipes to dry run
-        run_in_parallel: If True, run pipes in parallel using ThreadPoolExecutor. If False, run sequentially.
         raise_on_failure: If True, raise an exception if any pipe fails.
 
     For each pipe, this method:

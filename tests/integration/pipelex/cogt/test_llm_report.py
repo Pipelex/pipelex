@@ -11,7 +11,7 @@ from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
 @pytest.mark.asyncio
-async def test_llm_report_without_running_anything():
+def test_llm_report_without_running_anything():
     get_report_delegate().generate_report()
 
 

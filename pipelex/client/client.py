@@ -96,9 +96,9 @@ class PipelexClient(PipelexProtocol):
             output_name: Name of the output slot to write to
             output_multiplicity: Output multiplicity setting
             dynamic_output_concept_code: Override for the dynamic output concept code
-        Returns:
-            PipelineResponse: Complete execution results including pipeline state and output
 
+        Returns:
+            Complete execution results including pipeline state and output
         """
         if not pipe_code and not plx_content:
             msg = "Either pipe_code or plx_content must be provided to the API execute_pipeline."
@@ -142,8 +142,9 @@ class PipelexClient(PipelexProtocol):
             output_name: Name of the output slot to write to
             output_multiplicity: Output multiplicity setting
             dynamic_output_concept_code: Override for the dynamic output concept code
+
         Returns:
-            PipelineResponse: Initial response with pipeline_run_id and created_at timestamp
+            Initial response with pipeline_run_id and created_at timestamp
         """
         if not pipe_code and not plx_content:
             msg = "Either pipe_code or plx_content must be provided to the API start_pipeline."

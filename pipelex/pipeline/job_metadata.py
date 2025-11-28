@@ -30,7 +30,7 @@ class JobMetadata(BaseModel):
     unit_job_id: str | None = None
     job_category: JobCategory | None = None
 
-    started_at: datetime | None = Field(default_factory=lambda: datetime.now())
+    started_at: datetime | None = Field(default_factory=datetime.now)
     completed_at: datetime | None = None
 
     @property

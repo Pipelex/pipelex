@@ -1,14 +1,13 @@
-from enum import Enum
-
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.interpreter.validation_error_categorizer import ErrorCatKey
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.types import StrEnum
 
 
-class ModelScope(str, Enum):
+class ModelScope(StrEnum):
     """Indicates which type of model is being validated."""
 
     PIPE = "pipe"
@@ -43,10 +42,10 @@ def categorize_pipe_validation_error(
         if loc:
             field_name = str(loc[0])
             # Concept-specific fields
-            if field_name in ("structure_class_name", "refines"):
+            if field_name in {"structure_class_name", "refines"}:
                 model_scope = ModelScope.CONCEPT
             # Pipe-specific fields
-            elif field_name in ("type", "inputs", "output", "pipe_category"):
+            elif field_name in {"type", "inputs", "output", "pipe_category"}:
                 model_scope = ModelScope.PIPE
             # Ambiguous fields - try to infer from error message
             else:

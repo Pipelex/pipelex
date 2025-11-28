@@ -151,7 +151,7 @@ class ModelDeck(ConfigModel):
                 raise ModelDeckValidatonError(msg) from exc
 
     ############################################################
-    #### ModelDeck validations
+    # ModelDeck validations
     ############################################################
 
     @classmethod

@@ -60,7 +60,7 @@ class PipeLLMBlueprint(PipeBlueprint):
                 raise ValueError(msg) from exc
         # Filter out internal variables that start with underscore and special variables
         # TODO: replace magic strings by StrEnum and also, make this check clearer and more readable
-        required_variables = {var for var in required_variables if not var.startswith("_") and var not in ("preliminary_text", "place_holder")}
+        required_variables = {var for var in required_variables if not var.startswith("_") and var not in {"preliminary_text", "place_holder"}}
 
         # Check that all required variables are in inputs
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
