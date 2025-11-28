@@ -45,27 +45,38 @@ fast-img-gen = "fast-lightning-sdxl"
 [waterfalls]
 smart_llm = [
     "claude-4.5-sonnet",
+    # "claude-4.5-opus",
+    "gemini-3.0-pro",
     "claude-4.1-opus",
-    "claude-4-sonnet",
     "gemini-2.5-pro",
-    "gpt-4o",            # we're using gpt-4o here rather than gpt-5 until we'll handle reasoning parameters
+    "claude-4-sonnet",
+    "gpt-4o",          # we're using gpt-4o here rather than gpt-5 until we'll handle reasoning parameters
     "grok-3",
 ]
 smart_llm_with_vision = [
     "claude-4.5-sonnet",
+    # "claude-4.5-opus",
+    "gemini-3.0-pro",
     "claude-4.1-opus",
-    "claude-4-sonnet",
     "gemini-2.5-pro",
-    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
+    "claude-4-sonnet",
+    "gpt-4o",          # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
     "grok-3",
 ]
 smart_llm_for_structured = [
     "claude-4.5-sonnet",
+    # "claude-4.5-opus",
+    "gemini-3.0-pro",
     "claude-4.1-opus",
     "claude-4-sonnet",
-    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
+    "gpt-4o",          # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
 ]
-llm_for_creativity = ["claude-4.1-opus", "gemini-2.5-pro", "gpt-4o"]
+llm_for_creativity = [
+    "claude-4.5-opus",
+    "claude-4.1-opus",
+    "gemini-2.5-pro",
+    "gpt-4o",
+]
 llm_for_large_codebase = [
     "gemini-2.5-pro",
     "claude-4.5-sonnet",
