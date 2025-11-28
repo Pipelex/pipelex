@@ -208,9 +208,6 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "portkey_completions"
 structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-claude-aae09f"
-# x-portkey-trace-id = "pipe_builder"
-# x-portkey-span-id = "pipe_builder"
-# x-portkey-span-name = "Pipe builder"
 
 ["claude-4.5-haiku"]
 model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
@@ -232,6 +229,7 @@ max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
 sdk = "portkey_completions"
 structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-claude-aae09f"
 
 # --- Gemini LLMs --------------------------------------------------------------
 ["gemini-2.0-flash"]

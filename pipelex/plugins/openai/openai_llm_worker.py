@@ -162,7 +162,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             msg = f"Unit job id is not set for LLM job: {llm_job}"
             raise LLMCompletionError(msg)
         model_kind = llm_job.job_metadata.unit_job_id.model_kind
-        span_id = f"{model_kind}({inference_model.name}) -> {output_desc}"
+        span_id = f"{model_kind} -> {output_desc}"
         extra_headers["x-portkey-span-id"] = span_id
         extra_headers["x-portkey-span-name"] = f"{last_pipe_job_id}: {span_id}"
         return extra_headers
