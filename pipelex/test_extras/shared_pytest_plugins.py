@@ -11,9 +11,10 @@ from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_plac
 
 # List of environment variables that may need placeholders in CI
 ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI = [
-    "PIPELEX_API_TOKEN",
+    "PIPELEX_API_KEY",
     "PIPELEX_API_BASE_URL",
     "PIPELEX_INFERENCE_API_KEY",
+    "PIPELEX_GATEWAY_API_KEY",
     "OPENAI_API_KEY",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
