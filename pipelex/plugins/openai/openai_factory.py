@@ -12,7 +12,7 @@ from openai.types.completion_usage import CompletionUsage
 
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMPromptParameterError
-from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImagePath, PromptImageUrl
+from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageDetail, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
@@ -101,7 +101,7 @@ class OpenAIFactory:
             user_contents.append(user_part_text)
         if llm_prompt.user_images:
             for prompt_image in llm_prompt.user_images:
-                openai_image_url = cls.make_openai_image_url(prompt_image=prompt_image)
+                openai_image_url = cls.make_openai_image_url(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
                 image_param = ChatCompletionContentPartImageParam(image_url=openai_image_url, type="image_url")
                 user_contents.append(image_param)
 
@@ -109,17 +109,19 @@ class OpenAIFactory:
         return messages
 
     @classmethod
-    def make_openai_image_url(cls, prompt_image: PromptImage) -> ImageURL:
+    def make_openai_image_url(cls, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ImageURL:
+        if detail is None:
+            detail = PromptImageDetail.AUTO
         if isinstance(prompt_image, PromptImageUrl):
             url = prompt_image.url
-            openai_image_url = ImageURL(url=url, detail="high")
+            openai_image_url = ImageURL(url=url, detail=detail.as_openai_detail)
         elif isinstance(prompt_image, PromptImageBase64):
             # TODO: manage image type
             url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.base_64.decode('utf-8')}"
-            openai_image_url = ImageURL(url=url_with_bytes, detail="high")
+            openai_image_url = ImageURL(url=url_with_bytes, detail=detail.as_openai_detail)
         elif isinstance(prompt_image, PromptImagePath):
             image_bytes = load_binary_as_base64(path=prompt_image.file_path)
-            return cls.make_openai_image_url(PromptImageBase64(base_64=image_bytes))
+            return cls.make_openai_image_url(prompt_image=PromptImageBase64(base_64=image_bytes), detail=detail)
         else:
             msg = f"prompt_image of type {type(prompt_image)} is not supported"
             raise LLMPromptParameterError(msg)

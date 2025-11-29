@@ -2,7 +2,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
-from pipelex.cogt.image.prompt_image import PromptImageBase64, PromptImagePath
+from pipelex.cogt.image.prompt_image import PromptImageBase64, PromptImageDetail, PromptImagePath
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
@@ -27,7 +27,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
                 user_images=[prompt_image],
             ),
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, image_detail=PromptImageDetail.LOW, seed=None),
         )
 
         try:
@@ -49,7 +49,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
                 user_images=[prompt_image],
             ),
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, image_detail=PromptImageDetail.LOW, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -69,7 +69,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
                 user_images=[prompt_image],
             ),
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=1000, image_detail=PromptImageDetail.LOW, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -90,7 +90,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_IMAGES_COMPARE_PROMPT,
                 user_images=[prompt_image1, prompt_image2],
             ),
-            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=2000, seed=None),
+            llm_job_params=LLMJobParams(temperature=0.5, max_tokens=2000, image_detail=PromptImageDetail.LOW, seed=None),
         )
         try:
             generated_text = await llm_worker.gen_text(llm_job=llm_job)

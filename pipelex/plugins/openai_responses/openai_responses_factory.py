@@ -3,13 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from pipelex.cogt.exceptions import LLMPromptParameterError
-from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImagePath, PromptImageUrl
+from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 
 if TYPE_CHECKING:
     import openai
-    from openai.types.chat.chat_completion_content_part_image_param import ImageURL
     from openai.types.responses import (
         ResponseInputImageParam,
         ResponseInputItemParam,
@@ -18,6 +17,7 @@ if TYPE_CHECKING:
         ResponseUsage,
     )
 
+    from pipelex.cogt.image.prompt_image import PromptImage
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.plugins.plugin_sdk_registry import Plugin
@@ -47,7 +47,7 @@ class OpenAIResponsesFactory:
             user_contents.append(text_content)
 
         for prompt_image in llm_prompt.user_images:
-            image_content = cls._make_image_content(prompt_image=prompt_image)
+            image_content = cls._make_image_content(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
             user_contents.append(image_content)
 
         if not user_contents:
@@ -63,25 +63,11 @@ class OpenAIResponsesFactory:
         return input_items
 
     @classmethod
-    def _make_image_content(cls, prompt_image: PromptImage) -> ResponseInputImageParam:
-        openai_image_url = cls._make_openai_image_url(prompt_image=prompt_image)
-        detail = openai_image_url.get("detail") or "high"
-        return {"type": "input_image", "image_url": openai_image_url["url"], "detail": detail}
-
-    @classmethod
-    def _make_openai_image_url(cls, prompt_image: PromptImage) -> ImageURL:
-        if isinstance(prompt_image, PromptImageUrl):
-            url = prompt_image.url
-            openai_image_url: ImageURL = {"url": url, "detail": "high"}
-        elif isinstance(prompt_image, PromptImageBase64):
-            url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.base_64.decode('utf-8')}"
-            openai_image_url = {"url": url_with_bytes, "detail": "high"}
-        elif isinstance(prompt_image, PromptImagePath):
-            openai_image_url = OpenAIFactory.make_openai_image_url(prompt_image=prompt_image)
-        else:
-            msg = f"prompt_image of type {type(prompt_image)} is not supported"
-            raise LLMPromptParameterError(msg)
-        return openai_image_url
+    def _make_image_content(cls, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ResponseInputImageParam:
+        if detail is None:
+            detail = PromptImageDetail.AUTO
+        openai_image_url = OpenAIFactory.make_openai_image_url(prompt_image=prompt_image, detail=detail)
+        return {"type": "input_image", "image_url": openai_image_url["url"], "detail": detail.as_openai_detail}
 
     @staticmethod
     def make_nb_tokens_by_category(usage: ResponseUsage) -> NbTokensByCategoryDict:

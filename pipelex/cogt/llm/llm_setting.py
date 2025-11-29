@@ -2,6 +2,7 @@ from typing import Literal, Union
 
 from pydantic import Field, field_validator
 
+from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.system.configuration.config_model import ConfigModel
@@ -12,6 +13,7 @@ class LLMSetting(ConfigModel):
     model: str
     temperature: float = Field(..., ge=0, le=1)
     max_tokens: int | None = None
+    image_detail: PromptImageDetail | None = Field(default=None, strict=False)
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
 
     @field_validator("max_tokens", mode="before")
@@ -26,6 +28,7 @@ class LLMSetting(ConfigModel):
         return LLMJobParams(
             temperature=self.temperature,
             max_tokens=self.max_tokens,
+            image_detail=self.image_detail,
             seed=None,
         )
 

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 
 ########################################################################
@@ -10,6 +11,7 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 class LLMJobParams(BaseModel):
     temperature: float = Field(..., ge=0, le=1)
     max_tokens: int | None = Field(None, gt=0)
+    image_detail: PromptImageDetail | None = None
     seed: int | None = Field(None, ge=0)
 
 

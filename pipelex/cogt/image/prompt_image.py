@@ -1,6 +1,6 @@
 import base64
 from abc import ABC
-from typing import Union
+from typing import Literal, Union
 
 from pydantic import BaseModel
 from typing_extensions import override
@@ -13,6 +13,17 @@ from pipelex.tools.misc.filetype_utils import (
     detect_file_type_from_path,
 )
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
+from pipelex.types import StrEnum
+
+
+class PromptImageDetail(StrEnum):
+    HIGH = "high"
+    LOW = "low"
+    AUTO = "auto"
+
+    @property
+    def as_openai_detail(self) -> Literal["high", "low", "auto"]:
+        return self.value
 
 
 class PromptImageTypedBase64(CustomBaseModel):

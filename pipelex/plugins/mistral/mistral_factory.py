@@ -99,7 +99,7 @@ class MistralFactory:
 
         if user_images := llm_prompt.user_images:
             for prompt_image in user_images:
-                openai_image_url = OpenAIFactory.make_openai_image_url(prompt_image=prompt_image)
+                openai_image_url = OpenAIFactory.make_openai_image_url(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
                 image_param = ChatCompletionContentPartImageParam(image_url=openai_image_url, type="image_url")
                 user_contents.append(image_param)
 
