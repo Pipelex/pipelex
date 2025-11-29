@@ -270,16 +270,37 @@ costs = { input = 2, output = 12.0 }
 # --- XAI LLMs --------------------------------------------------------------
 
 [grok-3]
-model_id = "grok-3"
 inputs = ["text"]
-outputs = ["text"]
+outputs = ["text", "structured"]
 costs = { input = 3, output = 15 }
+sdk = "portkey_completions"
+structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-xai-70a222"
 
 [grok-3-mini]
 model_id = "grok-3-mini"
 inputs = ["text"]
-outputs = ["text"]
+outputs = ["text", "structured"]
 costs = { input = 0.3, output = 0.5 }
+sdk = "portkey_completions"
+structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-xai-70a222"
+
+[grok-4]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+sdk = "portkey_completions"
+structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-xai-70a222"
+
+[grok-4-fast]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+sdk = "portkey_completions"
+structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-xai-70a222"
 
 ################################################################################
 # OCR and IMAGE GENERATION MODELS

@@ -166,10 +166,12 @@ QWEN_MODELS = [
 
 # --- XAI Models (Grok) --------------------------------------------------------------------------
 XAI_MODELS = [
-    "grok-3",
-    "grok-3-fast",
-    "grok-3-mini",
-    "grok-3-mini-fast",
+    # "grok-3",
+    # "grok-3-fast",
+    # "grok-3-mini",
+    # "grok-3-mini-fast",
+    # "grok-4",
+    "grok-4-fast",
 ]
 
 # --- All LLM Handles ----------------------------------------------------------------------------
@@ -177,7 +179,7 @@ ALL_LLM_HANDLES = [
     # *AMAZON_MODELS,
     # *ANTHROPIC_MODELS,
     # *DEEPSEEK_MODELS,
-    *GOOGLE_MODELS,
+    # *GOOGLE_MODELS,
     # *GROQ_MODELS,
     # *META_MODELS,
     # *MISTRAL_MODELS,
@@ -185,7 +187,7 @@ ALL_LLM_HANDLES = [
     # *OPENAI_MODELS,
     # *OPENAI_OSS_MODELS,
     # *QWEN_MODELS,
-    # *XAI_MODELS,
+    *XAI_MODELS,
 ]
 
 
