@@ -12,6 +12,7 @@ from pipelex.cogt.exceptions import (
     InferenceModelSpecError,
 )
 from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsReport, CredentialsValidationReport
 from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendBlueprint,
     InferenceBackendFactory,
@@ -20,7 +21,6 @@ from pipelex.cogt.model_backends.model_spec_factory import (
     InferenceModelSpecBlueprint,
     InferenceModelSpecFactory,
 )
-from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.environment import get_optional_env
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.dict_utils import (
@@ -41,33 +41,7 @@ from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
-
-
-class BackendCredentialStatus(ConfigModel):
-    """Status of a single credential variable."""
-
-    var_name: str
-    is_set: bool
-    is_placeholder: bool  # True if value exists but is a placeholder like "${VAR}"
-
-
-class BackendCredentialsReport(ConfigModel):
-    """Report of credential status for a backend."""
-
-    backend_name: str
-    required_vars: list[str]
-    missing_vars: list[str]
-    placeholder_vars: list[str]
-    all_credentials_valid: bool
-
-
-class CredentialsValidationReport(ConfigModel):
-    """Complete report of credentials validation across all backends."""
-
-    backend_reports: dict[str, BackendCredentialsReport]
-    all_backends_valid: bool
 
 
 class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):

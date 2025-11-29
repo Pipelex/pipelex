@@ -14,6 +14,8 @@ from pipelex.cli.commands.init.ui.routing_ui import (
     prompt_fallback_order,
     prompt_primary_backend,
 )
+from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
@@ -47,11 +49,11 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
         backend_options = get_backend_options_from_toml(template_backends_path, backends_toml_path)
 
-        # Case 1: pipelex_inference is enabled - keep pipelex_first
-        if "pipelex_inference" in selected_backend_keys:
-            toml_doc["active"] = "pipelex_first"
+        # Case 1: pipelex_gateway is enabled - keep pipelex_first
+        if PipelexBackend.official_backend() in selected_backend_keys:
+            toml_doc["active"] = PipelexRoutingProfile.PIPELEX_FIRST
             save_toml_to_path(toml_doc, routing_profiles_toml_path)
-            display_routing_profile_result(console, "pipelex_first", created=False)
+            display_routing_profile_result(console, PipelexRoutingProfile.PIPELEX_FIRST, created=False)
             return
 
         # Case 2: Only one backend selected - use all_{backend_key} profile
@@ -88,7 +90,7 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
             display_routing_profile_result(console, profile_name, created=not profile_exists)
             return
 
-        # Case 3: Multiple backends (no pipelex_inference) - create/update custom_routing profile
+        # Case 3: Multiple backends (no pipelex_gateway) - create/update custom_routing profile
         console.print()
         console.print("[cyan]Setting up routing for multiple backends...[/cyan]")
         console.print()

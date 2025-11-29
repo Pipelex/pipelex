@@ -78,7 +78,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                     f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
                 )
                 temperature = 1
-            extra_headers = self._make_extra_headers(llm_job=llm_job, inference_model=self.inference_model, output_desc="Text")
+            extra_headers = self._make_extra_headers(llm_job=llm_job, output_desc="Text")
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
                 temperature=temperature,
@@ -125,7 +125,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
                 )
                 temperature = 1
             try:
-                extra_headers = self._make_extra_headers(llm_job=llm_job, inference_model=self.inference_model, output_desc=schema.__name__)
+                extra_headers = self._make_extra_headers(llm_job=llm_job, output_desc=schema.__name__)
                 result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                     model=self.inference_model.model_id,
                     temperature=temperature,
@@ -151,7 +151,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
 
         return result_object
 
-    def _make_extra_headers(self, llm_job: LLMJob, inference_model: InferenceModelSpec, output_desc: str) -> dict[str, str]:
+    def _make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
         if llm_job.job_metadata.pipe_job_ids:
             last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]
         else:

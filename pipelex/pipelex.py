@@ -23,6 +23,7 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
@@ -207,24 +208,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         except InferenceBackendCredentialsError as credentials_exc:
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
-            error_msg: str
-            if isinstance(secrets_provider, EnvSecretsProvider):
-                error_msg = (
-                    f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},\n"
-                    f"you need to add '{var_name}' to your environment variables or to your .env file."
-                )
-            else:
-                error_msg = (
-                    f"Could not get credentials for inference backend '{backend_name}':\n{credentials_exc},\n"
-                    f"check that secret '{var_name}' is available from your secrets provider."
-                )
-            if credentials_exc.backend_name == "pipelex_inference":
-                error_msg += (
-                    "\nYou can check the project's README about getting a Pipelex Inference API key,\n\n"
-                    "or you can bring your own 'OPENAI_API_KEY', "
-                    "'AZURE_OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'MISTRAL_API_KEY' etc.\n"
-                    "--> choose which inference backends to enable in '.pipelex/inference/backends.toml'\n"
-                )
+            error_msg = BackendCredentialsErrorMsgFactory.make_one_variable_missing_error_msg(
+                secrets_provider=secrets_provider, backend_name=backend_name, var_name=var_name
+            )
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
 

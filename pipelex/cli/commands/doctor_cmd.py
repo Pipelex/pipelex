@@ -19,6 +19,7 @@ from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.exceptions import InferenceBackendLibraryError
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
@@ -425,6 +426,9 @@ def display_health_report(
                     console.print(f"    [red]✗[/red] Missing: {', '.join(backend_credential_report.missing_vars)}")
                 if backend_credential_report.placeholder_vars:
                     console.print(f"    [yellow]⚠[/yellow] Placeholders: {', '.join(backend_credential_report.placeholder_vars)}")
+
+        error_msg = BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(backend_credential_reports=backend_credential_reports)
+        console.print(error_msg)
     console.print()
 
     # Models section
@@ -483,7 +487,7 @@ def display_health_report(
         )
 
         if has_recommendations:
-            console.print("[bold]Recommended Actions[/bold]")
+            console.print("[bold]Possible Solutions[/bold]")
 
             if can_auto_fix_config:
                 console.print("  • Run [cyan]pipelex init config[/cyan] to install missing configuration files")

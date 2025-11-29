@@ -167,12 +167,12 @@ def prompt_backend_indices(
     Raises:
         typer.Exit: If user chooses to quit.
     """
-    # Determine default based on current selection or fallback to first option (pipelex_inference)
+    # Determine default based on current selection or fallback to first option (pipelex_gateway)
     if currently_enabled and not is_first_time_setup:
         default_indices = sorted(currently_enabled)
         default_str = ",".join(str(i + 1) for i in default_indices)
     else:
-        # For first-time setup or no current selection, default to pipelex_inference (index 0)
+        # For first-time setup or no current selection, default to pipelex_gateway (index 0)
         default_indices = [0]
         default_str = "1"
 

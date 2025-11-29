@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.kit.paths import get_kit_configs_dir
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
 
@@ -22,7 +23,7 @@ class TestInputValidation:
         # User inputs: invalid index, then valid
         env.add_confirm_input(True)  # Confirm initialization
         env.add_prompt_input("99")  # Invalid index
-        env.add_prompt_input("1")  # Valid: pipelex_inference
+        env.add_prompt_input("1")  # Valid: pipelex_gateway
         env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
@@ -31,7 +32,7 @@ class TestInputValidation:
         init_cmd(focus=InitFocus.ALL, reset=False)
 
         # Verify successful completion with valid selection
-        env.verify_backends_enabled(["pipelex_inference"])
+        env.verify_backends_enabled([PipelexBackend.GATEWAY])
 
     def test_invalid_non_numeric_input_then_valid(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 8.2: Non-numeric input, then valid."""
@@ -42,7 +43,7 @@ class TestInputValidation:
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
         env.add_prompt_input("abc")  # Invalid non-numeric
-        env.add_prompt_input("1")  # Valid: pipelex_inference
+        env.add_prompt_input("1")  # Valid: pipelex_gateway
         env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
@@ -51,7 +52,7 @@ class TestInputValidation:
         init_cmd(focus=InitFocus.ALL, reset=False)
 
         # Verify successful completion
-        env.verify_backends_enabled(["pipelex_inference"])
+        env.verify_backends_enabled([PipelexBackend.GATEWAY])
 
     def test_space_separated_backend_indices(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 8.3: Space-separated backend indices."""
@@ -87,7 +88,7 @@ class TestInputValidation:
 
         # User inputs: empty string for default
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("")  # Empty = default (pipelex_inference)
+        env.add_prompt_input("")  # Empty = default (pipelex_gateway)
         env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
@@ -96,7 +97,7 @@ class TestInputValidation:
         init_cmd(focus=InitFocus.ALL, reset=False)
 
         # Verify default backend is selected
-        env.verify_backends_enabled(["pipelex_inference"])
+        env.verify_backends_enabled([PipelexBackend.GATEWAY])
 
     def test_invalid_telemetry_selection_then_valid(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 8.6: Invalid telemetry selection."""

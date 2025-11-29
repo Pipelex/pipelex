@@ -200,6 +200,17 @@ def execute_initialization(
     # Step 2: Set up inference backends if needed
     if needs_inference:
         console.print()
+
+        # If reset is True and we didn't already copy via config init, copy the template file first
+        if reset and not backends_just_copied_during_config:
+            template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
+
+            if path_exists(template_backends_path):
+                os.makedirs(os.path.dirname(backends_toml_path), exist_ok=True)
+                shutil.copy2(template_backends_path, backends_toml_path)
+                console.print("✅ Reset backends.toml from template")
+                first_time_setup = True  # Treat as first-time setup since we just replaced the file
+
         customize_backends_config(is_first_time_setup=first_time_setup)
 
         # Automatically set up routing after backends (unless routing is the specific focus)

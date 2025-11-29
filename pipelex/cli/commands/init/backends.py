@@ -85,7 +85,7 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
         currently_enabled = get_currently_enabled_backends(backends_toml_path, backend_options)
 
         # If this is first-time setup, ignore what's in the template (all enabled)
-        # and use only pipelex_inference as the default
+        # and use only pipelex_gateway as the default
         if is_first_time_setup or (currently_enabled and len(currently_enabled) == len(backend_options)):
             currently_enabled = []
 

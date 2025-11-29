@@ -4,6 +4,42 @@ from pydantic import Field
 
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.types import StrEnum
+
+
+class PipelexBackend(StrEnum):
+    """Special Pipelex-managed inference backends."""
+
+    GATEWAY = "pipelex_gateway"
+    LEGACY_INFERENCE = "pipelex_inference"  # Legacy, deprecated
+
+    @property
+    def display_name(self) -> str:
+        match self:
+            case PipelexBackend.GATEWAY:
+                return "Pipelex Gateway"
+            case PipelexBackend.LEGACY_INFERENCE:
+                return "Pipelex Inference (deprecated)"
+
+    @classmethod
+    def official_backend(cls) -> "PipelexBackend":
+        return cls.GATEWAY
+
+    @classmethod
+    def official_backend_display_name(cls) -> str:
+        return cls.official_backend().display_name
+
+    @classmethod
+    def is_official_backend(cls, backend_name: str) -> bool:
+        try:
+            the_backend = cls(backend_name)
+        except ValueError:
+            return False
+        match the_backend:
+            case PipelexBackend.GATEWAY:
+                return True
+            case PipelexBackend.LEGACY_INFERENCE:
+                return False
 
 
 class InferenceBackend(ConfigModel):

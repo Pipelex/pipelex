@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 from pipelex.cli.commands.init.backends import customize_backends_config
 from pipelex.cli.commands.init.config_files import init_config
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
 
@@ -35,7 +36,7 @@ def get_backend_indices(backends_toml_path: str, backend_names: list[str]) -> li
 
 class TestBackendCustomization:
     def test_customize_backends_config_with_default_selection(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test backend customization with default selection (pipelex_inference)."""
+        """Test backend customization with default selection (pipelex_gateway)."""
         # Setup directories with actual backends.toml
         inference_dir = tmp_path / ".pipelex" / "inference"
         inference_dir.mkdir(parents=True)
@@ -60,9 +61,9 @@ class TestBackendCustomization:
         # Verify backends.toml was customized
         toml_doc = load_toml_with_tomlkit(str(test_backends))
 
-        # pipelex_inference should be enabled
-        assert "enabled" in toml_doc["pipelex_inference"]  # type: ignore[operator]
-        assert toml_doc["pipelex_inference"]["enabled"] is True  # type: ignore[index]
+        # pipelex_gateway should be enabled
+        assert "enabled" in toml_doc[PipelexBackend.GATEWAY]  # type: ignore[operator]
+        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is True  # type: ignore[index]
 
         # Other backends should be disabled
         for backend in ["openai", "anthropic", "mistral", "fal"]:
@@ -107,8 +108,8 @@ class TestBackendCustomization:
         assert toml_doc["anthropic"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["mistral"]["enabled"] is True  # type: ignore[index]
 
-        # pipelex_inference should be disabled
-        assert toml_doc["pipelex_inference"]["enabled"] is False  # type: ignore[index]
+        # pipelex_gateway should be disabled
+        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is False  # type: ignore[index]
 
         # fal should be disabled
         assert toml_doc["fal"]["enabled"] is False  # type: ignore[index]
@@ -126,7 +127,7 @@ class TestBackendCustomization:
         shutil.copy2(actual_backends, test_backends)
 
         # Dynamically get indices for the backends we want to test
-        backend_names = ["pipelex_inference", "openai", "fal"]
+        backend_names = [PipelexBackend.GATEWAY, "openai", "fal"]
         indices = get_backend_indices(str(actual_backends), backend_names)
         indices_str = " ".join(str(i) for i in indices)
 
@@ -145,7 +146,7 @@ class TestBackendCustomization:
         toml_doc = load_toml_with_tomlkit(str(test_backends))
 
         # Selected backends should be enabled
-        assert toml_doc["pipelex_inference"]["enabled"] is True  # type: ignore[index]
+        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is True  # type: ignore[index]
         assert toml_doc["openai"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["fal"]["enabled"] is True  # type: ignore[index]
 
@@ -188,9 +189,9 @@ class TestBackendCustomization:
         # Verify backend customization was NOT applied (original values preserved)
         toml_doc = load_toml_with_tomlkit(str(target_dir / "inference" / "backends.toml"))
 
-        # Verify original enabled states from template (template has all backends enabled by default)
-        assert toml_doc["pipelex_inference"]["enabled"] is True  # type: ignore[index]
-        assert toml_doc["openai"]["enabled"] is True  # type: ignore[index]
+        # Verify original enabled states from template
+        # pipelex_gateway is enabled by default, pipelex_inference is deprecated (disabled)
+        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is True  # type: ignore[index]
         assert toml_doc["anthropic"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["mistral"]["enabled"] is True  # type: ignore[index]
         assert toml_doc["internal"]["enabled"] is True  # type: ignore[index]

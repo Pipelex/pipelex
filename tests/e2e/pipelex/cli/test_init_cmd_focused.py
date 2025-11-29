@@ -8,6 +8,8 @@ if TYPE_CHECKING:
 
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
@@ -70,10 +72,10 @@ class TestFocusedInitialization:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Set pipelex_inference as initially enabled
+        # Set pipelex_gateway as initially enabled
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
-        toml_doc["pipelex_inference"]["enabled"] = True  # type: ignore[index]
+        toml_doc[PipelexBackend.GATEWAY]["enabled"] = True  # type: ignore[index]
         save_toml_to_path(toml_doc, str(backends_path))
 
         # Get index for mistral
@@ -198,19 +200,19 @@ class TestFocusedInitialization:
         # Verify telemetry was changed
         env.verify_telemetry("identified")
 
-    def test_reset_routing_with_pipelex_inference(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case: Reset routing when only pipelex_inference is enabled (bug fix test)."""
-        # Setup environment with existing config and pipelex_inference enabled
+    def test_reset_routing_with_pipelex_gateway(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test Case: Reset routing when only pipelex_gateway is enabled (bug fix test)."""
+        # Setup environment with existing config and pipelex_gateway enabled
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Enable only pipelex_inference (disable everything else)
+        # Enable only pipelex_gateway (disable everything else)
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
         for backend_key in toml_doc:
             if backend_key == "internal":
                 continue
-            toml_doc[backend_key]["enabled"] = backend_key == "pipelex_inference"  # type: ignore[index]
+            toml_doc[backend_key]["enabled"] = backend_key == PipelexBackend.GATEWAY  # type: ignore[index]
         save_toml_to_path(toml_doc, str(backends_path))
 
         # Modify routing to have wrong config (simulating the bug scenario)
@@ -227,8 +229,8 @@ class TestFocusedInitialization:
         # Execute with ROUTING focus and reset flag
         init_cmd(focus=InitFocus.ROUTING, reset=True)
 
-        # Verify routing was reset to pipelex_first (correct for pipelex_inference)
-        env.verify_routing("pipelex_first")
+        # Verify routing was reset to pipelex_first (correct for pipelex_gateway)
+        env.verify_routing(PipelexRoutingProfile.PIPELEX_FIRST)
 
     def test_everything_already_configured(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 7.1: Everything configured - decline reconfigure."""

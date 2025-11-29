@@ -21,6 +21,7 @@ from pipelex.cogt.llm.llm_setting import (
     LLMSettingChoices,
     LLMSettingChoicesDefaults,
 )
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -199,7 +200,7 @@ class ModelDeck(ConfigModel):
     def validate_llm_presets(self) -> Self:
         for llm_preset_id, llm_setting in self.llm_presets.items():
             if not self.is_model_handle_defined(model_handle=llm_setting.model):
-                enabled_backends = {model.backend_name for model in self.inference_models.values()}
+                enabled_backends = self._get_enabled_backends()
                 msg = f"LLM handle '{llm_setting.model}' for llm preset '{llm_preset_id}' was not found in the model deck"
                 raise LLMHandleNotFoundError(
                     message=msg,
@@ -287,6 +288,10 @@ class ModelDeck(ConfigModel):
         for model_handle in self.inference_models:
             self.get_required_inference_model(model_handle=model_handle)
 
+    def _get_enabled_backends(self) -> set[str]:
+        """Return the set of backend names that have at least one model enabled."""
+        return {model.backend_name for model in self.inference_models.values()}
+
     def _is_model_available_in_backend(self, model_handle: str, backend_name: str) -> bool | None:
         """Check if a model is available from a specific backend.
 
@@ -296,7 +301,7 @@ class ModelDeck(ConfigModel):
 
         Args:
             model_handle: The model handle/name to check for
-            backend_name: The backend name (e.g., 'pipelex_inference')
+            backend_name: The backend name (e.g., 'bedrock')
 
         Returns:
             True if the model is defined in the backend's TOML file, False otherwise
@@ -346,14 +351,23 @@ class ModelDeck(ConfigModel):
                                 f"and the workflow might fail due to feature limitations such as context window size, etc. "
                                 f"Consider getting access to '{ideal_model_handle}'."
                             )
-                            enabled_backends = {model.backend_name for model in self.inference_models.values()}
-                            if "pipelex_inference" not in enabled_backends and self._is_model_available_in_backend(
-                                model_handle=ideal_model_handle, backend_name="pipelex_inference"
+                            enabled_backends = self._get_enabled_backends()
+                            if PipelexBackend.official_backend() not in enabled_backends and self._is_model_available_in_backend(
+                                model_handle=ideal_model_handle, backend_name=PipelexBackend.official_backend()
                             ):
                                 msg += (
-                                    f" Note that many high quality models such as '{ideal_model_handle}' are available from the Pipelex Inference "
-                                    f"platform and you can get free credits to try them out, please see our docs for more details about setting up "
-                                    f"Pipelex Inference or other inference backends:\n{URLs.backend_provider_docs}"
+                                    f" Note that many high quality models such as '{ideal_model_handle}' are available "
+                                    f"from the {PipelexBackend.official_backend_display_name()} "
+                                    f"and you can get free credits to try them out."
+                                )
+                                if PipelexBackend.LEGACY_INFERENCE in enabled_backends:
+                                    msg += (
+                                        f"\nAlso note that {PipelexBackend.LEGACY_INFERENCE.display_name} is deprecated "
+                                        "and will be removed in the near future."
+                                    )
+                                msg += (
+                                    f"\nPlease see our docs for more details about setting up "
+                                    f"{PipelexBackend.official_backend_display_name()} or other inference backends:\n{URLs.backend_provider_docs}"
                                 )
                             else:
                                 msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"

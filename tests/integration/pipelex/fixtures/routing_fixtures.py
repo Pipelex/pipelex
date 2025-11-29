@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pytest import MonkeyPatch
 
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_console
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
@@ -27,8 +28,8 @@ ALL_BACKENDS = [
     # "mistral",
     # "ollama",
     # "openai",
-    "pipelex_gateway",
-    # "pipelex_inference",
+    PipelexBackend.GATEWAY,
+    PipelexBackend.LEGACY_INFERENCE,
     # "vertexai",
     # "xai",
 ]
@@ -49,7 +50,7 @@ def get_all_routing_profiles() -> list[str]:
         if backend_name and backend_name in ALL_BACKENDS:
             enabled_profiles.append(profile_name)
 
-    return sorted(enabled_profiles) or ["pipelex_first"]
+    return sorted(enabled_profiles)
 
 
 def extract_backend_from_profile_name_if_possible(profile_name: str) -> str | None:
