@@ -83,7 +83,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text"]
 # outputs = ["text", "structured"]
 # costs = { input = 3.0, output = 12.0 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -93,7 +93,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text", "images"]
 # outputs = ["text", "structured"]
 # costs = { input = 15.0, output = 60.0 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -103,7 +103,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text"]
 # outputs = ["text", "structured"]
 # costs = { input = 1.1, output = 4.4 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -113,7 +113,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text"]
 # outputs = ["text", "structured"]
 # costs = { input = 2, output = 8 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -123,7 +123,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text", "images"]
 # outputs = ["text", "structured"]
 # costs = { input = 0.25, output = 2.0 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -133,7 +133,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text", "images"]
 # outputs = ["text", "structured"]
 # costs = { input = 0.05, output = 0.4 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -143,7 +143,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text", "images"]
 # outputs = ["text", "structured"]
 # costs = { input = 1.25, output = 10.0 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -153,7 +153,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text", "images"]
 # outputs = ["text", "structured"]
 # costs = { input = 1.25, output = 10.0 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -163,7 +163,7 @@ model_id = "gpt-5.1-2025-11-13"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
@@ -173,7 +173,7 @@ x-portkey-config = "pc-openai-ba0fa7"
 # inputs = ["text", "images"]
 # outputs = ["text", "structured"]
 # costs = { input = 1.25, output = 10.0 }
-# constraints = ["temperature_must_be_1"]
+# valued_constraints = { fixed_temperature = 1 }
 # sdk = "portkey_responses"
 # structure_method = "instructor/openai_responses_tools"
 # x-portkey-config = "pc-openai-ba0fa7"
@@ -199,7 +199,7 @@ x-portkey-config = "pc-gptoss-fb48b7"
 
 ["claude-3.7-sonnet"]
 model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-max_tokens = 8192
+max_tokens = 64000
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
@@ -235,7 +235,7 @@ x-portkey-config = "pc-claude-aae09f"
 
 ["claude-4.5-sonnet"]
 model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-max_tokens = 8192
+max_tokens = 64000
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
@@ -244,7 +244,7 @@ x-portkey-config = "pc-claude-aae09f"
 
 ["claude-4.5-haiku"]
 model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-max_tokens = 8192
+max_tokens = 64000
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
@@ -253,7 +253,7 @@ x-portkey-config = "pc-claude-aae09f"
 
 ["claude-4.5-opus"]
 model_id = "global.anthropic.claude-opus-4-5-20251101-v1:0"
-max_tokens = 8192
+max_tokens = 64000
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100

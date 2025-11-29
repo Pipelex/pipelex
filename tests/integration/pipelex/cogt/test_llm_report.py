@@ -37,7 +37,6 @@ class TestLLMReport:
                 user_text=prompt_text,
             ),
             llm_job_config=LLMJobConfig(
-                is_streaming_enabled=False,
                 max_retries=3,
             ),
             llm_job_params=llm_job_params,

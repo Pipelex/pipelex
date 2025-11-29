@@ -45,7 +45,6 @@ class TestConceptSpecGeneration:
                 user_text=user_prompt,
             ),
             llm_job_config=LLMJobConfig(
-                is_streaming_enabled=False,
                 max_retries=3,
             ),
             llm_job_params=llm_job_params,

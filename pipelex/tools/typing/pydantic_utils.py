@@ -11,11 +11,31 @@ from pipelex.types import StrEnum
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
 
 T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 def empty_list_factory_of(_: type[T]) -> Callable[[], list[T]]:
     def _factory() -> list[T]:
         return []
+
+    return _factory
+
+
+def empty_dict_factory_of(_key: type[K], _val: type[V] | None = None) -> Callable[[], dict[K, Any]]:
+    """Create a typed empty dict factory.
+
+    Args:
+        _key: The key type (used for type inference)
+        _val: The value type (optional, used for type inference)
+
+    Returns:
+        A callable that returns an empty dict
+
+    """
+
+    def _factory() -> dict[K, Any]:
+        return {}
 
     return _factory
 

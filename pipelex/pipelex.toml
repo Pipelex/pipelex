@@ -117,7 +117,6 @@ is_dump_error_enabled = false
 
 [cogt.llm_config.llm_job_config]
 max_retries = 3
-is_streaming_enabled = false
 
 [cogt.llm_config.generic_templates]
 structure_from_preliminary_text_system = """

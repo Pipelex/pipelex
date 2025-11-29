@@ -2,8 +2,10 @@ from typing import Any
 
 from pydantic import Field
 
+from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 from pipelex.types import StrEnum
 
 
@@ -48,6 +50,8 @@ class InferenceBackend(ConfigModel):
     enabled: bool = True
     endpoint: str | None = None
     api_key: str | None = None
+    listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
+    valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     extra_config: dict[str, Any] = Field(default_factory=dict)
     model_specs: dict[str, InferenceModelSpec] = Field(default_factory=dict)
 

@@ -16,7 +16,6 @@ class LLMJobParams(BaseModel):
 
 
 class LLMJobConfig(BaseModel):
-    is_streaming_enabled: bool
     max_retries: int = Field(..., ge=1, le=10)
 
 

@@ -22,7 +22,7 @@ from pipelex.cogt.llm.llm_setting import (
     LLMSettingChoicesDefaults,
 )
 from pipelex.cogt.model_backends.backend import PipelexBackend
-from pipelex.cogt.model_backends.model_constraints import ModelConstraints
+from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.system.configuration.config_model import ConfigModel
@@ -164,10 +164,11 @@ class ModelDeck(ConfigModel):
                     f"which is greater than the model's max_tokens of {inference_model.max_tokens}"
                 )
                 raise LLMSettingsValidationError(msg)
-        if ModelConstraints.TEMPERATURE_MUST_BE_1 in inference_model.constraints and llm_setting.temperature != 1:
+        fixed_temperature = inference_model.valued_constraints.get(ValuedConstraint.FIXED_TEMPERATURE)
+        if fixed_temperature is not None and llm_setting.temperature != fixed_temperature:
             msg = (
                 f"LLM setting '{llm_setting.model}' has a temperature of {llm_setting.temperature}, "
-                f"which is not allowed by the model's constraints: it must be 1"
+                f"which is not allowed by the model's constraints: it must be {fixed_temperature}"
             )
             raise LLMSettingsValidationError(msg)
 

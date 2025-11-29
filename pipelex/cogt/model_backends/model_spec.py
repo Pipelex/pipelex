@@ -1,13 +1,15 @@
+from typing import Any
+
 from instructor import Mode as InstructorMode
 from pydantic import Field
 
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.cogt.model_backends.model_constraints import ModelConstraints
+from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 
 
 class InferenceModelSpec(ConfigModel):
@@ -23,7 +25,8 @@ class InferenceModelSpec(ConfigModel):
     max_tokens: int | None
     max_prompt_images: int | None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
-    constraints: list[ModelConstraints] = Field(default_factory=empty_list_factory_of(ModelConstraints))
+    listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
+    valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     extra_headers: dict[str, str] | None = None
 
     @property

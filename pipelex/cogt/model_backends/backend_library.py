@@ -152,6 +152,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                         backend_name=backend_name,
                         name=model_spec_name,
                         blueprint=model_spec_blueprint,
+                        backend_listed_constraints=backend_blueprint.listed_constraints,
+                        backend_valued_constraints=backend_blueprint.valued_constraints,
                         extra_headers=extra_headers,
                     )
                     backend_model_specs[model_spec_name] = model_spec

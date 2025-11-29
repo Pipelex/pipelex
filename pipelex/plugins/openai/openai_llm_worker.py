@@ -9,12 +9,10 @@ if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
@@ -67,23 +65,16 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
+        job_params = llm_job.applied_job_params or llm_job.job_params
         messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
 
         try:
-            temperature = llm_job.job_params.temperature
-            if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
-                temperature *= 2
-            if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
-                log.warning(
-                    f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
-                )
-                temperature = 1
             extra_headers = self._make_extra_headers(llm_job=llm_job, output_desc="Text")
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
-                temperature=temperature,
-                max_tokens=llm_job.job_params.max_tokens or omit,
-                seed=llm_job.job_params.seed,
+                temperature=job_params.temperature,
+                max_tokens=job_params.max_tokens or omit,
+                seed=job_params.seed,
                 messages=messages,
                 extra_headers=extra_headers,
             )
@@ -114,23 +105,16 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
+        job_params = llm_job.applied_job_params or llm_job.job_params
         messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
         try:
-            temperature = llm_job.job_params.temperature
-            if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
-                temperature *= 2
-            if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
-                log.warning(
-                    f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
-                )
-                temperature = 1
             try:
                 extra_headers = self._make_extra_headers(llm_job=llm_job, output_desc=schema.__name__)
                 result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                     model=self.inference_model.model_id,
-                    temperature=temperature,
-                    max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                    seed=llm_job.job_params.seed,
+                    temperature=job_params.temperature,
+                    max_tokens=job_params.max_tokens or NOT_GIVEN,
+                    seed=job_params.seed,
                     messages=messages,
                     response_model=schema,
                     max_retries=llm_job.job_config.max_retries,

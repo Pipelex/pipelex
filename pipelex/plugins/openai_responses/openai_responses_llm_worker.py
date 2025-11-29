@@ -8,11 +8,9 @@ from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError, omit
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.config import get_config
 from pipelex.plugins.openai_responses.openai_responses_factory import OpenAIResponsesFactory
 
@@ -62,31 +60,20 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
     def teardown(self):
         pass
 
-    def _prepare_temperature(self, llm_job: LLMJob) -> float:
-        temperature = llm_job.job_params.temperature
-        if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
-            temperature *= 2
-        if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
-            log.warning(
-                f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
-            )
-            temperature = 1
-        return temperature
-
     #########################################################
     @override
     async def _gen_text(
         self,
         llm_job: LLMJob,
     ) -> str:
+        job_params = llm_job.applied_job_params or llm_job.job_params
         input_items = OpenAIResponsesFactory.make_input_items(llm_job=llm_job)
-        temperature = self._prepare_temperature(llm_job=llm_job)
         try:
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
-                temperature=temperature,
-                max_output_tokens=llm_job.job_params.max_tokens or omit,
+                temperature=job_params.temperature,
+                max_output_tokens=job_params.max_tokens or omit,
                 input=input_items,
                 extra_headers=self.inference_model.extra_headers,
             )
@@ -116,7 +103,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        temperature = self._prepare_temperature(llm_job=llm_job)
+        job_params = llm_job.applied_job_params or llm_job.job_params
         try:
             if not hasattr(self.instructor_for_objects, "responses"):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
@@ -129,8 +116,8 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 max_retries=llm_job.job_config.max_retries,
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
-                temperature=temperature,
-                max_output_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
+                temperature=job_params.temperature,
+                max_output_tokens=job_params.max_tokens or NOT_GIVEN,
                 extra_headers=self.inference_model.extra_headers,
             )  # type: ignore[arg-type,misc]
         except InstructorRetryException as exc:

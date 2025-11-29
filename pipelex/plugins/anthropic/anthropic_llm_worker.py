@@ -4,7 +4,6 @@ import instructor
 from anthropic import AsyncAnthropic, AsyncAnthropicBedrock, omit
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -25,11 +24,6 @@ from pipelex.plugins.anthropic.anthropic_factory import (
 )
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from pipelex.types import StrEnum
-
-
-class AnthropicExtraField(StrEnum):
-    CLAUDE_4_TOKENS_LIMIT = "claude_4_tokens_limit"
 
 
 class AnthropicLLMWorkerError(PipelexError):
@@ -97,38 +91,20 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     # Instance methods
     #########################################################
 
-    # TODO: implement streaming behind the scenes to avoid timeout/streaming errors with Claude 4 and high tokens
-    def _adapt_max_tokens(self, max_tokens: int | None) -> int:
-        max_tokens = max_tokens or self.default_max_tokens
-
-        if (claude_4_tokens_limit := self.extra_config.get(AnthropicExtraField.CLAUDE_4_TOKENS_LIMIT)) and max_tokens > claude_4_tokens_limit:
-            max_tokens = claude_4_tokens_limit
-            log.warning(f"Max tokens is greater than the claude 4 reduced tokens limit, reducing to {max_tokens}")
-        if not max_tokens:
-            msg = f"Max tokens is None for model {self.inference_model.desc}"
-            raise AnthropicWorkerConfigurationError(msg)
-        return max_tokens
-
     @override
     async def _gen_text(
         self,
         llm_job: LLMJob,
     ) -> str:
+        job_params = llm_job.applied_job_params or llm_job.job_params
         message = await AnthropicFactory.make_user_message(llm_job=llm_job)
-        max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)
         response = await self.anthropic_async_client.messages.create(
             messages=[message],
             system=llm_job.llm_prompt.system_text or omit,
             model=self.inference_model.model_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=max_tokens,
+            temperature=job_params.temperature,
+            max_tokens=job_params.max_tokens or self.default_max_tokens,
         )
-
-        single_content_block = response.content[0]
-        if single_content_block.type != "text":
-            msg = f"Unexpected content block type: {single_content_block.type}\nmodel: {self.inference_model.desc}"
-            raise LLMCompletionError(msg)
-        full_reply_content = single_content_block.text
 
         single_content_block = response.content[0]
         if single_content_block.type != "text":
@@ -147,8 +123,8 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
+        job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
-        max_tokens = self._adapt_max_tokens(max_tokens=llm_job.job_params.max_tokens)
         (
             result_object,
             completion,
@@ -157,8 +133,8 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             response_model=schema,
             max_retries=llm_job.job_config.max_retries,
             model=self.inference_model.model_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=max_tokens,
+            temperature=job_params.temperature,
+            max_tokens=job_params.max_tokens or self.default_max_tokens,
         )
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)

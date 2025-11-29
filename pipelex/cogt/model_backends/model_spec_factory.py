@@ -1,13 +1,15 @@
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex.cogt.llm.structured_output import StructureMethod
-from pipelex.cogt.model_backends.model_constraints import ModelConstraints
+from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 
 
 class InferenceModelSpecBlueprint(ConfigModel):
@@ -22,7 +24,8 @@ class InferenceModelSpecBlueprint(ConfigModel):
     max_tokens: int | None = None
     max_prompt_images: int | None = None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
-    constraints: list[ModelConstraints] = Field(default_factory=empty_list_factory_of(ModelConstraints))
+    listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
+    valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
 
     @field_validator("costs", mode="before")
     @staticmethod
@@ -32,12 +35,20 @@ class InferenceModelSpecBlueprint(ConfigModel):
             key_enum_cls=CostCategory,
         )
 
-    @field_validator("constraints", mode="before")
+    @field_validator("listed_constraints", mode="before")
     @staticmethod
-    def validate_constraints(value: list[str]) -> list[ModelConstraints]:
+    def validate_listed_constraints(value: list[str]) -> list[ListedConstraint]:
         return ConfigModel.transform_list_of_str_to_enum(
             input_list=value,
-            enum_cls=ModelConstraints,
+            enum_cls=ListedConstraint,
+        )
+
+    @field_validator("valued_constraints", mode="before")
+    @staticmethod
+    def validate_valued_constraints(value: dict[str, Any]) -> dict[ValuedConstraint, Any]:
+        return ConfigModel.transform_dict_keys_str_to_enum(
+            input_dict=value,
+            key_enum_cls=ValuedConstraint,
         )
 
 
@@ -48,8 +59,16 @@ class InferenceModelSpecFactory(BaseModel):
         backend_name: str,
         name: str,
         blueprint: InferenceModelSpecBlueprint,
+        backend_listed_constraints: list[ListedConstraint],
+        backend_valued_constraints: dict[ValuedConstraint, Any],
         extra_headers: dict[str, str] | None = None,
     ) -> InferenceModelSpec:
+        # Merge constraints: backend as base, model-level adds/overrides
+        # Listed constraints: union of backend + model (model can add, not remove)
+        merged_listed_constraints = list(set(backend_listed_constraints + blueprint.listed_constraints))
+        # Valued constraints: backend as base, model overrides
+        merged_valued_constraints = {**backend_valued_constraints, **blueprint.valued_constraints}
+
         return InferenceModelSpec(
             backend_name=backend_name,
             name=name,
@@ -63,6 +82,7 @@ class InferenceModelSpecFactory(BaseModel):
             max_tokens=blueprint.max_tokens,
             max_prompt_images=blueprint.max_prompt_images,
             prompting_target=blueprint.prompting_target,
-            constraints=blueprint.constraints,
+            listed_constraints=merged_listed_constraints,
+            valued_constraints=merged_valued_constraints,
             extra_headers=extra_headers,
         )
