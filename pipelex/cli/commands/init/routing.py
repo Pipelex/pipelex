@@ -1,7 +1,7 @@
 """Routing profile configuration logic for the init command."""
 
 import os
-from typing import Any
+from typing import Any, cast
 
 from rich.prompt import Confirm
 from tomlkit import table
@@ -21,6 +21,40 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
+
+
+def _migrate_profile_to_official_backend(profile: dict[str, Any]) -> None:
+    """Migrate a routing profile from legacy pipelex_inference to pipelex_gateway.
+
+    Updates default, fallback_order, and routes in place.
+
+    Args:
+        profile: The profile dict to migrate (modified in place).
+    """
+    legacy_backend = PipelexBackend.LEGACY_INFERENCE.value
+    official_backend = PipelexBackend.official_backend().value
+
+    # Update default
+    if profile.get("default") == legacy_backend:
+        profile["default"] = official_backend
+
+    # Update fallback_order
+    if "fallback_order" in profile:
+        old_fallback: list[str] = list(profile["fallback_order"])
+        new_fallback: list[str] = []
+        for backend in old_fallback:
+            if backend == legacy_backend:
+                new_fallback.append(official_backend)
+            else:
+                new_fallback.append(backend)
+        profile["fallback_order"] = new_fallback
+
+    # Update routes
+    if "routes" in profile:
+        routes: dict[str, str] = profile["routes"]
+        patterns_to_update = [pattern for pattern, backend in routes.items() if backend == legacy_backend]
+        for pattern in patterns_to_update:
+            routes[pattern] = official_backend
 
 
 def customize_routing_profile(selected_backend_keys: list[str]) -> None:
@@ -52,6 +86,12 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         # Case 1: pipelex_gateway is enabled - keep pipelex_first
         if PipelexBackend.official_backend() in selected_backend_keys:
             toml_doc["active"] = PipelexRoutingProfile.PIPELEX_FIRST
+            # Migrate the profile from legacy pipelex_inference to pipelex_gateway
+            # (fixes stale config where pipelex_first pointed to pipelex_inference)
+            profiles: dict[str, dict[str, Any]] = toml_doc.get("profiles") or {}  # type: ignore[assignment]
+            if PipelexRoutingProfile.PIPELEX_FIRST in profiles:
+                pipelex_first_profile = cast("dict[str, Any]", profiles[PipelexRoutingProfile.PIPELEX_FIRST])
+                _migrate_profile_to_official_backend(pipelex_first_profile)
             save_toml_to_path(toml_doc, routing_profiles_toml_path)
             display_routing_profile_result(console, PipelexRoutingProfile.PIPELEX_FIRST, created=False)
             return
