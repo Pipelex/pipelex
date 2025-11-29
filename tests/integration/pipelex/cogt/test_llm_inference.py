@@ -9,21 +9,13 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_inference_manager
 from tests.integration.pipelex.cogt.test_data import ImageDescription, LLMTestConstants, LLMVisionTestCases, Person
 
-USER_TEXT_TRICKY_1 = """
-When my son was 7 he was 3ft tall. When he was 8 he was 4ft tall. When he was 9 he was 5ft tall.
-How tall do you think he was when he was 12? and at 15?
-"""
-USER_TEXT_TRICKY_2 = """
-Count the Rs in "Strawberry"
-"""
-
 
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 @pytest.mark.usefixtures("routing_profile_override")
 class TestLLMInference:
-    @pytest.mark.parametrize("user_text", [USER_TEXT_TRICKY_1])
+    @pytest.mark.parametrize("user_text", [LLMTestConstants.USER_TEXT_SUPER_SHORT])
     async def test_simple_gen_text_from_text(self, llm_job_params: LLMJobParams, llm_handle: str, user_text: str):
         log.info(f"test_simple_gen_text_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)

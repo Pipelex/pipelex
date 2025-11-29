@@ -24,7 +24,7 @@ claude_4_tokens_limit = 8192
 
 [azure_openai]
 display_name = "Azure OpenAI"
-enabled = false
+enabled = true
 endpoint = "${AZURE_API_BASE}"
 api_key = "${AZURE_API_KEY}"
 api_version = "${AZURE_API_VERSION}"
@@ -67,7 +67,7 @@ endpoint = "http://localhost:11434/v1"
 
 [openai]
 display_name = "OpenAI"
-enabled = false
+enabled = true
 api_key = "${OPENAI_API_KEY}"
 
 [vertexai]
@@ -88,7 +88,7 @@ enabled = true
 
 # Deprecated
 [pipelex_inference]
-display_name = "⭐ Pipelex Inference"
+display_name = "🛑 Legacy Pipelex Inference"
 enabled = false
 endpoint = "https://inference.pipelex.com/v1"
 api_key = "${PIPELEX_INFERENCE_API_KEY}"

@@ -18,20 +18,19 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_to
 # ================================================================================================
 
 ALL_BACKENDS = [
-    # "anthropic",
-    # "azure_openai",
-    # "bedrock",
-    # "blackboxai",
-    # "fal",
-    # "google",
-    # "groq",
-    # "mistral",
-    # "ollama",
-    # "openai",
     PipelexBackend.GATEWAY,
-    PipelexBackend.LEGACY_INFERENCE,
-    # "vertexai",
-    # "xai",
+    "anthropic",
+    "azure_openai",
+    "bedrock",
+    "blackboxai",
+    "fal",
+    "google",
+    "groq",
+    "mistral",
+    "ollama",
+    "openai",
+    "vertexai",
+    "xai",
 ]
 
 

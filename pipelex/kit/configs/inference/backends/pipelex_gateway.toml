@@ -23,9 +23,9 @@
 
 [defaults]
 model_type = "llm"
-sdk = "portkey_responses"
+sdk = "portkey_completions"
+structure_method = "instructor/openai_tools"
 prompting_target = "anthropic"
-structure_method = "instructor/openai_responses_tools"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -33,92 +33,130 @@ structure_method = "instructor/openai_responses_tools"
 
 # --- OpenAI LLMs --------------------------------------------------------------
 
-[gpt-4o]
-model_id = "gpt-4o-2024-11-20"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 2.5, output = 10.0 }
+# [gpt-4o]
+# model_id = "gpt-4o-2024-11-20"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 2.5, output = 10.0 }
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
 [gpt-4o-mini]
 model_id = "gpt-4o-mini-2024-07-18"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
-["gpt-4.1"]
-model_id = "gpt-4.1-2025-04-14"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 2, output = 8 }
+# ["gpt-4.1"]
+# model_id = "gpt-4.1-2025-04-14"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 2, output = 8 }
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-["gpt-4.1-mini"]
-model_id = "gpt-4.1-mini-2025-04-14"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 0.4, output = 1.6 }
+# ["gpt-4.1-mini"]
+# model_id = "gpt-4.1-mini-2025-04-14"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 0.4, output = 1.6 }
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-["gpt-4.1-nano"]
-model_id = "gpt-4.1-nano-2025-04-14"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 0.1, output = 0.4 }
+# ["gpt-4.1-nano"]
+# model_id = "gpt-4.1-nano-2025-04-14"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 0.1, output = 0.4 }
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-[o1-mini]
-model_id = "o1-mini-2024-09-12"
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 3.0, output = 12.0 }
-constraints = ["temperature_must_be_1"]
+# [o1-mini]
+# model_id = "o1-mini-2024-09-12"
+# inputs = ["text"]
+# outputs = ["text", "structured"]
+# costs = { input = 3.0, output = 12.0 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-[o1]
-model_id = "o1-2024-12-17"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 15.0, output = 60.0 }
-constraints = ["temperature_must_be_1"]
+# [o1]
+# model_id = "o1-2024-12-17"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 15.0, output = 60.0 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-[o3-mini]
-model_id = "o3-mini-2025-01-31"
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 1.1, output = 4.4 }
-constraints = ["temperature_must_be_1"]
+# [o3-mini]
+# model_id = "o3-mini-2025-01-31"
+# inputs = ["text"]
+# outputs = ["text", "structured"]
+# costs = { input = 1.1, output = 4.4 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-[o3]
-model_id = "o3-2025-04-16"
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 2, output = 8 }
-constraints = ["temperature_must_be_1"]
+# [o3]
+# model_id = "o3-2025-04-16"
+# inputs = ["text"]
+# outputs = ["text", "structured"]
+# costs = { input = 2, output = 8 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-[gpt-5-mini]
-model_id = "gpt-5-mini-2025-08-07"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 0.25, output = 2.0 }
-constraints = ["temperature_must_be_1"]
+# [gpt-5-mini]
+# model_id = "gpt-5-mini-2025-08-07"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 0.25, output = 2.0 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-[gpt-5-nano]
-model_id = "gpt-5-nano-2025-08-07"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 0.05, output = 0.4 }
-constraints = ["temperature_must_be_1"]
+# [gpt-5-nano]
+# model_id = "gpt-5-nano-2025-08-07"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 0.05, output = 0.4 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-[gpt-5-chat]
-model_id = "gpt-5-chat-2025-08-07"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+# [gpt-5-chat]
+# model_id = "gpt-5-chat-2025-08-07"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 1.25, output = 10.0 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
-[gpt-5]
-model_id = "gpt-5-2025-08-07"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+# [gpt-5]
+# model_id = "gpt-5-2025-08-07"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 1.25, output = 10.0 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
 ["gpt-5.1"]
 model_id = "gpt-5.1-2025-11-13"
@@ -126,14 +164,19 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 constraints = ["temperature_must_be_1"]
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
-["gpt-5.1-chat"]
-model_id = "gpt-5.1-chat-2025-11-13"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+# ["gpt-5.1-chat"]
+# model_id = "gpt-5.1-chat-2025-11-13"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 1.25, output = 10.0 }
+# constraints = ["temperature_must_be_1"]
+# sdk = "portkey_responses"
+# structure_method = "instructor/openai_responses_tools"
+# x-portkey-config = "pc-openai-ba0fa7"
 
 # --- OpenAI GPT-OSS Models ----------------------------------------------------
 ["gpt-oss-20b"]
@@ -142,8 +185,6 @@ max_tokens = 65536
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.075, output = 0.30 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-gptoss-fb48b7"
 
 ["gpt-oss-120b"]
@@ -152,8 +193,6 @@ max_tokens = 65536
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.60 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-gptoss-fb48b7"
 
 # --- Claude LLMs --------------------------------------------------------------
@@ -165,8 +204,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-claude-aae09f"
 
 [claude-4-sonnet]
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
@@ -175,8 +213,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-claude-aae09f"
 
 [claude-4-opus]
 model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
@@ -185,8 +222,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-claude-aae09f"
 
 ["claude-4.1-opus"]
 model_id = "us.anthropic.claude-opus-4-1-20250805-v1:0"
@@ -195,8 +231,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
+x-portkey-config = "pc-claude-aae09f"
 
 ["claude-4.5-sonnet"]
 model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
@@ -205,8 +240,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-claude-aae09f"
 
 ["claude-4.5-haiku"]
@@ -216,8 +249,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-claude-aae09f"
 
 ["claude-4.5-opus"]
@@ -227,8 +258,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-claude-aae09f"
 
 # --- Gemini LLMs --------------------------------------------------------------
@@ -237,6 +266,7 @@ model_id = "gemini-2.0-flash"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.10, output = 0.40 }
+x-portkey-config = "pc-google-b19ef8"
 
 ["gemini-2.5-pro"]
 model_id = "gemini-2.5-pro"
@@ -244,14 +274,13 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 1.25, output = 10.0 }
+x-portkey-config = "pc-google-b19ef8"
 
 ["gemini-2.5-flash"]
 model_id = "gemini-2.5-flash"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.30, output = 2.50 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-google-b19ef8"
 
 ["gemini-2.5-flash-lite"]
@@ -259,13 +288,15 @@ model_id = "gemini-2.5-flash-lite"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.10, output = 0.40 }
+x-portkey-config = "pc-google-b19ef8"
 
 ["gemini-3.0-pro"]
-model_id = "gemini-3.0-pro"
+model_id = "gemini-3-pro-preview"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
+x-portkey-config = "pc-google-b19ef8"
 
 # --- XAI LLMs --------------------------------------------------------------
 
@@ -273,8 +304,6 @@ costs = { input = 2, output = 12.0 }
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 3, output = 15 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-xai-70a222"
 
 [grok-3-mini]
@@ -282,24 +311,18 @@ model_id = "grok-3-mini"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.3, output = 0.5 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-xai-70a222"
 
 [grok-4]
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3, output = 15 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-xai-70a222"
 
 [grok-4-fast]
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3, output = 15 }
-sdk = "portkey_completions"
-structure_method = "instructor/openai_tools"
 x-portkey-config = "pc-xai-70a222"
 
 ################################################################################
