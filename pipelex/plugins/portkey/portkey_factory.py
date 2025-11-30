@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import openai
 from portkey_ai import (
@@ -10,11 +10,13 @@ from portkey_ai import (
 )
 
 from pipelex import log
-from pipelex.cogt.extract.extract_output import ExtractOutput, Page
+from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.plugins.portkey.portkey_exceptions import PortkeyFactoryError
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
+    from portkey_ai.api_resources.utils import GenericResponse
+
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.plugins.plugin_sdk_registry import Plugin
@@ -87,17 +89,42 @@ class PortkeyFactory:
     @classmethod
     def make_extract_output_from_portkey_response(
         cls,
-        portkey_extract_response: dict[str, Any],
+        response: GenericResponse,
     ) -> ExtractOutput:
-        dump = json.dumps(portkey_extract_response, indent=4)
-        print(dump)
-        # return ExtractOutput(
-        #     text=portkey_extract_response["text"],
-        #     images=portkey_extract_response["images"],
-        # )
-        fake_page = Page(
-            text=dump,
-        )
+        if not hasattr(response, "pages"):
+            msg = "Portkey extract response does not have pages"
+            raise PortkeyFactoryError(msg)
+        pages: dict[int, Page] = {}
+        for extracted_page in response.pages:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
+            if not isinstance(extracted_page, dict):
+                msg = "Extracted page is not a dictionary"
+                raise PortkeyFactoryError(msg)
+            extracted_page_dict = cast("dict[str, Any]", extracted_page)
+            page_index = extracted_page_dict.get("index")
+            if page_index is None:
+                msg = "Page index is not set"
+                raise PortkeyFactoryError(msg)
+            extracted_page_text = extracted_page_dict.get("markdown")
+            if extracted_page_text is None:
+                msg = "Page text is not set"
+                raise PortkeyFactoryError(msg)
+            extracted_page_images = extracted_page_dict.get("images")
+            if extracted_page_images is None:
+                msg = "Page images are not set"
+                raise PortkeyFactoryError(msg)
+            page_images: list[ExtractedImageFromPage] = []
+            for extracted_page_image in extracted_page_images:
+                extracted_image = ExtractedImageFromPage(
+                    image_id=extracted_page_image["id"],
+                    base_64=extracted_page_image["image_base64"],
+                    caption=extracted_page_image["image_annotation"],
+                )
+                page_images.append(extracted_image)
+            pages[page_index] = Page(
+                text=extracted_page_text,
+                extracted_images=page_images,
+                page_view=None,
+            )
         return ExtractOutput(
-            pages={1: fake_page},
+            pages=pages,
         )

@@ -18,6 +18,7 @@ from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlu
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from tests.cases import ImageTestCases, PDFTestCases
 from tests.integration.pipelex.test_data import PipeExtractTestCases
 
 
@@ -90,7 +91,8 @@ class TestPipeExtract:
         list_result = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(list_result, title="list_result")
 
-    @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
+    # @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
+    @pytest.mark.parametrize("pdf_url", PDFTestCases.DOCUMENT_FILE_PATHS)
     @pytest.mark.parametrize("page_image_captions", [False])  # TODO: add True when captioning is implemented
     async def test_pipe_extract_from_pdf(
         self,

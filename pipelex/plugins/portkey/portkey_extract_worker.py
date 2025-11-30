@@ -231,5 +231,5 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         response_dict = response.model_dump()
         pretty_print(response_dict)
         return PortkeyFactory.make_extract_output_from_portkey_response(
-            portkey_extract_response={},
+            response=response,
         )

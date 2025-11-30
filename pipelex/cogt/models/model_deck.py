@@ -392,7 +392,7 @@ class ModelDeck(ConfigModel):
         if inference_model is None:
             msg = (
                 f"Model handle '{model_handle}' was not found in the model deck. "
-                "Make sure it's defined in ond of the model decks '.pipelex/inference/deck/*.toml'. "
+                "Make sure it's defined in one of the model decks '.pipelex/inference/deck/*.toml'. "
                 "If the model handle is indeed in the deck, make sure the required backend for this model to run is enabled in "
                 "'.pipelex/inference/backends.toml' and that you have the necessary credentials. "
                 "To find what backend is required for this model, look at the routing profile in '.pipelex/inference/routing_profiles.toml' "
