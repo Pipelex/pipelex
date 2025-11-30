@@ -8,7 +8,7 @@ from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_aft
 from typing_extensions import override
 
 from pipelex import log, pretty_print
-from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
+from pipelex.cogt.exceptions import ExtractCapabilityError, ExtractJobFailureError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -38,6 +38,21 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             raise SdkTypeError(msg)
 
         self.portkey_client: AsyncPortkey = sdk_instance
+
+    def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
+        if isinstance(exc, portkey_exceptions.NotFoundError):
+            msg = str(exc).lower()
+            return "specified deployment could not be found" in msg
+        return False
+
+    def _log_retry(self, retry_state: RetryCallState) -> None:
+        """Called before sleeping between retries."""
+        if not retry_state.outcome:
+            log.error("Tenacity retry state outcome is None")
+            return
+        exc = retry_state.outcome.exception()
+        attempt = retry_state.attempt_number
+        log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}': '{exc}'")
 
     @override
     async def _extract_pages(
@@ -173,20 +188,19 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         pdf_path: str,
         should_include_images: bool = False,
     ) -> ExtractOutput:
-        log.dev(f"Extracting from PDF file: {pdf_path} with should_include_images: {should_include_images}")
-        # Get the base64 string from the PDF
-        with open(pdf_path, "rb") as pdf_file:
-            base64_pdf = base64.b64encode(pdf_file.read()).decode("utf-8")
-        doc_url = f"data:application/pdf;base64,{base64_pdf}"
         if not self.inference_model.extra_headers:
             msg = "x-portkey-config header is required"
             raise ExtractInputError(msg)
-
-        log.debug(self.inference_model.extra_headers, title="extra_headers")
         config = self.inference_model.extra_headers.get("x-portkey-config")
         if not config:
             msg = "x-portkey-config header is required"
             raise ExtractInputError(msg)
+        log.dev(f"Extracting from PDF file: {pdf_path} using config '{config}' with should_include_images: {should_include_images}")
+
+        # Get the base64 string from the PDF
+        with open(pdf_path, "rb") as pdf_file:
+            base64_pdf = base64.b64encode(pdf_file.read()).decode("utf-8")
+        doc_url = f"data:application/pdf;base64,{base64_pdf}"
 
         retryer = AsyncRetrying(
             retry=retry_if_exception(self._is_retryable_portkey_error),
@@ -201,12 +215,16 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             with attempt:
                 response = await self.portkey_client.with_options(config=config).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                     "/",
-                    model="mistral-document-ai-2505",
+                    model=self.inference_model.model_id,
                     document={"type": "document_url", "document_url": doc_url},
                     include_image_base64=True,
                 )
 
-        if response is None or not isinstance(response, GenericResponse):
+        if response is None:
+            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
+            raise ExtractJobFailureError(msg)
+
+        if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
         pretty_print(response)
@@ -215,18 +233,3 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         return PortkeyFactory.make_extract_output_from_portkey_response(
             portkey_extract_response={},
         )
-
-    def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
-        if isinstance(exc, portkey_exceptions.NotFoundError):
-            msg = str(exc).lower()
-            return "specified deployment could not be found" in msg
-        return False
-
-    def _log_retry(self, retry_state: RetryCallState) -> None:
-        """Called before sleeping between retries."""
-        if not retry_state.outcome:
-            log.error("Tenacity retry state outcome is None")
-            return
-        exc = retry_state.outcome.exception()
-        attempt = retry_state.attempt_number
-        log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}': '{exc}'")
