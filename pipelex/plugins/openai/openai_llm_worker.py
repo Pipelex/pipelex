@@ -135,6 +135,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
 
         return result_object
 
+    # TODO: this is specific to Portkey, we should move it to some specific Portkey class and apply to the other kinds of workers
     def _make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
         if llm_job.job_metadata.pipe_job_ids:
             last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]

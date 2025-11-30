@@ -16,6 +16,7 @@ from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend
+    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
@@ -47,7 +48,6 @@ class PortkeyFactory:
         cls,
         plugin: Plugin,
         backend: InferenceBackend,
-        config_override: str | None = None,
     ) -> openai.AsyncOpenAI:
         log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
         try:
@@ -59,10 +59,6 @@ class PortkeyFactory:
             msg = "Portkey endpoint is not set"
             raise PortkeyFactoryError(msg)
 
-        config = config_override or backend.extra_config.get("x-portkey-config")
-        if not config:
-            msg = "x-portkey-config header is required"
-            raise ValueError(msg)
         is_debug = backend.extra_config.get("debug", False)
 
         the_client: openai.AsyncOpenAI
