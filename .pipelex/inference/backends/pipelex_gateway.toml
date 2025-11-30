@@ -326,8 +326,23 @@ costs = { input = 3, output = 15 }
 x-portkey-config = "pc-xai-70a222"
 
 ################################################################################
-# OCR and IMAGE GENERATION MODELS
+# DOCUMENT EXTRACTION MODELS
 ################################################################################
 
-# We are still working in giving you acces to OCR and image generation models
-# and to the best models from Mistral through the Pipelex Inference backend.
+[mistral-document]
+model_type = "text_extractor"
+model_id = "mistral-document-ai-2505"
+max_tokens = 4096
+inputs = ["pdf", "image"]
+outputs = ["pages"]
+costs = { input = 0, output = 0 }     # TODO handle cost per page 3$/1K pages
+sdk = "portkey_extract"
+x-portkey-config = "pc-misdoc-b4ae47"
+
+
+################################################################################
+# IMAGE GENERATION MODELS
+################################################################################
+
+# We are still working in giving you acces to image generation models
+# through the Pipelex Gateway.

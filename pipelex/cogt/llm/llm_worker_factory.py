@@ -28,6 +28,7 @@ class LLMWorkerFactory:
                     sdk_instance=PortkeyFactory.make_portkey_openai_client(
                         plugin=plugin,
                         backend=backend,
+                        config_override=inference_model.extra_headers.get("x-portkey-config") if inference_model.extra_headers else None,
                     ),
                 )
 
@@ -45,6 +46,7 @@ class LLMWorkerFactory:
                     sdk_instance=PortkeyFactory.make_portkey_openai_client(
                         plugin=plugin,
                         backend=backend,
+                        config_override=inference_model.extra_headers.get("x-portkey-config") if inference_model.extra_headers else None,
                     ),
                 )
 
