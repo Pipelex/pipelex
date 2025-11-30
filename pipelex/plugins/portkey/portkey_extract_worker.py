@@ -39,21 +39,6 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
 
         self.portkey_client: AsyncPortkey = sdk_instance
 
-    def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
-        if isinstance(exc, portkey_exceptions.NotFoundError):
-            msg = str(exc).lower()
-            return "specified deployment could not be found" in msg
-        return False
-
-    def _log_retry(self, retry_state: RetryCallState) -> None:
-        """Called before sleeping between retries."""
-        if not retry_state.outcome:
-            log.error("Tenacity retry state outcome is None")
-            return
-        exc = retry_state.outcome.exception()
-        attempt = retry_state.attempt_number
-        log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}': '{exc}'")
-
     @override
     async def _extract_pages(
         self,
@@ -183,6 +168,21 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         msg = "Not implemented for Portkey"
         raise NotImplementedError(msg)
 
+    def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
+        if isinstance(exc, portkey_exceptions.NotFoundError):
+            msg = str(exc).lower()
+            return "specified deployment could not be found" in msg
+        return False
+
+    def _log_retry(self, retry_state: RetryCallState) -> None:
+        """Called before sleeping between retries."""
+        if not retry_state.outcome:
+            log.error("Tenacity retry state outcome is None")
+            return
+        exc = retry_state.outcome.exception()
+        attempt = retry_state.attempt_number
+        log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}': '{exc}'")
+
     async def extract_from_pdf_file(
         self,
         pdf_path: str,
@@ -227,9 +227,9 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
-        pretty_print(response)
+        pretty_print(response, title="Portkey response")
         response_dict = response.model_dump()
-        pretty_print(response_dict)
+        pretty_print(response_dict, title="Portkey response dict")
         return PortkeyFactory.make_extract_output_from_portkey_response(
             response=response,
         )

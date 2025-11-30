@@ -4,6 +4,7 @@ from io import StringIO
 from typing import Any, ClassVar
 
 from kajson import kajson
+from pydantic import BaseModel
 from rich.console import Console, Group
 from rich.json import JSON
 from rich.markdown import Markdown
@@ -16,7 +17,9 @@ from rich.table import Table
 from rich.terminal_theme import TerminalTheme
 from rich.text import Text, TextType
 
+from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor, print_to_stderr
+from pipelex.tools.typing.pydantic_utils import CustomBaseModel, make_truncated_wrapper
 from pipelex.types import StrEnum
 
 TEXT_COLOR = TerminalColor.WHITE
@@ -241,12 +244,16 @@ class PrettyPrinter:
         # Format the value
         if isinstance(value, PrettyPrintable):
             pretty = value
+        elif isinstance(value, BaseModel) and not isinstance(value, CustomBaseModel):
+            # Wrap regular BaseModel to get truncated __rich_repr__ with proper class name
+            pretty = Pretty(make_truncated_wrapper(value))
         elif isinstance(value, dict):
-            # For dicts, use JSON rendering
+            # For dicts, apply truncation and use JSON rendering
+            truncated_data = AttributePolisher.apply_truncation_recursive(value)
             try:
-                pretty = JSON.from_data(value, indent=4)
+                pretty = JSON.from_data(truncated_data, indent=4)
             except TypeError:
-                json_string = kajson.dumps(value, indent=4)
+                json_string = kajson.dumps(truncated_data, indent=4)
                 pretty = Syntax(json_string, "json", theme="monokai")
         elif isinstance(value, list):
             # For lists, build a table without headers
@@ -269,6 +276,9 @@ class PrettyPrinter:
             # Handle URLs specially, otherwise use Text for simple strings
             if value.startswith(("http://", "https://")):
                 pretty = Text(value, style="link " + value, no_wrap=True)
+            elif AttributePolisher.should_truncate_any_long_string(value):
+                # Truncate long base64-like strings
+                pretty = Text(AttributePolisher.get_truncated_long_string(value))
             else:
                 # Use Text instead of Markdown to allow proper auto-sizing
                 pretty = Text(value)
