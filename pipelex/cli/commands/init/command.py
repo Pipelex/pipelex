@@ -201,15 +201,46 @@ def execute_initialization(
     if needs_inference:
         console.print()
 
-        # If reset is True and we didn't already copy via config init, copy the template file first
+        # If reset is True and we didn't already copy via config init, copy the template files
         if reset and not backends_just_copied_during_config:
-            template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
+            template_inference_dir = os.path.join(str(get_kit_configs_dir()), "inference")
+            target_inference_dir = os.path.join(config_manager.pipelex_config_dir, "inference")
 
-            if path_exists(template_backends_path):
-                os.makedirs(os.path.dirname(backends_toml_path), exist_ok=True)
-                shutil.copy2(template_backends_path, backends_toml_path)
-                console.print("✅ Reset backends.toml from template")
-                first_time_setup = True  # Treat as first-time setup since we just replaced the file
+            # Reset backends.toml
+            template_backends_path = os.path.join(template_inference_dir, "backends.toml")
+            os.makedirs(os.path.dirname(backends_toml_path), exist_ok=True)
+            shutil.copy2(template_backends_path, backends_toml_path)
+            console.print("✅ Reset backends.toml from template")
+
+            # Reset all individual backend files in backends/ directory
+            template_backends_dir = os.path.join(template_inference_dir, "backends")
+            target_backends_dir = os.path.join(target_inference_dir, "backends")
+            os.makedirs(target_backends_dir, exist_ok=True)
+            reset_backend_files: list[str] = []
+            for backend_file in os.listdir(template_backends_dir):
+                if backend_file.endswith(".toml"):
+                    src_path = os.path.join(template_backends_dir, backend_file)
+                    dst_path = os.path.join(target_backends_dir, backend_file)
+                    shutil.copy2(src_path, dst_path)
+                    reset_backend_files.append(backend_file)
+            if reset_backend_files:
+                console.print(f"✅ Reset {len(reset_backend_files)} backend config files from template")
+
+            # Reset deck/ directory files (model deck configurations)
+            template_deck_dir = os.path.join(template_inference_dir, "deck")
+            target_deck_dir = os.path.join(target_inference_dir, "deck")
+            os.makedirs(target_deck_dir, exist_ok=True)
+            reset_deck_files: list[str] = []
+            for deck_file in os.listdir(template_deck_dir):
+                if deck_file.endswith(".toml"):
+                    src_path = os.path.join(template_deck_dir, deck_file)
+                    dst_path = os.path.join(target_deck_dir, deck_file)
+                    shutil.copy2(src_path, dst_path)
+                    reset_deck_files.append(deck_file)
+            if reset_deck_files:
+                console.print(f"✅ Reset {len(reset_deck_files)} model deck config files from template")
+
+            first_time_setup = True  # Treat as first-time setup since we just replaced the files
 
         customize_backends_config(is_first_time_setup=first_time_setup)
 
@@ -227,10 +258,8 @@ def execute_initialization(
         if reset:
             routing_profiles_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "routing_profiles.toml")
             template_routing_path = os.path.join(str(get_kit_configs_dir()), "inference", "routing_profiles.toml")
-
-            if path_exists(template_routing_path):
-                shutil.copy2(template_routing_path, routing_profiles_toml_path)
-                console.print("✅ Reset routing_profiles.toml from template")
+            shutil.copy2(template_routing_path, routing_profiles_toml_path)
+            console.print("✅ Reset routing_profiles.toml from template")
 
         selected_backend_keys = get_selected_backend_keys(backends_toml_path)
         if selected_backend_keys:

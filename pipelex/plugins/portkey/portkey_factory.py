@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
@@ -18,7 +17,6 @@ if TYPE_CHECKING:
     from portkey_ai.api_resources.utils import GenericResponse
 
     from pipelex.cogt.model_backends.backend import InferenceBackend
-    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
