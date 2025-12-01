@@ -4,7 +4,7 @@
 
 ### Added
 
-- Added `exception_dirs` parameter to the `find_files_in_dir` function. This allows specific directories to be included in the search even when they are nested within excluded directories. For example, you can now exclude `.venv` while still including `.venv/lib/python3.11/site-packages/pipelex` for loading Pipelex libraries from installed packages.
+- Added `force_include_dirs` parameter to the `find_files_in_dir` function. This allows specific directories to be force included in the search even when they are nested within excluded directories. For example, you can now exclude `.venv` while still including `.venv/lib/python3.11/site-packages/pipelex` for loading Pipelex libraries from installed packages.
 
 ## [v0.17.1] - 2025-11-27
 

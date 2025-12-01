@@ -350,7 +350,7 @@ def find_files_in_dir(
     pattern: str,
     is_recursive: bool = True,
     excluded_dirs: list[str] | None = None,
-    exception_dirs: list[str] | None = None,
+    force_include_dirs: list[str] | None = None,
 ) -> list[Path]:
     """Find files matching a pattern in a directory.
 
@@ -359,8 +359,8 @@ def find_files_in_dir(
         pattern: File pattern to match (e.g. "*.py")
         is_recursive: Whether to search recursively in subdirectories
         excluded_dirs: List of directory names to exclude from the search (e.g. [".venv", "node_modules"])
-        exception_dirs: List of directories that are exceptions to excluded_dirs (will be included even if within excluded dirs).
-                       Can be either full absolute paths or directory names.
+        force_include_dirs: List of directories to force include even if they are within excluded_dirs.
+                           Can be either full absolute paths or directory names.
 
     Returns:
         List of matching Path objects
@@ -377,27 +377,27 @@ def find_files_in_dir(
     for file in files:
         is_excluded = excluded_dirs is not None and any(excluded_dir in file.parts for excluded_dir in excluded_dirs)
 
-        # Check if file is in an exception directory
-        # Exception dirs can be full paths or directory names
-        is_exception = False
-        if exception_dirs is not None:
-            for exception_dir in exception_dirs:
-                exception_path = Path(exception_dir)
-                # If exception_dir is an absolute path, check if file is under it
-                if exception_path.is_absolute():
+        # Check if file is in a force include directory (forced inclusion despite exclusions)
+        # Force include dirs can be full paths or directory names
+        should_force_include = False
+        if force_include_dirs is not None:
+            for force_include_dir in force_include_dirs:
+                force_include_path = Path(force_include_dir)
+                # If force_include_dir is an absolute path, check if file is under it
+                if force_include_path.is_absolute():
                     try:
-                        file.relative_to(exception_path)
-                        is_exception = True
+                        file.relative_to(force_include_path)
+                        should_force_include = True
                         break
                     except ValueError:
-                        # file is not relative to exception_path
+                        # file is not relative to force_include_path
                         continue
-                # If exception_dir is just a directory name, check if it's in the file path parts
-                elif exception_dir in file.parts:
-                    is_exception = True
+                # If force_include_dir is just a directory name, check if it's in the file path parts
+                elif force_include_dir in file.parts:
+                    should_force_include = True
                     break
 
-        # Include if not excluded, or if excluded but is an exception
-        if not is_excluded or is_exception:
+        # Include if not excluded, or if force included
+        if not is_excluded or should_force_include:
             filtered_files.append(file)
     return filtered_files

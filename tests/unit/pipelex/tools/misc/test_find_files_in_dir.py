@@ -128,8 +128,8 @@ class TestFindFilesInDir:
             assert "node_file.py" not in file_names
             assert "cache_file.py" not in file_names
 
-    def test_find_files_with_exception_dirs_full_path(self):
-        """Test finding files with exception directories using full paths."""
+    def test_find_files_with_force_include_dirs_full_path(self):
+        """Test finding files with force force include directories using full paths."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create files in root
             (Path(temp_dir) / "root.py").touch()
@@ -140,17 +140,17 @@ class TestFindFilesInDir:
             venv_lib.mkdir(parents=True)
             (venv_lib / "excluded.py").touch()
 
-            # Create exception directory within excluded
-            exception_dir = venv_lib / "pipelex"
-            exception_dir.mkdir()
-            (exception_dir / "important.py").touch()
+            # Create include directory within excluded
+            force_include_dir = venv_lib / "pipelex"
+            force_include_dir.mkdir()
+            (force_include_dir / "important.py").touch()
 
-            # Create nested file in exception dir
-            exception_nested = exception_dir / "builder"
-            exception_nested.mkdir()
-            (exception_nested / "builder.py").touch()
+            # Create nested file in include dir
+            include_nested = force_include_dir / "builder"
+            include_nested.mkdir()
+            (include_nested / "builder.py").touch()
 
-            # Create another file in venv but outside exception
+            # Create another file in venv but outside include dir
             other_venv = venv_lib / "other_package"
             other_venv.mkdir()
             (other_venv / "other.py").touch()
@@ -160,13 +160,13 @@ class TestFindFilesInDir:
                 "*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
-                exception_dirs=[str(exception_dir)],
+                force_include_dirs=[str(force_include_dir)],
             )
 
             file_names = [f.name for f in files]
             file_paths_str = [str(f) for f in files]
 
-            # Should include root and exception files, but not other venv files
+            # Should include root and include dir files, but not other venv files
             assert len(files) == 3
             assert "root.py" in file_names
             assert "important.py" in file_names
@@ -175,11 +175,11 @@ class TestFindFilesInDir:
             assert "other.py" not in file_names
 
             # Verify the full paths are correct
-            assert any(str(exception_dir / "important.py") in path for path in file_paths_str)
-            assert any(str(exception_nested / "builder.py") in path for path in file_paths_str)
+            assert any(str(force_include_dir / "important.py") in path for path in file_paths_str)
+            assert any(str(include_nested / "builder.py") in path for path in file_paths_str)
 
-    def test_find_files_with_exception_dirs_directory_name(self):
-        """Test finding files with exception directories using directory names."""
+    def test_find_files_with_force_include_dirs_directory_name(self):
+        """Test finding files with force force include directories using directory names."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create files in root
             (Path(temp_dir) / "root.py").touch()
@@ -190,7 +190,7 @@ class TestFindFilesInDir:
             venv_lib.mkdir(parents=True)
             (venv_lib / "excluded.py").touch()
 
-            # Create exception directory by name within excluded
+            # Create include directory by name within excluded
             pipelex_dir = venv_lib / "pipelex"
             pipelex_dir.mkdir()
             (pipelex_dir / "important.py").touch()
@@ -205,20 +205,20 @@ class TestFindFilesInDir:
                 "*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
-                exception_dirs=["pipelex"],
+                force_include_dirs=["pipelex"],
             )
 
             file_names = [f.name for f in files]
 
-            # Should include root, both pipelex directories (one from venv exception, one from src)
+            # Should include root, both pipelex directories (one from venv as included, one from src)
             assert len(files) == 3
             assert "root.py" in file_names
             assert "important.py" in file_names
             assert "also_important.py" in file_names
             assert "excluded.py" not in file_names
 
-    def test_find_files_with_exception_dirs_mixed_types(self):
-        """Test finding files with exception directories using both full paths and names."""
+    def test_find_files_with_force_include_dirs_mixed_types(self):
+        """Test finding files with force force include directories using both full paths and names."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create files in root
             (Path(temp_dir) / "root.py").touch()
@@ -228,7 +228,7 @@ class TestFindFilesInDir:
             venv_packages = venv_dir / "lib" / "site-packages"
             venv_packages.mkdir(parents=True)
 
-            # Exception by full path
+            # Include by full path
             pipelex_dir = venv_packages / "pipelex"
             pipelex_dir.mkdir()
             (pipelex_dir / "pipelex_file.py").touch()
@@ -238,7 +238,7 @@ class TestFindFilesInDir:
             node_modules.mkdir()
             (node_modules / "node_file.py").touch()
 
-            # Exception by name within node_modules
+            # Include by name within node_modules
             special_dir = node_modules / "special"
             special_dir.mkdir()
             (special_dir / "special_file.py").touch()
@@ -251,12 +251,12 @@ class TestFindFilesInDir:
                 "*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv", "node_modules"],
-                exception_dirs=[str(pipelex_dir), "special"],
+                force_include_dirs=[str(pipelex_dir), "special"],
             )
 
             file_names = [f.name for f in files]
 
-            # Should include root, pipelex (full path exception), and special (name exception)
+            # Should include root, pipelex (full path include), and special (name include)
             assert len(files) == 3
             assert "root.py" in file_names
             assert "pipelex_file.py" in file_names
@@ -264,8 +264,8 @@ class TestFindFilesInDir:
             assert "node_file.py" not in file_names
             assert "regular_node.py" not in file_names
 
-    def test_find_files_with_multiple_exception_dirs_full_paths(self):
-        """Test finding files with multiple exception directories using full paths."""
+    def test_find_files_with_multiple_force_include_dirs_full_paths(self):
+        """Test finding files with multiple force include directories using full paths."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create files in root
             (Path(temp_dir) / "root.py").touch()
@@ -275,17 +275,17 @@ class TestFindFilesInDir:
             packages = venv_dir / "site-packages"
             packages.mkdir(parents=True)
 
-            # First exception directory
+            # First include directory
             pkg1 = packages / "package1"
             pkg1.mkdir()
             (pkg1 / "pkg1_file.py").touch()
 
-            # Second exception directory
+            # Second include directory
             pkg2 = packages / "package2"
             pkg2.mkdir()
             (pkg2 / "pkg2_file.py").touch()
 
-            # Non-exception directory
+            # Non-included directory
             pkg3 = packages / "package3"
             pkg3.mkdir()
             (pkg3 / "pkg3_file.py").touch()
@@ -295,7 +295,7 @@ class TestFindFilesInDir:
                 "*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
-                exception_dirs=[str(pkg1), str(pkg2)],
+                force_include_dirs=[str(pkg1), str(pkg2)],
             )
 
             file_names = [f.name for f in files]
@@ -306,8 +306,8 @@ class TestFindFilesInDir:
             assert "pkg2_file.py" in file_names
             assert "pkg3_file.py" not in file_names
 
-    def test_find_files_with_deeply_nested_exception(self):
-        """Test finding files with deeply nested exception directories."""
+    def test_find_files_with_deeply_nested_force_include(self):
+        """Test finding files with deeply nested force include directories."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create deeply nested structure
             deep_path = Path(temp_dir) / ".venv" / "lib" / "python3.11" / "site-packages" / "pipelex" / "builder"
@@ -326,7 +326,7 @@ class TestFindFilesInDir:
                 "*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
-                exception_dirs=[str(deep_path)],
+                force_include_dirs=[str(deep_path)],
             )
 
             file_names = [f.name for f in files]
@@ -354,8 +354,8 @@ class TestFindFilesInDir:
             assert "file1.py" in file_names
             assert "venv_file.py" in file_names
 
-    def test_find_files_no_exception_dirs(self):
-        """Test that passing None for exception_dirs works correctly."""
+    def test_find_files_no_force_include_dirs(self):
+        """Test that passing None for force_include_dirs works correctly."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create files
             (Path(temp_dir) / "file1.py").touch()
@@ -364,14 +364,14 @@ class TestFindFilesInDir:
             venv_dir.mkdir()
             (venv_dir / "venv_file.py").touch()
 
-            files = find_files_in_dir(temp_dir, "*.py", is_recursive=True, excluded_dirs=[".venv"], exception_dirs=None)
+            files = find_files_in_dir(temp_dir, "*.py", is_recursive=True, excluded_dirs=[".venv"], force_include_dirs=None)
 
-            # Should exclude all venv files when no exceptions
+            # Should exclude all venv files when no includes
             assert len(files) == 1
             assert files[0].name == "file1.py"
 
-    def test_find_files_exception_not_in_excluded_dir(self):
-        """Test that exception directories outside excluded directories are handled correctly."""
+    def test_find_files_force_include_not_in_excluded_dir(self):
+        """Test that force include directories outside excluded directories are handled correctly."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create normal directory
             src_dir = Path(temp_dir) / "src"
@@ -383,13 +383,13 @@ class TestFindFilesInDir:
             venv_dir.mkdir()
             (venv_dir / "venv_file.py").touch()
 
-            # Exception directory is in src, not in excluded dir
+            # Include directory is in src, not in excluded dir
             files = find_files_in_dir(
                 temp_dir,
                 "*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
-                exception_dirs=[str(src_dir)],
+                force_include_dirs=[str(src_dir)],
             )
 
             # Should find src file (not excluded) but not venv file
@@ -433,8 +433,8 @@ class TestFindFilesInDir:
             # Empty list should behave like None - no exclusions
             assert len(files) == 2
 
-    def test_find_files_empty_exception_list(self):
-        """Test that passing an empty list for exception_dirs works correctly."""
+    def test_find_files_empty_force_include_list(self):
+        """Test that passing an empty list for force_include_dirs works correctly."""
         with tempfile.TemporaryDirectory() as temp_dir:
             (Path(temp_dir) / "file1.py").touch()
 
@@ -442,8 +442,8 @@ class TestFindFilesInDir:
             venv_dir.mkdir()
             (venv_dir / "venv_file.py").touch()
 
-            files = find_files_in_dir(temp_dir, "*.py", is_recursive=True, excluded_dirs=[".venv"], exception_dirs=[])
+            files = find_files_in_dir(temp_dir, "*.py", is_recursive=True, excluded_dirs=[".venv"], force_include_dirs=[])
 
-            # Empty exception list should exclude all venv files
+            # Empty include list should exclude all venv files
             assert len(files) == 1
             assert files[0].name == "file1.py"
