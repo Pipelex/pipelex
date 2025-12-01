@@ -132,11 +132,13 @@ jobs:
             gh release create "v$VERSION" \
               --repo "$GITHUB_REPOSITORY" \
               --title "v$VERSION" \
+              --generate-notes \
               --notes "$CHANGELOG_NOTES"
           else
             gh release create "v$VERSION" \
               --repo "$GITHUB_REPOSITORY" \
               --title "v$VERSION" \
+              --generate-notes \
               --notes "Release v$VERSION"
           fi
       - name: Upload artifact signatures to GitHub Release

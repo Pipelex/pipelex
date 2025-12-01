@@ -227,9 +227,15 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
-            the_content = TextContent(
-                text=generated_text,
-            )
+            try:
+                the_content = TextContent(
+                    text=generated_text,
+                )
+            except ValidationError as exc:
+                location = self._format_error_location(pipe_run_params=pipe_run_params)
+                error_details = format_pydantic_validation_error(exc)
+                msg = f"Error generating text content with in PipeLLM {location}: {error_details}"
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
         else:
             if is_multiple_output:
                 log.verbose(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
