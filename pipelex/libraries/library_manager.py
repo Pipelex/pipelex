@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.builder import builder
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain import Domain
@@ -150,10 +151,12 @@ class LibraryManager(LibraryManagerAbstract):
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=str(library_dir),
                 base_class_names=[StructuredContent.__name__],
+                force_include_dirs=[str(Path(builder.__file__).parent)],
             )
             # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
             FuncRegistryUtils.register_funcs_in_folder(
                 folder_path=str(library_dir),
+                force_include_dirs=[str(Path(builder.__file__).parent)],
             )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
