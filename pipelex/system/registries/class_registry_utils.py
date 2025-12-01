@@ -97,6 +97,7 @@ class ClassRegistryUtils:
             pattern="*.py",
             is_recursive=is_recursive,
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
+            force_include_dirs=[folder_path],
         )
 
         for python_file in python_files:
