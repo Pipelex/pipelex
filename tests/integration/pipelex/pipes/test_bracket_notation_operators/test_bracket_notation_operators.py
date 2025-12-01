@@ -21,7 +21,7 @@ from pipelex.system.registries.func_registry import pipe_func
 
 # Test function for PipeFunc bracket notation test
 @pipe_func(name="process_function")
-async def process_function(working_memory: WorkingMemory) -> ListContent[TextContent]:
+def process_function(working_memory: WorkingMemory) -> ListContent[TextContent]:
     """Test function that processes items and returns a list."""
     items = working_memory.get_stuff_as_list(name="two_texts", item_type=TextContent).items
     # Process items and return as list

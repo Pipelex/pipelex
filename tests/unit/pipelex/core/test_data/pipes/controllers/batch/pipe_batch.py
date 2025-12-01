@@ -9,6 +9,7 @@ description = "Domain with batch pipe"
 [pipe.batch_process]
 type = "PipeBatch"
 description = "Process items in batch"
+inputs = { items = "Item[]" }
 output = "ProcessedData"
 branch_pipe_code = "process_item"
 input_list_name = "items"
@@ -21,6 +22,7 @@ input_item_name = "current_item"
             "batch_process": PipeBatchBlueprint(
                 type="PipeBatch",
                 description="Process items in batch",
+                inputs={"items": "Item[]"},
                 output="ProcessedData",
                 branch_pipe_code="process_item",
                 input_list_name="items",

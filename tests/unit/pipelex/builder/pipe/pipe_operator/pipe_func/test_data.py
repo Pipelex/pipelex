@@ -33,7 +33,6 @@ class PipeFuncTestCases:
         ),
         PipeFuncBlueprint(
             description="Generate data",
-            inputs=None,
             output="GeneratedData",
             function_name="generate_data",
         ),

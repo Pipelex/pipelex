@@ -63,7 +63,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         return {
             variable_name
             for variable_name in required_variables
-            if not variable_name.startswith("_") and variable_name not in ("preliminary_text", "place_holder")
+            if not variable_name.startswith("_") and variable_name not in {"preliminary_text", "place_holder"}
         }
 
     @override

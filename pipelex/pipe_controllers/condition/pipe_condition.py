@@ -130,11 +130,11 @@ class PipeCondition(PipeController):
         """
         for pipe_code in self.mapped_pipe_codes:
             pipe = get_required_pipe(pipe_code=pipe_code)
-            if self.output.concept_string not in (
+            if self.output.concept_string not in {
                 pipe.output.concept_string,
                 NativeConceptCode.DYNAMIC.concept_string,
                 NativeConceptCode.ANYTHING.concept_string,
-            ):
+            }:
                 msg = (
                     f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is not "
                     f"matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"

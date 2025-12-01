@@ -20,7 +20,7 @@ class StructurePrinter:
         args = get_args(tp)
 
         # was: if origin is Union and args:
-        if origin in (Union, types.UnionType) and args:
+        if origin in {Union, types.UnionType} and args:
             non_none = [a for a in args if a is not type(None)]
             if len(args) == 2 and len(non_none) == 1:
                 return f"{self.pretty_type(non_none[0])} | None"
@@ -39,9 +39,9 @@ class StructurePrinter:
                 return "Literal[\n        " + ",\n        ".join(values) + ",\n    ]"
             return f"Literal[{', '.join(values)}]"
 
-        if (origin is list or origin is list) and args:
+        if origin is list and args:
             return f"List[{self.pretty_type(args[0])}]"
-        if (origin is dict or origin is dict) and args:
+        if origin is dict and args:
             return f"Dict[{self.pretty_type(args[0])}, {self.pretty_type(args[1])}]"
         return str(tp)
 
@@ -80,7 +80,7 @@ class StructurePrinter:
 
             args = get_args(tp)
             # was: if origin is Union:
-            if origin in (Union, types.UnionType):
+            if origin in {Union, types.UnionType}:
                 non_none = [a for a in args if a is not type(None)]
                 if len(args) == 2 and len(non_none) == 1:
                     return f"{format_type(non_none[0])} | None"
@@ -106,9 +106,9 @@ class StructurePrinter:
                     return "Literal[\n        " + ",\n        ".join(lines) + ",\n    ]"
                 return f"Literal[{', '.join(values)}]"
 
-            if origin in (list, list):
+            if origin is list:
                 return f"List[{format_type(args[0])}]"
-            if origin in (dict, dict):
+            if origin is dict:
                 return f"Dict[{format_type(args[0])}, {format_type(args[1])}]"
             return str(tp)
 
@@ -121,7 +121,7 @@ class StructurePrinter:
 
             if origin:
                 # was: if origin is Union:
-                if origin in (Union, types.UnionType):
+                if origin in {Union, types.UnionType}:
                     for arg in args:
                         if arg is type(None):
                             continue
@@ -152,7 +152,7 @@ class StructurePrinter:
                     if (
                         issubclass(base, BaseModel)
                         and base is not BaseModel
-                        and base.__module__ not in ("pydantic.main", "abc")
+                        and base.__module__ not in {"pydantic.main", "abc"}
                         and not base.__module__.startswith("pipelex.core")
                     ):
                         collect_types(base)
@@ -262,7 +262,7 @@ class StructurePrinter:
                             field_origin = get_origin(field_type)
                             field_args = get_args(field_type)
 
-                            is_optional = field_origin in (Union, types.UnionType) and type(None) in field_args
+                            is_optional = field_origin in {Union, types.UnionType} and type(None) in field_args
 
                         # Handle default values
                         field_default = None

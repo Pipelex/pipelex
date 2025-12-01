@@ -103,7 +103,7 @@ class PipeSorterTestCases:
     PIPE_BATCH_PIPES: ClassVar[dict[str, PipeBlueprintUnion]] = {
         "batch_pipe": PipeBatchBlueprint(
             description="Batch depends on process",
-            inputs={},
+            inputs={"items": "Item[]"},
             output="Text",
             branch_pipe_code="process_item",
             input_list_name="items",

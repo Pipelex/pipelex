@@ -156,7 +156,7 @@ class TestConvertFilePathToModulePath:
         # Create a deeply nested path
         long_path = tmp_path
         for i in range(10):
-            long_path = long_path / f"dir{i}"
+            long_path /= f"dir{i}"
         file_path = str(long_path / "module.py")
         result = convert_file_path_to_module_path(file_path)
         # Should contain elements from all directory levels
