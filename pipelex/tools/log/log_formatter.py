@@ -86,7 +86,7 @@ class LevelAndEmojiLogFormatter(logging.Formatter):
             log_fmt = f"{color}{tag}:%(name)s{RESET_FONT} %(message)s"
         formatter = logging.Formatter(log_fmt)
 
-        if record.levelno in [logging.WARNING, logging.ERROR, logging.CRITICAL]:
+        if record.levelno in {logging.WARNING, logging.ERROR, logging.CRITICAL}:
             record.msg = f"{color}{BOLD_FONT}{record.msg}{RESET_FONT}"
 
         return formatter.format(record)

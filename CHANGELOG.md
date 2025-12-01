@@ -1,12 +1,18 @@
 # Changelog
 
-### [v0.17.1] - 2025-11-27
+### Unreleased
+
+### Added
+
+- Added `force_include_dirs` parameter to the `find_files_in_dir` function. This allows specific directories to be force included in the search even when they are nested within excluded directories. For example, you can now exclude `.venv` while still including `.venv/lib/python3.11/site-packages/pipelex` for loading Pipelex libraries from installed packages.
+
+## [v0.17.1] - 2025-11-27
 
 ### Fixed
 
 - Fixed a bug in the `find_files_in_dir` function.
 
-### [v0.17.0] - 2025-11-27
+## [v0.17.0] - 2025-11-27
 
 **Highlights:** - Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
 

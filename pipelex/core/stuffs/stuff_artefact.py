@@ -38,7 +38,7 @@ class StuffArtefact(RootModel[dict[str, Any]], Jinja2TaggableAbstract):
         instead of getting the dict.items() method.
         """
         # Allow access to special attributes, 'root', and model-related attributes
-        if key.startswith("_") or key in ("root", "model_dump", "model_config"):
+        if key.startswith("_") or key in {"root", "model_dump", "model_config"}:
             return object.__getattribute__(self, key)
 
         # Check if it's a key in the root dict first

@@ -49,12 +49,10 @@ class TestUpdateCursorRules:
 
         cursor_rules_dir = repo_root / ".cursor" / "rules"
         exported_files: set[str] = set()
-        for mdc_file in cursor_rules_dir.glob("*.mdc"):
-            exported_files.add(mdc_file.name)
+        exported_files.update(mdc_file.name for mdc_file in cursor_rules_dir.glob("*.mdc"))
 
         expected_files: set[str] = set()
-        for file_name in kit_index.agent_rules.sets[agent_set]:
-            expected_files.add(f"{file_name.removesuffix('.md')}.mdc")
+        expected_files.update(f"{file_name.removesuffix('.md')}.mdc" for file_name in kit_index.agent_rules.sets[agent_set])
 
         assert exported_files == expected_files
 

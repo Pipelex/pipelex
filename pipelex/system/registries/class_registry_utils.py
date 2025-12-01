@@ -51,7 +51,6 @@ class ClassRegistryUtils:
             folder_path: Path to folder containing Python files
             base_class: Optional base class to filter registerable classes
             is_recursive: Whether to search recursively in subdirectories
-            include_imported: Whether to include classes imported from other modules
             is_include_imported: Whether to include classes imported from other modules
 
         """
@@ -98,6 +97,7 @@ class ClassRegistryUtils:
             pattern="*.py",
             is_recursive=is_recursive,
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
+            force_include_dirs=[folder_path],
         )
 
         for python_file in python_files:

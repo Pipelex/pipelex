@@ -118,7 +118,7 @@ def do_show_backends(show_all: bool = False) -> None:
     backends_table.add_column("Models", style="cyan", justify="right")
 
     for backend in sorted(backends_to_display, key=lambda b: b.name):
-        endpoint = backend.endpoint if backend.endpoint else "[dim]N/A[/dim]"
+        endpoint = backend.endpoint or "[dim]N/A[/dim]"
         model_count = str(len(backend.model_specs))
 
         if show_all:

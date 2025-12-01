@@ -24,7 +24,7 @@ def valid_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG00
 
 
 # Valid async function for testing (should also be eligible)
-async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
+async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
     return TextContent(text="test")
 
 

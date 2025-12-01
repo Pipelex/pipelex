@@ -154,7 +154,7 @@ class PipeAbstract(ABC, BaseModel):
 
                 # Allow mismatch if the needed requirement is a flexible type (Dynamic or Anything)
                 if (
-                    needed_requirement.concept.code not in (NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING)
+                    needed_requirement.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
                     and declared_requirement != needed_requirement
                 ):
                     # Identify the specific mismatched field(s)

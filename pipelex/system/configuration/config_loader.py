@@ -87,16 +87,16 @@ class ConfigLoader:
             Dict[str, Any]: The merged configuration dictionary
 
         """
-        #################### 1. Load pipelex base config ####################
+        # 1. Load pipelex base config ####################
         pipelex_config = self.get_pipelex_config()
 
-        #################### 2. Load local (current project) config ####################
+        # 2. Load local (current project) config ####################
         if not self.is_in_pipelex_config:
             local_config = self.get_local_config()
             if local_config:
                 deep_update(pipelex_config, local_config)
 
-        #################### 3. Load overrides for the current project ####################
+        # 3. Load overrides for the current project ####################
         list_of_overrides: list[str] = [
             *CONFIG_BASE_OVERRIDES_BEFORE_ENV,
             runtime_manager.environment,

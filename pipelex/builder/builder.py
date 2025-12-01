@@ -46,7 +46,7 @@ def _convert_pipe_spec(pipe_spec: PipeSpecUnion) -> PipeSpecUnion:
 
 
 @pipe_func()
-async def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundleSpec:
+def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundleSpec:
     """Construct a PipelexBundleSpec from working memory containing concept and pipe blueprints.
 
     Args:

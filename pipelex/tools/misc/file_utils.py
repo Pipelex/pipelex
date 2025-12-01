@@ -25,8 +25,7 @@ def save_bytes_to_binary_file(file_path: str, byte_data: bytes, create_directory
     if create_directory:
         ensure_directory_exists(os.path.dirname(file_path))
 
-    with open(file_path, "wb") as file:
-        file.write(byte_data)
+    Path(file_path).write_bytes(byte_data)
     return file_path
 
 
@@ -51,8 +50,7 @@ def save_text_to_path(text: str, path: str, create_directory: bool = False):
         if directory:
             ensure_directory_exists(directory)
 
-    with open(path, "w", encoding="utf-8") as file:
-        file.write(text)
+    Path(path).write_text(text, encoding="utf-8")
 
 
 def load_text_from_path(path: str) -> str:
@@ -347,14 +345,23 @@ def get_incremental_file_path(
 ########################################################
 
 
-def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, excluded_dirs: list[str] | None = None) -> list[Path]:
+def find_files_in_dir(
+    dir_path: str,
+    pattern: str,
+    is_recursive: bool = True,
+    excluded_dirs: list[str] | None = None,
+    force_include_dirs: list[str] | None = None,
+) -> list[Path]:
     """Find files matching a pattern in a directory.
 
     Args:
         dir_path: Directory path to search in
         pattern: File pattern to match (e.g. "*.py")
         is_recursive: Whether to search recursively in subdirectories
-        excluded_dirs: List of directories to exclude from the search
+        excluded_dirs: List of directory names to exclude from the search (e.g. [".venv", "node_modules"])
+        force_include_dirs: List of directories to force include even if they are within excluded_dirs.
+                           Can be either full absolute paths or directory names.
+
     Returns:
         List of matching Path objects
 
@@ -368,6 +375,29 @@ def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, ex
         files = list(path.glob(pattern))
 
     for file in files:
-        if excluded_dirs is None or not any(part in excluded_dirs for part in file.parts):
+        is_excluded = excluded_dirs is not None and any(excluded_dir in file.parts for excluded_dir in excluded_dirs)
+
+        # Check if file is in a force include directory (forced inclusion despite exclusions)
+        # Force include dirs can be full paths or directory names
+        should_force_include = False
+        if force_include_dirs is not None:
+            for force_include_dir in force_include_dirs:
+                force_include_path = Path(force_include_dir)
+                # If force_include_dir is an absolute path, check if file is under it
+                if force_include_path.is_absolute():
+                    try:
+                        file.relative_to(force_include_path)
+                        should_force_include = True
+                        break
+                    except ValueError:
+                        # file is not relative to force_include_path
+                        continue
+                # If force_include_dir is just a directory name, check if it's in the file path parts
+                elif force_include_dir in file.parts:
+                    should_force_include = True
+                    break
+
+        # Include if not excluded, or if force included
+        if not is_excluded or should_force_include:
             filtered_files.append(file)
     return filtered_files
