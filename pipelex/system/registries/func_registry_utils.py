@@ -62,6 +62,7 @@ class FuncRegistryUtils:
     def register_funcs_in_folder(
         cls,
         folder_path: str,
+        force_include_dirs: list[str] | None = None,
         is_recursive: bool = True,
     ) -> None:
         """Discovers and attempts to register all functions in Python files within a folder.
@@ -80,6 +81,7 @@ class FuncRegistryUtils:
         Args:
             folder_path: Path to folder containing Python files
             is_recursive: Whether to search recursively in subdirectories
+            force_include_dirs: List of directories to force include even if they are within excluded_dirs.
 
         """
         python_files = find_files_in_dir(
@@ -87,7 +89,7 @@ class FuncRegistryUtils:
             pattern="*.py",
             is_recursive=is_recursive,
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
-            force_include_dirs=[folder_path],
+            force_include_dirs=force_include_dirs,
         )
 
         for python_file in python_files:
