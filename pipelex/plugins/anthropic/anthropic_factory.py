@@ -1,4 +1,3 @@
-import asyncio
 from typing import TYPE_CHECKING
 
 from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
@@ -11,22 +10,15 @@ from openai.types.chat import (
 
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image import (
-    PromptImage,
-    PromptImageBase64,
-    PromptImagePath,
     PromptImageTypedBase64,
     PromptImageTypedUrlOrBase64,
-    PromptImageUrl,
 )
-from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
-from pipelex.cogt.image.prompt_image_utils import promptimage_to_typed_bytes_or_url
+from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -77,16 +69,16 @@ class AnthropicFactory:
     ) -> MessageParam:
         message: MessageParam
         content: list[TextBlockParam | ImageBlockParam] = []
+        llm_prompt = llm_job.llm_prompt
 
-        if llm_job.llm_prompt.user_text:
+        if user_text := llm_prompt.user_text:
             text_block_param: TextBlockParam = {
                 "type": "text",
-                "text": llm_job.llm_prompt.user_text,
+                "text": user_text,
             }
             content.append(text_block_param)
-        if llm_job.llm_prompt.user_images:
-            tasks_to_prep_images = [promptimage_to_typed_bytes_or_url(prompt_image) for prompt_image in llm_job.llm_prompt.user_images]
-            prepped_user_images = await asyncio.gather(*tasks_to_prep_images)
+        if llm_prompt.user_images:
+            prepped_user_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=False)
             for prepped_image in prepped_user_images:
                 image_block_param: ImageBlockParam
                 if isinstance(prepped_image, PromptImageTypedBase64):
@@ -178,14 +170,12 @@ class AnthropicFactory:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
-        # System message ####
         if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
 
         prepped_user_images: list[PromptImageTypedUrlOrBase64] | None
         if llm_prompt.user_images:
-            tasks_to_prep_images = [promptimage_to_typed_bytes_or_url(prompt_image) for prompt_image in llm_prompt.user_images]
-            prepped_user_images = await asyncio.gather(*tasks_to_prep_images)
+            prepped_user_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=False)
         else:
             prepped_user_images = None
 

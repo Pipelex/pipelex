@@ -4,18 +4,13 @@ from pipelex.cogt.image.prompt_image import (
     PromptImageBase64,
     PromptImageBinary,
     PromptImagePath,
-    PromptImageTypedBase64,
-    PromptImageTypedUrlOrBase64,
     PromptImageUrl,
 )
 from pipelex.tools.misc.base_64_utils import (
     encode_to_base64_async,
-    load_binary_as_base64_async,
-    load_binary_async,
     strip_base_64_str_if_needed,
 )
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 
 
 class PromptImageFactory:

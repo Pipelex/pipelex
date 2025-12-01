@@ -1,8 +1,9 @@
+import asyncio
+
 from pipelex.cogt.exceptions import PromptImageFactoryError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
     PromptImageBase64,
-    PromptImageBinary,
     PromptImagePath,
     PromptImageTypedBase64,
     PromptImageTypedUrlOrBase64,
@@ -10,12 +11,9 @@ from pipelex.cogt.image.prompt_image import (
 )
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.tools.misc.base_64_utils import (
-    encode_to_base64_async,
     load_binary_as_base64_async,
     load_binary_async,
-    strip_base_64_str_if_needed,
 )
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 
 
@@ -49,14 +47,18 @@ async def promptimage_to_bytes_async(prompt_image: PromptImage) -> bytes:
 
 async def promptimage_to_typed_bytes_or_url(
     prompt_image: PromptImage,
+    is_http_url_enabled: bool,
 ) -> PromptImageTypedUrlOrBase64:
     typed_bytes_or_url: PromptImageTypedUrlOrBase64
     if isinstance(prompt_image, PromptImageBase64):
         typed_bytes_or_url = prompt_image.make_prompt_image_typed_base64()
     elif isinstance(prompt_image, PromptImageUrl):
-        image_bytes = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image_url=prompt_image)
-        file_type = detect_file_type_from_base64(image_bytes.base_64)
-        typed_bytes_or_url = PromptImageTypedBase64(base_64=image_bytes.base_64, file_type=file_type)
+        if is_http_url_enabled:
+            typed_bytes_or_url = prompt_image.url
+        else:
+            image_bytes = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image_url=prompt_image)
+            file_type = detect_file_type_from_base64(image_bytes.base_64)
+            typed_bytes_or_url = PromptImageTypedBase64(base_64=image_bytes.base_64, file_type=file_type)
     elif isinstance(prompt_image, PromptImagePath):
         b64 = await load_binary_as_base64_async(prompt_image.file_path)
         typed_bytes_or_url = PromptImageTypedBase64(base_64=b64, file_type=prompt_image.get_file_type())
@@ -64,3 +66,8 @@ async def promptimage_to_typed_bytes_or_url(
         msg = f"Unsupported PromptImage type: '{type(prompt_image).__name__}'"
         raise PromptImageFactoryError(msg)
     return typed_bytes_or_url
+
+
+async def prep_prompt_images(prompt_images: list[PromptImage], is_http_url_enabled: bool) -> list[PromptImageTypedUrlOrBase64]:
+    tasks_to_prep_images = [promptimage_to_typed_bytes_or_url(prompt_image, is_http_url_enabled) for prompt_image in prompt_images]
+    return await asyncio.gather(*tasks_to_prep_images)
