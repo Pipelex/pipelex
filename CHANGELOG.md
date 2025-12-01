@@ -1,10 +1,22 @@
 # Changelog
 
-### Unreleased
+## Unreleased
 
 ### Added
 
-- Added `force_include_dirs` parameter to the `find_files_in_dir` function. This allows specific directories to be force included in the search even when they are nested within excluded directories. For example, you can now exclude `.venv` while still including `.venv/lib/python3.11/site-packages/pipelex` for loading Pipelex libraries from installed packages.
+- **New AI models support**: Added GPT-5.1, Claude 4.5 Opus, and Gemini 3 Preview to the available models.
+- **Codex Cloud support**: Added support for running Pipelex in Codex Cloud environments with appropriate configuration and testing capabilities.
+- **Enhanced file discovery**: Added `force_include_dirs` parameter to the `find_files_in_dir` function. This allows specific directories to be force included in the search even when they are nested within excluded directories. For example, you can now exclude `.venv` while still including `.venv/lib/python3.11/site-packages/pipelex` for loading Pipelex libraries from installed packages.
+
+### Changed
+
+- Backend fallback now only activates when explicitly opted-in, giving users more control over model selection.
+- Renamed and improved the Azure Image Generation SDK implementation.
+- Enhanced language spec examples, operator details, and added Viewpoint documentation.
+
+### Fixed
+
+- Fixed kit rules to be idempotent and work correctly across multiple executions.
 
 ## [v0.17.1] - 2025-11-27
 
