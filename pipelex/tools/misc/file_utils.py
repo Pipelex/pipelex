@@ -358,8 +358,9 @@ def find_files_in_dir(
         dir_path: Directory path to search in
         pattern: File pattern to match (e.g. "*.py")
         is_recursive: Whether to search recursively in subdirectories
-        excluded_dirs: List of directories to exclude from the search
-        exception_dirs: List of directories that are exceptions to excluded_dirs (will be included even if within excluded dirs)
+        excluded_dirs: List of directory names to exclude from the search (e.g. [".venv", "node_modules"])
+        exception_dirs: List of directories that are exceptions to excluded_dirs (will be included even if within excluded dirs).
+                       Can be either full absolute paths or directory names.
 
     Returns:
         List of matching Path objects
@@ -375,7 +376,26 @@ def find_files_in_dir(
 
     for file in files:
         is_excluded = excluded_dirs is not None and any(excluded_dir in file.parts for excluded_dir in excluded_dirs)
-        is_exception = exception_dirs is not None and any(exception_dir in file.parts for exception_dir in exception_dirs)
+
+        # Check if file is in an exception directory
+        # Exception dirs can be full paths or directory names
+        is_exception = False
+        if exception_dirs is not None:
+            for exception_dir in exception_dirs:
+                exception_path = Path(exception_dir)
+                # If exception_dir is an absolute path, check if file is under it
+                if exception_path.is_absolute():
+                    try:
+                        file.relative_to(exception_path)
+                        is_exception = True
+                        break
+                    except ValueError:
+                        # file is not relative to exception_path
+                        continue
+                # If exception_dir is just a directory name, check if it's in the file path parts
+                elif exception_dir in file.parts:
+                    is_exception = True
+                    break
 
         # Include if not excluded, or if excluded but is an exception
         if not is_excluded or is_exception:
