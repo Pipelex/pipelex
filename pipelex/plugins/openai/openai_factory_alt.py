@@ -1,3 +1,18 @@
+from openai.types.chat import (
+    ChatCompletionContentPartImageParam,
+    ChatCompletionContentPartParam,
+    ChatCompletionContentPartTextParam,
+    ChatCompletionMessageParam,
+    ChatCompletionSystemMessageParam,
+    ChatCompletionUserMessageParam,
+)
+from openai.types.chat.chat_completion_content_part_image_param import ImageURL
+from typing_extensions import override
+
+from pipelex.cogt.image.prompt_image import PromptImageDetail, PromptImageTypedBase64
+from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
+from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
 
 
@@ -6,27 +21,36 @@ class OpenAIFactoryAlt(OpenAIFactory):
         super().__init__()
         self.is_http_url_enabled = is_http_url_enabled
 
-    # @override
-    # async def make_image_url_obj(self, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ImageURL:
-    #     if detail is None:
-    #         detail = PromptImageDetail.AUTO
-    #     if isinstance(prompt_image, PromptImageUrl):
-    #         if self.is_http_url_enabled:
-    #             url = prompt_image.url
-    #             openai_image_url = ImageURL(url=url, detail=detail.as_openai_detail)
-    #         else:
-    #             # we can't use an actual HTTP URL, so we need to download the image and use a base64-encoded string
-    #             image_bytes = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image_url=prompt_image)
-    #             file_type = detect_file_type_from_base64(image_bytes.base_64)
-    #             typed_bytes_or_url = PromptImageTypedBase64(base_64=image_bytes.base_64, file_type=file_type)
-    #     elif isinstance(prompt_image, PromptImageBase64):
-    #         # TODO: manage image type
-    #         url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.base_64.decode('utf-8')}"
-    #         openai_image_url = ImageURL(url=url_with_bytes, detail=detail.as_openai_detail)
-    #     elif isinstance(prompt_image, PromptImagePath):
-    #         image_bytes = load_binary_as_base64(path=prompt_image.file_path)
-    #         return self.make_image_url_obj(prompt_image=PromptImageBase64(base_64=image_bytes), detail=detail)
-    #     else:
-    #         msg = f"prompt_image of type {type(prompt_image)} is not supported"
-    #         raise LLMPromptParameterError(msg)
-    #     return openai_image_url
+    @override
+    @override
+    async def make_simple_messages(
+        self,
+        llm_job: LLMJob,
+    ) -> list[ChatCompletionMessageParam]:
+        """Makes a list of messages with a system message (if provided) and followed by a user message."""
+        llm_prompt = llm_job.llm_prompt
+        messages: list[ChatCompletionMessageParam] = []
+        user_contents: list[ChatCompletionContentPartParam] = []
+        if system_content := llm_prompt.system_text:
+            messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
+        # TODO: confirm that we can prompt without user_contents, for instance if we have only images,
+        # otherwise consider using a default user_content
+        if user_prompt_text := llm_prompt.user_text:
+            user_part_text = ChatCompletionContentPartTextParam(text=user_prompt_text, type="text")
+            user_contents.append(user_part_text)
+        if llm_prompt.user_images:
+            detail = llm_job.job_params.image_detail or PromptImageDetail.AUTO
+            prepped_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=self.is_http_url_enabled)
+            for prepped_image in prepped_images:
+                if isinstance(prepped_image, str):
+                    url = prepped_image
+                else:
+                    assert isinstance(prepped_image, PromptImageTypedBase64)
+                    url = PromptImageFactory.make_base_64_url_from_prompt_image_typed_base64(prompt_image=prepped_image)
+
+                image_url_obj = ImageURL(url=url, detail=detail.as_openai_detail)
+                image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
+                user_contents.append(image_param)
+
+        messages.append(ChatCompletionUserMessageParam(role="user", content=user_contents))
+        return messages

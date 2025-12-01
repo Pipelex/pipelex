@@ -18,9 +18,9 @@ from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 @pytest.mark.usefixtures("routing_profile_override")
 class TestLLMVision:
     @pytest.mark.parametrize(("topic", "image_uri"), LLMVisionTestCases.IMAGE_URLS)
-    async def test_gen_text_from_vision_by_url(self, llm_handle_for_vision: str, topic: str, image_uri: str):
+    async def test_gen_text_from_vision_by_url(self, llm_handle: str, topic: str, image_uri: str):
         prompt_image = PromptImageFactory.make_prompt_image(url=image_uri)
-        llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
+        llm_worker = get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
@@ -35,15 +35,15 @@ class TestLLMVision:
             assert generated_text
             pretty_print(generated_text, title=f"Vision of {topic}")
         except LLMCapabilityError as exc:
-            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle_for_vision} because {exc}")
+            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle} because {exc}")
         except PromptImageFormatError as exc:
-            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle_for_vision} because {exc}")
+            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
 
     @pytest.mark.parametrize(("topic", "image_path"), LLMVisionTestCases.IMAGE_PATHS)
-    async def test_gen_text_from_vision_by_bytes(self, llm_handle_for_vision: str, topic: str, image_path: str):
+    async def test_gen_text_from_vision_by_bytes(self, llm_handle: str, topic: str, image_path: str):
         image_bytes = load_binary_as_base64(path=image_path)
         prompt_image = PromptImageBase64(base_64=image_bytes)
-        llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
+        llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
                 user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
@@ -56,14 +56,14 @@ class TestLLMVision:
             assert generated_text
             pretty_print(generated_text, title=f"Vision of {topic}")
         except LLMCapabilityError as exc:
-            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle_for_vision} because {exc}")
+            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle} because {exc}")
         except PromptImageFormatError as exc:
-            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle_for_vision} because {exc}")
+            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
 
     @pytest.mark.parametrize(("topic", "image_path"), LLMVisionTestCases.IMAGE_PATHS)
-    async def test_gen_text_from_vision_by_path(self, llm_handle_for_vision: str, topic: str, image_path: str):
+    async def test_gen_text_from_vision_by_path(self, llm_handle: str, topic: str, image_path: str):
         prompt_image = PromptImagePath(file_path=image_path)
-        llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
+        llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
                 user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
@@ -76,15 +76,15 @@ class TestLLMVision:
             assert generated_text
             pretty_print(generated_text, title=f"Vision of {topic}")
         except LLMCapabilityError as exc:
-            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle_for_vision} because {exc}")
+            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle} because {exc}")
         except PromptImageFormatError as exc:
-            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle_for_vision} because {exc}")
+            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
 
     @pytest.mark.parametrize(("topic", "image_pair"), LLMVisionTestCases.IMAGE_PATH_PAIRS)
-    async def test_gen_text_from_vision_2_images(self, llm_handle_for_vision: str, topic: str, image_pair: tuple[str, str]):
+    async def test_gen_text_from_vision_2_images(self, llm_handle: str, topic: str, image_pair: tuple[str, str]):
         prompt_image1 = PromptImagePath(file_path=image_pair[0])
         prompt_image2 = PromptImagePath(file_path=image_pair[1])
-        llm_worker = get_llm_worker(llm_handle=llm_handle_for_vision)
+        llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
                 user_text=LLMVisionTestCases.VISION_IMAGES_COMPARE_PROMPT,
@@ -97,6 +97,6 @@ class TestLLMVision:
             assert generated_text
             pretty_print(generated_text, title=f"Comparative vision of {topic}")
         except LLMCapabilityError as exc:
-            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle_for_vision} because {exc}")
+            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle} because {exc}")
         except PromptImageFormatError as exc:
-            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle_for_vision} because {exc}")
+            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
