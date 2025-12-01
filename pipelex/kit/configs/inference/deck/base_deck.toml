@@ -22,12 +22,13 @@ base-gpt = "gpt-4o"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
 base-groq = "llama-3.3-70b-versatile"
+base-grok = "grok-4-fast"
 
-best-gpt = "gpt-4o"
-best-claude = "claude-4.1-opus"
-best-gemini = "gemini-2.5-pro"
+best-gpt = "gpt-5.1"
+best-claude = "claude-4.5-opus"
+best-gemini = "gemini-3.0-pro"
 best-mistral = "mistral-medium"
-best-grok = "grok-3"
+best-grok = "grok-4"
 
 # Groq-specific aliases
 fast-groq = "llama-3.1-8b-instant"
@@ -47,42 +48,43 @@ smart_llm = [
     "claude-4.5-opus",
     "claude-4.5-sonnet",
     "gemini-3.0-pro",
+    "gpt-5.1",
     "claude-4.1-opus",
     "gemini-2.5-pro",
     "claude-4-sonnet",
-    "gpt-4o",            # we're using gpt-4o here rather than gpt-5 until we'll handle reasoning parameters
-    "grok-3",
+    "grok-4",
 ]
 smart_llm_with_vision = [
     "claude-4.5-opus",
     "claude-4.5-sonnet",
     "gemini-3.0-pro",
+    "gpt-5.1",
     "claude-4.1-opus",
     "gemini-2.5-pro",
     "claude-4-sonnet",
-    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
-    "grok-3",
+    "grok-4",
 ]
 smart_llm_for_structured = [
     "claude-4.5-opus",
     "claude-4.5-sonnet",
     "gemini-3.0-pro",
+    "gpt-5.1",
     "claude-4.1-opus",
     "claude-4-sonnet",
-    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
 ]
 llm_for_creativity = [
     "claude-4.5-opus",
     "claude-4.1-opus",
     "gemini-2.5-pro",
-    "gpt-4o",
+    "gpt-5.1",
 ]
 llm_for_large_codebase = [
     "gemini-2.5-pro",
     "claude-4.5-sonnet",
-    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
+    "gemini-3.0-pro",
+    "gpt-5.1",
     "gemini-2.5-flash",
-    "grok-3",
+    "grok-4",
 ]
 cheap_llm = [
     "gpt-4o-mini",
@@ -130,7 +132,7 @@ llm_to_analyze_large_codebase = { model = "base-claude", temperature = 0.1 }
 # Vision skills
 llm_for_img_to_text_cheap = { model = "gpt-4o-mini", temperature = 0.1 }
 llm_for_img_to_text = { model = "base-claude", temperature = 0.1 }
-llm_for_diagram_to_text = { model = "base-claude", temperature = 0.3 }
+llm_for_diagram_to_text = { model = "best-claude", temperature = 0.3 }
 llm_for_table_to_text = { model = "base-claude", temperature = 0.3 }
 
 # Image generation prompting skills
