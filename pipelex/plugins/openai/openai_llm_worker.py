@@ -15,7 +15,7 @@ from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_fr
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
-from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.openai.openai_factory_protocol import OpenAIFactoryProtocol
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -23,6 +23,7 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 class OpenAILLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
+        openai_factory: OpenAIFactoryProtocol,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -38,6 +39,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             raise SdkTypeError(msg)
 
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
+        self.openai_factory = openai_factory
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance, mode=instructor_mode)
         else:
@@ -66,7 +68,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
+        messages = await self.openai_factory.make_simple_messages(llm_job=llm_job)
 
         try:
             extra_headers = self._make_extra_headers(llm_job=llm_job, output_desc="Text")
@@ -96,7 +98,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
-            llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)
+            llm_tokens_usage.nb_tokens_by_category = self.openai_factory.make_nb_tokens_by_category(usage=usage)
         return response_text
 
     @override
@@ -106,7 +108,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
+        messages = await self.openai_factory.make_simple_messages(llm_job=llm_job)
         try:
             try:
                 extra_headers = self._make_extra_headers(llm_job=llm_job, output_desc=schema.__name__)
@@ -131,7 +133,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg) from bad_request_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
-            llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)
+            llm_tokens_usage.nb_tokens_by_category = self.openai_factory.make_nb_tokens_by_category(usage=usage)
 
         return result_object
 

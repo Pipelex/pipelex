@@ -179,7 +179,7 @@ class AnthropicFactory:
         if isinstance(prompt_image, PromptImageBase64):
             typed_bytes_or_url = prompt_image.make_prompt_image_typed_base64()
         elif isinstance(prompt_image, PromptImageUrl):
-            image_bytes = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image)
+            image_bytes = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image_url=prompt_image)
             file_type = detect_file_type_from_base64(image_bytes.base_64)
             typed_bytes_or_url = PromptImageTypedBase64(base_64=image_bytes.base_64, file_type=file_type)
         elif isinstance(prompt_image, PromptImagePath):

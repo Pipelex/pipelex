@@ -9,6 +9,7 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_content_part_image_param import ImageURL
 from openai.types.completion_usage import CompletionUsage
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMPromptParameterError
@@ -16,6 +17,7 @@ from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, Prom
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.plugins.openai.openai_factory_protocol import OpenAIFactoryProtocol
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from pipelex.types import StrEnum
@@ -37,7 +39,7 @@ class AzureExtraField(StrEnum):
     API_VERSION = "api_version"
 
 
-class OpenAIFactory:
+class OpenAIFactory(OpenAIFactoryProtocol):
     @classmethod
     def make_openai_client(
         cls,
@@ -83,9 +85,9 @@ class OpenAIFactory:
 
         return the_client
 
-    @classmethod
-    def make_simple_messages(
-        cls,
+    @override
+    async def make_simple_messages(
+        self,
         llm_job: LLMJob,
     ) -> list[ChatCompletionMessageParam]:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
@@ -101,58 +103,34 @@ class OpenAIFactory:
             user_contents.append(user_part_text)
         if llm_prompt.user_images:
             for prompt_image in llm_prompt.user_images:
-                openai_image_url = cls.make_openai_image_url(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
-                image_param = ChatCompletionContentPartImageParam(image_url=openai_image_url, type="image_url")
+                image_url_obj = await self.make_image_url_obj(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
+                image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)
 
         messages.append(ChatCompletionUserMessageParam(role="user", content=user_contents))
         return messages
 
-    @classmethod
-    def make_openai_image_url(cls, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ImageURL:
+    @override
+    async def make_image_url_obj(self, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ImageURL:
         if detail is None:
             detail = PromptImageDetail.AUTO
         if isinstance(prompt_image, PromptImageUrl):
             url = prompt_image.url
-            openai_image_url = ImageURL(url=url, detail=detail.as_openai_detail)
+            image_url_obj = ImageURL(url=url, detail=detail.as_openai_detail)
         elif isinstance(prompt_image, PromptImageBase64):
             # TODO: manage image type
             url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.base_64.decode('utf-8')}"
-            openai_image_url = ImageURL(url=url_with_bytes, detail=detail.as_openai_detail)
+            image_url_obj = ImageURL(url=url_with_bytes, detail=detail.as_openai_detail)
         elif isinstance(prompt_image, PromptImagePath):
             image_bytes = load_binary_as_base64(path=prompt_image.file_path)
-            return cls.make_openai_image_url(prompt_image=PromptImageBase64(base_64=image_bytes), detail=detail)
+            return await self.make_image_url_obj(prompt_image=PromptImageBase64(base_64=image_bytes), detail=detail)
         else:
             msg = f"prompt_image of type {type(prompt_image)} is not supported"
             raise LLMPromptParameterError(msg)
-        return openai_image_url
+        return image_url_obj
 
-    @staticmethod
-    def make_openai_error_info(exception: Exception) -> str:
-        error_mapping: dict[type, str] = {
-            openai.BadRequestError: "OpenAI API request was invalid.",
-            openai.InternalServerError: "OpenAI is having trouble. Please try again later.",
-            openai.RateLimitError: "OpenAI API request exceeded rate limit.",
-            openai.AuthenticationError: "OpenAI API request was not authorized.",
-            openai.PermissionDeniedError: "OpenAI API request was not permitted.",
-            openai.NotFoundError: "Requested resource not found.",
-            openai.APITimeoutError: "OpenAI API request timed out.",
-            openai.APIConnectionError: "OpenAI API request failed to connect.",
-            openai.APIError: "OpenAI API returned an API Error.",
-        }
-        return error_mapping.get(type(exception), "An unexpected error occurred with the OpenAI API.")
-
-    # reference:
-    # https://help.openai.com/en/articles/5247780-using-logit-bias-to-define-token-probability
-    # https://platform.openai.com/tokenizer
-    @staticmethod
-    def make_logit_bias(nb_items: int, weight: int = 100) -> dict[str, int]:
-        logit_bias = {str(item): weight for item in range(15, 15 + nb_items + 1)}
-        log.verbose(f"logit_bias: {logit_bias}")
-        return logit_bias
-
-    @staticmethod
-    def make_nb_tokens_by_category(usage: CompletionUsage) -> NbTokensByCategoryDict:
+    @override
+    def make_nb_tokens_by_category(self, usage: CompletionUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
             TokenCategory.INPUT: usage.prompt_tokens,
             TokenCategory.OUTPUT: usage.completion_tokens,

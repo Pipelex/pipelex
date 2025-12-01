@@ -20,6 +20,7 @@ class LLMWorkerFactory:
         llm_worker: LLMWorkerInternalAbstract
         match plugin.sdk:
             case "portkey_completions":
+                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_llm_worker import OpenAILLMWorker  # noqa: PLC0415
                 from pipelex.plugins.portkey.portkey_factory import PortkeyFactory  # noqa: PLC0415
 
@@ -32,11 +33,13 @@ class LLMWorkerFactory:
                 )
 
                 llm_worker = OpenAILLMWorker(
+                    openai_factory=OpenAIFactory(),
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
             case "portkey_responses":
+                from pipelex.plugins.openai_responses.openai_responses_factory import OpenAIResponsesFactory  # noqa: PLC0415
                 from pipelex.plugins.openai_responses.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
                 from pipelex.plugins.portkey.portkey_factory import PortkeyFactory  # noqa: PLC0415
 
@@ -49,6 +52,7 @@ class LLMWorkerFactory:
                 )
 
                 llm_worker = OpenAIResponsesLLMWorker(
+                    openai_responses_factory=OpenAIResponsesFactory(),
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
@@ -66,6 +70,7 @@ class LLMWorkerFactory:
                 )
 
                 llm_worker = OpenAIResponsesLLMWorker(
+                    openai_responses_factory=OpenAIResponsesFactory(),
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
@@ -83,6 +88,7 @@ class LLMWorkerFactory:
                 )
 
                 llm_worker = OpenAILLMWorker(
+                    openai_factory=OpenAIFactory(),
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
@@ -140,6 +146,7 @@ class LLMWorkerFactory:
                 )
 
                 llm_worker = MistralLLMWorker(
+                    mistral_factory=MistralFactory(),
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

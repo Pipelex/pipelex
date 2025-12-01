@@ -12,13 +12,13 @@ from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, S
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.config import get_config
-from pipelex.plugins.openai_responses.openai_responses_factory import OpenAIResponsesFactory
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
 
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+    from pipelex.plugins.openai_responses.openai_responses_factory import OpenAIResponsesFactory
     from pipelex.reporting.reporting_protocol import ReportingProtocol
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
+        openai_responses_factory: OpenAIResponsesFactory,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -37,6 +38,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             raise SdkTypeError(msg)
 
         self.openai_client_for_responses: openai.AsyncOpenAI = sdk_instance
+        self.openai_responses_factory = openai_responses_factory
 
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance, mode=instructor_mode)
@@ -67,7 +69,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        input_items = OpenAIResponsesFactory.make_input_items(llm_job=llm_job)
+        input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
         try:
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
@@ -94,7 +96,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and response.usage:
-            llm_tokens_usage.nb_tokens_by_category = OpenAIResponsesFactory.make_nb_tokens_by_category(usage=response.usage)
+            llm_tokens_usage.nb_tokens_by_category = self.openai_responses_factory.make_nb_tokens_by_category(usage=response.usage)
         return response.output_text
 
     @override
@@ -109,7 +111,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
                 raise LLMCompletionError(msg)
 
-            input_items = OpenAIResponsesFactory.make_input_items(llm_job=llm_job)
+            input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
             result_object, completion = await self.instructor_for_objects.responses.create_with_completion(  # pyright: ignore[reportUnknownMemberType]
                 input=cast("list[ChatCompletionMessageParam]", input_items),
                 response_model=schema,
@@ -133,7 +135,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and hasattr(completion, "usage"):
             completion_usage = completion.usage
             if completion_usage:
-                llm_tokens_usage.nb_tokens_by_category = OpenAIResponsesFactory.make_nb_tokens_by_category(usage=completion_usage)
+                llm_tokens_usage.nb_tokens_by_category = self.openai_responses_factory.make_nb_tokens_by_category(usage=completion_usage)
 
         typed_result_object: BaseModelTypeVar = result_object
         return typed_result_object

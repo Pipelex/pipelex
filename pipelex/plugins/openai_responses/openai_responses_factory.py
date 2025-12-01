@@ -20,10 +20,14 @@ if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
+    from pipelex.plugins.openai.openai_factory_protocol import OpenAIFactoryProtocol
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 class OpenAIResponsesFactory:
+    def __init__(self, openai_factory: OpenAIFactoryProtocol | None = None):
+        self.openai_factory: OpenAIFactoryProtocol = openai_factory or OpenAIFactory()
+
     @classmethod
     def make_openai_client(
         cls,
@@ -35,8 +39,7 @@ class OpenAIResponsesFactory:
             backend=backend,
         )
 
-    @classmethod
-    def make_input_items(cls, llm_job: LLMJob) -> list[ResponseInputItemParam]:
+    async def make_input_items(self, llm_job: LLMJob) -> list[ResponseInputItemParam]:
         """Build Response API input items from a standard LLM job prompt."""
         llm_prompt = llm_job.llm_prompt
         input_items: list[ResponseInputItemParam] = []
@@ -47,7 +50,7 @@ class OpenAIResponsesFactory:
             user_contents.append(text_content)
 
         for prompt_image in llm_prompt.user_images:
-            image_content = cls._make_image_content(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
+            image_content = await self._make_image_content(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
             user_contents.append(image_content)
 
         if not user_contents:
@@ -62,15 +65,13 @@ class OpenAIResponsesFactory:
         )
         return input_items
 
-    @classmethod
-    def _make_image_content(cls, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ResponseInputImageParam:
+    async def _make_image_content(self, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ResponseInputImageParam:
         if detail is None:
             detail = PromptImageDetail.AUTO
-        openai_image_url = OpenAIFactory.make_openai_image_url(prompt_image=prompt_image, detail=detail)
-        return {"type": "input_image", "image_url": openai_image_url["url"], "detail": detail.as_openai_detail}
+        image_url_obj = await self.openai_factory.make_image_url_obj(prompt_image=prompt_image, detail=detail)
+        return {"type": "input_image", "image_url": image_url_obj["url"], "detail": detail.as_openai_detail}
 
-    @staticmethod
-    def make_nb_tokens_by_category(usage: ResponseUsage) -> NbTokensByCategoryDict:
+    def make_nb_tokens_by_category(self, usage: ResponseUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
             TokenCategory.INPUT: usage.input_tokens,
             TokenCategory.OUTPUT: usage.output_tokens,
