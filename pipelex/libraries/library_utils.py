@@ -77,6 +77,7 @@ def get_pipelex_plx_files_from_dirs(dirs: set[Path]) -> list[Path]:
             dir_path=str(dir_path),
             pattern="*.plx",
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
+            exception_dirs=[str(dir_path) for dir_path in dirs],
         )
 
         # Filter to only include valid Pipelex files

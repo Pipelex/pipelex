@@ -345,7 +345,13 @@ def get_incremental_file_path(
 ########################################################
 
 
-def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, excluded_dirs: list[str] | None = None) -> list[Path]:
+def find_files_in_dir(
+    dir_path: str,
+    pattern: str,
+    is_recursive: bool = True,
+    excluded_dirs: list[str] | None = None,
+    exception_dirs: list[str] | None = None,
+) -> list[Path]:
     """Find files matching a pattern in a directory.
 
     Args:
@@ -353,6 +359,8 @@ def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, ex
         pattern: File pattern to match (e.g. "*.py")
         is_recursive: Whether to search recursively in subdirectories
         excluded_dirs: List of directories to exclude from the search
+        exception_dirs: List of directories that are exceptions to excluded_dirs (will be included even if within excluded dirs)
+
     Returns:
         List of matching Path objects
 
@@ -366,6 +374,10 @@ def find_files_in_dir(dir_path: str, pattern: str, is_recursive: bool = True, ex
         files = list(path.glob(pattern))
 
     for file in files:
-        if excluded_dirs is None or not any(part in excluded_dirs for part in file.parts):
+        is_excluded = excluded_dirs is not None and any(excluded_dir in file.parts for excluded_dir in excluded_dirs)
+        is_exception = exception_dirs is not None and any(exception_dir in file.parts for exception_dir in exception_dirs)
+
+        # Include if not excluded, or if excluded but is an exception
+        if not is_excluded or is_exception:
             filtered_files.append(file)
     return filtered_files
