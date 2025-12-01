@@ -72,6 +72,7 @@ class ClassRegistryUtils:
     def import_modules_in_folder(
         cls,
         folder_path: str,
+        force_include_dirs: list[str] | None = None,
         is_recursive: bool = True,
         base_class_names: list[str] | None = None,
     ) -> None:
@@ -90,6 +91,7 @@ class ClassRegistryUtils:
             base_class_names: Optional list of base class names (e.g. ["StructuredContent"]).
                             If provided, only imports files that contain classes inheriting
                             from these base classes. If None, imports all Python files.
+            force_include_dirs: List of directories to force include even if they are within excluded_dirs.
 
         """
         python_files = find_files_in_dir(
@@ -97,7 +99,7 @@ class ClassRegistryUtils:
             pattern="*.py",
             is_recursive=is_recursive,
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
-            force_include_dirs=[folder_path],
+            force_include_dirs=force_include_dirs,
         )
 
         for python_file in python_files:
