@@ -63,6 +63,9 @@ pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and ge
 pipelex build pipe \
     "Take a Job offer text and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
 
+pipelex build pipe \
+    "Take a Job offer and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
+
 # Other ideas:
 pipelex build pipe "Take a photo as input, and render the opposite of the photo, don't structure anything, use only text content, be super concise"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"

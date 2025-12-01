@@ -41,7 +41,7 @@ class PipeTestCases:
         The moon is white.
     """
     MULTI_IMG_DESC_PROMPT = "If there is one image, describe it. If there are multiple images, compare them."
-    URL_IMG_GANTT_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/diagrams/gantt_tree_house.png"  # AI generated
+    URL_IMG_GANTT_1 = "https://pipelex-web.s3.amazonaws.com/tests/gantt_tree_house.png"  # AI generated
     URL_IMG_FASHION_PHOTO_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg"  # AI generated
     URL_IMG_FASHION_PHOTO_2 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png"  # AI generated
 

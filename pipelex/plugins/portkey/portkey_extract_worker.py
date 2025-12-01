@@ -181,7 +181,7 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             return
         exc = retry_state.outcome.exception()
         attempt = retry_state.attempt_number
-        log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}': '{exc}'")
+        log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}' (service is flaky).")
 
     async def extract_from_pdf_file(
         self,
