@@ -44,32 +44,32 @@ fast-img-gen = "fast-lightning-sdxl"
 
 [waterfalls]
 smart_llm = [
+    "claude-4.5-opus",
     "claude-4.5-sonnet",
-    # "claude-4.5-opus",
     "gemini-3.0-pro",
     "claude-4.1-opus",
     "gemini-2.5-pro",
     "claude-4-sonnet",
-    "gpt-4o",          # we're using gpt-4o here rather than gpt-5 until we'll handle reasoning parameters
+    "gpt-4o",            # we're using gpt-4o here rather than gpt-5 until we'll handle reasoning parameters
     "grok-3",
 ]
 smart_llm_with_vision = [
+    "claude-4.5-opus",
     "claude-4.5-sonnet",
-    # "claude-4.5-opus",
     "gemini-3.0-pro",
     "claude-4.1-opus",
     "gemini-2.5-pro",
     "claude-4-sonnet",
-    "gpt-4o",          # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
+    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
     "grok-3",
 ]
 smart_llm_for_structured = [
+    "claude-4.5-opus",
     "claude-4.5-sonnet",
-    # "claude-4.5-opus",
     "gemini-3.0-pro",
     "claude-4.1-opus",
     "claude-4-sonnet",
-    "gpt-4o",          # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
+    "gpt-4o",            # we use gpt-4o here rather than gpt-5 until we handle reasoning parameters
 ]
 llm_for_creativity = [
     "claude-4.5-opus",
@@ -166,7 +166,6 @@ choice_default = "extract_text_from_visuals"
 
 [extract.presets]
 extract_text_from_visuals = { model = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-# extract_text_from_visuals = { model = "mistral-document", max_nb_images = 100, image_min_size = 50 }
 extract_text_from_pdf = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 
 ####################################################################################################

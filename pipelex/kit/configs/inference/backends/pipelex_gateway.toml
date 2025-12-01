@@ -329,7 +329,7 @@ x-portkey-config = "pc-xai-70a222"
 # DOCUMENT EXTRACTION MODELS
 ################################################################################
 
-[mistral-document]
+[mistral-ocr]
 model_type = "text_extractor"
 model_id = "mistral-document-ai-2505"
 max_tokens = 4096
