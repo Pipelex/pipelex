@@ -14,6 +14,7 @@ from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.config import get_config
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.plugins.portkey.portkey_factory import PortkeyFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -39,6 +40,18 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             raise SdkTypeError(msg)
 
         self.portkey_client: AsyncPortkey = sdk_instance
+        tenacity_config = get_config().cogt.tenacity_config
+        self.retryer = AsyncRetrying(
+            retry=retry_if_exception(self._is_retryable_portkey_error),
+            before_sleep=self._log_retry,
+            wait=wait_random_exponential(
+                multiplier=tenacity_config.wait_multiplier,
+                max=tenacity_config.wait_max,
+                exp_base=tenacity_config.wait_exp_base,
+            ),
+            reraise=True,
+            stop=stop_after_attempt(tenacity_config.max_retries),
+        )
 
     @override
     async def _extract_pages(
@@ -205,16 +218,8 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             base64_pdf = base64.b64encode(pdf_file.read()).decode("utf-8")
         doc_url = f"data:application/pdf;base64,{base64_pdf}"
 
-        retryer = AsyncRetrying(
-            retry=retry_if_exception(self._is_retryable_portkey_error),
-            before_sleep=self._log_retry,
-            wait=wait_random_exponential(multiplier=0.2, max=20, exp_base=1.3),
-            reraise=True,
-            stop=stop_after_attempt(50),
-        )
-
         response: GenericResponse | None = None
-        async for attempt in retryer:
+        async for attempt in self.retryer:
             with attempt:
                 response = await self.portkey_client.with_options(config=config).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                     "/",
