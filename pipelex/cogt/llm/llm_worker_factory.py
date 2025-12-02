@@ -54,10 +54,10 @@ class LLMWorkerFactory:
                     ),
                 )
 
-                openai_factory = OpenAIFactoryAlt(is_http_url_enabled=False)
+                portkey_factory = PortkeyFactory(is_http_url_enabled=False)
 
                 llm_worker = OpenAIResponsesLLMWorker(
-                    openai_responses_factory=OpenAIResponsesFactory(openai_factory=openai_factory),
+                    openai_responses_factory=OpenAIResponsesFactory(openai_factory=portkey_factory),
                     sdk_instance=sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

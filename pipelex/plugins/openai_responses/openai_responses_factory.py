@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from typing_extensions import override
+
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
 
 if TYPE_CHECKING:
     import openai
@@ -24,7 +27,7 @@ if TYPE_CHECKING:
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
-class OpenAIResponsesFactory:
+class OpenAIResponsesFactory(PluginFactoryAbstract):
     def __init__(self, openai_factory: OpenAIFactoryAbstract | None = None):
         self.openai_factory: OpenAIFactoryAbstract = openai_factory or OpenAIFactory()
 
@@ -81,3 +84,7 @@ class OpenAIResponsesFactory:
         if usage.output_tokens_details:
             nb_tokens_by_category[TokenCategory.OUTPUT_REASONING] = usage.output_tokens_details.reasoning_tokens
         return nb_tokens_by_category
+
+    @override
+    def make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
+        return self.openai_factory.make_extra_headers(llm_job=llm_job, output_desc=output_desc)
