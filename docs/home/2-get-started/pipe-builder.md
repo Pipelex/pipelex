@@ -15,9 +15,9 @@ pipelex init
 
 To use AI models, you need API key(s):
 
-- The `PIPELEX_INFERENCE_API_KEY` key provides access to all the AI models. To get your key, join our [Discord community](https://go.pipelex.com/discord), then request your **free API key** (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
-- You can also use other AI routing services like [BlackBox AI](https://docs.blackbox.ai/), or you can bring your own API keys (OpenAI, Anthropic, Google, Mistral, etc.), or run local AI (no key needed).
-See [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) for details. If you are using non-standard APIs, that's OK too, don't hesitate to join our [Discord](https://go.pipelex.com/discord) for guidance, Pipelex provides dependency injections for the API portals, [See here for more information](../10-advanced-customizations/plugin-injection.md)
+- **Recommended:** Use **Pipelex Gateway** for instant access to all AI models with a single API key. Get your key at [app.pipelex.com](https://app.pipelex.com) and follow the [Pipelex Gateway Quick Setup](../7-configuration/config-technical/pipelex-gateway.md) guide.
+
+- **Alternative:** Use your own API keys from LLM providers. See [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) for details.
 
 # Generate workflows with Pipe Builder
 
@@ -113,5 +113,6 @@ Now that you know how to generate workflows with the Pipe Builder, explore these
 
 **Configure Your Setup:**
 
+- [Pipelex Gateway Quick Setup](../7-configuration/config-technical/pipelex-gateway.md) - Get started with a single API key for all AI models
 - [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) - API keys, local AI, model providers
 - [Project Organization](../../home/5-setup/project-organization.md) - Structure your Pipelex projects
