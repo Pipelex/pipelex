@@ -29,14 +29,13 @@ INTERNAL_EXTRACT_MODELS = [
 
 # --- Mistral Models -----------------------------------------------------------------------------
 MISTRAL_EXTRACT_MODELS = [
-    # "mistral-ocr",
-    "mistral-document",
+    "mistral-ocr",
 ]
 
 # --- All Extract Handles ------------------------------------------------------------------------
 ALL_EXTRACT_HANDLES = [
-    # *INTERNAL_EXTRACT_MODELS,
-    *MISTRAL_EXTRACT_MODELS,
+    *INTERNAL_EXTRACT_MODELS,
+    # *MISTRAL_EXTRACT_MODELS,
 ]
 
 ALL_EXTRACT_HANDLES_FROM_IMAGE = [

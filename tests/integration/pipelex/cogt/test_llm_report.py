@@ -10,7 +10,6 @@ from pipelex.hub import get_llm_worker, get_model_deck, get_report_delegate
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
-@pytest.mark.asyncio
 def test_llm_report_without_running_anything():
     get_report_delegate().generate_report()
 

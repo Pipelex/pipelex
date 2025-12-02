@@ -16,7 +16,7 @@ from .fixtures.extract_fixtures import (
 )
 from .fixtures.img_gen_fixtures import img_gen_handle
 from .fixtures.llm_fixtures import llm_handle, llm_job_params, llm_preset_id
-from .fixtures.plugin_fixtures import openai_endpoint, plugin_for_anthropic, plugin_for_openai
+from .fixtures.plugin_fixtures import plugin_for_anthropic, plugin_for_openai
 from .fixtures.routing_fixtures import (
     check_backend_supports_model,
     extract_backend_from_profile_name_if_possible,
@@ -37,7 +37,6 @@ __all__ = [
     # Plugin fixtures
     "plugin_for_openai",
     "plugin_for_anthropic",
-    "openai_endpoint",
     # Image generation fixtures
     "img_gen_handle",
     # Extract fixtures

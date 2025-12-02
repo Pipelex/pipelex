@@ -330,8 +330,9 @@ x-portkey-config = "pc-xai-70a222"
 ################################################################################
 
 [mistral-ocr]
-model_type = "text_extractor"
+# "mistral-document-ai-2505" provides the same capabilities as "mistral-ocr" and more but currently we use it like "mistral-ocr"
 model_id = "mistral-document-ai-2505"
+model_type = "text_extractor"
 max_tokens = 4096
 inputs = ["pdf", "image"]
 outputs = ["pages"]

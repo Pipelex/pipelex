@@ -158,4 +158,4 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         attempt = retry_state.attempt_number
         wait_duration = retry_state.next_action.sleep if retry_state.next_action else 0.0
         log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}' (service is flaky).")
-        log.dev(f"Wait duration before next attempt: {wait_duration:.4f}s")
+        log.verbose(f"Wait duration before next attempt: {wait_duration:.4f}s")

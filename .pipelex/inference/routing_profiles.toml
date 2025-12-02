@@ -50,6 +50,10 @@ fallback_order = [
 "gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
 
+[profiles.all_pipelex_gateway]
+description = "Use Pipelex Gateway for all its supported models"
+default = "pipelex_gateway"
+
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
 default = "anthropic"
@@ -90,13 +94,13 @@ default = "ollama"
 description = "Use OpenAI backend for all its supported models"
 default = "openai"
 
-[profiles.all_pipelex_gateway]
-description = "Use Pipelex Gateway for all its supported models"
-default = "pipelex_gateway"
-
 [profiles.all_xai]
 description = "Use xAI backend for all its supported models"
 default = "xai"
+
+[profiles.all_internal]
+description = "Use internal backend for all its supported models"
+default = "internal"
 
 # =========================================================================================
 # Custom Profiles

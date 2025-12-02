@@ -31,6 +31,7 @@ ALL_BACKENDS = [
     "openai",
     "vertexai",
     "xai",
+    "internal",
 ]
 
 
@@ -41,6 +42,7 @@ def get_all_routing_profiles() -> list[str]:
 
     # Get all profiles starting with 'all_'
     all_profiles = [profile_name for profile_name in profiles if profile_name.startswith("all_")]
+    # all_profiles.append()
 
     # Filter to only include profiles for enabled backends
     enabled_profiles: list[str] = []
