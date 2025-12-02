@@ -4,7 +4,7 @@ from typing import Any
 from portkey_ai import AsyncPortkey
 from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
-from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_fixed
+from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_random_exponential
 from typing_extensions import override
 
 from pipelex import log, pretty_print
@@ -182,7 +182,9 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             return
         exc = retry_state.outcome.exception()
         attempt = retry_state.attempt_number
+        wait_duration = retry_state.next_action.sleep if retry_state.next_action else 0.0
         log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}' (service is flaky).")
+        log.dev(f"Wait duration before next attempt: {wait_duration:.4f}s")
 
     async def extract_from_pdf_file(
         self,
@@ -206,7 +208,7 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         retryer = AsyncRetrying(
             retry=retry_if_exception(self._is_retryable_portkey_error),
             before_sleep=self._log_retry,
-            wait=wait_fixed(wait=0.02),
+            wait=wait_random_exponential(multiplier=0.2, max=20, exp_base=1.3),
             reraise=True,
             stop=stop_after_attempt(50),
         )
@@ -228,9 +230,6 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
-        pretty_print(response, title="Portkey response")
-        response_dict = response.model_dump()
-        pretty_print(response_dict, title="Portkey response dict")
         return PortkeyFactory.make_extract_output_from_portkey_response(
             response=response,
         )
