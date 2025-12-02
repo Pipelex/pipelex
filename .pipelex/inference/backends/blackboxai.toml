@@ -167,13 +167,13 @@ costs = { input = 0.06, output = 0.24 }
 ################################################################################
 
 # --- DeepSeek Free Models -----------------------------------------------------
-[deepseek-chat-free]
+[deepseek-chat]
 model_id = "blackboxai/deepseek/deepseek-chat:free"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.00, output = 0.00 }
 
-[deepseek-r1-free]
+[deepseek-r1]
 model_id = "blackboxai/deepseek/deepseek-r1:free"
 inputs = ["text"]
 outputs = ["text", "structured"]

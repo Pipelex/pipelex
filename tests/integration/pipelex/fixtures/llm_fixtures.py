@@ -67,17 +67,18 @@ ANTHROPIC_MODELS = [
 
 # --- DeepSeek Models ----------------------------------------------------------------------------
 DEEPSEEK_MODELS = [
-    "deepseek-chat-free",
-    "deepseek-r1-free",
+    "deepseek-chat",
+    "deepseek-r1",
+    "deepseek-v3.1",
 ]
 
 # --- Google Models (Gemini) ---------------------------------------------------------------------
 GOOGLE_MODELS = [
+    "gemini-flash-1.5-8b",
     "gemini-2.0-flash",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
-    "gemini-flash-1.5-8b",
     "gemini-3.0-pro",
 ]
 
@@ -156,32 +157,35 @@ QWEN_MODELS = [
     "qwen-2.5-72b-instruct",
     "qwen3-32b",
     "qwen2.5-vl-72b-instruct",
+    "qwen3-vl-235b-a22b",
 ]
 
 # --- XAI Models (Grok) --------------------------------------------------------------------------
 XAI_MODELS = [
     "grok-3",
-    "grok-3-fast",
     "grok-3-mini",
-    "grok-3-mini-fast",
     "grok-4",
+    "grok-3-fast",
+    "grok-3-mini-fast",
+    "grok-4-fast-reasoning",
+    "grok-4-fast-non-reasoning",
     "grok-4-fast",
 ]
 
 # --- All LLM Handles ----------------------------------------------------------------------------
 ALL_LLM_HANDLES = [
-    # *AMAZON_MODELS,
-    # *ANTHROPIC_MODELS,
-    # *DEEPSEEK_MODELS,
-    # *GOOGLE_MODELS,
-    # *GROQ_MODELS,
-    # *META_MODELS,
-    # *MISTRALAI_MODELS,
-    # *MOONSHOTAI_MODELS,
+    *AMAZON_MODELS,
+    *ANTHROPIC_MODELS,
+    *DEEPSEEK_MODELS,
+    *GOOGLE_MODELS,
+    *GROQ_MODELS,
+    *META_MODELS,
+    *MISTRALAI_MODELS,
+    *MOONSHOTAI_MODELS,
     *OPENAI_MODELS,
-    # *OPENAI_OSS_MODELS,
-    # *QWEN_MODELS,
-    # *XAI_MODELS,
+    *OPENAI_OSS_MODELS,
+    *QWEN_MODELS,
+    *XAI_MODELS,
 ]
 
 

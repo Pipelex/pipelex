@@ -279,6 +279,23 @@ max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
 x-portkey-config = "pc-claude-aae09f"
 
+# --- DeepSeek LLMs --------------------------------------------------------------
+# [deepseek-r1]
+# model_id = "deepseek.r1-v1:0"
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 0, output = 0 }
+# structure_method = "instructor/json"
+# x-portkey-config = "pc-bedroc-96f922"
+
+["deepseek-v3.1"]
+model_id = "deepseek.v3-v1:0"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+structure_method = "instructor/json"
+x-portkey-config = "pc-bedroc-96f922"
+
 # --- Gemini LLMs --------------------------------------------------------------
 ["gemini-2.0-flash"]
 model_id = "gemini-2.0-flash"
@@ -317,28 +334,42 @@ max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
 x-portkey-config = "pc-google-b19ef8"
 
+# --- Qwen LLMs --------------------------------------------------------------
+["qwen3-vl-235b-a22b"]
+model_id = "qwen.qwen3-vl-235b-a22b"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+structure_method = "instructor/json"
+x-portkey-config = "pc-bedroc-96f922"
+
 # --- XAI LLMs --------------------------------------------------------------
 
 [grok-3]
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 3, output = 15 }
-x-portkey-config = "pc-xai-70a222"
+x-portkey-config = "pc-azure-551745"
 
 [grok-3-mini]
-model_id = "grok-3-mini"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.3, output = 0.5 }
-x-portkey-config = "pc-xai-70a222"
+x-portkey-config = "pc-azure-551745"
 
-[grok-4]
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 3, output = 15 }
-x-portkey-config = "pc-xai-70a222"
+# [grok-4]
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 3, output = 15 }
+# x-portkey-config = "pc-azure-551745"
 
-[grok-4-fast]
+# [grok-4-fast-reasoning]
+# inputs = ["text", "images"]
+# outputs = ["text", "structured"]
+# costs = { input = 3, output = 15 }
+# x-portkey-config = "pc-azure-551745"
+
+[grok-4-fast-non-reasoning]
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3, output = 15 }
