@@ -4,14 +4,9 @@ import base64
 import aiofiles
 
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
-from pipelex.tools.misc.file_utils import save_bytes_to_binary_file
+from pipelex.tools.misc.file_utils import load_binary, load_binary_async, save_bytes_to_binary_file
 from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_base64, detect_file_type_from_bytes
 from pipelex.tools.misc.path_utils import clarify_path_or_url
-
-
-def load_binary(path: str) -> bytes:
-    with open(path, "rb") as file_pointer:
-        return file_pointer.read()
 
 
 def load_binary_as_base64(path: str) -> bytes:
@@ -23,11 +18,6 @@ async def load_binary_as_base64_async(path: str) -> bytes:
     async with aiofiles.open(path, "rb") as fp:  # pyright: ignore[reportUnknownMemberType]
         data_bytes = await fp.read()
         return base64.b64encode(data_bytes)
-
-
-async def load_binary_async(path: str) -> bytes:
-    async with aiofiles.open(path, "rb") as fp:  # pyright: ignore[reportUnknownMemberType]
-        return await fp.read()
 
 
 def make_base_64_url_from_path(path: str) -> str:

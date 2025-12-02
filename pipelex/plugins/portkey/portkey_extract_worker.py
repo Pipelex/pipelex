@@ -72,60 +72,35 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         extract_job: ExtractJob,
     ) -> ExtractOutput:
         if image_uri := extract_job.extract_input.image_uri:
-            extract_output = await self._extract_from_image(
-                image_uri=image_uri,
-                should_caption_image=extract_job.job_params.should_caption_images,
+            if extract_job.job_params.should_caption_images:
+                msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
+                raise NotImplementedError(msg)
+            base64_url = await make_base_64_url_from_location_async(location=image_uri)
+            extract_output = await self.extract_base64_url(
+                base64_url=base64_url,
+                document_type=DocumentType.IMAGE,
+                should_include_images=False,
             )
 
         elif pdf_uri := extract_job.extract_input.pdf_uri:
-            extract_output = await self._extract_from_pdf(
-                pdf_uri=pdf_uri,
+            if extract_job.job_params.should_caption_images:
+                msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
+                raise ExtractCapabilityError(msg)
+            if extract_job.job_params.should_include_page_views:
+                log.verbose(f"Page views are not implemented by '{self.inference_model.tag}'.")
+                # TODO: use a model capability flag to check possibility before asking for it
+                # it it's asked and not available, raise
+                # the caller will be responsible to get the page views using other solution if needed
+            base64_url = await make_base_64_url_from_location_async(location=pdf_uri)
+            extract_output = await self.extract_base64_url(
+                base64_url=base64_url,
+                document_type=DocumentType.PDF,
                 should_include_images=extract_job.job_params.should_include_images,
-                should_caption_images=extract_job.job_params.should_caption_images,
-                should_include_page_views=extract_job.job_params.should_include_page_views,
             )
         else:
             msg = "No image nor PDF URI provided in ExtractJob"
             raise ExtractInputError(msg)
         return extract_output
-
-    async def _extract_from_image(
-        self,
-        image_uri: str,
-        should_caption_image: bool = False,
-    ) -> ExtractOutput:
-        if should_caption_image:
-            msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
-            raise NotImplementedError(msg)
-        base64_url = await make_base_64_url_from_location_async(location=image_uri)
-        return await self.extract_base64_url(
-            base64_url=base64_url,
-            document_type=DocumentType.IMAGE,
-            should_include_images=False,
-        )
-
-    async def _extract_from_pdf(
-        self,
-        pdf_uri: str,
-        should_include_images: bool,
-        should_caption_images: bool,
-        should_include_page_views: bool,
-    ) -> ExtractOutput:
-        if should_caption_images:
-            msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
-            raise ExtractCapabilityError(msg)
-        if should_include_page_views:
-            log.verbose(f"Page views are not implemented by '{self.inference_model.tag}'.")
-            # TODO: use a model capability flag to check possibility before asking for it
-            # it it's asked and not available, raise
-            # the caller will be responsible to get the page views using other solution if needed
-            # raise OcrCapabilityError("Page views are not implemented for Mistral OCR.")
-        base64_url = await make_base_64_url_from_location_async(location=pdf_uri)
-        return await self.extract_base64_url(
-            base64_url=base64_url,
-            document_type=DocumentType.PDF,
-            should_include_images=should_include_images,
-        )
 
     async def extract_base64_url(
         self,
