@@ -77,6 +77,7 @@ SUB_COMMAND_RUNNER = "runner"
 SUB_COMMAND_INPUTS = "inputs"
 SUB_COMMAND_ONE_SHOT_PIPE = "one-shot-pipe"
 SUB_COMMAND_PARTIAL_PIPE = "partial-pipe"
+SUB_COMMAND_STRUCTURES = "structures"
 
 
 @build_app.command(SUB_COMMAND_PIPE, help="Build a Pipelex bundle with one validation/fix loop correcting deterministic issues")
@@ -731,3 +732,20 @@ def build_partial_cmd(
 
     finally:
         pipelex_instance.teardown()
+
+
+@build_app.command(SUB_COMMAND_STRUCTURES, help="Generate Python structure files from concept definitions in PLX files")
+def build_structures_command(
+    target_directory: Annotated[
+        str,
+        typer.Argument(help="Target directory to scan for PLX files"),
+    ],
+    output_dir: Annotated[
+        str | None,
+        typer.Option("--output-dir", "-o", help="Output directory for generated structures (default: .structures)"),
+    ] = None,
+) -> None:
+    """Wrapper to call the actual build_structures_cmd function."""
+    from pipelex.cli.commands import build_structures_cmd  # noqa: PLC0415
+
+    build_structures_cmd.build_structures_cmd(target_directory=target_directory, output_dir=output_dir)
