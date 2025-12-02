@@ -28,14 +28,14 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.openai.openai_factory import OpenAIFactory
-from pipelex.plugins.openai.openai_factory_protocol import OpenAIFactoryProtocol
+from pipelex.plugins.openai.openai_factory_abstract import OpenAIFactoryAbstract
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_path
 
 
 class MistralFactory:
-    def __init__(self, openai_factory: OpenAIFactoryProtocol | None = None):
-        self.openai_factory: OpenAIFactoryProtocol = openai_factory or OpenAIFactory()
+    def __init__(self, openai_factory: OpenAIFactoryAbstract | None = None):
+        self.openai_factory: OpenAIFactoryAbstract = openai_factory or OpenAIFactory()
 
     #########################################################
     # Client

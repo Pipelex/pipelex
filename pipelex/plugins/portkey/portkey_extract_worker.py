@@ -14,6 +14,7 @@ from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.plugins.portkey.portkey_factory import PortkeyFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.path_utils import clarify_path_or_url
@@ -189,11 +190,11 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         should_include_images: bool = False,
     ) -> ExtractOutput:
         if not self.inference_model.extra_headers:
-            msg = "x-portkey-config header is required"
+            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
             raise ExtractInputError(msg)
-        config = self.inference_model.extra_headers.get("x-portkey-config")
+        config = self.inference_model.extra_headers.get(PortkeyHeaderKey.CONFIG)
         if not config:
-            msg = "x-portkey-config header is required"
+            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
             raise ExtractInputError(msg)
         log.dev(f"Extracting from PDF file: {pdf_path} using config '{config}' with should_include_images: {should_include_images}")
 

@@ -20,13 +20,13 @@ if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
-    from pipelex.plugins.openai.openai_factory_protocol import OpenAIFactoryProtocol
+    from pipelex.plugins.openai.openai_factory_abstract import OpenAIFactoryAbstract
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 class OpenAIResponsesFactory:
-    def __init__(self, openai_factory: OpenAIFactoryProtocol | None = None):
-        self.openai_factory: OpenAIFactoryProtocol = openai_factory or OpenAIFactory()
+    def __init__(self, openai_factory: OpenAIFactoryAbstract | None = None):
+        self.openai_factory: OpenAIFactoryAbstract = openai_factory or OpenAIFactory()
 
     @classmethod
     def make_openai_client(

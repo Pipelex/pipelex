@@ -6,6 +6,8 @@ from posthog import Posthog, new_context, tag  # type: ignore[attr-defined]
 from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 
+from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
+from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
@@ -165,3 +167,22 @@ class TelemetryManager(TelemetryManagerAbstract):
         """Context manager that uses PostHog's new_context when telemetry is enabled."""
         with new_context():
             yield
+
+    @override
+    def is_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+        is_debug: bool = is_debug_configured
+        if not is_debug and is_env_var_truthy(PortkeyEnvVar.FORCE_PORTKEY_DEBUG):
+            log.info(f"Force-enabling Portkey logging (debug mode) because '{PortkeyEnvVar.FORCE_PORTKEY_DEBUG}' is set")
+            is_debug = True
+        if is_debug and is_env_var_truthy(DO_NOT_TRACK_ENV_VAR_KEY):
+            log.warning(f"Disabling Portkey logging (debug mode) because '{DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence")
+            is_debug = False
+        return is_debug
+
+    @override
+    def is_portkey_tracing_enabled(self) -> bool:
+        if is_env_var_truthy(PortkeyEnvVar.FORCE_PORTKEY_TRACING):
+            log.info(f"Force-enabling Portkey tracing because '{PortkeyEnvVar.FORCE_PORTKEY_TRACING}' is set")
+            return True
+        else:
+            return False

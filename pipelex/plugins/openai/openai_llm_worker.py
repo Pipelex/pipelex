@@ -15,7 +15,7 @@ from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_fr
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
-from pipelex.plugins.openai.openai_factory_protocol import OpenAIFactoryProtocol
+from pipelex.plugins.openai.openai_factory_abstract import OpenAIFactoryAbstract
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -23,7 +23,7 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 class OpenAILLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
-        openai_factory: OpenAIFactoryProtocol,
+        openai_factory: OpenAIFactoryAbstract,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -71,7 +71,8 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         messages = await self.openai_factory.make_simple_messages(llm_job=llm_job)
 
         try:
-            extra_headers = self._make_extra_headers(llm_job=llm_job, output_desc="Text")
+            extra_headers: dict[str, str] = self.inference_model.extra_headers or {}
+            extra_headers.update(self.openai_factory.make_extra_headers(llm_job=llm_job, output_desc="Text"))
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
                 temperature=job_params.temperature,
@@ -111,7 +112,8 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         messages = await self.openai_factory.make_simple_messages(llm_job=llm_job)
         try:
             try:
-                extra_headers = self._make_extra_headers(llm_job=llm_job, output_desc=schema.__name__)
+                extra_headers: dict[str, str] = self.inference_model.extra_headers or {}
+                extra_headers.update(self.openai_factory.make_extra_headers(llm_job=llm_job, output_desc=schema.__name__))
                 result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                     model=self.inference_model.model_id,
                     temperature=job_params.temperature,
@@ -136,20 +138,3 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             llm_tokens_usage.nb_tokens_by_category = self.openai_factory.make_nb_tokens_by_category(usage=usage)
 
         return result_object
-
-    # TODO: this is specific to Portkey, we should move it to some specific Portkey class and apply to the other kinds of workers
-    def _make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
-        if llm_job.job_metadata.pipe_job_ids:
-            last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]
-        else:
-            last_pipe_job_id = "main"
-        extra_headers = self.inference_model.extra_headers or {}
-        extra_headers["x-portkey-trace-id"] = llm_job.job_metadata.pipeline_run_id
-        if not llm_job.job_metadata.unit_job_id:
-            msg = f"Unit job id is not set for LLM job: {llm_job}"
-            raise LLMCompletionError(msg)
-        model_kind = llm_job.job_metadata.unit_job_id.model_kind
-        span_id = f"{model_kind} -> {output_desc}"
-        extra_headers["x-portkey-span-id"] = span_id
-        extra_headers["x-portkey-span-name"] = f"{last_pipe_job_id}: {span_id}"
-        return extra_headers

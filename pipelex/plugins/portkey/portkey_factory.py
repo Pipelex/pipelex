@@ -4,43 +4,59 @@ from typing import TYPE_CHECKING, Any, cast
 
 import openai
 from portkey_ai import (
+    PORTKEY_GATEWAY_URL,
     AsyncPortkey,
     createHeaders,  # type: ignore[reportUnknownVariableType]
 )
+from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
-from pipelex.plugins.portkey.portkey_exceptions import PortkeyFactoryError
-from pipelex.types import StrEnum
+from pipelex.hub import get_telemetry_manager
+from pipelex.plugins.openai.openai_factory import OpenAIFactoryError
+from pipelex.plugins.openai.openai_factory_alt import OpenAIFactoryAlt
+from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey, PortkeyOpenAISdkVariant
+from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError, PortkeyFactoryError
 
 if TYPE_CHECKING:
     from portkey_ai.api_resources.utils import GenericResponse
 
+    from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
-class PortkeyOpenAISdkVariant(StrEnum):
-    PORTKEY_COMPLETIONS = "portkey_completions"
-    PORTKEY_RESPONSES = "portkey_responses"
+class PortkeyFactory(OpenAIFactoryAlt):
+    @classmethod
+    def _is_debug_enabled(cls, backend: InferenceBackend) -> bool:
+        is_debug_configured = backend.extra_config.get("debug", False)
+        return get_telemetry_manager().is_portkey_logging_enabled(is_debug_configured=is_debug_configured)
 
+    @classmethod
+    def _get_endpoint(cls, backend: InferenceBackend) -> str:
+        return backend.endpoint or PORTKEY_GATEWAY_URL
 
-class PortkeyFactory:
+    @classmethod
+    def _get_api_key(cls, backend: InferenceBackend) -> str:
+        if not backend.api_key:
+            msg = "Portkey API key is not set"
+            raise PortkeyCredentialsError(msg)
+        return backend.api_key
+
     @classmethod
     def make_portkey_client(
         cls,
         backend: InferenceBackend,
     ) -> AsyncPortkey:
-        log.verbose(f"Making Portkey client with endpoint: {backend.endpoint}")
-        is_debug = backend.extra_config.get("debug", False)
-        if backend.endpoint is None:
-            msg = "Portkey endpoint is not set"
-            raise PortkeyFactoryError(msg)
+        is_debug_enabled = cls._is_debug_enabled(backend=backend)
+        endpoint = cls._get_endpoint(backend=backend)
+        api_key = cls._get_api_key(backend=backend)
+        log.verbose(f"Making Portkey client with endpoint: {endpoint}, debug: {is_debug_enabled}")
 
         return AsyncPortkey(
-            base_url=backend.endpoint,
-            api_key=backend.api_key,
-            debug=is_debug,
+            base_url=endpoint,
+            api_key=api_key,
+            debug=is_debug_enabled,
         )
 
     @classmethod
@@ -49,37 +65,36 @@ class PortkeyFactory:
         plugin: Plugin,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
-        log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
+        is_debug_enabled = cls._is_debug_enabled(backend=backend)
+        endpoint = cls._get_endpoint(backend=backend)
+        api_key = cls._get_api_key(backend=backend)
+        log.verbose(f"Making AsyncOpenAI client with endpoint: {endpoint}, debug: {is_debug_enabled}")
+
         try:
             sdk_variant = PortkeyOpenAISdkVariant(plugin.sdk)
         except ValueError as exc:
             msg = f"Plugin '{plugin}' is not supported by OpenAIFactory"
             raise PortkeyFactoryError(msg) from exc
-        if backend.endpoint is None:
-            msg = "Portkey endpoint is not set"
-            raise PortkeyFactoryError(msg)
-
-        is_debug = backend.extra_config.get("debug", False)
 
         the_client: openai.AsyncOpenAI
         match sdk_variant:
             case PortkeyOpenAISdkVariant.PORTKEY_COMPLETIONS:
                 the_client = openai.AsyncOpenAI(
-                    base_url=backend.endpoint,
+                    base_url=endpoint,
                     api_key="",
                     default_headers=createHeaders(
-                        api_key=backend.api_key,
+                        api_key=api_key,
                         strict_open_ai_compliance=False,
-                        debug=is_debug,
+                        debug=is_debug_enabled,
                     ),  # type: ignore[call-overload]
                 )
             case PortkeyOpenAISdkVariant.PORTKEY_RESPONSES:
                 the_client = openai.AsyncOpenAI(
-                    base_url=backend.endpoint,
+                    base_url=endpoint,
                     api_key="",
                     default_headers=createHeaders(
-                        api_key=backend.api_key,
-                        debug=is_debug,
+                        api_key=api_key,
+                        debug=is_debug_enabled,
                     ),  # type: ignore[call-overload]
                 )
         return the_client
@@ -126,3 +141,22 @@ class PortkeyFactory:
         return ExtractOutput(
             pages=pages,
         )
+
+    @override
+    def make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
+        if not get_telemetry_manager().is_portkey_tracing_enabled():
+            return {}
+        if llm_job.job_metadata.pipe_job_ids:
+            last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]
+        else:
+            last_pipe_job_id = "main"
+        extra_headers: dict[str, str] = {}
+        extra_headers[PortkeyHeaderKey.TRACE_ID] = llm_job.job_metadata.pipeline_run_id
+        if not llm_job.job_metadata.unit_job_id:
+            msg = f"Unit job id is not set for LLM job: {llm_job}"
+            raise OpenAIFactoryError(msg)
+        model_kind = llm_job.job_metadata.unit_job_id.model_kind
+        span_id = f"{model_kind} -> {output_desc}"
+        extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id
+        extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{last_pipe_job_id}: {span_id}"
+        return extra_headers

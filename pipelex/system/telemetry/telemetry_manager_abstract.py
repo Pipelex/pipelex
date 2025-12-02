@@ -36,6 +36,14 @@ class TelemetryManagerAbstract(ABC):
     def telemetry_context(self) -> Generator[None, None, None]:
         """Safe context manager for telemetry that works whether telemetry is enabled or not."""
 
+    @abstractmethod
+    def is_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+        pass
+
+    @abstractmethod
+    def is_portkey_tracing_enabled(self) -> bool:
+        pass
+
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
@@ -55,3 +63,11 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     def telemetry_context(self) -> Generator[None, None, None]:
         """No-op context manager that doesn't use PostHog."""
         yield
+
+    @override
+    def is_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+        return False
+
+    @override
+    def is_portkey_tracing_enabled(self) -> bool:
+        return False

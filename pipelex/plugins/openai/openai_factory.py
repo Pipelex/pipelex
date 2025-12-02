@@ -17,7 +17,7 @@ from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, Prom
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.openai.openai_factory_protocol import OpenAIFactoryProtocol
+from pipelex.plugins.openai.openai_factory_abstract import OpenAIFactoryAbstract
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from pipelex.types import StrEnum
@@ -39,7 +39,7 @@ class AzureExtraField(StrEnum):
     API_VERSION = "api_version"
 
 
-class OpenAIFactory(OpenAIFactoryProtocol):
+class OpenAIFactory(OpenAIFactoryAbstract):
     @classmethod
     def make_openai_client(
         cls,
