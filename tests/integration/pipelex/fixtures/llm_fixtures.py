@@ -125,28 +125,23 @@ MOONSHOTAI_MODELS = [
 
 # --- OpenAI Models ------------------------------------------------------------------------------
 OPENAI_MODELS = [
-    "gpt-3.5-turbo",
-    "gpt-4",
-    "gpt-4-turbo",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-    "gpt-4.1-nano",
-    "gpt-4o",
-    "gpt-4o-2024-11-20",
     "gpt-4o-mini",
-    "gpt-4o-mini-2024-07-18",
-    "gpt-5",
-    "gpt-5-chat",
-    "gpt-5-mini",
-    "gpt-5-nano",
-    "gpt-5.1",
-    "gpt-5.1-chat",
-    "gpt-5.1-codex",
-    "o1",
+    "gpt-4o",
+    "gpt-4.1-nano",
+    "gpt-4.1-mini",
+    "gpt-4.1",
     "o1-mini",
-    "o3",
+    "o1",
     "o3-mini",
+    "o3",
     "o4-mini",
+    "gpt-5-nano",
+    "gpt-5-mini",
+    "gpt-5-chat",
+    "gpt-5",
+    "gpt-5.1-chat",
+    "gpt-5.1",
+    "gpt-5.1-codex",
 ]
 
 # --- OpenAI OSS Models --------------------------------------------------------------------------
@@ -175,18 +170,18 @@ XAI_MODELS = [
 
 # --- All LLM Handles ----------------------------------------------------------------------------
 ALL_LLM_HANDLES = [
-    *AMAZON_MODELS,
-    *ANTHROPIC_MODELS,
-    *DEEPSEEK_MODELS,
-    *GOOGLE_MODELS,
-    *GROQ_MODELS,
-    *META_MODELS,
-    *MISTRALAI_MODELS,
-    *MOONSHOTAI_MODELS,
+    # *AMAZON_MODELS,
+    # *ANTHROPIC_MODELS,
+    # *DEEPSEEK_MODELS,
+    # *GOOGLE_MODELS,
+    # *GROQ_MODELS,
+    # *META_MODELS,
+    # *MISTRALAI_MODELS,
+    # *MOONSHOTAI_MODELS,
     *OPENAI_MODELS,
-    *OPENAI_OSS_MODELS,
-    *QWEN_MODELS,
-    *XAI_MODELS,
+    # *OPENAI_OSS_MODELS,
+    # *QWEN_MODELS,
+    # *XAI_MODELS,
 ]
 
 
