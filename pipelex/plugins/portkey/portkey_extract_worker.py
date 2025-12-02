@@ -1,4 +1,3 @@
-import base64
 from typing import Any
 
 from portkey_ai import AsyncPortkey
@@ -7,7 +6,7 @@ from portkey_ai.api_resources.utils import GenericResponse
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_random_exponential
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.exceptions import ExtractCapabilityError, ExtractJobFailureError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
@@ -18,7 +17,21 @@ from pipelex.config import get_config
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.plugins.portkey.portkey_factory import PortkeyFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.path_utils import clarify_path_or_url
+from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_async
+from pipelex.types import StrEnum
+
+
+class DocumentType(StrEnum):
+    IMAGE = "image"
+    PDF = "pdf"
+
+    @property
+    def document_tag(self) -> str:
+        match self:
+            case DocumentType.IMAGE:
+                return "image_url"
+            case DocumentType.PDF:
+                return "document_url"
 
 
 class PortkeyExtractWorker(ExtractWorkerAbstract):
@@ -82,16 +95,13 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         should_caption_image: bool = False,
     ) -> ExtractOutput:
         if should_caption_image:
-            msg = "Captioning is not implemented for Mistral OCR."
+            msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
             raise NotImplementedError(msg)
-        image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
-        if image_url:
-            return await self.extract_from_image_url(
-                image_url=image_url,
-            )
-        assert image_path is not None
-        return await self.extract_from_image_file(
-            image_path=image_path,
+        base64_url = await make_base_64_url_from_location_async(location=image_uri)
+        return await self.extract_base64_url(
+            base64_url=base64_url,
+            document_type=DocumentType.IMAGE,
+            should_include_images=False,
         )
 
     async def _extract_from_pdf(
@@ -102,85 +112,61 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         should_include_page_views: bool,
     ) -> ExtractOutput:
         if should_caption_images:
-            msg = "Captioning is not implemented for Mistral OCR."
+            msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
             raise ExtractCapabilityError(msg)
         if should_include_page_views:
-            log.verbose("Page views are not implemented for Mistral OCR.")
+            log.verbose(f"Page views are not implemented by '{self.inference_model.tag}'.")
             # TODO: use a model capability flag to check possibility before asking for it
             # it it's asked and not available, raise
             # the caller will be responsible to get the page views using other solution if needed
             # raise OcrCapabilityError("Page views are not implemented for Mistral OCR.")
-        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
-        extract_output: ExtractOutput
-        if pdf_url:
-            extract_output = await self.extract_from_pdf_url(
-                pdf_url=pdf_url,
-                should_include_images=should_include_images,
-            )
-        else:  # pdf_path must be provided based on validation
-            assert pdf_path is not None
-            extract_output = await self.extract_from_pdf_file(
-                pdf_path=pdf_path,
-                should_include_images=should_include_images,
-            )
-        return extract_output
+        base64_url = await make_base_64_url_from_location_async(location=pdf_uri)
+        return await self.extract_base64_url(
+            base64_url=base64_url,
+            document_type=DocumentType.PDF,
+            should_include_images=should_include_images,
+        )
 
-    async def extract_from_image_url(
+    async def extract_base64_url(
         self,
-        image_url: str,
-    ) -> ExtractOutput:
-        # extract_response = await self.portkey_client.ocr.process_async(
-        #     model=self.inference_model.model_id,
-        #     document={
-        #         "type": "image_url",
-        #         "image_url": image_url,
-        #     },
-        # )
-        # return await PortkeyFactory.make_extract_output_from_mistral_response(
-        #     mistral_extract_response=extract_response,
-        # )
-        msg = "Not implemented for Portkey"
-        raise NotImplementedError(msg)
-
-    async def extract_from_image_file(
-        self,
-        image_path: str,
-    ) -> ExtractOutput:
-        # b64 = await load_binary_as_base64_async(path=image_path)
-
-        # file_type = detect_file_type_from_base64(b64=b64)
-        # mime_type = file_type.mime
-
-        # extract_response = await self.portkey_client.ocr.process_async(
-        #     model=self.inference_model.model_id,
-        #     document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64.decode('utf-8')}"},
-        # )
-        # return await PortkeyFactory.make_extract_output_from_portkey_response(
-        #     mistral_extract_response=extract_response,
-        # )
-        msg = "Not implemented for Portkey"
-        raise NotImplementedError(msg)
-
-    async def extract_from_pdf_url(
-        self,
-        pdf_url: str,
+        base64_url: str,
+        document_type: DocumentType,
         should_include_images: bool = False,
     ) -> ExtractOutput:
-        # extract_response = await self.portkey_client.ocr.process_async(
-        #     model=self.inference_model.model_id,
-        #     document={
-        #         "type": "document_url",
-        #         "document_url": pdf_url,
-        #     },
-        #     include_image_base64=should_include_images,
-        # )
+        config_id = self._get_portkey_config_id()
+        log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
+        doc_tag = document_type.document_tag
 
-        # return await PortkeyFactory.make_extract_output_from_mistral_response(
-        #     mistral_extract_response=extract_response,
-        #     should_include_images=should_include_images,
-        # )
-        msg = "Not implemented for Portkey"
-        raise NotImplementedError(msg)
+        response: GenericResponse | None = None
+        async for attempt in self.retryer:
+            with attempt:
+                response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                    "/",
+                    model=self.inference_model.model_id,
+                    document={"type": doc_tag, doc_tag: base64_url},
+                    include_image_base64=True,
+                )
+
+        if response is None:
+            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
+            raise ExtractJobFailureError(msg)
+
+        if not isinstance(response, GenericResponse):
+            msg = "Response is not of type GenericResponse"
+            raise TypeError(msg)
+        return PortkeyFactory.make_extract_output_from_portkey_response(
+            response=response,
+        )
+
+    def _get_portkey_config_id(self) -> str:
+        if not self.inference_model.extra_headers:
+            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
+            raise ExtractInputError(msg)
+        config_id = self.inference_model.extra_headers.get(PortkeyHeaderKey.CONFIG)
+        if not config_id:
+            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
+            raise ExtractInputError(msg)
+        return config_id
 
     def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
         if isinstance(exc, portkey_exceptions.NotFoundError):
@@ -198,43 +184,3 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         wait_duration = retry_state.next_action.sleep if retry_state.next_action else 0.0
         log.dev(f"{self.__class__.__name__} retry #{attempt} for '{self.inference_model.model_id}' due to '{type(exc).__name__}' (service is flaky).")
         log.dev(f"Wait duration before next attempt: {wait_duration:.4f}s")
-
-    async def extract_from_pdf_file(
-        self,
-        pdf_path: str,
-        should_include_images: bool = False,
-    ) -> ExtractOutput:
-        if not self.inference_model.extra_headers:
-            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
-            raise ExtractInputError(msg)
-        config = self.inference_model.extra_headers.get(PortkeyHeaderKey.CONFIG)
-        if not config:
-            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
-            raise ExtractInputError(msg)
-        log.dev(f"Extracting from PDF file: {pdf_path} using config '{config}' with should_include_images: {should_include_images}")
-
-        # Get the base64 string from the PDF
-        with open(pdf_path, "rb") as pdf_file:
-            base64_pdf = base64.b64encode(pdf_file.read()).decode("utf-8")
-        doc_url = f"data:application/pdf;base64,{base64_pdf}"
-
-        response: GenericResponse | None = None
-        async for attempt in self.retryer:
-            with attempt:
-                response = await self.portkey_client.with_options(config=config).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                    "/",
-                    model=self.inference_model.model_id,
-                    document={"type": "document_url", "document_url": doc_url},
-                    include_image_base64=True,
-                )
-
-        if response is None:
-            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
-            raise ExtractJobFailureError(msg)
-
-        if not isinstance(response, GenericResponse):
-            msg = "Response is not of type GenericResponse"
-            raise TypeError(msg)
-        return PortkeyFactory.make_extract_output_from_portkey_response(
-            response=response,
-        )

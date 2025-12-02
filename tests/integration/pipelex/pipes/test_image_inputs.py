@@ -41,7 +41,7 @@ class TestImageInputs:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.IMAGE),
-                content=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG),
+                content=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
                 name="image",
             ),
         )
@@ -71,7 +71,7 @@ class TestImageInputs:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         # Create the page content
         # image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
-        image_content = ImageContent(url=f"file://{ImageTestCases.IMAGE_FILE_PATH_PNG}")
+        image_content = ImageContent(url=f"file://{ImageTestCases.IMAGE_FILE_PATH_PNG_1}")
         text_and_images = TextAndImagesContent(text=TextContent(text="It was designed by Slartibartfast, a famous designer"), images=[])
         page_content = PageContent(text_and_images=text_and_images, page_view=image_content)
 

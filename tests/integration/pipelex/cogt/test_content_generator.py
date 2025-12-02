@@ -133,7 +133,7 @@ class TestContentGenerator:
         extract_output = await get_content_generator().make_extract_pages(
             job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
             extract_handle=extract_handle_from_image,
-            extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
+            extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )

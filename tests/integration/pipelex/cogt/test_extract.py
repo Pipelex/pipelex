@@ -37,8 +37,8 @@ class TestExtract:
         pretty_print(extract_output, title="OCR Output")
         assert extract_output.pages
 
-    @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_FILE_PATHS)
-    async def test_extract_image_file(self, extract_handle_from_image: str, file_path: str):
+    @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_TEXT_FILE_PATHS)
+    async def test_extract_image_path(self, extract_handle_from_image: str, file_path: str):
         extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
         extract_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(image_uri=file_path),

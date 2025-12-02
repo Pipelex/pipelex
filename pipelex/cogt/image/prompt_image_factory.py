@@ -9,10 +9,10 @@ from pipelex.cogt.image.prompt_image import (
 )
 from pipelex.tools.misc.base_64_utils import (
     encode_to_base64_async,
+    make_base_64_url,
     strip_base_64_str_if_needed,
 )
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
-from pipelex.tools.misc.filetype_utils import FileType
 
 
 class PromptImageFactory:
@@ -55,16 +55,8 @@ class PromptImageFactory:
         return PromptImageBinary(binary=raw_image_bytes)
 
     @classmethod
-    def make_base_64_url(
-        cls,
-        base_64: bytes,
-        file_type: FileType,
-    ) -> str:
-        return f"data:{file_type.mime};base64,{base_64.decode('utf-8')}"
-
-    @classmethod
     def make_base_64_url_from_prompt_image_typed_base64(
         cls,
         prompt_image: PromptImageTypedBase64,
     ) -> str:
-        return cls.make_base_64_url(base_64=prompt_image.base_64, file_type=prompt_image.file_type)
+        return make_base_64_url(base_64=prompt_image.base_64, file_type=prompt_image.file_type)

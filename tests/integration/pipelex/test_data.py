@@ -156,7 +156,7 @@ class PipeTestCases:
 
 class PipeExtractTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
-        ImageTestCases.IMAGE_FILE_PATH_PNG,
+        ImageTestCases.IMAGE_FILE_PATH_PNG_1,
         ImageTestCases.IMAGE_URL_PNG,
     ]
     PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS
