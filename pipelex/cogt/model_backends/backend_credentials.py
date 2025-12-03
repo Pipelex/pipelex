@@ -54,7 +54,7 @@ class BackendCredentialsErrorMsgFactory:
                 f"   Add the variable to your environment or .env file:\n"
                 f"   - '{var_name}'=<your_api_key>\n"
                 "\n2. Disable this backend\n"
-                f"   Add 'enabled = false' under '[{backend_name}]' in '.pipelex/inference/backends.toml'\n"
+                rf"   Add 'enabled = false' under '\[{backend_name}]' in '.pipelex/inference/backends.toml'" + "\n"
             )
         else:
             error_msg = (
@@ -64,7 +64,7 @@ class BackendCredentialsErrorMsgFactory:
                 "1. Provide the missing secret\n"
                 f"   Make sure '{var_name}' is available from your secrets provider.\n"
                 "\n2. Disable this backend\n"
-                f"   Add 'enabled = false' under '[{backend_name}]' in '.pipelex/inference/backends.toml'\n"
+                rf"   Add 'enabled = false' under '\[{backend_name}]' in '.pipelex/inference/backends.toml'" + "\n"
             )
 
         # Add pitch for Pipelex Gateway and BYOK (Bring Your Own Keys)
@@ -132,7 +132,7 @@ class BackendCredentialsErrorMsgFactory:
 
             error_msg += "\n2. Disable unused backends\n   Disable backends you don't need in '.pipelex/inference/backends.toml':\n"
             for backend_name in backend_names:
-                error_msg += f"   - Add 'enabled = false' under '[{backend_name}]'\n"
+                error_msg += rf"   - Add 'enabled = false' under '\[{backend_name}]'" + "\n"
         else:
             error_msg = (
                 f"Could not get credentials for inference backend(s): {backends_list}\n\n"
@@ -147,7 +147,7 @@ class BackendCredentialsErrorMsgFactory:
 
             error_msg += "\n2. Disable unused backends\n   Disable backends you don't need in '.pipelex/inference/backends.toml':\n"
             for backend_name in backend_names:
-                error_msg += f"   - Add 'enabled = false' under [{backend_name}]\n"
+                error_msg += rf"   - Add 'enabled = false' under '\[{backend_name}]'" + "\n"
 
         # Add pitch for Pipelex Gateway and BYOK (Bring Your Own Keys)
         error_msg += (

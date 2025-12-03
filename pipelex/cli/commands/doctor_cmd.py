@@ -416,18 +416,20 @@ def display_health_report(
         console.print()
 
         # Show details for each backend
+        bad_backend_credential_reports: dict[str, BackendCredentialsReport] = {}
         for backend_name, backend_credential_report in backend_credential_reports.items():
             if backend_credential_report.all_credentials_valid:
                 console.print(f"  [dim]{backend_name}[/dim]")
                 console.print("    [green]✓[/green] All credentials set")
             else:
+                bad_backend_credential_reports[backend_name] = backend_credential_report
                 console.print(f"  [bold]{backend_name}[/bold]")
                 if backend_credential_report.missing_vars:
                     console.print(f"    [red]✗[/red] Missing: {', '.join(backend_credential_report.missing_vars)}")
                 if backend_credential_report.placeholder_vars:
                     console.print(f"    [yellow]⚠[/yellow] Placeholders: {', '.join(backend_credential_report.placeholder_vars)}")
 
-        error_msg = BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(backend_credential_reports=backend_credential_reports)
+        error_msg = BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(backend_credential_reports=bad_backend_credential_reports)
         console.print(error_msg)
     console.print()
 
