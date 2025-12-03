@@ -14,6 +14,7 @@ from pipelex.cogt.image.prompt_image import PromptImageDetail, PromptImageTypedB
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
 
@@ -71,5 +72,5 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
         return nb_tokens_by_category
 
     @override
-    def make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
-        return {}
+    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+        return inference_model.extra_headers or {}, {}

@@ -142,7 +142,7 @@ OPENAI_MODELS = [
     # "gpt-5",
     # "gpt-5.1-chat",
     # "gpt-5.1",
-    # "gpt-5.1-codex",
+    "gpt-5.1-codex",
 ]
 
 # --- OpenAI OSS Models --------------------------------------------------------------------------
@@ -176,12 +176,12 @@ ALL_LLM_HANDLES = [
     # *AMAZON_MODELS,
     *ANTHROPIC_MODELS,
     # *DEEPSEEK_MODELS,
-    *GOOGLE_MODELS,
+    # *GOOGLE_MODELS,
     # *GROQ_MODELS,
     # *META_MODELS,
     # *MISTRALAI_MODELS,
     # *MOONSHOTAI_MODELS,
-    *OPENAI_MODELS,
+    # *OPENAI_MODELS,
     # *OPENAI_OSS_MODELS,
     # *QWEN_MODELS,
     # *XAI_MODELS,

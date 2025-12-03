@@ -10,8 +10,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
-from pipelex.hub import get_telemetry_manager
-from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant, PortkeyHeaderKey
+from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
 from pipelex.plugins.gateway.gateway_exceptions import GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
@@ -21,6 +20,7 @@ if TYPE_CHECKING:
 
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
+    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
@@ -94,20 +94,5 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         )
 
     @override
-    def make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
-        if not get_telemetry_manager().is_portkey_tracing_enabled():
-            return {}
-        if llm_job.job_metadata.pipe_job_ids:
-            last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]
-        else:
-            last_pipe_job_id = "main"
-        extra_headers: dict[str, str] = {}
-        extra_headers[PortkeyHeaderKey.TRACE_ID] = llm_job.job_metadata.pipeline_run_id
-        if not llm_job.job_metadata.unit_job_id:
-            msg = f"Unit job id is not set for LLM job: {llm_job}"
-            raise GatewayFactoryError(msg)
-        model_kind = llm_job.job_metadata.unit_job_id.model_kind
-        span_id = f"{model_kind} -> {output_desc}"
-        extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id
-        extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{last_pipe_job_id}: {span_id}"
-        return extra_headers
+    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+        return GatewayFactory.make_extras(inference_model=inference_model, llm_job=llm_job, output_desc=output_desc)

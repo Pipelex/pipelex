@@ -71,10 +71,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
         try:
-            extra_headers: dict[str, str] = {}
-            if self.inference_model.extra_headers:
-                extra_headers = self.inference_model.extra_headers.copy()
-            extra_headers.update(self.openai_responses_factory.make_extra_headers(llm_job=llm_job, output_desc="Text"))
+            extra_headers, extra_body = self.openai_responses_factory.make_extras(
+                inference_model=self.inference_model, llm_job=llm_job, output_desc="Text"
+            )
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
@@ -82,6 +81,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 max_output_tokens=job_params.max_tokens or omit,
                 input=input_items,
                 extra_headers=extra_headers,
+                extra_body=extra_body,
             )
         except NotFoundError as not_found_error:
             msg = (
@@ -114,12 +114,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             if not hasattr(self.instructor_for_objects, "responses"):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
                 raise LLMCompletionError(msg)
-
-            extra_headers: dict[str, str] = {}
-            if self.inference_model.extra_headers:
-                extra_headers = self.inference_model.extra_headers.copy()
-            extra_headers.update(self.openai_responses_factory.make_extra_headers(llm_job=llm_job, output_desc=schema.__name__))
-
+            extra_headers, extra_body = self.openai_responses_factory.make_extras(
+                inference_model=self.inference_model, llm_job=llm_job, output_desc=schema.__name__
+            )
             input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
             result_object, completion = await self.instructor_for_objects.responses.create_with_completion(  # pyright: ignore[reportUnknownMemberType]
                 input=cast("list[ChatCompletionMessageParam]", input_items),
@@ -130,6 +127,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 temperature=job_params.temperature,
                 max_output_tokens=job_params.max_tokens or NOT_GIVEN,
                 extra_headers=extra_headers,
+                extra_body=extra_body,
             )  # type: ignore[arg-type,misc]
         except InstructorRetryException as exc:
             msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"

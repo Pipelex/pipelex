@@ -39,7 +39,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
             raise SdkTypeError(msg)
 
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
-        self.openai_factory = openai_completions_factory
+        self.openai_completions_factory = openai_completions_factory
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance, mode=instructor_mode)
         else:
@@ -68,13 +68,12 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        messages = await self.openai_factory.make_simple_messages(llm_job=llm_job)
+        messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
 
         try:
-            extra_headers: dict[str, str] = {}
-            if self.inference_model.extra_headers:
-                extra_headers = self.inference_model.extra_headers.copy()
-            extra_headers.update(self.openai_factory.make_extra_headers(llm_job=llm_job, output_desc="Text"))
+            extra_headers, extra_body = self.openai_completions_factory.make_extras(
+                inference_model=self.inference_model, llm_job=llm_job, output_desc="Text"
+            )
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
                 temperature=job_params.temperature,
@@ -82,6 +81,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 seed=job_params.seed,
                 messages=messages,
                 extra_headers=extra_headers,
+                extra_body=extra_body,
             )
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
@@ -101,7 +101,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
-            llm_tokens_usage.nb_tokens_by_category = self.openai_factory.make_nb_tokens_by_category(usage=usage)
+            llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
         return response_text
 
     @override
@@ -111,13 +111,12 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        messages = await self.openai_factory.make_simple_messages(llm_job=llm_job)
+        messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         try:
             try:
-                extra_headers: dict[str, str] = {}
-                if self.inference_model.extra_headers:
-                    extra_headers = self.inference_model.extra_headers.copy()
-                extra_headers.update(self.openai_factory.make_extra_headers(llm_job=llm_job, output_desc=schema.__name__))
+                extra_headers, extra_body = self.openai_completions_factory.make_extras(
+                    inference_model=self.inference_model, llm_job=llm_job, output_desc=schema.__name__
+                )
                 result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                     model=self.inference_model.model_id,
                     temperature=job_params.temperature,
@@ -127,6 +126,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                     response_model=schema,
                     max_retries=llm_job.job_config.max_retries,
                     extra_headers=extra_headers,
+                    extra_body=extra_body,
                 )
             except InstructorRetryException as exc:
                 msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
@@ -139,6 +139,6 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg) from bad_request_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
-            llm_tokens_usage.nb_tokens_by_category = self.openai_factory.make_nb_tokens_by_category(usage=usage)
+            llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
 
         return result_object

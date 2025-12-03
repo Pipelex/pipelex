@@ -71,6 +71,7 @@ api_key = "${OPENAI_API_KEY}"
 [portkey]
 display_name = "Portkey"
 enabled = true
+endpoint = "https://api.portkey.ai/v1"
 api_key = "${PORTKEY_API_KEY}"
 
 [vertexai]

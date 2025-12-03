@@ -6,15 +6,18 @@ from portkey_ai import (
     PORTKEY_GATEWAY_URL,  # type: ignore[reportUnknownVariableType]
 )
 
+from pipelex import log
 from pipelex.hub import get_telemetry_manager
-from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
-from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError
+from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
+from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError, PortkeyFactoryError
 
 if TYPE_CHECKING:
+    from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
+    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 
-class PortkeyFactory(OpenAIResponsesFactory):
+class PortkeyFactory:
     @classmethod
     def is_debug_enabled(cls, backend: InferenceBackend) -> bool:
         is_debug_configured = backend.extra_config.get("debug", False)
@@ -30,3 +33,28 @@ class PortkeyFactory(OpenAIResponsesFactory):
             msg = "Portkey API key is not set"
             raise PortkeyCredentialsError(msg)
         return backend.api_key
+
+    @classmethod
+    def make_extras(cls, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+        extra_headers: dict[str, str] = {}
+        if inference_model.extra_headers:
+            extra_headers.update(inference_model.extra_headers)
+        if not llm_job.job_params.max_tokens and inference_model.max_tokens:
+            log.debug(f"Setting max tokens for Portkey: {inference_model.max_tokens}")
+            extra_headers[PortkeyHeaderKey.MAX_TOKENS] = str(inference_model.max_tokens)
+        else:
+            log.debug(f"Max tokens for Portkey: {llm_job.job_params.max_tokens}")
+        if get_telemetry_manager().is_portkey_tracing_enabled():
+            if llm_job.job_metadata.pipe_job_ids:
+                last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]
+            else:
+                last_pipe_job_id = "main"
+            extra_headers[PortkeyHeaderKey.TRACE_ID] = llm_job.job_metadata.pipeline_run_id
+            if not llm_job.job_metadata.unit_job_id:
+                msg = f"Unit job id is not set for LLM job: {llm_job}"
+                raise PortkeyFactoryError(msg)
+            model_kind = llm_job.job_metadata.unit_job_id.model_kind
+            span_id = f"{model_kind} -> {output_desc}"
+            extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id
+            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{last_pipe_job_id}: {span_id}"
+        return extra_headers, {}
