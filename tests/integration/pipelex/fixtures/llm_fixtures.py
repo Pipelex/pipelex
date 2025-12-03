@@ -169,7 +169,6 @@ XAI_MODELS = [
     "grok-3-mini-fast",
     "grok-4-fast-reasoning",
     "grok-4-fast-non-reasoning",
-    "grok-4-fast",
 ]
 
 # --- All LLM Handles ----------------------------------------------------------------------------

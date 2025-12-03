@@ -22,7 +22,7 @@ base-gpt = "gpt-4o"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
 base-groq = "llama-3.3-70b-versatile"
-base-grok = "grok-4-fast"
+base-grok = "grok-4-fast-non-reasoning"
 
 best-gpt = "gpt-5.1"
 best-claude = "claude-4.5-opus"
