@@ -1,4 +1,3 @@
-import openai
 from openai.types.chat import (
     ChatCompletionContentPartImageParam,
     ChatCompletionContentPartParam,
@@ -11,84 +10,18 @@ from openai.types.chat.chat_completion_content_part_image_param import ImageURL
 from openai.types.completion_usage import CompletionUsage
 from typing_extensions import override
 
-from pipelex import log
-from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image import PromptImageDetail, PromptImageTypedBase64
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
-from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.types import StrEnum
-
-
-class OpenAIFactoryError(CogtError):
-    pass
-
-
-class OpenAISdkVariant(StrEnum):
-    AZURE_OPENAI = "azure_openai"
-    AZURE_OPENAI_RESPONSES = "azure_openai_responses"
-    OPENAI = "openai"
-    OPENAI_RESPONSES = "openai_responses"
-    OPENAI_ALT_IMG_GEN = "openai_alt_img_gen"
-
-
-class AzureExtraField(StrEnum):
-    API_VERSION = "api_version"
 
 
 class OpenAICompletionsFactory(PluginFactoryAbstract):
     def __init__(self, is_http_url_enabled: bool):
         super().__init__()
         self.is_http_url_enabled = is_http_url_enabled
-
-    @classmethod
-    def make_openai_client(
-        cls,
-        plugin: Plugin,
-        backend: InferenceBackend,
-    ) -> openai.AsyncClient:
-        try:
-            sdk_variant = OpenAISdkVariant(plugin.sdk)
-        except ValueError as exc:
-            msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
-            raise OpenAIFactoryError(msg) from exc
-
-        # We have a workaround here:
-        # OpenAI can be used without any API key (for instance when pointing to local Ollama) but the SDK,
-        # as it is, raises if there is not API key (api_key is None and there is not env var).
-        # But it works fine with an empty string.
-        api_key = backend.api_key or ""
-
-        the_client: openai.AsyncOpenAI
-        match sdk_variant:
-            case OpenAISdkVariant.AZURE_OPENAI | OpenAISdkVariant.AZURE_OPENAI_RESPONSES:
-                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
-                if backend.endpoint is None:
-                    msg = "Azure OpenAI endpoint is not set"
-                    raise OpenAIFactoryError(msg)
-                the_client = openai.AsyncAzureOpenAI(
-                    azure_endpoint=backend.endpoint,
-                    api_key=api_key,
-                    api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
-                )
-            case OpenAISdkVariant.OPENAI | OpenAISdkVariant.OPENAI_RESPONSES:
-                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=backend.endpoint,
-                )
-            case OpenAISdkVariant.OPENAI_ALT_IMG_GEN:
-                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=backend.endpoint,
-                )
-
-        return the_client
 
     async def make_simple_messages(
         self,

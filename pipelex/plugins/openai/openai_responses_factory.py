@@ -11,11 +11,9 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
 
 if TYPE_CHECKING:
-    import openai
     from openai.types.responses import (
         ResponseInputItemParam,
         ResponseInputMessageContentListParam,
@@ -24,25 +22,12 @@ if TYPE_CHECKING:
     )
 
     from pipelex.cogt.llm.llm_job import LLMJob
-    from pipelex.cogt.model_backends.backend import InferenceBackend
-    from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 class OpenAIResponsesFactory(PluginFactoryAbstract):
     def __init__(self, is_http_url_enabled: bool):
         super().__init__()
         self.is_http_url_enabled = is_http_url_enabled
-
-    @classmethod
-    def make_openai_client(
-        cls,
-        plugin: Plugin,
-        backend: InferenceBackend,
-    ) -> openai.AsyncOpenAI:
-        return OpenAICompletionsFactory.make_openai_client(
-            plugin=plugin,
-            backend=backend,
-        )
 
     async def make_input_items(self, llm_job: LLMJob) -> list[ResponseInputItemParam]:
         """Build Response API input items from a standard LLM job prompt."""
@@ -53,10 +38,6 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
         if llm_prompt.user_text:
             text_content: ResponseInputTextParam = {"type": "input_text", "text": llm_prompt.user_text}
             user_contents.append(text_content)
-
-        # for prompt_image in llm_prompt.user_images:
-        #     image_content = await self._make_image_content(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
-        #     user_contents.append(image_content)
 
         detail = llm_job.job_params.image_detail or PromptImageDetail.AUTO
         prepped_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=self.is_http_url_enabled)
@@ -81,12 +62,6 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
             }
         )
         return input_items
-
-    # async def _make_image_content(self, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ResponseInputImageParam:
-    #     if detail is None:
-    #         detail = PromptImageDetail.AUTO
-    #     image_url_obj = await self.openai_factory.make_image_url_obj(prompt_image=prompt_image, detail=detail)
-    #     return {"type": "input_image", "image_url": image_url_obj["url"], "detail": detail.as_openai_detail}
 
     def make_nb_tokens_by_category(self, usage: ResponseUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {

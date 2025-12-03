@@ -55,12 +55,12 @@ class ImgGenWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "openai_img_gen":
-                from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=OpenAICompletionsFactory.make_openai_client(
+                    sdk_instance=OpenAIClientFactory.make_openai_client(
                         plugin=plugin,
                         backend=backend,
                     ),
@@ -72,12 +72,12 @@ class ImgGenWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "openai_alt_img_gen":
-                from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_img_gen_alt_worker import OpenAIImgGenAlternativeWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=OpenAICompletionsFactory.make_openai_client(
+                    sdk_instance=OpenAIClientFactory.make_openai_client(
                         plugin=plugin,
                         backend=backend,
                     ),

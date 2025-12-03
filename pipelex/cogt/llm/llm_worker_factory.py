@@ -61,12 +61,13 @@ class LLMWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "openai_responses" | "azure_openai_responses":
+                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=OpenAIResponsesFactory.make_openai_client(
+                    sdk_instance=OpenAIClientFactory.make_openai_client(
                         plugin=plugin,
                         backend=backend,
                     ),
@@ -81,12 +82,13 @@ class LLMWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "openai" | "azure_openai":
+                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # noqa: PLC0415
 
                 sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=OpenAICompletionsFactory.make_openai_client(
+                    sdk_instance=OpenAIClientFactory.make_openai_client(
                         plugin=plugin,
                         backend=backend,
                     ),
