@@ -31,7 +31,6 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
         is_debug_enabled = PortkeyFactory.is_debug_enabled(backend=backend)
         endpoint = PortkeyFactory.get_endpoint(backend=backend)
         api_key = PortkeyFactory.get_api_key(backend=backend)
-        log.verbose(f"Making AsyncOpenAI client with endpoint: {endpoint}, debug: {is_debug_enabled}")
 
         if not PortkeyOpenAISdkVariant.is_completions(plugin.sdk):
             msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"

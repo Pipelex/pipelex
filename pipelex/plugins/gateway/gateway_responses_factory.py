@@ -31,7 +31,6 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
         is_debug_enabled = GatewayFactory.is_debug_enabled(backend=backend)
         endpoint = GatewayFactory.get_endpoint(backend=backend)
         api_key = GatewayFactory.get_api_key(backend=backend)
-        log.verbose(f"Making AsyncOpenAI client with endpoint: {endpoint}, debug: {is_debug_enabled}")
         if not GatewayOpenAISdkVariant.is_responses(plugin.sdk):
             msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
             raise GatewayFactoryError(msg)

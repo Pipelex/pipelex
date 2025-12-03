@@ -31,12 +31,9 @@ class PortkeyResponsesFactory(OpenAIResponsesFactory):
         is_debug_enabled = PortkeyFactory.is_debug_enabled(backend=backend)
         endpoint = PortkeyFactory.get_endpoint(backend=backend)
         api_key = PortkeyFactory.get_api_key(backend=backend)
-        log.verbose(f"Making AsyncOpenAI client with endpoint: {endpoint}, debug: {is_debug_enabled}")
         if not PortkeyOpenAISdkVariant.is_responses(plugin.sdk):
             msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
             raise PortkeyFactoryError(msg)
-
-        log.debug(f"Creating Portkey OpenAI client with endpoint: {endpoint}, api_key: {api_key}, debug: {is_debug_enabled}")
 
         return openai.AsyncOpenAI(
             base_url=endpoint,
