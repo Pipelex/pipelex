@@ -41,7 +41,7 @@ class TestFirstTimeInitialization:
         env.verify_file_exists("inference/routing_profiles.toml")
         env.verify_file_exists("telemetry.toml")
         env.verify_backends_enabled([PipelexBackend.GATEWAY])
-        env.verify_routing(PipelexRoutingProfile.PIPELEX_FIRST)
+        env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
         env.verify_telemetry("off")
 
     def test_init_with_multiple_backends_and_routing(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -98,8 +98,8 @@ class TestFirstTimeInitialization:
             if backend_key != "internal":
                 assert toml_doc[backend_key]["enabled"] is True  # type: ignore[index]
 
-        # Verify routing (pipelex_first since pipelex_gateway is included)
-        env.verify_routing(PipelexRoutingProfile.PIPELEX_FIRST)
+        # Verify routing (pipelex_gateway_first since pipelex_gateway is included)
+        env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
 
     def test_cancel_at_backend_selection(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 1.4: Cancel at backend selection."""

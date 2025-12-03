@@ -9,7 +9,8 @@ from pipelex.types import StrEnum
 class PipelexRoutingProfile(StrEnum):
     """Special Pipelex routing profiles."""
 
-    PIPELEX_FIRST = "pipelex_first"
+    PIPELEX_GATEWAY_FIRST = "pipelex_gateway_first"
+    PIPELEX_FIRST = "pipelex_first"  # Legacy, deprecated - use PIPELEX_GATEWAY_FIRST
     ALL_PIPELEX_GATEWAY = "all_pipelex_gateway"
     ALL_PIPELEX_INFERENCE = "all_pipelex_inference"  # Legacy, deprecated
 
