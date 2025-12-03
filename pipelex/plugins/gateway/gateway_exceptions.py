@@ -5,9 +5,9 @@ class PortkeyError(CogtError):
     pass
 
 
-class PortkeyFactoryError(PortkeyError):
+class GatewayFactoryError(PortkeyError):
     pass
 
 
-class PortkeyCredentialsError(PortkeyError):
+class GatewayCredentialsError(PortkeyError):
     pass

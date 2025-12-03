@@ -12,7 +12,7 @@ from pipelex import log
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant, PortkeyHeaderKey
-from pipelex.plugins.gateway.gateway_exceptions import PortkeyFactoryError
+from pipelex.plugins.gateway.gateway_exceptions import GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
 
@@ -37,7 +37,7 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
         log.verbose(f"Making AsyncOpenAI client with endpoint: {endpoint}, debug: {is_debug_enabled}")
         if not GatewayOpenAISdkVariant.is_responses(plugin.sdk):
             msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
-            raise PortkeyFactoryError(msg)
+            raise GatewayFactoryError(msg)
 
         return openai.AsyncOpenAI(
             base_url=endpoint,
@@ -55,25 +55,25 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
     ) -> ExtractOutput:
         if not hasattr(response, "pages"):
             msg = "Portkey extract response does not have pages"
-            raise PortkeyFactoryError(msg)
+            raise GatewayFactoryError(msg)
         pages: dict[int, Page] = {}
         for extracted_page in response.pages:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
             if not isinstance(extracted_page, dict):
                 msg = "Extracted page is not a dictionary"
-                raise PortkeyFactoryError(msg)
+                raise GatewayFactoryError(msg)
             extracted_page_dict = cast("dict[str, Any]", extracted_page)
             page_index = extracted_page_dict.get("index")
             if page_index is None:
                 msg = "Page index is not set"
-                raise PortkeyFactoryError(msg)
+                raise GatewayFactoryError(msg)
             extracted_page_text = extracted_page_dict.get("markdown")
             if extracted_page_text is None:
                 msg = "Page text is not set"
-                raise PortkeyFactoryError(msg)
+                raise GatewayFactoryError(msg)
             extracted_page_images = extracted_page_dict.get("images")
             if extracted_page_images is None:
                 msg = "Page images are not set"
-                raise PortkeyFactoryError(msg)
+                raise GatewayFactoryError(msg)
             page_images: list[ExtractedImageFromPage] = []
             for extracted_page_image in extracted_page_images:
                 extracted_image = ExtractedImageFromPage(
@@ -103,7 +103,7 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
         extra_headers[PortkeyHeaderKey.TRACE_ID] = llm_job.job_metadata.pipeline_run_id
         if not llm_job.job_metadata.unit_job_id:
             msg = f"Unit job id is not set for LLM job: {llm_job}"
-            raise PortkeyFactoryError(msg)
+            raise GatewayFactoryError(msg)
         model_kind = llm_job.job_metadata.unit_job_id.model_kind
         span_id = f"{model_kind} -> {output_desc}"
         extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id

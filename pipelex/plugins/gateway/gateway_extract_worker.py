@@ -21,16 +21,16 @@ from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_asyn
 from pipelex.types import StrEnum
 
 
-class DocumentType(StrEnum):
+class DocumentKind(StrEnum):
     IMAGE = "image"
     PDF = "pdf"
 
     @property
     def document_tag(self) -> str:
         match self:
-            case DocumentType.IMAGE:
+            case DocumentKind.IMAGE:
                 return "image_url"
-            case DocumentType.PDF:
+            case DocumentKind.PDF:
                 return "document_url"
 
 
@@ -78,7 +78,7 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             base64_url = await make_base_64_url_from_location_async(location=image_uri)
             extract_output = await self.extract_base64_url(
                 base64_url=base64_url,
-                document_type=DocumentType.IMAGE,
+                document_type=DocumentKind.IMAGE,
                 should_include_images=False,
             )
 
@@ -94,7 +94,7 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             base64_url = await make_base_64_url_from_location_async(location=pdf_uri)
             extract_output = await self.extract_base64_url(
                 base64_url=base64_url,
-                document_type=DocumentType.PDF,
+                document_type=DocumentKind.PDF,
                 should_include_images=extract_job.job_params.should_include_images,
             )
         else:
@@ -105,7 +105,7 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
     async def extract_base64_url(
         self,
         base64_url: str,
-        document_type: DocumentType,
+        document_type: DocumentKind,
         should_include_images: bool = False,
     ) -> ExtractOutput:
         config_id = self._get_portkey_config_id()
