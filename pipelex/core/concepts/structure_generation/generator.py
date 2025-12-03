@@ -7,7 +7,6 @@ from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
-from pipelex.core.stuffs.structured_content import StructuredContent
 
 
 class StructureGenerator:
@@ -23,12 +22,18 @@ class StructureGenerator:
         }
         self.enum_definitions: dict[str, dict[str, Any]] = {}  # Store enum definitions
 
-    def generate_from_structure_blueprint(self, class_name: str, structure_blueprint: dict[str, ConceptStructureBlueprint]) -> tuple[str, type]:
+    def generate_from_structure_blueprint(
+        self,
+        class_name: str,
+        structure_blueprint: dict[str, ConceptStructureBlueprint],
+        base_class_name: str | None = None,
+    ) -> tuple[str, type]:
         """Generate Python module content from structure blueprint.
 
         Args:
             class_name: Name of the class to generate
             structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
+            base_class_name: Optional base class name to inherit from (defaults to StructuredContent)
 
         Returns:
             Generated Python module content, the generated class
@@ -38,7 +43,7 @@ class StructureGenerator:
 
         """
         # Generate the class
-        class_code = self._generate_class_source_code_from_blueprint(class_name, structure_blueprint)
+        class_code = self._generate_class_source_code_from_blueprint(class_name, structure_blueprint, base_class_name)
 
         # Generate the complete module
         imports_section = "\n".join(sorted(self.imports))
@@ -48,7 +53,9 @@ class StructureGenerator:
         # Validate the generated code
         try:
             the_class = self.validate_generated_code(
-                python_code=generated_code, expected_class_name=class_name, required_base_class=StructuredContent
+                python_code=generated_code,
+                expected_class_name=class_name,
+                base_class_name=base_class_name,
             )
         except SyntaxError as syntax_error:
             msg = f"Error validating generated code: {syntax_error}"
@@ -62,13 +69,18 @@ class StructureGenerator:
 
         return generated_code, the_class
 
-    def validate_generated_code(self, python_code: str, expected_class_name: str, required_base_class: type) -> type:
+    def validate_generated_code(
+        self,
+        python_code: str,
+        expected_class_name: str,
+        base_class_name: str | None = None,
+    ) -> type:
         """Validate that the generated Python code is syntactically correct and executable.
 
         Args:
             python_code: The generated Python code to validate
             expected_class_name: The name of the class that should be created
-            required_base_class: The base class that the generated class should inherit from
+            base_class_name: Optional name of a custom base class to use
 
         """
         ast.parse(python_code)
@@ -78,7 +90,7 @@ class StructureGenerator:
         return self._validate_execution(
             python_code=python_code,
             expected_class_name=expected_class_name,
-            required_base_class=required_base_class,
+            base_class_name=base_class_name,
         )
 
     ############################################################
@@ -123,19 +135,43 @@ class StructureGenerator:
             return self._escape_string_for_python(value)
         return repr(value)
 
-    def _generate_class_source_code_from_blueprint(self, class_name: str, structure_blueprint: dict[str, ConceptStructureBlueprint]) -> str:
+    def _generate_class_source_code_from_blueprint(
+        self,
+        class_name: str,
+        structure_blueprint: dict[str, ConceptStructureBlueprint],
+        base_class_name: str | None = None,
+    ) -> str:
         """Generate a class definition from ConceptStructureBlueprint.
 
         Args:
             class_name: Name of the class
             structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
+            base_class_name: Optional base class name to inherit from (defaults to StructuredContent)
 
         Returns:
             Generated class code
 
         """
+        # Determine base class
+        base_class = base_class_name or "StructuredContent"
+
+        # Add import for the base class if it's a native content class (other than StructuredContent which is already imported)
+        native_classes = {
+            "TextContent",
+            "ImageContent",
+            "NumberContent",
+            "JSONContent",
+            "HtmlContent",
+            "PDFContent",
+            "DynamicContent",
+            "PageContent",
+            "TextAndImagesContent",
+        }
+        if base_class in native_classes:
+            self.imports.add(f"from pipelex.core.stuffs import {base_class}")
+
         # Generate class header
-        class_header = f'class {class_name}(StructuredContent):\n    """Generated {class_name} class"""\n'
+        class_header = f'class {class_name}({base_class}):\n    """Generated {class_name} class"""\n'
 
         # Generate fields
         field_definitions: list[str] = []
@@ -366,14 +402,23 @@ class StructureGenerator:
                 # Unknown FieldType, assume it's a custom type
                 return str(field_type)
 
-    def _validate_execution(self, python_code: str, expected_class_name: str, required_base_class: type) -> type:
+    def _validate_execution(
+        self,
+        python_code: str,
+        expected_class_name: str,
+        base_class_name: str | None = None,
+    ) -> type:
         """Validate that the code executes and creates the expected class."""
         # Import necessary modules for the execution context
         from typing import Any  # noqa: PLC0415
 
-        # Provide necessary imports in the execution context
-        exec_globals = {
+        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+
+        # exec_globals with basic types but let native class imports execute naturally
+        # This ensures we use the same class objects for inheritance checks
+        exec_globals: dict[str, Any] = {
             "__builtins__": __builtins__,
+            # Provide these directly as they're used in generated code but not imported from pipelex
             "datetime": datetime,
             "Enum": Enum,
             "Optional": Optional,
@@ -382,8 +427,31 @@ class StructureGenerator:
             "Any": Any,
             "Literal": Literal,
             "Field": Field,
-            "StructuredContent": StructuredContent,
         }
+
+        # If a custom base class is specified that's not a native class, get it from the registry
+        if base_class_name:
+            # Check if it's a native class
+            native_classes = {
+                "StructuredContent",
+                "TextContent",
+                "ImageContent",
+                "NumberContent",
+                "JSONContent",
+                "HtmlContent",
+                "PDFContent",
+                "DynamicContent",
+                "PageContent",
+                "TextAndImagesContent",
+            }
+            if base_class_name not in native_classes:
+                # Not a native class, provide it from registry
+                custom_base_class = KajsonManager.get_class_registry().get_class(name=base_class_name)
+                if custom_base_class is None:
+                    msg = f"Base class '{base_class_name}' not found in native classes or class registry"
+                    raise ConceptStructureValidationError(msg)
+                exec_globals[base_class_name] = custom_base_class  # type: ignore[assignment]
+
         exec_locals: dict[str, Any] = {}
         exec(python_code, exec_globals, exec_locals)
 
@@ -400,8 +468,12 @@ class StructureGenerator:
             raise ConceptStructureValidationError(msg)
 
         # Verify it inherits from the required base class
-        if not issubclass(the_class, required_base_class):
-            msg = f"'{expected_class_name}' does not inherit from {required_base_class.__name__}"
+        # Check the MRO (Method Resolution Order) by class name to handle cases
+        # where the class object references might differ due to exec() context
+        mro_class_names = [cls.__name__ for cls in the_class.__mro__]
+
+        if "StuffContent" not in mro_class_names:
+            msg = f"'{expected_class_name}' does not inherit from StuffContent. MRO: {mro_class_names}"
             raise ConceptStructureValidationError(msg)
 
         return the_class

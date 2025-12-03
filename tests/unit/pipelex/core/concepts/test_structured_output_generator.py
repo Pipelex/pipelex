@@ -517,7 +517,7 @@ class TestStructureGenerator:
         assert issubclass(the_class, StructuredContent)
 
         # Test validation directly
-        generator.validate_generated_code(python_code=python_code, expected_class_name="ValidTestModel", required_base_class=StructuredContent)
+        generator.validate_generated_code(python_code=python_code, expected_class_name="ValidTestModel")
 
     def test_code_validation_syntax_error(self):
         """Test that invalid syntax fails validation."""
@@ -531,7 +531,7 @@ class InvalidModel(StructuredContent):
 """
 
         with pytest.raises(SyntaxError):
-            generator.validate_generated_code(python_code=invalid_code, expected_class_name="InvalidModel", required_base_class=StructuredContent)
+            generator.validate_generated_code(python_code=invalid_code, expected_class_name="InvalidModel")
 
     def test_code_validation_missing_class(self):
         """Test that code without the expected class fails validation."""
@@ -545,6 +545,281 @@ class WrongClassName(StructuredContent):
 """
 
         with pytest.raises(ConceptStructureValidationError):
-            generator.validate_generated_code(
-                python_code=code_without_expected_class, expected_class_name="ExpectedClassName", required_base_class=StructuredContent
+            generator.validate_generated_code(python_code=code_without_expected_class, expected_class_name="ExpectedClassName")
+
+    def test_inheritance_from_text_content(self):
+        """Test generating a class that inherits from TextContent."""
+        structure_blueprint = {
+            "author": ConceptStructureBlueprint(
+                description="The author of the question",
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                required=False,
+            ),
+        }
+
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            "Question",
+            structure_blueprint,
+            base_class_name="TextContent",
+        )
+
+        pretty_print(structure_blueprint, title="Source Blueprint")
+        pretty_print(generated_code, title="Generated Result")
+
+        # Verify the code compiles
+        import ast  # noqa: PLC0415
+
+        ast.parse(generated_code)
+        compile(generated_code, "<generated>", "exec")
+
+        # Verify correct import is present
+        assert "from pipelex.core.stuffs import TextContent" in generated_code
+
+        # Verify class inherits from TextContent
+        assert "class Question(TextContent):" in generated_code
+
+        # Verify the generated class is valid
+        from pipelex.core.stuffs import TextContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, TextContent)
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, StuffContent)
+
+        # Test instantiation (TextContent requires 'text' field)
+        instance = generated_class(text="Sample text", author="John Doe")  # pyright: ignore[reportCallIssue]
+        assert instance.author == "John Doe"  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+    def test_inheritance_from_image_content(self):
+        """Test generating a class that inherits from ImageContent."""
+        structure_blueprint = {
+            "table_name": ConceptStructureBlueprint(
+                description="Name of the table in the screenshot",
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                required=False,
+            ),
+            "row_count": ConceptStructureBlueprint(
+                description="Number of rows in the table",
+                type=ConceptStructureBlueprintFieldType.INTEGER,
+                required=False,
+            ),
+        }
+
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            "TableScreenshot",
+            structure_blueprint,
+            base_class_name="ImageContent",
+        )
+
+        pretty_print(structure_blueprint, title="Source Blueprint")
+        pretty_print(generated_code, title="Generated Result")
+
+        # Verify correct import is present
+        assert "from pipelex.core.stuffs import ImageContent" in generated_code
+
+        # Verify class inherits from ImageContent
+        assert "class TableScreenshot(ImageContent):" in generated_code
+
+        # Verify the generated class is valid
+        from pipelex.core.stuffs import ImageContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, ImageContent)
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, StuffContent)
+
+    def test_inheritance_from_number_content(self):
+        """Test generating a class that inherits from NumberContent."""
+        structure_blueprint = {
+            "unit": ConceptStructureBlueprint(
+                description="Unit of measurement",
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                required=False,
+            ),
+        }
+
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            "Temperature",
+            structure_blueprint,
+            base_class_name="NumberContent",
+        )
+
+        # Verify correct import is present
+        assert "from pipelex.core.stuffs import NumberContent" in generated_code
+
+        # Verify class inherits from NumberContent
+        assert "class Temperature(NumberContent):" in generated_code
+
+        # Verify the generated class is valid
+        from pipelex.core.stuffs import NumberContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, NumberContent)
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, StuffContent)
+
+    def test_inheritance_from_json_content(self):
+        """Test generating a class that inherits from JSONContent."""
+        structure_blueprint = {
+            "schema_version": ConceptStructureBlueprint(
+                description="Version of the schema",
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                required=False,
+            ),
+        }
+
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            "ConfigData",
+            structure_blueprint,
+            base_class_name="JSONContent",
+        )
+
+        # Verify correct import is present
+        assert "from pipelex.core.stuffs import JSONContent" in generated_code
+
+        # Verify class inherits from JSONContent
+        assert "class ConfigData(JSONContent):" in generated_code
+
+        # Verify the generated class is valid
+        from pipelex.core.stuffs import JSONContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, JSONContent)
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, StuffContent)
+
+    def test_inheritance_from_html_content(self):
+        """Test generating a class that inherits from HtmlContent."""
+        structure_blueprint = {
+            "page_title": ConceptStructureBlueprint(
+                description="Title of the HTML page",
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                required=False,
+            ),
+        }
+
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            "WebPage",
+            structure_blueprint,
+            base_class_name="HtmlContent",
+        )
+
+        # Verify correct import is present
+        assert "from pipelex.core.stuffs import HtmlContent" in generated_code
+
+        # Verify class inherits from HtmlContent
+        assert "class WebPage(HtmlContent):" in generated_code
+
+        # Verify the generated class is valid
+        from pipelex.core.stuffs import HtmlContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, HtmlContent)
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, StuffContent)
+
+    def test_inheritance_with_empty_structure(self):
+        """Test generating a class with no additional fields that just inherits from a base class."""
+        structure_blueprint: dict[str, ConceptStructureBlueprint] = {}
+
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            "EnhancedText",
+            structure_blueprint,
+            base_class_name="TextContent",
+        )
+
+        pretty_print(generated_code, title="Generated Result with Empty Structure")
+
+        # Verify correct import is present
+        assert "from pipelex.core.stuffs import TextContent" in generated_code
+
+        # Verify class inherits from TextContent
+        assert "class EnhancedText(TextContent):" in generated_code
+
+        # Verify it has pass since there are no fields
+        assert "pass" in generated_code
+
+        # Verify the generated class is valid
+        from pipelex.core.stuffs import TextContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, TextContent)
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, StuffContent)
+
+        # Test instantiation works (TextContent requires 'text' field)
+        instance = generated_class(text="Sample text")  # pyright: ignore[reportCallIssue]
+        assert instance is not None
+
+    def test_inheritance_from_pdf_content(self):
+        """Test generating a class that inherits from PDFContent."""
+        structure_blueprint = {
+            "document_type": ConceptStructureBlueprint(
+                description="Type of PDF document",
+                type=ConceptStructureBlueprintFieldType.TEXT,
+                required=False,
+            ),
+        }
+
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            "Invoice",
+            structure_blueprint,
+            base_class_name="PDFContent",
+        )
+
+        # Verify correct import is present
+        assert "from pipelex.core.stuffs import PDFContent" in generated_code
+
+        # Verify class inherits from PDFContent
+        assert "class Invoice(PDFContent):" in generated_code
+
+        # Verify the generated class is valid
+        from pipelex.core.stuffs import PDFContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, PDFContent)
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        assert issubclass(generated_class, StuffContent)
+
+    def test_multiple_inheritance_scenarios(self):
+        """Test multiple classes with different inheritance scenarios."""
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        test_cases = [
+            ("TextContent", "Question", {"source": "The source of the question"}),
+            ("ImageContent", "Diagram", {"diagram_type": "Type of diagram"}),
+            ("NumberContent", "Score", {"max_value": "Maximum possible score"}),
+        ]
+
+        for base_class_name, class_name, field_dict in test_cases:
+            structure_blueprint = {
+                field_name: ConceptStructureBlueprint(
+                    description=description,
+                    type=ConceptStructureBlueprintFieldType.TEXT,
+                    required=False,
+                )
+                for field_name, description in field_dict.items()
+            }
+
+            generator = StructureGenerator()
+            generated_code, generated_class = generator.generate_from_structure_blueprint(
+                class_name,
+                structure_blueprint,
+                base_class_name=base_class_name,
             )
+
+            # Verify correct import is present
+            assert f"from pipelex.core.stuffs import {base_class_name}" in generated_code
+
+            # Verify class inherits from correct base
+            assert f"class {class_name}({base_class_name}):" in generated_code
+
+            # Verify it's a valid subclass of StuffContent
+            assert issubclass(generated_class, StuffContent)

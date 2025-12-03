@@ -269,20 +269,35 @@ class ConceptFactory:
 
         # Handle refines definition
         elif blueprint.refines:
-            # If we have refines, validate that there is not already a structure related to this concept code in the class registry
-            # TODO: This test should NOT BE HERE, but in the `validate_with_libraries`.
-            if Concept.is_valid_structure_class(structure_class_name=concept_code):
-                msg = (
-                    f"Concept '{concept_code}' in domain '{domain}' has refines but also has a structure class registered. "
-                    "A concept cannot have both structure and refines."
-                )
-                raise ConceptFactoryError(msg)
             try:
                 current_refine = cls.make_refine(refine=blueprint.refines)
             except ConceptRefineError as exc:
                 msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain}': {exc}"
                 raise ConceptFactoryError(msg) from exc
-            structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
+
+            # Get the refined concept's structure class name
+            refined_structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else "TextContent"
+
+            # Generate a new class that inherits from the refined structure class
+            # This creates an empty class that can be extended with additional fields in the future
+            try:
+                _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+                    class_name=concept_code,
+                    structure_blueprint={},  # Empty structure - just inherits from refined class
+                    base_class_name=refined_structure_class_name,
+                )
+            except ConceptStructureGeneratorError as exc:
+                msg = (
+                    f"Error generating structure class for concept '{concept_code}' "
+                    f"refining '{refined_structure_class_name}' in domain '{domain}': {exc}"
+                )
+                raise ConceptFactoryError(msg) from exc
+
+            # Register the generated class
+            KajsonManager.get_class_registry().register_class(the_generated_class)
+
+            # The structure_class_name of the concept is the concept_code
+            structure_class_name = concept_code
         # Handle neither structure nor refines - check the class registry
         # If there is a class, use it. structure_class_name is then the concept_code
         elif Concept.is_valid_structure_class(structure_class_name=concept_code):

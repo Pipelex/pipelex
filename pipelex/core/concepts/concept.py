@@ -25,6 +25,7 @@ class Concept(BaseModel):
     domain: str
     description: str
     structure_class_name: str
+    # TODO: rethink this refiens field here.
     refines: str | None = None
 
     @field_validator("code")
@@ -82,30 +83,37 @@ class Concept(BaseModel):
         if concept_1.structure_class_name == concept_2.structure_class_name:
             return True
 
-        # If concept_1 refines concept_2, they are strictly compatible
+        # If concept_1 refines concept_2 by string, they are strictly compatible
         if concept_1.refines is not None and concept_1.refines == concept_2.concept_string:
             return True
 
-        if concept_1.refines is None and concept_2.refines is None:
-            concept_1_class = KajsonManager.get_class_registry().get_class(name=concept_1.structure_class_name)
-            concept_2_class = KajsonManager.get_class_registry().get_class(name=concept_2.structure_class_name)
+        # If both concepts refine the same concept, they are compatible
+        if concept_1.refines is not None and concept_2.refines is not None and concept_1.refines == concept_2.refines:
+            return True
 
-            if concept_1_class is None or concept_2_class is None:
-                return False
+        # Check class-based compatibility
+        # This now works even when one or both concepts have refines, since we generate
+        # structure classes that inherit from the refined concept's class
+        concept_1_class = KajsonManager.get_class_registry().get_class(name=concept_1.structure_class_name)
+        concept_2_class = KajsonManager.get_class_registry().get_class(name=concept_2.structure_class_name)
 
-            if strict:
-                # Check if classes are equivalent (same fields, types, descriptions)
-                return are_classes_equivalent(concept_1_class, concept_2_class)
-            # Check if concept_1 is a subclass of concept_2
-            try:
-                if issubclass(concept_1_class, concept_2_class):
-                    return True
-            except TypeError:
-                pass
+        if concept_1_class is None or concept_2_class is None:
+            return False
 
-            # Check if concept_1 has compatible fields with concept_2
-            return has_compatible_field(concept_1_class, concept_2_class)
-        return False
+        if strict:
+            # Check if classes are equivalent (same fields, types, descriptions)
+            return are_classes_equivalent(concept_1_class, concept_2_class)
+
+        # Check if concept_1 is a subclass of concept_2
+        # This handles inheritance from refined concepts (e.g., RefusalEmail inherits from TextContent)
+        try:
+            if issubclass(concept_1_class, concept_2_class):
+                return True
+        except TypeError:
+            pass
+
+        # Check if concept_1 has compatible fields with concept_2
+        return has_compatible_field(concept_1_class, concept_2_class)
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:

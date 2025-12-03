@@ -113,7 +113,7 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
-    ) -> None:
+    ) -> list[PipeAbstract]:
         # Ensure libraries exist for this library_id
         if library_id not in self._libraries:
             msg = f"Trying to load a library that does not exist: '{library_id}'"
@@ -167,7 +167,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Load PLX files into the specific library
 
-        self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
+        return self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
 
     @override
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
@@ -235,7 +235,7 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> None:
+    def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> list[PipeAbstract]:
         """Load PLX files into a specific library.
 
         This method:
@@ -264,7 +264,7 @@ class LibraryManager(LibraryManagerAbstract):
             blueprints.append(blueprint)
 
         self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
-        self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+        return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

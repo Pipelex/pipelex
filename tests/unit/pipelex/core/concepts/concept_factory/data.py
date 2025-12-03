@@ -126,7 +126,7 @@ class TestCases:
                 domain="my_domain",
                 code="ConceptWithRefines",
                 description="A concept with refines",
-                structure_class_name=NativeConceptCode.IMAGE.structure_class_name,
+                structure_class_name="ConceptWithRefines",
                 refines="native.Image",
             ),
         ),

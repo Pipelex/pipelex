@@ -12,6 +12,7 @@ from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
+from pipelex.cli.commands.build_structures_cmd import build_structures_cmd
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -208,6 +209,11 @@ def build_pipe_cmd(
                     runner_path = os.path.join(extras_output_dir, f"run_{main_pipe_code}.py")
                     save_text_to_path(text=runner_code, path=runner_path)
                     typer.secho(f"✅ Python runner script saved to: {runner_path}", fg=typer.colors.GREEN)
+
+                    # Generate empty __init__.py to make it a proper Python package
+                    init_path = os.path.join(extras_output_dir, "__init__.py")
+                    save_text_to_path(text="", path=init_path)
+                    typer.secho(f"✅ Package init file saved to: {init_path}", fg=typer.colors.GREEN)
 
                     end_time = time.time()
                     typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds\n", fg=typer.colors.WHITE)
@@ -746,6 +752,4 @@ def build_structures_command(
     ] = None,
 ) -> None:
     """Wrapper to call the actual build_structures_cmd function."""
-    from pipelex.cli.commands import build_structures_cmd  # noqa: PLC0415
-
-    build_structures_cmd.build_structures_cmd(target_directory=target_directory, output_dir=output_dir)
+    asyncio.run(build_structures_cmd(target_directory=target_directory, output_dir=output_dir))
