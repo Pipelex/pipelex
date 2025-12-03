@@ -8,7 +8,6 @@ from portkey_ai import (
 )
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
 from pipelex.plugins.gateway.gateway_exceptions import GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory

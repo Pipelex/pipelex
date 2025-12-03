@@ -13,8 +13,9 @@ class FalCredentialsError(CredentialsError):
 
 
 class ImgGenWorkerFactory:
+    @classmethod
     def make_img_gen_worker(
-        self,
+        cls,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ImgGenWorkerAbstract:

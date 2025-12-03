@@ -8,7 +8,6 @@ from portkey_ai import (
 )
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
 from pipelex.plugins.portkey.portkey_constants import PortkeyOpenAISdkVariant
 from pipelex.plugins.portkey.portkey_exceptions import PortkeyFactoryError

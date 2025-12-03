@@ -9,8 +9,9 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class ExtractWorkerFactory:
+    @classmethod
     def make_extract_worker(
-        self,
+        cls,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ExtractWorkerAbstract:
