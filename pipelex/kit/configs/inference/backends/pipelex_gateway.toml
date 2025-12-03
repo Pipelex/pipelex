@@ -1,11 +1,10 @@
 ################################################################################
-# Pipelex Inference Backend Configuration
+# Pipelex Gateway Configuration
 ################################################################################
 #
-# This file defines the model specifications for the Pipelex Inference backend.
+# This file defines the model specifications for the Pipelex Gateway backend.
 # It contains model definitions for various AI models:
-# LLM of course but also image generation models and document extraction models.
-# accessible through the Pipelex Gateway API.
+# LLMs of course but also image generation models and document extraction models.
 #
 # Configuration structure:
 # - Each model is defined in its own section with the model name as the header
