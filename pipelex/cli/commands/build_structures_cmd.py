@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from kajson.kajson_manager import KajsonManager
 
+from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.structure_generation.code_merger import CodeMerger
@@ -86,6 +87,23 @@ async def build_structures_cmd(
                 # Check if structure class was manually created (exists in registry after setup but before structures/)
                 if class_registry.has_class(name=concept_code):
                     # Manually-created structure class exists, skip generation
+                    existing_class = class_registry.get_class(name=concept_code)
+                    if existing_class:
+                        # Try to get the actual file location
+                        import inspect  # noqa: PLC0415
+
+                        try:
+                            source_file = inspect.getfile(existing_class)
+                            log.warning(
+                                f"Skipping Generation for '{concept_code}' (domain '{blueprint.domain}'): "
+                                f"manually-created class exists at '{source_file}'"
+                            )
+                        except (TypeError, OSError):
+                            # Fallback if we can't get the file
+                            module_name = existing_class.__module__ if hasattr(existing_class, "__module__") else "unknown"
+                            log.warning(
+                                f"Skipping '{concept_code}' (domain '{blueprint.domain}'): manually-created class exists in module '{module_name}'"
+                            )
                     continue
 
                 # Handle simple string concept definitions (description only, refines Text by default)
