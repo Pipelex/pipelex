@@ -68,6 +68,11 @@ display_name = "OpenAI"
 enabled = true
 api_key = "${OPENAI_API_KEY}"
 
+[portkey]
+display_name = "Portkey"
+enabled = true
+api_key = "${PORTKEY_API_KEY}"
+
 [vertexai]
 display_name = "Google Vertex AI"
 enabled = false                                            # This is the only one we disable beacuse setting it up requires internet access just to get credentials so it fails in CI sandboxes

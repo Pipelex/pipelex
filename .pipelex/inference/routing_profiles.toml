@@ -94,6 +94,10 @@ default = "ollama"
 description = "Use OpenAI backend for all its supported models"
 default = "openai"
 
+[profiles.all_portkey]
+description = "Use Portkey backend for all its supported models"
+default = "portkey"
+
 [profiles.all_xai]
 description = "Use xAI backend for all its supported models"
 default = "xai"
