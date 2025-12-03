@@ -174,14 +174,14 @@ XAI_MODELS = [
 # --- All LLM Handles ----------------------------------------------------------------------------
 ALL_LLM_HANDLES = [
     # *AMAZON_MODELS,
-    *ANTHROPIC_MODELS,
+    # *ANTHROPIC_MODELS,
     # *DEEPSEEK_MODELS,
     # *GOOGLE_MODELS,
     # *GROQ_MODELS,
     # *META_MODELS,
     # *MISTRALAI_MODELS,
     # *MOONSHOTAI_MODELS,
-    # *OPENAI_MODELS,
+    *OPENAI_MODELS,
     # *OPENAI_OSS_MODELS,
     # *QWEN_MODELS,
     # *XAI_MODELS,

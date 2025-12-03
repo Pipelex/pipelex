@@ -232,3 +232,41 @@ outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
 x-portkey-provider = "@anthropic"
+
+# --- Gemini LLMs --------------------------------------------------------------
+["gemini-2.0-flash"]
+model_id = "gemini-2.0-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.10, output = 0.40 }
+x-portkey-provider = "@google"
+
+["gemini-2.5-pro"]
+model_id = "gemini-2.5-pro"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+x-portkey-provider = "@google"
+
+["gemini-2.5-flash"]
+model_id = "gemini-2.5-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.30, output = 2.50 }
+x-portkey-provider = "@google"
+
+["gemini-2.5-flash-lite"]
+model_id = "gemini-2.5-flash-lite"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.10, output = 0.40 }
+x-portkey-provider = "@google"
+
+["gemini-3.0-pro"]
+model_id = "gemini-3-pro-preview"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 2, output = 12.0 }
+x-portkey-provider = "@google"
