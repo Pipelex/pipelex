@@ -9,7 +9,7 @@
 # =========================================================================================
 
 # Which profile to use (change this to switch routing)
-active = "pipelex_first"
+active = "pipelex_gateway_first"
 
 # We recommend using the "pipelex_first" profile to get a head start with all models.
 # The Pipelex Inference backend is currently not recommended for production use,
@@ -25,7 +25,7 @@ active = "pipelex_first"
 # Routing Profiles
 # =========================================================================================
 
-[profiles.pipelex_first]
+[profiles.pipelex_gateway_first]
 description = "Use Pipelex Inference backend for all its supported models"
 default = "pipelex_gateway"
 fallback_order = [
@@ -37,14 +37,14 @@ fallback_order = [
     "fal",
 ]
 
-[profiles.pipelex_first.routes]
+[profiles.pipelex_gateway_first.routes]
 # Pattern matching: "model-pattern" = "backend-name"
 "gpt-*" = "pipelex_gateway"
 "claude-*" = "pipelex_gateway"
 "grok-*" = "pipelex_gateway"
 "gemini-*" = "pipelex_gateway"
 
-[profiles.pipelex_first.optional_routes] # Each optional route is considered only if its backend is available
+[profiles.pipelex_gateway_first.optional_routes] # Each optional route is considered only if its backend is available
 "*-sdxl" = "fal"
 "flux-*" = "fal"
 "gpt-image-1" = "openai"

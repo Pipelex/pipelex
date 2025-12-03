@@ -112,14 +112,14 @@ Pipelex Inference is a unified inference backend that provides access to all maj
 
 4. **Verify routing configuration:**
    
-   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `pipelex_first`:
+   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `pipelex_gateway_first`:
    
    ```toml
-   active = "pipelex_first"
+   active = "pipelex_gateway_first"
    
-   [profiles.pipelex_first]
-   description = "Use Pipelex Inference backend for all its supported models"
-   default = "pipelex_inference"
+   [profiles.pipelex_gateway_first]
+   description = "Use Pipelex Gateway backend for all its supported models"
+   default = "pipelex_gateway"
    ```
 
 ### Usage
@@ -264,11 +264,11 @@ PIPELEX_INFERENCE_API_KEY="your-pipelex-key"
 In `.pipelex/inference/routing_profiles.toml`:
 ```toml
 # Which profile to use
-active = "pipelex_first"
+active = "pipelex_gateway_first"
 
-[profiles.pipelex_first]
-description = "Use Pipelex Inference backend for all its supported models"
-default = "pipelex_inference"
+[profiles.pipelex_gateway_first]
+description = "Use Pipelex Gateway backend for all its supported models"
+default = "pipelex_gateway"
 ```
 
 **Native Providers Only (Option B):**
