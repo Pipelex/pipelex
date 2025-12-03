@@ -63,7 +63,7 @@ class TestLLMInference:
 
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
-                user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
+                user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
             llm_job_params=llm_job_params,

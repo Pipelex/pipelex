@@ -47,11 +47,10 @@ class ImageDescription(BaseModel):
 
 
 class LLMVisionTestCases:
-    VISION_USER_TEXT_1 = "Describe the provide image."
-    VISION_USER_TEXT_2 = "What is this image about?"
-    VISION_IMAGES_COMPARE_PROMPT = "Compare these two images"
+    VISION_USER_TEXT = "Describe the provide image in 1-2 concise sentences."
+    VISION_IMAGES_COMPARE_PROMPT = "Compare these two images in 2-3 concise bullet points."
 
-    URL_CLOUDFRONT_ALAN_TURING = "https://d2cinlfp2qnig1.cloudfront.net/tests/alan_turing.jpg"
+    URL_CLOUDFRONT_ALAN_TURING_JPG = "https://d2cinlfp2qnig1.cloudfront.net/tests/alan_turing.jpg"
 
     TEST_IMAGE_DIRECTORY = "tests/data/images"
 
@@ -69,8 +68,10 @@ class LLMVisionTestCases:
     IMAGE_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, image_path
         ("Gantt Chart", PATH_IMG_GANTT_1),
         ("AI Lympics PNG", PATH_IMG_PNG_1),
+        ("Animal Lympics PNG", PATH_IMG_PNG_2),
         ("AI Lympics JPEG", PATH_IMG_JPEG_1),
         ("Eiffel Tower", PATH_IMG_JPEG_3),
+        ("Eiffel Tower", PATH_IMG_PNG_3),
     ]
     IMAGE_PATH_PAIRS: ClassVar[list[tuple[str, tuple[str, str]]]] = [  # topic, image_pair
         ("AI Lympics PNG", (PATH_IMG_PNG_1, PATH_IMG_PNG_2)),
@@ -79,11 +80,11 @@ class LLMVisionTestCases:
     IMAGE_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, image_uri
         (
             "Alan Turing",
-            URL_CLOUDFRONT_ALAN_TURING,
+            URL_CLOUDFRONT_ALAN_TURING_JPG,
         ),
         (
             "Gantt chart",
-            PipeTestCases.URL_IMG_GANTT_1,
+            PipeTestCases.URL_IMG_GANTT_PNG,
         ),
     ]
 

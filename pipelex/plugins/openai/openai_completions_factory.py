@@ -7,22 +7,22 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 from openai.types.chat.chat_completion_content_part_image_param import ImageURL
+from openai.types.completion_usage import CompletionUsage
 from typing_extensions import override
 
 from pipelex.cogt.image.prompt_image import PromptImageDetail, PromptImageTypedBase64
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
 
 
-class OpenAIFactoryAlt(OpenAIFactory):
+class OpenAICompletionsFactory(PluginFactoryAbstract):
     def __init__(self, is_http_url_enabled: bool):
         super().__init__()
         self.is_http_url_enabled = is_http_url_enabled
 
-    @override
-    @override
     async def make_simple_messages(
         self,
         llm_job: LLMJob,
@@ -54,3 +54,22 @@ class OpenAIFactoryAlt(OpenAIFactory):
 
         messages.append(ChatCompletionUserMessageParam(role="user", content=user_contents))
         return messages
+
+    def make_nb_tokens_by_category(self, usage: CompletionUsage) -> NbTokensByCategoryDict:
+        nb_tokens_by_category: NbTokensByCategoryDict = {
+            TokenCategory.INPUT: usage.prompt_tokens,
+            TokenCategory.OUTPUT: usage.completion_tokens,
+        }
+        if prompt_tokens_details := usage.prompt_tokens_details:
+            nb_tokens_by_category[TokenCategory.INPUT_AUDIO] = prompt_tokens_details.audio_tokens or 0
+            nb_tokens_by_category[TokenCategory.INPUT_CACHED] = prompt_tokens_details.cached_tokens or 0
+        if completion_tokens_details := usage.completion_tokens_details:
+            nb_tokens_by_category[TokenCategory.OUTPUT_AUDIO] = completion_tokens_details.audio_tokens or 0
+            nb_tokens_by_category[TokenCategory.OUTPUT_REASONING] = completion_tokens_details.reasoning_tokens or 0
+            nb_tokens_by_category[TokenCategory.OUTPUT_ACCEPTED_PREDICTION] = completion_tokens_details.accepted_prediction_tokens or 0
+            nb_tokens_by_category[TokenCategory.OUTPUT_REJECTED_PREDICTION] = completion_tokens_details.rejected_prediction_tokens or 0
+        return nb_tokens_by_category
+
+    @override
+    def make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
+        return {}

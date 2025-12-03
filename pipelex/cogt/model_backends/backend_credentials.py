@@ -4,14 +4,6 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
-class BackendCredentialStatus(ConfigModel):
-    """Status of a single credential variable."""
-
-    var_name: str
-    is_set: bool
-    is_placeholder: bool  # True if value exists but is a placeholder like "${VAR}"
-
-
 class BackendCredentialsReport(ConfigModel):
     """Report of credential status for a backend."""
 

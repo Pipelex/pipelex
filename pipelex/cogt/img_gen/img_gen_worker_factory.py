@@ -54,13 +54,13 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "openai":
-                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
+            case "openai_img_gen":
+                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=OpenAIFactory.make_openai_client(
+                    sdk_instance=OpenAIClientFactory.make_openai_client(
                         plugin=plugin,
                         backend=backend,
                     ),
@@ -72,12 +72,12 @@ class ImgGenWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case "openai_alt_img_gen":
-                from pipelex.plugins.openai.openai_factory import OpenAIFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_img_gen_alt_worker import OpenAIImgGenAlternativeWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=OpenAIFactory.make_openai_client(
+                    sdk_instance=OpenAIClientFactory.make_openai_client(
                         plugin=plugin,
                         backend=backend,
                     ),
@@ -88,7 +88,7 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "azure_rest":
+            case "azure_rest_img_gen":
                 from pipelex.plugins.azure_rest.azure_img_gen_worker import AzureImgGenWorker  # noqa: PLC0415
 
                 img_gen_worker = AzureImgGenWorker(

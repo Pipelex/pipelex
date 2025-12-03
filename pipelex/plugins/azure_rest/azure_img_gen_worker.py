@@ -30,7 +30,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
     ):
         super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
-        if plugin.sdk != "azure_rest":
+        if plugin.sdk != "azure_rest_img_gen":
             msg = f"Plugin '{plugin}' is not supported for image generation"
             raise NotImplementedError(msg)
         self.plugin = plugin
