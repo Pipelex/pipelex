@@ -91,8 +91,7 @@ class TestPipeExtract:
         list_result = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
         pretty_print(list_result, title="list_result")
 
-    # @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
-    @pytest.mark.parametrize("pdf_url", PDFTestCases.DOCUMENT_FILE_PATHS)
+    @pytest.mark.parametrize("pdf_url", PipeExtractTestCases.PIPE_OCR_PDF_TEST_CASES)
     @pytest.mark.parametrize("page_image_captions", [False])  # TODO: add True when captioning is implemented
     async def test_pipe_extract_from_pdf(
         self,

@@ -35,7 +35,7 @@ MISTRAL_EXTRACT_MODELS = [
 # --- All Extract Handles ------------------------------------------------------------------------
 ALL_EXTRACT_HANDLES = [
     *INTERNAL_EXTRACT_MODELS,
-    # *MISTRAL_EXTRACT_MODELS,
+    *MISTRAL_EXTRACT_MODELS,
 ]
 
 ALL_EXTRACT_HANDLES_FROM_IMAGE = [
