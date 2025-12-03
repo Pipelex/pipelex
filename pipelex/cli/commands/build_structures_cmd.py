@@ -67,48 +67,70 @@ async def build_structures_cmd(
                 continue
 
             for concept_code, concept_blueprint in blueprint.concept.items():
+                # Check if a custom structure class already exists for this concept
+                # If so, skip generation - the user has manually created it
+                if Concept.is_valid_structure_class(structure_class_name=concept_code):
+                    # Structure class already exists in registry, don't generate
+                    continue
+
+                # Handle simple string concept definitions (description only, refines Text by default)
                 if isinstance(concept_blueprint, str):
+                    # String concept definition means: description=string, refines=Text
+                    # Generate a class that inherits from TextContent
+                    try:
+                        generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                            class_name=concept_code,
+                            structure_blueprint={},  # Empty structure - just inherits from TextContent
+                            base_class_name="TextContent",
+                        )
+                    except ConceptStructureGeneratorError as exc:
+                        msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
+                        raise PipelexError(msg) from exc
+
+                    # Write generated structure to file: domain_conceptCode.py
+                    output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
+
+                    # If file exists and has autogen markers, merge with existing custom code
+                    if output_file.exists():
+                        existing_content = output_file.read_text()
+                        if CodeMerger.has_autogen_markers(existing_content):
+                            generated_code = CodeMerger.merge_with_existing(generated_code, existing_content)
+
+                    output_file.write_text(generated_code)
+                    generated_files.append((blueprint.domain, concept_code))
                     continue
 
                 # Handle concepts with explicit structure definition
                 if concept_blueprint.structure:
                     if isinstance(concept_blueprint.structure, str):
-                        # Structure is defined as a string - check if the class is in the registry and is valid
-                        if not Concept.is_valid_structure_class(structure_class_name=concept_blueprint.structure):
-                            msg = (
-                                f"Structure class '{concept_blueprint.structure}' set for concept '{concept_code}' in domain '{blueprint.domain}' "
-                                "is not a registered subclass of StuffContent"
-                            )
-                            raise PipelexError(msg)
-                    else:
-                        # Structure is defined as a ConceptStructureBlueprint - run the structure generator
-                        # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
-                        normalized_structure = ConceptFactory.normalize_structure_blueprint(concept_blueprint.structure)
+                        # Structure is defined as a string reference to existing class - skip generation
+                        continue
+                    # Structure is defined as a ConceptStructureBlueprint - run the structure generator
+                    # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
+                    normalized_structure = ConceptFactory.normalize_structure_blueprint(concept_blueprint.structure)
 
-                        try:
-                            generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
-                                class_name=concept_code,
-                                structure_blueprint=normalized_structure,
-                            )
-                        except ConceptStructureGeneratorError as exc:
-                            msg = (
-                                f"Error generating python code for structure class of concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
-                            )
-                            raise PipelexError(
-                                msg,
-                            ) from exc
+                    try:
+                        generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                            class_name=concept_code,
+                            structure_blueprint=normalized_structure,
+                        )
+                    except ConceptStructureGeneratorError as exc:
+                        msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
+                        raise PipelexError(
+                            msg,
+                        ) from exc
 
-                        # Write generated structure to file: domain_conceptCode.py
-                        output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
+                    # Write generated structure to file: domain_conceptCode.py
+                    output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
 
-                        # If file exists and has autogen markers, merge with existing custom code
-                        if output_file.exists():
-                            existing_content = output_file.read_text()
-                            if CodeMerger.has_autogen_markers(existing_content):
-                                generated_code = CodeMerger.merge_with_existing(generated_code, existing_content)
+                    # If file exists and has autogen markers, merge with existing custom code
+                    if output_file.exists():
+                        existing_content = output_file.read_text()
+                        if CodeMerger.has_autogen_markers(existing_content):
+                            generated_code = CodeMerger.merge_with_existing(generated_code, existing_content)
 
-                        output_file.write_text(generated_code)
-                        generated_files.append((blueprint.domain, concept_code))
+                    output_file.write_text(generated_code)
+                    generated_files.append((blueprint.domain, concept_code))
 
                 # Handle concepts with refines - generate a class that inherits from the refined structure
                 elif concept_blueprint.refines:
