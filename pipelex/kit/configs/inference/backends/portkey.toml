@@ -1,0 +1,272 @@
+################################################################################
+# Portkey Configuration
+################################################################################
+#
+# This file defines the model specifications for the Portkey backend.
+# It contains model definitions for various AI models.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["gpt-4.1"])
+# - Model costs are in USD per million tokens (input/output)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "portkey_completions"
+structure_method = "instructor/openai_tools"
+prompting_target = "anthropic"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- OpenAI LLMs --------------------------------------------------------------
+[gpt-4o-mini]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.6 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+[gpt-4o]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10.0 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+["gpt-4.1-nano"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+["gpt-4.1-mini"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.6 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+["gpt-4.1"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+[o1]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 15.0, output = 60.0 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+[o3-mini]
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+[o3]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+[o4-mini]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+[gpt-5-nano]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.4 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+[gpt-5-mini]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 2.0 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+[gpt-5]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+["gpt-5.1"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+["gpt-5.1-codex"]
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+sdk = "portkey_responses"
+structure_method = "instructor/openai_responses_tools"
+x-portkey-provider = "@openai"
+
+# --- Claude LLMs --------------------------------------------------------------
+[claude-3-haiku]
+model_id = "claude-3-haiku-20240307"
+max_tokens = 4096
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 0.25, output = 1.25 }
+x-portkey-provider = "@anthropic"
+
+[claude-3-opus]
+model_id = "claude-3-opus-20240229"
+max_tokens = 4096
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 15.0, output = 75.0 }
+x-portkey-provider = "@anthropic"
+
+["claude-3.7-sonnet"]
+model_id = "claude-3-7-sonnet-20250219"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+x-portkey-provider = "@anthropic"
+
+[claude-4-sonnet]
+model_id = "claude-sonnet-4-20250514"
+max_tokens = 64000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+x-portkey-provider = "@anthropic"
+
+[claude-4-opus]
+model_id = "claude-opus-4-20250514"
+max_tokens = 32000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+x-portkey-provider = "@anthropic"
+
+["claude-4.1-opus"]
+model_id = "claude-opus-4-1-20250805"
+max_tokens = 32000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+x-portkey-provider = "@anthropic"
+
+["claude-4.5-sonnet"]
+model_id = "claude-sonnet-4-5-20250929"
+max_tokens = 64000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 3.0, output = 15.0 }
+x-portkey-provider = "@anthropic"
+
+["claude-4.5-haiku"]
+model_id = "claude-haiku-4-5-20251001"
+max_tokens = 64000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 1.0, output = 5.0 }
+x-portkey-provider = "@anthropic"
+
+["claude-4.5-opus"]
+model_id = "claude-opus-4-5-20251101"
+max_tokens = 64000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+x-portkey-provider = "@anthropic"
+
+# --- Gemini LLMs --------------------------------------------------------------
+["gemini-2.0-flash"]
+model_id = "gemini-2.0-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.10, output = 0.40 }
+x-portkey-provider = "@google"
+
+["gemini-2.5-pro"]
+model_id = "gemini-2.5-pro"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 1.25, output = 10.0 }
+x-portkey-provider = "@google"
+
+["gemini-2.5-flash"]
+model_id = "gemini-2.5-flash"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.30, output = 2.50 }
+x-portkey-provider = "@google"
+
+["gemini-2.5-flash-lite"]
+model_id = "gemini-2.5-flash-lite"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.10, output = 0.40 }
+x-portkey-provider = "@google"
+
+["gemini-3.0-pro"]
+model_id = "gemini-3-pro-preview"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 2, output = 12.0 }
+x-portkey-provider = "@google"

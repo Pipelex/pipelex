@@ -98,6 +98,10 @@ default = "openai"
 description = "Use Portkey backend for all its supported models"
 default = "portkey"
 
+[profiles.all_scaleway]
+description = "Use Scaleway backend for all its supported models"
+default = "scaleway"
+
 [profiles.all_xai]
 description = "Use xAI backend for all its supported models"
 default = "xai"

@@ -74,6 +74,12 @@ enabled = true
 endpoint = "https://api.portkey.ai/v1"
 api_key = "${PORTKEY_API_KEY}"
 
+[scaleway]
+display_name = "Scaleway"
+enabled = true
+endpoint = "${SCALEWAY_ENDPOINT}"
+api_key = "${SCALEWAY_API_KEY}"
+
 [vertexai]
 display_name = "Google Vertex AI"
 enabled = false                                            # This is the only one we disable beacuse setting it up requires internet access just to get credentials so it fails in CI sandboxes
