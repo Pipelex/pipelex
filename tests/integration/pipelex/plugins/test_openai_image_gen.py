@@ -2,7 +2,7 @@ import pytest
 
 from pipelex.cogt.exceptions import ImgGenGenerationError
 from pipelex.hub import get_models_manager
-from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.misc.base_64_utils import save_base_64_str_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
@@ -20,7 +20,7 @@ class TestImgGenByOpenAIGpt:
         if not is_backend_available("openai"):
             pytest.skip("Backend 'openai' is not available or enabled")
         backend = get_models_manager().get_required_inference_backend("openai")
-        client = OpenAIFactory.make_openai_client(
+        client = OpenAICompletionsFactory.make_openai_client(
             Plugin(sdk="openai", backend="openai"),
             backend=backend,
         )

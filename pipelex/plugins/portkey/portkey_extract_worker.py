@@ -14,8 +14,8 @@ from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
+from pipelex.plugins.portkey.portkey_completions_factory import PortkeyCompletionsFactory
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
-from pipelex.plugins.portkey.portkey_factory import PortkeyFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_async
 from pipelex.types import StrEnum
@@ -129,7 +129,7 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
-        return PortkeyFactory.make_extract_output_from_portkey_response(
+        return PortkeyCompletionsFactory.make_extract_output_from_portkey_response(
             response=response,
         )
 

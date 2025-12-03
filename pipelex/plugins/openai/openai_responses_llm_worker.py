@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-    from pipelex.plugins.openai_responses.openai_responses_factory import OpenAIResponsesFactory
+    from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
     from pipelex.reporting.reporting_protocol import ReportingProtocol
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 

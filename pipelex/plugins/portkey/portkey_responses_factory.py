@@ -13,8 +13,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.hub import get_telemetry_manager
-from pipelex.plugins.openai.openai_factory import OpenAIFactoryError
-from pipelex.plugins.openai.openai_factory_alt import OpenAIFactoryAlt
+from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey, PortkeyOpenAISdkVariant
 from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError, PortkeyFactoryError
 
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
-class PortkeyFactory(OpenAIFactoryAlt):
+class PortkeyResponsesFactory(OpenAIResponsesFactory):
     @classmethod
     def _is_debug_enabled(cls, backend: InferenceBackend) -> bool:
         is_debug_configured = backend.extra_config.get("debug", False)
@@ -60,7 +59,7 @@ class PortkeyFactory(OpenAIFactoryAlt):
         )
 
     @classmethod
-    def make_portkey_openai_client(
+    def make_portkey_openai_client_for_responses(
         cls,
         plugin: Plugin,
         backend: InferenceBackend,
@@ -69,35 +68,18 @@ class PortkeyFactory(OpenAIFactoryAlt):
         endpoint = cls._get_endpoint(backend=backend)
         api_key = cls._get_api_key(backend=backend)
         log.verbose(f"Making AsyncOpenAI client with endpoint: {endpoint}, debug: {is_debug_enabled}")
+        if not PortkeyOpenAISdkVariant.is_responses(plugin.sdk):
+            msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
+            raise PortkeyFactoryError(msg)
 
-        try:
-            sdk_variant = PortkeyOpenAISdkVariant(plugin.sdk)
-        except ValueError as exc:
-            msg = f"Plugin '{plugin}' is not supported by OpenAIFactory"
-            raise PortkeyFactoryError(msg) from exc
-
-        the_client: openai.AsyncOpenAI
-        match sdk_variant:
-            case PortkeyOpenAISdkVariant.PORTKEY_COMPLETIONS:
-                the_client = openai.AsyncOpenAI(
-                    base_url=endpoint,
-                    api_key="",
-                    default_headers=createHeaders(
-                        api_key=api_key,
-                        strict_open_ai_compliance=False,
-                        debug=is_debug_enabled,
-                    ),  # type: ignore[call-overload]
-                )
-            case PortkeyOpenAISdkVariant.PORTKEY_RESPONSES:
-                the_client = openai.AsyncOpenAI(
-                    base_url=endpoint,
-                    api_key="",
-                    default_headers=createHeaders(
-                        api_key=api_key,
-                        debug=is_debug_enabled,
-                    ),  # type: ignore[call-overload]
-                )
-        return the_client
+        return openai.AsyncOpenAI(
+            base_url=endpoint,
+            api_key="",
+            default_headers=createHeaders(
+                api_key=api_key,
+                debug=is_debug_enabled,
+            ),  # type: ignore[call-overload]
+        )
 
     @classmethod
     def make_extract_output_from_portkey_response(
@@ -154,7 +136,7 @@ class PortkeyFactory(OpenAIFactoryAlt):
         extra_headers[PortkeyHeaderKey.TRACE_ID] = llm_job.job_metadata.pipeline_run_id
         if not llm_job.job_metadata.unit_job_id:
             msg = f"Unit job id is not set for LLM job: {llm_job}"
-            raise OpenAIFactoryError(msg)
+            raise PortkeyFactoryError(msg)
         model_kind = llm_job.job_metadata.unit_job_id.model_kind
         span_id = f"{model_kind} -> {output_desc}"
         extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id

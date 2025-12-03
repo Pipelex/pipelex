@@ -27,16 +27,12 @@ from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, Prom
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.openai.openai_factory import OpenAIFactory
-from pipelex.plugins.openai.openai_factory_abstract import OpenAIFactoryAbstract
+from pipelex.plugins.openai.openai_utils import make_image_url_obj
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_path
 
 
 class MistralFactory:
-    def __init__(self, openai_factory: OpenAIFactoryAbstract | None = None):
-        self.openai_factory: OpenAIFactoryAbstract = openai_factory or OpenAIFactory()
-
     #########################################################
     # Client
     #########################################################
@@ -100,7 +96,7 @@ class MistralFactory:
 
         if user_images := llm_prompt.user_images:
             for prompt_image in user_images:
-                image_url_obj = await self.openai_factory.make_image_url_obj(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
+                image_url_obj = await make_image_url_obj(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
                 image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)
 

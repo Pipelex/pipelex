@@ -141,7 +141,7 @@ valued_constraints = { fixed_temperature = 1 }
 
 # --- OpenAI Image Generation --------------------------------------------------
 [gpt-image-1]
-sdk = "azure_rest"
+sdk = "azure_rest_img_gen"
 model_type = "img_gen"
 model_id = "gpt-image-1-2025-04-15"
 inputs = ["text"]

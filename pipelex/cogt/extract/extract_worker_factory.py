@@ -20,12 +20,12 @@ class ExtractWorkerFactory:
         extract_worker: ExtractWorkerAbstract
         match plugin.sdk:
             case "portkey_extract":
+                from pipelex.plugins.portkey.portkey_completions_factory import PortkeyCompletionsFactory  # noqa: PLC0415
                 from pipelex.plugins.portkey.portkey_extract_worker import PortkeyExtractWorker  # noqa: PLC0415
-                from pipelex.plugins.portkey.portkey_factory import PortkeyFactory  # noqa: PLC0415
 
                 extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=PortkeyFactory.make_portkey_client(backend=backend),
+                    sdk_instance=PortkeyCompletionsFactory.make_portkey_client(backend=backend),
                 )
 
                 extract_worker = PortkeyExtractWorker(

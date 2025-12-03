@@ -1,7 +1,7 @@
 from openai.types import Model
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
-from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
@@ -9,7 +9,7 @@ async def openai_list_available_models(
     plugin: Plugin,
     backend: InferenceBackend,
 ) -> list[Model]:
-    openai_client_async = OpenAIFactory.make_openai_client(
+    openai_client_async = OpenAICompletionsFactory.make_openai_client(
         plugin=plugin,
         backend=backend,
     )

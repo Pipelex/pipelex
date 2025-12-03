@@ -2,15 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from openai.types.chat import (
-    ChatCompletionContentPartImageParam,
-    ChatCompletionContentPartParam,
-    ChatCompletionContentPartTextParam,
-    ChatCompletionMessageParam,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-)
-from openai.types.chat.chat_completion_content_part_image_param import ImageURL
+from openai.types.responses import ResponseInputImageParam
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMPromptParameterError
@@ -19,30 +11,27 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
 
 if TYPE_CHECKING:
     import openai
     from openai.types.responses import (
-        ResponseInputImageParam,
         ResponseInputItemParam,
         ResponseInputMessageContentListParam,
         ResponseInputTextParam,
         ResponseUsage,
     )
 
-    from pipelex.cogt.image.prompt_image import PromptImage
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
-    from pipelex.plugins.openai.openai_factory_abstract import OpenAIFactoryAbstract
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 class OpenAIResponsesFactory(PluginFactoryAbstract):
-    def __init__(self, is_http_url_enabled: bool, openai_factory: OpenAIFactoryAbstract | None = None):
+    def __init__(self, is_http_url_enabled: bool):
+        super().__init__()
         self.is_http_url_enabled = is_http_url_enabled
-        self.openai_factory: OpenAIFactoryAbstract = openai_factory or OpenAIFactory(is_http_url_enabled=is_http_url_enabled)
 
     @classmethod
     def make_openai_client(
@@ -50,7 +39,7 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
         plugin: Plugin,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
-        return OpenAIFactory.make_openai_client(
+        return OpenAICompletionsFactory.make_openai_client(
             plugin=plugin,
             backend=backend,
         )
@@ -112,4 +101,4 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
 
     @override
     def make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
-        return self.openai_factory.make_extra_headers(llm_job=llm_job, output_desc=output_desc)
+        return {}

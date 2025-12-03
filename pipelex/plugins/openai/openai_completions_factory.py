@@ -12,16 +12,15 @@ from openai.types.completion_usage import CompletionUsage
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMPromptParameterError
-from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageDetail, PromptImagePath, PromptImageTypedBase64, PromptImageUrl
+from pipelex.cogt.exceptions import CogtError
+from pipelex.cogt.image.prompt_image import PromptImageDetail, PromptImageTypedBase64
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.openai.openai_factory_abstract import OpenAIFactoryAbstract
+from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
 from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from pipelex.types import StrEnum
 
 
@@ -41,7 +40,7 @@ class AzureExtraField(StrEnum):
     API_VERSION = "api_version"
 
 
-class OpenAIFactory(OpenAIFactoryAbstract):
+class OpenAICompletionsFactory(PluginFactoryAbstract):
     def __init__(self, is_http_url_enabled: bool):
         super().__init__()
         self.is_http_url_enabled = is_http_url_enabled
@@ -55,7 +54,7 @@ class OpenAIFactory(OpenAIFactoryAbstract):
         try:
             sdk_variant = OpenAISdkVariant(plugin.sdk)
         except ValueError as exc:
-            msg = f"Plugin '{plugin}' is not supported by OpenAIFactory"
+            msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
             raise OpenAIFactoryError(msg) from exc
 
         # We have a workaround here:
@@ -91,8 +90,6 @@ class OpenAIFactory(OpenAIFactoryAbstract):
 
         return the_client
 
-    @override
-    @override
     async def make_simple_messages(
         self,
         llm_job: LLMJob,
@@ -125,26 +122,6 @@ class OpenAIFactory(OpenAIFactoryAbstract):
         messages.append(ChatCompletionUserMessageParam(role="user", content=user_contents))
         return messages
 
-    @override
-    async def make_image_url_obj(self, prompt_image: PromptImage, detail: PromptImageDetail | None) -> ImageURL:
-        if detail is None:
-            detail = PromptImageDetail.AUTO
-        if isinstance(prompt_image, PromptImageUrl):
-            url = prompt_image.url
-            image_url_obj = ImageURL(url=url, detail=detail.as_openai_detail)
-        elif isinstance(prompt_image, PromptImageBase64):
-            # TODO: manage image type
-            url_with_bytes: str = f"data:image/jpeg;base64,{prompt_image.base_64.decode('utf-8')}"
-            image_url_obj = ImageURL(url=url_with_bytes, detail=detail.as_openai_detail)
-        elif isinstance(prompt_image, PromptImagePath):
-            image_bytes = load_binary_as_base64(path=prompt_image.file_path)
-            return await self.make_image_url_obj(prompt_image=PromptImageBase64(base_64=image_bytes), detail=detail)
-        else:
-            msg = f"prompt_image of type {type(prompt_image)} is not supported"
-            raise LLMPromptParameterError(msg)
-        return image_url_obj
-
-    @override
     def make_nb_tokens_by_category(self, usage: CompletionUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
             TokenCategory.INPUT: usage.prompt_tokens,
@@ -159,3 +136,7 @@ class OpenAIFactory(OpenAIFactoryAbstract):
             nb_tokens_by_category[TokenCategory.OUTPUT_ACCEPTED_PREDICTION] = completion_tokens_details.accepted_prediction_tokens or 0
             nb_tokens_by_category[TokenCategory.OUTPUT_REJECTED_PREDICTION] = completion_tokens_details.rejected_prediction_tokens or 0
         return nb_tokens_by_category
+
+    @override
+    def make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
+        return {}

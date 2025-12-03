@@ -163,6 +163,7 @@ costs = { input = 1.25, output = 10.0 }
 
 # --- OpenAI Image Generation --------------------------------------------------
 [gpt-image-1]
+sdk = "openai_img_gen"
 model_type = "img_gen"
 model_id = "gpt-image-1"
 inputs = ["text"]
