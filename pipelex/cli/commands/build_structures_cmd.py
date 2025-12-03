@@ -204,6 +204,31 @@ async def build_structures_cmd(
                     output_file.write_text(generated_code)
                     generated_files.append((blueprint.domain, concept_code))
 
+                # Handle concepts with neither structure nor refines - defaults to TextContent
+                else:
+                    # No structure or refines specified - generate a class that inherits from TextContent
+                    try:
+                        generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                            class_name=concept_code,
+                            structure_blueprint={},  # Empty structure - just inherits from TextContent
+                            base_class_name="TextContent",
+                        )
+                    except ConceptStructureGeneratorError as exc:
+                        msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
+                        raise PipelexError(msg) from exc
+
+                    # Write generated structure to file: domain_conceptCode.py
+                    output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
+
+                    # If file exists and has autogen markers, merge with existing custom code
+                    if output_file.exists():
+                        existing_content = output_file.read_text()
+                        if CodeMerger.has_autogen_markers(existing_content):
+                            generated_code = CodeMerger.merge_with_existing(generated_code, existing_content)
+
+                    output_file.write_text(generated_code)
+                    generated_files.append((blueprint.domain, concept_code))
+
         # Generate empty __init__.py to make structures importable
         if generated_files:
             init_file = output_directory / "__init__.py"
