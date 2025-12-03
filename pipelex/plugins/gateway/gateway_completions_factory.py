@@ -13,9 +13,9 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.hub import get_telemetry_manager
+from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant, PortkeyHeaderKey
+from pipelex.plugins.gateway.gateway_exceptions import PortkeyCredentialsError, PortkeyFactoryError
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
-from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey, PortkeyOpenAISdkVariant
-from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError, PortkeyFactoryError
 
 if TYPE_CHECKING:
     from portkey_ai.api_resources.utils import GenericResponse
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
-class PortkeyCompletionsFactory(OpenAICompletionsFactory):
+class GatewayCompletionsFactory(OpenAICompletionsFactory):
     @classmethod
     def _is_debug_enabled(cls, backend: InferenceBackend) -> bool:
         is_debug_configured = backend.extra_config.get("debug", False)
@@ -69,7 +69,7 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
         api_key = cls._get_api_key(backend=backend)
         log.verbose(f"Making AsyncOpenAI client with endpoint: {endpoint}, debug: {is_debug_enabled}")
 
-        if not PortkeyOpenAISdkVariant.is_completions(plugin.sdk):
+        if not GatewayOpenAISdkVariant.is_completions(plugin.sdk):
             msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
             raise PortkeyFactoryError(msg)
 

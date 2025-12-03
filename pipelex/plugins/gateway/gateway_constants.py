@@ -8,14 +8,9 @@ class PortkeyHeaderKey(StrEnum):
     CONFIG = "x-portkey-config"
 
 
-class PortkeyEnvVar(StrEnum):
-    FORCE_PORTKEY_DEBUG = "FORCE_PORTKEY_DEBUG"
-    FORCE_PORTKEY_TRACING = "FORCE_PORTKEY_TRACING"
-
-
-class PortkeyOpenAISdkVariant(StrEnum):
-    PORTKEY_COMPLETIONS = "portkey_completions"
-    PORTKEY_RESPONSES = "portkey_responses"
+class GatewayOpenAISdkVariant(StrEnum):
+    GATEWAY_COMPLETIONS = "gateway_completions"
+    GATEWAY_RESPONSES = "gateway_responses"
 
     @classmethod
     def is_completions(cls, sdk: str) -> bool:
@@ -24,9 +19,9 @@ class PortkeyOpenAISdkVariant(StrEnum):
         except ValueError:
             return False
         match variant:
-            case cls.PORTKEY_COMPLETIONS:
+            case cls.GATEWAY_COMPLETIONS:
                 return True
-            case cls.PORTKEY_RESPONSES:
+            case cls.GATEWAY_RESPONSES:
                 return False
 
     @classmethod
@@ -36,7 +31,7 @@ class PortkeyOpenAISdkVariant(StrEnum):
         except ValueError:
             return False
         match variant:
-            case cls.PORTKEY_COMPLETIONS:
+            case cls.GATEWAY_COMPLETIONS:
                 return False
-            case cls.PORTKEY_RESPONSES:
+            case cls.GATEWAY_RESPONSES:
                 return True

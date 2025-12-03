@@ -18,7 +18,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_to
 # ================================================================================================
 
 ALL_BACKENDS = [
-    # PipelexBackend.GATEWAY,
+    PipelexBackend.GATEWAY,
     # "anthropic",
     # "azure_openai",
     # "bedrock",
@@ -29,7 +29,7 @@ ALL_BACKENDS = [
     # "mistral",
     # "ollama",
     # "openai",
-    "portkey",
+    # "portkey",
     # "vertexai",
     # "xai",
     # "internal",

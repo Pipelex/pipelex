@@ -22,7 +22,7 @@
 
 [defaults]
 model_type = "llm"
-sdk = "portkey_completions"
+sdk = "gateway_completions"
 structure_method = "instructor/openai_tools"
 prompting_target = "anthropic"
 
@@ -36,7 +36,7 @@ model_id = "gpt-4o-mini-2024-07-18"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -45,7 +45,7 @@ model_id = "gpt-4o-2024-11-20"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 2.5, output = 10.0 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -54,7 +54,7 @@ model_id = "gpt-4.1-nano-2025-04-14"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -63,7 +63,7 @@ model_id = "gpt-4.1-mini-2025-04-14"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.4, output = 1.6 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -72,7 +72,7 @@ model_id = "gpt-4.1-2025-04-14"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -82,7 +82,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3.0, output = 12.0 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -92,7 +92,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 15.0, output = 60.0 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -102,7 +102,7 @@ inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -112,7 +112,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -122,7 +122,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -132,7 +132,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.4 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -142,7 +142,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.0 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -152,7 +152,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -162,7 +162,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -172,7 +172,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -182,7 +182,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 
@@ -192,7 +192,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
-sdk = "portkey_responses"
+sdk = "gateway_responses"
 structure_method = "instructor/openai_responses_tools"
 x-portkey-config = "pc-openai-ba0fa7"
 

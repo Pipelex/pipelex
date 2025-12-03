@@ -53,16 +53,16 @@ AMAZON_MODELS = [
 
 # --- Anthropic Models (Claude) ------------------------------------------------------------------
 ANTHROPIC_MODELS = [
-    "claude-3-haiku",
-    "claude-3-opus",
-    "claude-3.7-sonnet",
-    "claude-4-opus",
-    "claude-4-sonnet",
-    "claude-4.1-opus",
+    # "claude-3-haiku",
+    # "claude-3-opus",
+    # "claude-3.7-sonnet",
+    # "claude-4-opus",
+    # "claude-4-sonnet",
+    # "claude-4.1-opus",
     "claude-4.5-haiku",
-    "claude-4.5-sonnet",
-    "claude-opus-4",
-    "claude-4.5-opus",
+    # "claude-4.5-sonnet",
+    # "claude-opus-4",
+    # "claude-4.5-opus",
 ]
 
 # --- DeepSeek Models ----------------------------------------------------------------------------
@@ -74,12 +74,12 @@ DEEPSEEK_MODELS = [
 
 # --- Google Models (Gemini) ---------------------------------------------------------------------
 GOOGLE_MODELS = [
-    "gemini-flash-1.5-8b",
-    "gemini-2.0-flash",
+    # "gemini-flash-1.5-8b",
+    # "gemini-2.0-flash",
     "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-pro",
-    "gemini-3.0-pro",
+    # "gemini-2.5-flash-lite",
+    # "gemini-2.5-pro",
+    # "gemini-3.0-pro",
 ]
 
 # --- Groq Models --------------------------------------------------------------------------------
@@ -127,22 +127,22 @@ MOONSHOTAI_MODELS = [
 # --- OpenAI Models ------------------------------------------------------------------------------
 OPENAI_MODELS = [
     "gpt-4o-mini",
-    "gpt-4o",
-    "gpt-4.1-nano",
-    "gpt-4.1-mini",
-    "gpt-4.1",
-    "o1-mini",
-    "o1",
-    "o3-mini",
-    "o3",
-    "o4-mini",
-    "gpt-5-nano",
-    "gpt-5-mini",
-    "gpt-5-chat",
-    "gpt-5",
-    "gpt-5.1-chat",
-    "gpt-5.1",
-    "gpt-5.1-codex",
+    # "gpt-4o",
+    # "gpt-4.1-nano",
+    # "gpt-4.1-mini",
+    # "gpt-4.1",
+    # "o1-mini",
+    # "o1",
+    # "o3-mini",
+    # "o3",
+    # "o4-mini",
+    # "gpt-5-nano",
+    # "gpt-5-mini",
+    # "gpt-5-chat",
+    # "gpt-5",
+    # "gpt-5.1-chat",
+    # "gpt-5.1",
+    # "gpt-5.1-codex",
 ]
 
 # --- OpenAI OSS Models --------------------------------------------------------------------------
@@ -173,18 +173,18 @@ XAI_MODELS = [
 
 # --- All LLM Handles ----------------------------------------------------------------------------
 ALL_LLM_HANDLES = [
-    *AMAZON_MODELS,
+    # *AMAZON_MODELS,
     *ANTHROPIC_MODELS,
-    *DEEPSEEK_MODELS,
+    # *DEEPSEEK_MODELS,
     *GOOGLE_MODELS,
-    *GROQ_MODELS,
-    *META_MODELS,
-    *MISTRALAI_MODELS,
-    *MOONSHOTAI_MODELS,
+    # *GROQ_MODELS,
+    # *META_MODELS,
+    # *MISTRALAI_MODELS,
+    # *MOONSHOTAI_MODELS,
     *OPENAI_MODELS,
-    *OPENAI_OSS_MODELS,
-    *QWEN_MODELS,
-    *XAI_MODELS,
+    # *OPENAI_OSS_MODELS,
+    # *QWEN_MODELS,
+    # *XAI_MODELS,
 ]
 
 
