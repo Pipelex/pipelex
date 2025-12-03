@@ -13,7 +13,9 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMPromptParameterError
-from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageDetail, PromptImagePath, PromptImageUrl
+from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageDetail, PromptImagePath, PromptImageTypedBase64, PromptImageUrl
+from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
@@ -40,6 +42,10 @@ class AzureExtraField(StrEnum):
 
 
 class OpenAIFactory(OpenAIFactoryAbstract):
+    def __init__(self, is_http_url_enabled: bool):
+        super().__init__()
+        self.is_http_url_enabled = is_http_url_enabled
+
     @classmethod
     def make_openai_client(
         cls,
@@ -86,6 +92,7 @@ class OpenAIFactory(OpenAIFactoryAbstract):
         return the_client
 
     @override
+    @override
     async def make_simple_messages(
         self,
         llm_job: LLMJob,
@@ -102,8 +109,16 @@ class OpenAIFactory(OpenAIFactoryAbstract):
             user_part_text = ChatCompletionContentPartTextParam(text=user_prompt_text, type="text")
             user_contents.append(user_part_text)
         if llm_prompt.user_images:
-            for prompt_image in llm_prompt.user_images:
-                image_url_obj = await self.make_image_url_obj(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
+            detail = llm_job.job_params.image_detail or PromptImageDetail.AUTO
+            prepped_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=self.is_http_url_enabled)
+            for prepped_image in prepped_images:
+                if isinstance(prepped_image, str):
+                    url = prepped_image
+                else:
+                    assert isinstance(prepped_image, PromptImageTypedBase64)
+                    url = PromptImageFactory.make_base_64_url_from_prompt_image_typed_base64(prompt_image=prepped_image)
+
+                image_url_obj = ImageURL(url=url, detail=detail.as_openai_detail)
                 image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)
 
