@@ -16,6 +16,7 @@ class OpenAISdkVariant(StrEnum):
     AZURE_OPENAI_RESPONSES = "azure_openai_responses"
     OPENAI = "openai"
     OPENAI_RESPONSES = "openai_responses"
+    OPENAI_IMG_GEN = "openai_img_gen"
     OPENAI_ALT_IMG_GEN = "openai_alt_img_gen"
 
 
@@ -54,13 +55,7 @@ class OpenAIClientFactory:
                     api_key=api_key,
                     api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
                 )
-            case OpenAISdkVariant.OPENAI | OpenAISdkVariant.OPENAI_RESPONSES:
-                log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
-                the_client = openai.AsyncOpenAI(
-                    api_key=api_key,
-                    base_url=backend.endpoint,
-                )
-            case OpenAISdkVariant.OPENAI_ALT_IMG_GEN:
+            case OpenAISdkVariant.OPENAI | OpenAISdkVariant.OPENAI_RESPONSES | OpenAISdkVariant.OPENAI_IMG_GEN | OpenAISdkVariant.OPENAI_ALT_IMG_GEN:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=api_key,
