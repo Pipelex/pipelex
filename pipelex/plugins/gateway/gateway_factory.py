@@ -13,7 +13,6 @@ from pipelex.plugins.gateway.gateway_exceptions import PortkeyCredentialsError
 from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
 
 if TYPE_CHECKING:
-
     from pipelex.cogt.model_backends.backend import InferenceBackend
 
 
