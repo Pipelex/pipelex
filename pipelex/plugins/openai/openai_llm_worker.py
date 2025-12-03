@@ -71,7 +71,9 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         messages = await self.openai_factory.make_simple_messages(llm_job=llm_job)
 
         try:
-            extra_headers: dict[str, str] = self.inference_model.extra_headers or {}
+            extra_headers: dict[str, str] = {}
+            if self.inference_model.extra_headers:
+                extra_headers = self.inference_model.extra_headers.copy()
             extra_headers.update(self.openai_factory.make_extra_headers(llm_job=llm_job, output_desc="Text"))
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
@@ -112,7 +114,9 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         messages = await self.openai_factory.make_simple_messages(llm_job=llm_job)
         try:
             try:
-                extra_headers: dict[str, str] = self.inference_model.extra_headers or {}
+                extra_headers: dict[str, str] = {}
+                if self.inference_model.extra_headers:
+                    extra_headers = self.inference_model.extra_headers.copy()
                 extra_headers.update(self.openai_factory.make_extra_headers(llm_job=llm_job, output_desc=schema.__name__))
                 result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                     model=self.inference_model.model_id,

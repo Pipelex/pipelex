@@ -71,7 +71,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
         try:
-            extra_headers: dict[str, str] = self.inference_model.extra_headers or {}
+            extra_headers: dict[str, str] = {}
+            if self.inference_model.extra_headers:
+                extra_headers = self.inference_model.extra_headers.copy()
             extra_headers.update(self.openai_responses_factory.make_extra_headers(llm_job=llm_job, output_desc="Text"))
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
@@ -113,7 +115,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
                 raise LLMCompletionError(msg)
 
-            extra_headers: dict[str, str] = self.inference_model.extra_headers or {}
+            extra_headers: dict[str, str] = {}
+            if self.inference_model.extra_headers:
+                extra_headers = self.inference_model.extra_headers.copy()
             extra_headers.update(self.openai_responses_factory.make_extra_headers(llm_job=llm_job, output_desc=schema.__name__))
 
             input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)

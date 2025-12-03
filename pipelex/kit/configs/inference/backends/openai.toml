@@ -93,13 +93,6 @@ outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
 
 # --- o Series ----------------------------------------------------------------
-[o1-mini]
-model_id = "o1-mini"
-inputs = ["text"]
-outputs = ["text"]
-costs = { input = 3.0, output = 12.0 }
-valued_constraints = { fixed_temperature = 1 }
-
 [o1]
 model_id = "o1"
 inputs = ["text", "images"]
