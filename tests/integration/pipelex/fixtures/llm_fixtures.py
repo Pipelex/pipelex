@@ -62,7 +62,7 @@ ANTHROPIC_MODELS = [
     "claude-4.5-haiku",
     # "claude-4.5-sonnet",
     # "claude-opus-4",
-    # "claude-4.5-opus",
+    "claude-4.5-opus",
 ]
 
 # --- DeepSeek Models ----------------------------------------------------------------------------

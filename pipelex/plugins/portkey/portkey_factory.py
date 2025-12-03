@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from portkey_ai import (
     PORTKEY_GATEWAY_URL,  # type: ignore[reportUnknownVariableType]
 )
 
-from pipelex import log
 from pipelex.hub import get_telemetry_manager
+from pipelex.plugins.openai.openai_constants import OpenAIBodyKey
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError, PortkeyFactoryError
 
@@ -35,15 +35,13 @@ class PortkeyFactory:
         return backend.api_key
 
     @classmethod
-    def make_extras(cls, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+    def make_extras(cls, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
         extra_headers: dict[str, str] = {}
+        extra_body: dict[str, Any] = {}
         if inference_model.extra_headers:
             extra_headers.update(inference_model.extra_headers)
         if not llm_job.job_params.max_tokens and inference_model.max_tokens:
-            log.debug(f"Setting max tokens for Portkey: {inference_model.max_tokens}")
-            extra_headers[PortkeyHeaderKey.MAX_TOKENS] = str(inference_model.max_tokens)
-        else:
-            log.debug(f"Max tokens for Portkey: {llm_job.job_params.max_tokens}")
+            extra_body[OpenAIBodyKey.MAX_TOKENS] = inference_model.max_tokens
         if get_telemetry_manager().is_portkey_tracing_enabled():
             if llm_job.job_metadata.pipe_job_ids:
                 last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]
@@ -57,4 +55,4 @@ class PortkeyFactory:
             span_id = f"{model_kind} -> {output_desc}"
             extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id
             extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{last_pipe_job_id}: {span_id}"
-        return extra_headers, {}
+        return extra_headers, extra_body

@@ -15,7 +15,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
-from pipelex.plugins.gateway.gateway_constants import PortkeyHeaderKey
+from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_async
 from pipelex.types import StrEnum

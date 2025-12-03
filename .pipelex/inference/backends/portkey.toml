@@ -159,7 +159,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 0.25, output = 1.25 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"
 
 [claude-3-opus]
@@ -169,7 +168,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 15.0, output = 75.0 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"
 
 ["claude-3.7-sonnet"]
@@ -179,7 +177,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"
 
 [claude-4-sonnet]
@@ -189,7 +186,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"
 
 [claude-4-opus]
@@ -199,7 +195,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.1-opus"]
@@ -209,7 +204,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-sonnet"]
@@ -219,7 +213,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-haiku"]
@@ -229,7 +222,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-opus"]
@@ -239,5 +231,4 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
-structure_method = "instructor/anthropic_tools"
 x-portkey-provider = "@anthropic"

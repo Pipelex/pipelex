@@ -94,5 +94,5 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         )
 
     @override
-    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
         return GatewayFactory.make_extras(inference_model=inference_model, llm_job=llm_job, output_desc=output_desc)

@@ -1,14 +1,6 @@
 from pipelex.types import StrEnum
 
 
-class PortkeyHeaderKey(StrEnum):
-    TRACE_ID = "x-portkey-trace-id"
-    SPAN_ID = "x-portkey-span-id"
-    SPAN_NAME = "x-portkey-span-name"
-    CONFIG = "x-portkey-config"
-    PROVIDER = "x-portkey-provider"
-
-
 class GatewayOpenAISdkVariant(StrEnum):
     GATEWAY_COMPLETIONS = "gateway_completions"
     GATEWAY_RESPONSES = "gateway_responses"

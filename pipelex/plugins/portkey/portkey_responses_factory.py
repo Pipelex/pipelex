@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import openai
 from portkey_ai import (
@@ -48,5 +48,5 @@ class PortkeyResponsesFactory(OpenAIResponsesFactory):
         )
 
     @override
-    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
         return PortkeyFactory.make_extras(inference_model=inference_model, llm_job=llm_job, output_desc=output_desc)

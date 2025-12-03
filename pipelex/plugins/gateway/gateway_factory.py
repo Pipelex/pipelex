@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from portkey_ai import (
     PORTKEY_GATEWAY_URL,
@@ -9,8 +9,8 @@ from portkey_ai import (
 
 from pipelex import log
 from pipelex.hub import get_telemetry_manager
-from pipelex.plugins.gateway.gateway_constants import PortkeyHeaderKey
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError, GatewayFactoryError
+from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -52,7 +52,7 @@ class GatewayFactory:
         )
 
     @classmethod
-    def make_extras(cls, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+    def make_extras(cls, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
         extra_headers: dict[str, str] = {}
         if inference_model.extra_headers:
             extra_headers.update(inference_model.extra_headers)

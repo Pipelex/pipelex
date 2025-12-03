@@ -1,3 +1,5 @@
+from typing import Any
+
 from openai.types.chat import (
     ChatCompletionContentPartImageParam,
     ChatCompletionContentPartParam,
@@ -72,5 +74,5 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
         return nb_tokens_by_category
 
     @override
-    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
         return inference_model.extra_headers or {}, {}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from openai.types.responses import ResponseInputImageParam
 from typing_extensions import override
@@ -76,5 +76,5 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
         return nb_tokens_by_category
 
     @override
-    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, str]]:
+    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
         return inference_model.extra_headers or {}, {}
