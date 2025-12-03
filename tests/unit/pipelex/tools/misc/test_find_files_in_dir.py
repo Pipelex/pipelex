@@ -447,3 +447,104 @@ class TestFindFilesInDir:
             # Empty include list should exclude all venv files
             assert len(files) == 1
             assert files[0].name == "file1.py"
+
+    def test_exclude_using_absolute_path_structures_directory(self):
+        """Test excluding structures directory using absolute path (build_structures_cmd use case)."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create Python files in library directory
+            (temp_path / "concept_a.py").write_text("# concept_a")
+            (temp_path / "concept_b.py").write_text("# concept_b")
+
+            # Create structures subdirectory with generated files (should be excluded)
+            structures_dir = temp_path / "structures"
+            structures_dir.mkdir()
+            (structures_dir / "__init__.py").write_text("")
+            (structures_dir / "domain_Generated1.py").write_text("# generated")
+            (structures_dir / "domain_Generated2.py").write_text("# generated")
+
+            # Exclude structures using its absolute path
+            result = find_files_in_dir(
+                str(temp_path),
+                "*.py",
+                is_recursive=True,
+                excluded_dirs=[str(structures_dir.resolve())],
+            )
+
+            # Should find only the manually-created files, not generated ones
+            assert len(result) == 2
+            result_names = [f.name for f in result]
+            assert "concept_a.py" in result_names
+            assert "concept_b.py" in result_names
+            # Verify no files from structures/ are included
+            assert not any("structures" in str(f) for f in result)
+
+    def test_exclude_absolute_path_with_trailing_slash(self):
+        """Test that absolute path exclusion works with or without trailing slash."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            (temp_path / "main.py").write_text("# main")
+
+            structures_dir = temp_path / "structures"
+            structures_dir.mkdir()
+            (structures_dir / "gen.py").write_text("# gen")
+
+            # Test with trailing slash
+            result_with_slash = find_files_in_dir(
+                str(temp_path),
+                "*.py",
+                is_recursive=True,
+                excluded_dirs=[str(structures_dir.resolve()) + "/"],
+            )
+
+            # Test without trailing slash
+            result_without_slash = find_files_in_dir(
+                str(temp_path),
+                "*.py",
+                is_recursive=True,
+                excluded_dirs=[str(structures_dir.resolve())],
+            )
+
+            # Both should produce same result
+            assert len(result_with_slash) == 1
+            assert len(result_without_slash) == 1
+            assert result_with_slash[0].name == "main.py"
+            assert result_without_slash[0].name == "main.py"
+
+    def test_mixed_name_and_absolute_path_exclusions(self):
+        """Test mixing directory name and absolute path exclusions."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            (temp_path / "main.py").write_text("# main")
+
+            # Exclude by name
+            venv_dir = temp_path / ".venv"
+            venv_dir.mkdir()
+            (venv_dir / "venv.py").write_text("# venv")
+
+            # Exclude by absolute path
+            structures_dir = temp_path / "structures"
+            structures_dir.mkdir()
+            (structures_dir / "gen.py").write_text("# gen")
+
+            # Regular directory
+            src_dir = temp_path / "src"
+            src_dir.mkdir()
+            (src_dir / "code.py").write_text("# code")
+
+            result = find_files_in_dir(
+                str(temp_path),
+                "*.py",
+                is_recursive=True,
+                excluded_dirs=[".venv", str(structures_dir.resolve())],
+            )
+
+            assert len(result) == 2
+            result_names = [f.name for f in result]
+            assert "main.py" in result_names
+            assert "code.py" in result_names
+            assert "venv.py" not in result_names
+            assert "gen.py" not in result_names

@@ -2,15 +2,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
+from kajson.kajson_manager import KajsonManager
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.structure_generation.code_merger import CodeMerger
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.validate_bundle import validate_bundles_from_directory
+from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.runtime import IntegrationMode
 
 if TYPE_CHECKING:
@@ -56,6 +58,20 @@ async def build_structures_cmd(
 
         typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
 
+        # Reload class registry to detect manually-created structure classes
+        # This ensures we don't regenerate classes that users have manually created
+        class_registry = KajsonManager.get_class_registry()
+        class_registry.teardown()
+        class_registry.setup()
+        ClassRegistryUtils.register_classes_in_folder(
+            folder_path=str(target_path),
+            base_class=StructuredContent,
+            force_exclude_dirs=[str(output_directory.resolve())],
+        )
+
+        # Note: At this point, the registry contains manually-created classes from the library.
+        # We'll check has_class() for each concept to skip regenerating manual classes.
+
         # Track generated files
         generated_files: list[tuple[str, str]] = []  # (domain, concept_code)
 
@@ -67,10 +83,9 @@ async def build_structures_cmd(
                 continue
 
             for concept_code, concept_blueprint in blueprint.concept.items():
-                # Check if a custom structure class already exists for this concept
-                # If so, skip generation - the user has manually created it
-                if Concept.is_valid_structure_class(structure_class_name=concept_code):
-                    # Structure class already exists in registry, don't generate
+                # Check if structure class was manually created (exists in registry after setup but before structures/)
+                if class_registry.has_class(name=concept_code):
+                    # Manually-created structure class exists, skip generation
                     continue
 
                 # Handle simple string concept definitions (description only, refines Text by default)
