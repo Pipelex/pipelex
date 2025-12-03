@@ -18,7 +18,6 @@ from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlu
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from tests.cases import PDFTestCases
 from tests.integration.pipelex.test_data import PipeExtractTestCases
 
 
