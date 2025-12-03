@@ -386,7 +386,7 @@ max_tokens = 4096
 inputs = ["pdf", "image"]
 outputs = ["pages"]
 costs = { input = 0, output = 0 }     # TODO handle cost per page 3$/1K pages
-sdk = "portkey_extract"
+sdk = "gateway_extract"
 x-portkey-config = "pc-misdoc-b4ae47"
 
 

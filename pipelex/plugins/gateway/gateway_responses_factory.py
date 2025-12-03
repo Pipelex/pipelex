@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 import openai
 from portkey_ai import (
-    PORTKEY_GATEWAY_URL,
-    AsyncPortkey,
     createHeaders,  # type: ignore[reportUnknownVariableType]
 )
 from typing_extensions import override
@@ -14,7 +12,8 @@ from pipelex import log
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant, PortkeyHeaderKey
-from pipelex.plugins.gateway.gateway_exceptions import PortkeyCredentialsError, PortkeyFactoryError
+from pipelex.plugins.gateway.gateway_exceptions import PortkeyFactoryError
+from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
 
 if TYPE_CHECKING:
@@ -27,46 +26,14 @@ if TYPE_CHECKING:
 
 class GatewayResponsesFactory(OpenAIResponsesFactory):
     @classmethod
-    def _is_debug_enabled(cls, backend: InferenceBackend) -> bool:
-        is_debug_configured = backend.extra_config.get("debug", False)
-        return get_telemetry_manager().is_portkey_logging_enabled(is_debug_configured=is_debug_configured)
-
-    @classmethod
-    def _get_endpoint(cls, backend: InferenceBackend) -> str:
-        return backend.endpoint or PORTKEY_GATEWAY_URL
-
-    @classmethod
-    def _get_api_key(cls, backend: InferenceBackend) -> str:
-        if not backend.api_key:
-            msg = "Portkey API key is not set"
-            raise PortkeyCredentialsError(msg)
-        return backend.api_key
-
-    @classmethod
-    def make_portkey_client(
-        cls,
-        backend: InferenceBackend,
-    ) -> AsyncPortkey:
-        is_debug_enabled = cls._is_debug_enabled(backend=backend)
-        endpoint = cls._get_endpoint(backend=backend)
-        api_key = cls._get_api_key(backend=backend)
-        log.verbose(f"Making Portkey client with endpoint: {endpoint}, debug: {is_debug_enabled}")
-
-        return AsyncPortkey(
-            base_url=endpoint,
-            api_key=api_key,
-            debug=is_debug_enabled,
-        )
-
-    @classmethod
     def make_portkey_openai_client_for_responses(
         cls,
         plugin: Plugin,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
-        is_debug_enabled = cls._is_debug_enabled(backend=backend)
-        endpoint = cls._get_endpoint(backend=backend)
-        api_key = cls._get_api_key(backend=backend)
+        is_debug_enabled = GatewayFactory.is_debug_enabled(backend=backend)
+        endpoint = GatewayFactory.get_endpoint(backend=backend)
+        api_key = GatewayFactory.get_api_key(backend=backend)
         log.verbose(f"Making AsyncOpenAI client with endpoint: {endpoint}, debug: {is_debug_enabled}")
         if not GatewayOpenAISdkVariant.is_responses(plugin.sdk):
             msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
