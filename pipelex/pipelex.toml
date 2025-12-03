@@ -105,10 +105,10 @@ is_model_fallback_enabled = true
 missing_presets_reaction = "log"
 
 [cogt.tenacity_config]
-max_retries = 50
-wait_multiplier = 0.2
-wait_max = 20
-wait_exp_base = 1.3
+max_retries = 50      # Maximum number of retry attempts before giving up
+wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
+wait_max = 20         # Maximum wait time between retries (in seconds)
+wait_exp_base = 1.3   # Base for exponential backoff calculation
 
 [cogt.llm_config]
 default_max_images = 100

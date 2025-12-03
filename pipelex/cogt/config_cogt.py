@@ -46,10 +46,10 @@ class LLMConfig(ConfigModel):
 
 
 class TenacityConfig(ConfigModel):
-    max_retries: int = Field(..., ge=1, le=100)
-    wait_multiplier: float = Field(..., ge=0.1, le=10)
-    wait_max: float = Field(..., ge=0.1, le=20)
-    wait_exp_base: float = Field(..., ge=1.1, le=10)
+    max_retries: int = Field(..., ge=1, le=100, description="Maximum number of retry attempts before giving up")
+    wait_multiplier: float = Field(..., ge=0.1, le=10, description="Multiplier applied to the wait time between retries (in seconds)")
+    wait_max: float = Field(..., ge=0.1, le=20, description="Maximum wait time between retries (in seconds)")
+    wait_exp_base: float = Field(..., ge=1.1, le=10, description="Base for exponential backoff calculation")
 
 
 class Cogt(ConfigModel):
