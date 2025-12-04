@@ -7,7 +7,6 @@ from kajson.kajson_manager import KajsonManager
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.structure_generation.code_merger import CodeMerger
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -122,13 +121,6 @@ async def build_structures_cmd(
 
                     # Write generated structure to file: domain_conceptCode.py
                     output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
-
-                    # If file exists and has autogen markers, merge with existing custom code
-                    if output_file.exists():
-                        existing_content = output_file.read_text()
-                        if CodeMerger.has_autogen_markers(existing_content):
-                            generated_code = CodeMerger.merge_with_existing(generated_code, existing_content)
-
                     output_file.write_text(generated_code)
                     generated_files.append((blueprint.domain, concept_code))
                     continue
@@ -155,13 +147,6 @@ async def build_structures_cmd(
 
                     # Write generated structure to file: domain_conceptCode.py
                     output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
-
-                    # If file exists and has autogen markers, merge with existing custom code
-                    if output_file.exists():
-                        existing_content = output_file.read_text()
-                        if CodeMerger.has_autogen_markers(existing_content):
-                            generated_code = CodeMerger.merge_with_existing(generated_code, existing_content)
-
                     output_file.write_text(generated_code)
                     generated_files.append((blueprint.domain, concept_code))
 
@@ -194,13 +179,6 @@ async def build_structures_cmd(
 
                     # Write generated structure to file: domain_conceptCode.py
                     output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
-
-                    # If file exists and has autogen markers, merge with existing custom code
-                    if output_file.exists():
-                        existing_content = output_file.read_text()
-                        if CodeMerger.has_autogen_markers(existing_content):
-                            generated_code = CodeMerger.merge_with_existing(generated_code, existing_content)
-
                     output_file.write_text(generated_code)
                     generated_files.append((blueprint.domain, concept_code))
 
@@ -219,13 +197,6 @@ async def build_structures_cmd(
 
                     # Write generated structure to file: domain_conceptCode.py
                     output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
-
-                    # If file exists and has autogen markers, merge with existing custom code
-                    if output_file.exists():
-                        existing_content = output_file.read_text()
-                        if CodeMerger.has_autogen_markers(existing_content):
-                            generated_code = CodeMerger.merge_with_existing(generated_code, existing_content)
-
                     output_file.write_text(generated_code)
                     generated_files.append((blueprint.domain, concept_code))
 
