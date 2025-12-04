@@ -1,20 +1,65 @@
+from typing import cast
+
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
-from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import (
     ConceptFactoryError,
     ConceptRefineError,
     ConceptStringError,
 )
+from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
-from pipelex.core.concepts.validation import is_concept_code_valid, validate_concept_string_or_code
+from pipelex.core.concepts.validation import validate_concept_string_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.types import StrEnum
+
+
+class ConceptDeclarationType(StrEnum):
+    """Enum representing the 5 ways a concept can be declared in PLX files.
+
+    Option 1: STRING - Concept is defined as a string
+        Example:
+            [concept]
+            Concept1 = "Definition of Concept1"
+
+    Option 2: BASIC_BLUEPRINT - Concept is defined with a basic blueprint
+        Example:
+            [concept.Concept2]
+            description = "Definition of Concept2"
+
+    Option 3: REFINES - Concept refines another concept
+        Example:
+            [concept.Concept3]
+            description = "A concept3"
+            refines = "native.Text"
+
+    Option 4: STRUCTURE_WITH_CLASSNAME
+        Example:
+            [concept.Concept4]
+            description = "A concept4"
+            structure = "ExistingClassName"
+
+    Option 5: BLUEPRINT_WITH_STRUCTURE - Concept is defined with a blueprint and a structure
+        Example:
+            [concept.Concept5]
+            description = "A concept5"
+
+            [concept.Concept5.structure]
+            field1 = "A field1"
+            field2 = {type = "text", description = "A field2"}
+    """
+
+    STRING = "string"
+    BASIC_BLUEPRINT = "basic_blueprint"
+    REFINES = "refines"
+    STRUCTURE_WITH_CLASSNAME = "structure_with_classname"
+    BLUEPRINT_WITH_STRUCTURE = "blueprint_with_structure"
 
 
 class DomainAndConceptCode(BaseModel):
@@ -25,32 +70,6 @@ class DomainAndConceptCode(BaseModel):
 
 
 class ConceptFactory:
-    @classmethod
-    def normalize_structure_blueprint(cls, structure_dict: dict[str, str | ConceptStructureBlueprint]) -> dict[str, ConceptStructureBlueprint]:
-        """Convert a mixed structure dictionary to a proper ConceptStructureBlueprint dictionary.
-
-        Args:
-            structure_dict: Dictionary that may contain strings or ConceptStructureBlueprint objects
-
-        Returns:
-            Dictionary with all values as ConceptStructureBlueprint objects
-
-        """
-        normalized: dict[str, ConceptStructureBlueprint] = {}
-
-        for field_name, field_value in structure_dict.items():
-            if isinstance(field_value, str):
-                # Convert string definition to ConceptStructureBlueprint for text field
-                normalized[field_name] = ConceptStructureBlueprint(
-                    description=field_value,
-                    type=ConceptStructureBlueprintFieldType.TEXT,  # Explicitly set as text field
-                    required=True,  # Default for simple string definitions
-                )
-            else:
-                normalized[field_name] = field_value
-
-        return normalized
-
     @classmethod
     def make(cls, concept_code: str, domain: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
         return Concept(
@@ -137,10 +156,6 @@ class ConceptFactory:
                 )
 
     @classmethod
-    def make_all_native_concepts(cls) -> list[Concept]:
-        return [cls.make_native_concept(native_concept_code=native_concept) for native_concept in NativeConceptCode.values_list()]
-
-    @classmethod
     def make_domain_and_concept_code_from_concept_string_or_code(
         cls,
         concept_string_or_code: str,
@@ -204,117 +219,240 @@ class ConceptFactory:
         return NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
 
     @classmethod
-    def make_from_blueprint_or_description(
+    def _handle_structure_with_classname(
         cls,
-        domain: str,
+        blueprint: ConceptBlueprint,
         concept_code: str,
-        concept_blueprint_or_description: ConceptBlueprint | str,
-    ) -> Concept:
-        blueprint: ConceptBlueprint
-        if isinstance(concept_blueprint_or_description, str):
-            blueprint = ConceptBlueprint(description=concept_blueprint_or_description)
-        else:
-            blueprint = concept_blueprint_or_description
-        return cls.make_from_blueprint(
-            domain=domain,
-            concept_code=concept_code,
-            blueprint=blueprint,
-        )
+        domain: str,
+    ) -> str:
+        """Handle STRUCTURE_WITH_CLASSNAME declaration type.
+
+        Structure is defined as a string class name - check if the class is in the registry and is valid.
+
+        Returns:
+            The structure class name
+        """
+        structure_class_name = blueprint.structure
+        if not isinstance(structure_class_name, str):
+            msg = f"Expected structure to be a string, got {type(structure_class_name)}"
+            raise ConceptFactoryError(msg)
+        if not Concept.is_valid_structure_class(structure_class_name=structure_class_name):
+            msg = (
+                f"Structure class '{structure_class_name}' set for concept '{concept_code}' in domain '{domain}' "
+                "is not a registered subclass of StuffContent, or was not found in the library."
+            )
+            raise ConceptFactoryError(msg)
+        return structure_class_name
+
+    @classmethod
+    def _handle_blueprint_with_structure(
+        cls,
+        blueprint: ConceptBlueprint,
+        concept_code: str,
+        domain: str,
+    ) -> str:
+        """Handle BLUEPRINT_WITH_STRUCTURE declaration type.
+
+        Structure is defined as a ConceptStructureBlueprint dict - run the structure generator
+        and register it in the class registry.
+
+        Returns:
+            The structure class name (which is the concept_code)
+        """
+        if not isinstance(blueprint.structure, dict):
+            msg = f"Expected structure to be a dict, got {type(blueprint.structure)}"
+            raise ConceptFactoryError(msg)
+
+        # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
+        normalized_structure = normalize_structure_blueprint(blueprint.structure)
+
+        try:
+            _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+                class_name=concept_code,
+                structure_blueprint=normalized_structure,
+            )
+        except ConceptStructureGeneratorError as exc:
+            msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain}': {exc}"
+            raise ConceptFactoryError(msg) from exc
+
+        # Register the generated class
+        KajsonManager.get_class_registry().register_class(the_generated_class)
+
+        return concept_code
+
+    @classmethod
+    def _handle_basic_blueprint(
+        cls,
+        concept_code: str,
+        domain: str,
+    ) -> tuple[str, str | None]:
+        """Handle BASIC_BLUEPRINT declaration type.
+
+        Returns:
+            Tuple of (structure_class_name, refine_string)
+        """
+        # Generate a new class that inherits from TextContent and register it
+        # (unless a valid structure class already exists for this concept_code)
+        if Concept.is_valid_structure_class(structure_class_name=concept_code):
+            return concept_code, None
+
+        # Because native concepts have structure class names diffrent than other (with "Content")
+        if concept_code in NativeConceptCode.values_list():
+            return NativeConceptCode.TEXT.structure_class_name, NativeConceptCode.TEXT.concept_string
+        
+        try:
+            _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+                class_name=concept_code,
+                structure_blueprint={},
+                base_class_name=TextContent.__name__,
+            )
+        except ConceptStructureGeneratorError as exc:
+            msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain}': {exc}"
+            raise ConceptFactoryError(msg) from exc
+        # Register the generated class
+        KajsonManager.get_class_registry().register_class(the_generated_class)
+
+        return concept_code, NativeConceptCode.TEXT.concept_string
+
+    @classmethod
+    def _handle_refines(
+        cls,
+        blueprint: ConceptBlueprint,
+        concept_code: str,
+        domain: str,
+    ) -> tuple[str, str]:
+        """Handle REFINES declaration type.
+
+        Concept refines another concept - generate a new class that inherits from the refined
+        structure class.
+
+        Returns:
+            Tuple of (structure_class_name, refine_string)
+        """
+        if blueprint.refines is None:
+            msg = "Expected refines to be set"
+            raise ConceptFactoryError(msg)
+
+        try:
+            current_refine = cls.make_refine(refine=blueprint.refines)
+        except ConceptRefineError as exc:
+            msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain}': {exc}"
+            raise ConceptFactoryError(msg) from exc
+
+        # Get the refined concept's structure class name
+        refined_structure_class_name = current_refine.split(".")[1] + "Content"
+
+        # Generate a new class that inherits from the refined structure class
+        # This creates an empty class that can be extended with additional fields in the future
+        try:
+            _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+                class_name=concept_code,
+                structure_blueprint={},  # Empty structure - just inherits from refined class
+                base_class_name=refined_structure_class_name,
+            )
+        except ConceptStructureGeneratorError as exc:
+            msg = (
+                f"Error generating structure class for concept '{concept_code}' refining '{refined_structure_class_name}' in domain '{domain}': {exc}"
+            )
+            raise ConceptFactoryError(msg) from exc
+
+        # Register the generated class
+        KajsonManager.get_class_registry().register_class(the_generated_class)
+
+        return concept_code, current_refine
 
     @classmethod
     def make_from_blueprint(
         cls,
         domain: str,
         concept_code: str,
-        blueprint: ConceptBlueprint,
+        blueprint_or_string_description: ConceptBlueprint | str,
     ) -> Concept:
-        if not is_concept_code_valid(concept_code=concept_code):
-            msg = f"Concept code '{concept_code}' is not a valid concept code"
-            raise ConceptFactoryError(msg)
-        structure_class_name: str
-        current_refine: str | None = None
-
-        # Handle structure definition
-        if blueprint.structure:
-            if isinstance(blueprint.structure, str):
-                # Structure is defined as a string - check if the class is in the registry and is valid
-                if not Concept.is_valid_structure_class(structure_class_name=blueprint.structure):
-                    msg = (
-                        f"Structure class '{blueprint.structure}' set for concept '{concept_code}' in domain '{domain}' "
-                        "is not a registered subclass of StuffContent"
-                    )
-                    raise ConceptFactoryError(msg)
-                structure_class_name = blueprint.structure
+        # Determine declaration type
+        declaration_type: ConceptDeclarationType
+        if isinstance(blueprint_or_string_description, str):
+            declaration_type = ConceptDeclarationType.STRING
+        elif blueprint_or_string_description.structure is not None:
+            if isinstance(blueprint_or_string_description.structure, str):
+                declaration_type = ConceptDeclarationType.STRUCTURE_WITH_CLASSNAME
             else:
-                # Structure is defined as a ConceptStructureBlueprint - run the structure generator and put it in the class registry
-                # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
-                normalized_structure = cls.normalize_structure_blueprint(blueprint.structure)
-
-                try:
-                    _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
-                        class_name=concept_code,
-                        structure_blueprint=normalized_structure,
-                    )
-                except ConceptStructureGeneratorError as exc:
-                    msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain}': {exc}"
-                    raise ConceptFactoryError(
-                        msg,
-                    ) from exc
-
-                # Register the generated class
-                KajsonManager.get_class_registry().register_class(the_generated_class)
-
-                # The structure_class_name of the concept is the concept_code
-                structure_class_name = concept_code
-
-        # Handle refines definition
-        elif blueprint.refines:
-            try:
-                current_refine = cls.make_refine(refine=blueprint.refines)
-            except ConceptRefineError as exc:
-                msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain}': {exc}"
-                raise ConceptFactoryError(msg) from exc
-
-            # Get the refined concept's structure class name
-            refined_structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else "TextContent"
-
-            # Generate a new class that inherits from the refined structure class
-            # This creates an empty class that can be extended with additional fields in the future
-            try:
-                _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
-                    class_name=concept_code,
-                    structure_blueprint={},  # Empty structure - just inherits from refined class
-                    base_class_name=refined_structure_class_name,
-                )
-            except ConceptStructureGeneratorError as exc:
-                msg = (
-                    f"Error generating structure class for concept '{concept_code}' "
-                    f"refining '{refined_structure_class_name}' in domain '{domain}': {exc}"
-                )
-                raise ConceptFactoryError(msg) from exc
-
-            # Register the generated class
-            KajsonManager.get_class_registry().register_class(the_generated_class)
-
-            # The structure_class_name of the concept is the concept_code
-            structure_class_name = concept_code
-        # Handle neither structure nor refines - check the class registry
-        # If there is a class, use it. structure_class_name is then the concept_code
-        elif Concept.is_valid_structure_class(structure_class_name=concept_code):
-            structure_class_name = concept_code
+                declaration_type = ConceptDeclarationType.BLUEPRINT_WITH_STRUCTURE
+        elif blueprint_or_string_description.refines is not None:
+            declaration_type = ConceptDeclarationType.REFINES
         else:
-            # If there is NO class, the fallback class is TextContent.__name__
-            structure_class_name = TextContent.__name__
+            declaration_type = ConceptDeclarationType.BASIC_BLUEPRINT
 
         domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_string_or_code(
             concept_string_or_code=concept_code,
             domain=domain,
         )
 
-        return Concept(
-            domain=domain_and_concept_code.domain,
-            code=domain_and_concept_code.concept_code,
-            description=blueprint.description,
-            structure_class_name=structure_class_name,
-            refines=current_refine,
-        )
+        match declaration_type:
+            case ConceptDeclarationType.STRING:
+                structure_class_name, refines = cls._handle_basic_blueprint(
+                    concept_code=concept_code,
+                    domain=domain,
+                )
+                return Concept(
+                    domain=domain_and_concept_code.domain,
+                    code=domain_and_concept_code.concept_code,
+                    description=cast("str", blueprint_or_string_description),
+                    structure_class_name=structure_class_name,
+                    refines=refines,
+                )
+
+            case ConceptDeclarationType.BASIC_BLUEPRINT:
+                structure_class_name, refines = cls._handle_basic_blueprint(
+                    concept_code=concept_code,
+                    domain=domain,
+                )
+                return Concept(
+                    domain=domain_and_concept_code.domain,
+                    code=domain_and_concept_code.concept_code,
+                    description=cast("ConceptBlueprint", blueprint_or_string_description).description,
+                    structure_class_name=structure_class_name,
+                    refines=refines,
+                )
+
+            case ConceptDeclarationType.STRUCTURE_WITH_CLASSNAME:
+                blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
+                return Concept(
+                    domain=domain_and_concept_code.domain,
+                    code=domain_and_concept_code.concept_code,
+                    description=blueprint.description,
+                    structure_class_name=cls._handle_structure_with_classname(
+                        blueprint=blueprint,
+                        concept_code=concept_code,
+                        domain=domain,
+                    ),
+                    refines=None,
+                )
+
+            case ConceptDeclarationType.BLUEPRINT_WITH_STRUCTURE:
+                blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
+                return Concept(
+                    domain=domain_and_concept_code.domain,
+                    code=domain_and_concept_code.concept_code,
+                    description=blueprint.description,
+                    structure_class_name=cls._handle_blueprint_with_structure(
+                        blueprint=blueprint,
+                        concept_code=concept_code,
+                        domain=domain,
+                    ),
+                    refines=None,
+                )
+
+            case ConceptDeclarationType.REFINES:
+                blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
+                structure_class_name, current_refine = cls._handle_refines(
+                    blueprint=blueprint,
+                    concept_code=concept_code,
+                    domain=domain,
+                )
+                return Concept(
+                    domain=domain_and_concept_code.domain,
+                    code=domain_and_concept_code.concept_code,
+                    description=blueprint.description,
+                    structure_class_name=structure_class_name,
+                    refines=current_refine,
+                )

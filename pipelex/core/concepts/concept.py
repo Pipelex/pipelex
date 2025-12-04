@@ -6,9 +6,9 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptValueError
+from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.validation import validate_concept_code, validate_concept_string
+from pipelex.core.concepts.validation import validate_concept_code
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
@@ -25,7 +25,7 @@ class Concept(BaseModel):
     domain: str
     description: str
     structure_class_name: str
-    # TODO: rethink this refiens field here.
+    # TODO: rethink this refines field here.
     refines: str | None = None
 
     @field_validator("code")
@@ -53,11 +53,10 @@ class Concept(BaseModel):
     def validate_refines(cls, refines: str | None) -> str | None:
         if refines is None:
             return None
-        try:
-            validate_concept_string(concept_string=refines)
-        except ConceptStringError as exc:
-            msg = f"Refines '{refines}' is not a valid concept string for concept '{cls.concept_string}'"
-            raise ConceptValueError(msg) from exc
+        if not NativeConceptCode.is_valid_native_concept_string(concept_string=refines):
+            valid_native_concepts = ", ".join(native.concept_string for native in NativeConceptCode.values_list())
+            msg = f"Refines '{refines}' is not a valid native concept string. Valid options are: {valid_native_concepts}"
+            raise ConceptValueError(msg)
         return refines
 
     @property

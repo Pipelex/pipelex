@@ -7,6 +7,7 @@ from kajson.kajson_manager import KajsonManager
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -132,7 +133,7 @@ async def build_structures_cmd(
                         continue
                     # Structure is defined as a ConceptStructureBlueprint - run the structure generator
                     # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
-                    normalized_structure = ConceptFactory.normalize_structure_blueprint(concept_blueprint.structure)
+                    normalized_structure = normalize_structure_blueprint(concept_blueprint.structure)
 
                     try:
                         generated_code, _ = StructureGenerator().generate_from_structure_blueprint(

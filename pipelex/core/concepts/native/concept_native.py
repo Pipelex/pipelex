@@ -93,6 +93,24 @@ class NativeConceptCode(StrEnum):
         return concept_string_or_code in cls.values_list()
 
     @classmethod
+    def is_valid_native_concept_string(cls, concept_string: str) -> bool:
+        """Check if the string is a valid native concept string (e.g., native.Text, native.Image).
+
+        Unlike is_native_concept_string_or_code, this method requires the full concept string
+        with the native domain prefix (e.g., "native.Text" is valid, but "Text" alone is not).
+
+        Args:
+            concept_string: The concept string to validate
+
+        Returns:
+            True if the string is a valid native concept string with domain prefix
+        """
+        if "." not in concept_string:
+            return False
+        domain_code, concept_code = concept_string.split(".", 1)
+        return SpecialDomain.is_native(domain=domain_code) and concept_code in cls.values_list()
+
+    @classmethod
     def validate_native_concept_string_or_code(cls, concept_string_or_code: str) -> None:
         if not cls.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
             msg = f"Concept string or code '{concept_string_or_code}' is not a valid native concept string or code"

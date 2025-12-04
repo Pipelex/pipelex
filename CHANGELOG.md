@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Can now generate the pydantic structure of a concept with the cli: `pipelex build structures /library_dir/`.
+- Added validation for output concepts of `PipeCompose`: must be strictly compatible with the Text concept.
+- Added validation for the Pipelex Bundle on the concept keys: Cannot create a native concept.
+
+### Fixed
+
+### Refactored
+
+- Refactored the `ConceptFactory.make_from_blueprint` method: Now it correctly handles native concepts.
+
 ## [v0.17.3] - 2025-12-01
 
 ### Fixed

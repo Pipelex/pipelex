@@ -13,12 +13,13 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_content_generator
+from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -88,7 +89,24 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     def validate_output_with_library(self):
-        pass
+        if not get_concept_library().is_compatible(
+            tested_concept=self.output,
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
+            strict=True,
+        ):
+            msg = (
+                f"The output of a PipeCompose must be strictly compatible with the Text concept. "
+                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'. "
+                "Make sure this concept refines the native Text concept."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain=self.domain,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept_string,
+                required_concept_codes=[NativeConceptCode.TEXT.concept_string],
+            )
 
     @override
     async def _run_operator_pipe(
@@ -118,7 +136,13 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         )
         log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
         assert isinstance(jinja2_text, str)
-        the_content = TextContent(text=jinja2_text)
+
+        # Get the structure class from the registry (might be a subclass of TextContent)
+        structure_class = get_class_registry().get_required_subclass(
+            name=self.output.structure_class_name,
+            base_class=StuffContent,
+        )
+        the_content = structure_class(text=jinja2_text)
 
         output_stuff = StuffFactory.make_stuff(concept=self.output, content=the_content, name=output_name)
 

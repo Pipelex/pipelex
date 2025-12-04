@@ -82,7 +82,7 @@ class TestConcept:
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT,
                     domain=valid_domain,
-                    blueprint=ConceptBlueprint(description=valid_definition),
+                    blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is True
@@ -92,7 +92,7 @@ class TestConcept:
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT,
                     domain=SpecialDomain.NATIVE,
-                    blueprint=ConceptBlueprint(description=valid_definition),
+                    blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is True
@@ -102,7 +102,7 @@ class TestConcept:
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.IMAGE,
                     domain=valid_domain,
-                    blueprint=ConceptBlueprint(description=valid_definition),
+                    blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is True
@@ -112,7 +112,7 @@ class TestConcept:
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.PDF,
                     domain=valid_domain,
-                    blueprint=ConceptBlueprint(description=valid_definition),
+                    blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is True
@@ -122,7 +122,7 @@ class TestConcept:
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT_AND_IMAGES,
                     domain=valid_domain,
-                    blueprint=ConceptBlueprint(description=valid_definition),
+                    blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is True
@@ -132,7 +132,7 @@ class TestConcept:
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.NUMBER,
                     domain=valid_domain,
-                    blueprint=ConceptBlueprint(description=valid_definition),
+                    blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is True
@@ -142,7 +142,7 @@ class TestConcept:
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.ANYTHING,
                     domain=valid_domain,
-                    blueprint=ConceptBlueprint(description=valid_definition),
+                    blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is True
@@ -152,7 +152,7 @@ class TestConcept:
                 ConceptFactory.make_from_blueprint(
                     concept_code="RandomConcept",
                     domain=valid_domain,
-                    blueprint=ConceptBlueprint(description=valid_definition),
+                    blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is False
@@ -218,22 +218,22 @@ class TestConcept:
         concept1 = ConceptFactory.make_from_blueprint(
             concept_code="Code1",
             domain="domain1",
-            blueprint=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
         )
         concept2 = ConceptFactory.make_from_blueprint(
             concept_code="Code2",
             domain="domain1",
-            blueprint=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
         )
         concept3 = ConceptFactory.make_from_blueprint(
             concept_code="Code3",
             domain="domain2",
-            blueprint=ConceptBlueprint(description="Lorem Ipsum", structure="TextContent"),
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", structure="TextContent"),
         )
         concept4 = ConceptFactory.make_from_blueprint(
             concept_code="Code4",
             domain="domain1",
-            blueprint=ConceptBlueprint(description="Lorem Ipsum", structure="ImageContent"),
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", structure="ImageContent"),
         )
 
         concept_5 = ConceptFactory.make_native_concept(
@@ -247,7 +247,7 @@ class TestConcept:
         concept_7 = ConceptFactory.make_from_blueprint(
             concept_code="VisualDescription",
             domain="images",
-            blueprint=ConceptBlueprint(description="Lorem Ipsum"),
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
 
         assert Concept.are_concept_compatible(concept_7, concept_6, strict=True) is False

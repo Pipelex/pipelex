@@ -202,11 +202,11 @@ class LibraryManager(LibraryManagerAbstract):
         for blueprint in blueprints:
             if blueprint.concept is not None:
                 concepts: list[Concept] = []
-                for concept_code, concept_blueprint_or_description in blueprint.concept.items():
-                    concept = ConceptFactory.make_from_blueprint_or_description(
+                for concept_code, concept_blueprint in blueprint.concept.items():
+                    concept = ConceptFactory.make_from_blueprint(
                         domain=blueprint.domain,
                         concept_code=concept_code,
-                        concept_blueprint_or_description=concept_blueprint_or_description,
+                        blueprint_or_string_description=concept_blueprint,
                     )
                     concepts.append(concept)
                 all_concepts.extend(concepts)

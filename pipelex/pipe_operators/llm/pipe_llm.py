@@ -208,6 +208,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
 
         the_content: StuffContent
+
         if (
             Concept.are_concept_compatible(concept_1=output_concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True)
             and not is_multiple_output

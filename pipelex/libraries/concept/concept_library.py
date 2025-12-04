@@ -49,8 +49,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     def make_empty_with_native_concepts(cls) -> Self:
         library = cls(root={})
         library.setup()
-        all_native_concepts = ConceptFactory.make_all_native_concepts()
-        library.add_concepts(concepts=all_native_concepts)
+        library.add_concepts(
+            concepts=[ConceptFactory.make_native_concept(native_concept_code=native_concept) for native_concept in NativeConceptCode.values_list()]
+        )
         return library
 
     @override

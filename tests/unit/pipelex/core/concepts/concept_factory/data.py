@@ -73,7 +73,7 @@ class TestCases:
                 code="Text",
                 description="Native text concept",
                 structure_class_name=NativeConceptCode.TEXT.structure_class_name,
-                refines=None,
+                refines=NativeConceptCode.TEXT.concept_string,
             ),
         ),
         # Test case 6: Concept code from same domain
@@ -86,8 +86,8 @@ class TestCases:
                 domain="my_domain",
                 code="DomainConcept",
                 description="A concept from same domain",
-                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
-                refines=None,
+                structure_class_name="DomainConcept",
+                refines="native.Text",
             ),
         ),
         # Test case 9: Blueprint with dict structure (same domain)

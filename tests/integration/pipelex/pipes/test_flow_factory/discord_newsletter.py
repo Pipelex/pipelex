@@ -43,15 +43,3 @@ class ChannelSummaryFlow(StructuredContent):
     channel_name: str = Field(..., description="Name of the Discord channel")
     summary_items: list[str] = Field(..., description="Well-written summaries of the channel's activity")
 
-
-class HtmlNewsletterFlow(StructuredContent):
-    """Represents the final newsletter content"""
-
-    weekly_summary: str = Field(..., description="200 character summary of weekly Share channel content")
-    new_members: list[str] = Field(default_factory=empty_list_factory_of(str), description="New member introductions in bullet points")
-    channel_sections: list[ChannelSummaryFlow] = Field(
-        default_factory=empty_list_factory_of(ChannelSummaryFlow), description="Ordered channel summaries"
-    )
-    geographic_hubs: list[ChannelSummaryFlow] = Field(
-        default_factory=empty_list_factory_of(ChannelSummaryFlow), description="Geographic hub channels grouped at end"
-    )

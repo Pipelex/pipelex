@@ -1,8 +1,8 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureValidationError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -376,7 +376,7 @@ class TestStructureGenerator:
             ),
         }
 
-        normalized_structure = ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint)
+        normalized_structure = normalize_structure_blueprint(mixed_structure_blueprint)
 
         result, _ = StructureGenerator().generate_from_structure_blueprint("PersonInfo", normalized_structure)
 
