@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 import instructor
 import openai
 from instructor.exceptions import InstructorRetryException
-from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError, omit
+from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
@@ -94,6 +94,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         except BadRequestError as bad_request_error:
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
+        except AuthenticationError as authentication_error:
+            msg = f"Authentication error: {authentication_error}"
+            raise LLMCompletionError(msg) from authentication_error
 
         if not response.output_text:
             msg = f"OpenAI Responses message content is empty: {response}\nmodel: {self.inference_model.desc}"
@@ -138,6 +141,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         except BadRequestError as bad_request_error:
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
+        except AuthenticationError as authentication_error:
+            msg = f"Authentication error: {authentication_error}"
+            raise LLMCompletionError(msg) from authentication_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and hasattr(completion, "usage"):
             completion_usage = completion.usage

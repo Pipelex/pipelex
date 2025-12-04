@@ -3,13 +3,13 @@ from typing import TYPE_CHECKING, Any
 import instructor
 import openai
 from instructor.exceptions import InstructorRetryException
-from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError, omit
+from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -83,16 +83,18 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
-        except NotFoundError as not_found_error:
-            # TODO: record llm config so it can be displayed here
-            msg = f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
-            raise LLMModelNotFoundError(msg) from not_found_error
+        except NotFoundError as exc:
+            msg = f"LLM model or deployment '{self.inference_model.model_id}' not found: {exc}"
+            raise LLMCompletionError(msg) from exc
         except APIConnectionError as api_connection_error:
-            msg = f"OpenAI API connection error: {api_connection_error}"
+            msg = f"LLM API connection error: {api_connection_error}"
             raise LLMCompletionError(msg) from api_connection_error
         except BadRequestError as bad_request_error:
-            msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
+            msg = f"LLM bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
+        except AuthenticationError as authentication_error:
+            msg = f"LLM authentication error: {authentication_error}"
+            raise LLMCompletionError(msg) from authentication_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
@@ -129,14 +131,23 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                     extra_body=extra_body,
                 )
             except InstructorRetryException as exc:
-                msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
+                msg = (
+                    f"LLM structured generation via 'instructor' failed with model: {self.inference_model.desc} "
+                    f"trying to generate schema: {schema} with error: {exc}"
+                )
                 raise LLMCompletionError(msg) from exc
         except NotFoundError as exc:
-            msg = f"OpenAI model or deployment '{self.inference_model.model_id}' not found: {exc}"
+            msg = f"LLM model or deployment '{self.inference_model.model_id}' not found: {exc}"
             raise LLMCompletionError(msg) from exc
+        except APIConnectionError as api_connection_error:
+            msg = f"LLM API connection error: {api_connection_error}"
+            raise LLMCompletionError(msg) from api_connection_error
         except BadRequestError as bad_request_error:
-            msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
+            msg = f"LLM bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
+        except AuthenticationError as authentication_error:
+            msg = f"LLM authentication error: {authentication_error}"
+            raise LLMCompletionError(msg) from authentication_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)

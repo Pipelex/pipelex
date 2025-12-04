@@ -223,7 +223,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 )
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = self._format_llm_error(exc)
+                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main])
                 msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
@@ -344,7 +344,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    error_details = self._format_llm_error(exc)
+                    error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main, llm_setting_for_object])
                     msg = f"Error generating list of objects with text then object {location}: {error_details}"
                     raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             else:
@@ -361,7 +361,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    error_details = self._format_llm_error(exc)
+                    error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
                     msg = f"Error generating list of objects with direct method {location}: {error_details}"
                     raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
@@ -386,7 +386,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    error_details = self._format_llm_error(exc)
+                    error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main, llm_setting_for_object])
                     msg = f"Error generating single object with text then object {location}: {error_details}"
                     raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             else:
@@ -402,7 +402,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     )
                 except LLMCompletionError as exc:
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
-                    error_details = self._format_llm_error(exc)
+                    error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
                     msg = f"Error generating single object with direct method {location}: {error_details}"
                     raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
             the_content = generated_object
@@ -412,16 +412,16 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
 
-    def _format_llm_error(self, exc: LLMCompletionError) -> str:
+    def _format_llm_error(self, exc: LLMCompletionError, settings: list[LLMSetting]) -> str:
         """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
         error_details = str(exc)
         current_exc: BaseException | None = exc
         while current_exc is not None:
             if isinstance(current_exc, ValidationError):
-                error_details = format_pydantic_validation_error(current_exc)
+                error_details += f"\n{format_pydantic_validation_error(current_exc)}"
                 break
             current_exc = current_exc.__cause__
-        return error_details
+        return f"{error_details}\nLLM settings: {settings}"
 
     @override
     async def _dry_run_operator_pipe(
