@@ -1,6 +1,7 @@
 import asyncio
 import os
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import click
@@ -12,7 +13,7 @@ from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
-from pipelex.cli.commands.build_structures_cmd import build_structures_cmd
+from pipelex.cli.commands.build_structures_cmd import build_structures_cmd, generate_structures_from_blueprints
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -214,6 +215,16 @@ def build_pipe_cmd(
                     init_path = os.path.join(extras_output_dir, "__init__.py")
                     save_text_to_path(text="", path=init_path)
                     typer.secho(f"✅ Package init file saved to: {init_path}", fg=typer.colors.GREEN)
+
+                    # Generate structures folder from the bundle blueprint
+                    structures_output_dir = Path(extras_output_dir) / "structures"
+                    generated_structures = generate_structures_from_blueprints(
+                        blueprints=[pipelex_bundle_spec.to_blueprint()],
+                        output_directory=structures_output_dir,
+                        skip_existing_check=True,
+                    )
+                    if generated_structures:
+                        typer.secho(f"✅ Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
 
                     end_time = time.time()
                     typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds\n", fg=typer.colors.WHITE)
