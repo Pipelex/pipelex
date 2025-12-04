@@ -47,4 +47,3 @@ class TestPipeSequenceMultipleSteps:
         assert pipe_sequence.inputs.root["initial_input"].concept.code == concept_1.code
 
         concept_library.teardown()
-
