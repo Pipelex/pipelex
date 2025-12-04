@@ -294,32 +294,97 @@ def generate_input_memory_json_string(inputs: InputRequirements, indent: int = 2
     return json.dumps(json_inputs, indent=indent, ensure_ascii=False)
 
 
+def _get_structure_class_import(class_name: str) -> str | None:
+    """Get the import statement for a structure class.
+
+    Args:
+        class_name: The name of the structure class
+
+    Returns:
+        Import statement string, or None if no import needed
+    """
+    # Native content classes
+    native_imports = {
+        "PDFContent": "from pipelex.core.stuffs.pdf_content import PDFContent",
+        "ImageContent": "from pipelex.core.stuffs.image_content import ImageContent",
+        "TextContent": "from pipelex.core.stuffs.text_content import TextContent",
+        "NumberContent": "from pipelex.core.stuffs.number_content import NumberContent",
+        "PageContent": "from pipelex.core.stuffs.page_content import PageContent",
+        "TextAndImagesContent": "from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent",
+    }
+
+    if class_name in native_imports:
+        return native_imports[class_name]
+
+    # For custom structure classes, return a placeholder comment
+    # The actual import path depends on where the structures/ folder is
+    return None
+
+
+def _collect_structure_classes(pipe: PipeAbstract) -> set[str]:
+    """Collect all structure class names from a pipe's inputs and output.
+
+    Args:
+        pipe: The pipe to analyze
+
+    Returns:
+        Set of structure class names
+    """
+    structure_classes: set[str] = set()
+
+    # Collect from inputs
+    for input_req in pipe.inputs.root.values():
+        concept = input_req.concept
+        structure_classes.add(concept.structure_class_name)
+
+    # Collect from output
+    if pipe.output:
+        structure_classes.add(pipe.output.structure_class_name)
+
+    return structure_classes
+
+
 def generate_runner_code(pipe: PipeAbstract) -> str:
-    """Generate the complete Python runner code for a pipe."""
+    """Generate the complete Python runner code for a pipe.
+
+    This generates a runnable Python script with:
+    - Import statements for all required structure classes
+    - An async function to run the pipeline
+    - Example input values based on the pipe's input concepts
+    """
     pipe_code = pipe.code
     inputs = pipe.inputs
 
-    # Determine which imports are needed based on input concepts
-    needs_pdf = False
-    needs_image = False
-    for input_req in inputs.root.values():
-        concept = input_req.concept
-        if concept.structure_class_name == "PDFContent":
-            needs_pdf = True
-        elif concept.structure_class_name == "ImageContent":
-            needs_image = True
+    # Collect all structure classes needed
+    structure_classes = _collect_structure_classes(pipe)
 
     # Build import section
     import_lines = ["import asyncio", ""]
 
-    # Add content class imports if needed
-    if needs_pdf:
-        import_lines.append("from pipelex.core.stuffs.pdf_content import PDFContent")
-    if needs_image:
-        import_lines.append("from pipelex.core.stuffs.image_content import ImageContent")
+    # Add native content class imports
+    native_imports: list[str] = []
+    custom_classes: list[str] = []
+    for class_name in sorted(structure_classes):
+        import_stmt = _get_structure_class_import(class_name)
+        if import_stmt:
+            native_imports.append(import_stmt)
+        elif class_name not in {"TextContent", "NumberContent"}:
+            # Skip TextContent and NumberContent as they're typically not needed for imports
+            custom_classes.append(class_name)
+
+    import_lines.extend(native_imports)
+
+    # Add custom structure class imports (from structures folder)
+    if custom_classes:
+        import_lines.append("")
+        import_lines.append("# Import custom structure classes from the structures folder")
+        import_lines.append("# Adjust the import path based on your project structure:")
+        for class_name in sorted(custom_classes):
+            import_lines.append(f"# from structures import {class_name}")
 
     import_lines.extend(
         [
+            "",
             "from pipelex.pipelex import Pipelex",
             "from pipelex.pipeline.execute import execute_pipeline",
         ]
