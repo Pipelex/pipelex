@@ -23,12 +23,14 @@ class ConceptExampleGranularity(StrEnum):
     LIGHT: Simplified format for simple types
         - TextContent: "my_text"
         - NumberContent: 0
-        - ImageContent: {"_class": "ImageContent", "url": "..."}
+        - ImageContent: "my_url"
+        - PDFContent: "my_url"
 
     HARD: Full BaseModel format with all fields explicitly shown
         - TextContent: {"text": "my_text"}
-        - NumberContent: {"value": 0}
-        - ImageContent: {"url": "..."}
+        - NumberContent: {"number": 0}
+        - ImageContent: {"url": "my_url"}
+        - PDFContent: {"url": "my_url"}
     """
 
     LIGHT = "light"
@@ -42,18 +44,22 @@ class ConceptExampleGenerator:
 
     JSON format (Light):
         For native.Text: "my_text"
+        For native.Image: "my_url"
         For structured: {"concept_code": "domain.ConceptCode", "content": {...}}
 
     JSON format (Hard):
         For native.Text: {"concept_code": "native.Text", "content": {"text": "my_text"}}
+        For native.Image: {"concept_code": "native.Image", "content": {"url": "my_url"}}
         For structured: {"concept_code": "domain.ConceptCode", "content": {...}}
 
     Python format (Light):
         For native.Text: "my_text"
+        For native.Image: ImageContent(url="my_url")
         For structured: {"concept_code": "domain.ConceptCode", "content": MyClass(field1="value1")}
 
     Python format (Hard):
         For native.Text: TextContent(text="my_text")
+        For native.Image: ImageContent(url="my_url")
         For structured: {"concept_code": "domain.ConceptCode", "content": MyClass(field1="value1")}
     """
 
@@ -134,32 +140,36 @@ class ConceptExampleGenerator:
         var_name: str,
     ) -> dict[str, Any] | str | int:
         """Handle native concepts in LIGHT mode - simplified format."""
-        match structure_class_name:
-            case "TextContent":
-                return f"{var_name}_text"
-            case "NumberContent":
-                return 0
-            case "ImageContent":
-                self._imports_needed.add("ImageContent")
-                match self.output_format:
-                    case ConceptExampleFormat.JSON:
-                        return {"_class": "ImageContent", "url": f"{var_name}_url"}
-                    case ConceptExampleFormat.PYTHON:
-                        return f'ImageContent(url="{var_name}_url")'
-            case "PDFContent":
-                self._imports_needed.add("PDFContent")
-                match self.output_format:
-                    case ConceptExampleFormat.JSON:
-                        return {"_class": "PDFContent", "url": f"{var_name}_url"}
-                    case ConceptExampleFormat.PYTHON:
-                        return f'PDFContent(url="{var_name}_url")'
-            case _:
-                # For other native concepts, generate full content
-                structure_class = KajsonManager.get_class_registry().get_class(name=structure_class_name)
-                if structure_class and issubclass(structure_class, StuffContent):
-                    content = self._generate_content_for_class(structure_class, var_name)
-                    return {"content": content}
-                return {"content": {}}
+        # Use NativeConceptCode to get structure class names
+        if structure_class_name == NativeConceptCode.TEXT.structure_class_name:
+            return f"{var_name}_text"
+
+        elif structure_class_name == NativeConceptCode.NUMBER.structure_class_name:
+            return 0
+
+        elif structure_class_name == NativeConceptCode.IMAGE.structure_class_name:
+            self._imports_needed.add(NativeConceptCode.IMAGE.structure_class_name)
+            match self.output_format:
+                case ConceptExampleFormat.JSON:
+                    return f"{var_name}_url"
+                case ConceptExampleFormat.PYTHON:
+                    return f'{NativeConceptCode.IMAGE.structure_class_name}(url="{var_name}_url")'
+
+        elif structure_class_name == NativeConceptCode.PDF.structure_class_name:
+            self._imports_needed.add(NativeConceptCode.PDF.structure_class_name)
+            match self.output_format:
+                case ConceptExampleFormat.JSON:
+                    return f"{var_name}_url"
+                case ConceptExampleFormat.PYTHON:
+                    return f'{NativeConceptCode.PDF.structure_class_name}(url="{var_name}_url")'
+
+        else:
+            # For other native concepts, generate full content
+            structure_class = KajsonManager.get_class_registry().get_class(name=structure_class_name)
+            if structure_class and issubclass(structure_class, StuffContent):
+                content = self._generate_content_for_class(structure_class, var_name)
+                return {"content": content}
+            return {"content": {}}
 
     def _handle_native_concept_hard(
         self,
@@ -202,22 +212,25 @@ class ConceptExampleGenerator:
 
         # In LIGHT mode, simple native types have shortcuts
         if self.granularity == ConceptExampleGranularity.LIGHT:
-            if class_name == "TextContent":
+            if class_name == NativeConceptCode.TEXT.structure_class_name:
                 return f"{var_name}_text"
-            elif class_name == "NumberContent":
+
+            elif class_name == NativeConceptCode.NUMBER.structure_class_name:
                 return 0
-            elif class_name == "ImageContent":
+
+            elif class_name == NativeConceptCode.IMAGE.structure_class_name:
                 match self.output_format:
                     case ConceptExampleFormat.JSON:
-                        return {"_class": "ImageContent", "url": f"{var_name}_url"}
+                        return f"{var_name}_url"
                     case ConceptExampleFormat.PYTHON:
-                        return f'ImageContent(url="{var_name}_url")'
-            elif class_name == "PDFContent":
+                        return f'{NativeConceptCode.IMAGE.structure_class_name}(url="{var_name}_url")'
+
+            elif class_name == NativeConceptCode.PDF.structure_class_name:
                 match self.output_format:
                     case ConceptExampleFormat.JSON:
-                        return {"_class": "PDFContent", "url": f"{var_name}_url"}
+                        return f"{var_name}_url"
                     case ConceptExampleFormat.PYTHON:
-                        return f'PDFContent(url="{var_name}_url")'
+                        return f'{NativeConceptCode.PDF.structure_class_name}(url="{var_name}_url")'
 
         # For structured content or HARD mode, generate all fields
         fields_dict = self._generate_fields_for_class(content_class)
@@ -315,25 +328,28 @@ class ConceptExampleGenerator:
 
         item_class_name = list_item_type.__name__
 
-        if item_class_name == "ImageContent":
-            self._imports_needed.add("ImageContent")
+        if item_class_name == NativeConceptCode.IMAGE.structure_class_name:
+            self._imports_needed.add(NativeConceptCode.IMAGE.structure_class_name)
             match self.output_format:
                 case ConceptExampleFormat.JSON:
-                    return [{"_class": "ImageContent", "url": f"{field_name}_url_1"}]
+                    if self.granularity == ConceptExampleGranularity.LIGHT:
+                        return [f"{field_name}_url_1"]
+                    else:
+                        return [{"url": f"{field_name}_url_1"}]
                 case ConceptExampleFormat.PYTHON:
-                    return [f'ImageContent(url="{field_name}_url_1")']
+                    return [f'{NativeConceptCode.IMAGE.structure_class_name}(url="{field_name}_url_1")']
 
-        elif item_class_name == "TextContent":
+        elif item_class_name == NativeConceptCode.TEXT.structure_class_name:
             if self.granularity == ConceptExampleGranularity.LIGHT:
                 return [f"{field_name}_text_1", f"{field_name}_text_2"]
             else:
                 # HARD mode - full TextContent
-                self._imports_needed.add("TextContent")
+                self._imports_needed.add(NativeConceptCode.TEXT.structure_class_name)
                 match self.output_format:
                     case ConceptExampleFormat.JSON:
                         return [{"text": f"{field_name}_text_1"}]
                     case ConceptExampleFormat.PYTHON:
-                        return [f'TextContent(text="{field_name}_text_1")']
+                        return [f'{NativeConceptCode.TEXT.structure_class_name}(text="{field_name}_text_1")']
 
         elif inspect.isclass(list_item_type) and issubclass(list_item_type, StuffContent):
             item_content = self._generate_content_for_class(list_item_type, f"{field_name}_item")

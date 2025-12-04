@@ -67,30 +67,26 @@ class TestConceptExampleGeneratorJsonLight:
         assert result == 0
 
     def test_json_light_image_native(self) -> None:
-        """Test JSON LIGHT format for native Image concept."""
+        """Test JSON LIGHT format for native Image concept - should return just the URL."""
         generator = ConceptExampleGenerator(ConceptExampleFormat.JSON, ConceptExampleGranularity.LIGHT)
         result = generator.generate_example(
             concept_string="native.Image",
             structure_class_name="ImageContent",
             var_name="photo",
         )
-        # LIGHT mode: _class with url
-        assert isinstance(result, dict)
-        assert result["_class"] == "ImageContent"
-        assert result["url"] == "photo_url"
+        # LIGHT mode: just the URL string
+        assert result == "photo_url"
 
     def test_json_light_pdf_native(self) -> None:
-        """Test JSON LIGHT format for native PDF concept."""
+        """Test JSON LIGHT format for native PDF concept - should return just the URL."""
         generator = ConceptExampleGenerator(ConceptExampleFormat.JSON, ConceptExampleGranularity.LIGHT)
         result = generator.generate_example(
             concept_string="native.PDF",
             structure_class_name="PDFContent",
             var_name="document",
         )
-        # LIGHT mode: _class with url
-        assert isinstance(result, dict)
-        assert result["_class"] == "PDFContent"
-        assert result["url"] == "document_url"
+        # LIGHT mode: just the URL string
+        assert result == "document_url"
 
 
 class TestConceptExampleGeneratorJsonHard:
