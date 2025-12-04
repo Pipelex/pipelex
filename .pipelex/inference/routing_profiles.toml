@@ -26,7 +26,7 @@ active = "pipelex_gateway_first"
 # =========================================================================================
 
 [profiles.pipelex_gateway_first]
-description = "Use Pipelex Inference backend for all its supported models"
+description = "Use Pipelex Gateway backend for all its supported models"
 default = "pipelex_gateway"
 fallback_order = [
     "pipelex_gateway",

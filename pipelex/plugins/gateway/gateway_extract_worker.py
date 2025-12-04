@@ -53,17 +53,24 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
             raise SdkTypeError(msg)
 
         self.portkey_client: AsyncPortkey = sdk_instance
-        tenacity_config = get_config().cogt.tenacity_config
-        self.retryer = AsyncRetrying(
+        self._tenacity_config = get_config().cogt.tenacity_config
+
+    def _make_retryer(self) -> AsyncRetrying:
+        """Create a fresh AsyncRetrying instance for each extraction call.
+
+        This is necessary because AsyncRetrying is stateful and cannot be shared
+        across parallel async calls without causing race conditions.
+        """
+        return AsyncRetrying(
             retry=retry_if_exception(self._is_retryable_portkey_error),
             before_sleep=self._log_retry,
             wait=wait_random_exponential(
-                multiplier=tenacity_config.wait_multiplier,
-                max=tenacity_config.wait_max,
-                exp_base=tenacity_config.wait_exp_base,
+                multiplier=self._tenacity_config.wait_multiplier,
+                max=self._tenacity_config.wait_max,
+                exp_base=self._tenacity_config.wait_exp_base,
             ),
             reraise=True,
-            stop=stop_after_attempt(tenacity_config.max_retries),
+            stop=stop_after_attempt(self._tenacity_config.max_retries),
         )
 
     @override
@@ -112,8 +119,10 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
         doc_tag = document_type.document_tag
 
+        attempt_number = 0
         response: GenericResponse | None = None
-        async for attempt in self.retryer:
+        retryer = self._make_retryer()
+        async for attempt in retryer:
             with attempt:
                 response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                     "/",
@@ -121,9 +130,10 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
                     document={"type": doc_tag, doc_tag: base64_url},
                     include_image_base64=True,
                 )
+                attempt_number += 1
 
         if response is None:
-            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
+            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey after {attempt_number} attempts"
             raise ExtractJobFailureError(msg)
 
         if not isinstance(response, GenericResponse):
