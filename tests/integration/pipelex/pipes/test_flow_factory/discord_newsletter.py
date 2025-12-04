@@ -42,4 +42,3 @@ class ChannelSummaryFlow(StructuredContent):
 
     channel_name: str = Field(..., description="Name of the Discord channel")
     summary_items: list[str] = Field(..., description="Well-written summaries of the channel's activity")
-

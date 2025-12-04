@@ -299,7 +299,7 @@ class ConceptFactory:
         # Because native concepts have structure class names diffrent than other (with "Content")
         if concept_code in NativeConceptCode.values_list():
             return NativeConceptCode.TEXT.structure_class_name, NativeConceptCode.TEXT.concept_string
-        
+
         try:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
                 class_name=concept_code,
