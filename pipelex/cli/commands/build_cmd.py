@@ -24,6 +24,7 @@ from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_console, get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -199,24 +200,7 @@ def build_pipe_cmd(
 
                     pipe = get_required_pipe(pipe_code=main_pipe_code)
 
-                    # Generate inputs.json
-                    inputs_json_str = generate_input_memory_json_string(pipe.inputs, indent=2)
-                    inputs_json_path = os.path.join(extras_output_dir, "inputs.json")
-                    save_text_to_path(text=inputs_json_str, path=inputs_json_path)
-                    typer.secho(f"✅ Inputs template saved to: {inputs_json_path}", fg=typer.colors.GREEN)
-
-                    # Generate runner.py
-                    runner_code = generate_runner_code(pipe)
-                    runner_path = os.path.join(extras_output_dir, f"run_{main_pipe_code}.py")
-                    save_text_to_path(text=runner_code, path=runner_path)
-                    typer.secho(f"✅ Python runner script saved to: {runner_path}", fg=typer.colors.GREEN)
-
-                    # Generate empty __init__.py to make it a proper Python package
-                    init_path = os.path.join(extras_output_dir, "__init__.py")
-                    save_text_to_path(text="", path=init_path)
-                    typer.secho(f"✅ Package init file saved to: {init_path}", fg=typer.colors.GREEN)
-
-                    # Generate structures folder from the bundle blueprint
+                    # Generate structures folder FIRST (before runner, since runner imports from structures)
                     structures_output_dir = Path(extras_output_dir) / "structures"
                     generated_structures = generate_structures_from_blueprints(
                         blueprints=[pipelex_bundle_spec.to_blueprint()],
@@ -225,6 +209,30 @@ def build_pipe_cmd(
                     )
                     if generated_structures:
                         typer.secho(f"✅ Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
+
+                    # Generate inputs.json
+                    inputs_json_str = generate_input_memory_json_string(pipe.inputs, indent=2)
+                    inputs_json_path = os.path.join(extras_output_dir, "inputs.json")
+                    save_text_to_path(text=inputs_json_str, path=inputs_json_path)
+                    typer.secho(f"✅ Inputs template saved to: {inputs_json_path}", fg=typer.colors.GREEN)
+
+                    # Determine if output is a list from the bundle spec
+                    main_pipe_spec = pipelex_bundle_spec.pipe[main_pipe_code] if pipelex_bundle_spec.pipe else None
+                    output_is_list = False
+                    if main_pipe_spec:
+                        output_parse = parse_concept_with_multiplicity(main_pipe_spec.output)
+                        output_is_list = output_parse.multiplicity is not None
+
+                    # Generate runner.py (after structures are generated)
+                    runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list)
+                    runner_path = os.path.join(extras_output_dir, f"run_{main_pipe_code}.py")
+                    save_text_to_path(text=runner_code, path=runner_path)
+                    typer.secho(f"✅ Python runner script saved to: {runner_path}", fg=typer.colors.GREEN)
+
+                    # Generate empty __init__.py to make it a proper Python package
+                    init_path = os.path.join(extras_output_dir, "__init__.py")
+                    save_text_to_path(text="", path=init_path)
+                    typer.secho(f"✅ Package init file saved to: {init_path}", fg=typer.colors.GREEN)
 
                     end_time = time.time()
                     typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds\n", fg=typer.colors.WHITE)
@@ -338,16 +346,24 @@ def prepare_runner_cmd(
         raise typer.Exit(1)
 
     async def prepare_runner(pipe_code: str | None = None, bundle_path: str | None = None):
+        bundle_blueprint = None
         if bundle_path:
             try:
                 validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
+                bundle_blueprint = validate_bundle_result.blueprints[0]
                 if not pipe_code:
-                    main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
+                    main_pipe_code = bundle_blueprint.main_pipe
                     if not main_pipe_code:
-                        typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
-                        raise typer.Exit(1)
+                        # Fall back to first pipe if no main_pipe declared
+                        if bundle_blueprint.pipe:
+                            main_pipe_code = next(iter(bundle_blueprint.pipe.keys()))
+                            typer.echo(f"No main_pipe declared, using first pipe '{main_pipe_code}' from bundle '{bundle_path}'")
+                        else:
+                            typer.secho(f"Bundle '{bundle_path}' has no pipes defined", fg=typer.colors.RED, err=True)
+                            raise typer.Exit(1)
+                    else:
+                        typer.echo(f"Using main pipe '{main_pipe_code}' from bundle '{bundle_path}'")
                     pipe_code = main_pipe_code
-                    typer.echo(f"Using main pipe '{pipe_code}' from bundle '{bundle_path}'")
                 else:
                     typer.echo(f"Using pipe '{pipe_code}' from bundle '{bundle_path}'")
             except FileNotFoundError as exc:
@@ -370,12 +386,12 @@ def prepare_runner_cmd(
             typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-        # Generate the code
-        try:
-            runner_code = generate_runner_code(pipe)
-        except Exception as exc:
-            typer.secho(f"❌ Error generating runner code: {exc}", fg=typer.colors.RED)
-            raise typer.Exit(1) from exc
+        # Determine if output is a list from the bundle blueprint
+        output_is_list = False
+        if bundle_blueprint and bundle_blueprint.pipe and pipe_code in bundle_blueprint.pipe:
+            pipe_blueprint = bundle_blueprint.pipe[pipe_code]
+            output_parse = parse_concept_with_multiplicity(pipe_blueprint.output)
+            output_is_list = output_parse.multiplicity is not None
 
         # Determine output path
         final_output_path = output_path or get_incremental_file_path(
@@ -383,8 +399,27 @@ def prepare_runner_cmd(
             base_name=f"run_{pipe_code}",
             extension="py",
         )
+        output_dir = Path(final_output_path).parent
 
-        # Save the file
+        # Generate structures folder FIRST (before runner, since runner imports from structures)
+        if bundle_blueprint:
+            structures_output_dir = output_dir / "structures"
+            generated_structures = generate_structures_from_blueprints(
+                blueprints=[bundle_blueprint],
+                output_directory=structures_output_dir,
+                skip_existing_check=True,
+            )
+            if generated_structures:
+                typer.secho(f"✅ Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
+
+        # Generate the runner code
+        try:
+            runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list)
+        except Exception as exc:
+            typer.secho(f"❌ Error generating runner code: {exc}", fg=typer.colors.RED)
+            raise typer.Exit(1) from exc
+
+        # Save the runner file
         try:
             ensure_directory_for_file_path(file_path=final_output_path)
             save_text_to_path(text=runner_code, path=final_output_path)
@@ -495,13 +530,20 @@ def generate_inputs_cmd(
         if bundle_path:
             try:
                 validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
+                bundle_blueprint = validate_bundle_result.blueprints[0]
                 if not pipe_code:
-                    main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
+                    main_pipe_code = bundle_blueprint.main_pipe
                     if not main_pipe_code:
-                        typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
-                        raise typer.Exit(1)
+                        # Fall back to first pipe if no main_pipe declared
+                        if bundle_blueprint.pipe:
+                            main_pipe_code = next(iter(bundle_blueprint.pipe.keys()))
+                            typer.echo(f"No main_pipe declared, using first pipe '{main_pipe_code}' from bundle '{bundle_path}'")
+                        else:
+                            typer.secho(f"Bundle '{bundle_path}' has no pipes defined", fg=typer.colors.RED, err=True)
+                            raise typer.Exit(1)
+                    else:
+                        typer.echo(f"Using main pipe '{main_pipe_code}' from bundle '{bundle_path}'")
                     pipe_code = main_pipe_code
-                    typer.echo(f"Using main pipe '{pipe_code}' from bundle '{bundle_path}'")
                 else:
                     typer.echo(f"Using pipe '{pipe_code}' from bundle '{bundle_path}'")
             except FileNotFoundError as exc:

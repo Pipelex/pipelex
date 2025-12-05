@@ -11,6 +11,7 @@ from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.validate_bundle import validate_bundles_from_directory
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
@@ -90,7 +91,7 @@ def generate_structures_from_blueprints(
                     generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
-                        base_class_name="TextContent",
+                        base_class_name=TextContent.__name__,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
@@ -132,7 +133,7 @@ def generate_structures_from_blueprints(
                     )
                     raise PipelexError(msg) from exc
 
-                refined_structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else "TextContent"
+                refined_structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
 
                 try:
                     generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
@@ -158,7 +159,7 @@ def generate_structures_from_blueprints(
                     generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
-                        base_class_name="TextContent",
+                        base_class_name=TextContent.__name__,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
