@@ -148,11 +148,12 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         """
         list_content = cast("ListContent[StuffContentType]", self.content_as(content_type=ListContent))
 
-        # Validate all items are of the expected type
+        converted_items: list[StuffContentType] = []
         for item in list_content.items:
-            self.verify_content_type(item, item_type)
+            converted_item = self.verify_content_type(item, item_type)
+            converted_items.append(converted_item)
 
-        return list_content
+        return ListContent[StuffContentType](items=converted_items)
 
     @property
     def as_text(self) -> TextContent:

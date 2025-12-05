@@ -8,6 +8,7 @@ from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -19,7 +20,6 @@ from tests.integration.pipelex.pipes.controller.pipe_sequence.discord_newsletter
 
 if TYPE_CHECKING:
     from pipelex.core.memory.working_memory import WorkingMemory
-    from pipelex.core.stuffs.stuff import Stuff
 
 
 @pytest.mark.dry_runnable
@@ -104,14 +104,20 @@ class TestPipeSequenceDryRun:
             assert channel_summaries_stuff is not None, "channel_summaries should be in working memory"
             assert channel_summaries_stuff.concept.code == "ChannelSummary"
             assert channel_summaries_stuff.concept.domain == "discord_newsletter"
+            assert isinstance(channel_summaries_stuff, Stuff), "ChannelSurrmary Stuff is not a Stuff"
 
             # Verify channel_summaries is also a ListContent with multiple ChannelSummary items
             channel_summaries_list: ListContent[ChannelSummary] = channel_summaries_stuff.as_list_of_fixed_content_type(item_type=ChannelSummary)
+
+            pretty_print(channel_summaries_stuff, "jiodisjdqosj")
+            pretty_print(channel_summaries_list, title="Channel Summaries List")
             assert isinstance(channel_summaries_list, ListContent)
             assert len(channel_summaries_list.items) > 1, "Should have multiple ChannelSummary items from batch processing"
 
             # Verify each summary item (these should be proper ChannelSummary objects from the LLM mock)
             for i, summary in enumerate(channel_summaries_list.items):
+                print(summary)
+                print(type(summary))
                 assert isinstance(summary, ChannelSummary), f"Summary {i} should be ChannelSummary"
                 assert len(summary.channel_name) > 0, f"Summary {i} should have a non-empty channel name"
                 assert isinstance(summary.summary_items, list), f"Summary {i} should have a list of summary items"

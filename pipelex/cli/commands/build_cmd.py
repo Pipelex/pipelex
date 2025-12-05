@@ -354,10 +354,16 @@ def prepare_runner_cmd(
                 if not pipe_code:
                     main_pipe_code = bundle_blueprint.main_pipe
                     if not main_pipe_code:
-                        typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
-                        raise typer.Exit(1)
+                        # Fall back to first pipe if no main_pipe declared
+                        if bundle_blueprint.pipe:
+                            main_pipe_code = next(iter(bundle_blueprint.pipe.keys()))
+                            typer.echo(f"No main_pipe declared, using first pipe '{main_pipe_code}' from bundle '{bundle_path}'")
+                        else:
+                            typer.secho(f"Bundle '{bundle_path}' has no pipes defined", fg=typer.colors.RED, err=True)
+                            raise typer.Exit(1)
+                    else:
+                        typer.echo(f"Using main pipe '{main_pipe_code}' from bundle '{bundle_path}'")
                     pipe_code = main_pipe_code
-                    typer.echo(f"Using main pipe '{pipe_code}' from bundle '{bundle_path}'")
                 else:
                     typer.echo(f"Using pipe '{pipe_code}' from bundle '{bundle_path}'")
             except FileNotFoundError as exc:
@@ -387,21 +393,33 @@ def prepare_runner_cmd(
             output_parse = parse_concept_with_multiplicity(pipe_blueprint.output)
             output_is_list = output_parse.multiplicity is not None
 
-        # Generate the code
-        try:
-            runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list)
-        except Exception as exc:
-            typer.secho(f"❌ Error generating runner code: {exc}", fg=typer.colors.RED)
-            raise typer.Exit(1) from exc
-
         # Determine output path
         final_output_path = output_path or get_incremental_file_path(
             base_path="results",
             base_name=f"run_{pipe_code}",
             extension="py",
         )
+        output_dir = Path(final_output_path).parent
 
-        # Save the file
+        # Generate structures folder FIRST (before runner, since runner imports from structures)
+        if bundle_blueprint:
+            structures_output_dir = output_dir / "structures"
+            generated_structures = generate_structures_from_blueprints(
+                blueprints=[bundle_blueprint],
+                output_directory=structures_output_dir,
+                skip_existing_check=True,
+            )
+            if generated_structures:
+                typer.secho(f"✅ Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
+
+        # Generate the runner code
+        try:
+            runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list)
+        except Exception as exc:
+            typer.secho(f"❌ Error generating runner code: {exc}", fg=typer.colors.RED)
+            raise typer.Exit(1) from exc
+
+        # Save the runner file
         try:
             ensure_directory_for_file_path(file_path=final_output_path)
             save_text_to_path(text=runner_code, path=final_output_path)
@@ -512,13 +530,20 @@ def generate_inputs_cmd(
         if bundle_path:
             try:
                 validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
+                bundle_blueprint = validate_bundle_result.blueprints[0]
                 if not pipe_code:
-                    main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
+                    main_pipe_code = bundle_blueprint.main_pipe
                     if not main_pipe_code:
-                        typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
-                        raise typer.Exit(1)
+                        # Fall back to first pipe if no main_pipe declared
+                        if bundle_blueprint.pipe:
+                            main_pipe_code = next(iter(bundle_blueprint.pipe.keys()))
+                            typer.echo(f"No main_pipe declared, using first pipe '{main_pipe_code}' from bundle '{bundle_path}'")
+                        else:
+                            typer.secho(f"Bundle '{bundle_path}' has no pipes defined", fg=typer.colors.RED, err=True)
+                            raise typer.Exit(1)
+                    else:
+                        typer.echo(f"Using main pipe '{main_pipe_code}' from bundle '{bundle_path}'")
                     pipe_code = main_pipe_code
-                    typer.echo(f"Using main pipe '{pipe_code}' from bundle '{bundle_path}'")
                 else:
                     typer.echo(f"Using pipe '{pipe_code}' from bundle '{bundle_path}'")
             except FileNotFoundError as exc:
