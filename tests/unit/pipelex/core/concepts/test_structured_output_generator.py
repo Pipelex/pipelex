@@ -477,7 +477,7 @@ class WrongClassName(StructuredContent):
         assert "class Question(TextContent):" in generated_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs import TextContent  # noqa: PLC0415
+        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
 
         assert issubclass(generated_class, TextContent)
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
@@ -520,7 +520,7 @@ class WrongClassName(StructuredContent):
         assert "class TableScreenshot(ImageContent):" in generated_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs import ImageContent  # noqa: PLC0415
+        from pipelex.core.stuffs.image_content import ImageContent  # noqa: PLC0415
 
         assert issubclass(generated_class, ImageContent)
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
@@ -551,7 +551,7 @@ class WrongClassName(StructuredContent):
         assert "class Temperature(NumberContent):" in generated_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs import NumberContent  # noqa: PLC0415
+        from pipelex.core.stuffs.number_content import NumberContent  # noqa: PLC0415
 
         assert issubclass(generated_class, NumberContent)
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
@@ -582,7 +582,7 @@ class WrongClassName(StructuredContent):
         assert "class ConfigData(JSONContent):" in generated_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs import JSONContent  # noqa: PLC0415
+        from pipelex.core.stuffs.json_content import JSONContent  # noqa: PLC0415
 
         assert issubclass(generated_class, JSONContent)
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
@@ -607,13 +607,13 @@ class WrongClassName(StructuredContent):
         )
 
         # Verify correct import is present
-        assert "from pipelex.core.stuffs import HtmlContent" in generated_code
+        assert "from pipelex.core.stuffs.html_content import HtmlContent" in generated_code
 
         # Verify class inherits from HtmlContent
         assert "class WebPage(HtmlContent):" in generated_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs import HtmlContent  # noqa: PLC0415
+        from pipelex.core.stuffs.html_content import HtmlContent  # noqa: PLC0415
 
         assert issubclass(generated_class, HtmlContent)
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
@@ -634,7 +634,7 @@ class WrongClassName(StructuredContent):
         pretty_print(generated_code, title="Generated Result with Empty Structure")
 
         # Verify correct import is present
-        assert "from pipelex.core.stuffs import TextContent" in generated_code
+        assert "from pipelex.core.stuffs.text_content import TextContent" in generated_code
 
         # Verify class inherits from TextContent
         assert "class EnhancedText(TextContent):" in generated_code
@@ -643,7 +643,7 @@ class WrongClassName(StructuredContent):
         assert '"""Generated EnhancedText class"""' in generated_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs import TextContent  # noqa: PLC0415
+        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
 
         assert issubclass(generated_class, TextContent)
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
@@ -672,13 +672,13 @@ class WrongClassName(StructuredContent):
         )
 
         # Verify correct import is present
-        assert "from pipelex.core.stuffs import PDFContent" in generated_code
+        assert "from pipelex.core.stuffs.pdf_content import PDFContent" in generated_code
 
         # Verify class inherits from PDFContent
         assert "class Invoice(PDFContent):" in generated_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs import PDFContent  # noqa: PLC0415
+        from pipelex.core.stuffs.pdf_content import PDFContent  # noqa: PLC0415
 
         assert issubclass(generated_class, PDFContent)
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
