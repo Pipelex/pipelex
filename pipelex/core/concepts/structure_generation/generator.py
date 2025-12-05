@@ -7,6 +7,29 @@ from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
+from pipelex.core.stuffs.dynamic_content import DynamicContent
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.json_content import JSONContent
+from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.pdf_content import PDFContent
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
+
+# Mapping of native content class names to their actual class objects
+# Import statements are generated dynamically from the class's __module__ attribute
+NATIVE_CONTENT_CLASSES: dict[str, type] = {
+    "TextContent": TextContent,
+    "ImageContent": ImageContent,
+    "NumberContent": NumberContent,
+    "JSONContent": JSONContent,
+    "HtmlContent": HtmlContent,
+    "PDFContent": PDFContent,
+    "DynamicContent": DynamicContent,
+    "PageContent": PageContent,
+    "TextAndImagesContent": TextAndImagesContent,
+}
 
 
 class StructureGenerator:
@@ -170,19 +193,9 @@ class StructureGenerator:
         base_class = base_class_name or "StructuredContent"
 
         # Add import for the base class if it's a native content class (other than StructuredContent which is already imported)
-        native_classes = {
-            "TextContent",
-            "ImageContent",
-            "NumberContent",
-            "JSONContent",
-            "HtmlContent",
-            "PDFContent",
-            "DynamicContent",
-            "PageContent",
-            "TextAndImagesContent",
-        }
-        if base_class in native_classes:
-            self.imports.add(f"from pipelex.core.stuffs import {base_class}")
+        if base_class in NATIVE_CONTENT_CLASSES:
+            cls = NATIVE_CONTENT_CLASSES[base_class]
+            self.imports.add(f"from {cls.__module__} import {cls.__name__}")
 
         # Generate class header with docstring
         class_header = f'class {class_name}({base_class}):\n    """Generated {class_name} class"""\n'
