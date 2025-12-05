@@ -124,13 +124,13 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         retryer = self._make_retryer()
         async for attempt in retryer:
             with attempt:
+                attempt_number += 1
                 response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                     "/",
                     model=self.inference_model.model_id,
                     document={"type": doc_tag, doc_tag: base64_url},
                     include_image_base64=True,
                 )
-                attempt_number += 1
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey after {attempt_number} attempts"
