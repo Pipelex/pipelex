@@ -36,7 +36,7 @@ class UnitJobId(StrEnum):
 class JobMetadata(BaseModel):
     job_name: str | None = None
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
-    pipe_job_ids: list[str] | None = None
+    pipe_code: str | None = None
 
     # OTel span context: current pipe's span ID (16-char hex string)
     # Used by LLM workers to link inference spans to their parent pipe span
@@ -58,9 +58,8 @@ class JobMetadata(BaseModel):
     def update(self, updated_metadata: "JobMetadata"):
         if updated_metadata.job_category:
             self.job_category = updated_metadata.job_category
-        if updated_metadata.pipe_job_ids:
-            self.pipe_job_ids = self.pipe_job_ids or []
-            self.pipe_job_ids.extend(updated_metadata.pipe_job_ids)
+        if updated_metadata.pipe_code:
+            self.pipe_code = updated_metadata.pipe_code
         if updated_metadata.pipe_run_id:
             self.pipe_run_id = updated_metadata.pipe_run_id
         if updated_metadata.content_generation_job_id:
@@ -73,6 +72,6 @@ class JobMetadata(BaseModel):
             self.completed_at = updated_metadata.completed_at
 
     def copy_with_update(self, updated_metadata: "JobMetadata") -> "JobMetadata":
-        new_metadata = self.model_copy()
+        new_metadata = self.model_copy(deep=True)
         new_metadata.update(updated_metadata=updated_metadata)
         return new_metadata

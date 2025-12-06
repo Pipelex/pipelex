@@ -388,22 +388,28 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
-        # Save current pipe_run_id - this is the PARENT span for this new pipe
+        # Get the parent span ID from caller's metadata
         # (will be None for root pipe, otherwise the parent pipe's span ID)
-        parent_span_id_for_this_pipe = job_metadata.pipe_run_id
+        parent_span_id_hex = job_metadata.pipe_run_id
 
-        # Update metadata with pipe_job_ids (pipe code)
-        updated_metadata = JobMetadata(pipe_job_ids=[self.code])
-        job_metadata.update(updated_metadata=updated_metadata)
+        # Start OTel span for this pipe (skipped in dry mode)
+        span = self._start_pipe_span(job_metadata, parent_span_id_hex=parent_span_id_hex, run_mode=pipe_run_params.run_mode)
 
-        # Start OTel span for this pipe, passing the parent span ID (skipped in dry mode)
-        span = self._start_pipe_span(job_metadata, parent_span_id_hex=parent_span_id_for_this_pipe, run_mode=pipe_run_params.run_mode)
-
-        # Store this pipe's span_id for child operations (e.g., LLM calls)
+        # Determine this pipe's span ID for child operations
+        this_pipe_span_id: str | None = None
         if span:
             span_context = span.get_span_context()
             if span_context and span_context.is_valid:
-                job_metadata.pipe_run_id = f"{span_context.span_id:016x}"
+                this_pipe_span_id = f"{span_context.span_id:016x}"
+
+        # Create child metadata with updated pipe_code and pipe_run_id
+        # This passes down a modified copy rather than mutating the original
+        child_metadata = job_metadata.copy_with_update(
+            updated_metadata=JobMetadata(
+                pipe_code=self.code,
+                pipe_run_id=this_pipe_span_id,
+            )
+        )
 
         # check we have the required inputs in the working memory
         missing_inputs: dict[str, str] = {}
@@ -421,15 +427,15 @@ class PipeAbstract(ABC, BaseModel):
             log.info(pipe_run_info)
 
         await self.validate_before_run(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
 
         try:
             pipe_output = await self._run_pipe(
-                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
             await self.validate_after_run(
-                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
         except Exception as exc:
             self._end_pipe_span(span, error=exc)
@@ -439,10 +445,6 @@ class PipeAbstract(ABC, BaseModel):
         self._end_pipe_span(span)
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
-
-        # Restore parent span context after pipe completes
-        # This ensures the caller's pipe_run_id is preserved for sibling pipes
-        job_metadata.pipe_run_id = parent_span_id_for_this_pipe
 
         return pipe_output
 

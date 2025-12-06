@@ -59,10 +59,7 @@ class GatewayFactory:
         if not extra_headers.get(PortkeyHeaderKey.CONFIG) and not extra_headers.get(PortkeyHeaderKey.PROVIDER):
             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
         if get_telemetry_manager().is_portkey_tracing_enabled():
-            if llm_job.job_metadata.pipe_job_ids:
-                last_pipe_job_id = llm_job.job_metadata.pipe_job_ids[-1]
-            else:
-                last_pipe_job_id = "main"
+            pipe_code = llm_job.job_metadata.pipe_code or "main"
             extra_headers[PortkeyHeaderKey.TRACE_ID] = llm_job.job_metadata.pipeline_run_id
             if not llm_job.job_metadata.unit_job_id:
                 msg = f"Unit job id is not set for LLM job: {llm_job}"
@@ -70,5 +67,5 @@ class GatewayFactory:
             model_kind = llm_job.job_metadata.unit_job_id.model_kind
             span_id = f"{model_kind} -> {output_desc}"
             extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id
-            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{last_pipe_job_id}: {span_id}"
+            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {span_id}"
         return extra_headers, {}

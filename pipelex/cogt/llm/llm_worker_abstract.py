@@ -96,12 +96,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         metadata = llm_job.job_metadata
         unit_job_id = metadata.unit_job_id or "unknown"
         pipeline_run_id = metadata.pipeline_run_id
-        pipe_job_id = metadata.pipe_job_ids[-1] if metadata.pipe_job_ids else "main"
+        pipe_code = metadata.pipe_code or "main"
 
         # Construct span name
-        # Format: "{pipe_job_id}: {unit_job_id} {model_name}"
+        # Format: "{pipe_code}: {unit_job_id} {model_name}"
         model_name = self._get_model_name()
-        span_name = f"{pipe_job_id}: {unit_job_id} {model_name}"
+        span_name = f"{pipe_code}: {unit_job_id} {model_name}"
 
         # Get trace ID (derived deterministically from pipeline_run_id)
         trace_id_int = pipeline_run_id_to_trace_id(pipeline_run_id)
@@ -138,7 +138,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Set Pipelex specific context attributes
         span.set_attribute(PIPELEX_SPAN_KIND, "inference")
         span.set_attribute(PIPELEX_PIPELINE_RUN_ID, pipeline_run_id)
-        span.set_attribute("pipelex.pipe.job_id", pipe_job_id)
+        span.set_attribute("pipelex.pipe.code", pipe_code)
         if metadata.job_name:
             span.set_attribute("pipelex.job.name", metadata.job_name)
 
