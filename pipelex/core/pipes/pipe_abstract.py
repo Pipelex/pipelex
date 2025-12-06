@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, final
 
+from opentelemetry import trace
+from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex import log
@@ -16,6 +18,17 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.telemetry.otel_utils import (
+    PIPELEX_PIPE_CATEGORY,
+    PIPELEX_PIPE_CODE,
+    PIPELEX_PIPE_TYPE,
+    PIPELEX_PIPELINE_RUN_ID,
+    PIPELEX_SPAN_KIND,
+    VIRTUAL_ROOT_PARENT_SPAN_ID,
+    get_global_tracer,
+    hex_span_id_to_int,
+    pipeline_run_id_to_trace_id,
+)
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
@@ -288,6 +301,77 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         pass
 
+    def _start_pipe_span(self, job_metadata: JobMetadata, parent_span_id_hex: str | None) -> Span | None:
+        """Start an OTel span for this pipe execution.
+
+        Args:
+            job_metadata: The job metadata containing pipeline_run_id.
+            parent_span_id_hex: The parent pipe's span ID (16-char hex string) to use as parent.
+                               This should be the pipe_run_id saved BEFORE calling this method.
+                               If None, this is a root span.
+        """
+        tracer = get_global_tracer()
+        if tracer is None:
+            log.dev(f"[OTel] No tracer available for pipe '{self.code}'")
+            return None
+
+        pipeline_run_id = job_metadata.pipeline_run_id
+        trace_id_int = pipeline_run_id_to_trace_id(pipeline_run_id)
+
+        # ALWAYS set context with our deterministic trace_id to ensure all spans
+        # in a pipeline share the same trace_id.
+        # For root spans: use VIRTUAL_ROOT_PARENT_SPAN_ID (1) as parent - this ensures
+        # OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid and ignored).
+        # The exporter filters out this virtual parent when setting $ai_parent_id.
+        # For child spans: use the actual parent span_id
+        parent_span_id = hex_span_id_to_int(parent_span_id_hex) if parent_span_id_hex else VIRTUAL_ROOT_PARENT_SPAN_ID
+        parent_span_context = SpanContext(
+            trace_id=trace_id_int,
+            span_id=parent_span_id,
+            is_remote=True,
+            trace_flags=TraceFlags(TraceFlags.SAMPLED),
+        )
+        parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
+
+        # Start span with our context (inherits our deterministic trace_id)
+        span = tracer.start_span(
+            name=f"{self.pipe_type}: {self.code}",
+            kind=SpanKind.INTERNAL,
+            context=parent_ctx,
+        )
+
+        # Set pipe-specific attributes
+        span.set_attribute(PIPELEX_SPAN_KIND, "pipe")
+        span.set_attribute(PIPELEX_PIPE_CODE, self.code)
+        span.set_attribute(PIPELEX_PIPE_TYPE, self.pipe_type)
+        span.set_attribute(PIPELEX_PIPE_CATEGORY, self.pipe_category)
+        span.set_attribute(PIPELEX_PIPELINE_RUN_ID, pipeline_run_id)
+
+        # Debug logging
+        span_ctx = span.get_span_context()
+        log.dev(
+            f"[OTel] PIPE SPAN STARTED: pipe='{self.code}' "
+            f"trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x} "
+            f"parent_span_id={parent_span_id:016x} (parent_hex={parent_span_id_hex})"
+        )
+
+        return span
+
+    def _end_pipe_span(self, span: Span | None, error: Exception | None = None) -> None:
+        """End the pipe's OTel span."""
+        if span is None:
+            return
+
+        span_ctx = span.get_span_context()
+        log.dev(f"[OTel] PIPE SPAN ENDING: trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x}")
+
+        if error:
+            span.record_exception(error)
+            span.set_status(Status(StatusCode.ERROR, str(error)))
+        else:
+            span.set_status(Status(StatusCode.OK))
+        span.end()
+
     @final
     async def run_pipe(
         self,
@@ -299,10 +383,22 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
-        updated_metadata = JobMetadata(
-            pipe_job_ids=[self.code],
-        )
+        # Save current pipe_run_id - this is the PARENT span for this new pipe
+        # (will be None for root pipe, otherwise the parent pipe's span ID)
+        parent_span_id_for_this_pipe = job_metadata.pipe_run_id
+
+        # Update metadata with pipe_job_ids (pipe code)
+        updated_metadata = JobMetadata(pipe_job_ids=[self.code])
         job_metadata.update(updated_metadata=updated_metadata)
+
+        # Start OTel span for this pipe, passing the parent span ID
+        span = self._start_pipe_span(job_metadata, parent_span_id_hex=parent_span_id_for_this_pipe)
+
+        # Store this pipe's span_id for child operations (e.g., LLM calls)
+        if span:
+            span_context = span.get_span_context()
+            if span_context and span_context.is_valid:
+                job_metadata.pipe_run_id = f"{span_context.span_id:016x}"
 
         # check we have the required inputs in the working memory
         missing_inputs: dict[str, str] = {}
@@ -310,6 +406,7 @@ class PipeAbstract(ABC, BaseModel):
             if not working_memory.is_stuff_exists(name=required_stuff_name):
                 missing_inputs[required_stuff_name] = requirement.concept.code
         if missing_inputs:
+            self._end_pipe_span(span, error=None)
             raise PipeRunInputsError(
                 message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
             )
@@ -322,15 +419,27 @@ class PipeAbstract(ABC, BaseModel):
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
 
-        pipe_output = await self._run_pipe(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-        )
+        try:
+            pipe_output = await self._run_pipe(
+                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
+        except Exception as exc:
+            self._end_pipe_span(span, error=exc)
+            raise
 
         await self.validate_after_run(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
 
+        # End span successfully
+        self._end_pipe_span(span)
+
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
+
+        # Restore parent span context after pipe completes
+        # This ensures the caller's pipe_run_id is preserved for sibling pipes
+        job_metadata.pipe_run_id = parent_span_id_for_this_pipe
+
         return pipe_output
 
 

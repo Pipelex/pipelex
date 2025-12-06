@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
@@ -21,6 +20,11 @@ from pipelex.system.telemetry.otel_utils import (
     GEN_AI_SYSTEM,
     GEN_AI_USAGE_INPUT_TOKENS,
     GEN_AI_USAGE_OUTPUT_TOKENS,
+    PIPELEX_PIPELINE_RUN_ID,
+    PIPELEX_SPAN_KIND,
+    VIRTUAL_ROOT_PARENT_SPAN_ID,
+    hex_span_id_to_int,
+    pipeline_run_id_to_trace_id,
 )
 
 if TYPE_CHECKING:
@@ -85,6 +89,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Start an OTel span and attach it to the llm_job. Safe to call if tracer is None."""
         tracer = self._get_tracer()
         if tracer is None:
+            log.dev("[OTel] No tracer available for LLM span")
             return
 
         # Get context from job metadata
@@ -93,38 +98,46 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         pipeline_run_id = metadata.pipeline_run_id
         pipe_job_id = metadata.pipe_job_ids[-1] if metadata.pipe_job_ids else "main"
 
-        # Construct span name similar to GatewayFactory
+        # Construct span name
         # Format: "{pipe_job_id}: {unit_job_id} {model_name}"
         model_name = self._get_model_name()
         span_name = f"{pipe_job_id}: {unit_job_id} {model_name}"
 
-        # 1. Generate deterministic 128-bit Trace ID from pipeline_run_id
-        trace_id_int = int(hashlib.md5(pipeline_run_id.encode("utf-8")).hexdigest(), 16)  # noqa: S324
+        # Get trace ID (derived deterministically from pipeline_run_id)
+        trace_id_int = pipeline_run_id_to_trace_id(pipeline_run_id)
 
-        # 2. Create a virtual parent context
-        # We pretend all these calls are children of a remote parent representing the run
-        span_context = SpanContext(
+        # ALWAYS set context with our deterministic trace_id.
+        # Use pipe_run_id as parent span if available, otherwise VIRTUAL_ROOT_PARENT_SPAN_ID.
+        if metadata.pipe_run_id:
+            parent_span_id = hex_span_id_to_int(metadata.pipe_run_id)
+            log.dev(f"[OTel] LLM span parent from pipe_run_id: {metadata.pipe_run_id}")
+        else:
+            log.warning("No pipe_run_id found in job metadata - LLM span will be a root span")
+            parent_span_id = VIRTUAL_ROOT_PARENT_SPAN_ID
+
+        parent_span_context = SpanContext(
             trace_id=trace_id_int,
-            span_id=1,  # Arbitrary valid span ID for the virtual parent
+            span_id=parent_span_id,
             is_remote=True,
             trace_flags=TraceFlags(TraceFlags.SAMPLED),
         )
-        parent_ctx = trace.set_span_in_context(NonRecordingSpan(span_context))
+        parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
 
-        # 3. Start span with this parent context
+        # Start span with our context (inherits our deterministic trace_id)
         span = tracer.start_span(
             name=span_name,
             kind=SpanKind.CLIENT,
             context=parent_ctx,
         )
 
-        # Set standard attributes
+        # Set standard GenAI attributes
         span.set_attribute(GEN_AI_SYSTEM, self._get_system())
         span.set_attribute(GEN_AI_REQUEST_MODEL, model_name)
         span.set_attribute(GEN_AI_OPERATION_NAME, unit_job_id)
 
         # Set Pipelex specific context attributes
-        span.set_attribute("pipelex.pipeline.run_id", pipeline_run_id)
+        span.set_attribute(PIPELEX_SPAN_KIND, "inference")
+        span.set_attribute(PIPELEX_PIPELINE_RUN_ID, pipeline_run_id)
         span.set_attribute("pipelex.pipe.job_id", pipe_job_id)
         if metadata.job_name:
             span.set_attribute("pipelex.job.name", metadata.job_name)
@@ -132,6 +145,14 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Capture prompt content if enabled
         if self._should_capture_content() and llm_job.llm_prompt.user_text:
             span.set_attribute(GEN_AI_PROMPT_CONTENT, llm_job.llm_prompt.user_text)
+
+        # Debug logging
+        span_ctx = span.get_span_context()
+        log.dev(
+            f"[OTel] LLM SPAN STARTED: name='{span_name}' "
+            f"trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x} "
+            f"parent_span_id={parent_span_id:016x}"
+        )
 
         # Store span on job for later retrieval
         llm_job.set_otel_span(span)
@@ -145,6 +166,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span = self._get_otel_span(llm_job)
         if span is None:
             return
+
+        span_ctx = span.get_span_context()
+        log.dev(f"[OTel] LLM SPAN ENDING: trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x}")
 
         if is_error and error is not None:
             span.record_exception(error)

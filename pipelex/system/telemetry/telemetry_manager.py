@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from typing import Any, Callable, Generator
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import posthog
 from opentelemetry.trace import Tracer
@@ -7,12 +7,15 @@ from posthog import Posthog, new_context, tag  # type: ignore[attr-defined]
 from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 
+if TYPE_CHECKING:
+    from opentelemetry.sdk.trace import TracerProvider
+
 from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
-from pipelex.system.telemetry.otel_utils import create_ai_tracer
+from pipelex.system.telemetry.otel_utils import create_ai_tracer, set_global_tracer
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
@@ -36,15 +39,21 @@ class TelemetryManager(TelemetryManagerAbstract):
         )
 
         # Create OTel tracer for AI tracing if enabled
+        self._tracer: Tracer | None
+        self._tracer_provider: TracerProvider | None
         if telemetry_config.ai_tracing_enabled:
-            self._tracer: Tracer | None = create_ai_tracer(
+            self._tracer, self._tracer_provider = create_ai_tracer(
                 posthog_client=self.posthog_client,
                 otlp_endpoint=telemetry_config.otlp_endpoint,
                 otlp_headers=telemetry_config.otlp_headers,
             )
+            # Set the global tracer for modules that can't import from hub (avoids circular imports)
+            set_global_tracer(self._tracer)
             log.dev("AI tracing enabled: OpenTelemetry tracer created")
         else:
             self._tracer = None
+            self._tracer_provider = None
+            set_global_tracer(None)
             log.dev("AI tracing disabled: No OpenTelemetry tracer created")
 
         # Store original capture_exception method
@@ -118,6 +127,18 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def teardown(self):
+        # First, shutdown the TracerProvider to flush all pending spans
+        # This MUST happen before PostHog shutdown, otherwise spans won't be exported
+        if self._tracer_provider:
+            try:
+                log.dev("Shutting down OTel TracerProvider (flushing pending spans)...")
+                self._tracer_provider.shutdown()
+                log.dev("OTel TracerProvider shutdown complete")
+            except Exception as exc:
+                # Suppress any shutdown errors to avoid cascading failures
+                log.debug(f"Error during TracerProvider shutdown: {exc}")
+
+        # Then shutdown PostHog client
         if self.posthog_client:
             try:
                 # PostHog client has a shutdown method to flush pending events
