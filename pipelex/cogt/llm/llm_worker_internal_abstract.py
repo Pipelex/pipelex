@@ -1,3 +1,4 @@
+from opentelemetry.trace import Tracer
 from typing_extensions import override
 
 from pipelex import log
@@ -9,6 +10,7 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
+from pipelex.hub import get_telemetry_manager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -46,6 +48,37 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @override
     def is_vision_supported(self) -> bool:
         return self.inference_model.is_vision_supported
+
+    #########################################################
+    # OTel helper method overrides
+    #########################################################
+
+    @override
+    def _get_tracer(self) -> Tracer | None:
+        """Get the OTel tracer from the telemetry manager."""
+        return get_telemetry_manager().get_tracer()
+
+    @override
+    def _get_system(self) -> str:
+        """Get the GenAI system/provider name from the inference model SDK."""
+        return self.inference_model.sdk
+
+    @override
+    def _get_model_name(self) -> str:
+        """Get the model name/id from the inference model."""
+        return self.inference_model.model_id
+
+    @override
+    def _should_capture_content(self) -> bool:
+        """Return whether prompt/response content should be captured."""
+        telemetry_config = get_telemetry_manager().get_telemetry_config()
+        if telemetry_config is None:
+            return False
+        return telemetry_config.capture_content_enabled
+
+    #########################################################
+    # Job lifecycle overrides
+    #########################################################
 
     @override
     async def _before_job(

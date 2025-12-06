@@ -23,7 +23,9 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
+from pipelex.cogt.model_backends.backend_credentials import (
+    BackendCredentialsErrorMsgFactory,
+)
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
@@ -57,6 +59,7 @@ from pipelex.system.telemetry.telemetry_config import (
     TELEMETRY_CONFIG_FILE_NAME,
     TelemetryConfig,
     TelemetryMode,
+    load_telemetry_config,
 )
 from pipelex.system.telemetry.telemetry_manager import (
     DO_NOT_TRACK_ENV_VAR_KEY,
@@ -68,7 +71,6 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
-from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -209,7 +211,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
             error_msg = BackendCredentialsErrorMsgFactory.make_one_variable_missing_error_msg(
-                secrets_provider=secrets_provider, backend_name=backend_name, var_name=var_name
+                secrets_provider=secrets_provider,
+                backend_name=backend_name,
+                var_name=var_name,
             )
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
@@ -246,9 +250,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         if integration_mode.allows_telemetry() or force_enable_telemetry:
             if not telemetry_config:
-                config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
-                telemetry_config_toml = load_toml_from_path(path=config_path)
-                telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
+                telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
+                telemetry_config = load_telemetry_config(path=telemetry_config_path)
 
             match telemetry_config.telemetry_mode:
                 case TelemetryMode.OFF:
@@ -309,7 +312,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     @classmethod
     def make(
         cls,
-        integration_mode: IntegrationMode = IntegrationMode.PYTHON,
+        integration_mode: IntegrationMode = IntegrationMode.CLI,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,

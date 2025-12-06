@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, Generator
 
 import posthog
+from opentelemetry.trace import Tracer
 from posthog import Posthog, new_context, tag  # type: ignore[attr-defined]
 from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
@@ -11,6 +12,7 @@ from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
+from pipelex.system.telemetry.otel_utils import create_ai_tracer
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
@@ -24,7 +26,6 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     def __init__(self, telemetry_config: TelemetryConfig):
         self.telemetry_config = telemetry_config
-
         # Create PostHog client
         self.posthog_client = Posthog(
             project_api_key=self.telemetry_config.project_api_key,
@@ -33,6 +34,18 @@ class TelemetryManager(TelemetryManagerAbstract):
             debug=self.telemetry_config.verbose_enabled,
             on_error=self._handle_transmission_error,
         )
+
+        # Create OTel tracer for AI tracing if enabled
+        if telemetry_config.ai_tracing_enabled:
+            self._tracer: Tracer | None = create_ai_tracer(
+                posthog_client=self.posthog_client,
+                otlp_endpoint=telemetry_config.otlp_endpoint,
+                otlp_headers=telemetry_config.otlp_headers,
+            )
+            log.dev("AI tracing enabled: OpenTelemetry tracer created")
+        else:
+            self._tracer = None
+            log.dev("AI tracing disabled: No OpenTelemetry tracer created")
 
         # Store original capture_exception method
         self._original_capture_exception: Callable[..., Any] = self.posthog_client.capture_exception
@@ -132,7 +145,11 @@ class TelemetryManager(TelemetryManagerAbstract):
                     log.error(f"Could not track event '{event_name}' as identified because user_id is not set, tracking as anonymous")
                     self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
                 else:
-                    self._track_identified_event(event_name=event_name, properties=tracked_properties, user_id=self.telemetry_config.user_id)
+                    self._track_identified_event(
+                        event_name=event_name,
+                        properties=tracked_properties,
+                        user_id=self.telemetry_config.user_id,
+                    )
             case TelemetryMode.OFF:
                 log.verbose(f"Telemetry is off, skipping event '{event_name}'")
 
@@ -141,7 +158,10 @@ class TelemetryManager(TelemetryManagerAbstract):
             return
         if self.telemetry_config.dry_mode_enabled:
             if properties:
-                log.debug(properties, title=f"Tracking anonymous event '{event_name}'. Properties")
+                log.debug(
+                    properties,
+                    title=f"Tracking anonymous event '{event_name}'. Properties",
+                )
             else:
                 log.debug(f"Tracking anonymous event '{event_name}'. No properties.")
         else:
@@ -154,7 +174,10 @@ class TelemetryManager(TelemetryManagerAbstract):
             return
         if self.telemetry_config.dry_mode_enabled:
             if properties:
-                log.debug(properties, title=f"Tracking identified event '{event_name}'. Properties")
+                log.debug(
+                    properties,
+                    title=f"Tracking identified event '{event_name}'. Properties",
+                )
             else:
                 log.debug(f"Tracking identified event '{event_name}'. No properties.")
         else:
@@ -186,3 +209,11 @@ class TelemetryManager(TelemetryManagerAbstract):
             return True
         else:
             return False
+
+    @override
+    def get_tracer(self) -> Tracer | None:
+        return self._tracer
+
+    @override
+    def get_telemetry_config(self) -> TelemetryConfig | None:
+        return self.telemetry_config

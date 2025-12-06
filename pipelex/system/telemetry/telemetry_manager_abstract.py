@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from typing import Any, Generator
 
+from opentelemetry.trace import Tracer
 from typing_extensions import override
 
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.telemetry_config import TelemetryMode
+from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 
 
 class TelemetryManagerAbstract(ABC):
@@ -44,6 +45,14 @@ class TelemetryManagerAbstract(ABC):
     def is_portkey_tracing_enabled(self) -> bool:
         pass
 
+    @abstractmethod
+    def get_tracer(self) -> Tracer | None:
+        """Get the OpenTelemetry tracer for GenAI spans, if configured."""
+
+    @abstractmethod
+    def get_telemetry_config(self) -> TelemetryConfig | None:
+        """Get the telemetry configuration, if available."""
+
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
@@ -71,3 +80,11 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
     def is_portkey_tracing_enabled(self) -> bool:
         return False
+
+    @override
+    def get_tracer(self) -> Tracer | None:
+        return None
+
+    @override
+    def get_telemetry_config(self) -> TelemetryConfig | None:
+        return None

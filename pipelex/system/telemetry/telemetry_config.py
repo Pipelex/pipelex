@@ -1,6 +1,9 @@
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
+from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.types import StrEnum
 
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
@@ -32,3 +35,18 @@ class TelemetryConfig(ConfigModel):
     dry_mode_enabled: bool
     verbose_enabled: bool
     user_id: str
+    ai_tracing_enabled: bool  # Enable OpenTelemetry tracing for AI operations
+    otlp_endpoint: str | None = None  # Optional OTLP endpoint for generic tracing
+    otlp_headers: dict[str, str] | None = None  # Optional headers for OTLP export
+    capture_content_enabled: bool  # Controls gen_ai.prompt/completion content capture for OTel
+
+
+def load_telemetry_config(path: str) -> TelemetryConfig:
+    telemetry_config_toml = load_toml_from_path(path=path)
+    try:
+        telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
+    except ValidationError as exc:
+        validation_error_msg = format_pydantic_validation_error(exc)
+        msg = f"Invalid telemetry configuration: {validation_error_msg}"
+        raise TelemetryConfigValidationError(msg) from exc
+    return telemetry_config
