@@ -19,14 +19,8 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.run_id_factory import make_pipe_run_id
-from pipelex.system.telemetry.otel_utils import (
-    PIPELEX_PIPE_CATEGORY,
-    PIPELEX_PIPE_CODE,
-    PIPELEX_PIPE_TYPE,
-    PIPELEX_PIPELINE_RUN_ID,
-    PIPELEX_SPAN_KIND,
-    get_global_tracer,
-)
+from pipelex.system.telemetry.otel_utils import get_global_tracer
+from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
@@ -339,11 +333,11 @@ class PipeAbstract(ABC, BaseModel):
         )
 
         # Set pipe-specific attributes
-        span.set_attribute(PIPELEX_SPAN_KIND, "pipe")
-        span.set_attribute(PIPELEX_PIPE_CODE, self.code)
-        span.set_attribute(PIPELEX_PIPE_TYPE, self.pipe_type)
-        span.set_attribute(PIPELEX_PIPE_CATEGORY, self.pipe_category)
-        span.set_attribute(PIPELEX_PIPELINE_RUN_ID, pipeline_run_id)
+        span.set_attribute(PipelexSpanAttr.SPAN_KIND, "pipe")
+        span.set_attribute(PipelexSpanAttr.PIPE_CODE, self.code)
+        span.set_attribute(PipelexSpanAttr.PIPE_TYPE, self.pipe_type)
+        span.set_attribute(PipelexSpanAttr.PIPE_CATEGORY, self.pipe_category)
+        span.set_attribute(PipelexSpanAttr.PIPELINE_RUN_ID, pipeline_run_id)
 
         # Debug logging
         span_ctx = span.get_span_context()

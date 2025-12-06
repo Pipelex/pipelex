@@ -1,21 +1,23 @@
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Generator
+from typing import Any, Callable, Generator
 
 import posthog
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Tracer
 from posthog import Posthog, new_context, tag  # type: ignore[attr-defined]
 from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
-
-if TYPE_CHECKING:
-    from opentelemetry.sdk.trace import TracerProvider
 
 from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
-from pipelex.system.telemetry.otel_utils import create_ai_tracer, set_global_tracer
+from pipelex.system.telemetry.otel_utils import set_global_tracer
+from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
@@ -42,8 +44,9 @@ class TelemetryManager(TelemetryManagerAbstract):
         self._tracer: Tracer | None
         self._tracer_provider: TracerProvider | None
         if telemetry_config.ai_tracing_enabled:
-            self._tracer, self._tracer_provider = create_ai_tracer(
+            self._tracer, self._tracer_provider = self.make_ai_tracer(
                 posthog_client=self.posthog_client,
+                user_id=telemetry_config.user_id,
                 otlp_endpoint=telemetry_config.otlp_endpoint,
                 otlp_headers=telemetry_config.otlp_headers,
             )
@@ -238,3 +241,58 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def get_telemetry_config(self) -> TelemetryConfig | None:
         return self.telemetry_config
+
+    def make_ai_tracer(
+        self,
+        posthog_client: Posthog | None,
+        user_id: str,
+        otlp_endpoint: str | None = None,
+        otlp_headers: dict[str, str] | None = None,
+    ) -> tuple[Tracer, TracerProvider]:
+        """Create an isolated OpenTelemetry Tracer for GenAI instrumentation.
+
+        This creates a dedicated TracerProvider that does NOT register itself as the
+        global tracer to avoid polluting other traces in the host application.
+
+        It can configure two types of exporters:
+        1. PostHog Exporter: Converts spans to PostHog $ai_generation events
+        2. OTLP Exporter: Sends standard OTLP traces to a collector
+
+        Args:
+            posthog_client: Optional PostHog client for sending events
+            user_id: User ID for event attribution
+            otlp_endpoint: Optional OTLP endpoint URL
+            otlp_headers: Optional headers for OTLP export
+
+        Returns:
+            A tuple of (Tracer, TracerProvider). The caller should call
+            provider.shutdown() during teardown to flush pending spans.
+        """
+        # 1. Define Resource (Identity)
+        resource = Resource.create(
+            {
+                "service.name": "pipelex-ai",
+                "service.version": get_package_version(),
+                "service.namespace": "ai.orchestration",
+            }
+        )
+
+        # 2. Create Provider
+        provider = TracerProvider(resource=resource)
+
+        # 3. Add PostHog Exporter if client provided
+        if posthog_client:
+            posthog_exporter = PostHogSpanExporter(posthog_client, user_id=user_id)
+            provider.add_span_processor(BatchSpanProcessor(posthog_exporter))
+
+        # 4. Add Generic OTLP Exporter if endpoint provided
+        if otlp_endpoint:
+            otlp_exporter = OTLPSpanExporter(
+                endpoint=otlp_endpoint,
+                headers=otlp_headers or {},
+            )
+            provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+
+        # 5. Get the Tracer and return both tracer and provider
+        tracer = provider.get_tracer("pipelex", get_package_version())
+        return tracer, provider

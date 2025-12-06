@@ -12,17 +12,8 @@ from pipelex import log
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.job_metadata import UnitJobId
-from pipelex.system.telemetry.otel_utils import (
-    GEN_AI_COMPLETION_CONTENT,
-    GEN_AI_OPERATION_NAME,
-    GEN_AI_PROMPT_CONTENT,
-    GEN_AI_REQUEST_MODEL,
-    GEN_AI_SYSTEM,
-    GEN_AI_USAGE_INPUT_TOKENS,
-    GEN_AI_USAGE_OUTPUT_TOKENS,
-    PIPELEX_PIPELINE_RUN_ID,
-    PIPELEX_SPAN_KIND,
-)
+from pipelex.system.telemetry.otel_constants import GenAISpanAttr
+from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -128,20 +119,20 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         )
 
         # Set standard GenAI attributes
-        span.set_attribute(GEN_AI_SYSTEM, self._get_system())
-        span.set_attribute(GEN_AI_REQUEST_MODEL, model_name)
-        span.set_attribute(GEN_AI_OPERATION_NAME, unit_job_id)
+        span.set_attribute(GenAISpanAttr.SYSTEM, self._get_system())
+        span.set_attribute(GenAISpanAttr.REQUEST_MODEL, model_name)
+        span.set_attribute(GenAISpanAttr.OPERATION_NAME, unit_job_id)
 
         # Set Pipelex specific context attributes
-        span.set_attribute(PIPELEX_SPAN_KIND, "inference")
-        span.set_attribute(PIPELEX_PIPELINE_RUN_ID, pipeline_run_id)
-        span.set_attribute("pipelex.pipe.code", pipe_code)
+        span.set_attribute(PipelexSpanAttr.SPAN_KIND, "inference")
+        span.set_attribute(PipelexSpanAttr.PIPELINE_RUN_ID, pipeline_run_id)
+        span.set_attribute(PipelexSpanAttr.PIPE_CODE, pipe_code)
         if metadata.job_name:
             span.set_attribute("pipelex.job.name", metadata.job_name)
 
         # Capture prompt content if enabled
         if self._should_capture_content() and llm_job.llm_prompt.user_text:
-            span.set_attribute(GEN_AI_PROMPT_CONTENT, llm_job.llm_prompt.user_text)
+            span.set_attribute(GenAISpanAttr.PROMPT_CONTENT, llm_job.llm_prompt.user_text)
 
         # Debug logging
         span_ctx = span.get_span_context()
@@ -186,12 +177,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                 tokens = llm_job.job_report.llm_tokens_usage.nb_tokens_by_category
                 input_tokens = tokens.get(TokenCategory.INPUT, 0)
                 output_tokens = tokens.get(TokenCategory.OUTPUT, 0)
-                span.set_attribute(GEN_AI_USAGE_INPUT_TOKENS, input_tokens)
-                span.set_attribute(GEN_AI_USAGE_OUTPUT_TOKENS, output_tokens)
+                span.set_attribute(GenAISpanAttr.USAGE_INPUT_TOKENS, input_tokens)
+                span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
 
             # Capture response content if enabled and result is a string
             if self._should_capture_content() and isinstance(result, str):
-                span.set_attribute(GEN_AI_COMPLETION_CONTENT, result)
+                span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, result)
 
             span.set_status(Status(StatusCode.OK))
 

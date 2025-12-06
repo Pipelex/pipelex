@@ -25,7 +25,8 @@ from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.otel_utils import VIRTUAL_ROOT_PARENT_SPAN_ID, pipeline_run_id_to_trace_id
+from pipelex.system.telemetry.otel_constants import VIRTUAL_ROOT_PARENT_SPAN_ID
+from pipelex.system.telemetry.otel_utils import pipeline_run_id_to_trace_id
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
