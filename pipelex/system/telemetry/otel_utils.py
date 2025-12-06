@@ -5,7 +5,6 @@ with OpenTelemetry, following the GenAI semantic conventions for PostHog compati
 """
 
 import hashlib
-import secrets
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -53,16 +52,6 @@ PIPELEX_SPAN_KIND = "pipelex.span.kind"  # "pipe" or "inference"
 # Using 1 as virtual parent ensures OTel uses our deterministic trace_id while
 # still treating the span as a root (we filter this out in the exporter).
 VIRTUAL_ROOT_PARENT_SPAN_ID = 1
-
-
-def generate_span_id() -> str:
-    """Generate a 64-bit span ID as a 16-char hex string.
-
-    Returns:
-        A cryptographically random 16-character hexadecimal string
-        suitable for use as an OTel span ID.
-    """
-    return secrets.token_hex(8)
 
 
 def pipeline_run_id_to_trace_id(pipeline_run_id: str) -> int:

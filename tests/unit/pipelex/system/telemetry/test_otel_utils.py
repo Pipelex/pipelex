@@ -2,39 +2,11 @@
 
 import pytest
 
-from pipelex.system.telemetry.otel_utils import (
-    generate_span_id,
-    pipeline_run_id_to_trace_id,
-)
+from pipelex.system.telemetry.otel_utils import pipeline_run_id_to_trace_id
 
 
 class TestOtelUtils:
     """Test OTel ID generation utilities."""
-
-    def test_generate_span_id_produces_16_char_hex(self) -> None:
-        """Test that generate_span_id produces a valid 16-character hex string."""
-        span_id = generate_span_id()
-
-        assert len(span_id) == 16
-        # Verify it's valid hex by converting to int
-        int(span_id, 16)
-
-    def test_generate_span_id_is_random(self) -> None:
-        """Test that generate_span_id produces unique values."""
-        span_ids = [generate_span_id() for _ in range(100)]
-
-        # All should be unique
-        assert len(set(span_ids)) == 100
-
-    def test_generate_span_id_can_be_converted_to_int(self) -> None:
-        """Test that generated span IDs can be converted to int and back."""
-        span_id = generate_span_id()
-
-        span_id_int = int(span_id, 16)
-        # Convert back to hex (with leading zeros)
-        span_id_back = f"{span_id_int:016x}"
-
-        assert span_id_back == span_id
 
     def test_pipeline_run_id_to_trace_id_is_deterministic(self) -> None:
         """Test that pipeline_run_id_to_trace_id produces consistent trace IDs."""

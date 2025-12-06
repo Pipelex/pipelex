@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, final
 
-import shortuuid
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -19,6 +18,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
+from pipelex.pipeline.run_id_factory import make_pipe_run_id
 from pipelex.system.telemetry.otel_utils import (
     PIPELEX_PIPE_CATEGORY,
     PIPELEX_PIPE_CODE,
@@ -382,7 +382,7 @@ class PipeAbstract(ABC, BaseModel):
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
         # Generate pipe_run_id (business ID, always set) - similar to pipeline_run_id format
-        this_pipe_run_id = f"{self.code}_{shortuuid.uuid()}"
+        this_pipe_run_id = make_pipe_run_id(self.code)
 
         # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
         # The trace_id comes from parent's otel_context (already computed at pipeline start)
