@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.types import StrEnum
@@ -33,14 +33,31 @@ class UnitJobId(StrEnum):
                 return "Extract"
 
 
+class OtelContext(BaseModel):
+    """OpenTelemetry context for tracing, derived from business IDs.
+
+    Contains precomputed OTel IDs to avoid repeated conversions:
+    - trace_id: 128-bit int derived from pipeline_run_id (computed once at pipeline start)
+    - span_id: 64-bit int derived from pipe_run_id
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    trace_id: int  # 128-bit, derived from pipeline_run_id
+    span_id: int  # 64-bit, derived from pipe_run_id
+
+
 class JobMetadata(BaseModel):
     job_name: str | None = None
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     pipe_code: str | None = None
 
-    # OTel span context: current pipe's span ID (16-char hex string)
-    # Used by LLM workers to link inference spans to their parent pipe span
+    # Business ID for the current pipe execution (16-char hex string).
+    # Always set during pipe runs for tracking purposes.
     pipe_run_id: str | None = None
+
+    # OTel context with precomputed trace/span IDs. None when telemetry is disabled.
+    otel_context: OtelContext | None = None
 
     content_generation_job_id: str | None = None
     unit_job_id: UnitJobId | None = None
@@ -62,6 +79,8 @@ class JobMetadata(BaseModel):
             self.pipe_code = updated_metadata.pipe_code
         if updated_metadata.pipe_run_id:
             self.pipe_run_id = updated_metadata.pipe_run_id
+        if updated_metadata.otel_context:
+            self.otel_context = updated_metadata.otel_context
         if updated_metadata.content_generation_job_id:
             self.content_generation_job_id = updated_metadata.content_generation_job_id
         if updated_metadata.unit_job_id:

@@ -22,9 +22,6 @@ from pipelex.system.telemetry.otel_utils import (
     GEN_AI_USAGE_OUTPUT_TOKENS,
     PIPELEX_PIPELINE_RUN_ID,
     PIPELEX_SPAN_KIND,
-    VIRTUAL_ROOT_PARENT_SPAN_ID,
-    hex_span_id_to_int,
-    pipeline_run_id_to_trace_id,
 )
 
 if TYPE_CHECKING:
@@ -86,14 +83,21 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         return False
 
     def _start_otel_span(self, llm_job: LLMJob) -> None:
-        """Start an OTel span and attach it to the llm_job. Safe to call if tracer is None."""
+        """Start an OTel span and attach it to the llm_job. Safe to call if otel_context is None."""
+        # Get context from job metadata
+        metadata = llm_job.job_metadata
+        otel_context = metadata.otel_context
+
+        # Skip if telemetry is disabled (no otel_context)
+        if otel_context is None:
+            log.dev("[OTel] No otel_context - skipping LLM span")
+            return
+
         tracer = self._get_tracer()
         if tracer is None:
             log.dev("[OTel] No tracer available for LLM span")
             return
 
-        # Get context from job metadata
-        metadata = llm_job.job_metadata
         unit_job_id = metadata.unit_job_id or "unknown"
         pipeline_run_id = metadata.pipeline_run_id
         pipe_code = metadata.pipe_code or "main"
@@ -103,20 +107,13 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         model_name = self._get_model_name()
         span_name = f"{pipe_code}: {unit_job_id} {model_name}"
 
-        # Get trace ID (derived deterministically from pipeline_run_id)
-        trace_id_int = pipeline_run_id_to_trace_id(pipeline_run_id)
-
-        # ALWAYS set context with our deterministic trace_id.
-        # Use pipe_run_id as parent span if available, otherwise VIRTUAL_ROOT_PARENT_SPAN_ID.
-        if metadata.pipe_run_id:
-            parent_span_id = hex_span_id_to_int(metadata.pipe_run_id)
-            log.dev(f"[OTel] LLM span parent from pipe_run_id: {metadata.pipe_run_id}")
-        else:
-            log.warning("No pipe_run_id found in job metadata - LLM span will be a root span")
-            parent_span_id = VIRTUAL_ROOT_PARENT_SPAN_ID
+        # Use trace_id and span_id from otel_context (precomputed)
+        # The span_id in otel_context is the parent pipe's span - use it as parent
+        parent_span_id = otel_context.span_id
+        log.dev(f"[OTel] LLM span parent from otel_context.span_id: {parent_span_id:016x}")
 
         parent_span_context = SpanContext(
-            trace_id=trace_id_int,
+            trace_id=otel_context.trace_id,
             span_id=parent_span_id,
             is_remote=True,
             trace_flags=TraceFlags(TraceFlags.SAMPLED),

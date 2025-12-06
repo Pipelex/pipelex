@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, final
 
+import shortuuid
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -17,17 +18,14 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.system.telemetry.otel_utils import (
     PIPELEX_PIPE_CATEGORY,
     PIPELEX_PIPE_CODE,
     PIPELEX_PIPE_TYPE,
     PIPELEX_PIPELINE_RUN_ID,
     PIPELEX_SPAN_KIND,
-    VIRTUAL_ROOT_PARENT_SPAN_ID,
     get_global_tracer,
-    hex_span_id_to_int,
-    pipeline_run_id_to_trace_id,
 )
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
@@ -301,44 +299,39 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         pass
 
-    def _start_pipe_span(self, job_metadata: JobMetadata, parent_span_id_hex: str | None, run_mode: PipeRunMode) -> Span | None:
+    def _start_pipe_span(
+        self,
+        parent_otel_context: OtelContext,
+        pipeline_run_id: str,
+    ) -> Span | None:
         """Start an OTel span for this pipe execution.
 
         Args:
-            job_metadata: The job metadata containing pipeline_run_id.
-            parent_span_id_hex: The parent pipe's span ID (16-char hex string) to use as parent.
-                               This should be the pipe_run_id saved BEFORE calling this method.
-                               If None, this is a root span.
-            run_mode: The pipe run mode. Tracing is skipped in dry mode.
-        """
-        # Skip tracing in dry mode
-        if run_mode.is_dry:
-            return None
+            parent_otel_context: The parent's OTel context (contains trace_id and parent span_id).
+            pipeline_run_id: The pipeline run ID for span attributes.
 
+        Returns:
+            The started span, or None if tracer is unavailable.
+        """
         tracer = get_global_tracer()
         if tracer is None:
             log.dev(f"[OTel] No tracer available for pipe '{self.code}'")
             return None
 
-        pipeline_run_id = job_metadata.pipeline_run_id
-        trace_id_int = pipeline_run_id_to_trace_id(pipeline_run_id)
-
-        # ALWAYS set context with our deterministic trace_id to ensure all spans
-        # in a pipeline share the same trace_id.
-        # For root spans: use VIRTUAL_ROOT_PARENT_SPAN_ID (1) as parent - this ensures
-        # OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid and ignored).
+        # For root spans: parent_otel_context.span_id is VIRTUAL_ROOT_PARENT_SPAN_ID (1)
+        # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
         # The exporter filters out this virtual parent when setting $ai_parent_id.
-        # For child spans: use the actual parent span_id
-        parent_span_id = hex_span_id_to_int(parent_span_id_hex) if parent_span_id_hex else VIRTUAL_ROOT_PARENT_SPAN_ID
+        # For child spans: parent_otel_context.span_id is the actual parent's span_id
+        parent_span_id = parent_otel_context.span_id
         parent_span_context = SpanContext(
-            trace_id=trace_id_int,
+            trace_id=parent_otel_context.trace_id,
             span_id=parent_span_id,
             is_remote=True,
             trace_flags=TraceFlags(TraceFlags.SAMPLED),
         )
         parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
 
-        # Start span with our context (inherits our deterministic trace_id)
+        # Start span - OTel generates the span_id, we capture it after
         span = tracer.start_span(
             name=f"{self.pipe_type}: {self.code}",
             kind=SpanKind.INTERNAL,
@@ -357,7 +350,7 @@ class PipeAbstract(ABC, BaseModel):
         log.dev(
             f"[OTel] PIPE SPAN STARTED: pipe='{self.code}' "
             f"trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x} "
-            f"parent_span_id={parent_span_id:016x} (parent_hex={parent_span_id_hex})"
+            f"parent_span_id={parent_span_id:016x}"
         )
 
         return span
@@ -388,26 +381,37 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
-        # Get the parent span ID from caller's metadata
-        # (will be None for root pipe, otherwise the parent pipe's span ID)
-        parent_span_id_hex = job_metadata.pipe_run_id
+        # Generate pipe_run_id (business ID, always set) - similar to pipeline_run_id format
+        this_pipe_run_id = f"{self.code}_{shortuuid.uuid()}"
 
-        # Start OTel span for this pipe (skipped in dry mode)
-        span = self._start_pipe_span(job_metadata, parent_span_id_hex=parent_span_id_hex, run_mode=pipe_run_params.run_mode)
+        # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
+        # The trace_id comes from parent's otel_context (already computed at pipeline start)
+        this_otel_context: OtelContext | None = None
+        span: Span | None = None
 
-        # Determine this pipe's span ID for child operations
-        this_pipe_span_id: str | None = None
-        if span:
-            span_context = span.get_span_context()
-            if span_context and span_context.is_valid:
-                this_pipe_span_id = f"{span_context.span_id:016x}"
+        parent_otel_context = job_metadata.otel_context
+        if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
+            # Start OTel span first
+            span = self._start_pipe_span(
+                parent_otel_context=parent_otel_context,
+                pipeline_run_id=job_metadata.pipeline_run_id,
+            )
+            # Get the actual span_id from OTel (OTel generates its own span_id)
+            if span:
+                span_context = span.get_span_context()
+                if span_context and span_context.is_valid:
+                    this_otel_context = OtelContext(
+                        trace_id=parent_otel_context.trace_id,
+                        span_id=span_context.span_id,
+                    )
 
-        # Create child metadata with updated pipe_code and pipe_run_id
+        # Create child metadata with updated pipe_code, pipe_run_id, and otel_context
         # This passes down a modified copy rather than mutating the original
         child_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
                 pipe_code=self.code,
-                pipe_run_id=this_pipe_span_id,
+                pipe_run_id=this_pipe_run_id,
+                otel_context=this_otel_context,
             )
         )
 

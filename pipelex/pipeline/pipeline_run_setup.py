@@ -21,10 +21,11 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.system.telemetry.otel_utils import VIRTUAL_ROOT_PARENT_SPAN_ID, pipeline_run_id_to_trace_id
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -155,8 +156,19 @@ async def pipeline_run_setup(
 
     get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
 
+    # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
+    # The trace_id is computed once here; span_id uses VIRTUAL_ROOT_PARENT_SPAN_ID for root
+    otel_context: OtelContext | None = None
+    if pipe_run_mode != PipeRunMode.DRY and get_telemetry_manager().get_tracer() is not None:
+        trace_id = pipeline_run_id_to_trace_id(pipeline_run_id)
+        otel_context = OtelContext(
+            trace_id=trace_id,
+            span_id=VIRTUAL_ROOT_PARENT_SPAN_ID,
+        )
+
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline.pipeline_run_id,
+        otel_context=otel_context,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(

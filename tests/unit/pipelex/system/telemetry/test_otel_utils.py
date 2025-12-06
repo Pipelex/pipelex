@@ -4,7 +4,6 @@ import pytest
 
 from pipelex.system.telemetry.otel_utils import (
     generate_span_id,
-    hex_span_id_to_int,
     pipeline_run_id_to_trace_id,
 )
 
@@ -26,6 +25,16 @@ class TestOtelUtils:
 
         # All should be unique
         assert len(set(span_ids)) == 100
+
+    def test_generate_span_id_can_be_converted_to_int(self) -> None:
+        """Test that generated span IDs can be converted to int and back."""
+        span_id = generate_span_id()
+
+        span_id_int = int(span_id, 16)
+        # Convert back to hex (with leading zeros)
+        span_id_back = f"{span_id_int:016x}"
+
+        assert span_id_back == span_id
 
     def test_pipeline_run_id_to_trace_id_is_deterministic(self) -> None:
         """Test that pipeline_run_id_to_trace_id produces consistent trace IDs."""
@@ -53,41 +62,6 @@ class TestOtelUtils:
         trace_id_2 = pipeline_run_id_to_trace_id("pipeline_b")
 
         assert trace_id_1 != trace_id_2
-
-    def test_hex_span_id_to_int_converts_correctly(self) -> None:
-        """Test that hex_span_id_to_int correctly converts hex strings to integers."""
-        hex_span_id = "a1b2c3d4e5f60708"
-        expected_int = 0xA1B2C3D4E5F60708
-
-        result = hex_span_id_to_int(hex_span_id)
-
-        assert result == expected_int
-
-    def test_hex_span_id_to_int_handles_lowercase(self) -> None:
-        """Test that hex_span_id_to_int handles lowercase hex."""
-        hex_span_id = "abcdef0123456789"
-
-        result = hex_span_id_to_int(hex_span_id)
-
-        assert result == 0xABCDEF0123456789
-
-    def test_hex_span_id_to_int_handles_uppercase(self) -> None:
-        """Test that hex_span_id_to_int handles uppercase hex."""
-        hex_span_id = "ABCDEF0123456789"
-
-        result = hex_span_id_to_int(hex_span_id)
-
-        assert result == 0xABCDEF0123456789
-
-    def test_hex_span_id_to_int_roundtrip_with_generate(self) -> None:
-        """Test that generated span IDs can be converted to int and back."""
-        span_id = generate_span_id()
-
-        span_id_int = hex_span_id_to_int(span_id)
-        # Convert back to hex (with leading zeros)
-        span_id_back = f"{span_id_int:016x}"
-
-        assert span_id_back == span_id
 
     @pytest.mark.parametrize(
         "pipeline_run_id",

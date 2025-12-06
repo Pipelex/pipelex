@@ -80,18 +80,6 @@ def pipeline_run_id_to_trace_id(pipeline_run_id: str) -> int:
     return int(hashlib.md5(pipeline_run_id.encode("utf-8")).hexdigest(), 16)  # noqa: S324
 
 
-def hex_span_id_to_int(span_id: str) -> int:
-    """Convert a 16-char hex span ID to a 64-bit integer.
-
-    Args:
-        span_id: A 16-character hexadecimal string representing a span ID.
-
-    Returns:
-        The span ID as a 64-bit integer.
-    """
-    return int(span_id, 16)
-
-
 #########################################################
 # Global Tracer Accessor (avoids circular imports)
 #########################################################
