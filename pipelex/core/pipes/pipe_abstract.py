@@ -301,7 +301,7 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         pass
 
-    def _start_pipe_span(self, job_metadata: JobMetadata, parent_span_id_hex: str | None) -> Span | None:
+    def _start_pipe_span(self, job_metadata: JobMetadata, parent_span_id_hex: str | None, run_mode: PipeRunMode) -> Span | None:
         """Start an OTel span for this pipe execution.
 
         Args:
@@ -309,7 +309,12 @@ class PipeAbstract(ABC, BaseModel):
             parent_span_id_hex: The parent pipe's span ID (16-char hex string) to use as parent.
                                This should be the pipe_run_id saved BEFORE calling this method.
                                If None, this is a root span.
+            run_mode: The pipe run mode. Tracing is skipped in dry mode.
         """
+        # Skip tracing in dry mode
+        if run_mode.is_dry:
+            return None
+
         tracer = get_global_tracer()
         if tracer is None:
             log.dev(f"[OTel] No tracer available for pipe '{self.code}'")
@@ -391,8 +396,8 @@ class PipeAbstract(ABC, BaseModel):
         updated_metadata = JobMetadata(pipe_job_ids=[self.code])
         job_metadata.update(updated_metadata=updated_metadata)
 
-        # Start OTel span for this pipe, passing the parent span ID
-        span = self._start_pipe_span(job_metadata, parent_span_id_hex=parent_span_id_for_this_pipe)
+        # Start OTel span for this pipe, passing the parent span ID (skipped in dry mode)
+        span = self._start_pipe_span(job_metadata, parent_span_id_hex=parent_span_id_for_this_pipe, run_mode=pipe_run_params.run_mode)
 
         # Store this pipe's span_id for child operations (e.g., LLM calls)
         if span:
@@ -423,13 +428,12 @@ class PipeAbstract(ABC, BaseModel):
             pipe_output = await self._run_pipe(
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
+            await self.validate_after_run(
+                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
         except Exception as exc:
             self._end_pipe_span(span, error=exc)
             raise
-
-        await self.validate_after_run(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-        )
 
         # End span successfully
         self._end_pipe_span(span)
