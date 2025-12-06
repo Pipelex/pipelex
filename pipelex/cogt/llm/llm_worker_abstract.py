@@ -110,7 +110,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
         parent_span_id = otel_context.span_id
-        log.dev(f"[OTel] LLM span parent from otel_context.span_id: {parent_span_id:016x}")
+        log.dev(f"[OTel] LLM span:\n  pipe_code='{pipe_code}'\n  pipeline_run_id='{pipeline_run_id}'\n  parent_span_id={parent_span_id:016x}")
 
         parent_span_context = SpanContext(
             trace_id=otel_context.trace_id,
@@ -146,9 +146,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Debug logging
         span_ctx = span.get_span_context()
         log.dev(
-            f"[OTel] LLM SPAN STARTED: name='{span_name}' "
-            f"trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x} "
-            f"parent_span_id={parent_span_id:016x}"
+            f"[OTel] LLM SPAN STARTED:\n"
+            f"  pipe_code='{pipe_code}'\n"
+            f"  pipeline_run_id='{pipeline_run_id}'\n"
+            f"  trace_id={span_ctx.trace_id:032x}\n"
+            f"  span_id={span_ctx.span_id:016x}\n"
+            f"  parent_span_id={parent_span_id:016x}"
         )
 
         # Store span on job for later retrieval
@@ -164,8 +167,15 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if span is None:
             return
 
+        metadata = llm_job.job_metadata
         span_ctx = span.get_span_context()
-        log.dev(f"[OTel] LLM SPAN ENDING: trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x}")
+        log.dev(
+            f"[OTel] LLM SPAN ENDING:\n"
+            f"  pipe_code='{metadata.pipe_code}'\n"
+            f"  pipeline_run_id='{metadata.pipeline_run_id}'\n"
+            f"  trace_id={span_ctx.trace_id:032x}\n"
+            f"  span_id={span_ctx.span_id:016x}"
+        )
 
         if is_error and error is not None:
             span.record_exception(error)

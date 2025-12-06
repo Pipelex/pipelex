@@ -348,9 +348,12 @@ class PipeAbstract(ABC, BaseModel):
         # Debug logging
         span_ctx = span.get_span_context()
         log.dev(
-            f"[OTel] PIPE SPAN STARTED: pipe='{self.code}' "
-            f"trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x} "
-            f"parent_span_id={parent_span_id:016x}"
+            f"[OTel] PIPE SPAN STARTED:\n"
+            f"  pipe_code='{self.code}'\n"
+            f"  pipeline_run_id='{pipeline_run_id}'\n"
+            f"  trace_id={span_ctx.trace_id:032x}\n"
+            f"  span_id={span_ctx.span_id:016x}\n"
+            f"  parent_span_id={parent_span_id:016x}"
         )
 
         return span
@@ -361,7 +364,7 @@ class PipeAbstract(ABC, BaseModel):
             return
 
         span_ctx = span.get_span_context()
-        log.dev(f"[OTel] PIPE SPAN ENDING: trace_id={span_ctx.trace_id:032x} span_id={span_ctx.span_id:016x}")
+        log.dev(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
 
         if error:
             span.record_exception(error)

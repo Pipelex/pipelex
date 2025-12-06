@@ -136,10 +136,16 @@ class PostHogSpanExporter(SpanExporter):
         if completion := attributes.get(GEN_AI_COMPLETION_CONTENT):
             properties["$ai_output_choices"] = [{"content": completion}]
 
+        pipe_code = attributes.get(PIPELEX_PIPE_CODE)
+        pipeline_run_id = attributes.get(PIPELEX_PIPELINE_RUN_ID)
         log.dev(
-            f"[OTel->PostHog] EXPORT $ai_generation: "
-            f"trace_id={properties.get('$ai_trace_id')} span_id={properties.get('$ai_span_id')} "
-            f"parent_id={properties.get('$ai_parent_id')} model={properties.get('$ai_model')}"
+            f"[OTel->PostHog] EXPORT $ai_generation:\n"
+            f"  pipe_code='{pipe_code}'\n"
+            f"  pipeline_run_id='{pipeline_run_id}'\n"
+            f"  trace_id={properties.get('$ai_trace_id')}\n"
+            f"  span_id={properties.get('$ai_span_id')}\n"
+            f"  parent_id={properties.get('$ai_parent_id')}\n"
+            f"  model={properties.get('$ai_model')}"
         )
 
         self.client.capture(
@@ -160,10 +166,15 @@ class PostHogSpanExporter(SpanExporter):
             }
         )
 
+        pipe_code = attributes.get(PIPELEX_PIPE_CODE)
+        pipeline_run_id = attributes.get(PIPELEX_PIPELINE_RUN_ID)
         log.dev(
-            f"[OTel->PostHog] EXPORT $ai_span: "
-            f"trace_id={properties.get('$ai_trace_id')} span_id={properties.get('$ai_span_id')} "
-            f"parent_id={properties.get('$ai_parent_id')} name={span.name}"
+            f"[OTel->PostHog] EXPORT $ai_span:\n"
+            f"  pipe_code='{pipe_code}'\n"
+            f"  pipeline_run_id='{pipeline_run_id}'\n"
+            f"  trace_id={properties.get('$ai_trace_id')}\n"
+            f"  span_id={properties.get('$ai_span_id')}\n"
+            f"  parent_id={properties.get('$ai_parent_id')}"
         )
 
         self.client.capture(
@@ -185,9 +196,16 @@ class PostHogSpanExporter(SpanExporter):
                 parent_id = f"{span.parent.span_id:016x}" if span.parent else "None"
                 trace_id_str = f"{span_ctx.trace_id:032x}" if span_ctx else "unknown"
                 span_id_str = f"{span_ctx.span_id:016x}" if span_ctx else "unknown"
+                pipe_code = attributes.get(PIPELEX_PIPE_CODE)
+                pipeline_run_id = attributes.get(PIPELEX_PIPELINE_RUN_ID)
                 log.dev(
-                    f"[OTel->PostHog] Processing span: name='{span.name}' kind={span_kind} "
-                    f"trace_id={trace_id_str} span_id={span_id_str} parent_id={parent_id}"
+                    f"[OTel->PostHog] Processing span:\n"
+                    f"  pipe_code='{pipe_code}'\n"
+                    f"  pipeline_run_id='{pipeline_run_id}'\n"
+                    f"  kind={span_kind}\n"
+                    f"  trace_id={trace_id_str}\n"
+                    f"  span_id={span_id_str}\n"
+                    f"  parent_id={parent_id}"
                 )
 
                 # Route to appropriate exporter based on span kind
