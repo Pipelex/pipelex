@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 class PostHogSpanExporter(SpanExporter):
     """Exports OTel spans to PostHog as $ai_generation or $ai_span events."""
 
-    DEFAULT_USER_ID = "pipelex-user"
+    DEFAULT_USER_ID = "anonymous"
 
     def __init__(self, posthog_client: "Posthog", user_id: str):
         self.client = posthog_client
@@ -88,6 +88,10 @@ class PostHogSpanExporter(SpanExporter):
     def _export_pipe_span(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> None:
         """Export a pipe execution span."""
         properties = self._get_base_properties(span, attributes)
+
+        # Use the original span.name for $ai_span_name
+        # The trace name is established by a "trace start" event emitted at pipeline setup,
+        # which ensures PostHog receives the correct trace name before any pipe spans arrive.
         properties.update(
             {
                 "$ai_span_name": span.name,
@@ -103,6 +107,7 @@ class PostHogSpanExporter(SpanExporter):
             f"[OTel->PostHog] EXPORT $ai_span:\n"
             f"  pipe_code='{pipe_code}'\n"
             f"  pipeline_run_id='{pipeline_run_id}'\n"
+            f"  $ai_span_name='{span.name}'\n"
             f"  trace_id={properties.get('$ai_trace_id')}\n"
             f"  span_id={properties.get('$ai_span_id')}\n"
             f"  parent_id={properties.get('$ai_parent_id')}"

@@ -244,6 +244,30 @@ class TelemetryManager(TelemetryManagerAbstract):
     def get_telemetry_config(self) -> TelemetryConfig | None:
         return self.telemetry_config
 
+    @override
+    def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
+        """Emit a trace start event to establish the trace name in PostHog.
+
+        Sends a minimal $ai_span event with the pipeline_run_id as the span name.
+        This event is sent directly (not via OTel spans) to ensure it arrives
+        before any batched pipe spans, establishing the correct trace name.
+        """
+        user_id = self.telemetry_config.user_id or "pipelex-user"
+        properties = {
+            "$ai_trace_id": f"{trace_id:032x}",
+            "$ai_span_name": pipeline_run_id,
+            "$ai_trace_name": pipeline_run_id,
+            # No $ai_parent_id - this is a root-level marker
+        }
+
+        log.dev(f"[Telemetry] Emitting trace start event:\n  pipeline_run_id='{pipeline_run_id}'\n  trace_id={trace_id:032x}")
+
+        self.posthog_client.capture(
+            distinct_id=user_id,
+            event="$ai_span",
+            properties=properties,
+        )
+
     def make_ai_tracer(
         self,
         posthog_client: Posthog | None,

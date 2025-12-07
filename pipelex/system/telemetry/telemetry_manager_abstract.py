@@ -80,6 +80,20 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     def get_telemetry_config(self) -> TelemetryConfig | None:
         """Get the telemetry configuration, if available."""
 
+    @abstractmethod
+    def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
+        """Emit a trace start event to establish the trace name in PostHog.
+
+        This should be called at the very beginning of pipeline execution,
+        before any pipe spans are created. PostHog uses the first $ai_span_name
+        it receives to name the trace, so this event ensures the trace is named
+        after the pipeline_run_id rather than the first child span.
+
+        Args:
+            pipeline_run_id: The pipeline run ID to use as the trace name.
+            trace_id: The 128-bit trace ID for correlation.
+        """
+
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
@@ -115,3 +129,7 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
     def get_telemetry_config(self) -> TelemetryConfig | None:
         return None
+
+    @override
+    def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
+        pass

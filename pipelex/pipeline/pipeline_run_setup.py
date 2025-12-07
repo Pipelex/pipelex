@@ -161,12 +161,15 @@ async def pipeline_run_setup(
     # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
     # The trace_id is computed once here; span_id uses VIRTUAL_ROOT_PARENT_SPAN_ID for root
     otel_context: OtelContext | None = None
-    if pipe_run_mode != PipeRunMode.DRY and get_otel_tracer() is not None:
+    if pipe_run_mode.is_live and get_otel_tracer() is not None:
         trace_id = pipeline_run_id_to_trace_id(pipeline_run_id)
         otel_context = OtelContext(
             trace_id=trace_id,
             span_id=VIRTUAL_ROOT_PARENT_SPAN_ID,
         )
+        # Emit trace start event immediately to establish trace name in PostHog
+        # This must happen before any pipe spans are created/exported
+        get_telemetry_manager().emit_trace_start(pipeline_run_id=pipeline_run_id, trace_id=trace_id)
 
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline.pipeline_run_id,
