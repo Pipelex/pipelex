@@ -12,7 +12,7 @@ from pipelex.types import StrEnum
 class GenAISpanAttr(StrEnum):
     """OpenTelemetry GenAI semantic convention attribute keys."""
 
-    SYSTEM = otel_gen_ai_attributes.GEN_AI_SYSTEM
+    PROVIDER_NAME = otel_gen_ai_attributes.GEN_AI_PROVIDER_NAME
     REQUEST_MODEL = otel_gen_ai_attributes.GEN_AI_REQUEST_MODEL
     OPERATION_NAME = otel_gen_ai_attributes.GEN_AI_OPERATION_NAME
     USAGE_INPUT_TOKENS = otel_gen_ai_attributes.GEN_AI_USAGE_INPUT_TOKENS
@@ -45,8 +45,8 @@ class PostHogAttr(StrEnum):
 class PostHogEvent(StrEnum):
     """PostHog AI analytics event names."""
 
-    GENERATION = "$ai_generation"
     SPAN = "$ai_span"
+    GENERATION = "$ai_generation"
 
 
 # Virtual parent span ID for root spans.

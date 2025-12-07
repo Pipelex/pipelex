@@ -73,6 +73,22 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return instance.capture_pipe_codes_enabled
 
     @classmethod
+    def is_capture_output_class_name_enabled(cls) -> bool:
+        """Check if output class name capture is enabled for telemetry.
+
+        When this returns False, output class names should be redacted from span names
+        and attributes.
+
+        Returns:
+            True if output class name capture is enabled, False otherwise (including when
+            no telemetry manager is configured).
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return False
+        return instance.capture_output_class_name_enabled
+
+    @classmethod
     def telemetry_was_just_enabled(cls) -> TelemetryMode | None:
         if cls.telemetry_mode_just_set is None:
             return None
@@ -117,6 +133,11 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     @abstractmethod
     def capture_pipe_codes_enabled(self) -> bool:
         """Whether pipe codes should appear in span names and attributes."""
+
+    @property
+    @abstractmethod
+    def capture_output_class_name_enabled(self) -> bool:
+        """Whether output class names should appear in span names and attributes."""
 
     @abstractmethod
     def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
@@ -172,6 +193,11 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @property
     @override
     def capture_pipe_codes_enabled(self) -> bool:
+        return False
+
+    @property
+    @override
+    def capture_output_class_name_enabled(self) -> bool:
         return False
 
     @override

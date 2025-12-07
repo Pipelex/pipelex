@@ -342,7 +342,7 @@ class PipeAbstract(ABC, BaseModel):
         )
 
         # Set pipe-specific attributes
-        span.set_attribute(PipelexSpanAttr.SPAN_KIND, "pipe")
+        span.set_attribute(PipelexSpanAttr.SPAN_CATEGORY, "pipe")
         span.set_attribute(PipelexSpanAttr.PIPE_CODE, pipe_code_attr)
         span.set_attribute(PipelexSpanAttr.PIPE_TYPE, self.pipe_type)
         span.set_attribute(PipelexSpanAttr.PIPE_CATEGORY, self.pipe_category)

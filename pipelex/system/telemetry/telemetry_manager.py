@@ -250,6 +250,11 @@ class TelemetryManager(TelemetryManagerAbstract):
     def capture_pipe_codes_enabled(self) -> bool:
         return self.telemetry_config.capture_pipe_codes_enabled
 
+    @property
+    @override
+    def capture_output_class_name_enabled(self) -> bool:
+        return self.telemetry_config.capture_output_class_name_enabled
+
     @override
     def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
         """Emit a trace start event to establish the trace name in PostHog.

@@ -9,8 +9,10 @@ from portkey_ai import (
 
 from pipelex import log
 from pipelex.hub import get_telemetry_manager
-from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError, GatewayFactoryError
+from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
+from pipelex.system.telemetry.telemetry_constants import REDACTED
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -58,14 +60,19 @@ class GatewayFactory:
             extra_headers.update(inference_model.extra_headers)
         if not extra_headers.get(PortkeyHeaderKey.CONFIG) and not extra_headers.get(PortkeyHeaderKey.PROVIDER):
             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
-        if get_telemetry_manager().is_portkey_tracing_enabled():
+
+        # OTel-correlated Portkey tracing (only when enabled and OTel context available)
+        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := llm_job.job_metadata.otel_context):
+            # Use OTel trace_id and span_id for correlation
+            extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
+            extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"
+
+            # Build span name respecting privacy settings
             pipe_code = llm_job.job_metadata.pipe_code or "main"
-            extra_headers[PortkeyHeaderKey.TRACE_ID] = llm_job.job_metadata.pipeline_run_id
-            if not llm_job.job_metadata.unit_job_id:
-                msg = f"Unit job id is not set for LLM job: {llm_job}"
-                raise GatewayFactoryError(msg)
-            model_kind = llm_job.job_metadata.unit_job_id.model_kind
-            span_id = f"{model_kind} -> {output_desc}"
-            extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id
-            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {span_id}"
+            if not TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
+                pipe_code = REDACTED
+
+            unit_job_id = llm_job.job_metadata.unit_job_id or "unknown"
+            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {unit_job_id} -> {output_desc}"
+
         return extra_headers, {}

@@ -4,7 +4,7 @@ This module provides a SpanExporter that sends OTel spans to PostHog
 as $ai_generation or $ai_span events.
 """
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -14,7 +14,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.system.telemetry.otel_constants import OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID, GenAISpanAttr, PostHogAttr, PostHogEvent
-from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr
+from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr, SpanCategory
 
 
 class PostHogSpanExporter(SpanExporter):
@@ -26,9 +26,9 @@ class PostHogSpanExporter(SpanExporter):
 
     def _get_base_properties(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> dict[str, Any]:
         """Get common properties for all span types."""
-        properties: dict[str, Any] = {
-            PostHogAttr.LATENCY: (span.end_time - span.start_time) / 1e9 if span.end_time and span.start_time else None,
-        }
+        properties: dict[str, Any] = {}
+        if span.end_time and span.start_time:
+            properties[PostHogAttr.LATENCY] = (span.end_time - span.start_time) / 1e9
 
         # Add trace/span IDs for PostHog trace grouping
         span_context = span.get_span_context()
@@ -46,11 +46,12 @@ class PostHogSpanExporter(SpanExporter):
 
     def _export_generation_span(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> None:
         """Export a GenAI generation span."""
-        properties = self._get_base_properties(span, attributes)
+        properties = self._get_base_properties(span=span, attributes=attributes)
+        provider_operation_combo = f"{attributes.get(GenAISpanAttr.PROVIDER_NAME)}:{attributes.get(GenAISpanAttr.OPERATION_NAME)}"
         properties.update(
             {
                 PostHogAttr.MODEL: attributes.get(GenAISpanAttr.REQUEST_MODEL),
-                PostHogAttr.PROVIDER: attributes.get(GenAISpanAttr.SYSTEM),
+                PostHogAttr.PROVIDER: provider_operation_combo,
                 PostHogAttr.INPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_INPUT_TOKENS),
                 PostHogAttr.OUTPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_OUTPUT_TOKENS),
                 PostHogAttr.HTTP_STATUS: 200,
@@ -123,7 +124,8 @@ class PostHogSpanExporter(SpanExporter):
         for span in spans:
             try:
                 attributes = span.attributes or {}
-                span_kind = attributes.get(PipelexSpanAttr.SPAN_KIND)
+                span_category_str = cast("str", attributes.get(PipelexSpanAttr.SPAN_CATEGORY))
+                span_category = SpanCategory(span_category_str)
 
                 span_ctx = span.get_span_context()
                 parent_id = f"{span.parent.span_id:016x}" if span.parent else "None"
@@ -135,21 +137,17 @@ class PostHogSpanExporter(SpanExporter):
                     f"[OTel->PostHog] Processing span:\n"
                     f"  pipe_code='{pipe_code}'\n"
                     f"  pipeline_run_id='{pipeline_run_id}'\n"
-                    f"  kind={span_kind}\n"
+                    f"  span_category={span_category}\n"
                     f"  trace_id={trace_id_str}\n"
                     f"  span_id={span_id_str}\n"
                     f"  parent_id={parent_id}"
                 )
 
-                # Route to appropriate exporter based on span kind
-                if attributes.get(GenAISpanAttr.OPERATION_NAME):
-                    # GenAI (LLM) span
-                    self._export_generation_span(span, attributes)
-                elif span_kind == "pipe":
-                    # Pipe execution span
-                    self._export_pipe_span(span, attributes)
-                else:
-                    log.dev(f"[OTel->PostHog] SKIPPING span (unknown kind): {span.name}")
+                match span_category:
+                    case SpanCategory.INFERENCE:
+                        self._export_generation_span(span=span, attributes=attributes)
+                    case SpanCategory.PIPE:
+                        self._export_pipe_span(span=span, attributes=attributes)
 
             except Exception as exc:
                 # Fail silently to avoid breaking app

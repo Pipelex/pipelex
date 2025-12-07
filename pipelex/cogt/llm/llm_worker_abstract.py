@@ -13,10 +13,12 @@ from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbst
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import GenAISpanAttr
-from pipelex.system.telemetry.telemetry_constants import REDACTED, PipelexSpanAttr
+from pipelex.system.telemetry.telemetry_constants import REDACTED, UNKNOWN_JOB, UNKNOWN_PIPE, OutputDesc, PipelexSpanAttr, SpanCategory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
+    from opentelemetry.util.types import AttributeValue
+
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.reporting.reporting_protocol import ReportingProtocol
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -62,19 +64,19 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Get the OTel tracer. Override in subclass to provide actual tracer."""
         return None
 
-    def _get_system(self) -> str:
-        """Get the GenAI system/provider name (e.g., 'openai', 'anthropic'). Override in subclass."""
+    def _get_provider_name(self) -> str:
+        """Get the GenAI provider name (e.g., 'openai', 'anthropic'). Override in subclass."""
         return "unknown"
 
     def _get_model_name(self) -> str:
-        """Get the model name/id (e.g., 'gpt-4'). Override in subclass."""
+        """Get the model name. Override in subclass."""
         return "unknown"
 
     def _should_capture_content(self) -> bool:
         """Return whether prompt/response content should be captured. Override in subclass."""
         return False
 
-    def _start_otel_span(self, llm_job: LLMJob) -> None:
+    def _start_otel_span_llm(self, llm_job: LLMJob, output_desc: str) -> None:
         """Start an OTel span and attach it to the llm_job. Safe to call if otel_context is None."""
         # Get context from job metadata
         metadata = llm_job.job_metadata
@@ -90,21 +92,38 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             log.dev("[OTel] No tracer available for LLM span")
             return
 
-        unit_job_id = metadata.unit_job_id or "unknown"
+        unit_job_id = metadata.unit_job_id or UNKNOWN_JOB
         pipeline_run_id = metadata.pipeline_run_id
-        pipe_code = metadata.pipe_code or "main"
+        pipe_code = metadata.pipe_code or UNKNOWN_PIPE
 
-        # Determine if we need to redact pipe codes for privacy
-        # Note: pipeline_run_id is already generated without pipe_code when capture is disabled
-        model_name = self._get_model_name()
+        # Determine if we need to redact output class names
+        if not TelemetryManagerAbstract.is_capture_output_class_name_enabled() and not OutputDesc.is_text(output_desc):
+            output_desc = OutputDesc.OBJECT
+
+        # Determine if we need to redact pipe code
         if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
-            # Format: "{pipe_code}: {unit_job_id} {model_name}"
-            span_name = f"{pipe_code}: {unit_job_id} {model_name}"
             pipe_code_attr = pipe_code
         else:
-            # Redact pipe code but keep unit_job_id and model_name for debugging
-            span_name = f"{REDACTED}: {unit_job_id} {model_name}"
             pipe_code_attr = REDACTED
+
+        model_name = self._get_model_name()
+        span_name = f"{pipe_code_attr}: {unit_job_id} ({model_name}) -> {output_desc}"
+
+        # Build all span attributes upfront
+        span_attributes: dict[str, AttributeValue] = {
+            # GenAI standard attributes
+            GenAISpanAttr.PROVIDER_NAME: self._get_provider_name(),
+            GenAISpanAttr.REQUEST_MODEL: model_name,
+            GenAISpanAttr.OPERATION_NAME: unit_job_id,
+            # Pipelex specific context attributes
+            PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.INFERENCE,
+            PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
+            PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
+        }
+        if metadata.job_name:
+            span_attributes[PipelexSpanAttr.JOB_NAME] = metadata.job_name
+        if self._should_capture_content() and llm_job.llm_prompt.user_text:
+            span_attributes[GenAISpanAttr.PROMPT_CONTENT] = llm_job.llm_prompt.user_text
 
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
@@ -119,28 +138,13 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         )
         parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
 
-        # Start span with our context (inherits our deterministic trace_id)
+        # Start span with our context and all attributes
         span = tracer.start_span(
             name=span_name,
             kind=SpanKind.CLIENT,
             context=parent_ctx,
+            attributes=span_attributes,
         )
-
-        # Set standard GenAI attributes
-        span.set_attribute(GenAISpanAttr.SYSTEM, self._get_system())
-        span.set_attribute(GenAISpanAttr.REQUEST_MODEL, model_name)
-        span.set_attribute(GenAISpanAttr.OPERATION_NAME, unit_job_id)
-
-        # Set Pipelex specific context attributes
-        span.set_attribute(PipelexSpanAttr.SPAN_KIND, "inference")
-        span.set_attribute(PipelexSpanAttr.PIPELINE_RUN_ID, pipeline_run_id)
-        span.set_attribute(PipelexSpanAttr.PIPE_CODE, pipe_code_attr)
-        if metadata.job_name:
-            span.set_attribute("pipelex.job.name", metadata.job_name)
-
-        # Capture prompt content if enabled
-        if self._should_capture_content() and llm_job.llm_prompt.user_text:
-            span.set_attribute(GenAISpanAttr.PROMPT_CONTENT, llm_job.llm_prompt.user_text)
 
         # Debug logging
         span_ctx = span.get_span_context()
@@ -241,7 +245,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         await self._before_job(llm_job=llm_job)
 
         # Start OTel span after _before_job (which may set model info)
-        self._start_otel_span(llm_job=llm_job)
+        self._start_otel_span_llm(llm_job=llm_job, output_desc="Text")
 
         # Get span and create context manager
         span = self._get_otel_span(llm_job)
@@ -279,7 +283,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         await self._before_job(llm_job=llm_job)
 
         # Start OTel span after _before_job (which may set model info)
-        self._start_otel_span(llm_job=llm_job)
+        self._start_otel_span_llm(llm_job=llm_job, output_desc=schema.__name__)
 
         # Get span and create context manager
         span = self._get_otel_span(llm_job)

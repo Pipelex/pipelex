@@ -9,7 +9,9 @@ from portkey_ai import (
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.openai.openai_constants import OpenAIBodyKey
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
-from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError, PortkeyFactoryError
+from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError
+from pipelex.system.telemetry.telemetry_constants import REDACTED
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -38,18 +40,25 @@ class PortkeyFactory:
     def make_extras(cls, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
         extra_headers: dict[str, str] = {}
         extra_body: dict[str, Any] = {}
+
+        # Model-level extras (unchanged)
         if inference_model.extra_headers:
             extra_headers.update(inference_model.extra_headers)
         if not llm_job.job_params.max_tokens and inference_model.max_tokens:
             extra_body[OpenAIBodyKey.MAX_TOKENS] = inference_model.max_tokens
-        if get_telemetry_manager().is_portkey_tracing_enabled():
+
+        # OTel-correlated Portkey tracing (only when enabled and OTel context available)
+        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := llm_job.job_metadata.otel_context):
+            # Use OTel trace_id and span_id for correlation
+            extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
+            extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"
+
+            # Build span name respecting privacy settings
             pipe_code = llm_job.job_metadata.pipe_code or "main"
-            extra_headers[PortkeyHeaderKey.TRACE_ID] = llm_job.job_metadata.pipeline_run_id
-            if not llm_job.job_metadata.unit_job_id:
-                msg = f"Unit job id is not set for LLM job: {llm_job}"
-                raise PortkeyFactoryError(msg)
-            model_kind = llm_job.job_metadata.unit_job_id.model_kind
-            span_id = f"{model_kind} -> {output_desc}"
-            extra_headers[PortkeyHeaderKey.SPAN_ID] = span_id
-            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {span_id}"
+            if not TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
+                pipe_code = REDACTED
+
+            unit_job_id = llm_job.job_metadata.unit_job_id or "unknown"
+            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {unit_job_id} -> {output_desc}"
+
         return extra_headers, extra_body

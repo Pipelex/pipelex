@@ -60,14 +60,14 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         return get_otel_tracer()
 
     @override
-    def _get_system(self) -> str:
-        """Get the GenAI system/provider name from the inference model SDK."""
-        return self.inference_model.sdk
+    def _get_provider_name(self) -> str:
+        """Get the GenAI provider name from the inference model SDK."""
+        return self.inference_model.backend_name
 
     @override
     def _get_model_name(self) -> str:
-        """Get the model name/id from the inference model."""
-        return self.inference_model.model_id
+        """Get the model name from the inference model."""
+        return self.inference_model.name
 
     @override
     def _should_capture_content(self) -> bool:
