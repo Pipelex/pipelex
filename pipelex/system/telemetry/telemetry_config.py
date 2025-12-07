@@ -36,9 +36,10 @@ class TelemetryConfig(ConfigModel):
     verbose_enabled: bool
     user_id: str
     ai_tracing_enabled: bool  # Enable OpenTelemetry tracing for AI operations
+    capture_content_enabled: bool  # Controls gen_ai.prompt/completion content capture for OTel
+    capture_pipe_codes_enabled: bool  # Controls whether pipe codes appear in span names/attributes
     otlp_endpoint: str | None = None  # Optional OTLP endpoint for generic tracing
     otlp_headers: dict[str, str] | None = None  # Optional headers for OTLP export
-    capture_content_enabled: bool  # Controls gen_ai.prompt/completion content capture for OTel
 
 
 def load_telemetry_config(path: str) -> TelemetryConfig:

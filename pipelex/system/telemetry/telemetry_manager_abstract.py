@@ -8,7 +8,7 @@ from typing_extensions import override
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
+from pipelex.system.telemetry.telemetry_config import TelemetryMode
 
 
 class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
@@ -39,6 +39,38 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         if instance is None:
             return None
         return instance.get_otel_tracer()
+
+    @classmethod
+    def is_capture_content_enabled(cls) -> bool:
+        """Check if content capture is enabled for telemetry.
+
+        When this returns False, prompt/completion content should not be
+        captured in span attributes.
+
+        Returns:
+            True if content capture is enabled, False otherwise (including when
+            no telemetry manager is configured).
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return False
+        return instance.capture_content_enabled
+
+    @classmethod
+    def is_capture_pipe_codes_enabled(cls) -> bool:
+        """Check if pipe code capture is enabled for telemetry.
+
+        When this returns False, pipe codes should be redacted from span names
+        and attributes, and excluded from run IDs.
+
+        Returns:
+            True if pipe code capture is enabled, False otherwise (including when
+            no telemetry manager is configured).
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return False
+        return instance.capture_pipe_codes_enabled
 
     @classmethod
     def telemetry_was_just_enabled(cls) -> TelemetryMode | None:
@@ -76,9 +108,15 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     def get_otel_tracer(self) -> OTelTracer | None:
         """Get the OpenTelemetry tracer for GenAI spans, if configured."""
 
+    @property
     @abstractmethod
-    def get_telemetry_config(self) -> TelemetryConfig | None:
-        """Get the telemetry configuration, if available."""
+    def capture_content_enabled(self) -> bool:
+        """Whether prompt/completion content should be captured in span attributes."""
+
+    @property
+    @abstractmethod
+    def capture_pipe_codes_enabled(self) -> bool:
+        """Whether pipe codes should appear in span names and attributes."""
 
     @abstractmethod
     def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
@@ -126,9 +164,15 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     def get_otel_tracer(self) -> OTelTracer | None:
         return None
 
+    @property
     @override
-    def get_telemetry_config(self) -> TelemetryConfig | None:
-        return None
+    def capture_content_enabled(self) -> bool:
+        return False
+
+    @property
+    @override
+    def capture_pipe_codes_enabled(self) -> bool:
+        return False
 
     @override
     def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:

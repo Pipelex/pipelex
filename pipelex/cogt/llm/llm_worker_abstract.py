@@ -13,7 +13,8 @@ from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbst
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import GenAISpanAttr
-from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr
+from pipelex.system.telemetry.telemetry_constants import REDACTED, PipelexSpanAttr
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -93,10 +94,17 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         pipeline_run_id = metadata.pipeline_run_id
         pipe_code = metadata.pipe_code or "main"
 
-        # Construct span name
-        # Format: "{pipe_code}: {unit_job_id} {model_name}"
+        # Determine if we need to redact pipe codes for privacy
+        # Note: pipeline_run_id is already generated without pipe_code when capture is disabled
         model_name = self._get_model_name()
-        span_name = f"{pipe_code}: {unit_job_id} {model_name}"
+        if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
+            # Format: "{pipe_code}: {unit_job_id} {model_name}"
+            span_name = f"{pipe_code}: {unit_job_id} {model_name}"
+            pipe_code_attr = pipe_code
+        else:
+            # Redact pipe code but keep unit_job_id and model_name for debugging
+            span_name = f"{REDACTED}: {unit_job_id} {model_name}"
+            pipe_code_attr = REDACTED
 
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
@@ -126,7 +134,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Set Pipelex specific context attributes
         span.set_attribute(PipelexSpanAttr.SPAN_KIND, "inference")
         span.set_attribute(PipelexSpanAttr.PIPELINE_RUN_ID, pipeline_run_id)
-        span.set_attribute(PipelexSpanAttr.PIPE_CODE, pipe_code)
+        span.set_attribute(PipelexSpanAttr.PIPE_CODE, pipe_code_attr)
         if metadata.job_name:
             span.set_attribute("pipelex.job.name", metadata.job_name)
 

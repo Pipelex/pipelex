@@ -10,8 +10,9 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
-from pipelex.hub import get_otel_tracer, get_telemetry_manager
+from pipelex.hub import get_otel_tracer
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 
 class LLMWorkerInternalAbstract(LLMWorkerAbstract):
@@ -71,10 +72,7 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @override
     def _should_capture_content(self) -> bool:
         """Return whether prompt/response content should be captured."""
-        telemetry_config = get_telemetry_manager().get_telemetry_config()
-        if telemetry_config is None:
-            return False
-        return telemetry_config.capture_content_enabled
+        return TelemetryManagerAbstract.is_capture_content_enabled()
 
     #########################################################
     # Job lifecycle overrides

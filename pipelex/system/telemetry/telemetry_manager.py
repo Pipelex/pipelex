@@ -240,9 +240,15 @@ class TelemetryManager(TelemetryManagerAbstract):
     def get_otel_tracer(self) -> OTelTracer | None:
         return self._otel_tracer
 
+    @property
     @override
-    def get_telemetry_config(self) -> TelemetryConfig | None:
-        return self.telemetry_config
+    def capture_content_enabled(self) -> bool:
+        return self.telemetry_config.capture_content_enabled
+
+    @property
+    @override
+    def capture_pipe_codes_enabled(self) -> bool:
+        return self.telemetry_config.capture_pipe_codes_enabled
 
     @override
     def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
@@ -251,6 +257,9 @@ class TelemetryManager(TelemetryManagerAbstract):
         Sends a minimal $ai_span event with the pipeline_run_id as the span name.
         This event is sent directly (not via OTel spans) to ensure it arrives
         before any batched pipe spans, establishing the correct trace name.
+
+        Note: pipeline_run_id is already generated without pipe_code when
+        capture_content_enabled is False.
         """
         user_id = self.telemetry_config.user_id or OTelConstants.DEFAULT_USER_ID
         properties: dict[str, Any] = {

@@ -2,6 +2,9 @@
 
 from pipelex.types import StrEnum
 
+# Constant used when pipe codes should be redacted for privacy
+REDACTED = "[REDACTED]"
+
 
 class PipelexSpanAttr(StrEnum):
     """Pipelex-specific span attribute keys for workflow tracing."""

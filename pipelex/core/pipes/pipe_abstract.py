@@ -19,7 +19,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.run_id_factory import make_pipe_run_id
-from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr, SpanOutcome
+from pipelex.system.telemetry.telemetry_constants import REDACTED, PipelexSpanAttr, SpanOutcome
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
@@ -312,6 +312,15 @@ class PipeAbstract(ABC, BaseModel):
             log.dev(f"[OTel] No tracer available for pipe '{self.code}'")
             return None
 
+        # Determine if we need to redact pipe codes for privacy
+        # Note: pipeline_run_id is already generated without pipe_code when capture is disabled
+        if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
+            span_name = f"{self.pipe_type}: {self.code}"
+            pipe_code_attr = self.code
+        else:
+            span_name = f"{self.pipe_type}: {REDACTED}"
+            pipe_code_attr = REDACTED
+
         # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
         # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
         # The exporter filters out this virtual parent when setting $ai_parent_id.
@@ -327,14 +336,14 @@ class PipeAbstract(ABC, BaseModel):
 
         # Start span - OTel generates the span_id, we capture it after
         span = tracer.start_span(
-            name=f"{self.pipe_type}: {self.code}",
+            name=span_name,
             kind=SpanKind.INTERNAL,
             context=parent_ctx,
         )
 
         # Set pipe-specific attributes
         span.set_attribute(PipelexSpanAttr.SPAN_KIND, "pipe")
-        span.set_attribute(PipelexSpanAttr.PIPE_CODE, self.code)
+        span.set_attribute(PipelexSpanAttr.PIPE_CODE, pipe_code_attr)
         span.set_attribute(PipelexSpanAttr.PIPE_TYPE, self.pipe_type)
         span.set_attribute(PipelexSpanAttr.PIPE_CATEGORY, self.pipe_category)
         span.set_attribute(PipelexSpanAttr.PIPELINE_RUN_ID, pipeline_run_id)
