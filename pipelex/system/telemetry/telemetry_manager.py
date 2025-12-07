@@ -297,5 +297,8 @@ class TelemetryManager(TelemetryManagerAbstract):
             provider.add_span_processor(OTelBatchSpanProcessor(otlp_exporter))
 
         # 5. Get the Tracer and return both tracer and provider
-        tracer = provider.get_tracer("pipelex", get_package_version())
+        tracer = provider.get_tracer(
+            instrumenting_module_name=OTelConstants.INSTRUMENTATION_NAME,
+            instrumenting_library_version=get_package_version(),
+        )
         return tracer, provider

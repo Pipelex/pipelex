@@ -37,3 +37,4 @@ class OTelConstants(StrEnum):
     SERVICE_NAME = "pipelex"
     SERVICE_NAMESPACE_KEY = "service.namespace"
     SERVICE_NAMESPACE = "ai.orchestration"
+    INSTRUMENTATION_NAME = "pipelex"
