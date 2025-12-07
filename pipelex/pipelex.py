@@ -1,4 +1,5 @@
 import os
+import types
 from typing import Any, cast
 
 from kajson.class_registry import ClassRegistry
@@ -311,7 +312,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None) -> None:
         self.teardown()
 
     @classmethod
