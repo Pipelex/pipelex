@@ -94,6 +94,7 @@ class PostHogSpanExporter(SpanExporter):
                 "pipe_code": attributes.get(PipelexSpanAttr.PIPE_CODE),
                 "pipe_type": attributes.get(PipelexSpanAttr.PIPE_TYPE),
                 "pipe_category": attributes.get(PipelexSpanAttr.PIPE_CATEGORY),
+                "outcome": attributes.get(PipelexSpanAttr.OUTCOME),
             }
         )
 

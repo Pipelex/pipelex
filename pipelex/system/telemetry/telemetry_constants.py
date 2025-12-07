@@ -11,3 +11,11 @@ class PipelexSpanAttr(StrEnum):
     PIPE_CATEGORY = "pipelex.pipe.category"
     PIPELINE_RUN_ID = "pipelex.pipeline.run_id"
     SPAN_KIND = "pipelex.span.kind"  # "pipe" or "inference"
+    OUTCOME = "pipelex.outcome"  # "success" or "failure"
+
+
+class SpanOutcome(StrEnum):
+    """Outcome values for span completion."""
+
+    SUCCESS = "success"
+    FAILURE = "failure"

@@ -1,3 +1,5 @@
+from typing import Any
+
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -88,9 +90,16 @@ async def execute_pipeline(
         search_domains=search_domains,
     )
 
+    properties: dict[EventProperty, Any]
     try:
         pipe_output = await get_pipe_router().run(pipe_job)
     except PipeRouterError as exc:
+        properties = {
+            EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
+            EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
+            EventProperty.PIPELINE_OUTCOME: Outcome.FAILURE,
+        }
+        get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
         raise PipelineExecutionError(
             message=exc.message,
             run_mode=pipe_job.pipe_run_params.run_mode,
@@ -105,7 +114,7 @@ async def execute_pipeline(
     properties = {
         EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
         EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
-        EventProperty.PIPELINE_EXECUTE_OUTCOME: Outcome.SUCCESS,
+        EventProperty.PIPELINE_OUTCOME: Outcome.SUCCESS,
     }
     get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
     return pipe_output

@@ -19,7 +19,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.run_id_factory import make_pipe_run_id
-from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr
+from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr, SpanOutcome
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
@@ -361,9 +361,11 @@ class PipeAbstract(ABC, BaseModel):
         log.dev(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
 
         if error:
+            span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.FAILURE)
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR, str(error)))
         else:
+            span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
             span.set_status(Status(StatusCode.OK))
         span.end()
 
