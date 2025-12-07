@@ -308,6 +308,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if self.__class__ in MetaSingleton.instances:
             del MetaSingleton.instances[self.__class__]
 
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
+        self.teardown()
+
     @classmethod
     def make(
         cls,
