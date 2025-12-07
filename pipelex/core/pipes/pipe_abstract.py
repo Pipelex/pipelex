@@ -19,8 +19,8 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.run_id_factory import make_pipe_run_id
-from pipelex.system.telemetry.otel_utils import get_global_tracer
 from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
@@ -307,7 +307,7 @@ class PipeAbstract(ABC, BaseModel):
         Returns:
             The started span, or None if tracer is unavailable.
         """
-        tracer = get_global_tracer()
+        tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
             log.dev(f"[OTel] No tracer available for pipe '{self.code}'")
             return None

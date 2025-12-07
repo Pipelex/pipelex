@@ -1,17 +1,44 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from contextlib import contextmanager
 from typing import Any, Generator
 
-from opentelemetry.trace import Tracer
+from opentelemetry.trace import Tracer as OTelTracer
 from typing_extensions import override
 
+from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 
 
-class TelemetryManagerAbstract(ABC):
+class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     telemetry_mode_just_set: TelemetryMode | None = None
+
+    @classmethod
+    def clear_instance(cls) -> None:
+        """Clear the singleton instance from MetaSingleton registry."""
+        MetaSingleton.clear_subclass_instances(TelemetryManagerAbstract)
+
+    @classmethod
+    def get_instance(cls) -> "TelemetryManagerAbstract | None":
+        """Get the singleton instance from MetaSingleton registry.
+
+        This provides a way to access the telemetry manager without importing from hub,
+        avoiding circular dependency issues.
+        """
+        return MetaSingleton.get_subclass_instance(TelemetryManagerAbstract)  # type: ignore[type-abstract]
+
+    @classmethod
+    def get_instance_tracer(cls) -> OTelTracer | None:
+        """Get the tracer from the singleton instance.
+
+        This provides a way to access the tracer without importing from hub,
+        avoiding circular dependency issues.
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return None
+        return instance.get_otel_tracer()
 
     @classmethod
     def telemetry_was_just_enabled(cls) -> TelemetryMode | None:
@@ -46,7 +73,7 @@ class TelemetryManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_tracer(self) -> Tracer | None:
+    def get_otel_tracer(self) -> OTelTracer | None:
         """Get the OpenTelemetry tracer for GenAI spans, if configured."""
 
     @abstractmethod
@@ -82,7 +109,7 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         return False
 
     @override
-    def get_tracer(self) -> Tracer | None:
+    def get_otel_tracer(self) -> OTelTracer | None:
         return None
 
     @override

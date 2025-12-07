@@ -4,7 +4,6 @@ from typing import Any, cast
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
-from kajson.singleton import MetaSingleton
 from pydantic import ValidationError
 
 from pipelex import log
@@ -53,6 +52,7 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
 from pipelex.system.telemetry.telemetry_config import (
@@ -111,7 +111,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
 
         self.reporting_delegate: ReportingProtocol | None = None
-        self.telemetry_manager: TelemetryManagerAbstract | None = None
+        self.telemetry_manager: TelemetryManagerAbstract
         # pipeline
         self.pipeline_tracker: PipelineTrackerProtocol | None = None
         self.library_manager: LibraryManagerAbstract | None = None
@@ -288,8 +288,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipeline_manager.teardown()
         if self.pipeline_tracker:
             self.pipeline_tracker.teardown()
-        if self.telemetry_manager:
-            self.telemetry_manager.teardown()
+        self.telemetry_manager.teardown()
 
         # cogt
         self.inference_manager.teardown()

@@ -6,6 +6,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import (
     get_library_manager,
+    get_otel_tracer,
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
@@ -160,7 +161,7 @@ async def pipeline_run_setup(
     # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
     # The trace_id is computed once here; span_id uses VIRTUAL_ROOT_PARENT_SPAN_ID for root
     otel_context: OtelContext | None = None
-    if pipe_run_mode != PipeRunMode.DRY and get_telemetry_manager().get_tracer() is not None:
+    if pipe_run_mode != PipeRunMode.DRY and get_otel_tracer() is not None:
         trace_id = pipeline_run_id_to_trace_id(pipeline_run_id)
         otel_context = OtelContext(
             trace_id=trace_id,
