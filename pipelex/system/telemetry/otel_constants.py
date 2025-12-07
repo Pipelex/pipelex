@@ -24,11 +24,36 @@ class GenAISpanAttr(StrEnum):
     COMPLETION_CONTENT = "gen_ai.completion.0.content"
 
 
+class PostHogAttr(StrEnum):
+    """PostHog AI analytics attribute keys."""
+
+    MODEL = "$ai_model"
+    PROVIDER = "$ai_provider"
+    INPUT_TOKENS = "$ai_input_tokens"
+    OUTPUT_TOKENS = "$ai_output_tokens"
+    HTTP_STATUS = "$ai_http_status"
+    LATENCY = "$ai_latency"
+    TRACE_ID = "$ai_trace_id"
+    SPAN_ID = "$ai_span_id"
+    TRACE_NAME = "$ai_trace_name"
+    PARENT_ID = "$ai_parent_id"
+    INPUT = "$ai_input"
+    OUTPUT_CHOICES = "$ai_output_choices"
+    SPAN_NAME = "$ai_span_name"
+
+
+class PostHogEvent(StrEnum):
+    """PostHog AI analytics event names."""
+
+    GENERATION = "$ai_generation"
+    SPAN = "$ai_span"
+
+
 # Virtual parent span ID for root spans.
 # INVALID_SPAN_ID (0) makes SpanContext invalid, causing OTel to ignore our trace_id.
 # Using 1 as virtual parent ensures OTel uses our deterministic trace_id while
 # still treating the span as a root (we filter this out in the exporter).
-VIRTUAL_ROOT_PARENT_SPAN_ID = 1
+OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID = 1
 
 
 class OTelConstants(StrEnum):

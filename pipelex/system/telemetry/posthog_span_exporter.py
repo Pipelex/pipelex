@@ -4,7 +4,7 @@ This module provides a SpanExporter that sends OTel spans to PostHog
 as $ai_generation or $ai_span events.
 """
 
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -13,7 +13,7 @@ from posthog import Posthog
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.system.telemetry.otel_constants import VIRTUAL_ROOT_PARENT_SPAN_ID, GenAISpanAttr
+from pipelex.system.telemetry.otel_constants import OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID, GenAISpanAttr, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr
 
 
@@ -27,20 +27,20 @@ class PostHogSpanExporter(SpanExporter):
     def _get_base_properties(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> dict[str, Any]:
         """Get common properties for all span types."""
         properties: dict[str, Any] = {
-            "$ai_latency": (span.end_time - span.start_time) / 1e9 if span.end_time and span.start_time else None,
+            PostHogAttr.LATENCY: (span.end_time - span.start_time) / 1e9 if span.end_time and span.start_time else None,
         }
 
         # Add trace/span IDs for PostHog trace grouping
         span_context = span.get_span_context()
         if span_context and span_context.is_valid:
-            properties["$ai_trace_id"] = f"{span_context.trace_id:032x}"
-            properties["$ai_span_id"] = f"{span_context.span_id:016x}"
-            properties["$ai_trace_name"] = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
+            properties[PostHogAttr.TRACE_ID] = f"{span_context.trace_id:032x}"
+            properties[PostHogAttr.SPAN_ID] = f"{span_context.span_id:016x}"
+            properties[PostHogAttr.TRACE_NAME] = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
 
         # Add parent span ID for trace hierarchy
         # Filter out virtual root parent (used to set trace_id for root spans)
-        if span.parent and span.parent.span_id != VIRTUAL_ROOT_PARENT_SPAN_ID:
-            properties["$ai_parent_id"] = f"{span.parent.span_id:016x}"
+        if span.parent and span.parent.span_id != OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID:
+            properties[PostHogAttr.PARENT_ID] = f"{span.parent.span_id:016x}"
 
         return properties
 
@@ -49,19 +49,19 @@ class PostHogSpanExporter(SpanExporter):
         properties = self._get_base_properties(span, attributes)
         properties.update(
             {
-                "$ai_model": attributes.get(GenAISpanAttr.REQUEST_MODEL),
-                "$ai_provider": attributes.get(GenAISpanAttr.SYSTEM),
-                "$ai_input_tokens": attributes.get(GenAISpanAttr.USAGE_INPUT_TOKENS),
-                "$ai_output_tokens": attributes.get(GenAISpanAttr.USAGE_OUTPUT_TOKENS),
-                "$ai_http_status": 200,
+                PostHogAttr.MODEL: attributes.get(GenAISpanAttr.REQUEST_MODEL),
+                PostHogAttr.PROVIDER: attributes.get(GenAISpanAttr.SYSTEM),
+                PostHogAttr.INPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_INPUT_TOKENS),
+                PostHogAttr.OUTPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_OUTPUT_TOKENS),
+                PostHogAttr.HTTP_STATUS: 200,
             }
         )
 
         # Add content if available
         if prompt := attributes.get(GenAISpanAttr.PROMPT_CONTENT):
-            properties["$ai_input"] = prompt
+            properties[PostHogAttr.INPUT] = prompt
         if completion := attributes.get(GenAISpanAttr.COMPLETION_CONTENT):
-            properties["$ai_output_choices"] = [{"content": completion}]
+            properties[PostHogAttr.OUTPUT_CHOICES] = [{"content": completion}]
 
         pipe_code = attributes.get(PipelexSpanAttr.PIPE_CODE)
         pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
@@ -69,15 +69,15 @@ class PostHogSpanExporter(SpanExporter):
             f"[OTel->PostHog] EXPORT $ai_generation:\n"
             f"  pipe_code='{pipe_code}'\n"
             f"  pipeline_run_id='{pipeline_run_id}'\n"
-            f"  trace_id={properties.get('$ai_trace_id')}\n"
-            f"  span_id={properties.get('$ai_span_id')}\n"
-            f"  parent_id={properties.get('$ai_parent_id')}\n"
-            f"  model={properties.get('$ai_model')}"
+            f"  trace_id={properties.get(PostHogAttr.TRACE_ID)}\n"
+            f"  span_id={properties.get(PostHogAttr.SPAN_ID)}\n"
+            f"  parent_id={properties.get(PostHogAttr.PARENT_ID)}\n"
+            f"  model={properties.get(PostHogAttr.MODEL)}"
         )
 
         self.client.capture(
             distinct_id=self.user_id,
-            event="$ai_generation",
+            event=PostHogEvent.GENERATION,
             properties=properties,
         )
 
@@ -90,7 +90,7 @@ class PostHogSpanExporter(SpanExporter):
         # which ensures PostHog receives the correct trace name before any pipe spans arrive.
         properties.update(
             {
-                "$ai_span_name": span.name,
+                PostHogAttr.SPAN_NAME: span.name,
                 "pipe_code": attributes.get(PipelexSpanAttr.PIPE_CODE),
                 "pipe_type": attributes.get(PipelexSpanAttr.PIPE_TYPE),
                 "pipe_category": attributes.get(PipelexSpanAttr.PIPE_CATEGORY),
@@ -104,14 +104,14 @@ class PostHogSpanExporter(SpanExporter):
             f"  pipe_code='{pipe_code}'\n"
             f"  pipeline_run_id='{pipeline_run_id}'\n"
             f"  $ai_span_name='{span.name}'\n"
-            f"  trace_id={properties.get('$ai_trace_id')}\n"
-            f"  span_id={properties.get('$ai_span_id')}\n"
-            f"  parent_id={properties.get('$ai_parent_id')}"
+            f"  trace_id={properties.get(PostHogAttr.TRACE_ID)}\n"
+            f"  span_id={properties.get(PostHogAttr.SPAN_ID)}\n"
+            f"  parent_id={properties.get(PostHogAttr.PARENT_ID)}"
         )
 
         self.client.capture(
             distinct_id=self.user_id,
-            event="$ai_span",
+            event=PostHogEvent.SPAN,
             properties=properties,
         )
 

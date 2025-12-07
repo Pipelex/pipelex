@@ -18,7 +18,7 @@ from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode, RunEnvironment
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
-from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -253,18 +253,18 @@ class TelemetryManager(TelemetryManagerAbstract):
         before any batched pipe spans, establishing the correct trace name.
         """
         user_id = self.telemetry_config.user_id or OTelConstants.DEFAULT_USER_ID
-        properties = {
-            "$ai_trace_id": f"{trace_id:032x}",
-            "$ai_span_name": pipeline_run_id,
-            "$ai_trace_name": pipeline_run_id,
-            # No $ai_parent_id - this is a root-level marker
+        properties: dict[str, Any] = {
+            PostHogAttr.TRACE_ID: f"{trace_id:032x}",
+            PostHogAttr.SPAN_NAME: pipeline_run_id,
+            PostHogAttr.TRACE_NAME: pipeline_run_id,
+            # No PARENT_ID - this is a root-level marker
         }
 
         log.dev(f"[Telemetry] Emitting trace start event:\n  pipeline_run_id='{pipeline_run_id}'\n  trace_id={trace_id:032x}")
 
         self.posthog_client.capture(
             distinct_id=user_id,
-            event="$ai_span",
+            event=PostHogEvent.SPAN,
             properties=properties,
         )
 

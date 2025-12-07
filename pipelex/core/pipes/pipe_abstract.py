@@ -312,7 +312,7 @@ class PipeAbstract(ABC, BaseModel):
             log.dev(f"[OTel] No tracer available for pipe '{self.code}'")
             return None
 
-        # For root spans: parent_otel_context.span_id is VIRTUAL_ROOT_PARENT_SPAN_ID (1)
+        # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
         # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
         # The exporter filters out this virtual parent when setting $ai_parent_id.
         # For child spans: parent_otel_context.span_id is the actual parent's span_id
