@@ -58,7 +58,7 @@ default_log_level = "INFO"
 # console_print_target = "stderr"
 
 [pipelex.log_config.package_log_levels]
-pipelex = "DEBUG"
+pipelex = "INFO"
 
 [cogt]
 [cogt.model_deck_config]

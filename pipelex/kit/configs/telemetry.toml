@@ -21,3 +21,5 @@ verbose_enabled = false
 user_id = ""
 ai_tracing_enabled = false                                           # Enable OpenTelemetry tracing for AI operations
 capture_content_enabled = false                                      # Controls gen_ai.prompt/completion content capture for OTel
+# otlp_endpoint = "https://..."
+# otlp_headers = { "Authorization" = "Bearer ..." }
