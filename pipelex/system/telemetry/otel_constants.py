@@ -34,6 +34,7 @@ VIRTUAL_ROOT_PARENT_SPAN_ID = 1
 class OTelConstants(StrEnum):
     """OpenTelemetry constants."""
 
+    DEFAULT_USER_ID = "anonymous"
     SERVICE_NAME = "pipelex"
     SERVICE_NAMESPACE_KEY = "service.namespace"
     SERVICE_NAMESPACE = "ai.orchestration"

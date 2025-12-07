@@ -9,24 +9,20 @@ from typing import TYPE_CHECKING, Any, Mapping, Sequence
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from opentelemetry.util.types import AttributeValue
+from posthog import Posthog
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.system.telemetry.otel_constants import VIRTUAL_ROOT_PARENT_SPAN_ID, GenAISpanAttr
 from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr
 
-if TYPE_CHECKING:
-    from posthog import Posthog
-
 
 class PostHogSpanExporter(SpanExporter):
     """Exports OTel spans to PostHog as $ai_generation or $ai_span events."""
 
-    DEFAULT_USER_ID = "anonymous"
-
-    def __init__(self, posthog_client: "Posthog", user_id: str):
+    def __init__(self, posthog_client: Posthog, user_id: str):
         self.client = posthog_client
-        self.user_id = user_id or self.DEFAULT_USER_ID
+        self.user_id = user_id
 
     def _get_base_properties(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> dict[str, Any]:
         """Get common properties for all span types."""

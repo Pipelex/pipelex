@@ -252,7 +252,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         This event is sent directly (not via OTel spans) to ensure it arrives
         before any batched pipe spans, establishing the correct trace name.
         """
-        user_id = self.telemetry_config.user_id or "pipelex-user"
+        user_id = self.telemetry_config.user_id or OTelConstants.DEFAULT_USER_ID
         properties = {
             "$ai_trace_id": f"{trace_id:032x}",
             "$ai_span_name": pipeline_run_id,
