@@ -425,14 +425,16 @@ class PipeAbstract(ABC, BaseModel):
                     span_id=span_context.span_id,
                 )
 
-        # Create child metadata with updated pipe_code, pipe_run_id, and otel_context
+        # Create child metadata with updated pipe_code and pipe_run_id
         # This passes down a modified copy rather than mutating the original
+        # otel_context is passed separately because it must always be set explicitly
+        # (even when None in dry mode) to avoid inheriting stale parent context
         child_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
                 pipe_code=self.code,
                 pipe_run_id=this_pipe_run_id,
-                otel_context=this_otel_context,
-            )
+            ),
+            otel_context=this_otel_context,
         )
 
         # check we have the required inputs in the working memory

@@ -89,7 +89,16 @@ class JobMetadata(BaseModel):
         if updated_metadata.completed_at:
             self.completed_at = updated_metadata.completed_at
 
-    def copy_with_update(self, updated_metadata: "JobMetadata") -> "JobMetadata":
+    def copy_with_update(self, updated_metadata: "JobMetadata", otel_context: OtelContext | None) -> "JobMetadata":
+        """Create a copy of this metadata with updates applied.
+
+        Args:
+            updated_metadata: Metadata with fields to update (sparse update - only truthy fields are applied)
+            otel_context: OTel context to set on the copy. Unlike other fields, this is always set explicitly
+                because it's computed fresh per pipe run and should replace the parent's context
+                (even when None, e.g. in dry mode or when tracing is disabled).
+        """
         new_metadata = self.model_copy(deep=True)
         new_metadata.update(updated_metadata=updated_metadata)
+        new_metadata.otel_context = otel_context
         return new_metadata
