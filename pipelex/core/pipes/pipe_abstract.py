@@ -306,7 +306,7 @@ class PipeAbstract(ABC, BaseModel):
         parent_otel_context: OtelContext,
         pipeline_run_id: str,
         working_memory: WorkingMemory,
-    ) -> Span | None:
+    ) -> tuple[Span | None, bool]:
         """Start an OTel span for this pipe execution.
 
         Args:
@@ -315,12 +315,13 @@ class PipeAbstract(ABC, BaseModel):
             working_memory: The working memory containing input stuffs for telemetry capture.
 
         Returns:
-            The started span, or None if tracer is unavailable.
+            A tuple of (span, is_root_span) where span is the started span or None if tracer
+            is unavailable, and is_root_span indicates if this is the trace root span.
         """
         tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
             log.verbose(f"[OTel] No tracer available for pipe '{self.code}'")
-            return None
+            return None, False
 
         # Determine if we need to redact pipe codes for privacy
         if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
@@ -329,6 +330,13 @@ class PipeAbstract(ABC, BaseModel):
             pipe_code_attr = OTelConstants.PIPE_CODE_REDACTED
 
         span_name = f"{self.pipe_type}: {pipe_code_attr}"
+
+        # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
+        # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
+        # The exporter filters out this virtual parent when setting $ai_parent_id.
+        # For child spans: parent_otel_context.span_id is the actual parent's span_id
+        parent_span_id = parent_otel_context.span_id
+        is_root_span = parent_span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
 
         # Build all span attributes upfront
         span_attributes: dict[str, str] = {
@@ -366,11 +374,10 @@ class PipeAbstract(ABC, BaseModel):
             )
             span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = inputs_json
 
-        # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
-        # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
-        # The exporter filters out this virtual parent when setting $ai_parent_id.
-        # For child spans: parent_otel_context.span_id is the actual parent's span_id
-        parent_span_id = parent_otel_context.span_id
+            # For root span, also set trace-level input
+            if is_root_span:
+                span_attributes[LangfuseSpanAttr.TRACE_INPUT] = inputs_json
+
         parent_span_context = SpanContext(
             trace_id=parent_otel_context.trace_id,
             span_id=parent_span_id,
@@ -395,17 +402,19 @@ class PipeAbstract(ABC, BaseModel):
             f"  pipeline_run_id='{pipeline_run_id}'\n"
             f"  trace_id={span_ctx.trace_id:032x}\n"
             f"  span_id={span_ctx.span_id:016x}\n"
-            f"  parent_span_id={parent_span_id:016x}"
+            f"  parent_span_id={parent_span_id:016x}\n"
+            f"  is_root_span={is_root_span}"
         )
 
-        return span
+        return span, is_root_span
 
-    def _end_pipe_span_success(self, span: Span | None, pipe_output: PipeOutput) -> None:
+    def _end_pipe_span_success(self, span: Span | None, pipe_output: PipeOutput, is_root_span: bool) -> None:
         """End the pipe's OTel span with success status. Safe to call if span is None.
 
         Args:
             span: The OTel span to end, or None if telemetry is disabled.
             pipe_output: The pipe output containing the result for telemetry capture.
+            is_root_span: Whether this is the root span of the trace.
         """
         if span is None:
             return
@@ -421,6 +430,10 @@ class PipeAbstract(ABC, BaseModel):
                 max_length=max_length,
             )
             span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, output_json)
+
+            # For root span, also set trace-level output
+            if is_root_span:
+                span.set_attribute(LangfuseSpanAttr.TRACE_OUTPUT, output_json)
 
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
         span.set_status(Status(StatusCode.OK))
@@ -463,11 +476,12 @@ class PipeAbstract(ABC, BaseModel):
         # The trace_id comes from parent's otel_context (already computed at pipeline start)
         this_otel_context: OtelContext | None = None
         span: Span | None = None
+        is_root_span: bool = False
 
         parent_otel_context = job_metadata.otel_context
         if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
             # Start OTel span first
-            span = self._start_pipe_span(
+            span, is_root_span = self._start_pipe_span(
                 parent_otel_context=parent_otel_context,
                 pipeline_run_id=job_metadata.pipeline_run_id,
                 working_memory=working_memory,
@@ -523,7 +537,7 @@ class PipeAbstract(ABC, BaseModel):
             self._end_pipe_span_error(span, error=exc)
             raise
 
-        self._end_pipe_span_success(span=span, pipe_output=pipe_output)
+        self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 

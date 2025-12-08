@@ -129,6 +129,8 @@ class LangfuseSpanAttr(StrEnum):
     USER_ID = "langfuse.user.id"
     SESSION_ID = "langfuse.session.id"
     RELEASE = "langfuse.release"
+    TRACE_INPUT = "langfuse.trace.input"
+    TRACE_OUTPUT = "langfuse.trace.output"
 
     # Environment (standard OTel attribute recognized by Langfuse)
     DEPLOYMENT_ENVIRONMENT = "deployment.environment"
