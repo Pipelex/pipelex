@@ -1,5 +1,6 @@
 from typing import Any
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -94,6 +95,22 @@ async def execute_pipeline(
     try:
         pipe_output = await get_pipe_router().run(pipe_job)
     except PipeRouterError as exc:
+        properties = {
+            EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
+            EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
+            EventProperty.PIPELINE_OUTCOME: Outcome.FAILURE,
+        }
+        get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
+        raise PipelineExecutionError(
+            message=exc.message,
+            run_mode=pipe_job.pipe_run_params.run_mode,
+            pipe_code=pipe_job.pipe.code,
+            output_name=pipe_job.output_name,
+            pipe_stack=pipe_job.pipe_run_params.pipe_stack,
+        ) from exc
+    except PipelexError as exc:
+        # Catch other Pipelex errors that bypass the router's PipeRunError handling
+        # (e.g., PipeRunInputsError raised directly from pipe_abstract.py)
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
