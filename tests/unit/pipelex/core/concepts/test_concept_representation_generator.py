@@ -74,6 +74,15 @@ class ContentWithOptional(StructuredContent):
     maybe_name: str | None = Field(None, description="Optional name")
 
 
+class ContentWithRequiredAndOptional(StructuredContent):
+    """Content with both required and optional fields (like ImageContent)."""
+
+    url: str = Field(..., description="Required URL")
+    source_prompt: str | None = Field(None, description="Optional prompt")
+    caption: str | None = Field(None, description="Optional caption")
+    base_64: str | None = Field(None, description="Optional base64")
+
+
 # =============================================================================
 # Tests for ConceptRepresentationFormat enum
 # =============================================================================
@@ -386,3 +395,67 @@ class TestConvenienceFunctions:
         }
         assert result == expected
         assert "SimpleContent" in imports
+
+
+# =============================================================================
+# Tests for include_optional parameter
+# =============================================================================
+
+
+class TestIncludeOptionalParameter:
+    """Test that optional fields can be excluded from generation."""
+
+    def test_excludes_optional_fields_json(self) -> None:
+        """With include_optional=False, optional fields are excluded (JSON)."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
+        expected = {"url": "url_value"}
+        assert result == expected
+        # Verify optional fields are NOT present
+        assert "source_prompt" not in result
+        assert "caption" not in result
+        assert "base_64" not in result
+
+    def test_excludes_optional_fields_python(self) -> None:
+        """With include_optional=False, optional fields are excluded (Python)."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
+        result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
+        expected = 'ContentWithRequiredAndOptional(url="url_value")'
+        assert result == expected
+
+    def test_includes_optional_fields_by_default(self) -> None:
+        """By default, optional fields ARE included (backward compatibility)."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_class_representation(ContentWithRequiredAndOptional)
+        # All fields should be present by default
+        assert "url" in result
+        assert "source_prompt" in result
+        assert "caption" in result
+        assert "base_64" in result
+
+    def test_all_optional_returns_empty_dict_json(self) -> None:
+        """Content with only optional fields returns empty dict when include_optional=False."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_class_representation(ContentWithOptional, include_optional=False)
+        expected: dict[str, str] = {}
+        assert result == expected
+
+    def test_all_optional_returns_empty_instantiation_python(self) -> None:
+        """Content with only optional fields returns empty instantiation when include_optional=False."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
+        result = generator.generate_class_representation(ContentWithOptional, include_optional=False)
+        expected = "ContentWithOptional()"
+        assert result == expected
+
+    def test_image_content_only_url_required(self) -> None:
+        """ImageContent should only have url when include_optional=False."""
+        from pipelex.core.stuffs.image_content import ImageContent  # noqa: PLC0415
+
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_class_representation(ImageContent, include_optional=False)
+        expected = {"url": "url_value"}
+        assert result == expected
+        # Verify optional fields are NOT present
+        assert "source_prompt" not in result
+        assert "caption" not in result
+        assert "base_64" not in result

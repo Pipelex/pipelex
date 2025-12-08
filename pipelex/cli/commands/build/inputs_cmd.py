@@ -1,11 +1,11 @@
 import asyncio
+from pathlib import Path
 from typing import Annotated
 
 import click
 import typer
 from posthog import tag
 
-from pipelex.builder.runner_code import generate_input_memory_json_string
 from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -47,7 +47,9 @@ def generate_inputs_cmd(
     ] = None,
     output_path: Annotated[
         str | None,
-        typer.Option("--output", "-o", help="Path to save the generated JSON file, defaults to 'results/inputs.json'"),
+        typer.Option(
+            "--output", "-o", help="Path to save the generated JSON file (defaults to bundle's directory if bundle provided, otherwise 'results/')"
+        ),
     ] = None,
 ) -> None:
     """Generate example input JSON for a pipe.
@@ -75,6 +77,16 @@ def generate_inputs_cmd(
 
     # Determine source:
     if target:
+        # Check if target is a directory (not allowed for inputs command)
+        target_path = Path(target)
+        if target_path.is_dir():
+            typer.secho(
+                f"Failed to run: '{target}' is a directory. The inputs command requires a .plx file or a pipe code, not a directory.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(1)
+
         if target.endswith(".plx"):
             bundle_path = target
             if bundle:
@@ -148,13 +160,20 @@ def generate_inputs_cmd(
 
         # Generate the input JSON
         try:
-            inputs_json_str = generate_input_memory_json_string(the_pipe.inputs, indent=2)
+            inputs_json_str = the_pipe.inputs.generate_json_string(indent=2)
         except Exception as exc:
             typer.secho(f"❌ Error generating input JSON: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-        # Determine output path
-        final_output_path = output_path or "results/inputs.json"
+        # Determine output path - use bundle's directory if bundle provided, otherwise results/
+        if output_path:
+            final_output_path = output_path
+        elif bundle_path:
+            # Place inputs.json in the same directory as the PLX file
+            bundle_dir = Path(bundle_path).parent
+            final_output_path = str(bundle_dir / "inputs.json")
+        else:
+            final_output_path = "results/inputs.json"
 
         # Save the file
         try:

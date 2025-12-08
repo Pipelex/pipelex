@@ -46,6 +46,7 @@ class ConceptRepresentationGenerator:
         self,
         concept_string: str,
         structure_class: type[StuffContent],
+        include_optional: bool = True,
     ) -> dict[str, Any]:
         """Generate a representation value for a concept.
 
@@ -54,17 +55,22 @@ class ConceptRepresentationGenerator:
         Args:
             concept_string: The concept string (e.g., "domain.ConceptCode")
             structure_class: The StuffContent class to generate representation for
+            include_optional: If False, exclude fields with default values (optional fields)
 
         Returns:
             Dict with concept and content keys
         """
         self._imports_needed.clear()
 
-        content = self.generate_class_representation(structure_class)
+        content = self.generate_class_representation(structure_class, include_optional=include_optional)
 
         return {"concept": concept_string, "content": content}
 
-    def generate_class_representation(self, content_class: type[StuffContent]) -> dict[str, Any] | str:
+    def generate_class_representation(
+        self,
+        content_class: type[StuffContent],
+        include_optional: bool = True,
+    ) -> dict[str, Any] | str:
         """Generate representation for a StuffContent class (recursive).
 
         For JSON format: returns a dict with all fields
@@ -72,6 +78,7 @@ class ConceptRepresentationGenerator:
 
         Args:
             content_class: The StuffContent class to generate representation for
+            include_optional: If False, exclude fields with default values (optional fields)
 
         Returns:
             Dict (JSON) or string (Python) representing the class
@@ -79,7 +86,7 @@ class ConceptRepresentationGenerator:
         class_name = content_class.__name__
         self._imports_needed.add(class_name)
 
-        fields_dict = self._generate_fields_dict(content_class)
+        fields_dict = self._generate_fields_dict(content_class, include_optional=include_optional)
 
         match self.output_format:
             case ConceptRepresentationFormat.JSON:
@@ -87,11 +94,16 @@ class ConceptRepresentationGenerator:
             case ConceptRepresentationFormat.PYTHON:
                 return self._format_as_python(class_name, fields_dict)
 
-    def _generate_fields_dict(self, content_class: type[StuffContent]) -> dict[str, Any]:
-        """Generate a dict with all field values for a class.
+    def _generate_fields_dict(
+        self,
+        content_class: type[StuffContent],
+        include_optional: bool = True,
+    ) -> dict[str, Any]:
+        """Generate a dict with field values for a class.
 
         Args:
             content_class: The class to generate fields for
+            include_optional: If False, exclude fields with default values (optional fields)
 
         Returns:
             Dict mapping field names to their generated values
@@ -99,6 +111,10 @@ class ConceptRepresentationGenerator:
         fields_dict: dict[str, Any] = {}
 
         for field_name, field_info in content_class.model_fields.items():
+            # Skip optional fields if include_optional is False
+            if not include_optional and not field_info.is_required():
+                continue
+
             field_type = field_info.annotation
             field_value = self.generate_field_value(field_type, field_name)
             fields_dict[field_name] = field_value

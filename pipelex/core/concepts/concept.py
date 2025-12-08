@@ -1,8 +1,14 @@
+from typing import Any
+
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.concepts.concept_representation_generator import (
+    ConceptRepresentationFormat,
+    ConceptRepresentationGenerator,
+)
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_code
@@ -142,3 +148,35 @@ class Concept(BaseModel):
             msg = f"Concept class '{self.structure_class_name}' is not a subclass of StuffContent"
             raise PipelexUnexpectedError(msg)
         return search_for_nested_image_fields(content_class=structure_class)
+
+    def generate_input_representation(
+        self,
+        output_format: ConceptRepresentationFormat,
+        is_multiple: bool = False,
+    ) -> tuple[dict[str, Any], set[str]]:
+        """Generate a representation for this concept's input.
+
+        Args:
+            output_format: The format to generate (JSON or PYTHON)
+            is_multiple: If True, wrap content in a list (only for JSON format)
+
+        Returns:
+            Tuple of (representation dict, imports_needed set)
+            - For JSON: content is a dict (or list of dicts if is_multiple)
+            - For Python: content is a class instantiation string (wrapping handled by caller)
+        """
+        structure_class = self.get_structure_class()
+        if structure_class is None:
+            content: Any = [{}] if is_multiple else {}
+            return {"concept": self.concept_string, "content": content}, set()
+
+        generator = ConceptRepresentationGenerator(output_format)
+        # For inputs, we only want required fields (not optional ones)
+        result = generator.generate_representation(self.concept_string, structure_class, include_optional=False)
+
+        # If multiple and JSON format, wrap content in a list
+        # For Python format, the caller handles wrapping since content is a string
+        if is_multiple and output_format == ConceptRepresentationFormat.JSON:
+            result["content"] = [result["content"]]
+
+        return result, generator.imports_needed

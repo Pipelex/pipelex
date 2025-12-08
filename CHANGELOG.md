@@ -5,10 +5,13 @@
 ### Added
 
 - Can now generate the pydantic structure of a concept with the cli: `pipelex build structures /library_dir/`.
+- The Pipelex CLI `pipelex build runner` that creates the python file to run a pipe now runs the `structures` build command and then imports those structures in the runner file.
 - Added validation for output concepts of `PipeCompose`: must be strictly compatible with the Text concept.
 - Added validation for the Pipelex Bundle on the concept keys: Cannot create a native concept.
 
-### Fixed
+### Changed
+
+- The Pipelex cli for the `runner`, `structures`, and `inputs` commands now accept a `--output-dir` option to specify the output directory, by default it in the `target_dir`
 
 ### Refactored
 

@@ -11,7 +11,7 @@ from pipelex import pretty_print
 from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
-from pipelex.builder.runner_code import generate_input_memory_json_string, generate_runner_code
+from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -205,7 +205,7 @@ def build_pipe_cmd(
                         typer.secho(f"✅ Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
 
                     # Generate inputs.json
-                    inputs_json_str = generate_input_memory_json_string(pipe.inputs, indent=2)
+                    inputs_json_str = pipe.inputs.generate_json_string(indent=2)
                     inputs_json_path = os.path.join(extras_output_dir, "inputs.json")
                     save_text_to_path(text=inputs_json_str, path=inputs_json_path)
                     typer.secho(f"✅ Inputs template saved to: {inputs_json_path}", fg=typer.colors.GREEN)
