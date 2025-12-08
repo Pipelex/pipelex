@@ -78,12 +78,13 @@ def validate_cmd(
         pipelex validate --bundle my_bundle.plx --pipe my_pipe
         pipelex validate all
     """
-    pipelex_instance: Pipelex
     # Check for "all" keyword
     if target == "all" and not pipe and not bundle:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-        do_validate_all_libraries_and_dry_run()
-        pipelex_instance.teardown()
+        try:
+            Pipelex.make(integration_mode=IntegrationMode.CLI)
+            do_validate_all_libraries_and_dry_run()
+        finally:
+            Pipelex.teardown_if_needed()
         return
 
     # Validate mutual exclusivity
@@ -160,7 +161,7 @@ def validate_cmd(
             raise typer.Exit(1)
 
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION)
 
@@ -179,4 +180,4 @@ def validate_cmd(
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()

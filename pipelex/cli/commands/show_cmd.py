@@ -197,7 +197,7 @@ def list_pipes_cmd() -> None:
     pipes from imported packages.
     """
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
 
@@ -214,7 +214,7 @@ def list_pipes_cmd() -> None:
 
             do_list_pipes()
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @show_app.command("pipe", help="Display the detailed definition of a specific pipe")
@@ -228,7 +228,7 @@ def show_pipe_cmd(
         pipelex show pipe hello_world
     """
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
 
@@ -245,7 +245,7 @@ def show_pipe_cmd(
 
             do_show_pipe(pipe_code=pipe_code)
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @show_app.command("models", help="List available AI models from a specific backend provider")
@@ -266,7 +266,7 @@ def show_models_cmd(
         pipelex show models anthropic --flat
     """
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
 
@@ -283,7 +283,7 @@ def show_models_cmd(
                 )
             )
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @show_app.command("backends", help="Display backend configurations and active routing profile")
@@ -299,7 +299,7 @@ def show_backends_cmd(
         pipelex show backends --all
     """
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
 
@@ -311,4 +311,4 @@ def show_backends_cmd(
 
             do_show_backends(show_all=show_all_backends)
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()

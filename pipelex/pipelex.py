@@ -408,3 +408,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = "Pipelex is not initialized"
             raise RuntimeError(msg)
         return cast("Self", instance)
+
+    @classmethod
+    def teardown_if_needed(cls) -> None:
+        """Teardown the Pipelex singleton instance if it exists.
+
+        This is useful for cleanup in finally blocks where the instance
+        may or may not have been successfully created.
+        """
+        instance = cls.get_optional_instance()
+        if instance is not None:
+            instance.teardown()
