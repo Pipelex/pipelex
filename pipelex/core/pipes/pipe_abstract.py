@@ -314,11 +314,11 @@ class PipeAbstract(ABC, BaseModel):
 
         # Determine if we need to redact pipe codes for privacy
         if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
-            span_name = f"{self.pipe_type}: {self.code}"
             pipe_code_attr = self.code
         else:
-            span_name = f"{self.pipe_type}: {PIPE_CODE_REDACTED}"
             pipe_code_attr = PIPE_CODE_REDACTED
+
+        span_name = f"{self.pipe_type}: {pipe_code_attr}"
 
         # Build all span attributes upfront
         span_attributes: dict[str, str] = {
