@@ -50,6 +50,8 @@ class TelemetryConfig(ConfigModel):
     capture_content_max_length: int | None = None  # Max length for captured content (None = unlimited)
     capture_pipe_codes_enabled: bool  # Controls whether pipe codes appear in span names/attributes
     capture_output_class_name_enabled: bool  # Controls whether output class names appear in span names/attributes
+    langfuse_enabled: bool = False  # Enable Langfuse OTLP exporter
+    langfuse_base_url: str | None = None  # Override for self-hosted Langfuse (defaults to https://cloud.langfuse.com)
     otlp_endpoint: str | None = None  # Optional OTLP endpoint for generic tracing
     otlp_headers: dict[str, str] | None = None  # Optional headers for OTLP export
 

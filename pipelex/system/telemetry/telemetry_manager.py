@@ -1,3 +1,4 @@
+import base64
 from contextlib import contextmanager
 from typing import Any, Callable, Generator
 
@@ -14,7 +15,7 @@ from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 
 from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
-from pipelex.system.environment import is_env_var_truthy
+from pipelex.system.environment import get_optional_env, get_required_env, is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode, RunEnvironment
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
@@ -51,6 +52,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                 posthog_client=self.posthog_client,
                 otlp_endpoint=telemetry_config.otlp_endpoint,
                 otlp_headers=telemetry_config.otlp_headers,
+                langfuse_enabled=telemetry_config.langfuse_enabled,
+                langfuse_base_url=telemetry_config.langfuse_base_url,
             )
             log.verbose("AI tracing enabled: OpenTelemetry tracer created")
         else:
@@ -292,27 +295,62 @@ class TelemetryManager(TelemetryManagerAbstract):
                 properties=properties,
             )
 
+    def _make_langfuse_exporter(self, langfuse_base_url: str | None) -> OTLPSpanExporter | None:
+        """Create a Langfuse OTLP exporter using environment credentials.
+
+        Requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY environment variables.
+        Optionally LANGFUSE_BASE_URL can be set via env var or config.
+
+        Args:
+            langfuse_base_url: Optional base URL override from config
+
+        Returns:
+            OTLPSpanExporter configured for Langfuse, or None if credentials missing
+        """
+        try:
+            public_key = get_required_env("LANGFUSE_PUBLIC_KEY")
+            secret_key = get_required_env("LANGFUSE_SECRET_KEY")
+        except Exception as exc:
+            log.warning(f"Langfuse enabled but credentials not found: {exc}")
+            return None
+
+        # Config takes precedence, then env var, then default
+        base_url = langfuse_base_url or get_optional_env("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com"
+
+        # Build Basic auth header
+        langfuse_auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
+
+        return OTLPSpanExporter(
+            endpoint=f"{base_url}/api/public/otel/v1/traces",
+            headers={"Authorization": f"Basic {langfuse_auth}"},
+        )
+
     def make_ai_tracer(
         self,
         user_id: str | None,
         posthog_client: Posthog | None,
         otlp_endpoint: str | None = None,
         otlp_headers: dict[str, str] | None = None,
+        langfuse_enabled: bool = False,
+        langfuse_base_url: str | None = None,
     ) -> tuple[OTelTracer, OTelTracerProvider]:
         """Create an isolated OpenTelemetry Tracer for GenAI instrumentation.
 
         This creates a dedicated TracerProvider that does NOT register itself as the
         global tracer to avoid polluting other traces in the host application.
 
-        It can configure two types of exporters:
+        It can configure multiple types of exporters:
         1. PostHog Exporter: Converts spans to PostHog $ai_generation events
         2. OTLP Exporter: Sends standard OTLP traces to a collector
+        3. Langfuse Exporter: Sends OTLP traces to Langfuse for LLM observability
 
         Args:
             user_id: Optional User ID for event attribution
             posthog_client: Optional PostHog client for sending events
             otlp_endpoint: Optional OTLP endpoint URL
             otlp_headers: Optional headers for OTLP export
+            langfuse_enabled: Whether to enable Langfuse OTLP export
+            langfuse_base_url: Optional base URL for self-hosted Langfuse
 
         Returns:
             A tuple of (Tracer, TracerProvider). The caller should call
@@ -344,7 +382,14 @@ class TelemetryManager(TelemetryManagerAbstract):
             )
             provider.add_span_processor(OTelBatchSpanProcessor(otlp_exporter))
 
-        # 5. Get the Tracer and return both tracer and provider
+        # 5. Add Langfuse OTLP Exporter if enabled
+        if langfuse_enabled:
+            langfuse_exporter = self._make_langfuse_exporter(langfuse_base_url)
+            if langfuse_exporter:
+                provider.add_span_processor(OTelBatchSpanProcessor(langfuse_exporter))
+                log.verbose("Langfuse OTLP exporter enabled")
+
+        # 6. Get the Tracer and return both tracer and provider
         tracer = provider.get_tracer(
             instrumenting_module_name=OTelConstants.INSTRUMENTING_MODULE_NAME,
             instrumenting_library_version=get_package_version(),

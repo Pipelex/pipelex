@@ -26,3 +26,7 @@ capture_pipe_codes_enabled = false        # Controls whether pipe codes appear i
 capture_output_class_name_enabled = false # Controls whether output class names appear in span names/attributes
 # otlp_endpoint = "https://..."
 # otlp_headers = { "Authorization" = "Bearer ..." }
+
+# Langfuse Integration (requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY env vars)
+langfuse_enabled = false
+# langfuse_base_url = "https://cloud.langfuse.com"  # Override for self-hosted Langfuse
