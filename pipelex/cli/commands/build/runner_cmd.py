@@ -87,6 +87,16 @@ def prepare_runner_cmd(
 
     # Determine source:
     if target:
+        # Check if target is a directory (not allowed for runner command)
+        target_path = Path(target)
+        if target_path.is_dir():
+            typer.secho(
+                f"Failed to run: '{target}' is a directory. The runner command requires a .plx file or a pipe code, not a directory.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(1)
+
         if target.endswith(".plx"):
             bundle_path = target
             if bundle:
