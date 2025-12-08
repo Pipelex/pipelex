@@ -1,5 +1,4 @@
 from opentelemetry.trace import Span
-from opentelemetry.trace import Tracer as OTelTracer
 from pydantic import BaseModel
 from typing_extensions import override
 
@@ -12,7 +11,6 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
-from pipelex.hub import get_otel_tracer
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -54,11 +52,6 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     #########################################################
     # OTel helper method overrides
     #########################################################
-
-    @override
-    def _get_tracer(self) -> OTelTracer | None:
-        """Get the OTel tracer from the hub's telemetry manager."""
-        return get_otel_tracer()
 
     @override
     def _get_provider_name(self) -> str:

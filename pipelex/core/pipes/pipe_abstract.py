@@ -309,7 +309,7 @@ class PipeAbstract(ABC, BaseModel):
         """
         tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
-            log.dev(f"[OTel] No tracer available for pipe '{self.code}'")
+            log.verbose(f"[OTel] No tracer available for pipe '{self.code}'")
             return None
 
         # Determine if we need to redact pipe codes for privacy
@@ -353,7 +353,7 @@ class PipeAbstract(ABC, BaseModel):
 
         # Debug logging
         span_ctx = span.get_span_context()
-        log.dev(
+        log.verbose(
             f"[OTel] PIPE SPAN STARTED:\n"
             f"  pipe_code='{self.code}'\n"
             f"  pipeline_run_id='{pipeline_run_id}'\n"
@@ -370,7 +370,7 @@ class PipeAbstract(ABC, BaseModel):
             return
 
         span_ctx = span.get_span_context()
-        log.dev(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
+        log.verbose(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
 
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
         span.set_status(Status(StatusCode.OK))
@@ -382,7 +382,7 @@ class PipeAbstract(ABC, BaseModel):
             return
 
         span_ctx = span.get_span_context()
-        log.dev(
+        log.verbose(
             f"[OTel] PIPE SPAN ENDING WITH ERROR:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}"
         )
 

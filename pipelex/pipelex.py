@@ -318,7 +318,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     @classmethod
     def make(
         cls,
-        integration_mode: IntegrationMode = IntegrationMode.CLI,
+        integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,

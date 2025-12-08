@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
-from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags, Tracer
+from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from typing_extensions import override
 
 from pipelex import log
@@ -69,10 +69,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     # OTel helper methods - override in subclasses with model info
     #########################################################
 
-    def _get_tracer(self) -> Tracer | None:
-        """Get the OTel tracer. Override in subclass to provide actual tracer."""
-        return None
-
     def _get_provider_name(self) -> str:
         """Get the GenAI provider name (e.g., 'openai', 'anthropic'). Override in subclass."""
         return "unknown"
@@ -94,12 +90,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Skip if telemetry is disabled (no otel_context)
         if otel_context is None:
-            log.dev("[OTel] No otel_context - skipping LLM span")
+            log.verbose("[OTel] No otel_context - skipping LLM span")
             return None
 
-        tracer = self._get_tracer()
+        tracer = TelemetryManagerAbstract.get_instance_tracer()
         if tracer is None:
-            log.dev("[OTel] No tracer available for LLM span")
+            log.verbose("[OTel] No tracer available for LLM span")
             return None
 
         unit_job_id = job_metadata.unit_job_id or UNKNOWN_JOB
@@ -190,7 +186,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
         parent_span_id = otel_context.span_id
-        log.dev(f"[OTel] LLM span:\n  pipe_code='{pipe_code}'\n  pipeline_run_id='{pipeline_run_id}'\n  parent_span_id={parent_span_id:016x}")
+        log.verbose(f"[OTel] LLM span:\n  pipe_code='{pipe_code}'\n  pipeline_run_id='{pipeline_run_id}'\n  parent_span_id={parent_span_id:016x}")
 
         parent_span_context = SpanContext(
             trace_id=otel_context.trace_id,
@@ -210,7 +206,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Debug logging
         span_ctx = span.get_span_context()
-        log.dev(
+        log.verbose(
             f"[OTel] LLM SPAN STARTED:\n"
             f"  pipe_code='{pipe_code}'\n"
             f"  pipeline_run_id='{pipeline_run_id}'\n"
@@ -228,7 +224,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         job_metadata = llm_job.job_metadata
         span_ctx = span.get_span_context()
-        log.dev(
+        log.verbose(
             f"[OTel] LLM SPAN ENDING:\n"
             f"  pipe_code='{job_metadata.pipe_code}'\n"
             f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"
@@ -260,7 +256,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         job_metadata = llm_job.job_metadata
         span_ctx = span.get_span_context()
-        log.dev(
+        log.verbose(
             f"[OTel] LLM SPAN ENDING:\n"
             f"  pipe_code='{job_metadata.pipe_code}'\n"
             f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"
@@ -292,7 +288,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         job_metadata = llm_job.job_metadata
         span_ctx = span.get_span_context()
-        log.dev(
+        log.verbose(
             f"[OTel] LLM SPAN ENDING WITH ERROR:\n"
             f"  pipe_code='{job_metadata.pipe_code}'\n"
             f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"

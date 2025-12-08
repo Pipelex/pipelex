@@ -65,7 +65,6 @@ class PostHogSpanExporter(SpanExporter):
                 PostHogAttr.OUTPUT_TYPE: attributes.get(GenAISpanAttr.OUTPUT_TYPE),
                 PostHogAttr.INPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_INPUT_TOKENS),
                 PostHogAttr.OUTPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_OUTPUT_TOKENS),
-                PostHogAttr.HTTP_STATUS: 200,
             }
         )
 
@@ -77,7 +76,7 @@ class PostHogSpanExporter(SpanExporter):
 
         pipe_code = attributes.get(PipelexSpanAttr.PIPE_CODE)
         pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
-        log.dev(
+        log.verbose(
             f"[OTel->PostHog] EXPORT $ai_generation:\n"
             f"  pipe_code='{pipe_code}'\n"
             f"  pipeline_run_id='{pipeline_run_id}'\n"
@@ -112,7 +111,7 @@ class PostHogSpanExporter(SpanExporter):
 
         pipe_code = attributes.get(PipelexSpanAttr.PIPE_CODE)
         pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
-        log.dev(
+        log.verbose(
             f"[OTel->PostHog] EXPORT $ai_span:\n"
             f"  pipe_code='{pipe_code}'\n"
             f"  pipeline_run_id='{pipeline_run_id}'\n"
@@ -130,7 +129,7 @@ class PostHogSpanExporter(SpanExporter):
 
     @override
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
-        log.dev(f"[OTel->PostHog] export() called with {len(spans)} span(s)")
+        log.verbose(f"[OTel->PostHog] export() called with {len(spans)} span(s)")
 
         for span in spans:
             try:
@@ -144,7 +143,7 @@ class PostHogSpanExporter(SpanExporter):
                 span_id_str = f"{span_ctx.span_id:016x}" if span_ctx else "unknown"
                 pipe_code = attributes.get(PipelexSpanAttr.PIPE_CODE)
                 pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
-                log.dev(
+                log.verbose(
                     f"[OTel->PostHog] Processing span:\n"
                     f"  pipe_code='{pipe_code}'\n"
                     f"  pipeline_run_id='{pipeline_run_id}'\n"

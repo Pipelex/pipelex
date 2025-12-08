@@ -52,11 +52,11 @@ class TelemetryManager(TelemetryManagerAbstract):
                 otlp_endpoint=telemetry_config.otlp_endpoint,
                 otlp_headers=telemetry_config.otlp_headers,
             )
-            log.dev("AI tracing enabled: OpenTelemetry tracer created")
+            log.verbose("AI tracing enabled: OpenTelemetry tracer created")
         else:
             self._otel_tracer = None
             self._tracer_provider = None
-            log.dev("AI tracing disabled: No OpenTelemetry tracer created")
+            log.verbose("AI tracing disabled: No OpenTelemetry tracer created")
 
         # Store original capture_exception method
         self._original_capture_exception: Callable[..., Any] = self.posthog_client.capture_exception
@@ -133,9 +133,9 @@ class TelemetryManager(TelemetryManagerAbstract):
         # This MUST happen before PostHog shutdown, otherwise spans won't be exported
         if self._tracer_provider:
             try:
-                log.dev("Shutting down OTel TracerProvider (flushing pending spans)...")
+                log.verbose("Shutting down OTel TracerProvider (flushing pending spans)...")
                 self._tracer_provider.shutdown()
-                log.dev("OTel TracerProvider shutdown complete")
+                log.verbose("OTel TracerProvider shutdown complete")
             except Exception as exc:
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during TracerProvider shutdown: {exc}")
@@ -279,7 +279,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             # No PARENT_ID - this is a root-level marker
         }
 
-        log.dev(f"[Telemetry] Emitting trace start event:\n  pipeline_run_id='{pipeline_run_id}'\n  trace_id={trace_id:032x}")
+        log.verbose(f"[Telemetry] Emitting trace start event:\n  pipeline_run_id='{pipeline_run_id}'\n  trace_id={trace_id:032x}")
 
         self.posthog_client.capture(
             distinct_id=user_id,

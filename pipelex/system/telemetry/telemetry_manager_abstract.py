@@ -179,7 +179,8 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
 
     @override
     def teardown(self):
-        pass
+        # Clear singleton instance to allow telemetry to be re-enabled in the same process
+        TelemetryManagerAbstract.clear_instance()
 
     @override
     def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):
