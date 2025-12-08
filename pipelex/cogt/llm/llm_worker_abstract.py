@@ -88,8 +88,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def _start_otel_span_llm(self, llm_job: LLMJob, output_type: LLMOutputType, output_class_name: str | None = None) -> Span | None:
         """Start an OTel span for the LLM job and return it. Safe to call if otel_context is None."""
         # Get context from job metadata
-        metadata = llm_job.job_metadata
-        otel_context = metadata.otel_context
+        job_metadata = llm_job.job_metadata
+        otel_context = job_metadata.otel_context
         job_params = llm_job.applied_job_params or llm_job.job_params
 
         # Skip if telemetry is disabled (no otel_context)
@@ -102,9 +102,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             log.dev("[OTel] No tracer available for LLM span")
             return None
 
-        unit_job_id = metadata.unit_job_id or UNKNOWN_JOB
-        pipeline_run_id = metadata.pipeline_run_id
-        pipe_code = metadata.pipe_code or UNKNOWN_PIPE
+        unit_job_id = job_metadata.unit_job_id or UNKNOWN_JOB
+        pipeline_run_id = job_metadata.pipeline_run_id
+        pipe_code = job_metadata.pipe_code or UNKNOWN_PIPE
 
         # Determine if we need to redact output class names
         output_desc: str
@@ -144,8 +144,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span_attributes[GenAISpanAttr.REQUEST_MAX_TOKENS] = job_params.max_tokens
         if job_params.seed:
             span_attributes[GenAISpanAttr.REQUEST_SEED] = job_params.seed
-        if metadata.job_name:
-            span_attributes[PipelexSpanAttr.JOB_NAME] = metadata.job_name
+        if job_metadata.job_name:
+            span_attributes[PipelexSpanAttr.JOB_NAME] = job_metadata.job_name
         if TelemetryManagerAbstract.is_capture_content_enabled():
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
             messages: list[dict[str, Any]] = []
@@ -228,12 +228,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if span is None:
             return
 
-        metadata = llm_job.job_metadata
+        job_metadata = llm_job.job_metadata
         span_ctx = span.get_span_context()
         log.dev(
             f"[OTel] LLM SPAN ENDING:\n"
-            f"  pipe_code='{metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{metadata.pipeline_run_id}'\n"
+            f"  pipe_code='{job_metadata.pipe_code}'\n"
+            f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"
             f"  trace_id={span_ctx.trace_id:032x}\n"
             f"  span_id={span_ctx.span_id:016x}"
         )
@@ -260,12 +260,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if span is None:
             return
 
-        metadata = llm_job.job_metadata
+        job_metadata = llm_job.job_metadata
         span_ctx = span.get_span_context()
         log.dev(
             f"[OTel] LLM SPAN ENDING:\n"
-            f"  pipe_code='{metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{metadata.pipeline_run_id}'\n"
+            f"  pipe_code='{job_metadata.pipe_code}'\n"
+            f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"
             f"  trace_id={span_ctx.trace_id:032x}\n"
             f"  span_id={span_ctx.span_id:016x}"
         )
@@ -292,12 +292,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if span is None:
             return
 
-        metadata = llm_job.job_metadata
+        job_metadata = llm_job.job_metadata
         span_ctx = span.get_span_context()
         log.dev(
             f"[OTel] LLM SPAN ENDING WITH ERROR:\n"
-            f"  pipe_code='{metadata.pipe_code}'\n"
-            f"  pipeline_run_id='{metadata.pipeline_run_id}'\n"
+            f"  pipe_code='{job_metadata.pipe_code}'\n"
+            f"  pipeline_run_id='{job_metadata.pipeline_run_id}'\n"
             f"  trace_id={span_ctx.trace_id:032x}\n"
             f"  span_id={span_ctx.span_id:016x}"
         )
