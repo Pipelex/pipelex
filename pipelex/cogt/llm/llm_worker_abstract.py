@@ -75,10 +75,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Get the response model name. Override in subclass."""
         return "unknown"
 
-    def _should_capture_content(self) -> bool:
-        """Return whether prompt/response content should be captured. Override in subclass."""
-        return False
-
     def _start_otel_span_llm(self, llm_job: LLMJob, output_type: LLMOutputType, output_class_name: str | None = None) -> Span | None:
         """Start an OTel span for the LLM job and return it. Safe to call if otel_context is None."""
         # Get context from job metadata
@@ -140,7 +136,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span_attributes[GenAISpanAttr.REQUEST_SEED] = job_params.seed
         if metadata.job_name:
             span_attributes[PipelexSpanAttr.JOB_NAME] = metadata.job_name
-        if self._should_capture_content() and llm_job.llm_prompt.user_text:
+        if TelemetryManagerAbstract.is_capture_content_enabled() and llm_job.llm_prompt.user_text:
             span_attributes[GenAISpanAttr.PROMPT_CONTENT] = llm_job.llm_prompt.user_text
 
         # Use trace_id and span_id from otel_context (precomputed)
@@ -201,7 +197,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
 
         # Capture response content if enabled and result is a string
-        if self._should_capture_content():
+        if TelemetryManagerAbstract.is_capture_content_enabled():
             span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_string)
 
         span.set_status(Status(StatusCode.OK))
@@ -231,7 +227,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
 
         # Capture response content if enabled and result is a string
-        if self._should_capture_content():
+        if TelemetryManagerAbstract.is_capture_content_enabled():
             completion_string = completion_object.model_dump_json(serialize_as_any=True)
             span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_string)
 

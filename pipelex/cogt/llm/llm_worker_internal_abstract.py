@@ -76,11 +76,6 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         """Get the response model name from the inference model."""
         return self.inference_model.model_id
 
-    @override
-    def _should_capture_content(self) -> bool:
-        """Return whether prompt/response content should be captured."""
-        return TelemetryManagerAbstract.is_capture_content_enabled()
-
     #########################################################
     # Job lifecycle overrides
     #########################################################
