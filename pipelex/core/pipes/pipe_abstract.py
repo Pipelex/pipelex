@@ -341,13 +341,22 @@ class PipeAbstract(ABC, BaseModel):
             PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
         }
         if TelemetryManagerAbstract.get_langfuse_enabled():
-            span_attributes[LangfuseSpanAttr.TRACE_NAME] = parent_otel_context.trace_name
-            span_attributes[LangfuseSpanAttr.RELEASE] = get_package_version()
+            span_attributes.update(
+                {
+                    LangfuseSpanAttr.TRACE_NAME: parent_otel_context.trace_name,
+                    LangfuseSpanAttr.RELEASE: get_package_version(),
+                    LangfuseSpanAttr.SPAN_CATEGORY: SpanCategory.PIPE,
+                    LangfuseSpanAttr.PIPE_CATEGORY: self.pipe_category,
+                    LangfuseSpanAttr.PIPE_TYPE: self.pipe_type,
+                    LangfuseSpanAttr.PIPE_CODE: pipe_code_attr,
+                    LangfuseSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
+                }
+            )
 
         # Capture input content for Langfuse if enabled
         if TelemetryManagerAbstract.is_capture_content_enabled() and TelemetryManagerAbstract.get_langfuse_enabled():
             if self.description:
-                span_attributes[LangfuseSpanAttr.OBSERVATION_METADATA_DESCRIPTION] = self.description
+                span_attributes[LangfuseSpanAttr.METADATA_DESCRIPTION] = self.description
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
             needed_input_names = set(self.needed_inputs().required_names)
             inputs_json = OtelFactory.make_inputs_json(
@@ -415,6 +424,8 @@ class PipeAbstract(ABC, BaseModel):
 
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
         span.set_status(Status(StatusCode.OK))
+        if TelemetryManagerAbstract.get_langfuse_enabled():
+            span.set_attribute(LangfuseSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
         span.end()
 
     def _end_pipe_span_error(self, span: Span | None, error: Exception) -> None:
@@ -430,6 +441,8 @@ class PipeAbstract(ABC, BaseModel):
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.FAILURE)
         span.record_exception(error)
         span.set_status(Status(StatusCode.ERROR, str(error)))
+        if TelemetryManagerAbstract.get_langfuse_enabled():
+            span.set_attribute(LangfuseSpanAttr.OUTCOME, SpanOutcome.FAILURE)
         span.end()
 
     @final

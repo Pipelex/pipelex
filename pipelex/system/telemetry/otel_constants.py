@@ -134,7 +134,13 @@ class LangfuseSpanAttr(StrEnum):
     DEPLOYMENT_ENVIRONMENT = "deployment.environment"
 
     # Observation-level attributes
-    OBSERVATION_METADATA_DESCRIPTION = "langfuse.observation.metadata.description"
+    METADATA_DESCRIPTION = "langfuse.observation.metadata.description"
+    SPAN_CATEGORY = "langfuse.observation.metadata.span_category"
+    PIPE_CATEGORY = "langfuse.observation.metadata.pipe_category"
+    PIPE_TYPE = "langfuse.observation.metadata.pipe_type"
+    PIPE_CODE = "langfuse.observation.metadata.pipe_code"
+    PIPELINE_RUN_ID = "langfuse.observation.metadata.pipeline_run_id"
+    OUTCOME = "langfuse.observation.metadata.outcome"
     OBSERVATION_INPUT = "langfuse.observation.input"
     OBSERVATION_OUTPUT = "langfuse.observation.output"
 
