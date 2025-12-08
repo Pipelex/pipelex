@@ -168,14 +168,15 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                         "content": system_text,
                     }
                     messages.append(system_text_dict)
-                if llm_job.llm_prompt.user_text:
-                    user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                if llm_job.llm_prompt.user_text or llm_job.llm_prompt.user_images:
                     content_dict: list[dict[str, Any]] = []
-                    user_text_dict = {
-                        "type": "text",
-                        "text": user_text,
-                    }
-                    content_dict.append(user_text_dict)
+                    if llm_job.llm_prompt.user_text:
+                        user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                        user_text_dict = {
+                            "type": "text",
+                            "text": user_text,
+                        }
+                        content_dict.append(user_text_dict)
                     for prompt_image in llm_job.llm_prompt.user_images:
                         image_dict = {
                             "type": "image",

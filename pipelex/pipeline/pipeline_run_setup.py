@@ -127,7 +127,10 @@ async def pipeline_run_setup(
             raise PipeExecutionError(message=msg)
     elif pipe_code:
         if library_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(library_dir) for library_dir in library_dirs])
+            library_manager.load_libraries(
+                library_id=library_id,
+                library_dirs=[Path(library_dir) for library_dir in library_dirs],
+            )
         else:
             library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
         pipe = get_required_pipe(pipe_code=pipe_code)
