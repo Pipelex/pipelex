@@ -12,7 +12,15 @@ from pipelex import log
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.job_metadata import UnitJobId
-from pipelex.system.telemetry.otel_constants import REDACTED, UNKNOWN_JOB, UNKNOWN_PIPE, GenAISpanAttr, LLMOutputType, PipelexSpanAttr, SpanCategory
+from pipelex.system.telemetry.otel_constants import (
+    PIPE_CODE_REDACTED,
+    UNKNOWN_JOB,
+    UNKNOWN_PIPE,
+    GenAISpanAttr,
+    LLMOutputType,
+    PipelexSpanAttr,
+    SpanCategory,
+)
 from pipelex.system.telemetry.otel_utils import truncate_content_for_telemetry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
@@ -113,7 +121,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
             pipe_code_attr = pipe_code
         else:
-            pipe_code_attr = REDACTED
+            pipe_code_attr = PIPE_CODE_REDACTED
 
         model_name = self._get_request_model_name()
         span_name = f"{pipe_code_attr}: {unit_job_id} ({model_name}) -> {output_desc}"

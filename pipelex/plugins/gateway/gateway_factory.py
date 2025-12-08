@@ -11,7 +11,7 @@ from pipelex import log
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
-from pipelex.system.telemetry.otel_constants import REDACTED
+from pipelex.system.telemetry.otel_constants import PIPE_CODE_REDACTED
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
@@ -70,7 +70,7 @@ class GatewayFactory:
             # Build span name respecting privacy settings
             pipe_code = llm_job.job_metadata.pipe_code or "main"
             if not TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
-                pipe_code = REDACTED
+                pipe_code = PIPE_CODE_REDACTED
 
             unit_job_id = llm_job.job_metadata.unit_job_id or "unknown"
             extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {unit_job_id} -> {output_desc}"

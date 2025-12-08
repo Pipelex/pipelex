@@ -9,7 +9,7 @@ from opentelemetry.semconv._incubating.attributes import gen_ai_attributes as ot
 from pipelex.types import StrEnum
 
 UNKNOWN_PIPE = "unknown-pipe"
-REDACTED = "[REDACTED]"
+PIPE_CODE_REDACTED = "[REDACTED]"
 UNKNOWN_JOB = "unknown-job"
 TRUNCATION_SUFFIX = "... [truncated]"
 

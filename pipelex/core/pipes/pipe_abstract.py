@@ -19,7 +19,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.run_id_factory import make_pipe_run_id
-from pipelex.system.telemetry.otel_constants import REDACTED, PipelexSpanAttr, SpanOutcome
+from pipelex.system.telemetry.otel_constants import PIPE_CODE_REDACTED, PipelexSpanAttr, SpanCategory, SpanOutcome
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
@@ -318,8 +318,17 @@ class PipeAbstract(ABC, BaseModel):
             span_name = f"{self.pipe_type}: {self.code}"
             pipe_code_attr = self.code
         else:
-            span_name = f"{self.pipe_type}: {REDACTED}"
-            pipe_code_attr = REDACTED
+            span_name = f"{self.pipe_type}: {PIPE_CODE_REDACTED}"
+            pipe_code_attr = PIPE_CODE_REDACTED
+
+        # Build all span attributes upfront
+        span_attributes: dict[str, str] = {
+            PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.PIPE,
+            PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
+            PipelexSpanAttr.PIPE_TYPE: self.pipe_type,
+            PipelexSpanAttr.PIPE_CATEGORY: self.pipe_category,
+            PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
+        }
 
         # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
         # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
@@ -334,19 +343,13 @@ class PipeAbstract(ABC, BaseModel):
         )
         parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
 
-        # Start span - OTel generates the span_id, we capture it after
+        # Start span with attributes - OTel generates the span_id, we capture it after
         span = tracer.start_span(
             name=span_name,
             kind=SpanKind.INTERNAL,
             context=parent_ctx,
+            attributes=span_attributes,
         )
-
-        # Set pipe-specific attributes
-        span.set_attribute(PipelexSpanAttr.SPAN_CATEGORY, "pipe")
-        span.set_attribute(PipelexSpanAttr.PIPE_CODE, pipe_code_attr)
-        span.set_attribute(PipelexSpanAttr.PIPE_TYPE, self.pipe_type)
-        span.set_attribute(PipelexSpanAttr.PIPE_CATEGORY, self.pipe_category)
-        span.set_attribute(PipelexSpanAttr.PIPELINE_RUN_ID, pipeline_run_id)
 
         # Debug logging
         span_ctx = span.get_span_context()
@@ -361,21 +364,31 @@ class PipeAbstract(ABC, BaseModel):
 
         return span
 
-    def _end_pipe_span(self, span: Span | None, error: Exception | None = None) -> None:
-        """End the pipe's OTel span."""
+    def _end_pipe_span_success(self, span: Span | None) -> None:
+        """End the pipe's OTel span with success status. Safe to call if span is None."""
         if span is None:
             return
 
         span_ctx = span.get_span_context()
         log.dev(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
 
-        if error:
-            span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.FAILURE)
-            span.record_exception(error)
-            span.set_status(Status(StatusCode.ERROR, str(error)))
-        else:
-            span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
-            span.set_status(Status(StatusCode.OK))
+        span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
+        span.set_status(Status(StatusCode.OK))
+        span.end()
+
+    def _end_pipe_span_error(self, span: Span | None, error: Exception) -> None:
+        """End the pipe's OTel span with error status. Safe to call if span is None."""
+        if span is None:
+            return
+
+        span_ctx = span.get_span_context()
+        log.dev(
+            f"[OTel] PIPE SPAN ENDING WITH ERROR:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}"
+        )
+
+        span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.FAILURE)
+        span.record_exception(error)
+        span.set_status(Status(StatusCode.ERROR, str(error)))
         span.end()
 
     @final
@@ -407,11 +420,10 @@ class PipeAbstract(ABC, BaseModel):
             # Get the actual span_id from OTel (OTel generates its own span_id)
             if span:
                 span_context = span.get_span_context()
-                if span_context and span_context.is_valid:
-                    this_otel_context = OtelContext(
-                        trace_id=parent_otel_context.trace_id,
-                        span_id=span_context.span_id,
-                    )
+                this_otel_context = OtelContext(
+                    trace_id=parent_otel_context.trace_id,
+                    span_id=span_context.span_id,
+                )
 
         # Create child metadata with updated pipe_code, pipe_run_id, and otel_context
         # This passes down a modified copy rather than mutating the original
@@ -429,10 +441,11 @@ class PipeAbstract(ABC, BaseModel):
             if not working_memory.is_stuff_exists(name=required_stuff_name):
                 missing_inputs[required_stuff_name] = requirement.concept.code
         if missing_inputs:
-            self._end_pipe_span(span, error=None)
-            raise PipeRunInputsError(
+            error = PipeRunInputsError(
                 message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
             )
+            self._end_pipe_span_error(span, error=error)
+            raise error
 
         pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
         if pipe_run_params.run_mode == PipeRunMode.LIVE:
@@ -450,11 +463,10 @@ class PipeAbstract(ABC, BaseModel):
                 job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
         except Exception as exc:
-            self._end_pipe_span(span, error=exc)
+            self._end_pipe_span_error(span, error=exc)
             raise
 
-        # End span successfully
-        self._end_pipe_span(span)
+        self._end_pipe_span_success(span)
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 
