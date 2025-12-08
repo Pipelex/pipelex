@@ -486,6 +486,25 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
+        # Check inputs ------------------------------------------------------------
+
+        # check we have the required inputs in the working memory
+        missing_inputs: dict[str, str] = {}
+        for required_stuff_name, requirement in self.needed_inputs().items:
+            if not working_memory.is_stuff_exists(name=required_stuff_name):
+                missing_inputs[required_stuff_name] = requirement.concept.code
+        if missing_inputs:
+            error = PipeRunInputsError(
+                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
+            )
+            raise error
+
+        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
+        if pipe_run_params.run_mode == PipeRunMode.LIVE:
+            log.info(pipe_run_info)
+
+        # Handle telemetry ------------------------------------------------------------
+
         # Generate pipe_run_id (business ID, always set)
         this_pipe_run_id = PipelineFactory.make_pipe_run_id()
 
@@ -524,21 +543,7 @@ class PipeAbstract(ABC, BaseModel):
             otel_context=this_otel_context,
         )
 
-        # check we have the required inputs in the working memory
-        missing_inputs: dict[str, str] = {}
-        for required_stuff_name, requirement in self.needed_inputs().items:
-            if not working_memory.is_stuff_exists(name=required_stuff_name):
-                missing_inputs[required_stuff_name] = requirement.concept.code
-        if missing_inputs:
-            error = PipeRunInputsError(
-                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
-            )
-            self._end_pipe_span_error(span, error=error, is_root_span=is_root_span)
-            raise error
-
-        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
-        if pipe_run_params.run_mode == PipeRunMode.LIVE:
-            log.info(pipe_run_info)
+        # Run pipe ------------------------------------------------------------
 
         try:
             await self.validate_before_run(
@@ -554,7 +559,11 @@ class PipeAbstract(ABC, BaseModel):
             self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
             raise
 
+        # Handle telemetry ------------------------------------------------------------
+
         self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
+
+        # Cleanup ------------------------------------------------------------
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 

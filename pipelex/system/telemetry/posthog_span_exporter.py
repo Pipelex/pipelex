@@ -27,7 +27,7 @@ class PostHogSpanExporter(SpanExporter):
     """Exports OTel spans to PostHog as $ai_generation or $ai_span events."""
 
     def __init__(self, posthog_client: Posthog, distinct_id: str | None):
-        self.client = posthog_client
+        self.posthog_client = posthog_client
         self.distinct_id = distinct_id
 
     def _capture_event(self, event: PostHogEvent, properties: dict[str, Any]) -> None:
@@ -38,7 +38,7 @@ class PostHogSpanExporter(SpanExporter):
         """
         if self.distinct_id:
             # Identified user: pass distinct_id
-            self.client.capture(
+            self.posthog_client.capture(
                 distinct_id=self.distinct_id,
                 event=event,
                 properties=properties,
@@ -46,7 +46,7 @@ class PostHogSpanExporter(SpanExporter):
         else:
             # Anonymous user: don't pass distinct_id, mark as anonymous
             properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
-            self.client.capture(
+            self.posthog_client.capture(
                 event=event,
                 properties=properties,
             )
