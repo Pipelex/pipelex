@@ -19,8 +19,15 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.pipeline_factory import PipelineFactory
-from pipelex.system.telemetry.otel_constants import PIPE_CODE_REDACTED, PipelexSpanAttr, SpanCategory, SpanOutcome
+from pipelex.system.telemetry.otel_constants import (
+    PIPE_CODE_REDACTED,
+    LangfuseSpanAttr,
+    PipelexSpanAttr,
+    SpanCategory,
+    SpanOutcome,
+)
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
@@ -322,12 +329,16 @@ class PipeAbstract(ABC, BaseModel):
 
         # Build all span attributes upfront
         span_attributes: dict[str, str] = {
+            # Pipelex-specific attributes
             PipelexSpanAttr.TRACE_NAME: parent_otel_context.trace_name,
             PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.PIPE,
             PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
             PipelexSpanAttr.PIPE_CATEGORY: self.pipe_category,
             PipelexSpanAttr.PIPE_TYPE: self.pipe_type,
             PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
+            # Langfuse-specific trace-level attributes
+            LangfuseSpanAttr.TRACE_NAME: parent_otel_context.trace_name,
+            LangfuseSpanAttr.RELEASE: get_package_version(),
         }
 
         # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)

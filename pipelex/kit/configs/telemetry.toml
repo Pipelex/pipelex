@@ -24,9 +24,7 @@ capture_content_enabled = false # Controls gen_ai.prompt/completion content capt
 # capture_content_max_length = 1000                                  # Max length for captured content (omit for unlimited)
 capture_pipe_codes_enabled = false        # Controls whether pipe codes appear in span names/attributes
 capture_output_class_name_enabled = false # Controls whether output class names appear in span names/attributes
+langfuse_enabled = false                  # Langfuse Integration (requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY env vars)
+# langfuse_base_url = "https://cloud.langfuse.com"  # Override for self-hosted Langfuse
 # otlp_endpoint = "https://..."
 # otlp_headers = { "Authorization" = "Bearer ..." }
-
-# Langfuse Integration (requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY env vars)
-langfuse_enabled = false
-# langfuse_base_url = "https://cloud.langfuse.com"  # Override for self-hosted Langfuse

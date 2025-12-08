@@ -111,6 +111,26 @@ class PipelexSpanAttr(StrEnum):
     OUTCOME = "pipelex.outcome"  # "success" or "failure"
 
 
+class LangfuseSpanAttr(StrEnum):
+    """Langfuse-specific span attribute keys for enhanced observability.
+
+    These are trace-level attributes that Langfuse uses for grouping and filtering.
+    Note: Langfuse auto-detects "generation" type when gen_ai.request.model is present,
+    so we don't need to set langfuse.observation.type explicitly.
+
+    See: https://langfuse.com/integrations/native/opentelemetry
+    """
+
+    # Trace-level attributes (applied to trace record in Langfuse)
+    TRACE_NAME = "langfuse.trace.name"
+    USER_ID = "langfuse.user.id"
+    SESSION_ID = "langfuse.session.id"
+    RELEASE = "langfuse.release"
+
+    # Environment (standard OTel attribute recognized by Langfuse)
+    DEPLOYMENT_ENVIRONMENT = "deployment.environment"
+
+
 class SpanCategory(StrEnum):
     PIPE = "pipe"
     INFERENCE = "inference"

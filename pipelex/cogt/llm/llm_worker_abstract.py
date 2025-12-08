@@ -17,12 +17,14 @@ from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import (
     PIPE_CODE_REDACTED,
     GenAISpanAttr,
+    LangfuseSpanAttr,
     PipelexSpanAttr,
     SpanCategory,
     make_otel_gen_ai_output_type,
 )
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
     from opentelemetry.util.types import AttributeValue
@@ -142,6 +144,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.INFERENCE,
             PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
             PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
+            # Langfuse-specific trace-level attributes
+            # Note: Langfuse auto-detects "generation" type from gen_ai.request.model
+            LangfuseSpanAttr.TRACE_NAME: otel_context.trace_name,
+            LangfuseSpanAttr.RELEASE: get_package_version(),
         }
         if job_params.max_tokens:
             span_attributes[GenAISpanAttr.REQUEST_MAX_TOKENS] = job_params.max_tokens
