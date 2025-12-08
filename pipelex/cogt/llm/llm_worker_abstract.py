@@ -10,15 +10,16 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.llm.llm_constants import LLMOutputType
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.exceptions import JobMetadataError
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import (
     PIPE_CODE_REDACTED,
     GenAISpanAttr,
-    LLMOutputType,
     PipelexSpanAttr,
     SpanCategory,
+    make_otel_gen_ai_output_type,
 )
 from pipelex.system.telemetry.otel_utils import truncate_content_for_telemetry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -131,7 +132,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span_attributes: dict[str, AttributeValue] = {
             # GenAI standard attributes
             GenAISpanAttr.OPERATION_NAME: unit_job_id,
-            GenAISpanAttr.OUTPUT_TYPE: output_type.as_otel_gen_ai_output_type.value,
+            GenAISpanAttr.OUTPUT_TYPE: make_otel_gen_ai_output_type(output_type=output_type).value,
             GenAISpanAttr.PROVIDER_NAME: self._get_provider_name(),
             GenAISpanAttr.REQUEST_MODEL: model_name,
             GenAISpanAttr.RESPONSE_MODEL: self._get_response_model_name(),

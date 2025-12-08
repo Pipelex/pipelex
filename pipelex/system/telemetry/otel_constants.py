@@ -6,6 +6,7 @@ with OpenTelemetry, following the GenAI semantic conventions.
 
 from opentelemetry.semconv._incubating.attributes import gen_ai_attributes as otel_gen_ai_attributes  # noqa: PLC2701
 
+from pipelex.cogt.llm.llm_constants import LLMOutputType
 from pipelex.types import StrEnum
 
 PIPE_CODE_REDACTED = "[REDACTED]"
@@ -82,29 +83,17 @@ class OTelConstants(StrEnum):
     INSTRUMENTING_MODULE_NAME = "pipelex"
 
 
-class LLMOutputType(StrEnum):
-    TEXT = "Text"
-    OBJECT = "Object"
-
-    @classmethod
-    def is_text(cls, output_desc: str) -> bool:
-        try:
-            output_desc_enum = cls(output_desc)
-        except ValueError:
-            return False
-        match output_desc_enum:
-            case cls.TEXT:
-                return True
-            case cls.OBJECT:
-                return False
-
-    @property
-    def as_otel_gen_ai_output_type(self) -> otel_gen_ai_attributes.GenAiOutputTypeValues:
-        match self:
+def make_otel_gen_ai_output_type(output_type: str) -> otel_gen_ai_attributes.GenAiOutputTypeValues:
+    try:
+        llm_output_type = LLMOutputType(output_type)
+        match llm_output_type:
             case LLMOutputType.TEXT:
                 return otel_gen_ai_attributes.GenAiOutputTypeValues.TEXT
             case LLMOutputType.OBJECT:
                 return otel_gen_ai_attributes.GenAiOutputTypeValues.JSON
+    except ValueError as exc:
+        msg = f"Invalid LLM output type: {output_type}, and we only support LLM output types for now in OpenTelemetry"
+        raise ValueError(msg) from exc
 
 
 class PipelexSpanAttr(StrEnum):
