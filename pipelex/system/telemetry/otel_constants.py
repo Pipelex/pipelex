@@ -132,17 +132,25 @@ class LangfuseSpanAttr(StrEnum):
     TRACE_INPUT = "langfuse.trace.input"
     TRACE_OUTPUT = "langfuse.trace.output"
 
+    # Trace-level metadata (filterable in Langfuse UI)
+    TRACE_DESCRIPTION = "langfuse.trace.metadata.description"
+    TRACE_PIPE_CODE = "langfuse.trace.metadata.pipe_code"
+    TRACE_PIPE_TYPE = "langfuse.trace.metadata.pipe_type"
+    TRACE_PIPE_CATEGORY = "langfuse.trace.metadata.pipe_category"
+    TRACE_PIPELINE_RUN_ID = "langfuse.trace.metadata.pipeline_run_id"
+    TRACE_OUTCOME = "langfuse.trace.metadata.outcome"
+
     # Environment (standard OTel attribute recognized by Langfuse)
     DEPLOYMENT_ENVIRONMENT = "deployment.environment"
 
-    # Observation-level attributes
-    METADATA_DESCRIPTION = "langfuse.observation.metadata.description"
-    SPAN_CATEGORY = "langfuse.observation.metadata.span_category"
-    PIPE_CATEGORY = "langfuse.observation.metadata.pipe_category"
-    PIPE_TYPE = "langfuse.observation.metadata.pipe_type"
-    PIPE_CODE = "langfuse.observation.metadata.pipe_code"
-    PIPELINE_RUN_ID = "langfuse.observation.metadata.pipeline_run_id"
-    OUTCOME = "langfuse.observation.metadata.outcome"
+    # Observation-level metadata (filterable in Langfuse UI)
+    OBSERVATION_DESCRIPTION = "langfuse.observation.metadata.description"
+    OBSERVATION_TYPE = "langfuse.observation.metadata.observation_type"
+    OBSERVATION_PIPE_CATEGORY = "langfuse.observation.metadata.pipe_category"
+    OBSERVATION_PIPE_TYPE = "langfuse.observation.metadata.pipe_type"
+    OBSERVATION_PIPE_CODE = "langfuse.observation.metadata.pipe_code"
+    OBSERVATION_PIPELINE_RUN_ID = "langfuse.observation.metadata.pipeline_run_id"
+    OBSERVATION_OUTCOME = "langfuse.observation.metadata.outcome"
     OBSERVATION_INPUT = "langfuse.observation.input"
     OBSERVATION_OUTPUT = "langfuse.observation.output"
 

@@ -353,18 +353,18 @@ class PipeAbstract(ABC, BaseModel):
                 {
                     LangfuseSpanAttr.TRACE_NAME: parent_otel_context.trace_name,
                     LangfuseSpanAttr.RELEASE: get_package_version(),
-                    LangfuseSpanAttr.SPAN_CATEGORY: SpanCategory.PIPE,
-                    LangfuseSpanAttr.PIPE_CATEGORY: self.pipe_category,
-                    LangfuseSpanAttr.PIPE_TYPE: self.pipe_type,
-                    LangfuseSpanAttr.PIPE_CODE: pipe_code_attr,
-                    LangfuseSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
+                    LangfuseSpanAttr.OBSERVATION_TYPE: SpanCategory.PIPE,
+                    LangfuseSpanAttr.OBSERVATION_PIPE_CATEGORY: self.pipe_category,
+                    LangfuseSpanAttr.OBSERVATION_PIPE_TYPE: self.pipe_type,
+                    LangfuseSpanAttr.OBSERVATION_PIPE_CODE: pipe_code_attr,
+                    LangfuseSpanAttr.OBSERVATION_PIPELINE_RUN_ID: pipeline_run_id,
                 }
             )
 
         # Capture input content for Langfuse if enabled
         if TelemetryManagerAbstract.is_capture_content_enabled() and TelemetryManagerAbstract.get_langfuse_enabled():
             if self.description:
-                span_attributes[LangfuseSpanAttr.METADATA_DESCRIPTION] = self.description
+                span_attributes[LangfuseSpanAttr.OBSERVATION_DESCRIPTION] = self.description
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
             needed_input_names = set(self.needed_inputs().required_names)
             inputs_json = OtelFactory.make_inputs_json(
@@ -374,9 +374,16 @@ class PipeAbstract(ABC, BaseModel):
             )
             span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = inputs_json
 
-            # For root span, also set trace-level input
+            # For root span, also set trace-level input and metadata
             if is_root_span:
                 span_attributes[LangfuseSpanAttr.TRACE_INPUT] = inputs_json
+                # Set trace-level metadata (filterable in Langfuse UI)
+                span_attributes[LangfuseSpanAttr.TRACE_PIPE_CODE] = pipe_code_attr
+                span_attributes[LangfuseSpanAttr.TRACE_PIPE_TYPE] = self.pipe_type
+                span_attributes[LangfuseSpanAttr.TRACE_PIPE_CATEGORY] = self.pipe_category
+                span_attributes[LangfuseSpanAttr.TRACE_PIPELINE_RUN_ID] = pipeline_run_id
+                if self.description:
+                    span_attributes[LangfuseSpanAttr.TRACE_DESCRIPTION] = self.description
 
         parent_span_context = SpanContext(
             trace_id=parent_otel_context.trace_id,
@@ -438,11 +445,19 @@ class PipeAbstract(ABC, BaseModel):
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
         span.set_status(Status(StatusCode.OK))
         if TelemetryManagerAbstract.get_langfuse_enabled():
-            span.set_attribute(LangfuseSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
+            span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTCOME, SpanOutcome.SUCCESS)
+            if is_root_span:
+                span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.SUCCESS)
         span.end()
 
-    def _end_pipe_span_error(self, span: Span | None, error: Exception) -> None:
-        """End the pipe's OTel span with error status. Safe to call if span is None."""
+    def _end_pipe_span_error(self, span: Span | None, error: Exception, is_root_span: bool = False) -> None:
+        """End the pipe's OTel span with error status. Safe to call if span is None.
+
+        Args:
+            span: The OTel span to end, or None if telemetry is disabled.
+            error: The exception that caused the error.
+            is_root_span: Whether this is the root span of the trace.
+        """
         if span is None:
             return
 
@@ -455,7 +470,9 @@ class PipeAbstract(ABC, BaseModel):
         span.record_exception(error)
         span.set_status(Status(StatusCode.ERROR, str(error)))
         if TelemetryManagerAbstract.get_langfuse_enabled():
-            span.set_attribute(LangfuseSpanAttr.OUTCOME, SpanOutcome.FAILURE)
+            span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTCOME, SpanOutcome.FAILURE)
+            if is_root_span:
+                span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.FAILURE)
         span.end()
 
     @final
@@ -516,7 +533,7 @@ class PipeAbstract(ABC, BaseModel):
             error = PipeRunInputsError(
                 message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
             )
-            self._end_pipe_span_error(span, error=error)
+            self._end_pipe_span_error(span, error=error, is_root_span=is_root_span)
             raise error
 
         pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
@@ -534,7 +551,7 @@ class PipeAbstract(ABC, BaseModel):
                 job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
         except Exception as exc:
-            self._end_pipe_span_error(span, error=exc)
+            self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
             raise
 
         self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
