@@ -37,6 +37,7 @@ class TelemetryConfig(ConfigModel):
     user_id: str
     ai_tracing_enabled: bool  # Enable OpenTelemetry tracing for AI operations
     capture_content_enabled: bool  # Controls gen_ai.prompt/completion content capture for OTel
+    capture_content_max_length: int | None = None  # Max length for captured content (None = unlimited)
     capture_pipe_codes_enabled: bool  # Controls whether pipe codes appear in span names/attributes
     capture_output_class_name_enabled: bool  # Controls whether output class names appear in span names/attributes
     otlp_endpoint: str | None = None  # Optional OTLP endpoint for generic tracing

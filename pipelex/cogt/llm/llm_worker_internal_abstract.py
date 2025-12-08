@@ -14,7 +14,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.hub import get_otel_tracer
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 
 class LLMWorkerInternalAbstract(LLMWorkerAbstract):

@@ -89,6 +89,19 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return instance.capture_output_class_name_enabled
 
     @classmethod
+    def get_capture_content_max_length(cls) -> int | None:
+        """Get the maximum length for captured content.
+
+        Returns:
+            The maximum length for captured content, or None if unlimited
+            (including when no telemetry manager is configured).
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return None
+        return instance.capture_content_max_length
+
+    @classmethod
     def telemetry_was_just_enabled(cls) -> TelemetryMode | None:
         if cls.telemetry_mode_just_set is None:
             return None
@@ -138,6 +151,11 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     @abstractmethod
     def capture_output_class_name_enabled(self) -> bool:
         """Whether output class names should appear in span names and attributes."""
+
+    @property
+    @abstractmethod
+    def capture_content_max_length(self) -> int | None:
+        """Maximum length for captured content, or None if unlimited."""
 
     @abstractmethod
     def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
@@ -199,6 +217,11 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
     def capture_output_class_name_enabled(self) -> bool:
         return False
+
+    @property
+    @override
+    def capture_content_max_length(self) -> int | None:
+        return None
 
     @override
     def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:

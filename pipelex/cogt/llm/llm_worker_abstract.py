@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags, Tracer
@@ -12,6 +13,7 @@ from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbst
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import REDACTED, UNKNOWN_JOB, UNKNOWN_PIPE, GenAISpanAttr, LLMOutputType, PipelexSpanAttr, SpanCategory
+from pipelex.system.telemetry.otel_utils import truncate_content_for_telemetry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
@@ -136,8 +138,48 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span_attributes[GenAISpanAttr.REQUEST_SEED] = job_params.seed
         if metadata.job_name:
             span_attributes[PipelexSpanAttr.JOB_NAME] = metadata.job_name
-        if TelemetryManagerAbstract.is_capture_content_enabled() and llm_job.llm_prompt.user_text:
-            span_attributes[GenAISpanAttr.PROMPT_CONTENT] = llm_job.llm_prompt.user_text
+        if TelemetryManagerAbstract.is_capture_content_enabled():
+            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
+            messages: list[dict[str, Any]] = []
+            if llm_job.llm_prompt.user_text and not llm_job.llm_prompt.system_text and not llm_job.llm_prompt.user_images:
+                # simple prompt with only user text
+                user_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                span_attributes[GenAISpanAttr.PROMPT_CONTENT] = user_text
+            elif llm_job.llm_prompt.user_text and llm_job.llm_prompt.system_text and not llm_job.llm_prompt.user_images:
+                # simple prompt with only user text
+                user_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                system_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.system_text, max_length=max_length)
+                composed_text = f"# System Prompt\n\n{system_text}\n\n\n# User Prompt\n\n{user_text}"
+                span_attributes[GenAISpanAttr.PROMPT_CONTENT] = composed_text
+            else:
+                if llm_job.llm_prompt.system_text:
+                    system_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.system_text, max_length=max_length)
+                    system_text_dict = {
+                        "role": "system",
+                        "content": system_text,
+                    }
+                    messages.append(system_text_dict)
+                if llm_job.llm_prompt.user_text:
+                    user_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                    content_dict: list[dict[str, Any]] = []
+                    user_text_dict = {
+                        "type": "text",
+                        "text": user_text,
+                    }
+                    content_dict.append(user_text_dict)
+                    for prompt_image in llm_job.llm_prompt.user_images:
+                        image_dict = {
+                            "type": "image",
+                            "image": prompt_image.short_description(),
+                        }
+                        content_dict.append(image_dict)
+                    user_dict = {
+                        "role": "user",
+                        "content": content_dict,
+                    }
+                    messages.append(user_dict)
+
+                span_attributes[GenAISpanAttr.PROMPT_CONTENT] = json.dumps(messages)
 
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
@@ -198,7 +240,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         # Capture response content if enabled and result is a string
         if TelemetryManagerAbstract.is_capture_content_enabled():
-            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_string)
+            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
+            content = truncate_content_for_telemetry(content=completion_string, max_length=max_length)
+            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, content)
 
         span.set_status(Status(StatusCode.OK))
         span.end()
@@ -226,10 +270,11 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span.set_attribute(GenAISpanAttr.USAGE_INPUT_TOKENS, input_tokens)
             span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
 
-        # Capture response content if enabled and result is a string
+        # Capture response content if enabled and result is an object
         if TelemetryManagerAbstract.is_capture_content_enabled():
-            completion_string = completion_object.model_dump_json(serialize_as_any=True)
-            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_string)
+            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
+            content = truncate_content_for_telemetry(content=completion_object.model_dump_json(serialize_as_any=True), max_length=max_length)
+            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, content)
 
         span.set_status(Status(StatusCode.OK))
         span.end()

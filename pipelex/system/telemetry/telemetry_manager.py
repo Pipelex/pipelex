@@ -255,6 +255,11 @@ class TelemetryManager(TelemetryManagerAbstract):
     def capture_output_class_name_enabled(self) -> bool:
         return self.telemetry_config.capture_output_class_name_enabled
 
+    @property
+    @override
+    def capture_content_max_length(self) -> int | None:
+        return self.telemetry_config.capture_content_max_length
+
     @override
     def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
         """Emit a trace start event to establish the trace name in PostHog.

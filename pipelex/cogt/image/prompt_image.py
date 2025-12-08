@@ -1,5 +1,5 @@
 import base64
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Literal, Union
 
 from pydantic import BaseModel
@@ -35,7 +35,9 @@ PromptImageTypedUrlOrBase64 = Union[str, PromptImageTypedBase64]
 
 
 class PromptImage(BaseModel, ABC):
-    pass
+    @abstractmethod
+    def short_description(self) -> str:
+        pass
 
 
 class PromptImagePath(PromptImage):
@@ -51,6 +53,10 @@ class PromptImagePath(PromptImage):
     def __str__(self) -> str:
         return f"PromptImagePath(file_path='{self.file_path}')"
 
+    @override
+    def short_description(self) -> str:
+        return f"file path: {self.file_path}"
+
 
 class PromptImageUrl(PromptImage):
     url: str
@@ -63,6 +69,10 @@ class PromptImageUrl(PromptImage):
     @override
     def __format__(self, format_spec: str) -> str:
         return self.__str__()
+
+    @override
+    def short_description(self) -> str:
+        return self.url
 
 
 class PromptImageBase64(PromptImage):
@@ -94,6 +104,10 @@ class PromptImageBase64(PromptImage):
     def make_prompt_image_typed_base64(self) -> PromptImageTypedBase64:
         return PromptImageTypedBase64(base_64=self.base_64, file_type=self.get_file_type())
 
+    @override
+    def short_description(self) -> str:
+        return f"base64: {self.base_64[:100].decode('ascii')}..."
+
 
 class PromptImageBinary(PromptImage):
     binary: bytes
@@ -111,3 +125,7 @@ class PromptImageBinary(PromptImage):
     @override
     def __repr__(self) -> str:
         return self.__str__()
+
+    @override
+    def short_description(self) -> str:
+        return f"binary: {self.binary[:50].hex()}..."
