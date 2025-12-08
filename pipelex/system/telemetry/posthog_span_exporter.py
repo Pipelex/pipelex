@@ -26,9 +26,9 @@ from pipelex.system.telemetry.otel_constants import (
 class PostHogSpanExporter(SpanExporter):
     """Exports OTel spans to PostHog as $ai_generation or $ai_span events."""
 
-    def __init__(self, posthog_client: Posthog, user_id: str):
+    def __init__(self, posthog_client: Posthog, distinct_id: str | None):
         self.client = posthog_client
-        self.user_id = user_id
+        self.distinct_id = distinct_id
 
     def _get_base_properties(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> dict[str, Any]:
         """Get common properties for all span types."""
@@ -87,7 +87,7 @@ class PostHogSpanExporter(SpanExporter):
         )
 
         self.client.capture(
-            distinct_id=self.user_id,
+            distinct_id=self.distinct_id,
             event=PostHogEvent.GENERATION,
             properties=properties,
         )
@@ -122,7 +122,7 @@ class PostHogSpanExporter(SpanExporter):
         )
 
         self.client.capture(
-            distinct_id=self.user_id,
+            distinct_id=self.distinct_id,
             event=PostHogEvent.SPAN,
             properties=properties,
         )

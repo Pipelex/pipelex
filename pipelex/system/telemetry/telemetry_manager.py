@@ -47,8 +47,8 @@ class TelemetryManager(TelemetryManagerAbstract):
         self._tracer_provider: OTelTracerProvider | None
         if telemetry_config.ai_tracing_enabled:
             self._otel_tracer, self._tracer_provider = self.make_ai_tracer(
-                posthog_client=self.posthog_client,
                 user_id=telemetry_config.user_id,
+                posthog_client=self.posthog_client,
                 otlp_endpoint=telemetry_config.otlp_endpoint,
                 otlp_headers=telemetry_config.otlp_headers,
             )
@@ -271,7 +271,6 @@ class TelemetryManager(TelemetryManagerAbstract):
         Note: pipeline_run_id is already generated without pipe_code when
         capture_content_enabled is False.
         """
-        user_id = self.telemetry_config.user_id or OTelConstants.DEFAULT_USER_ID
         properties: dict[str, Any] = {
             PostHogAttr.TRACE_ID: f"{trace_id:032x}",
             PostHogAttr.SPAN_NAME: pipeline_run_id,
@@ -282,15 +281,15 @@ class TelemetryManager(TelemetryManagerAbstract):
         log.verbose(f"[Telemetry] Emitting trace start event:\n  pipeline_run_id='{pipeline_run_id}'\n  trace_id={trace_id:032x}")
 
         self.posthog_client.capture(
-            distinct_id=user_id,
+            distinct_id=self.telemetry_config.user_id,
             event=PostHogEvent.SPAN,
             properties=properties,
         )
 
     def make_ai_tracer(
         self,
+        user_id: str | None,
         posthog_client: Posthog | None,
-        user_id: str,
         otlp_endpoint: str | None = None,
         otlp_headers: dict[str, str] | None = None,
     ) -> tuple[OTelTracer, OTelTracerProvider]:
@@ -304,8 +303,8 @@ class TelemetryManager(TelemetryManagerAbstract):
         2. OTLP Exporter: Sends standard OTLP traces to a collector
 
         Args:
+            user_id: Optional User ID for event attribution
             posthog_client: Optional PostHog client for sending events
-            user_id: User ID for event attribution
             otlp_endpoint: Optional OTLP endpoint URL
             otlp_headers: Optional headers for OTLP export
 
@@ -328,7 +327,7 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         # 3. Add PostHog Exporter if client provided
         if posthog_client:
-            posthog_exporter = PostHogSpanExporter(posthog_client, user_id=user_id)
+            posthog_exporter = PostHogSpanExporter(posthog_client, distinct_id=user_id)
             provider.add_span_processor(OTelBatchSpanProcessor(posthog_exporter))
 
         # 4. Add Generic OTLP Exporter if endpoint provided
@@ -341,7 +340,7 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         # 5. Get the Tracer and return both tracer and provider
         tracer = provider.get_tracer(
-            instrumenting_module_name=OTelConstants.INSTRUMENTATION_NAME,
+            instrumenting_module_name=OTelConstants.INSTRUMENTING_MODULE_NAME,
             instrumenting_library_version=get_package_version(),
         )
         return tracer, provider
