@@ -11,11 +11,10 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.pipeline.exceptions import JobMetadataError
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import (
     PIPE_CODE_REDACTED,
-    UNKNOWN_JOB,
-    UNKNOWN_PIPE,
     GenAISpanAttr,
     LLMOutputType,
     PipelexSpanAttr,
@@ -98,9 +97,15 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             log.verbose("[OTel] No tracer available for LLM span")
             return None
 
-        unit_job_id = job_metadata.unit_job_id or UNKNOWN_JOB
+        unit_job_id = job_metadata.unit_job_id
+        if not unit_job_id:
+            msg = "unit_job_id is required for LLM span"
+            raise JobMetadataError(msg)
+        pipe_code = job_metadata.pipe_code
+        if not pipe_code:
+            msg = "pipe_code is required for LLM span"
+            raise JobMetadataError(msg)
         pipeline_run_id = job_metadata.pipeline_run_id
-        pipe_code = job_metadata.pipe_code or UNKNOWN_PIPE
 
         # Determine if we need to redact output class names
         output_desc: str
