@@ -30,6 +30,27 @@ class PostHogSpanExporter(SpanExporter):
         self.client = posthog_client
         self.distinct_id = distinct_id
 
+    def _capture_event(self, event: PostHogEvent, properties: dict[str, Any]) -> None:
+        """Capture an event to PostHog, handling anonymous vs identified users.
+
+        PostHog requires a valid distinct_id - passing None will cause the event to be rejected.
+        For anonymous tracking, we omit distinct_id and set $process_person_profile=False.
+        """
+        if self.distinct_id:
+            # Identified user: pass distinct_id
+            self.client.capture(
+                distinct_id=self.distinct_id,
+                event=event,
+                properties=properties,
+            )
+        else:
+            # Anonymous user: don't pass distinct_id, mark as anonymous
+            properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
+            self.client.capture(
+                event=event,
+                properties=properties,
+            )
+
     def _get_base_properties(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> dict[str, Any]:
         """Get common properties for all span types."""
         properties: dict[str, Any] = {}
@@ -86,11 +107,7 @@ class PostHogSpanExporter(SpanExporter):
             f"  model={properties.get(PostHogAttr.MODEL)}"
         )
 
-        self.client.capture(
-            distinct_id=self.distinct_id,
-            event=PostHogEvent.GENERATION,
-            properties=properties,
-        )
+        self._capture_event(event=PostHogEvent.GENERATION, properties=properties)
 
     def _export_pipe_span(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> None:
         """Export a pipe execution span."""
@@ -121,11 +138,7 @@ class PostHogSpanExporter(SpanExporter):
             f"  parent_id={properties.get(PostHogAttr.PARENT_ID)}"
         )
 
-        self.client.capture(
-            distinct_id=self.distinct_id,
-            event=PostHogEvent.SPAN,
-            properties=properties,
-        )
+        self._capture_event(event=PostHogEvent.SPAN, properties=properties)
 
     @override
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:

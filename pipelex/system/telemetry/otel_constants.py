@@ -65,6 +65,9 @@ class PostHogAttr(StrEnum):
     MAX_TOKENS = "$ai_max_tokens"
     SEED = "$ai_seed"
 
+    # Standard PostHog attribute for anonymous tracking
+    PROCESS_PERSON_PROFILE = "$process_person_profile"
+
 
 class PostHogEvent(StrEnum):
     """PostHog AI analytics event names."""

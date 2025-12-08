@@ -191,7 +191,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             else:
                 log.debug(f"Tracking anonymous event '{event_name}'. No properties.")
         else:
-            properties["$process_person_profile"] = False
+            properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
             self.posthog_client.capture(event_name, properties=properties)
             log.verbose(f"Tracked anonymous event '{event_name}' with properties: {properties}")
 
@@ -277,11 +277,20 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         log.verbose(f"[Telemetry] Emitting trace start event:\n  trace_name='{trace_name}'\n  trace_id={trace_id:032x}")
 
-        self.posthog_client.capture(
-            distinct_id=self.telemetry_config.user_id,
-            event=PostHogEvent.SPAN,
-            properties=properties,
-        )
+        if self.telemetry_config.user_id:
+            # Identified user: pass distinct_id
+            self.posthog_client.capture(
+                distinct_id=self.telemetry_config.user_id,
+                event=PostHogEvent.SPAN,
+                properties=properties,
+            )
+        else:
+            # Anonymous user: don't pass distinct_id, mark as anonymous
+            properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
+            self.posthog_client.capture(
+                event=PostHogEvent.SPAN,
+                properties=properties,
+            )
 
     def make_ai_tracer(
         self,
