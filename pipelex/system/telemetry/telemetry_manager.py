@@ -46,7 +46,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 posthog_client=self.posthog_client,
                 otlp_endpoint=telemetry_config.otlp_endpoint,
                 otlp_headers=telemetry_config.otlp_headers,
-                langfuse_enabled=telemetry_config.langfuse_enabled,
+                is_langfuse_enabled=telemetry_config.langfuse_enabled,
                 langfuse_base_url=telemetry_config.langfuse_base_url,
             )
             log.verbose("AI tracing enabled: OpenTelemetry tracer created")
@@ -258,6 +258,11 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def capture_content_max_length(self) -> int | None:
         return self.telemetry_config.capture_content_max_length
+
+    @property
+    @override
+    def is_langfuse_enabled(self) -> bool:
+        return self.telemetry_config.langfuse_enabled
 
     @override
     def handle_trace_start(self, trace_name: str, trace_id: int) -> None:

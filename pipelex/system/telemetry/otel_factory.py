@@ -5,6 +5,8 @@ This module provides helpers for instrumenting LLM operations with OpenTelemetry
 
 import base64
 import hashlib
+import json
+from typing import Any
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource as OTelResource
@@ -15,6 +17,8 @@ from opentelemetry.semconv.attributes import service_attributes
 from opentelemetry.trace import Tracer as OTelTracer
 from posthog import Posthog  # type: ignore[attr-defined]
 
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.system.environment import EnvVarNotFoundError, get_optional_env, get_required_env
 from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.exceptions import LangfuseCredentialsError
@@ -22,6 +26,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
+from pipelex.tools.misc.json_utils import JsonContent
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -41,6 +46,70 @@ class OtelFactory:
             return content
         truncate_at = max(0, max_length - len(OTelConstants.TRUNCATION_SUFFIX))
         return content[:truncate_at] + OTelConstants.TRUNCATION_SUFFIX
+
+    @classmethod
+    def stringify_json(cls, json_conent: JsonContent) -> str:
+        """Serialize a JSON dictionary to a string.
+
+        Args:
+            json_conent: The JSON content to serialize.
+
+        Returns:
+            The serialized JSON string.
+        """
+        return json.dumps(json_conent, default=str)
+
+    @classmethod
+    def make_inputs_json(
+        cls,
+        working_memory: WorkingMemory,
+        needed_input_names: set[str],
+        max_length: int | None,
+    ) -> str:
+        """Serialize pipe inputs from working memory to JSON for telemetry.
+
+        Args:
+            working_memory: The working memory containing input stuffs.
+            needed_input_names: Set of input variable names to capture.
+            max_length: Maximum allowed length for the JSON string, or None for no limit.
+
+        Returns:
+            JSON string representing the inputs, potentially truncated.
+        """
+        inputs_dict: dict[str, Any] = {}
+        for input_name in needed_input_names:
+            stuff = working_memory.get_stuff(name=input_name)
+            inputs_dict[input_name] = stuff.content.smart_dump()
+
+        json_str = cls.stringify_json(json_conent=inputs_dict)
+        return cls.make_truncated_content(content=json_str, max_length=max_length)
+
+    @classmethod
+    def make_output_json(
+        cls,
+        pipe_output: PipeOutput,
+        max_length: int | None,
+    ) -> str:
+        """Serialize pipe output to JSON for telemetry.
+
+        Args:
+            pipe_output: The pipe output containing the main stuff.
+            max_length: Maximum allowed length for the JSON string, or None for no limit.
+
+        Returns:
+            JSON string representing the output, potentially truncated.
+        """
+        main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+        if main_stuff is None:
+            return "{}"
+
+        output_dict: dict[str, Any] = {
+            "concept": main_stuff.concept.code,
+            "content": main_stuff.content.smart_dump(),
+        }
+
+        json_str = cls.stringify_json(json_conent=output_dict)
+        return cls.make_truncated_content(content=json_str, max_length=max_length)
 
     @classmethod
     def make_trace_id(cls, pipeline_run_id: str) -> int:
@@ -113,7 +182,7 @@ class OtelFactory:
         posthog_client: Posthog | None,
         otlp_endpoint: str | None = None,
         otlp_headers: dict[str, str] | None = None,
-        langfuse_enabled: bool = False,
+        is_langfuse_enabled: bool = False,
         langfuse_base_url: str | None = None,
     ) -> tuple[OTelTracer, OTelTracerProvider]:
         """Create an isolated OpenTelemetry Tracer for GenAI instrumentation.
@@ -131,7 +200,7 @@ class OtelFactory:
             posthog_client: Optional PostHog client for sending events
             otlp_endpoint: Optional OTLP endpoint URL
             otlp_headers: Optional headers for OTLP export
-            langfuse_enabled: Whether to enable Langfuse OTLP export
+            is_langfuse_enabled: Whether to enable Langfuse OTLP export
             langfuse_base_url: Optional base URL for self-hosted Langfuse
 
         Returns:
@@ -165,11 +234,10 @@ class OtelFactory:
             provider.add_span_processor(OTelBatchSpanProcessor(otlp_exporter))
 
         # 5. Add Langfuse OTLP Exporter if enabled
-        if langfuse_enabled:
+        if is_langfuse_enabled:
             langfuse_exporter = cls.make_langfuse_exporter(langfuse_base_url)
-            if langfuse_exporter:
-                provider.add_span_processor(OTelBatchSpanProcessor(langfuse_exporter))
-                log.verbose("Langfuse OTLP exporter enabled")
+            provider.add_span_processor(OTelBatchSpanProcessor(langfuse_exporter))
+            log.verbose("Langfuse OTLP exporter enabled")
 
         # 6. Get the Tracer and return both tracer and provider
         tracer = provider.get_tracer(

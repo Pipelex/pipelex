@@ -26,6 +26,7 @@ from pipelex.system.telemetry.otel_constants import (
     SpanCategory,
     SpanOutcome,
 )
+from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
@@ -304,12 +305,14 @@ class PipeAbstract(ABC, BaseModel):
         self,
         parent_otel_context: OtelContext,
         pipeline_run_id: str,
+        working_memory: WorkingMemory,
     ) -> Span | None:
         """Start an OTel span for this pipe execution.
 
         Args:
             parent_otel_context: The parent's OTel context.
             pipeline_run_id: The pipeline run ID for span attributes.
+            working_memory: The working memory containing input stuffs for telemetry capture.
 
         Returns:
             The started span, or None if tracer is unavailable.
@@ -336,10 +339,23 @@ class PipeAbstract(ABC, BaseModel):
             PipelexSpanAttr.PIPE_CATEGORY: self.pipe_category,
             PipelexSpanAttr.PIPE_TYPE: self.pipe_type,
             PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
-            # Langfuse-specific trace-level attributes
-            LangfuseSpanAttr.TRACE_NAME: parent_otel_context.trace_name,
-            LangfuseSpanAttr.RELEASE: get_package_version(),
         }
+        if TelemetryManagerAbstract.get_langfuse_enabled():
+            span_attributes[LangfuseSpanAttr.TRACE_NAME] = parent_otel_context.trace_name
+            span_attributes[LangfuseSpanAttr.RELEASE] = get_package_version()
+
+        # Capture input content for Langfuse if enabled
+        if TelemetryManagerAbstract.is_capture_content_enabled() and TelemetryManagerAbstract.get_langfuse_enabled():
+            if self.description:
+                span_attributes[LangfuseSpanAttr.OBSERVATION_METADATA_DESCRIPTION] = self.description
+            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
+            needed_input_names = set(self.needed_inputs().required_names)
+            inputs_json = OtelFactory.make_inputs_json(
+                working_memory=working_memory,
+                needed_input_names=needed_input_names,
+                max_length=max_length,
+            )
+            span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = inputs_json
 
         # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
         # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
@@ -375,13 +391,27 @@ class PipeAbstract(ABC, BaseModel):
 
         return span
 
-    def _end_pipe_span_success(self, span: Span | None) -> None:
-        """End the pipe's OTel span with success status. Safe to call if span is None."""
+    def _end_pipe_span_success(self, span: Span | None, pipe_output: PipeOutput) -> None:
+        """End the pipe's OTel span with success status. Safe to call if span is None.
+
+        Args:
+            span: The OTel span to end, or None if telemetry is disabled.
+            pipe_output: The pipe output containing the result for telemetry capture.
+        """
         if span is None:
             return
 
         span_ctx = span.get_span_context()
         log.verbose(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
+
+        # Capture output content for Langfuse if enabled
+        if TelemetryManagerAbstract.is_capture_content_enabled() and TelemetryManagerAbstract.get_langfuse_enabled():
+            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
+            output_json = OtelFactory.make_output_json(
+                pipe_output=pipe_output,
+                max_length=max_length,
+            )
+            span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, output_json)
 
         span.set_attribute(PipelexSpanAttr.OUTCOME, SpanOutcome.SUCCESS)
         span.set_status(Status(StatusCode.OK))
@@ -427,6 +457,7 @@ class PipeAbstract(ABC, BaseModel):
             span = self._start_pipe_span(
                 parent_otel_context=parent_otel_context,
                 pipeline_run_id=job_metadata.pipeline_run_id,
+                working_memory=working_memory,
             )
             # Get the actual span_id from OTel (OTel generates its own span_id)
             if span:
@@ -479,7 +510,7 @@ class PipeAbstract(ABC, BaseModel):
             self._end_pipe_span_error(span, error=exc)
             raise
 
-        self._end_pipe_span_success(span)
+        self._end_pipe_span_success(span=span, pipe_output=pipe_output)
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 

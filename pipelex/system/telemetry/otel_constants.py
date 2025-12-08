@@ -133,6 +133,11 @@ class LangfuseSpanAttr(StrEnum):
     # Environment (standard OTel attribute recognized by Langfuse)
     DEPLOYMENT_ENVIRONMENT = "deployment.environment"
 
+    # Observation-level attributes
+    OBSERVATION_METADATA_DESCRIPTION = "langfuse.observation.metadata.description"
+    OBSERVATION_INPUT = "langfuse.observation.input"
+    OBSERVATION_OUTPUT = "langfuse.observation.output"
+
 
 class SpanCategory(StrEnum):
     PIPE = "pipe"

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
@@ -144,11 +143,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.INFERENCE,
             PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
             PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
-            # Langfuse-specific trace-level attributes
-            # Note: Langfuse auto-detects "generation" type from gen_ai.request.model
-            LangfuseSpanAttr.TRACE_NAME: otel_context.trace_name,
-            LangfuseSpanAttr.RELEASE: get_package_version(),
         }
+        if TelemetryManagerAbstract.get_langfuse_enabled():
+            span_attributes[LangfuseSpanAttr.TRACE_NAME] = otel_context.trace_name
+            span_attributes[LangfuseSpanAttr.RELEASE] = get_package_version()
         if job_params.max_tokens:
             span_attributes[GenAISpanAttr.REQUEST_MAX_TOKENS] = job_params.max_tokens
         if job_params.seed:
@@ -156,46 +154,38 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if TelemetryManagerAbstract.is_capture_content_enabled():
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
             messages: list[dict[str, Any]] = []
-            if llm_job.llm_prompt.user_text and not llm_job.llm_prompt.system_text and not llm_job.llm_prompt.user_images:
-                # simple prompt with only user text
-                user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
-                span_attributes[GenAISpanAttr.PROMPT_CONTENT] = user_text
-            elif llm_job.llm_prompt.user_text and llm_job.llm_prompt.system_text and not llm_job.llm_prompt.user_images:
-                # simple prompt with only user text
-                user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
+            if llm_job.llm_prompt.system_text:
                 system_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.system_text, max_length=max_length)
-                composed_text = f"# System Prompt\n\n{system_text}\n\n\n# User Prompt\n\n{user_text}"
-                span_attributes[GenAISpanAttr.PROMPT_CONTENT] = composed_text
-            else:
-                if llm_job.llm_prompt.system_text:
-                    system_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.system_text, max_length=max_length)
-                    system_text_dict = {
-                        "role": "system",
-                        "content": system_text,
+                system_text_dict = {
+                    "role": "system",
+                    "content": system_text,
+                }
+                messages.append(system_text_dict)
+            if llm_job.llm_prompt.user_text or llm_job.llm_prompt.user_images:
+                content_dict: list[dict[str, Any]] = []
+                if llm_job.llm_prompt.user_text:
+                    user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                    user_text_dict = {
+                        "type": "text",
+                        "text": user_text,
                     }
-                    messages.append(system_text_dict)
-                if llm_job.llm_prompt.user_text or llm_job.llm_prompt.user_images:
-                    content_dict: list[dict[str, Any]] = []
-                    if llm_job.llm_prompt.user_text:
-                        user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
-                        user_text_dict = {
-                            "type": "text",
-                            "text": user_text,
-                        }
-                        content_dict.append(user_text_dict)
-                    for prompt_image in llm_job.llm_prompt.user_images:
-                        image_dict = {
-                            "type": "image",
-                            "image": prompt_image.short_description(),
-                        }
-                        content_dict.append(image_dict)
-                    user_dict = {
-                        "role": "user",
-                        "content": content_dict,
+                    content_dict.append(user_text_dict)
+                for prompt_image in llm_job.llm_prompt.user_images:
+                    image_dict = {
+                        "type": "image",
+                        "image": prompt_image.short_description(),
                     }
-                    messages.append(user_dict)
+                    content_dict.append(image_dict)
+                user_dict = {
+                    "role": "user",
+                    "content": content_dict,
+                }
+                messages.append(user_dict)
 
-                span_attributes[GenAISpanAttr.PROMPT_CONTENT] = json.dumps(messages)
+            messages_json = OtelFactory.stringify_json(json_conent=messages)
+            span_attributes[GenAISpanAttr.PROMPT_CONTENT] = messages_json
+            if TelemetryManagerAbstract.get_langfuse_enabled():
+                span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = messages_json
 
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
@@ -231,7 +221,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         return span
 
-    def _end_otel_span_with_completion_string(self, span: Span | None, llm_job: LLMJob, completion_string: str) -> None:
+    def _end_otel_span_with_completion_text(self, span: Span | None, llm_job: LLMJob, completion_text: str) -> None:
         """End the OTel span, recording usage and status. Safe to call if span is None."""
         if span is None:
             return
@@ -257,8 +247,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Capture response content if enabled and result is a string
         if TelemetryManagerAbstract.is_capture_content_enabled():
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
-            content = OtelFactory.make_truncated_content(content=completion_string, max_length=max_length)
+            content = OtelFactory.make_truncated_content(content=completion_text, max_length=max_length)
             span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, content)
+            if TelemetryManagerAbstract.get_langfuse_enabled():
+                span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, content)
 
         span.set_status(Status(StatusCode.OK))
         span.end()
@@ -289,8 +281,11 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Capture response content if enabled and result is an object
         if TelemetryManagerAbstract.is_capture_content_enabled():
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
-            content = OtelFactory.make_truncated_content(content=completion_object.model_dump_json(serialize_as_any=True), max_length=max_length)
+            completion_object_json = OtelFactory.stringify_json(json_conent=completion_object.model_dump(serialize_as_any=True))
+            content = OtelFactory.make_truncated_content(content=completion_object_json, max_length=max_length)
             span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, content)
+            if TelemetryManagerAbstract.get_langfuse_enabled():
+                span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, content)
 
         span.set_status(Status(StatusCode.OK))
         span.end()
@@ -340,7 +335,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             self.reporting_delegate.report_inference_job(inference_job=llm_job)
 
         # End OTel span with success status and usage data
-        self._end_otel_span_with_completion_string(span=span, llm_job=llm_job, completion_string=result_text)
+        self._end_otel_span_with_completion_text(span=span, llm_job=llm_job, completion_text=result_text)
 
     async def _after_object_job(
         self,

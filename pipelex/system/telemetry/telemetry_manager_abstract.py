@@ -102,6 +102,19 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return instance.capture_content_max_length
 
     @classmethod
+    def get_langfuse_enabled(cls) -> bool:
+        """Check if Langfuse OTLP exporter is enabled for telemetry.
+
+        Returns:
+            True if Langfuse OTLP exporter is enabled, False otherwise (including when
+            no telemetry manager is configured).
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return False
+        return instance.is_langfuse_enabled
+
+    @classmethod
     def telemetry_was_just_enabled(cls) -> TelemetryMode | None:
         if cls.telemetry_mode_just_set is None:
             return None
@@ -156,6 +169,11 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     @abstractmethod
     def capture_content_max_length(self) -> int | None:
         """Maximum length for captured content, or None if unlimited."""
+
+    @property
+    @abstractmethod
+    def is_langfuse_enabled(self) -> bool:
+        """Whether Langfuse OTLP exporter is enabled."""
 
     @abstractmethod
     def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
@@ -213,6 +231,11 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
     def capture_content_max_length(self) -> int | None:
         return None
+
+    @property
+    @override
+    def is_langfuse_enabled(self) -> bool:
+        return False
 
     @override
     def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
