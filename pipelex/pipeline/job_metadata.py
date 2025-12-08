@@ -34,17 +34,13 @@ class UnitJobId(StrEnum):
 
 
 class OtelContext(BaseModel):
-    """OpenTelemetry context for tracing, derived from business IDs.
-
-    Contains precomputed OTel IDs to avoid repeated conversions:
-    - trace_id: 128-bit int derived from pipeline_run_id (computed once at pipeline start)
-    - span_id: 64-bit int derived from pipe_run_id
-    """
+    """OpenTelemetry context for tracing, derived from business IDs."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    trace_id: int  # 128-bit, derived from pipeline_run_id
-    span_id: int  # 64-bit, derived from pipe_run_id
+    trace_id: int = Field(description="128-bit, derived from pipeline_run_id")
+    trace_name: str = Field(description="Trace name derived from pipeline_run_id and its main pipe_code")
+    span_id: int = Field(description="64-bit, derived from pipe_run_id")
 
 
 class JobMetadata(BaseModel):

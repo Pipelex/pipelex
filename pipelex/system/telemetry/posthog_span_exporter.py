@@ -41,7 +41,7 @@ class PostHogSpanExporter(SpanExporter):
         if span_context and span_context.is_valid:
             properties[PostHogAttr.TRACE_ID] = f"{span_context.trace_id:032x}"
             properties[PostHogAttr.SPAN_ID] = f"{span_context.span_id:016x}"
-            properties[PostHogAttr.TRACE_NAME] = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
+            properties[PostHogAttr.TRACE_NAME] = attributes.get(PipelexSpanAttr.TRACE_NAME)
 
         # Add parent span ID for trace hierarchy
         # Filter out virtual root parent (used to set trace_id for root spans)
@@ -94,7 +94,7 @@ class PostHogSpanExporter(SpanExporter):
 
     def _export_pipe_span(self, span: ReadableSpan, attributes: Mapping[str, AttributeValue]) -> None:
         """Export a pipe execution span."""
-        properties = self._get_base_properties(span, attributes)
+        properties = self._get_base_properties(span=span, attributes=attributes)
 
         # Use the original span.name for $ai_span_name
         # The trace name is established by a "trace start" event emitted at pipeline setup,
@@ -143,13 +143,15 @@ class PostHogSpanExporter(SpanExporter):
                 span_id_str = f"{span_ctx.span_id:016x}" if span_ctx else "unknown"
                 pipe_code = attributes.get(PipelexSpanAttr.PIPE_CODE)
                 pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)
+                trace_name = attributes.get(PipelexSpanAttr.TRACE_NAME)
                 log.verbose(
                     f"[OTel->PostHog] Processing span:\n"
-                    f"  pipe_code='{pipe_code}'\n"
-                    f"  pipeline_run_id='{pipeline_run_id}'\n"
-                    f"  span_category={span_category}\n"
+                    f"  trace_name='{trace_name}'\n"
                     f"  trace_id={trace_id_str}\n"
                     f"  span_id={span_id_str}\n"
+                    f"  span_category={span_category}\n"
+                    f"  pipeline_run_id='{pipeline_run_id}'\n"
+                    f"  pipe_code='{pipe_code}'\n"
                     f"  parent_id={parent_id}"
                 )
 

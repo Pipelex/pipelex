@@ -27,7 +27,7 @@ from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
-from pipelex.system.telemetry.otel_utils import pipeline_run_id_to_trace_id
+from pipelex.system.telemetry.otel_factory import OtelFactory
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -135,6 +135,8 @@ async def pipeline_run_setup(
         msg = "Either provide pipe_code or plx_content to the pipeline API. 'pipe_code' must be provided when 'plx_content' is None"
         raise PipeExecutionError(message=msg)
 
+    pipe_code = pipe.code
+
     search_domains = search_domains or []
     if pipe.domain not in search_domains:
         search_domains.insert(0, pipe.domain)
@@ -162,14 +164,16 @@ async def pipeline_run_setup(
     # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
     otel_context: OtelContext | None = None
     if pipe_run_mode.is_live and get_otel_tracer() is not None:
-        trace_id = pipeline_run_id_to_trace_id(pipeline_run_id)
+        trace_id = OtelFactory.make_trace_id(pipeline_run_id=pipeline_run_id)
+        trace_name = OtelFactory.make_trace_name(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
         otel_context = OtelContext(
             trace_id=trace_id,
+            trace_name=trace_name,
             span_id=OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
         )
         # Emit trace start event immediately to establish trace name in PostHog
         # This must happen before any pipe spans are created/exported
-        get_telemetry_manager().emit_trace_start(pipeline_run_id=pipeline_run_id, trace_id=trace_id)
+        get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_id=trace_id)
 
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline.pipeline_run_id,

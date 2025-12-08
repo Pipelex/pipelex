@@ -261,24 +261,21 @@ class TelemetryManager(TelemetryManagerAbstract):
         return self.telemetry_config.capture_content_max_length
 
     @override
-    def emit_trace_start(self, pipeline_run_id: str, trace_id: int) -> None:
-        """Emit a trace start event to establish the trace name in PostHog.
-
-        Sends a minimal $ai_span event with the pipeline_run_id as the span name.
+    def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
+        """Hook to do something when a trace starts and just got its trace_name and trace_id.
+        Here we emit a trace start event to establish the trace name in PostHog:
+        we send a minimal $ai_span event with the trace_name as the span name.
         This event is sent directly (not via OTel spans) to ensure it arrives
         before any batched pipe spans, establishing the correct trace name.
-
-        Note: pipeline_run_id is already generated without pipe_code when
-        capture_content_enabled is False.
         """
         properties: dict[str, Any] = {
             PostHogAttr.TRACE_ID: f"{trace_id:032x}",
-            PostHogAttr.SPAN_NAME: pipeline_run_id,
-            PostHogAttr.TRACE_NAME: pipeline_run_id,
+            PostHogAttr.SPAN_NAME: trace_name,
+            PostHogAttr.TRACE_NAME: trace_name,
             # No PARENT_ID - this is a root-level marker
         }
 
-        log.verbose(f"[Telemetry] Emitting trace start event:\n  pipeline_run_id='{pipeline_run_id}'\n  trace_id={trace_id:032x}")
+        log.verbose(f"[Telemetry] Emitting trace start event:\n  trace_name='{trace_name}'\n  trace_id={trace_id:032x}")
 
         self.posthog_client.capture(
             distinct_id=self.telemetry_config.user_id,

@@ -21,7 +21,7 @@ from pipelex.system.telemetry.otel_constants import (
     SpanCategory,
     make_otel_gen_ai_output_type,
 )
-from pipelex.system.telemetry.otel_utils import truncate_content_for_telemetry
+from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
@@ -138,6 +138,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             GenAISpanAttr.RESPONSE_MODEL: self._get_response_model_name(),
             GenAISpanAttr.REQUEST_TEMPERATURE: job_params.temperature,
             # Pipelex specific context attributes
+            PipelexSpanAttr.TRACE_NAME: otel_context.trace_name,
             PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.INFERENCE,
             PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
             PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
@@ -151,24 +152,24 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             messages: list[dict[str, Any]] = []
             if llm_job.llm_prompt.user_text and not llm_job.llm_prompt.system_text and not llm_job.llm_prompt.user_images:
                 # simple prompt with only user text
-                user_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
                 span_attributes[GenAISpanAttr.PROMPT_CONTENT] = user_text
             elif llm_job.llm_prompt.user_text and llm_job.llm_prompt.system_text and not llm_job.llm_prompt.user_images:
                 # simple prompt with only user text
-                user_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.user_text, max_length=max_length)
-                system_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.system_text, max_length=max_length)
+                user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                system_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.system_text, max_length=max_length)
                 composed_text = f"# System Prompt\n\n{system_text}\n\n\n# User Prompt\n\n{user_text}"
                 span_attributes[GenAISpanAttr.PROMPT_CONTENT] = composed_text
             else:
                 if llm_job.llm_prompt.system_text:
-                    system_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.system_text, max_length=max_length)
+                    system_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.system_text, max_length=max_length)
                     system_text_dict = {
                         "role": "system",
                         "content": system_text,
                     }
                     messages.append(system_text_dict)
                 if llm_job.llm_prompt.user_text:
-                    user_text = truncate_content_for_telemetry(content=llm_job.llm_prompt.user_text, max_length=max_length)
+                    user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
                     content_dict: list[dict[str, Any]] = []
                     user_text_dict = {
                         "type": "text",
@@ -249,7 +250,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Capture response content if enabled and result is a string
         if TelemetryManagerAbstract.is_capture_content_enabled():
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
-            content = truncate_content_for_telemetry(content=completion_string, max_length=max_length)
+            content = OtelFactory.make_truncated_content(content=completion_string, max_length=max_length)
             span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, content)
 
         span.set_status(Status(StatusCode.OK))
@@ -281,7 +282,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Capture response content if enabled and result is an object
         if TelemetryManagerAbstract.is_capture_content_enabled():
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
-            content = truncate_content_for_telemetry(content=completion_object.model_dump_json(serialize_as_any=True), max_length=max_length)
+            content = OtelFactory.make_truncated_content(content=completion_object.model_dump_json(serialize_as_any=True), max_length=max_length)
             span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, content)
 
         span.set_status(Status(StatusCode.OK))

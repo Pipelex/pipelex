@@ -18,7 +18,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
-from pipelex.pipeline.run_id_factory import make_pipe_run_id
+from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.telemetry.otel_constants import PIPE_CODE_REDACTED, PipelexSpanAttr, SpanCategory, SpanOutcome
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.string_utils import is_snake_case
@@ -301,7 +301,7 @@ class PipeAbstract(ABC, BaseModel):
         """Start an OTel span for this pipe execution.
 
         Args:
-            parent_otel_context: The parent's OTel context (contains trace_id and parent span_id).
+            parent_otel_context: The parent's OTel context.
             pipeline_run_id: The pipeline run ID for span attributes.
 
         Returns:
@@ -313,7 +313,6 @@ class PipeAbstract(ABC, BaseModel):
             return None
 
         # Determine if we need to redact pipe codes for privacy
-        # Note: pipeline_run_id is already generated without pipe_code when capture is disabled
         if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
             span_name = f"{self.pipe_type}: {self.code}"
             pipe_code_attr = self.code
@@ -323,11 +322,12 @@ class PipeAbstract(ABC, BaseModel):
 
         # Build all span attributes upfront
         span_attributes: dict[str, str] = {
+            PipelexSpanAttr.TRACE_NAME: parent_otel_context.trace_name,
             PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.PIPE,
-            PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
-            PipelexSpanAttr.PIPE_TYPE: self.pipe_type,
-            PipelexSpanAttr.PIPE_CATEGORY: self.pipe_category,
             PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
+            PipelexSpanAttr.PIPE_CATEGORY: self.pipe_category,
+            PipelexSpanAttr.PIPE_TYPE: self.pipe_type,
+            PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
         }
 
         # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
@@ -402,8 +402,8 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
         self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
-        # Generate pipe_run_id (business ID, always set) - similar to pipeline_run_id format
-        this_pipe_run_id = make_pipe_run_id(self.code)
+        # Generate pipe_run_id (business ID, always set)
+        this_pipe_run_id = PipelineFactory.make_pipe_run_id()
 
         # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
         # The trace_id comes from parent's otel_context (already computed at pipeline start)
@@ -422,6 +422,7 @@ class PipeAbstract(ABC, BaseModel):
                 span_context = span.get_span_context()
                 this_otel_context = OtelContext(
                     trace_id=parent_otel_context.trace_id,
+                    trace_name=parent_otel_context.trace_name,
                     span_id=span_context.span_id,
                 )
 
