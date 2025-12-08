@@ -5,7 +5,6 @@ This module provides helpers for instrumenting LLM operations with OpenTelemetry
 
 import base64
 import hashlib
-import json
 from typing import Any
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -26,7 +25,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
-from pipelex.tools.misc.json_utils import JsonContent
+from pipelex.tools.misc.json_utils import JsonContent, pure_json_str
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -57,7 +56,8 @@ class OtelFactory:
         Returns:
             The serialized JSON string.
         """
-        return json.dumps(json_conent, default=str)
+        # return json.dumps(json_conent, default=str)
+        return pure_json_str(data=json_conent)
 
     @classmethod
     def make_inputs_json(
@@ -79,7 +79,10 @@ class OtelFactory:
         inputs_dict: dict[str, Any] = {}
         for input_name in needed_input_names:
             stuff = working_memory.get_stuff(name=input_name)
-            inputs_dict[input_name] = stuff.content.smart_dump()
+            inputs_dict[input_name] = {
+                "concept": stuff.concept.simple_concept_string,
+                "content": stuff.content.smart_dump(),
+            }
 
         json_str = cls.stringify_json(json_conent=inputs_dict)
         return cls.make_truncated_content(content=json_str, max_length=max_length)
@@ -104,7 +107,7 @@ class OtelFactory:
             return "{}"
 
         output_dict: dict[str, Any] = {
-            "concept": main_stuff.concept.code,
+            "concept": main_stuff.concept.simple_concept_string,
             "content": main_stuff.content.smart_dump(),
         }
 
