@@ -22,5 +22,6 @@ user_id = ""
 ai_tracing_enabled = false                                           # Enable OpenTelemetry tracing for AI operations
 capture_content_enabled = false                                      # Controls gen_ai.prompt/completion content capture for OTel
 capture_pipe_codes_enabled = false                                   # Controls whether pipe codes appear in span names/attributes
+capture_output_class_name_enabled = false                            # Controls whether output class names appear in span names/attributes
 # otlp_endpoint = "https://..."
 # otlp_headers = { "Authorization" = "Bearer ..." }
