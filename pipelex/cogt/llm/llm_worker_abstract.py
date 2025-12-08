@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
 from opentelemetry import trace
@@ -319,12 +318,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Start OTel span after _before_job (which may set model info)
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.TEXT)
 
-        # Create context manager from span
-        ctx_manager = trace.use_span(span, end_on_exit=False) if span else nullcontext()
-
         try:
-            with ctx_manager:
-                text_result = await self._gen_text(llm_job=llm_job)
+            text_result = await self._gen_text(llm_job=llm_job)
         except Exception as exc:
             self._end_otel_span_with_error(span=span, llm_job=llm_job, error=exc)
             raise
@@ -356,17 +351,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Start OTel span after _before_job (which may set model info)
         span = self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.OBJECT, output_class_name=schema.__name__)
 
-        # Create context manager from span
-        ctx_manager = trace.use_span(span, end_on_exit=False) if span else nullcontext()
-
         try:
-            with ctx_manager:
-                # Execute job
-                object_result = await self._gen_object(llm_job=llm_job, schema=schema)
+            object_result = await self._gen_object(llm_job=llm_job, schema=schema)
 
-                # Cleanup result
-                if hasattr(object_result, "_raw_response"):
-                    delattr(object_result, "_raw_response")
+            # Cleanup result
+            if hasattr(object_result, "_raw_response"):
+                delattr(object_result, "_raw_response")
         except Exception as exc:
             self._end_otel_span_with_error(span=span, llm_job=llm_job, error=exc)
             raise
