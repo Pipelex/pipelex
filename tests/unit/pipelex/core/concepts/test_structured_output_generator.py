@@ -471,7 +471,7 @@ class WrongClassName(StructuredContent):
         compile(generated_code, "<generated>", "exec")
 
         # Verify correct import is present
-        assert "from pipelex.core.stuffs import TextContent" in generated_code
+        assert "from pipelex.core.stuffs.text_content import TextContent" in generated_code
 
         # Verify class inherits from TextContent
         assert "class Question(TextContent):" in generated_code
@@ -514,7 +514,7 @@ class WrongClassName(StructuredContent):
         pretty_print(generated_code, title="Generated Result")
 
         # Verify correct import is present
-        assert "from pipelex.core.stuffs import ImageContent" in generated_code
+        assert "from pipelex.core.stuffs.image_content import ImageContent" in generated_code
 
         # Verify class inherits from ImageContent
         assert "class TableScreenshot(ImageContent):" in generated_code
@@ -545,7 +545,7 @@ class WrongClassName(StructuredContent):
         )
 
         # Verify correct import is present
-        assert "from pipelex.core.stuffs import NumberContent" in generated_code
+        assert "from pipelex.core.stuffs.number_content import NumberContent" in generated_code
 
         # Verify class inherits from NumberContent
         assert "class Temperature(NumberContent):" in generated_code
@@ -576,7 +576,7 @@ class WrongClassName(StructuredContent):
         )
 
         # Verify correct import is present
-        assert "from pipelex.core.stuffs import JSONContent" in generated_code
+        assert "from pipelex.core.stuffs.json_content import JSONContent" in generated_code
 
         # Verify class inherits from JSONContent
         assert "class ConfigData(JSONContent):" in generated_code
@@ -690,12 +690,12 @@ class WrongClassName(StructuredContent):
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
 
         test_cases = [
-            ("TextContent", "Question", {"source": "The source of the question"}),
-            ("ImageContent", "Diagram", {"diagram_type": "Type of diagram"}),
-            ("NumberContent", "Score", {"max_value": "Maximum possible score"}),
+            ("TextContent", "text_content", "Question", {"source": "The source of the question"}),
+            ("ImageContent", "image_content", "Diagram", {"diagram_type": "Type of diagram"}),
+            ("NumberContent", "number_content", "Score", {"max_value": "Maximum possible score"}),
         ]
 
-        for base_class_name, class_name, field_dict in test_cases:
+        for base_class_name, module_name, class_name, field_dict in test_cases:
             structure_blueprint = {
                 field_name: ConceptStructureBlueprint(
                     description=description,
@@ -713,7 +713,7 @@ class WrongClassName(StructuredContent):
             )
 
             # Verify correct import is present
-            assert f"from pipelex.core.stuffs import {base_class_name}" in generated_code
+            assert f"from pipelex.core.stuffs.{module_name} import {base_class_name}" in generated_code
 
             # Verify class inherits from correct base
             assert f"class {class_name}({base_class_name}):" in generated_code
