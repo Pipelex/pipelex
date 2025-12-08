@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags, Tracer
@@ -12,12 +12,12 @@ from pipelex import log
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.job_metadata import UnitJobId
-from pipelex.system.telemetry.otel_constants import GenAISpanAttr
-from pipelex.system.telemetry.telemetry_constants import REDACTED, UNKNOWN_JOB, UNKNOWN_PIPE, OutputDesc, PipelexSpanAttr, SpanCategory
+from pipelex.system.telemetry.otel_constants import REDACTED, UNKNOWN_JOB, UNKNOWN_PIPE, GenAISpanAttr, LLMOutputType, PipelexSpanAttr, SpanCategory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
     from opentelemetry.util.types import AttributeValue
+    from pydantic import BaseModel
 
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -68,19 +68,24 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Get the GenAI provider name (e.g., 'openai', 'anthropic'). Override in subclass."""
         return "unknown"
 
-    def _get_model_name(self) -> str:
-        """Get the model name. Override in subclass."""
+    def _get_request_model_name(self) -> str:
+        """Get the request model name. Override in subclass."""
+        return "unknown"
+
+    def _get_response_model_name(self) -> str:
+        """Get the response model name. Override in subclass."""
         return "unknown"
 
     def _should_capture_content(self) -> bool:
         """Return whether prompt/response content should be captured. Override in subclass."""
         return False
 
-    def _start_otel_span_llm(self, llm_job: LLMJob, output_desc: str) -> None:
+    def _start_otel_span_llm(self, llm_job: LLMJob, output_type: LLMOutputType, output_class_name: str | None = None) -> None:
         """Start an OTel span and attach it to the llm_job. Safe to call if otel_context is None."""
         # Get context from job metadata
         metadata = llm_job.job_metadata
         otel_context = metadata.otel_context
+        job_params = llm_job.applied_job_params or llm_job.job_params
 
         # Skip if telemetry is disabled (no otel_context)
         if otel_context is None:
@@ -97,8 +102,15 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         pipe_code = metadata.pipe_code or UNKNOWN_PIPE
 
         # Determine if we need to redact output class names
-        if not TelemetryManagerAbstract.is_capture_output_class_name_enabled() and not OutputDesc.is_text(output_desc):
-            output_desc = OutputDesc.OBJECT
+        output_desc: str
+        match output_type:
+            case LLMOutputType.TEXT:
+                output_desc = output_type
+            case LLMOutputType.OBJECT:
+                if TelemetryManagerAbstract.is_capture_output_class_name_enabled() and output_class_name:
+                    output_desc = output_class_name
+                else:
+                    output_desc = output_type
 
         # Determine if we need to redact pipe code
         if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
@@ -106,20 +118,27 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         else:
             pipe_code_attr = REDACTED
 
-        model_name = self._get_model_name()
+        model_name = self._get_request_model_name()
         span_name = f"{pipe_code_attr}: {unit_job_id} ({model_name}) -> {output_desc}"
 
         # Build all span attributes upfront
         span_attributes: dict[str, AttributeValue] = {
             # GenAI standard attributes
+            GenAISpanAttr.OPERATION_NAME: unit_job_id,
+            GenAISpanAttr.OUTPUT_TYPE: output_type.as_otel_gen_ai_output_type.value,
             GenAISpanAttr.PROVIDER_NAME: self._get_provider_name(),
             GenAISpanAttr.REQUEST_MODEL: model_name,
-            GenAISpanAttr.OPERATION_NAME: unit_job_id,
+            GenAISpanAttr.RESPONSE_MODEL: self._get_response_model_name(),
+            GenAISpanAttr.REQUEST_TEMPERATURE: job_params.temperature,
             # Pipelex specific context attributes
             PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.INFERENCE,
             PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
             PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
         }
+        if job_params.max_tokens:
+            span_attributes[GenAISpanAttr.REQUEST_MAX_TOKENS] = job_params.max_tokens
+        if job_params.seed:
+            span_attributes[GenAISpanAttr.REQUEST_SEED] = job_params.seed
         if metadata.job_name:
             span_attributes[PipelexSpanAttr.JOB_NAME] = metadata.job_name
         if self._should_capture_content() and llm_job.llm_prompt.user_text:
@@ -164,7 +183,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Get the OTel span from the llm_job, if any."""
         return llm_job.get_otel_span()
 
-    def _end_otel_span(self, llm_job: LLMJob, result: Any, is_error: bool = False, error: Exception | None = None) -> None:
+    def _end_otel_span_with_completion_string(self, llm_job: LLMJob, completion_string: str) -> None:
         """End the OTel span, recording usage and status. Safe to call if no span exists."""
         span = self._get_otel_span(llm_job)
         if span is None:
@@ -180,24 +199,73 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             f"  span_id={span_ctx.span_id:016x}"
         )
 
-        if is_error and error is not None:
-            span.record_exception(error)
-            span.set_status(Status(StatusCode.ERROR, str(error)))
-        else:
-            # Record token usage if available
-            if llm_job.job_report.llm_tokens_usage:
-                tokens = llm_job.job_report.llm_tokens_usage.nb_tokens_by_category
-                input_tokens = tokens.get(TokenCategory.INPUT, 0)
-                output_tokens = tokens.get(TokenCategory.OUTPUT, 0)
-                span.set_attribute(GenAISpanAttr.USAGE_INPUT_TOKENS, input_tokens)
-                span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
+        # Record token usage if available
+        if llm_job.job_report.llm_tokens_usage:
+            tokens = llm_job.job_report.llm_tokens_usage.nb_tokens_by_category
+            input_tokens = tokens.get(TokenCategory.INPUT, 0)
+            output_tokens = tokens.get(TokenCategory.OUTPUT, 0)
+            span.set_attribute(GenAISpanAttr.USAGE_INPUT_TOKENS, input_tokens)
+            span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
 
-            # Capture response content if enabled and result is a string
-            if self._should_capture_content() and isinstance(result, str):
-                span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, result)
+        # Capture response content if enabled and result is a string
+        if self._should_capture_content():
+            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_string)
 
-            span.set_status(Status(StatusCode.OK))
+        span.set_status(Status(StatusCode.OK))
+        span.end()
+        llm_job.set_otel_span(None)
 
+    def _end_otel_span_with_completion_object(self, llm_job: LLMJob, completion_object: BaseModel) -> None:
+        """End the OTel span, recording usage and status. Safe to call if no span exists."""
+        span = self._get_otel_span(llm_job)
+        if span is None:
+            return
+
+        metadata = llm_job.job_metadata
+        span_ctx = span.get_span_context()
+        log.dev(
+            f"[OTel] LLM SPAN ENDING:\n"
+            f"  pipe_code='{metadata.pipe_code}'\n"
+            f"  pipeline_run_id='{metadata.pipeline_run_id}'\n"
+            f"  trace_id={span_ctx.trace_id:032x}\n"
+            f"  span_id={span_ctx.span_id:016x}"
+        )
+
+        # Record token usage if available
+        if llm_job.job_report.llm_tokens_usage:
+            tokens = llm_job.job_report.llm_tokens_usage.nb_tokens_by_category
+            input_tokens = tokens.get(TokenCategory.INPUT, 0)
+            output_tokens = tokens.get(TokenCategory.OUTPUT, 0)
+            span.set_attribute(GenAISpanAttr.USAGE_INPUT_TOKENS, input_tokens)
+            span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
+
+        # Capture response content if enabled and result is a string
+        if self._should_capture_content():
+            completion_string = completion_object.model_dump_json(serialize_as_any=True)
+            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_string)
+
+        span.set_status(Status(StatusCode.OK))
+        span.end()
+        llm_job.set_otel_span(None)
+
+    def _end_otel_span_with_error(self, llm_job: LLMJob, error: Exception) -> None:
+        """End the OTel span, recording usage and status. Safe to call if no span exists."""
+        span = self._get_otel_span(llm_job)
+        if span is None:
+            return
+
+        metadata = llm_job.job_metadata
+        span_ctx = span.get_span_context()
+        log.dev(
+            f"[OTel] LLM SPAN ENDING WITH ERROR:\n"
+            f"  pipe_code='{metadata.pipe_code}'\n"
+            f"  pipeline_run_id='{metadata.pipeline_run_id}'\n"
+            f"  trace_id={span_ctx.trace_id:032x}\n"
+            f"  span_id={span_ctx.span_id:016x}"
+        )
+
+        span.record_exception(error)
+        span.set_status(Status(StatusCode.ERROR, str(error)))
         span.end()
         llm_job.set_otel_span(None)
 
@@ -215,10 +283,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Verify feasibility
         self._check_can_perform_job(llm_job=llm_job)
 
-    async def _after_job(
+    async def _after_text_job(
         self,
         llm_job: LLMJob,
-        result: Any,
+        result_text: str,
     ):
         # Report job
         llm_job.llm_job_after_complete()
@@ -226,7 +294,20 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             self.reporting_delegate.report_inference_job(inference_job=llm_job)
 
         # End OTel span with success status and usage data
-        self._end_otel_span(llm_job=llm_job, result=result)
+        self._end_otel_span_with_completion_string(llm_job=llm_job, completion_string=result_text)
+
+    async def _after_object_job(
+        self,
+        llm_job: LLMJob,
+        result_object: BaseModel,
+    ):
+        # Report job
+        llm_job.llm_job_after_complete()
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=llm_job)
+
+        # End OTel span with success status and usage data
+        self._end_otel_span_with_completion_object(llm_job=llm_job, completion_object=result_object)
 
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks
@@ -245,7 +326,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         await self._before_job(llm_job=llm_job)
 
         # Start OTel span after _before_job (which may set model info)
-        self._start_otel_span_llm(llm_job=llm_job, output_desc="Text")
+        self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.TEXT)
 
         # Get span and create context manager
         span = self._get_otel_span(llm_job)
@@ -253,14 +334,14 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         try:
             with ctx_manager:
-                result = await self._gen_text(llm_job=llm_job)
+                text_result = await self._gen_text(llm_job=llm_job)
         except Exception as exc:
-            self._end_otel_span(llm_job=llm_job, result=None, is_error=True, error=exc)
+            self._end_otel_span_with_error(llm_job=llm_job, error=exc)
             raise
 
-        await self._after_job(llm_job=llm_job, result=result)
+        await self._after_text_job(llm_job=llm_job, result_text=text_result)
 
-        return result
+        return text_result
 
     @abstractmethod
     async def _gen_text(
@@ -283,7 +364,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         await self._before_job(llm_job=llm_job)
 
         # Start OTel span after _before_job (which may set model info)
-        self._start_otel_span_llm(llm_job=llm_job, output_desc=schema.__name__)
+        self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.OBJECT, output_class_name=schema.__name__)
 
         # Get span and create context manager
         span = self._get_otel_span(llm_job)
@@ -292,18 +373,18 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         try:
             with ctx_manager:
                 # Execute job
-                result = await self._gen_object(llm_job=llm_job, schema=schema)
+                object_result = await self._gen_object(llm_job=llm_job, schema=schema)
 
                 # Cleanup result
-                if hasattr(result, "_raw_response"):
-                    delattr(result, "_raw_response")
+                if hasattr(object_result, "_raw_response"):
+                    delattr(object_result, "_raw_response")
         except Exception as exc:
-            self._end_otel_span(llm_job=llm_job, result=None, is_error=True, error=exc)
+            self._end_otel_span_with_error(llm_job=llm_job, error=exc)
             raise
 
-        await self._after_job(llm_job=llm_job, result=result)
+        await self._after_object_job(llm_job=llm_job, result_object=object_result)
 
-        return result
+        return object_result
 
     @abstractmethod
     async def _gen_object(

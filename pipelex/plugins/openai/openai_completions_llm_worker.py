@@ -17,7 +17,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.system.telemetry.telemetry_constants import OutputDesc
+from pipelex.system.telemetry.otel_constants import LLMOutputType
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -73,7 +73,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
 
         try:
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
-                inference_model=self.inference_model, llm_job=llm_job, output_desc=OutputDesc.TEXT
+                inference_model=self.inference_model, llm_job=llm_job, output_desc=LLMOutputType.TEXT
             )
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,

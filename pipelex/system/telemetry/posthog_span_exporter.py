@@ -13,8 +13,14 @@ from posthog import Posthog
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.system.telemetry.otel_constants import OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID, GenAISpanAttr, PostHogAttr, PostHogEvent
-from pipelex.system.telemetry.telemetry_constants import PipelexSpanAttr, SpanCategory
+from pipelex.system.telemetry.otel_constants import (
+    OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+    GenAISpanAttr,
+    PipelexSpanAttr,
+    PostHogAttr,
+    PostHogEvent,
+    SpanCategory,
+)
 
 
 class PostHogSpanExporter(SpanExporter):
@@ -51,7 +57,12 @@ class PostHogSpanExporter(SpanExporter):
         properties.update(
             {
                 PostHogAttr.MODEL: attributes.get(GenAISpanAttr.REQUEST_MODEL),
+                PostHogAttr.MODEL_ID: attributes.get(GenAISpanAttr.RESPONSE_MODEL),
                 PostHogAttr.PROVIDER: provider_operation_combo,
+                PostHogAttr.TEMPERATURE: attributes.get(GenAISpanAttr.REQUEST_TEMPERATURE),
+                PostHogAttr.MAX_TOKENS: attributes.get(GenAISpanAttr.REQUEST_MAX_TOKENS),
+                PostHogAttr.SEED: attributes.get(GenAISpanAttr.REQUEST_SEED),
+                PostHogAttr.OUTPUT_TYPE: attributes.get(GenAISpanAttr.OUTPUT_TYPE),
                 PostHogAttr.INPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_INPUT_TOKENS),
                 PostHogAttr.OUTPUT_TOKENS: attributes.get(GenAISpanAttr.USAGE_OUTPUT_TOKENS),
                 PostHogAttr.HTTP_STATUS: 200,
@@ -62,7 +73,7 @@ class PostHogSpanExporter(SpanExporter):
         if prompt := attributes.get(GenAISpanAttr.PROMPT_CONTENT):
             properties[PostHogAttr.INPUT] = prompt
         if completion := attributes.get(GenAISpanAttr.COMPLETION_CONTENT):
-            properties[PostHogAttr.OUTPUT_CHOICES] = [{"content": completion}]
+            properties[PostHogAttr.OUTPUT_CHOICES] = completion
 
         pipe_code = attributes.get(PipelexSpanAttr.PIPE_CODE)
         pipeline_run_id = attributes.get(PipelexSpanAttr.PIPELINE_RUN_ID)

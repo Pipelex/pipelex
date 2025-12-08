@@ -19,7 +19,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.run_id_factory import make_pipe_run_id
-from pipelex.system.telemetry.telemetry_constants import REDACTED, PipelexSpanAttr, SpanOutcome
+from pipelex.system.telemetry.otel_constants import REDACTED, PipelexSpanAttr, SpanOutcome
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self

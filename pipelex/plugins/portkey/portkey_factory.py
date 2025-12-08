@@ -10,7 +10,7 @@ from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.openai.openai_constants import OpenAIBodyKey
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError
-from pipelex.system.telemetry.telemetry_constants import REDACTED
+from pipelex.system.telemetry.otel_constants import REDACTED
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:

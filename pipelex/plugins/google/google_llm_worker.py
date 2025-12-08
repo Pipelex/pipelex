@@ -101,13 +101,14 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
     ) -> str:
         """Generate text using Google Gemini API."""
-        # Prepare contents (text and images)
+        job_params = llm_job.applied_job_params or llm_job.job_params
+
         contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
         # Build generation config
         generation_config = types.GenerateContentConfig(
-            temperature=llm_job.job_params.temperature,
-            max_output_tokens=llm_job.job_params.max_tokens,
+            temperature=job_params.temperature,
+            max_output_tokens=job_params.max_tokens,
             candidate_count=1,  # Generate one candidate
         )
 
@@ -151,14 +152,14 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         """Generate structured output using Google Gemini API with instructor."""
-        # Prepare contents (text and images)
+        job_params = llm_job.applied_job_params or llm_job.job_params
         contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
         # Build generation config
         generation_config = types.GenerateContentConfig(
             system_instruction=llm_job.llm_prompt.system_text,
-            temperature=llm_job.job_params.temperature,
-            max_output_tokens=llm_job.job_params.max_tokens,
+            temperature=job_params.temperature,
+            max_output_tokens=job_params.max_tokens,
             candidate_count=1,
         )
 
