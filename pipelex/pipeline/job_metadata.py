@@ -48,7 +48,6 @@ class OtelContext(BaseModel):
 
 
 class JobMetadata(BaseModel):
-    job_name: str | None = None
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     pipe_code: str | None = None
 

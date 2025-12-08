@@ -2,10 +2,9 @@
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -29,9 +28,7 @@ from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition_co
 @pytest.mark.llm
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeConditionComplex:
-    async def test_technical_urgent_routing(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
-    ):
+    async def test_technical_urgent_routing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test technical document with urgent priority routing."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create complex input data
@@ -67,7 +64,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 
@@ -82,9 +79,7 @@ class TestPipeConditionComplex:
         if pipe_run_mode != PipeRunMode.DRY:
             assert "URGENT_TECHNICAL_PROCESSED" in final_result.content.text
 
-    async def test_business_finance_routing(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
-    ):
+    async def test_business_finance_routing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test business document for finance department routing."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="business", priority="normal", language="english", complexity="medium")
@@ -118,7 +113,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 
@@ -130,7 +125,7 @@ class TestPipeConditionComplex:
             assert isinstance(final_result.content, TextContent)
             assert "FINANCE_BUSINESS_PROCESSED" in final_result.content.text
 
-    async def test_legal_complex_routing(self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_legal_complex_routing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test complex legal document routing."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="legal", priority="normal", language="spanish", complexity="high")
@@ -164,7 +159,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 
@@ -176,9 +171,7 @@ class TestPipeConditionComplex:
             assert isinstance(final_result.content, TextContent)
             assert "COMPLEX_LEGAL_PROCESSED" in final_result.content.text
 
-    async def test_technical_expert_high_complexity_routing(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
-    ):
+    async def test_technical_expert_high_complexity_routing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test technical document with expert user and high complexity."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(
@@ -220,7 +213,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 
@@ -233,7 +226,7 @@ class TestPipeConditionComplex:
             assert "EXPERT_TECHNICAL_PROCESSED" in final_result.content.text
 
     # DRY RUN TESTS
-    async def test_complex_pipeline_dry_run_success(self, request: FixtureRequest, load_test_library: Callable[[list[Path]], None]):
+    async def test_complex_pipeline_dry_run_success(self, load_test_library: Callable[[list[Path]], None]):
         """Test complex pipeline dry run with valid inputs - should succeed."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="business", priority="urgent", language="english", complexity="low")
@@ -267,7 +260,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 
@@ -276,7 +269,7 @@ class TestPipeConditionComplex:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
 
-    async def test_complex_pipeline_dry_run_missing_inputs(self, request: FixtureRequest, load_test_library: Callable[[list[Path]], None]):
+    async def test_complex_pipeline_dry_run_missing_inputs(self, load_test_library: Callable[[list[Path]], None]):
         """Test complex pipeline dry run with missing inputs - should fail with PipeRouterError."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="technical", priority="urgent", language="english", complexity="high")
@@ -300,7 +293,7 @@ class TestPipeConditionComplex:
                     pipe=get_required_pipe(pipe_code="complex_document_processor"),
                     pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
                     working_memory=working_memory,
-                    job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                    job_metadata=JobMetadata(),
                 ),
             )
 
@@ -334,7 +327,6 @@ class TestPipeConditionComplex:
         complexity: Literal["low", "medium", "high"],
         language: Literal["english", "spanish", "french", "german", "chinese"],
         expected_output_contains: str,
-        request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ):
@@ -378,7 +370,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 

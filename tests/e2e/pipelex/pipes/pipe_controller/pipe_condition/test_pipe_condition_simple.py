@@ -48,7 +48,7 @@ class TestPipeConditionSimple:
 
         with pytest.raises(PipeRunInputsError) as exc_info:
             await pipe_condition.run_pipe(
-                job_metadata=JobMetadata(job_name="test_direct_condition_fail"),
+                job_metadata=JobMetadata(),
                 working_memory=empty_working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )
@@ -96,7 +96,7 @@ class TestPipeConditionSimple:
 
         try:
             pipe_output = await pipe_condition.run_pipe(
-                job_metadata=JobMetadata(job_name="test_direct_condition_succeed"),
+                job_metadata=JobMetadata(),
                 working_memory=working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )
