@@ -144,8 +144,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span_attributes[GenAISpanAttr.REQUEST_MAX_TOKENS] = job_params.max_tokens
         if job_params.seed:
             span_attributes[GenAISpanAttr.REQUEST_SEED] = job_params.seed
-        if job_metadata.job_name:
-            span_attributes[PipelexSpanAttr.JOB_NAME] = job_metadata.job_name
         if TelemetryManagerAbstract.is_capture_content_enabled():
             max_length = TelemetryManagerAbstract.get_capture_content_max_length()
             messages: list[dict[str, Any]] = []

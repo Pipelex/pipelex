@@ -47,10 +47,11 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
         working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
         pipe.validate_with_libraries()
         await pipe.run_pipe(
-            job_metadata=JobMetadata(job_name=f"dry_run_{pipe.code}"),
+            job_metadata=JobMetadata(),
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
+        log.dev(f"✅✅✅✅✅✅ Pipe '{pipe.code}' dry run completed successfully")
     except PipeStackOverflowError as exc:
         if pipe.code in get_config().pipelex.dry_run_config.allowed_to_fail_pipes:
             error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"

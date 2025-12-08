@@ -117,7 +117,6 @@ class PipelexSpanAttr(StrEnum):
     PIPE_TYPE = "pipelex.pipe.type"
     PIPE_CODE = "pipelex.pipe.code"
     PIPELINE_RUN_ID = "pipelex.pipeline.run_id"
-    JOB_NAME = "pipelex.job.name"
     OUTCOME = "pipelex.outcome"  # "success" or "failure"
 
 
