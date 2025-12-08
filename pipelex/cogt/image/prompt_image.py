@@ -106,7 +106,7 @@ class PromptImageBase64(PromptImage):
 
     @override
     def short_description(self) -> str:
-        return f"base64: {self.base_64[:100].decode('ascii')}..."
+        return f"base64: {self.base_64[:100].decode('ascii', errors='replace')}..."
 
 
 class PromptImageBinary(PromptImage):
