@@ -64,7 +64,6 @@ class TestFooBar:
 
 - Never more than 1 class per test module.
 - When testing one method, if possible, limit the number of test functions, but with different test cases in parameters
-- Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
 
 ### Test Data Organization
 
