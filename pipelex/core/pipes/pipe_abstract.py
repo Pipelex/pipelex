@@ -451,11 +451,10 @@ class PipeAbstract(ABC, BaseModel):
         if pipe_run_params.run_mode == PipeRunMode.LIVE:
             log.info(pipe_run_info)
 
-        await self.validate_before_run(
-            job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-        )
-
         try:
+            await self.validate_before_run(
+                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
             pipe_output = await self._run_pipe(
                 job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
