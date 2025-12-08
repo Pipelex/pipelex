@@ -282,7 +282,9 @@ def prepare_runner_cmd(
     ] = None,
     output_path: Annotated[
         str | None,
-        typer.Option("--output", "-o", help="Path to save the generated Python file, defaults to 'results/run_{pipe_code}.py'"),
+        typer.Option(
+            "--output", "-o", help="Path to save the generated Python file (defaults to bundle's directory if bundle provided, otherwise 'results/')"
+        ),
     ] = None,
 ) -> None:
     """Prepare a Python runner file for a pipe.
@@ -393,12 +395,19 @@ def prepare_runner_cmd(
             output_parse = parse_concept_with_multiplicity(pipe_blueprint.output)
             output_is_list = output_parse.multiplicity is not None
 
-        # Determine output path
-        final_output_path = output_path or get_incremental_file_path(
-            base_path="results",
-            base_name=f"run_{pipe_code}",
-            extension="py",
-        )
+        # Determine output path - use bundle's directory if bundle provided, otherwise results/
+        if output_path:
+            final_output_path = output_path
+        elif bundle_path:
+            # Place runner in the same directory as the PLX file
+            bundle_dir = Path(bundle_path).parent
+            final_output_path = str(bundle_dir / f"run_{pipe_code}.py")
+        else:
+            final_output_path = get_incremental_file_path(
+                base_path="results",
+                base_name=f"run_{pipe_code}",
+                extension="py",
+            )
         output_dir = Path(final_output_path).parent
 
         # Generate structures folder FIRST (before runner, since runner imports from structures)
@@ -407,7 +416,7 @@ def prepare_runner_cmd(
             generated_structures = generate_structures_from_blueprints(
                 blueprints=[bundle_blueprint],
                 output_directory=structures_output_dir,
-                skip_existing_check=True,
+                target_path=output_dir,  # Check for existing structures in the bundle's directory
             )
             if generated_structures:
                 typer.secho(f"✅ Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
