@@ -20,8 +20,8 @@ from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.telemetry.otel_constants import (
-    PIPE_CODE_REDACTED,
     LangfuseSpanAttr,
+    OTelConstants,
     PipelexSpanAttr,
     SpanCategory,
     SpanOutcome,
@@ -323,7 +323,7 @@ class PipeAbstract(ABC, BaseModel):
         if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
             pipe_code_attr = self.code
         else:
-            pipe_code_attr = PIPE_CODE_REDACTED
+            pipe_code_attr = OTelConstants.PIPE_CODE_REDACTED
 
         span_name = f"{self.pipe_type}: {pipe_code_attr}"
 

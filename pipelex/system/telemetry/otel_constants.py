@@ -9,14 +9,27 @@ from opentelemetry.semconv._incubating.attributes import gen_ai_attributes as ot
 from pipelex.cogt.llm.llm_constants import LLMOutputType
 from pipelex.types import StrEnum
 
-PIPE_CODE_REDACTED = "[REDACTED]"
-TRUNCATION_SUFFIX = "... [truncated]"
 
-# Virtual parent span ID for root spans.
-# INVALID_SPAN_ID (0) makes SpanContext invalid, causing OTel to ignore our trace_id.
-# Using 1 as virtual parent ensures OTel uses our deterministic trace_id while
-# still treating the span as a root (we filter this out in the exporter).
-OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID = 1
+class OTelConstants:
+    """OpenTelemetry constants."""
+
+    DEFAULT_USER_ID = "anonymous"
+    SERVICE_NAME = "pipelex"
+    SERVICE_NAMESPACE_KEY = "service.namespace"
+    SERVICE_NAMESPACE = "ai.orchestration"
+    INSTRUMENTING_MODULE_NAME = "pipelex"
+
+    DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
+    PIPE_CODE_REDACTED = "[REDACTED]"
+    TRUNCATION_SUFFIX = "... [truncated]"
+
+    # Virtual parent span ID for root spans.
+    # INVALID_SPAN_ID (0) makes SpanContext invalid, causing OTel to ignore our trace_id.
+    # Using 1 as virtual parent ensures OTel uses our deterministic trace_id while
+    # still treating the span as a root (we filter this out in the exporter).
+    OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID = 1
+
+    LANGFUSE_CLOUD_URL = "https://cloud.langfuse.com"
 
 
 class GenAISpanAttr(StrEnum):
@@ -74,16 +87,6 @@ class PostHogEvent(StrEnum):
 
     SPAN = "$ai_span"
     GENERATION = "$ai_generation"
-
-
-class OTelConstants(StrEnum):
-    """OpenTelemetry constants."""
-
-    DEFAULT_USER_ID = "anonymous"
-    SERVICE_NAME = "pipelex"
-    SERVICE_NAMESPACE_KEY = "service.namespace"
-    SERVICE_NAMESPACE = "ai.orchestration"
-    INSTRUMENTING_MODULE_NAME = "pipelex"
 
 
 def make_otel_gen_ai_output_type(output_type: str) -> otel_gen_ai_attributes.GenAiOutputTypeValues:

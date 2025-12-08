@@ -1,32 +1,26 @@
-import base64
 from contextlib import contextmanager
-from typing import Any, Callable, Generator
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import posthog
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource as OTelResource
-from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor as OTelBatchSpanProcessor
-from opentelemetry.semconv._incubating.attributes import deployment_attributes  # noqa: PLC2701
-from opentelemetry.semconv.attributes import service_attributes
 from opentelemetry.trace import Tracer as OTelTracer
 from posthog import Posthog, new_context, tag  # type: ignore[attr-defined]
 from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 
 from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
-from pipelex.system.environment import get_optional_env, get_required_env, is_env_var_truthy
+from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
-from pipelex.system.runtime import IntegrationMode, RunEnvironment
+from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
-from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
+from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
 from pipelex.tools.misc.package_utils import get_package_version
 
-DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
+if TYPE_CHECKING:
+    from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
 
 
 class TelemetryManager(TelemetryManagerAbstract):
@@ -47,7 +41,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         self._otel_tracer: OTelTracer | None
         self._tracer_provider: OTelTracerProvider | None
         if telemetry_config.ai_tracing_enabled:
-            self._otel_tracer, self._tracer_provider = self.make_ai_tracer(
+            self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 user_id=telemetry_config.user_id,
                 posthog_client=self.posthog_client,
                 otlp_endpoint=telemetry_config.otlp_endpoint,
@@ -226,8 +220,10 @@ class TelemetryManager(TelemetryManagerAbstract):
         if not is_debug and is_env_var_truthy(PortkeyEnvVar.FORCE_PORTKEY_DEBUG):
             log.info(f"Force-enabling Portkey logging (debug mode) because '{PortkeyEnvVar.FORCE_PORTKEY_DEBUG}' is set")
             is_debug = True
-        if is_debug and is_env_var_truthy(DO_NOT_TRACK_ENV_VAR_KEY):
-            log.warning(f"Disabling Portkey logging (debug mode) because '{DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence")
+        if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
+            log.warning(
+                f"Disabling Portkey logging (debug mode) because '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence"
+            )
             is_debug = False
         return is_debug
 
@@ -294,104 +290,3 @@ class TelemetryManager(TelemetryManagerAbstract):
                 event=PostHogEvent.SPAN,
                 properties=properties,
             )
-
-    def _make_langfuse_exporter(self, langfuse_base_url: str | None) -> OTLPSpanExporter | None:
-        """Create a Langfuse OTLP exporter using environment credentials.
-
-        Requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY environment variables.
-        Optionally LANGFUSE_BASE_URL can be set via env var or config.
-
-        Args:
-            langfuse_base_url: Optional base URL override from config
-
-        Returns:
-            OTLPSpanExporter configured for Langfuse, or None if credentials missing
-        """
-        try:
-            public_key = get_required_env("LANGFUSE_PUBLIC_KEY")
-            secret_key = get_required_env("LANGFUSE_SECRET_KEY")
-        except Exception as exc:
-            log.warning(f"Langfuse enabled but credentials not found: {exc}")
-            return None
-
-        # Config takes precedence, then env var, then default
-        base_url = langfuse_base_url or get_optional_env("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com"
-
-        # Build Basic auth header
-        langfuse_auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
-
-        return OTLPSpanExporter(
-            endpoint=f"{base_url}/api/public/otel/v1/traces",
-            headers={"Authorization": f"Basic {langfuse_auth}"},
-        )
-
-    def make_ai_tracer(
-        self,
-        user_id: str | None,
-        posthog_client: Posthog | None,
-        otlp_endpoint: str | None = None,
-        otlp_headers: dict[str, str] | None = None,
-        langfuse_enabled: bool = False,
-        langfuse_base_url: str | None = None,
-    ) -> tuple[OTelTracer, OTelTracerProvider]:
-        """Create an isolated OpenTelemetry Tracer for GenAI instrumentation.
-
-        This creates a dedicated TracerProvider that does NOT register itself as the
-        global tracer to avoid polluting other traces in the host application.
-
-        It can configure multiple types of exporters:
-        1. PostHog Exporter: Converts spans to PostHog $ai_generation events
-        2. OTLP Exporter: Sends standard OTLP traces to a collector
-        3. Langfuse Exporter: Sends OTLP traces to Langfuse for LLM observability
-
-        Args:
-            user_id: Optional User ID for event attribution
-            posthog_client: Optional PostHog client for sending events
-            otlp_endpoint: Optional OTLP endpoint URL
-            otlp_headers: Optional headers for OTLP export
-            langfuse_enabled: Whether to enable Langfuse OTLP export
-            langfuse_base_url: Optional base URL for self-hosted Langfuse
-
-        Returns:
-            A tuple of (Tracer, TracerProvider). The caller should call
-            provider.shutdown() during teardown to flush pending spans.
-        """
-        # 1. Define Resource (Identity)
-        resource = OTelResource.create(
-            attributes={
-                service_attributes.SERVICE_NAME: OTelConstants.SERVICE_NAME,
-                service_attributes.SERVICE_VERSION: get_package_version(),
-                OTelConstants.SERVICE_NAMESPACE_KEY: OTelConstants.SERVICE_NAMESPACE,
-                deployment_attributes.DEPLOYMENT_ENVIRONMENT: RunEnvironment.get_from_env_var().value,
-            }
-        )
-
-        # 2. Create Provider
-        provider = OTelTracerProvider(resource=resource)
-
-        # 3. Add PostHog Exporter if client provided
-        if posthog_client:
-            posthog_exporter = PostHogSpanExporter(posthog_client, distinct_id=user_id)
-            provider.add_span_processor(OTelBatchSpanProcessor(posthog_exporter))
-
-        # 4. Add Generic OTLP Exporter if endpoint provided
-        if otlp_endpoint:
-            otlp_exporter = OTLPSpanExporter(
-                endpoint=otlp_endpoint,
-                headers=otlp_headers or {},
-            )
-            provider.add_span_processor(OTelBatchSpanProcessor(otlp_exporter))
-
-        # 5. Add Langfuse OTLP Exporter if enabled
-        if langfuse_enabled:
-            langfuse_exporter = self._make_langfuse_exporter(langfuse_base_url)
-            if langfuse_exporter:
-                provider.add_span_processor(OTelBatchSpanProcessor(langfuse_exporter))
-                log.verbose("Langfuse OTLP exporter enabled")
-
-        # 6. Get the Tracer and return both tracer and provider
-        tracer = provider.get_tracer(
-            instrumenting_module_name=OTelConstants.INSTRUMENTING_MODULE_NAME,
-            instrumenting_library_version=get_package_version(),
-        )
-        return tracer, provider

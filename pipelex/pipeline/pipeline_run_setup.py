@@ -26,7 +26,7 @@ from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.otel_constants import OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
+from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
 
 if TYPE_CHECKING:
@@ -172,7 +172,7 @@ async def pipeline_run_setup(
         otel_context = OtelContext(
             trace_id=trace_id,
             trace_name=trace_name,
-            span_id=OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+            span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
         )
         # Emit trace start event immediately to establish trace name in PostHog
         # This must happen before any pipe spans are created/exported

@@ -14,8 +14,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.system.telemetry.otel_constants import (
-    OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
     GenAISpanAttr,
+    OTelConstants,
     PipelexSpanAttr,
     PostHogAttr,
     PostHogEvent,
@@ -66,7 +66,7 @@ class PostHogSpanExporter(SpanExporter):
 
         # Add parent span ID for trace hierarchy
         # Filter out virtual root parent (used to set trace_id for root spans)
-        if span.parent and span.parent.span_id != OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID:
+        if span.parent and span.parent.span_id != OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID:
             properties[PostHogAttr.PARENT_ID] = f"{span.parent.span_id:016x}"
 
         return properties

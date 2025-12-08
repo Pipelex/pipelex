@@ -56,16 +56,14 @@ from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
+from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_config import (
     TELEMETRY_CONFIG_FILE_NAME,
     TelemetryConfig,
     TelemetryMode,
     load_telemetry_config,
 )
-from pipelex.system.telemetry.telemetry_manager import (
-    DO_NOT_TRACK_ENV_VAR_KEY,
-    TelemetryManager,
-)
+from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
     TelemetryManagerNoOp,
@@ -260,9 +258,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                     chosen_telemetry_manager = TelemetryManagerNoOp()
                     log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
                 case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
-                    if telemetry_config.respect_dnt and is_env_var_truthy(DO_NOT_TRACK_ENV_VAR_KEY):
+                    if telemetry_config.respect_dnt and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
                         chosen_telemetry_manager = TelemetryManagerNoOp()
-                        log.debug(f"Telemetry is disabled by env var '{DO_NOT_TRACK_ENV_VAR_KEY}'")
+                        log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
                     else:
                         chosen_telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
         else:

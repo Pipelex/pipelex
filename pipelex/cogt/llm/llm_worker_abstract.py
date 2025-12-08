@@ -15,9 +15,9 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.exceptions import JobMetadataError
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import (
-    PIPE_CODE_REDACTED,
     GenAISpanAttr,
     LangfuseSpanAttr,
+    OTelConstants,
     PipelexSpanAttr,
     SpanCategory,
     make_otel_gen_ai_output_type,
@@ -125,7 +125,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
             pipe_code_attr = pipe_code
         else:
-            pipe_code_attr = PIPE_CODE_REDACTED
+            pipe_code_attr = OTelConstants.PIPE_CODE_REDACTED
 
         model_name = self._get_request_model_name()
         span_name = f"{pipe_code_attr}: {unit_job_id} ({model_name}) -> {output_desc}"

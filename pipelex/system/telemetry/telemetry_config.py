@@ -44,16 +44,16 @@ class TelemetryConfig(ConfigModel):
     geoip_enabled: bool
     dry_mode_enabled: bool
     verbose_enabled: bool
-    user_id: str | None = None  # Set if telemetry_mode is IDENTIFIED
-    ai_tracing_enabled: bool  # Enable OpenTelemetry tracing for AI operations
-    capture_content_enabled: bool  # Controls gen_ai.prompt/completion content capture for OTel
-    capture_content_max_length: int | None = None  # Max length for captured content (None = unlimited)
-    capture_pipe_codes_enabled: bool  # Controls whether pipe codes appear in span names/attributes
-    capture_output_class_name_enabled: bool  # Controls whether output class names appear in span names/attributes
-    langfuse_enabled: bool = False  # Enable Langfuse OTLP exporter
-    langfuse_base_url: str | None = None  # Override for self-hosted Langfuse (defaults to https://cloud.langfuse.com)
-    otlp_endpoint: str | None = None  # Optional OTLP endpoint for generic tracing
-    otlp_headers: dict[str, str] | None = None  # Optional headers for OTLP export
+    user_id: str | None = Field(default=None, description="Set if telemetry_mode is IDENTIFIED")
+    ai_tracing_enabled: bool = Field(description="Enable OpenTelemetry tracing for AI operations")
+    capture_content_enabled: bool = Field(description="Controls gen_ai.prompt/completion content capture for OTel")
+    capture_content_max_length: int | None = Field(default=None, description="Max length for captured content (None = unlimited)")
+    capture_pipe_codes_enabled: bool = Field(description="Controls whether pipe codes appear in span names/attributes")
+    capture_output_class_name_enabled: bool = Field(description="Controls whether output class names appear in span names/attributes")
+    langfuse_enabled: bool = Field(description="Enable Langfuse OTLP exporter")
+    langfuse_base_url: str | None = Field(default=None, description="Override for self-hosted Langfuse (defaults to https://cloud.langfuse.com)")
+    otlp_endpoint: str | None = Field(default=None, description="Optional OTLP endpoint for generic tracing")
+    otlp_headers: dict[str, str] | None = Field(default=None, description="Optional headers for OTLP export")
 
     @model_validator(mode="after")
     def validate_user_id(self) -> Self:

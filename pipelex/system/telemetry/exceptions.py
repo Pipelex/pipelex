@@ -7,3 +7,7 @@ class TelemetryConfigError(PipelexError):
 
 class TelemetryConfigValidationError(TelemetryConfigError):
     pass
+
+
+class LangfuseCredentialsError(PipelexError):
+    pass
