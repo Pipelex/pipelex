@@ -112,7 +112,7 @@ class Pipelex(metaclass=MetaSingleton):
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
 
         self.reporting_delegate: ReportingProtocol | None = None
-        self.telemetry_manager: TelemetryManagerAbstract
+        self.telemetry_manager: TelemetryManagerAbstract | None = None
         # pipeline
         self.pipeline_tracker: PipelineTrackerProtocol | None = None
         self.library_manager: LibraryManagerAbstract | None = None
@@ -249,6 +249,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
+        chosen_telemetry_manager: TelemetryManagerAbstract
         if integration_mode.allows_telemetry() or force_enable_telemetry:
             if not telemetry_config:
                 telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
@@ -256,18 +257,19 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
             match telemetry_config.telemetry_mode:
                 case TelemetryMode.OFF:
-                    self.telemetry_manager = TelemetryManagerNoOp()
+                    chosen_telemetry_manager = TelemetryManagerNoOp()
                     log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
                 case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
                     if telemetry_config.respect_dnt and is_env_var_truthy(DO_NOT_TRACK_ENV_VAR_KEY):
-                        self.telemetry_manager = TelemetryManagerNoOp()
+                        chosen_telemetry_manager = TelemetryManagerNoOp()
                         log.debug(f"Telemetry is disabled by env var '{DO_NOT_TRACK_ENV_VAR_KEY}'")
                     else:
-                        self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
+                        chosen_telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
         else:
-            self.telemetry_manager = TelemetryManagerNoOp()
+            chosen_telemetry_manager = TelemetryManagerNoOp()
             log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
 
+        self.telemetry_manager = chosen_telemetry_manager
         self.telemetry_manager.setup(integration_mode=integration_mode)
 
         self.pipelex_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
@@ -289,7 +291,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipeline_manager.teardown()
         if self.pipeline_tracker:
             self.pipeline_tracker.teardown()
-        self.telemetry_manager.teardown()
+        if self.telemetry_manager:
+            self.telemetry_manager.teardown()
 
         # cogt
         self.inference_manager.teardown()
