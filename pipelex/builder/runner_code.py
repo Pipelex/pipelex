@@ -383,7 +383,6 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
     # Add custom structure class imports from structures folder
     if custom_classes:
         import_lines.append("")
-        import_lines.append("# Import custom structure classes")
         for class_name in sorted(custom_classes.keys()):
             custom_info = custom_classes[class_name]
             import_lines.append(custom_info.import_statement)

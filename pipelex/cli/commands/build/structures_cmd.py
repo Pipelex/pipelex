@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -6,6 +7,7 @@ from kajson.kajson_manager import KajsonManager
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
+from pipelex.cli.commands.build.app import build_app
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
@@ -13,14 +15,14 @@ from pipelex.core.concepts.structure_generation.generator import StructureGenera
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import validate_bundles_from_directory
+from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.runtime import IntegrationMode
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
-COMMAND = "structures"
+SUB_COMMAND_STRUCTURES = "structures"
 
 
 def generate_structures_from_blueprints(
@@ -179,53 +181,80 @@ def generate_structures_from_blueprints(
     return generated_files
 
 
-async def build_structures_cmd(
-    target_directory: Annotated[
+@build_app.command(SUB_COMMAND_STRUCTURES, help="Generate Python structure files from concept definitions in PLX files")
+def build_structures_command(
+    target: Annotated[
         str,
-        typer.Argument(help="Target directory to scan for PLX files"),
+        typer.Argument(help="Target directory to scan for PLX files, or a specific .plx file"),
     ],
     output_dir: Annotated[
         str | None,
-        typer.Option("--output-dir", "-o", help="Output directory for generated structures (default: structures)"),
+        typer.Option("--output-dir", "-o", help="Output directory for generated structures (default: structures/ in target's directory)"),
     ] = None,
 ) -> None:
     """Generate Python structure files from concept definitions in PLX files."""
-    target_path = Path(target_directory).resolve()
 
-    if not target_path.exists():
-        typer.secho(f"❌ Target directory does not exist: {target_path}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
+    async def _build_structures_cmd():
+        target_path = Path(target).resolve()
 
-    if not target_path.is_dir():
-        typer.secho(f"❌ Target path is not a directory: {target_path}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
+        if not target_path.exists():
+            typer.secho(f"❌ Target does not exist: {target_path}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
 
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        # Determine if target is a file or directory
+        is_plx_file = target_path.is_file() and target_path.suffix == ".plx"
 
-    try:
-        output_directory = Path(output_dir) if output_dir else target_path / "structures"
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
 
-        typer.echo(f"🔍 Validating bundles in: {target_path}")
+        try:
+            if is_plx_file:
+                # Single PLX file: output to parent directory
+                base_dir = target_path.parent
+                output_directory = Path(output_dir) if output_dir else base_dir / "structures"
 
-        # Validate bundles from directory
-        validate_result = await validate_bundles_from_directory(directory=target_path)
+                typer.echo(f"🔍 Validating bundle: {target_path}")
 
-        # Extract blueprints
-        all_blueprints: list[PipelexBundleBlueprint] = validate_result.blueprints
+                # Validate single bundle
+                validate_result = await validate_bundle(plx_file_path=str(target_path))
+                all_blueprints: list[PipelexBundleBlueprint] = validate_result.blueprints
 
-        typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
+                typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
 
-        # Generate structures using the helper function
-        generated_files = generate_structures_from_blueprints(
-            blueprints=all_blueprints,
-            output_directory=output_directory,
-            target_path=target_path,
-        )
+                # Generate structures using the helper function
+                generated_files = generate_structures_from_blueprints(
+                    blueprints=all_blueprints,
+                    output_directory=output_directory,
+                    target_path=base_dir,
+                )
+            else:
+                # Directory: scan for all PLX files
+                if not target_path.is_dir():
+                    typer.secho(f"❌ Target is not a directory or .plx file: {target_path}", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(1)
 
-        if generated_files:
-            typer.secho(f"\n✨ Done! Generated {len(generated_files)} structure(s) in: {output_directory}", fg=typer.colors.GREEN)
-        else:
-            typer.secho("\n✨ Done! No structures to generate.", fg=typer.colors.GREEN)
+                output_directory = Path(output_dir) if output_dir else target_path / "structures"
 
-    finally:
-        pipelex_instance.teardown()
+                typer.echo(f"🔍 Validating bundles in: {target_path}")
+
+                # Validate bundles from directory
+                validate_result = await validate_bundles_from_directory(directory=target_path)
+                all_blueprints = validate_result.blueprints
+
+                typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
+
+                # Generate structures using the helper function
+                generated_files = generate_structures_from_blueprints(
+                    blueprints=all_blueprints,
+                    output_directory=output_directory,
+                    target_path=target_path,
+                )
+
+            if generated_files:
+                typer.secho(f"\n✨ Done! Generated {len(generated_files)} structure(s) in: {output_directory}", fg=typer.colors.GREEN)
+            else:
+                typer.secho("\n✨ Done! No structures to generate.", fg=typer.colors.GREEN)
+
+        finally:
+            pipelex_instance.teardown()
+
+    asyncio.run(_build_structures_cmd())
