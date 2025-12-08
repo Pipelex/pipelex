@@ -1,7 +1,5 @@
 from datetime import datetime
 
-from opentelemetry.trace import Span
-from pydantic import PrivateAttr
 from typing_extensions import override
 
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
@@ -18,17 +16,6 @@ class LLMJob(InferenceJobAbstract):
     job_report: LLMJobReport = LLMJobReport()
 
     applied_job_params: LLMJobParams | None = None
-
-    # Private attribute for OTel span (not serialized, not part of schema)
-    _otel_span: Span | None = PrivateAttr(default=None)
-
-    def get_otel_span(self) -> Span | None:
-        """Get the OTel span attached to this job."""
-        return self._otel_span
-
-    def set_otel_span(self, span: Span | None) -> None:
-        """Set the OTel span for this job."""
-        self._otel_span = span
 
     @property
     def params_desc(self) -> str:

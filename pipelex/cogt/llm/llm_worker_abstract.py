@@ -80,8 +80,8 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Return whether prompt/response content should be captured. Override in subclass."""
         return False
 
-    def _start_otel_span_llm(self, llm_job: LLMJob, output_type: LLMOutputType, output_class_name: str | None = None) -> None:
-        """Start an OTel span and attach it to the llm_job. Safe to call if otel_context is None."""
+    def _start_otel_span_llm(self, llm_job: LLMJob, output_type: LLMOutputType, output_class_name: str | None = None) -> Span | None:
+        """Start an OTel span for the LLM job and return it. Safe to call if otel_context is None."""
         # Get context from job metadata
         metadata = llm_job.job_metadata
         otel_context = metadata.otel_context
@@ -90,12 +90,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Skip if telemetry is disabled (no otel_context)
         if otel_context is None:
             log.dev("[OTel] No otel_context - skipping LLM span")
-            return
+            return None
 
         tracer = self._get_tracer()
         if tracer is None:
             log.dev("[OTel] No tracer available for LLM span")
-            return
+            return None
 
         unit_job_id = metadata.unit_job_id or UNKNOWN_JOB
         pipeline_run_id = metadata.pipeline_run_id
@@ -176,16 +176,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             f"  parent_span_id={parent_span_id:016x}"
         )
 
-        # Store span on job for later retrieval
-        llm_job.set_otel_span(span)
+        return span
 
-    def _get_otel_span(self, llm_job: LLMJob) -> Span | None:
-        """Get the OTel span from the llm_job, if any."""
-        return llm_job.get_otel_span()
-
-    def _end_otel_span_with_completion_string(self, llm_job: LLMJob, completion_string: str) -> None:
-        """End the OTel span, recording usage and status. Safe to call if no span exists."""
-        span = self._get_otel_span(llm_job)
+    def _end_otel_span_with_completion_string(self, span: Span | None, llm_job: LLMJob, completion_string: str) -> None:
+        """End the OTel span, recording usage and status. Safe to call if span is None."""
         if span is None:
             return
 
@@ -213,11 +207,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         span.set_status(Status(StatusCode.OK))
         span.end()
-        llm_job.set_otel_span(None)
 
-    def _end_otel_span_with_completion_object(self, llm_job: LLMJob, completion_object: BaseModel) -> None:
-        """End the OTel span, recording usage and status. Safe to call if no span exists."""
-        span = self._get_otel_span(llm_job)
+    def _end_otel_span_with_completion_object(self, span: Span | None, llm_job: LLMJob, completion_object: BaseModel) -> None:
+        """End the OTel span, recording usage and status. Safe to call if span is None."""
         if span is None:
             return
 
@@ -246,11 +238,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         span.set_status(Status(StatusCode.OK))
         span.end()
-        llm_job.set_otel_span(None)
 
-    def _end_otel_span_with_error(self, llm_job: LLMJob, error: Exception) -> None:
-        """End the OTel span, recording usage and status. Safe to call if no span exists."""
-        span = self._get_otel_span(llm_job)
+    def _end_otel_span_with_error(self, span: Span | None, llm_job: LLMJob, error: Exception) -> None:
+        """End the OTel span, recording the error. Safe to call if span is None."""
         if span is None:
             return
 
@@ -267,7 +257,6 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span.record_exception(error)
         span.set_status(Status(StatusCode.ERROR, str(error)))
         span.end()
-        llm_job.set_otel_span(None)
 
     #########################################################
     # Job lifecycle methods
@@ -285,6 +274,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
     async def _after_text_job(
         self,
+        span: Span | None,
         llm_job: LLMJob,
         result_text: str,
     ):
@@ -294,10 +284,11 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             self.reporting_delegate.report_inference_job(inference_job=llm_job)
 
         # End OTel span with success status and usage data
-        self._end_otel_span_with_completion_string(llm_job=llm_job, completion_string=result_text)
+        self._end_otel_span_with_completion_string(span=span, llm_job=llm_job, completion_string=result_text)
 
     async def _after_object_job(
         self,
+        span: Span | None,
         llm_job: LLMJob,
         result_object: BaseModel,
     ):
@@ -307,7 +298,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             self.reporting_delegate.report_inference_job(inference_job=llm_job)
 
         # End OTel span with success status and usage data
-        self._end_otel_span_with_completion_object(llm_job=llm_job, completion_object=result_object)
+        self._end_otel_span_with_completion_object(span=span, llm_job=llm_job, completion_object=result_object)
 
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks
@@ -326,20 +317,19 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         await self._before_job(llm_job=llm_job)
 
         # Start OTel span after _before_job (which may set model info)
-        self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.TEXT)
+        span = self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.TEXT)
 
-        # Get span and create context manager
-        span = self._get_otel_span(llm_job)
+        # Create context manager from span
         ctx_manager = trace.use_span(span, end_on_exit=False) if span else nullcontext()
 
         try:
             with ctx_manager:
                 text_result = await self._gen_text(llm_job=llm_job)
         except Exception as exc:
-            self._end_otel_span_with_error(llm_job=llm_job, error=exc)
+            self._end_otel_span_with_error(span=span, llm_job=llm_job, error=exc)
             raise
 
-        await self._after_text_job(llm_job=llm_job, result_text=text_result)
+        await self._after_text_job(span=span, llm_job=llm_job, result_text=text_result)
 
         return text_result
 
@@ -364,10 +354,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         await self._before_job(llm_job=llm_job)
 
         # Start OTel span after _before_job (which may set model info)
-        self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.OBJECT, output_class_name=schema.__name__)
+        span = self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.OBJECT, output_class_name=schema.__name__)
 
-        # Get span and create context manager
-        span = self._get_otel_span(llm_job)
+        # Create context manager from span
         ctx_manager = trace.use_span(span, end_on_exit=False) if span else nullcontext()
 
         try:
@@ -379,10 +368,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
                 if hasattr(object_result, "_raw_response"):
                     delattr(object_result, "_raw_response")
         except Exception as exc:
-            self._end_otel_span_with_error(llm_job=llm_job, error=exc)
+            self._end_otel_span_with_error(span=span, llm_job=llm_job, error=exc)
             raise
 
-        await self._after_object_job(llm_job=llm_job, result_object=object_result)
+        await self._after_object_job(span=span, llm_job=llm_job, result_object=object_result)
 
         return object_result
 

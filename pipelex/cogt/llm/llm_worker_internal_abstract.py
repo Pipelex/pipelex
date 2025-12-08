@@ -1,3 +1,4 @@
+from opentelemetry.trace import Span
 from opentelemetry.trace import Tracer as OTelTracer
 from pydantic import BaseModel
 from typing_extensions import override
@@ -141,22 +142,24 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @override
     async def _after_text_job(
         self,
+        span: Span | None,
         llm_job: LLMJob,
         result_text: str,
     ):
         if get_config().cogt.llm_config.is_dump_response_text_enabled:
             dump_response_from_text_gen(response=result_text)
-        await super()._after_text_job(llm_job=llm_job, result_text=result_text)
+        await super()._after_text_job(span=span, llm_job=llm_job, result_text=result_text)
 
     @override
     async def _after_object_job(
         self,
+        span: Span | None,
         llm_job: LLMJob,
         result_object: BaseModel,
     ):
         if get_config().cogt.llm_config.is_dump_response_text_enabled:
             dump_response_from_text_gen(response=result_object)
-        await super()._after_object_job(llm_job=llm_job, result_object=result_object)
+        await super()._after_object_job(span=span, llm_job=llm_job, result_object=result_object)
 
     @override
     def _check_can_perform_job(self, llm_job: LLMJob):
