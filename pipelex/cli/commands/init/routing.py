@@ -26,7 +26,7 @@ from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_p
 def _migrate_profile_to_official_backend(profile: dict[str, Any]) -> None:
     """Migrate a routing profile from legacy pipelex_inference to pipelex_gateway.
 
-    Updates default, fallback_order, and routes in place.
+    Updates default, fallback_order, routes, and optional_routes in place.
 
     Args:
         profile: The profile dict to migrate (modified in place).
@@ -55,6 +55,13 @@ def _migrate_profile_to_official_backend(profile: dict[str, Any]) -> None:
         patterns_to_update = [pattern for pattern, backend in routes.items() if backend == legacy_backend]
         for pattern in patterns_to_update:
             routes[pattern] = official_backend
+
+    # Update optional_routes
+    if "optional_routes" in profile:
+        optional_routes: dict[str, str] = profile["optional_routes"]
+        optional_patterns_to_update = [pattern for pattern, backend in optional_routes.items() if backend == legacy_backend]
+        for pattern in optional_patterns_to_update:
+            optional_routes[pattern] = official_backend
 
 
 def customize_routing_profile(selected_backend_keys: list[str]) -> None:
