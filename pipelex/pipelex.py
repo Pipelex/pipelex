@@ -239,9 +239,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         chosen_telemetry_manager: TelemetryManagerAbstract
         if integration_mode.allows_telemetry() or force_enable_telemetry or pipelex_telemetry_enabled:
             if not telemetry_config:
-                # TODO: RC - substitute env vars
                 telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
-                telemetry_config = load_telemetry_config(path=telemetry_config_path)
+                telemetry_config = load_telemetry_config(path=telemetry_config_path, secrets_provider=secrets_provider)
 
             match telemetry_config.telemetry_mode:
                 case TelemetryMode.OFF:

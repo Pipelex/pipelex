@@ -25,8 +25,8 @@ def hash_gateway_api_key(api_key: str) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
 
 
-class PipelexCredentials:
-    """Hardcoded credentials for Pipelex's internal services."""
+class PipelexServiceConfig:
+    """Hardcoded configuration for Pipelex's services."""
 
     # PostHog host for Pipelex services
     POSTHOG_HOST = "https://eu.i.posthog.com"

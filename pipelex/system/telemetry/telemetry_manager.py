@@ -11,7 +11,7 @@ from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.pipelex_service.pipelex_credentials import (
-    PipelexCredentials,
+    PipelexServiceConfig,
     hash_gateway_api_key,
 )
 from pipelex.system.runtime import IntegrationMode
@@ -62,8 +62,8 @@ class TelemetryManager(TelemetryManagerAbstract):
             if gateway_api_key:
                 self._pipelex_distinct_id = hash_gateway_api_key(gateway_api_key)
             self.pipelex_posthog_client = Posthog(
-                project_api_key=PipelexCredentials.POSTHOG_PROJECT_API_KEY,
-                host=PipelexCredentials.POSTHOG_HOST,
+                project_api_key=PipelexServiceConfig.POSTHOG_PROJECT_API_KEY,
+                host=PipelexServiceConfig.POSTHOG_HOST,
                 disable_geoip=True,  # Don't need geoip for service monitoring
                 debug=self.telemetry_config.verbose_enabled,
                 on_error=self._handle_pipelex_transmission_error,
