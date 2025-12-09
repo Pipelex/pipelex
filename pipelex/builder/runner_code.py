@@ -67,8 +67,8 @@ async def run_my_pipe():
 
 
 if __name__ == "__main__":
-    Pipelex.make()
-    result = asyncio.run(run_my_pipe())
+    with Pipelex.make():
+        result = asyncio.run(run_my_pipe())
 ```
 
 JSON Output Example:
@@ -360,11 +360,10 @@ def generate_runner_code(pipe: PipeAbstract) -> str:
             "",
             "",
             'if __name__ == "__main__":',
-            "    # Initialize Pipelex",
-            "    Pipelex.make()",
-            "",
-            "    # Run the pipeline",
-            f"    result = asyncio.run(run_{pipe_code}())",
+            "    # Initialize Pipelex with context manager for proper cleanup",
+            "    with Pipelex.make():",
+            "        # Run the pipeline",
+            f"        result = asyncio.run(run_{pipe_code}())",
             "",
         ]
     )

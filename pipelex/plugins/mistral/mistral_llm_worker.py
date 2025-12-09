@@ -53,12 +53,13 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
+        job_params = llm_job.applied_job_params or llm_job.job_params
         messages = self.mistral_factory.make_simple_messages(llm_job=llm_job)
         response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
             messages=messages,
             model=self.inference_model.model_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
+            temperature=job_params.temperature,
+            max_tokens=job_params.max_tokens or self.default_max_tokens,
         )
         if not response:
             msg = "Mistral response is None"
@@ -82,13 +83,14 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
+        job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
             response_model=schema,
             messages=messages,
             model=self.inference_model.model_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
+            temperature=job_params.temperature,
+            max_tokens=job_params.max_tokens or self.default_max_tokens,
         )
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)

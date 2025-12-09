@@ -110,7 +110,7 @@ def build_pipe_cmd(
     ] = False,
 ) -> None:
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
 
@@ -240,7 +240,7 @@ def build_pipe_cmd(
         handle_model_availability_error(exc, context=ErrorContext.BUILD)
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @build_app.command(SUB_COMMAND_RUNNER, help="Build the Python code to run a pipe with the necessary inputs")
@@ -379,7 +379,7 @@ def prepare_runner_cmd(
             raise typer.Exit(1) from exc
 
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_RUNNER)
 
@@ -398,7 +398,7 @@ def prepare_runner_cmd(
         handle_model_availability_error(exc, context=ErrorContext.BUILD)
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @build_app.command(SUB_COMMAND_INPUTS, help="Generate example input JSON for a pipe")
@@ -529,7 +529,7 @@ def generate_inputs_cmd(
             raise typer.Exit(1) from exc
 
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
 
@@ -548,7 +548,7 @@ def generate_inputs_cmd(
         handle_model_availability_error(exc, context=ErrorContext.BUILD)
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @build_app.command(SUB_COMMAND_ONE_SHOT_PIPE, help="Developer utility for contributors: deliver pipeline in one shot, without validation loop")
@@ -571,7 +571,7 @@ def build_one_shot_cmd(
     ] = False,
 ) -> None:
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
 
@@ -626,7 +626,7 @@ def build_one_shot_cmd(
         handle_model_availability_error(exc, context=ErrorContext.BUILD)
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @build_app.command(
@@ -660,7 +660,7 @@ def build_partial_cmd(
     ] = False,
 ) -> None:
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
 
@@ -733,4 +733,4 @@ def build_partial_cmd(
         handle_model_availability_error(exc, context=ErrorContext.BUILD)
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()

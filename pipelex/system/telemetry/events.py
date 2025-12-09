@@ -43,7 +43,7 @@ class EventProperty(StrEnum):
 
     # Pipeline
     PIPELINE_RUN_ID = "pipeline_run_id"
-    PIPELINE_EXECUTE_OUTCOME = "pipeline_execute_outcome"
+    PIPELINE_OUTCOME = "outcome"
 
     # Pipe
     PIPE_TYPE = "pipe_type"

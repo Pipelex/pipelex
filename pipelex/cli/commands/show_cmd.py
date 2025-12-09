@@ -201,17 +201,20 @@ def list_pipes_cmd() -> None:
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
 
-    library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+    try:
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
 
-    with get_telemetry_manager().telemetry_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPES}")
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPES}")
 
-        do_list_pipes()
+            do_list_pipes()
+    finally:
+        Pipelex.teardown_if_needed()
 
 
 @show_app.command("pipe", help="Display the detailed definition of a specific pipe")
@@ -229,17 +232,20 @@ def show_pipe_cmd(
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
 
-    library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+    try:
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
 
-    with get_telemetry_manager().telemetry_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
-        do_show_pipe(pipe_code=pipe_code)
+            do_show_pipe(pipe_code=pipe_code)
+    finally:
+        Pipelex.teardown_if_needed()
 
 
 @show_app.command("models", help="List available AI models from a specific backend provider")
@@ -260,7 +266,7 @@ def show_models_cmd(
         pipelex show models anthropic --flat
     """
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
 
@@ -277,7 +283,7 @@ def show_models_cmd(
                 )
             )
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @show_app.command("backends", help="Display backend configurations and active routing profile")
@@ -297,9 +303,12 @@ def show_backends_cmd(
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
 
-    with get_telemetry_manager().telemetry_context():
-        tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-        tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-        tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_BACKENDS}")
+    try:
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_BACKENDS}")
 
-        do_show_backends(show_all=show_all_backends)
+            do_show_backends(show_all=show_all_backends)
+    finally:
+        Pipelex.teardown_if_needed()

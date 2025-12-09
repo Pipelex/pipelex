@@ -1,3 +1,5 @@
+from opentelemetry.trace import Span
+from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex import log
@@ -46,6 +48,29 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @override
     def is_vision_supported(self) -> bool:
         return self.inference_model.is_vision_supported
+
+    #########################################################
+    # OTel helper method overrides
+    #########################################################
+
+    @override
+    def _get_provider_name(self) -> str:
+        """Get the GenAI provider name from the inference model SDK."""
+        return self.inference_model.backend_name
+
+    @override
+    def _get_request_model_name(self) -> str:
+        """Get the model name from the inference model."""
+        return self.inference_model.name
+
+    @override
+    def _get_response_model_name(self) -> str:
+        """Get the response model name from the inference model."""
+        return self.inference_model.model_id
+
+    #########################################################
+    # Job lifecycle overrides
+    #########################################################
 
     @override
     async def _before_job(
@@ -102,14 +127,26 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         return original_params.model_copy(update={"temperature": new_temperature, "max_tokens": new_max_tokens})
 
     @override
-    async def _after_job(
+    async def _after_text_job(
         self,
+        span: Span | None,
         llm_job: LLMJob,
-        result: str,
+        result_text: str,
     ):
         if get_config().cogt.llm_config.is_dump_response_text_enabled:
-            dump_response_from_text_gen(response=result)
-        await super()._after_job(llm_job=llm_job, result=result)
+            dump_response_from_text_gen(response=result_text)
+        await super()._after_text_job(span=span, llm_job=llm_job, result_text=result_text)
+
+    @override
+    async def _after_object_job(
+        self,
+        span: Span | None,
+        llm_job: LLMJob,
+        result_object: BaseModel,
+    ):
+        if get_config().cogt.llm_config.is_dump_response_text_enabled:
+            dump_response_from_text_gen(response=result_object)
+        await super()._after_object_job(span=span, llm_job=llm_job, result_object=result_object)
 
     @override
     def _check_can_perform_job(self, llm_job: LLMJob):

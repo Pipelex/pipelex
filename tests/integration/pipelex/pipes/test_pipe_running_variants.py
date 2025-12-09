@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -27,7 +26,6 @@ class TestPipeRunningVariants:
     async def test_pipe_from_stuff(
         self,
         pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
         topic: str,
         stuff: Stuff,
         pipe_code: str,
@@ -41,7 +39,7 @@ class TestPipeRunningVariants:
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 
@@ -49,7 +47,6 @@ class TestPipeRunningVariants:
     async def test_pipe_no_input(
         self,
         pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
         topic: str,
         pipe_code: str,
         load_test_library: Callable[[list[Path]], None],
@@ -61,7 +58,7 @@ class TestPipeRunningVariants:
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=WorkingMemoryFactory.make_empty(),
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 
@@ -74,7 +71,6 @@ class TestPipeRunningVariants:
     async def test_pipe_batch_no_input(
         self,
         pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
         topic: str,
         pipe_code: str,
         output_multiplicity: VariableMultiplicity | None,
@@ -89,7 +85,7 @@ class TestPipeRunningVariants:
                     pipe_run_mode=pipe_run_mode,
                     output_multiplicity=output_multiplicity,
                 ),
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
                 working_memory=WorkingMemoryFactory.make_empty(),
             ),
         )
@@ -103,7 +99,6 @@ class TestPipeRunningVariants:
     async def test_pipe_infinite_loop(
         self,
         pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
         pipe_code: str,
         exception: type[Exception],
         expected_error_message: str,
@@ -119,7 +114,7 @@ class TestPipeRunningVariants:
                         pipe_stack_limit=6,
                         pipe_run_mode=pipe_run_mode,
                     ),
-                    job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                    job_metadata=JobMetadata(),
                 ),
             )
         pretty_print(exc.value, title="exception")

@@ -40,7 +40,7 @@ class TestPipeSequenceSimple:
 
         pipe = get_required_pipe(pipe_code="simple_text_sequence")
         pipe_output = await pipe.run_pipe(
-            job_metadata=JobMetadata(job_name="test_simple_text_sequence"),
+            job_metadata=JobMetadata(),
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )

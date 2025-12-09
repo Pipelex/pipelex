@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -33,7 +32,6 @@ class TestImageInputs:
 
     async def test_extract_article_from_image(
         self,
-        request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ) -> None:
@@ -51,7 +49,7 @@ class TestImageInputs:
                 pipe=get_required_pipe(pipe_code="extract_article_from_image"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
         if pipe_run_mode != PipeRunMode.DRY:
@@ -67,7 +65,7 @@ class TestImageInputs:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-    async def test_describe_page(self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]) -> None:
+    async def test_describe_page(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         # Create the page content
         # image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
@@ -91,7 +89,7 @@ class TestImageInputs:
                 pipe=get_required_pipe(pipe_code="describe_page"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 
