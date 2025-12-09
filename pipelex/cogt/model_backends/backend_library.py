@@ -142,6 +142,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             # Handle pipelex_gateway specially - use remote config
             backend_config_source: str
             if PipelexBackend.is_gateway_backend(backend_name):
+                if gateway_remote_config is None:
+                    msg = "Pipelex Gateway backend is enabled but remote configuration was not provided"
+                    raise InferenceBackendLibraryError(msg)
                 model_specs_dict, backend_config_source = self._load_gateway_model_specs(
                     gateway_remote_config=gateway_remote_config,
                     backends_dir_path=backends_dir_path,
@@ -202,14 +205,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
     def _load_gateway_model_specs(
         self,
-        gateway_remote_config: GatewayRemoteConfig | None,
+        gateway_remote_config: GatewayRemoteConfig,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
     ) -> tuple[dict[str, Any], str]:
         """Load model specs for pipelex_gateway from remote config.
 
         Args:
-            gateway_remote_config: Remote configuration fetched by Pipelex.setup().
+            gateway_remote_config: Remote configuration for gateway backend.
             backends_dir_path: Path to directory containing local override file.
             substitute_vars_with_provider: Function to substitute variables.
 
@@ -217,12 +220,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             Model specs dictionary merged from remote and local overrides.
 
         Raises:
-            InferenceBackendLibraryError: If remote config is not provided.
+            InferenceModelSpecError: If variable substitution fails.
         """
-        if gateway_remote_config is None:
-            msg = "Pipelex Gateway is enabled but remote configuration was not provided"
-            raise InferenceBackendLibraryError(msg)
-
         # Load local overrides if they exist
         path_to_local_overrides = f"{backends_dir_path}/{PipelexBackend.GATEWAY}.toml"
         local_overrides = load_toml_from_path_if_exists(path=path_to_local_overrides) or {}

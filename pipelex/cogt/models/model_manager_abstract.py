@@ -16,7 +16,6 @@ class ModelManagerAbstract(ABC):
     def teardown(self) -> None:
         pass
 
-    # TODO: RC - remove default to None?
     @abstractmethod
     def setup(
         self,

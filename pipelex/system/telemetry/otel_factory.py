@@ -215,8 +215,7 @@ class OtelFactory:
             A tuple of (Tracer, TracerProvider). The caller should call
             provider.shutdown() during teardown to flush pending spans.
         """
-        # TODO: RC - remove numbering of steps
-        # 1. Define Resource (Identity)
+        # Define Resource (Identity)
         resource = OTelResource.create(
             attributes={
                 service_attributes.SERVICE_NAME: OTelConstants.SERVICE_NAME,
@@ -226,22 +225,22 @@ class OtelFactory:
             }
         )
 
-        # 2. Create Provider
+        # Create Provider
         provider = OTelTracerProvider(resource=resource)
 
-        # 3. Add Custom PostHog Exporter if client provided (custom telemetry)
+        # Add Custom PostHog Exporter if client provided (custom telemetry)
         if custom_posthog_client:
             custom_posthog_exporter = PostHogSpanExporter(posthog_client=custom_posthog_client, distinct_id=user_id)
             provider.add_span_processor(OTelBatchSpanProcessor(custom_posthog_exporter))
             log.verbose("Custom PostHog exporter enabled for custom telemetry")
 
-        # 4. Add Pipelex PostHog Exporter if client provided (mandatory for gateway)
+        # Add Pipelex PostHog Exporter if client provided (mandatory for gateway)
         if pipelex_posthog_client:
             pipelex_posthog_exporter = PostHogSpanExporter(posthog_client=pipelex_posthog_client, distinct_id=pipelex_distinct_id)
             provider.add_span_processor(OTelBatchSpanProcessor(pipelex_posthog_exporter))
             log.verbose("Pipelex PostHog exporter enabled for gateway telemetry")
 
-        # 5. Add Generic OTLP Exporter if endpoint provided
+        # Add Generic OTLP Exporter if endpoint provided
         if otlp_endpoint:
             otlp_exporter = OTLPSpanExporter(
                 endpoint=otlp_endpoint,
@@ -249,13 +248,13 @@ class OtelFactory:
             )
             provider.add_span_processor(OTelBatchSpanProcessor(otlp_exporter))
 
-        # 6. Add Langfuse OTLP Exporter if enabled
+        # Add Langfuse OTLP Exporter if enabled
         if is_langfuse_enabled:
             langfuse_exporter = cls.make_langfuse_exporter(langfuse_base_url)
             provider.add_span_processor(OTelBatchSpanProcessor(langfuse_exporter))
             log.verbose("Langfuse OTLP exporter enabled")
 
-        # 7. Get the Tracer and return both tracer and provider
+        # Get the Tracer and return both tracer and provider
         tracer = provider.get_tracer(
             instrumenting_module_name=OTelConstants.INSTRUMENTING_MODULE_NAME,
             instrumenting_library_version=get_package_version(),
