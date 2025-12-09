@@ -71,11 +71,6 @@ class ModelManager(ModelManagerAbstract):
         deck_blueprint = load_model_deck_blueprint(model_deck_paths=model_deck_paths)
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 
-    # TODO: RC - cleanup
-    # def is_gateway_enabled(self) -> bool:
-    #     """Check if Pipelex Gateway is enabled in the backend library."""
-    #     return PipelexBackend.GATEWAY in self.inference_backend_library.all_enabled_backends()
-
     @override
     def validate_model_deck(self):
         self.get_model_deck().validate_registered_models()
