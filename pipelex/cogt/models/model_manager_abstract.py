@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.cogt.models.model_deck import ModelDeck
-from pipelex.system.pipelex_service.remote_config_provider import GatewayRemoteConfig
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -20,7 +20,7 @@ class ModelManagerAbstract(ABC):
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract,
-        gateway_remote_config: GatewayRemoteConfig | None = None,
+        gateway_model_specs: BackendModelSpecs | None = None,
     ) -> None:
         pass
 

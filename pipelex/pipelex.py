@@ -1,6 +1,6 @@
 import os
 import types
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -23,7 +23,6 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )
@@ -61,11 +60,11 @@ from pipelex.system.pipelex_service.exceptions import (
 )
 from pipelex.system.pipelex_service.pipelex_credentials import PIPELEX_GATEWAY_API_KEY_VAR
 from pipelex.system.pipelex_service.pipelex_service_config import (
+    is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
-from pipelex.system.pipelex_service.remote_config_provider import (
-    GatewayRemoteConfig,
-    fetch_gateway_remote_config,
+from pipelex.system.pipelex_service.remote_config import (
+    fetch_remote_config,
 )
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.singleton import MetaSingleton
@@ -85,12 +84,14 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
-from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.types import Self
 from pipelex.urls import URLs
+
+if TYPE_CHECKING:
+    from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
@@ -101,6 +102,7 @@ class Pipelex(metaclass=MetaSingleton):
         config_dir_path: str | None = None,
         config_cls: type[ConfigRoot] | None = None,
     ) -> None:
+        self.is_pipelex_service_enabled = False  # Will be set during setup
         self.config_dir_path = config_dir_path or ConfigPaths.DEFAULT_CONFIG_DIR_PATH
         self.pipelex_hub = PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
@@ -159,27 +161,6 @@ Note that this command resets all config files to their default values.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 """
 
-    @staticmethod
-    def _is_gateway_enabled_in_backends() -> bool:
-        """Check if pipelex_gateway is enabled in the backends configuration.
-
-        This reads the backends.toml file directly without loading the full backend library.
-
-        Returns:
-            True if pipelex_gateway is enabled, False otherwise.
-        """
-        backends_toml = load_toml_from_path_if_exists(ConfigPaths.BACKENDS_FILE_PATH)
-        if backends_toml is None:
-            return False
-
-        gateway_config = backends_toml.get(PipelexBackend.GATEWAY)
-        if gateway_config is None or not isinstance(gateway_config, dict):
-            return False
-
-        gateway_config_dict = cast("dict[str, Any]", gateway_config)
-        enabled_value = gateway_config_dict.get("enabled", True)
-        return enabled_value is True
-
     def setup(
         self,
         integration_mode: IntegrationMode,
@@ -207,18 +188,26 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # Initialize secrets provider early - needed for gateway check
         secrets_provider = secrets_provider or EnvSecretsProvider()
 
-        # Check if Pipelex Gateway is enabled and validate terms acceptance
-        pipelex_telemetry_enabled = False
-        gateway_api_key: str | None = None
-        gateway_remote_config: GatewayRemoteConfig | None = None
-        is_gateway_enabled = self._is_gateway_enabled_in_backends()
+        # Check if Pipelex Gateway is enabled
+        # for now the only servic is the Pipelex Gateway
+        is_gateway_enabled = is_pipelex_gateway_enabled()
+        self.is_pipelex_service_enabled = is_gateway_enabled
 
-        if is_gateway_enabled:
+        gateway_model_specs: BackendModelSpecs | None = None
+        if self.is_pipelex_service_enabled:
             # Check if terms are accepted
             pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
             if pipelex_service_config is None or not pipelex_service_config.gateway.terms_accepted:
                 raise GatewayTermsNotAcceptedError
+            # Fetch remote configuration
+            remote_config = fetch_remote_config()
+            log.verbose("Successfully fetched Pipelex Gateway remote configuration")
+            gateway_model_specs = remote_config.backend
 
+        pipelex_telemetry_enabled = False
+        gateway_api_key: str | None = None
+
+        if is_gateway_enabled:
             # Get gateway API key for telemetry distinct_id
             gateway_api_key = secrets_provider.get_optional_secret(PIPELEX_GATEWAY_API_KEY_VAR)
             if not gateway_api_key:
@@ -227,10 +216,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # Cannot inject custom TelemetryManager when gateway is enabled
             if telemetry_manager is not None:
                 raise GatewayTelemetryManagerInjectedError
-
-            # Fetch remote configuration (centralized here for future extensibility)
-            gateway_remote_config = fetch_gateway_remote_config()
-            log.verbose("Successfully fetched Pipelex Gateway remote configuration")
 
             pipelex_telemetry_enabled = True
             log.verbose("Pipelex Gateway enabled - mandatory telemetry will be active")
@@ -297,7 +282,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         try:
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
-                gateway_remote_config=gateway_remote_config,
+                gateway_model_specs=gateway_model_specs,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
             msg = self._get_config_file_not_found_error_msg("routing profile library")

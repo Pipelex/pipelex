@@ -5,7 +5,7 @@ import hashlib
 import pytest
 from pydantic import ValidationError
 
-from pipelex.system.pipelex_service.remote_config_provider import GatewayRemoteConfig
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
 
 
 class TestGatewayRemoteConfig:
@@ -19,7 +19,7 @@ class TestGatewayRemoteConfig:
                 "gpt-4o": {"model_id": "gpt-4o-2024-11-20"},
             }
         }
-        config = GatewayRemoteConfig.model_validate(payload)
+        config = RemoteConfig.model_validate(payload)
         assert "defaults" in config.backend
         assert "gpt-4o" in config.backend
 
@@ -27,12 +27,12 @@ class TestGatewayRemoteConfig:
         """Test that missing backend key raises validation error."""
         payload = {"other_key": "value"}
         with pytest.raises(ValidationError):
-            GatewayRemoteConfig.model_validate(payload)
+            RemoteConfig.model_validate(payload)
 
     def test_gateway_remote_config_empty_backend(self) -> None:
         """Test GatewayRemoteConfig with empty backend dict."""
         payload: dict[str, dict[str, str]] = {"backend": {}}
-        config = GatewayRemoteConfig.model_validate(payload)
+        config = RemoteConfig.model_validate(payload)
         assert config.backend == {}
 
 

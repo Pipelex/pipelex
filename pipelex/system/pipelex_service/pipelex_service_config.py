@@ -1,11 +1,14 @@
 """Configuration model for Pipelex managed services."""
 
 import os
+from typing import Any, cast
 
 from pydantic import Field, ValidationError
 
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 PIPELEX_SERVICE_CONFIG_FILE_NAME = "pipelex_service.toml"
@@ -68,3 +71,24 @@ def load_pipelex_service_config_if_exists(config_dir: str) -> PipelexServiceConf
     if not os.path.exists(config_path):
         return None
     return load_pipelex_service_config(config_dir=config_dir)
+
+
+def is_pipelex_gateway_enabled() -> bool:
+    """Check if pipelex_gateway is enabled in the backends configuration.
+
+    This reads the backends.toml file directly without loading the full backend library.
+
+    Returns:
+        True if pipelex_gateway is enabled, False otherwise.
+    """
+    backends_toml = load_toml_from_path_if_exists(ConfigPaths.BACKENDS_FILE_PATH)
+    if backends_toml is None:
+        return False
+
+    gateway_config = backends_toml.get(PipelexBackend.GATEWAY)
+    if gateway_config is None or not isinstance(gateway_config, dict):
+        return False
+
+    gateway_config_dict = cast("dict[str, Any]", gateway_config)
+    enabled_value = gateway_config_dict.get("enabled", True)
+    return enabled_value is True

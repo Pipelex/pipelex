@@ -2,6 +2,7 @@ import copy
 import warnings
 from typing import Any, cast
 
+from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.system.pipelex_service.exceptions import GatewayConfigMergeError, GatewayOverrideWarning
 from pipelex.tools.log.log import log
 
@@ -19,19 +20,19 @@ class GatewayConfigMerger:
     @classmethod
     def merge(
         cls,
-        remote_config: dict[str, Any],
-        local_overrides: dict[str, Any],
+        gateway_model_specs: BackendModelSpecs,
+        local_overrides: BackendModelSpecs,
     ) -> dict[str, Any]:
         """Merge remote config with local overrides.
 
         Args:
-            remote_config: Configuration fetched from PostHog (model_name -> spec dict).
-            local_overrides: Local overrides from pipelex_gateway.toml.
+            gateway_model_specs: Model specs from Pipelex Gateway.
+            local_overrides: Local overrides from local pipelex_gateway.toml.
 
         Returns:
             Merged configuration with allowed overrides applied.
         """
-        result: dict[str, Any] = copy.deepcopy(remote_config)
+        result: dict[str, Any] = copy.deepcopy(gateway_model_specs)
 
         # Warn if defaults section is present (not allowed for local overrides)
         if "defaults" in local_overrides:
@@ -57,7 +58,7 @@ class GatewayConfigMerger:
 
             cls._apply_overrides_to_model(
                 model_name=model_name,
-                remote_model_config=cast("dict[str, Any]", remote_model),
+                gateway_model_specs=cast("dict[str, Any]", remote_model),
                 local_model_config=cast("dict[str, Any]", local_model_config),
             )
 
@@ -67,14 +68,14 @@ class GatewayConfigMerger:
     def _apply_overrides_to_model(
         cls,
         model_name: str,
-        remote_model_config: dict[str, Any],
-        local_model_config: dict[str, Any],
+        gateway_model_specs: BackendModelSpecs,
+        local_model_config: BackendModelSpecs,
     ) -> None:
         """Apply local overrides to a single model configuration.
 
         Args:
             model_name: Name of the model being configured.
-            remote_model_config: Remote configuration for the model (modified in place).
+            gateway_model_specs: Remote model configuration to apply overrides to.
             local_model_config: Local overrides for the model.
         """
         applied_overrides: list[str] = []
@@ -82,9 +83,9 @@ class GatewayConfigMerger:
 
         for key, value in local_model_config.items():
             if key in ALLOWED_OVERRIDE_KEYS:
-                old_value = remote_model_config.get(key)
+                old_value = gateway_model_specs.get(key)
                 if old_value != value:
-                    remote_model_config[key] = value
+                    gateway_model_specs[key] = value
                     applied_overrides.append(f"{key}: {old_value!r} -> {value!r}")
             else:
                 ignored_keys.append(key)

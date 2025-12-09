@@ -4,6 +4,7 @@ from pipelex.cogt.exceptions import ModelManagerError
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
@@ -12,7 +13,6 @@ from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.system.configuration.configs import ConfigPaths
-from pipelex.system.pipelex_service.remote_config_provider import GatewayRemoteConfig
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
@@ -54,13 +54,13 @@ class ModelManager(ModelManagerAbstract):
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract,
-        gateway_remote_config: GatewayRemoteConfig | None = None,
+        gateway_model_specs: BackendModelSpecs | None = None,
     ) -> None:
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_path=ConfigPaths.BACKENDS_FILE_PATH,
             backends_dir_path=ConfigPaths.BACKENDS_DIR_PATH,
-            gateway_remote_config=gateway_remote_config,
+            gateway_model_specs=gateway_model_specs,
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(

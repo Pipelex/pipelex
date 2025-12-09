@@ -17,21 +17,15 @@ from pipelex.tools.log.log import log
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
-class GatewayRemoteConfig(BaseModel):
-    """Structure of the remote configuration JSON.
-
-    The JSON contains:
-    - backend: model specs in the standard backend format
-    """
-
+class RemoteConfig(BaseModel):
     backend: dict[str, Any] = Field(description="Model specifications for Pipelex Gateway (model_name -> spec dict)")
 
 
-def fetch_gateway_remote_config() -> GatewayRemoteConfig:
-    """Fetch gateway configuration.
+def fetch_remote_config() -> RemoteConfig:
+    """Fetch Pipelex Service remote configuration.
 
     Returns:
-        GatewayRemoteConfig containing the backend model specifications.
+        RemoteConfig.
 
     Raises:
         RemoteConfigFetchError: If the HTTP request fails or returns an error.
@@ -63,7 +57,7 @@ def fetch_gateway_remote_config() -> GatewayRemoteConfig:
 
     # Validate the structure
     try:
-        config = GatewayRemoteConfig.model_validate(config_dict)
+        config = RemoteConfig.model_validate(config_dict)
     except ValidationError as exc:
         validation_error_msg = format_pydantic_validation_error(exc)
         msg = f"Remote configuration validation failed: {validation_error_msg}"

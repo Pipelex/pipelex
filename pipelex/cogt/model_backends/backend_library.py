@@ -18,12 +18,12 @@ from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendFactory,
 )
 from pipelex.cogt.model_backends.model_spec_factory import (
+    BackendModelSpecs,
     InferenceModelSpecBlueprint,
     InferenceModelSpecFactory,
 )
 from pipelex.system.environment import get_optional_env
 from pipelex.system.pipelex_service.gateway_config_merger import GatewayConfigMerger
-from pipelex.system.pipelex_service.remote_config_provider import GatewayRemoteConfig
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.dict_utils import (
     apply_to_strings_recursive,
@@ -63,7 +63,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backends_library_path: str,
         backends_dir_path: str,
         include_disabled: bool = False,
-        gateway_remote_config: GatewayRemoteConfig | None = None,
+        gateway_model_specs: BackendModelSpecs | None = None,
     ):
         """Load backend configurations from TOML files.
 
@@ -74,7 +74,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backends_library_path: Path to backends.toml.
             backends_dir_path: Path to directory containing per-backend TOML files.
             include_disabled: Whether to include disabled backends.
-            gateway_remote_config: Remote configuration for Pipelex Gateway.
+            gateway_model_specs: Remote model specs for Pipelex Gateway backend.
         """
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
@@ -142,11 +142,11 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             # Handle pipelex_gateway specially - use remote config
             backend_config_source: str
             if PipelexBackend.is_gateway_backend(backend_name):
-                if gateway_remote_config is None:
-                    msg = "Pipelex Gateway backend is enabled but remote configuration was not provided"
+                if gateway_model_specs is None:
+                    msg = "Pipelex Gateway backend is enabled but remote model specs were not provided"
                     raise InferenceBackendLibraryError(msg)
                 model_specs_dict, backend_config_source = self._load_gateway_model_specs(
-                    gateway_remote_config=gateway_remote_config,
+                    gateway_model_specs=gateway_model_specs,
                     backends_dir_path=backends_dir_path,
                     substitute_vars_with_provider=substitute_vars_with_provider,
                 )
@@ -205,14 +205,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
     def _load_gateway_model_specs(
         self,
-        gateway_remote_config: GatewayRemoteConfig,
+        gateway_model_specs: BackendModelSpecs,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
-    ) -> tuple[dict[str, Any], str]:
+    ) -> tuple[BackendModelSpecs, str]:
         """Load model specs for pipelex_gateway from remote config.
 
         Args:
-            gateway_remote_config: Remote configuration for gateway backend.
+            gateway_model_specs: dict of the model specs from the Pipelex Gateway.
             backends_dir_path: Path to directory containing local override file.
             substitute_vars_with_provider: Function to substitute variables.
 
@@ -228,7 +228,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         # Merge remote config with local overrides
         model_specs_dict = GatewayConfigMerger.merge(
-            remote_config=gateway_remote_config.backend,
+            gateway_model_specs=gateway_model_specs,
             local_overrides=local_overrides,
         )
 
@@ -246,7 +246,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backend_name: str,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
-    ) -> tuple[dict[str, Any], str]:
+    ) -> tuple[BackendModelSpecs, str]:
         """Load model specs from local TOML file.
 
         Args:

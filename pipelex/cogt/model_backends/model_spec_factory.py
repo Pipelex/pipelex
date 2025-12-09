@@ -11,6 +11,8 @@ from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
 
+BackendModelSpecs = dict[str, Any]
+
 
 class InferenceModelSpecBlueprint(ConfigModel):
     enabled: bool = True
