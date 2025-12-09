@@ -10,7 +10,7 @@ from pipelex.cli.commands.init.ui.backends_ui import (
     display_selected_backends,
     get_backend_options_from_toml,
     get_currently_enabled_backends,
-    prompt_backend_indices,
+    prompt_backend_select,
 )
 from pipelex.cli.commands.init.ui.gateway_ui import (
     display_gateway_accepted_message,
@@ -114,36 +114,6 @@ def update_gateway_terms_acceptance(accepted: bool) -> None:
     save_toml_to_path(toml_doc, service_config_path)
 
 
-def _find_backend_index(backend_key: str, backend_options: list[tuple[str, str]]) -> int | None:
-    """Find the index of a backend in the options list.
-
-    Args:
-        backend_key: The backend key to find.
-        backend_options: List of backend options.
-
-    Returns:
-        Index of the backend or None if not found.
-    """
-    for index, (key, _) in enumerate(backend_options):
-        if key == backend_key:
-            return index
-    return None
-
-
-def _is_gateway_selected(selected_indices: list[int], backend_options: list[tuple[str, str]]) -> bool:
-    """Check if pipelex_gateway is in the selected backends.
-
-    Args:
-        selected_indices: List of selected backend indices.
-        backend_options: List of available backend options.
-
-    Returns:
-        True if pipelex_gateway is selected.
-    """
-    gateway_index = _find_backend_index(PipelexBackend.GATEWAY, backend_options)
-    return gateway_index is not None and gateway_index in selected_indices
-
-
 def customize_backends_config(is_first_time_setup: bool = False) -> None:
     """Interactively customize which inference backends are enabled in backends.toml.
 
@@ -177,11 +147,15 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
 
         # UI: Display panel and get user selection
         console.print(build_backend_selection_panel(backend_options, currently_enabled, is_first_time_setup))
-        selected_indices = prompt_backend_indices(console, backend_options, currently_enabled, is_first_time_setup)
+        selected_indices, selected_backends = prompt_backend_select(
+            console=console,
+            backend_options=backend_options,
+            currently_enabled=currently_enabled,
+            is_first_time_setup=is_first_time_setup,
+        )
 
-        # TODO: RC - replace brtille solution by returning the selected backends from prompt_backend_indices() above
         # Check if pipelex_gateway is selected and handle terms acceptance
-        if _is_gateway_selected(selected_indices, backend_options):
+        if PipelexBackend.GATEWAY in selected_backends:
             gateway_accepted = prompt_gateway_acceptance(console)
 
             if gateway_accepted:
@@ -192,9 +166,7 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
                 update_gateway_terms_acceptance(accepted=False)
 
                 # Remove pipelex_gateway from selected indices
-                gateway_index = _find_backend_index(PipelexBackend.GATEWAY, backend_options)
-                if gateway_index is not None:
-                    selected_indices = [idx for idx in selected_indices if idx != gateway_index]
+                selected_indices = [idx for idx in selected_indices if backend_options[idx][0] != PipelexBackend.GATEWAY]
 
         # Business logic: Update TOML
         update_backends_in_toml(toml_doc, selected_indices, backend_options)
