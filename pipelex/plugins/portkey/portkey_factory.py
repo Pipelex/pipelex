@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from portkey_ai import (
-    PORTKEY_GATEWAY_URL,  # type: ignore[reportUnknownVariableType]
-)
+from portkey_ai import PORTKEY_GATEWAY_URL
 
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.openai.openai_constants import OpenAIBodyKey

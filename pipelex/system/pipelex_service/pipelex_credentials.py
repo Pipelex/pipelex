@@ -36,7 +36,7 @@ class PipelexCredentials:
     POSTHOG_PROJECT_API_KEY = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
 
     # Public URL for remote gateway configuration (JSON file on S3)
-    REMOTE_CONFIG_URL = "https://pipelex-config-1.s3.amazonaws.com/pipelex_remote_config.json"
+    REMOTE_CONFIG_URL = "https://pipelex-config.s3.amazonaws.com/pipelex_remote_config.json"
 
 
 # Privacy flags for Pipelex telemetry
