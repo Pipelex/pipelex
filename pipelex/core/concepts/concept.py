@@ -9,6 +9,7 @@ from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_code, validate_concept_string
+from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
@@ -62,6 +63,13 @@ class Concept(BaseModel):
     @property
     def concept_string(self) -> str:
         return f"{self.domain}.{self.code}"
+
+    @property
+    def simple_concept_string(self) -> str:
+        if SpecialDomain.is_native(domain=self.domain):
+            return self.code
+        else:
+            return self.concept_string
 
     @classmethod
     def sentence_from_concept(cls, concept: "Concept") -> str:

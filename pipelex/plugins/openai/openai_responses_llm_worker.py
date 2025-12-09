@@ -5,13 +5,14 @@ from typing import TYPE_CHECKING, Any, cast
 import instructor
 import openai
 from instructor.exceptions import InstructorRetryException
-from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError, omit
+from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.config import get_config
+from pipelex.system.telemetry.otel_constants import LLMOutputType
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -71,10 +72,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
         try:
-            extra_headers: dict[str, str] = {}
-            if self.inference_model.extra_headers:
-                extra_headers = self.inference_model.extra_headers.copy()
-            extra_headers.update(self.openai_responses_factory.make_extra_headers(llm_job=llm_job, output_desc="Text"))
+            extra_headers, extra_body = self.openai_responses_factory.make_extras(
+                inference_model=self.inference_model, llm_job=llm_job, output_desc=LLMOutputType.TEXT
+            )
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
@@ -82,6 +82,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 max_output_tokens=job_params.max_tokens or omit,
                 input=input_items,
                 extra_headers=extra_headers,
+                extra_body=extra_body,
             )
         except NotFoundError as not_found_error:
             msg = (
@@ -94,6 +95,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         except BadRequestError as bad_request_error:
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
+        except AuthenticationError as authentication_error:
+            msg = f"Authentication error: {authentication_error}"
+            raise LLMCompletionError(msg) from authentication_error
 
         if not response.output_text:
             msg = f"OpenAI Responses message content is empty: {response}\nmodel: {self.inference_model.desc}"
@@ -114,12 +118,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             if not hasattr(self.instructor_for_objects, "responses"):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
                 raise LLMCompletionError(msg)
-
-            extra_headers: dict[str, str] = {}
-            if self.inference_model.extra_headers:
-                extra_headers = self.inference_model.extra_headers.copy()
-            extra_headers.update(self.openai_responses_factory.make_extra_headers(llm_job=llm_job, output_desc=schema.__name__))
-
+            extra_headers, extra_body = self.openai_responses_factory.make_extras(
+                inference_model=self.inference_model, llm_job=llm_job, output_desc=schema.__name__
+            )
             input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
             result_object, completion = await self.instructor_for_objects.responses.create_with_completion(  # pyright: ignore[reportUnknownMemberType]
                 input=cast("list[ChatCompletionMessageParam]", input_items),
@@ -130,6 +131,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 temperature=job_params.temperature,
                 max_output_tokens=job_params.max_tokens or NOT_GIVEN,
                 extra_headers=extra_headers,
+                extra_body=extra_body,
             )  # type: ignore[arg-type,misc]
         except InstructorRetryException as exc:
             msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
@@ -140,6 +142,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         except BadRequestError as bad_request_error:
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
+        except AuthenticationError as authentication_error:
+            msg = f"Authentication error: {authentication_error}"
+            raise LLMCompletionError(msg) from authentication_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and hasattr(completion, "usage"):
             completion_usage = completion.usage

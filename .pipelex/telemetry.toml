@@ -18,4 +18,13 @@ redact = ["prompt", "system_prompt", "response", "file_path", "url"]
 geoip_enabled = true
 dry_mode_enabled = false
 verbose_enabled = false
-user_id = ""
+# user_id = "set_if_mode_is_identified"
+ai_tracing_enabled = false      # Enable OpenTelemetry tracing for AI operations
+capture_content_enabled = false # Controls gen_ai.prompt/completion content capture for OTel
+# capture_content_max_length = 1000                                  # Max length for captured content (omit for unlimited)
+capture_pipe_codes_enabled = false        # Controls whether pipe codes appear in span names/attributes
+capture_output_class_name_enabled = false # Controls whether output class names appear in span names/attributes
+langfuse_enabled = false                  # Langfuse Integration (requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY env vars)
+# langfuse_base_url = "https://cloud.langfuse.com"  # Override for self-hosted Langfuse
+# otlp_endpoint = "https://..."
+# otlp_headers = { "Authorization" = "Bearer ..." }

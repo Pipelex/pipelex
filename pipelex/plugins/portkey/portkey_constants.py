@@ -6,6 +6,7 @@ class PortkeyHeaderKey(StrEnum):
     SPAN_ID = "x-portkey-span-id"
     SPAN_NAME = "x-portkey-span-name"
     CONFIG = "x-portkey-config"
+    PROVIDER = "x-portkey-provider"
 
 
 class PortkeyEnvVar(StrEnum):

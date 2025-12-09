@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 from pytest import MonkeyPatch
 
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_console
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
@@ -18,7 +17,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_to
 # ================================================================================================
 
 ALL_BACKENDS = [
-    PipelexBackend.GATEWAY,
+    "pipelex_gateway",
     "anthropic",
     "azure_openai",
     "bedrock",
@@ -29,6 +28,8 @@ ALL_BACKENDS = [
     "mistral",
     "ollama",
     "openai",
+    "portkey",
+    "scaleway",
     "vertexai",
     "xai",
     "internal",

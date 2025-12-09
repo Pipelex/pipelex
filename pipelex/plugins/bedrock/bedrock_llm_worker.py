@@ -46,6 +46,7 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
+        job_params = llm_job.applied_job_params or llm_job.job_params
         message = BedrockFactory.make_simple_message(llm_job=llm_job)
 
         log.verbose(self.inference_model.model_id)
@@ -54,8 +55,8 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
             messages=message.to_dict_list(),
             system_text=llm_job.llm_prompt.system_text,
             model=self.inference_model.model_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
+            temperature=job_params.temperature,
+            max_tokens=job_params.max_tokens or self.default_max_tokens,
         )
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and nb_tokens_by_category:
             llm_tokens_usage.nb_tokens_by_category = nb_tokens_by_category

@@ -26,7 +26,7 @@ active = "pipelex_gateway_first"
 # =========================================================================================
 
 [profiles.pipelex_gateway_first]
-description = "Use Pipelex Inference backend for all its supported models"
+description = "Use Pipelex Gateway backend for all its supported models"
 default = "pipelex_gateway"
 fallback_order = [
     "pipelex_gateway",
@@ -93,6 +93,14 @@ default = "ollama"
 [profiles.all_openai]
 description = "Use OpenAI backend for all its supported models"
 default = "openai"
+
+[profiles.all_portkey]
+description = "Use Portkey backend for all its supported models"
+default = "portkey"
+
+[profiles.all_scaleway]
+description = "Use Scaleway backend for all its supported models"
+default = "scaleway"
 
 [profiles.all_xai]
 description = "Use xAI backend for all its supported models"

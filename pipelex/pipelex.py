@@ -1,10 +1,10 @@
 import os
+import types
 from typing import Any, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
-from kajson.singleton import MetaSingleton
 from pydantic import ValidationError
 
 from pipelex import log
@@ -23,7 +23,9 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
-from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
+from pipelex.cogt.model_backends.backend_credentials import (
+    BackendCredentialsErrorMsgFactory,
+)
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
@@ -51,24 +53,23 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
+from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_config import (
     TELEMETRY_CONFIG_FILE_NAME,
     TelemetryConfig,
     TelemetryMode,
+    load_telemetry_config,
 )
-from pipelex.system.telemetry.telemetry_manager import (
-    DO_NOT_TRACK_ENV_VAR_KEY,
-    TelemetryManager,
-)
+from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
     TelemetryManagerNoOp,
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
-from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -209,7 +210,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             backend_name = credentials_exc.backend_name
             var_name = credentials_exc.key_name
             error_msg = BackendCredentialsErrorMsgFactory.make_one_variable_missing_error_msg(
-                secrets_provider=secrets_provider, backend_name=backend_name, var_name=var_name
+                secrets_provider=secrets_provider,
+                backend_name=backend_name,
+                var_name=var_name,
             )
             raise PipelexSetupError(error_msg) from credentials_exc
         self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
@@ -244,26 +247,27 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
+        chosen_telemetry_manager: TelemetryManagerAbstract
         if integration_mode.allows_telemetry() or force_enable_telemetry:
             if not telemetry_config:
-                config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
-                telemetry_config_toml = load_toml_from_path(path=config_path)
-                telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
+                telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
+                telemetry_config = load_telemetry_config(path=telemetry_config_path)
 
             match telemetry_config.telemetry_mode:
                 case TelemetryMode.OFF:
-                    self.telemetry_manager = TelemetryManagerNoOp()
+                    chosen_telemetry_manager = TelemetryManagerNoOp()
                     log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
                 case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
-                    if telemetry_config.respect_dnt and is_env_var_truthy(DO_NOT_TRACK_ENV_VAR_KEY):
-                        self.telemetry_manager = TelemetryManagerNoOp()
-                        log.debug(f"Telemetry is disabled by env var '{DO_NOT_TRACK_ENV_VAR_KEY}'")
+                    if telemetry_config.respect_dnt and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
+                        chosen_telemetry_manager = TelemetryManagerNoOp()
+                        log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
                     else:
-                        self.telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
+                        chosen_telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
         else:
-            self.telemetry_manager = TelemetryManagerNoOp()
+            chosen_telemetry_manager = TelemetryManagerNoOp()
             log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
 
+        self.telemetry_manager = chosen_telemetry_manager
         self.telemetry_manager.setup(integration_mode=integration_mode)
 
         self.pipelex_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
@@ -305,6 +309,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:
             del MetaSingleton.instances[self.__class__]
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None) -> None:
+        self.teardown()
 
     @classmethod
     def make(
@@ -396,3 +406,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = "Pipelex is not initialized"
             raise RuntimeError(msg)
         return cast("Self", instance)
+
+    @classmethod
+    def teardown_if_needed(cls) -> None:
+        """Teardown the Pipelex singleton instance if it exists.
+
+        This is useful for cleanup in finally blocks where the instance
+        may or may not have been successfully created.
+        """
+        instance = cls.get_optional_instance()
+        if instance is not None:
+            instance.teardown()

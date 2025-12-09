@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from openai.types.responses import ResponseInputImageParam
 from typing_extensions import override
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     )
 
     from pipelex.cogt.llm.llm_job import LLMJob
+    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 
 class OpenAIResponsesFactory(PluginFactoryAbstract):
@@ -75,5 +76,5 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
         return nb_tokens_by_category
 
     @override
-    def make_extra_headers(self, llm_job: LLMJob, output_desc: str) -> dict[str, str]:
-        return {}
+    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
+        return inference_model.extra_headers or {}, {}

@@ -43,6 +43,8 @@ fast-img-gen = "fast-lightning-sdxl"
 ####################################################################################################
 
 [waterfalls]
+
+# --- Waterfalls for LLMs ---------------------------------------------------------------------
 smart_llm = [
     "claude-4.5-opus",
     "claude-4.5-sonnet",
@@ -104,6 +106,10 @@ cheap_llm_for_creativity = [
     "gpt-4o-mini",
     "claude-4.5-haiku",
 ]
+
+# --- Waterfalls for Extracts ---------------------------------------------------------------------
+pdf_text_extractor = ["mistral-ocr", "pypdfium2-extract-text"]
+image_text_extractor = ["mistral-ocr"]
 
 ####################################################################################################
 # LLM Presets

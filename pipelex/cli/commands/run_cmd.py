@@ -197,7 +197,7 @@ def run_cmd(
 
     # Initialize Pipelex BEFORE telemetry context to ensure proper setup
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        Pipelex.make(integration_mode=IntegrationMode.CLI)
     except ModelDeckPresetValidatonError as model_deck_error:
         handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
 
@@ -225,4 +225,4 @@ def run_cmd(
         raise typer.Exit(1) from exc
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()

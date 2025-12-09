@@ -27,9 +27,9 @@ def routing_profile_setup(request: pytest.FixtureRequest):  # noqa: ARG001  # py
 
 @pytest.fixture(scope="module", autouse=True)
 def reset_pipelex_config_fixture(routing_profile_setup: str | None):  # noqa: ARG001
-    pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.PYTEST)
+    Pipelex.make(integration_mode=IntegrationMode.PYTEST)
     yield
-    pipelex_instance.teardown()
+    Pipelex.teardown_if_needed()
 
 
 @pytest.fixture(scope="class")

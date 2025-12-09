@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Callable, cast
+from typing import Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -23,7 +22,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeParallelSimple:
-    async def test_parallel_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_parallel_text_analysis(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test PipeParallel running three text analysis pipes in parallel."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
         # Create PipeParallel instance - pipes are loaded from PLX files
@@ -78,7 +77,7 @@ class TestPipeParallelSimple:
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             working_memory=working_memory,
             output_name="parallel_results",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -140,9 +139,7 @@ class TestPipeParallelSimple:
         assert isinstance(final_result.content, TextContent)
         assert final_result.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
 
-    async def test_parallel_short_text_analysis(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
-    ):
+    async def test_parallel_short_text_analysis(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test PipeParallel with shorter text to verify consistent behavior."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
         # Create PipeParallel instance
@@ -175,7 +172,7 @@ class TestPipeParallelSimple:
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             working_memory=working_memory,
             output_name="parallel_results",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

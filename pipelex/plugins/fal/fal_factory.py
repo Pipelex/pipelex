@@ -1,7 +1,9 @@
-from typing import Any
+from typing import Any, cast
+
+from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenGeneratedTypeError, ImgGenParameterError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
@@ -138,56 +140,36 @@ class FalFactory:
 
         return args_dict
 
-    @staticmethod
-    def make_generated_image(fal_result: dict[str, Any]) -> GeneratedImage:
-        images = fal_result["images"]
-        fal_image_dict = images[0]
-        image_url = fal_image_dict["url"]
-        if not isinstance(image_url, str):
-            msg = "Image url is not a string"
-            raise ImgGenGeneratedTypeError(msg)
-        # TODO: if the url is actual image data, send it to cloud storage?
+    @classmethod
+    def make_generated_image(cls, fal_result: dict[str, Any]) -> GeneratedImage:
+        generated_image_list = cls.make_generated_image_list(fal_result=fal_result)
+        if len(generated_image_list) != 1:
+            msg = f"Expected 1 image, got {len(generated_image_list)}"
+            raise ImgGenGenerationError(msg)
+        return generated_image_list[0]
 
-        width = fal_image_dict["width"]
-        if not isinstance(width, int):
-            msg = "Image width is not an integer"
-            raise ImgGenGeneratedTypeError(msg)
-        height = fal_image_dict["height"]
-        if not isinstance(height, int):
-            msg = "Image height is not an integer"
-            raise ImgGenGeneratedTypeError(msg)
+    @classmethod
+    def make_generated_image_list(cls, fal_result: dict[str, Any]) -> list[GeneratedImage]:
+        return cls._unpack_fal_result(fal_result=fal_result)
 
-        return GeneratedImage(
-            url=image_url,
-            width=width,
-            height=height,
-        )
-
-    @staticmethod
-    def make_generated_image_list(fal_result: dict[str, Any]) -> list[GeneratedImage]:
-        fal_image_dicts = fal_result["images"]
-
+    @classmethod
+    def _unpack_fal_result(cls, fal_result: dict[str, Any]) -> list[GeneratedImage]:
         generated_image_list: list[GeneratedImage] = []
-        for fal_image_dict in fal_image_dicts:
-            image_url = fal_image_dict["url"]
-            if not isinstance(image_url, str):
-                msg = "Image url is not a string"
-                raise ImgGenGeneratedTypeError(msg)
-
-            width = fal_image_dict["width"]
-            if not isinstance(width, int):
-                msg = "Image width is not an integer"
-                raise ImgGenGeneratedTypeError(msg)
-            height = fal_image_dict["height"]
-            if not isinstance(height, int):
-                msg = "Image height is not an integer"
-                raise ImgGenGeneratedTypeError(msg)
-
-            generated_image = GeneratedImage(
-                url=image_url,
-                width=width,
-                height=height,
-            )
-            generated_image_list.append(generated_image)
+        try:
+            image_dicts = fal_result["images"]
+            if not isinstance(image_dicts, list):
+                msg = f"Expected 'images' to be a list, got {type(image_dicts).__name__}"
+                raise ImgGenGenerationError(msg)
+            image_dicts = cast("list[dict[str, Any]]", image_dicts)
+            for image_dict in image_dicts:
+                generated_image = GeneratedImage(
+                    url=image_dict["url"],
+                    width=image_dict["width"],
+                    height=image_dict["height"],
+                )
+                generated_image_list.append(generated_image)
+        except (KeyError, TypeError, ValidationError) as exc:
+            msg = f"Failed to parse image data from fal response: {exc}"
+            raise ImgGenGenerationError(msg) from exc
 
         return generated_image_list

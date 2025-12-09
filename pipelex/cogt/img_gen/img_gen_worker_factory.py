@@ -1,11 +1,12 @@
+import importlib.util
+
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.hub import get_models_manager, get_plugin_manager, get_secret
+from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
-from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
 
 
 class FalCredentialsError(CredentialsError):
@@ -13,8 +14,9 @@ class FalCredentialsError(CredentialsError):
 
 
 class ImgGenWorkerFactory:
+    @classmethod
     def make_img_gen_worker(
-        self,
+        cls,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ImgGenWorkerAbstract:
@@ -24,15 +26,7 @@ class ImgGenWorkerFactory:
         img_gen_worker: ImgGenWorkerAbstract
         match plugin.sdk:
             case "fal":
-                try:
-                    fal_api_key = get_secret(secret_id="FAL_API_KEY")
-                except SecretNotFoundError as exc:
-                    msg = "FAL_API_KEY not found"
-                    raise FalCredentialsError(msg) from exc
-
-                try:
-                    from fal_client import AsyncClient as FalAsyncClient  # noqa: PLC0415
-                except ImportError as exc:
+                if importlib.util.find_spec("fal_client") is None:
                     lib_name = "fal-client"
                     lib_extra_name = "fal"
                     msg = "The fal-client SDK is required in order to use FAL models (generation of images)."
@@ -40,13 +34,15 @@ class ImgGenWorkerFactory:
                         lib_name,
                         lib_extra_name,
                         msg,
-                    ) from exc
+                    )
+
+                from fal_client import AsyncClient as FalAsyncClient  # noqa: PLC0415
 
                 from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
-                    sdk_instance=FalAsyncClient(key=fal_api_key),
+                    sdk_instance=FalAsyncClient(key=backend.api_key),
                 )
 
                 img_gen_worker = FalImgGenWorker(

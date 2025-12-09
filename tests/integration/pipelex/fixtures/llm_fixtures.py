@@ -70,6 +70,7 @@ DEEPSEEK_MODELS = [
     "deepseek-chat",
     "deepseek-r1",
     "deepseek-v3.1",
+    "deepseek-r1-distill-llama-70b",
 ]
 
 # --- Google Models (Gemini) ---------------------------------------------------------------------
@@ -92,6 +93,7 @@ GROQ_MODELS = [
 META_MODELS = [
     "bedrock-meta-llama-3-3-70b-instruct",
     "llama-3.1-8b-instant",
+    "llama-3.1-8b-instruct",
     "llama-3.2-11b-vision-instruct",
     "llama-3.3-70b-instruct",
     "llama-3.3-70b-instruct-free",
@@ -158,6 +160,8 @@ QWEN_MODELS = [
     "qwen3-32b",
     "qwen2.5-vl-72b-instruct",
     "qwen3-vl-235b-a22b",
+    "qwen3-235b-a22b-instruct-2507",
+    "qwen3-coder-30b-a3b-instruct",
 ]
 
 # --- XAI Models (Grok) --------------------------------------------------------------------------
