@@ -140,9 +140,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
 
             # Handle pipelex_gateway specially - use remote config
-            # TODO: RC - match/case
             backend_config_source: str
-            if backend_name == PipelexBackend.GATEWAY:
+            if PipelexBackend.is_gateway_backend(backend_name):
                 model_specs_dict, backend_config_source = self._load_gateway_model_specs(
                     gateway_remote_config=gateway_remote_config,
                     backends_dir_path=backends_dir_path,

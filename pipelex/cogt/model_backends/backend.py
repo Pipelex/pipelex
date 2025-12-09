@@ -24,15 +24,7 @@ class PipelexBackend(StrEnum):
                 return "Pipelex Inference (deprecated)"
 
     @classmethod
-    def official_backend(cls) -> "PipelexBackend":
-        return cls.GATEWAY
-
-    @classmethod
-    def official_backend_display_name(cls) -> str:
-        return cls.official_backend().display_name
-
-    @classmethod
-    def is_official_backend(cls, backend_name: str) -> bool:
+    def is_gateway_backend(cls, backend_name: str) -> bool:
         try:
             the_backend = cls(backend_name)
         except ValueError:

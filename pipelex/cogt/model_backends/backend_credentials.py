@@ -61,8 +61,8 @@ class BackendCredentialsErrorMsgFactory:
 
         # Add pitch for Pipelex Gateway and BYOK (Bring Your Own Keys)
         error_msg += (
-            f"\n💡 Tip: Get a free {PipelexBackend.official_backend_display_name()} API key!\n"
-            f"   With {PipelexBackend.official_backend_display_name()}, you get unified access to multiple AI providers\n"
+            f"\n💡 Tip: Get a free {PipelexBackend.GATEWAY.display_name} API key!\n"
+            f"   With {PipelexBackend.GATEWAY.display_name}, you get unified access to multiple AI providers\n"
             "   (OpenAI, Anthropic, Google, Mistral, etc.) with a single API key.\n"
             "   Check the project's 'README.md' for details on obtaining your key.\n"
             "\n🔑 Or bring your own keys:\n"
@@ -143,8 +143,8 @@ class BackendCredentialsErrorMsgFactory:
 
         # Add pitch for Pipelex Gateway and BYOK (Bring Your Own Keys)
         error_msg += (
-            f"\n💡 Tip: Get a free {PipelexBackend.official_backend_display_name()} API key!\n"
-            f"   With {PipelexBackend.official_backend_display_name()}, you get unified access to multiple AI providers\n"
+            f"\n💡 Tip: Get a free {PipelexBackend.GATEWAY.display_name} API key!\n"
+            f"   With {PipelexBackend.GATEWAY.display_name}, you get unified access to multiple AI providers\n"
             "   (OpenAI, Anthropic, Google, Mistral, etc.) with a single API key.\n"
             "   Check the project's 'README.md' for details on obtaining your key.\n"
             "\n🔑 Or bring your own keys:\n"
