@@ -128,7 +128,7 @@ class Concept(BaseModel):
             log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
         return False
 
-    def get_structure_class(self) -> type[StuffContent] | None:
+    def get_structure_class(self) -> type[StuffContent]:
         """Get the structure class for this concept.
 
         Returns:
@@ -136,9 +136,8 @@ class Concept(BaseModel):
         """
         structure_class = KajsonManager.get_class_registry().get_class(name=self.structure_class_name)
         if structure_class is None:
-            return None
-        if not issubclass(structure_class, StuffContent):
-            return None
+            msg = f"Concept class '{self.structure_class_name}' not found"
+            raise ConceptValueError(msg)
         return structure_class
 
     def search_for_nested_image_fields_in_structure_class(self) -> list[str]:
@@ -166,9 +165,6 @@ class Concept(BaseModel):
             - For Python: content is a class instantiation string (wrapping handled by caller)
         """
         structure_class = self.get_structure_class()
-        if structure_class is None:
-            content: Any = [{}] if is_multiple else {}
-            return {"concept": self.concept_string, "content": content}, set()
 
         generator = ConceptRepresentationGenerator(output_format)
         # For inputs, we only want required fields (not optional ones)

@@ -143,9 +143,6 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
         Returns:
             Dictionary with JSON representations for each input
         """
-        if self.nb_inputs == 0:
-            return {}
-
         json_inputs: dict[str, Any] = {}
         for var_name, input_req in self.root.items():
             is_multiple = self._is_multiple(input_req.multiplicity)

@@ -305,6 +305,22 @@ class ConceptRepresentationGenerator:
 
         Returns:
             Python code string representation
+
+        Examples:
+            >>> self._format_python_value("hello")
+            '"hello"'
+            >>> self._format_python_value("MyClass(arg=value)")  # Already a Python expression
+            'MyClass(arg=value)'
+            >>> self._format_python_value(True)
+            'True'
+            >>> self._format_python_value(42)
+            '42'
+            >>> self._format_python_value(3.14)
+            '3.14'
+            >>> self._format_python_value({"key": "val"})
+            '{"key": "val"}'
+            >>> self._format_python_value([1, 2, 3])
+            '[1, 2, 3]'
         """
         if isinstance(value, str):
             # Check if it's already a Python expression (class instantiation)

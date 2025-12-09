@@ -86,6 +86,9 @@ class NativeConceptCode(StrEnum):
         Returns:
             The structure class, or None if not found
         """
+        if not cls.is_native_structure_class(class_name):
+            msg = f"Class name '{class_name}' is not a native structure class"
+            raise NativeConceptDefinitionError(msg)
         for native_code in cls:
             if native_code.structure_class_name == class_name:
                 return native_code.structure_class

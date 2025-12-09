@@ -133,8 +133,6 @@ def _collect_imports_for_inputs(inputs: InputRequirements) -> tuple[set[str], di
     for input_req in inputs.root.values():
         concept = input_req.concept
         structure_class = concept.get_structure_class()
-        if structure_class is None:
-            continue
 
         # Get imports from the representation generator
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)

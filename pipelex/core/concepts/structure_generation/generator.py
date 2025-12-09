@@ -6,30 +6,9 @@ from typing import Any, Literal, Optional
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
-from pipelex.core.stuffs.dynamic_content import DynamicContent
-from pipelex.core.stuffs.html_content import HtmlContent
-from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.core.stuffs.json_content import JSONContent
-from pipelex.core.stuffs.number_content import NumberContent
-from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.pdf_content import PDFContent
-from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
-from pipelex.core.stuffs.text_content import TextContent
-
-# Mapping of native content class names to their actual class objects
-# Import statements are generated dynamically from the class's __module__ attribute
-NATIVE_CONTENT_CLASSES: dict[str, type] = {
-    "TextContent": TextContent,
-    "ImageContent": ImageContent,
-    "NumberContent": NumberContent,
-    "JSONContent": JSONContent,
-    "HtmlContent": HtmlContent,
-    "PDFContent": PDFContent,
-    "DynamicContent": DynamicContent,
-    "PageContent": PageContent,
-    "TextAndImagesContent": TextAndImagesContent,
-}
+from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class StructureGenerator:
@@ -193,8 +172,11 @@ class StructureGenerator:
         base_class = base_class_name or "StructuredContent"
 
         # Add import for the base class if it's a native content class (other than StructuredContent which is already imported)
-        if base_class in NATIVE_CONTENT_CLASSES:
-            cls = NATIVE_CONTENT_CLASSES[base_class]
+        if NativeConceptCode.is_native_structure_class(base_class):
+            cls = NativeConceptCode.get_native_structure_class(base_class)
+            if not cls:
+                msg = f"Native structure class '{base_class}' not found"
+                raise ConceptStructureGeneratorError(msg)
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
 
         # Generate class header with docstring
@@ -458,20 +440,7 @@ class StructureGenerator:
 
         # If a custom base class is specified that's not a native class, get it from the registry
         if base_class_name:
-            # Check if it's a native class
-            native_classes = {
-                "StructuredContent",
-                "TextContent",
-                "ImageContent",
-                "NumberContent",
-                "JSONContent",
-                "HtmlContent",
-                "PDFContent",
-                "DynamicContent",
-                "PageContent",
-                "TextAndImagesContent",
-            }
-            if base_class_name not in native_classes:
+            if not NativeConceptCode.is_native_structure_class(base_class_name):
                 # Not a native class, provide it from registry
                 custom_base_class = KajsonManager.get_class_registry().get_class(name=base_class_name)
                 if custom_base_class is None:
@@ -499,7 +468,7 @@ class StructureGenerator:
         # where the class object references might differ due to exec() context
         mro_class_names = [cls.__name__ for cls in the_class.__mro__]
 
-        if "StuffContent" not in mro_class_names:
+        if StuffContent.__name__ not in mro_class_names:
             msg = f"'{expected_class_name}' does not inherit from StuffContent. MRO: {mro_class_names}"
             raise ConceptStructureValidationError(msg)
 
