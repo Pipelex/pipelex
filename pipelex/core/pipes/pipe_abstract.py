@@ -362,6 +362,7 @@ class PipeAbstract(ABC, BaseModel):
             )
 
         # Capture input content for Langfuse if enabled
+        # TODO: support OTel custom fields via a plugin / dependency injection mechanism
         if TelemetryManagerAbstract.is_capture_content_enabled() and TelemetryManagerAbstract.get_langfuse_enabled():
             if self.description:
                 span_attributes[LangfuseSpanAttr.OBSERVATION_DESCRIPTION] = self.description
