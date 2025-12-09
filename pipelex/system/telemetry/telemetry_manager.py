@@ -10,6 +10,10 @@ from typing_extensions import Unpack, override
 from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
+from pipelex.system.pipelex_service.pipelex_credentials import (
+    PipelexCredentials,
+    hash_gateway_api_key,
+)
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
@@ -26,10 +30,25 @@ if TYPE_CHECKING:
 class TelemetryManager(TelemetryManagerAbstract):
     PRIVACY_NOTICE = "[Privacy: exception message redacted]"
 
-    def __init__(self, telemetry_config: TelemetryConfig):
+    def __init__(
+        self,
+        telemetry_config: TelemetryConfig,
+        pipelex_telemetry_enabled: bool = False,
+        gateway_api_key: str | None = None,
+    ):
+        """Initialize the TelemetryManager with custom and optional Pipelex telemetry.
+
+        Args:
+            telemetry_config: User's telemetry configuration.
+            pipelex_telemetry_enabled: Whether Pipelex internal telemetry is enabled (for gateway).
+            gateway_api_key: The user's Pipelex Gateway API key (required if pipelex_telemetry_enabled).
+        """
         self.telemetry_config = telemetry_config
-        # Create PostHog client
-        self.posthog_client = Posthog(
+        self._pipelex_telemetry_enabled = pipelex_telemetry_enabled
+        self._pipelex_distinct_id: str | None = None
+
+        # Create custom PostHog client (user's telemetry)
+        self.custom_posthog_client = Posthog(
             project_api_key=self.telemetry_config.project_api_key,
             host=self.telemetry_config.host,
             disable_geoip=not self.telemetry_config.geoip_enabled,
@@ -37,13 +56,30 @@ class TelemetryManager(TelemetryManagerAbstract):
             on_error=self._handle_transmission_error,
         )
 
+        # Create Pipelex PostHog client if gateway telemetry is enabled
+        self.pipelex_posthog_client: Posthog | None = None
+        if pipelex_telemetry_enabled:
+            if gateway_api_key:
+                self._pipelex_distinct_id = hash_gateway_api_key(gateway_api_key)
+            self.pipelex_posthog_client = Posthog(
+                project_api_key=PipelexCredentials.POSTHOG_PROJECT_API_KEY,
+                host=PipelexCredentials.POSTHOG_HOST,
+                disable_geoip=True,  # Don't need geoip for service monitoring
+                debug=self.telemetry_config.verbose_enabled,
+                on_error=self._handle_pipelex_transmission_error,
+            )
+            log.verbose("Pipelex Gateway telemetry enabled")
+
         # Create OTel tracer for AI tracing if enabled
         self._otel_tracer: OTelTracer | None
         self._tracer_provider: OTelTracerProvider | None
-        if telemetry_config.ai_tracing_enabled:
+        if telemetry_config.ai_tracing_enabled or pipelex_telemetry_enabled:
+            # AI tracing is enabled if either custom or pipelex telemetry wants it
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 user_id=telemetry_config.user_id,
-                posthog_client=self.posthog_client,
+                custom_posthog_client=self.custom_posthog_client if telemetry_config.ai_tracing_enabled else None,
+                pipelex_posthog_client=self.pipelex_posthog_client,
+                pipelex_distinct_id=self._pipelex_distinct_id,
                 otlp_endpoint=telemetry_config.otlp_endpoint,
                 otlp_headers=telemetry_config.otlp_headers,
                 is_langfuse_enabled=telemetry_config.langfuse_enabled,
@@ -55,17 +91,18 @@ class TelemetryManager(TelemetryManagerAbstract):
             self._tracer_provider = None
             log.verbose("AI tracing disabled: No OpenTelemetry tracer created")
 
-        # Store original capture_exception method
-        self._original_capture_exception: Callable[..., Any] = self.posthog_client.capture_exception
+        # Store original capture_exception method for custom client
+        self._original_capture_exception: Callable[..., Any] = self.custom_posthog_client.capture_exception
 
         # Wrap capture_exception to sanitize before sending
+        # TODO: RC - Do the wrapping in one GO
         self._wrap_capture_exception()
 
         posthog.privacy_mode = True
-        posthog.default_client = self.posthog_client
+        posthog.default_client = self.custom_posthog_client
 
     def _handle_transmission_error(self, error: Exception | None, _items: list[dict[str, Any]]) -> None:
-        """Handle errors that occur during telemetry transmission.
+        """Handle errors that occur during custom telemetry transmission.
 
         Args:
             error: The transmission error that occurred
@@ -73,6 +110,16 @@ class TelemetryManager(TelemetryManagerAbstract):
         """
         if error:
             log.error(f"Telemetry transmission error: {error}")
+
+    def _handle_pipelex_transmission_error(self, error: Exception | None, _items: list[dict[str, Any]]) -> None:
+        """Handle errors that occur during Pipelex telemetry transmission.
+
+        Args:
+            error: The transmission error that occurred
+            _items: List of telemetry items that failed to send
+        """
+        if error:
+            log.debug(f"Pipelex telemetry transmission error: {error}")
 
     def _wrap_capture_exception(self) -> None:
         """Wrap the PostHog capture_exception method to sanitize exception messages."""
@@ -106,7 +153,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 return self._original_capture_exception(exception, **kwargs)
 
         # Replace the method
-        self.posthog_client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
+        self.custom_posthog_client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
     @override
     def setup(self, integration_mode: IntegrationMode):
@@ -116,7 +163,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                 tag(name=EventProperty.INTEGRATION, value=integration_mode)
                 tag(name=EventProperty.PIPELEX_VERSION, value=package_version)
                 tag(name=EventProperty.SETTING, value=Setting.TELEMETRY_MODE)
-            self.posthog_client.capture(
+            # TODO: RC - remove this event
+            self.custom_posthog_client.capture(
                 EventName.TELEMETRY_JUST_ENABLED,
                 properties={
                     EventProperty.TELEMETRY_MODE: telemetry_mode,
@@ -137,15 +185,23 @@ class TelemetryManager(TelemetryManagerAbstract):
                 # Suppress any shutdown errors to avoid cascading failures
                 log.debug(f"Error during TracerProvider shutdown: {exc}")
 
-        # Then shutdown PostHog client
-        if self.posthog_client:
+        # Then shutdown custom PostHog client
+        if self.custom_posthog_client:
             try:
                 # PostHog client has a shutdown method to flush pending events
                 # and close background threads
-                self.posthog_client.shutdown()
+                self.custom_posthog_client.shutdown()
             except Exception as exc:
                 # Suppress any shutdown errors to avoid cascading failures
-                log.debug(f"Error during PostHog shutdown: {exc}")
+                log.debug(f"Error during custom PostHog shutdown: {exc}")
+
+        # Then shutdown Pipelex PostHog client
+        if self.pipelex_posthog_client:
+            try:
+                self.pipelex_posthog_client.shutdown()
+            except Exception as exc:
+                # Suppress any shutdown errors to avoid cascading failures
+                log.debug(f"Error during Pipelex PostHog shutdown: {exc}")
 
         # Clear singleton instance
         TelemetryManagerAbstract.clear_instance()
@@ -160,6 +216,12 @@ class TelemetryManager(TelemetryManagerAbstract):
             tracked_properties = {key: value for key, value in properties.items() if key not in self.telemetry_config.redact}
         else:
             tracked_properties = {}
+
+        # 1. Always track to Pipelex PostHog if enabled (independent of telemetry_mode)
+        if self._pipelex_telemetry_enabled and self.pipelex_posthog_client and self._pipelex_distinct_id:
+            self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
+
+        # 2. Track to custom PostHog based on user's telemetry_mode
         match self.telemetry_config.telemetry_mode:
             case TelemetryMode.ANONYMOUS:
                 self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
@@ -174,10 +236,10 @@ class TelemetryManager(TelemetryManagerAbstract):
                         user_id=self.telemetry_config.user_id,
                     )
             case TelemetryMode.OFF:
-                log.verbose(f"Telemetry is off, skipping event '{event_name}'")
+                log.verbose(f"Custom telemetry is off, skipping event '{event_name}' for custom client")
 
     def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
-        if not self.posthog_client:
+        if not self.custom_posthog_client:
             return
         if self.telemetry_config.dry_mode_enabled:
             if properties:
@@ -189,11 +251,11 @@ class TelemetryManager(TelemetryManagerAbstract):
                 log.debug(f"Tracking anonymous event '{event_name}'. No properties.")
         else:
             properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
-            self.posthog_client.capture(event_name, properties=properties)
+            self.custom_posthog_client.capture(event_name, properties=properties)
             log.verbose(f"Tracked anonymous event '{event_name}' with properties: {properties}")
 
     def _track_identified_event(self, event_name: str, properties: dict[str, Any], user_id: str):
-        if not self.posthog_client:
+        if not self.custom_posthog_client:
             return
         if self.telemetry_config.dry_mode_enabled:
             if properties:
@@ -204,8 +266,19 @@ class TelemetryManager(TelemetryManagerAbstract):
             else:
                 log.debug(f"Tracking identified event '{event_name}'. No properties.")
         else:
-            self.posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
+            self.custom_posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
             log.verbose(f"Tracked identified event '{event_name}' with properties: {properties}")
+
+    # TODO: RC - cleanup optionals
+    def _track_to_pipelex(self, event_name: str, properties: dict[str, Any]):
+        """Track event to Pipelex's internal PostHog (always identified by hashed API key).
+
+        This is called independently of the user's telemetry_mode setting.
+        """
+        if not self.pipelex_posthog_client or not self._pipelex_distinct_id:
+            return
+        self.pipelex_posthog_client.capture(event_name, distinct_id=self._pipelex_distinct_id, properties=properties)
+        log.verbose(f"Tracked event '{event_name}' to Pipelex telemetry")
 
     @override
     @contextmanager
@@ -264,6 +337,11 @@ class TelemetryManager(TelemetryManagerAbstract):
     def is_langfuse_enabled(self) -> bool:
         return self.telemetry_config.langfuse_enabled
 
+    @property
+    @override
+    def is_pipelex_telemetry_enabled(self) -> bool:
+        return self._pipelex_telemetry_enabled
+
     @override
     def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
         """Hook to do something when a trace starts and just got its trace_name and trace_id.
@@ -281,17 +359,37 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         log.verbose(f"[Telemetry] Emitting trace start event:\n  trace_name='{trace_name}'\n  trace_id={trace_id:032x}")
 
-        if self.telemetry_config.user_id:
-            # Identified user: pass distinct_id
-            self.posthog_client.capture(
-                distinct_id=self.telemetry_config.user_id,
-                event=PostHogEvent.SPAN,
-                properties=properties,
-            )
-        else:
-            # Anonymous user: don't pass distinct_id, mark as anonymous
-            properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
-            self.posthog_client.capture(
-                event=PostHogEvent.SPAN,
-                properties=properties,
-            )
+        # Send to custom PostHog if configured
+        if self.custom_posthog_client and self.telemetry_config.ai_tracing_enabled:
+            if self.telemetry_config.user_id:
+                # Identified user: pass distinct_id
+                self.custom_posthog_client.capture(
+                    distinct_id=self.telemetry_config.user_id,
+                    event=PostHogEvent.SPAN,
+                    properties=properties,
+                )
+            else:
+                # Anonymous user: don't pass distinct_id, mark as anonymous
+                custom_properties = dict(properties)
+                custom_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
+                self.custom_posthog_client.capture(
+                    event=PostHogEvent.SPAN,
+                    properties=custom_properties,
+                )
+
+        # Send to Pipelex PostHog if gateway telemetry is enabled
+        if self.pipelex_posthog_client:
+            # TODO: RC - this dict thing
+            pipelex_properties = dict(properties)
+            if self._pipelex_distinct_id:
+                self.pipelex_posthog_client.capture(
+                    distinct_id=self._pipelex_distinct_id,
+                    event=PostHogEvent.SPAN,
+                    properties=pipelex_properties,
+                )
+            else:
+                pipelex_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
+                self.pipelex_posthog_client.capture(
+                    event=PostHogEvent.SPAN,
+                    properties=pipelex_properties,
+                )

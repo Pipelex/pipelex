@@ -12,6 +12,7 @@ from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.system.pipelex_service.remote_config_provider import GatewayRemoteConfig
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
@@ -50,11 +51,16 @@ class ModelManager(ModelManagerAbstract):
         self._routing_profile = None
 
     @override
-    def setup(self, secrets_provider: SecretsProviderAbstract) -> None:
+    def setup(
+        self,
+        secrets_provider: SecretsProviderAbstract,
+        gateway_remote_config: GatewayRemoteConfig | None = None,
+    ) -> None:
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_path=ConfigPaths.BACKENDS_FILE_PATH,
             backends_dir_path=ConfigPaths.BACKENDS_DIR_PATH,
+            gateway_remote_config=gateway_remote_config,
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
@@ -64,6 +70,11 @@ class ModelManager(ModelManagerAbstract):
         model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=ConfigPaths.MODEL_DECKS_DIR_PATH)
         deck_blueprint = load_model_deck_blueprint(model_deck_paths=model_deck_paths)
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
+
+    # TODO: RC - cleanup
+    # def is_gateway_enabled(self) -> bool:
+    #     """Check if Pipelex Gateway is enabled in the backend library."""
+    #     return PipelexBackend.GATEWAY in self.inference_backend_library.all_enabled_backends()
 
     @override
     def validate_model_deck(self):

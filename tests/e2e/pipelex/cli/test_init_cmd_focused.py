@@ -24,7 +24,8 @@ class TestFocusedInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("1")  # Backend selection
+        env.add_confirm_input(True)  # Accept gateway terms of service
+        env.add_prompt_input("1")  # Backend selection (pipelex_gateway)
         env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()

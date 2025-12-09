@@ -24,6 +24,7 @@ class TestInitCommandIntegration:
 
         # User inputs: confirm init, select all backends, select telemetry OFF
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service (since "all" includes gateway)
         env.add_prompt_input("all")  # Select all backends
         env.add_prompt_input("1")  # Telemetry: OFF
 
@@ -114,6 +115,7 @@ class TestInitCommandIntegration:
 
         # User inputs - CONFIG focus still runs full init on first time
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("1")  # Backend selection (pipelex_gateway)
         env.add_prompt_input("1")  # Telemetry
 
@@ -288,6 +290,7 @@ class TestInitCommandIntegration:
 
         # User inputs - no primary/fallback prompts because pipelex_gateway is included
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input(indices_str)  # Select pipelex_gateway and openai
         env.add_prompt_input("1")  # Telemetry: OFF
 

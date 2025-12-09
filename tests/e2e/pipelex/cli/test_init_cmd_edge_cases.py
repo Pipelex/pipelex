@@ -29,6 +29,7 @@ class TestEdgeCases:
 
         # User inputs - no primary/fallback prompts expected
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input(indices_str)  # Select pipelex_gateway and openai
         env.add_prompt_input("1")  # Telemetry
 

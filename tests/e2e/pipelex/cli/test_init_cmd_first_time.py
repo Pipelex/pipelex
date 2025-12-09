@@ -25,8 +25,9 @@ class TestFirstTimeInitialization:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_empty_dir()
 
-        # User inputs: confirm, default backend (1), telemetry OFF (1)
-        env.add_confirm_input(True)
+        # User inputs: confirm init, default backend (1), accept gateway terms, telemetry OFF (1)
+        env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("1")  # Default: pipelex_gateway
         env.add_prompt_input("1")  # Telemetry: OFF
 
@@ -84,6 +85,7 @@ class TestFirstTimeInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service (since all includes gateway)
         env.add_prompt_input("all")  # Select all backends
         env.add_prompt_input("1")  # Telemetry: OFF
 

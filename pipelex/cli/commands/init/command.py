@@ -7,18 +7,67 @@ import typer
 from rich.console import Console
 from rich.prompt import Confirm
 
-from pipelex.cli.commands.init.backends import customize_backends_config, get_selected_backend_keys
+from pipelex.cli.commands.init.backends import (
+    customize_backends_config,
+    disable_gateway_backend,
+    get_selected_backend_keys,
+    update_gateway_terms_acceptance,
+)
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.routing import customize_routing_profile
 from pipelex.cli.commands.init.telemetry import setup_telemetry
+from pipelex.cli.commands.init.ui.gateway_ui import (
+    display_gateway_accepted_message,
+    display_gateway_declined_message,
+    prompt_gateway_acceptance,
+)
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel, display_already_configured_message
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.pipelex_service.pipelex_service_config import load_pipelex_service_config_if_exists
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
+
+
+def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) -> None:
+    """Check if gateway is enabled and terms not yet accepted, then prompt for acceptance.
+
+    This is called after init_config() to ensure users who have gateway enabled
+    in their existing backends.toml are prompted to accept terms when pipelex_service.toml
+    is first created.
+
+    Args:
+        console: Rich Console instance for user interaction.
+        backends_toml_path: Path to backends.toml file.
+    """
+    # Check if backends.toml exists and gateway is enabled
+    if not path_exists(backends_toml_path):
+        return
+
+    selected_backend_keys = get_selected_backend_keys(backends_toml_path)
+    if PipelexBackend.GATEWAY not in selected_backend_keys:
+        return
+
+    # Gateway is enabled - check if terms are already accepted
+    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+    if pipelex_service_config is not None and pipelex_service_config.gateway.terms_accepted:
+        return
+
+    # Gateway is enabled but terms not accepted - prompt user
+    gateway_accepted = prompt_gateway_acceptance(console)
+
+    if gateway_accepted:
+        display_gateway_accepted_message(console)
+        update_gateway_terms_acceptance(accepted=True)
+    else:
+        display_gateway_declined_message(console)
+        update_gateway_terms_acceptance(accepted=False)
+        # Actually disable the gateway in backends.toml
+        disable_gateway_backend(backends_toml_path)
 
 
 def determine_needs(
@@ -193,6 +242,11 @@ def execute_initialization(
 
         if backends_just_copied_during_config or (check_inference and backends_exists_now):
             needs_inference = True
+
+        # If we're NOT going to run customize_backends_config (which handles gateway terms),
+        # we need to check if gateway is enabled and terms not accepted
+        if not needs_inference and backends_existed_before:
+            _check_gateway_terms_if_needed(console, backends_toml_path)
 
     # Determine if this is truly a first-time setup (either tracked from before or just copied now)
     first_time_setup = is_first_time_backends_setup or backends_just_copied_during_config

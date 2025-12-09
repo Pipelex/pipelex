@@ -22,6 +22,7 @@ class TestInputValidation:
 
         # User inputs: invalid index, then valid
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("99")  # Invalid index
         env.add_prompt_input("1")  # Valid: pipelex_gateway
         env.add_prompt_input("1")  # Telemetry
@@ -42,6 +43,7 @@ class TestInputValidation:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("abc")  # Invalid non-numeric
         env.add_prompt_input("1")  # Valid: pipelex_gateway
         env.add_prompt_input("1")  # Telemetry
@@ -88,6 +90,7 @@ class TestInputValidation:
 
         # User inputs: empty string for default
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("")  # Empty = default (pipelex_gateway)
         env.add_prompt_input("1")  # Telemetry
 
@@ -107,7 +110,8 @@ class TestInputValidation:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("1")  # Backend selection
+        env.add_confirm_input(True)  # Accept gateway terms of service
+        env.add_prompt_input("1")  # Backend selection (pipelex_gateway)
         env.add_prompt_input("5")  # Invalid telemetry option
         env.add_prompt_input("2")  # Valid: ANONYMOUS
 

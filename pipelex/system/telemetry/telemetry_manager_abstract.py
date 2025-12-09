@@ -175,6 +175,11 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     def is_langfuse_enabled(self) -> bool:
         """Whether Langfuse OTLP exporter is enabled."""
 
+    @property
+    @abstractmethod
+    def is_pipelex_telemetry_enabled(self) -> bool:
+        """Whether Pipelex internal telemetry is enabled (for gateway usage)."""
+
     @abstractmethod
     def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
         """Hook to do something when a trace starts and just got its trace_name and trace_id."""
@@ -235,6 +240,11 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @property
     @override
     def is_langfuse_enabled(self) -> bool:
+        return False
+
+    @property
+    @override
+    def is_pipelex_telemetry_enabled(self) -> bool:
         return False
 
     @override

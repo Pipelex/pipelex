@@ -23,6 +23,7 @@ from pipelex.cogt.exceptions import (
     RoutingProfileLibraryNotFoundError,
 )
 from pipelex.cogt.inference.inference_manager import InferenceManager
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )
@@ -52,6 +53,20 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
 from pipelex.system.environment import is_env_var_truthy
+from pipelex.system.pipelex_service.exceptions import (
+    GatewayApiKeyMissingError,
+    GatewayDoNotTrackConflictError,
+    GatewayTelemetryManagerInjectedError,
+    GatewayTermsNotAcceptedError,
+)
+from pipelex.system.pipelex_service.pipelex_credentials import PIPELEX_GATEWAY_API_KEY_VAR
+from pipelex.system.pipelex_service.pipelex_service_config import (
+    load_pipelex_service_config_if_exists,
+)
+from pipelex.system.pipelex_service.remote_config_provider import (
+    GatewayRemoteConfig,
+    fetch_gateway_remote_config,
+)
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -70,6 +85,7 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
+from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -143,6 +159,27 @@ Note that this command resets all config files to their default values.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 """
 
+    @staticmethod
+    def _is_gateway_enabled_in_backends() -> bool:
+        """Check if pipelex_gateway is enabled in the backends configuration.
+
+        This reads the backends.toml file directly without loading the full backend library.
+
+        Returns:
+            True if pipelex_gateway is enabled, False otherwise.
+        """
+        backends_toml = load_toml_from_path_if_exists(ConfigPaths.BACKENDS_FILE_PATH)
+        if backends_toml is None:
+            return False
+
+        gateway_config = backends_toml.get(PipelexBackend.GATEWAY)
+        if gateway_config is None or not isinstance(gateway_config, dict):
+            return False
+
+        gateway_config_dict = cast("dict[str, Any]", gateway_config)
+        enabled_value = gateway_config_dict.get("enabled", True)
+        return enabled_value is True
+
     def setup(
         self,
         integration_mode: IntegrationMode,
@@ -166,11 +203,86 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if kwargs:
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
+
+        # Initialize secrets provider early - needed for gateway check
+        secrets_provider = secrets_provider or EnvSecretsProvider()
+
+        # Check if Pipelex Gateway is enabled and validate terms acceptance
+        pipelex_telemetry_enabled = False
+        gateway_api_key: str | None = None
+        gateway_remote_config: GatewayRemoteConfig | None = None
+        is_gateway_enabled = self._is_gateway_enabled_in_backends()
+
+        if is_gateway_enabled:
+            # Check if terms are accepted
+            pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+            if pipelex_service_config is None or not pipelex_service_config.gateway.terms_accepted:
+                raise GatewayTermsNotAcceptedError
+
+            # Get gateway API key for telemetry distinct_id
+            gateway_api_key = secrets_provider.get_optional_secret(PIPELEX_GATEWAY_API_KEY_VAR)
+            if not gateway_api_key:
+                raise GatewayApiKeyMissingError
+
+            # Cannot inject custom TelemetryManager when gateway is enabled
+            if telemetry_manager is not None:
+                raise GatewayTelemetryManagerInjectedError
+
+            # Fetch remote configuration (centralized here for future extensibility)
+            gateway_remote_config = fetch_gateway_remote_config()
+            log.verbose("Successfully fetched Pipelex Gateway remote configuration")
+
+            pipelex_telemetry_enabled = True
+            log.verbose("Pipelex Gateway enabled - mandatory telemetry will be active")
+
+        # Telemetry ------------------------------------------------------------------------------------
+        chosen_telemetry_manager: TelemetryManagerAbstract
+        if integration_mode.allows_telemetry() or force_enable_telemetry or pipelex_telemetry_enabled:
+            if not telemetry_config:
+                # TODO: RC - substitute env vars
+                telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
+                telemetry_config = load_telemetry_config(path=telemetry_config_path)
+
+            match telemetry_config.telemetry_mode:
+                case TelemetryMode.OFF:
+                    if pipelex_telemetry_enabled:
+                        # Gateway requires telemetry - create manager with only Pipelex telemetry
+                        # Note: the telemetry_manager parameter is guaranteed to be None here (checked above)
+                        chosen_telemetry_manager = TelemetryManager(
+                            telemetry_config=telemetry_config,
+                            pipelex_telemetry_enabled=True,
+                            gateway_api_key=gateway_api_key,
+                        )
+                        log.debug("Custom telemetry is off, but Pipelex Gateway telemetry is enabled")
+                    else:
+                        chosen_telemetry_manager = TelemetryManagerNoOp()
+                        log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
+                case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
+                    if telemetry_config.respect_dnt and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
+                        if pipelex_telemetry_enabled:
+                            # Gateway requires telemetry but DNT is set - we respect DNT
+                            raise GatewayDoNotTrackConflictError(dnt_env_var=OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
+                        chosen_telemetry_manager = TelemetryManagerNoOp()
+                        log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
+                    else:
+                        # Note: if pipelex_telemetry_enabled then the telemetry_manager parameter is guaranteed to be None here (checked above)
+                        chosen_telemetry_manager = telemetry_manager or TelemetryManager(
+                            telemetry_config=telemetry_config,
+                            pipelex_telemetry_enabled=pipelex_telemetry_enabled,
+                            gateway_api_key=gateway_api_key,
+                        )
+        else:
+            chosen_telemetry_manager = TelemetryManagerNoOp()
+            log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
+
+        self.telemetry_manager = chosen_telemetry_manager
+        self.telemetry_manager.setup(integration_mode=integration_mode)
+        self.pipelex_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
+
         # tools
         self.class_registry = class_registry or ClassRegistry()
         self.pipelex_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
-        secrets_provider = secrets_provider or EnvSecretsProvider()
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
@@ -184,7 +296,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
 
         try:
-            self.models_manager.setup(secrets_provider=secrets_provider)
+            self.models_manager.setup(
+                secrets_provider=secrets_provider,
+                gateway_remote_config=gateway_remote_config,
+            )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
             msg = self._get_config_file_not_found_error_msg("routing profile library")
             raise PipelexSetupError(msg) from routing_not_found_exc
@@ -247,30 +362,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
 
-        chosen_telemetry_manager: TelemetryManagerAbstract
-        if integration_mode.allows_telemetry() or force_enable_telemetry:
-            if not telemetry_config:
-                telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
-                telemetry_config = load_telemetry_config(path=telemetry_config_path)
-
-            match telemetry_config.telemetry_mode:
-                case TelemetryMode.OFF:
-                    chosen_telemetry_manager = TelemetryManagerNoOp()
-                    log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
-                case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
-                    if telemetry_config.respect_dnt and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
-                        chosen_telemetry_manager = TelemetryManagerNoOp()
-                        log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
-                    else:
-                        chosen_telemetry_manager = telemetry_manager or TelemetryManager(telemetry_config=telemetry_config)
-        else:
-            chosen_telemetry_manager = TelemetryManagerNoOp()
-            log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
-
-        self.telemetry_manager = chosen_telemetry_manager
-        self.telemetry_manager.setup(integration_mode=integration_mode)
-
-        self.pipelex_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
         if not observers:
             local_observer = LocalObserver()
             observer_telemetry = ObserverTelemetry(telemetry_manager=self.telemetry_manager)

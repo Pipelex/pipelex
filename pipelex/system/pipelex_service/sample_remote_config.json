@@ -1,0 +1,93 @@
+{
+  "backend": {
+    "defaults": {
+      "sdk": "gateway_completions",
+      "structure_method": "instructor/openai_tools"
+    },
+    "gpt-4o": {
+      "model_id": "gpt-4o-2024-11-20",
+      "provider": "openai",
+      "costs": {
+        "input": 2.5,
+        "output": 10.0
+      },
+      "inputs": ["text", "images"],
+      "outputs": ["text"],
+      "context_window": 128000,
+      "max_output_tokens": 16384
+    },
+    "gpt-4o-mini": {
+      "model_id": "gpt-4o-mini-2024-07-18",
+      "provider": "openai",
+      "costs": {
+        "input": 0.15,
+        "output": 0.6
+      },
+      "inputs": ["text", "images"],
+      "outputs": ["text"],
+      "context_window": 128000,
+      "max_output_tokens": 16384
+    },
+    "claude-3.5-sonnet": {
+      "model_id": "claude-3-5-sonnet-20241022",
+      "provider": "anthropic",
+      "costs": {
+        "input": 3.0,
+        "output": 15.0
+      },
+      "inputs": ["text", "images"],
+      "outputs": ["text"],
+      "context_window": 200000,
+      "max_output_tokens": 8192
+    },
+    "claude-3.7-sonnet": {
+      "model_id": "claude-3-7-sonnet-20250219",
+      "provider": "anthropic",
+      "costs": {
+        "input": 3.0,
+        "output": 15.0
+      },
+      "inputs": ["text", "images"],
+      "outputs": ["text"],
+      "context_window": 200000,
+      "max_output_tokens": 64000
+    },
+    "claude-3-haiku": {
+      "model_id": "claude-3-haiku-20240307",
+      "provider": "anthropic",
+      "costs": {
+        "input": 0.25,
+        "output": 1.25
+      },
+      "inputs": ["text", "images"],
+      "outputs": ["text"],
+      "context_window": 200000,
+      "max_output_tokens": 4096
+    },
+    "gemini-2.0-flash": {
+      "model_id": "gemini-2.0-flash",
+      "provider": "google",
+      "costs": {
+        "input": 0.1,
+        "output": 0.4
+      },
+      "inputs": ["text", "images"],
+      "outputs": ["text"],
+      "context_window": 1048576,
+      "max_output_tokens": 8192
+    },
+    "gemini-1.5-pro": {
+      "model_id": "gemini-1.5-pro",
+      "provider": "google",
+      "costs": {
+        "input": 1.25,
+        "output": 5.0
+      },
+      "inputs": ["text", "images", "audio", "video"],
+      "outputs": ["text"],
+      "context_window": 2097152,
+      "max_output_tokens": 8192
+    }
+  }
+}
+
