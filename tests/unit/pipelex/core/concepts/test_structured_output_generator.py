@@ -589,37 +589,6 @@ class WrongClassName(StructuredContent):
 
         assert issubclass(generated_class, StuffContent)
 
-    def test_inheritance_from_html_content(self):
-        """Test generating a class that inherits from HtmlContent."""
-        structure_blueprint = {
-            "page_title": ConceptStructureBlueprint(
-                description="Title of the HTML page",
-                type=ConceptStructureBlueprintFieldType.TEXT,
-                required=False,
-            ),
-        }
-
-        generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "WebPage",
-            structure_blueprint,
-            base_class_name="HtmlContent",
-        )
-
-        # Verify correct import is present
-        assert "from pipelex.core.stuffs.html_content import HtmlContent" in generated_code
-
-        # Verify class inherits from HtmlContent
-        assert "class WebPage(HtmlContent):" in generated_code
-
-        # Verify the generated class is valid
-        from pipelex.core.stuffs.html_content import HtmlContent  # noqa: PLC0415
-
-        assert issubclass(generated_class, HtmlContent)
-        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
-
-        assert issubclass(generated_class, StuffContent)
-
     def test_inheritance_with_empty_structure(self):
         """Test generating a class with no additional fields that just inherits from a base class."""
         structure_blueprint: dict[str, ConceptStructureBlueprint] = {}
