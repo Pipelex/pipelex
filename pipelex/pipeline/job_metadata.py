@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.types import StrEnum
 
 
@@ -31,16 +32,6 @@ class UnitJobId(StrEnum):
                 return "ImgGen"
             case UnitJobId.EXTRACT_PAGES:
                 return "Extract"
-
-
-class OtelContext(BaseModel):
-    """OpenTelemetry context for tracing, derived from business IDs."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    trace_id: int = Field(description="128-bit, derived from pipeline_run_id")
-    trace_name: str = Field(description="Trace name derived from pipeline_run_id and its main pipe_code")
-    span_id: int = Field(description="64-bit, derived from pipe_run_id")
 
 
 class JobMetadata(BaseModel):
