@@ -1,9 +1,12 @@
+import json
 from collections.abc import Callable
+from typing import Any
 
 from pydantic import BaseModel, Field, RootModel, field_validator
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -125,3 +128,40 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
     @property
     def nb_inputs(self) -> int:
         return len(self.root)
+
+    def _is_multiple(self, multiplicity: VariableMultiplicity | None) -> bool:
+        """Check if multiplicity indicates multiple items."""
+        if multiplicity is None:
+            return False
+        if isinstance(multiplicity, bool):
+            return multiplicity
+        return multiplicity > 1
+
+    def generate_json_representation(self) -> dict[str, Any]:
+        """Generate a JSON representation for all inputs.
+
+        Returns:
+            Dictionary with JSON representations for each input
+        """
+        json_inputs: dict[str, Any] = {}
+        for var_name, input_req in self.root.items():
+            is_multiple = self._is_multiple(input_req.multiplicity)
+            json_value, _ = input_req.concept.generate_input_representation(
+                output_format=ConceptRepresentationFormat.JSON,
+                is_multiple=is_multiple,
+            )
+            json_inputs[var_name] = json_value
+
+        return json_inputs
+
+    def generate_json_string(self, indent: int = 2) -> str:
+        """Generate a JSON representation for all inputs as a formatted string.
+
+        Args:
+            indent: Number of spaces for indentation (default: 2)
+
+        Returns:
+            Formatted JSON string
+        """
+        json_inputs = self.generate_json_representation()
+        return json.dumps(json_inputs, indent=indent, ensure_ascii=False)

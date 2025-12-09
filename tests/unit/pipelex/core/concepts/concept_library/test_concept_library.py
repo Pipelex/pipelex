@@ -15,7 +15,7 @@ class TestConceptLibrary:
         concept_1 = ConceptFactory.make_from_blueprint(
             domain="test",
             concept_code="TestConcept",
-            blueprint=ConceptBlueprint(
+            blueprint_or_string_description=ConceptBlueprint(
                 description="Lorem Ipsum",
                 structure="ImageContent",
             ),
@@ -24,7 +24,7 @@ class TestConceptLibrary:
         concept_2 = ConceptFactory.make_from_blueprint(
             domain="test",
             concept_code="TestConcept2",
-            blueprint=ConceptBlueprint(
+            blueprint_or_string_description=ConceptBlueprint(
                 description="Lorem Ipsum",
                 refines="native.Image",
             ),
@@ -32,7 +32,7 @@ class TestConceptLibrary:
         concept_3 = ConceptFactory.make_from_blueprint(
             domain="test",
             concept_code="TestConcept2",
-            blueprint=ConceptBlueprint(
+            blueprint_or_string_description=ConceptBlueprint(
                 description="Lorem Ipsum",
                 refines="Image",
             ),
@@ -41,7 +41,7 @@ class TestConceptLibrary:
         concept_4 = ConceptFactory.make_from_blueprint(
             domain="test",
             concept_code="TestConcept4",
-            blueprint=ConceptBlueprint(
+            blueprint_or_string_description=ConceptBlueprint(
                 description="Lorem Ipsum",
                 structure="ImageContent",
             ),
@@ -50,7 +50,7 @@ class TestConceptLibrary:
         concept_5 = ConceptFactory.make_from_blueprint(
             domain="test",
             concept_code="TestConcept5",
-            blueprint=ConceptBlueprint(
+            blueprint_or_string_description=ConceptBlueprint(
                 description="Lorem Ipsum",
                 structure="TextContent",
             ),
@@ -59,7 +59,7 @@ class TestConceptLibrary:
         concept_6 = ConceptFactory.make_from_blueprint(
             domain="test",
             concept_code="TestConcept6",
-            blueprint=ConceptBlueprint(
+            blueprint_or_string_description=ConceptBlueprint(
                 description="Lorem Ipsum",
                 structure="PDFContent",
             ),

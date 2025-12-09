@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseModel, ValidationError
 
 from pipelex.base_exceptions import PipelexError
@@ -14,6 +16,7 @@ from pipelex.core.pipes.handle_pipe_errors import (
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_library_manager, set_current_library
+from pipelex.libraries.library_utils import get_pipelex_plx_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 
 
@@ -129,3 +132,45 @@ async def validate_bundle(
         ) from dry_run_error
 
     return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
+
+
+async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
+    plx_files = get_pipelex_plx_files_from_dirs(dirs={directory})
+    all_blueprints: list[PipelexBundleBlueprint] = []
+
+    library_manager = get_library_manager()
+    library_id, _ = library_manager.open_library()
+    set_current_library(library_id=library_id)
+    try:
+        for plx_file in plx_files:
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=str(plx_file))
+            all_blueprints.append(blueprint)
+
+        loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
+        dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+    except PipelexInterpreterError as interpreter_error:
+        raise ValidateBundleError(
+            message=interpreter_error.message,
+            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
+        ) from interpreter_error
+    except PipeValidationError as pipe_error:
+        pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
+        raise ValidateBundleError(
+            message=f"Pipe validation failed: {pipe_error}",
+            pipe_validation_errors=[pipe_error_data],
+        ) from pipe_error
+    except ValidationError as validation_error:
+        pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
+        validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+        msg = f"Could not load blueprints because of: {validation_error_msg}"
+        raise ValidateBundleError(
+            message=msg,
+            pipe_validation_errors=pipe_validation_errors,
+        ) from validation_error
+    except DryRunError as dry_run_error:
+        raise ValidateBundleError(
+            message=dry_run_error.message,
+            dry_run_error_message=dry_run_error.message,
+        ) from dry_run_error
+
+    return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)

@@ -5,7 +5,7 @@ from click import Command, Context
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex.cli.commands.build_cmd import build_app
+from pipelex.cli.commands.build import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus

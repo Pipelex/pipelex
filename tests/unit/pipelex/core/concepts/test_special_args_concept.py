@@ -48,7 +48,7 @@ class TestSpecialArgsConcept:
         concept = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="ContentConcept",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
 
         concept_library.add_new_concept(concept)

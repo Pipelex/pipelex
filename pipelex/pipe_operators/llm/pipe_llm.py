@@ -14,6 +14,7 @@ from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingC
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.config import get_config
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -26,7 +27,6 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import (
     get_class_registry,
     get_concept_library,
@@ -208,7 +208,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
 
         the_content: StuffContent
-        if output_concept.structure_class_name == "TextContent" and not is_multiple_output:
+
+        if (
+            Concept.are_concept_compatible(concept_1=output_concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True)
+            and not is_multiple_output
+        ):
             llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
                 output_concept_string=output_concept.concept_string,
                 context_provider=working_memory,
@@ -227,8 +231,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
 
+            structure_class = get_class_registry().get_required_subclass(
+                name=output_concept.structure_class_name,
+                base_class=StuffContent,
+            )
+
             try:
-                the_content = TextContent(
+                the_content = structure_class(
                     text=generated_text,
                 )
             except ValidationError as exc:

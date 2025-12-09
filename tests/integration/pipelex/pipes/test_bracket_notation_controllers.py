@@ -25,13 +25,13 @@ class TestBracketNotationInControllers:
         concept_data_item = ConceptFactory.make_from_blueprint(
             concept_code="DataItem",
             domain=domain,
-            blueprint=ConceptBlueprint(description="Data item"),
+            blueprint_or_string_description=ConceptBlueprint(description="Data item"),
         )
         concept_library.add_concepts([concept_data_item])
         concept_processed_data = ConceptFactory.make_from_blueprint(
             concept_code="ProcessedData",
             domain=domain,
-            blueprint=ConceptBlueprint(description="Processed data"),
+            blueprint_or_string_description=ConceptBlueprint(description="Processed data"),
         )
         concept_library.add_concepts([concept_processed_data])
 
@@ -64,12 +64,12 @@ class TestBracketNotationInControllers:
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="Category",
             domain=domain,
-            blueprint=ConceptBlueprint(description="Category"),
+            blueprint_or_string_description=ConceptBlueprint(description="Category"),
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             concept_code="Result",
             domain=domain,
-            blueprint=ConceptBlueprint(description="Result"),
+            blueprint_or_string_description=ConceptBlueprint(description="Result"),
         )
         concept_library.add_concepts([concept_1, concept_2])
 
@@ -103,12 +103,12 @@ class TestBracketNotationInControllers:
         concept_item = ConceptFactory.make_from_blueprint(
             concept_code="Item",
             domain=domain,
-            blueprint=ConceptBlueprint(description="Item"),
+            blueprint_or_string_description=ConceptBlueprint(description="Item"),
         )
         concept_processed_item = ConceptFactory.make_from_blueprint(
             concept_code="ProcessedItem",
             domain=domain,
-            blueprint=ConceptBlueprint(description="Processed item"),
+            blueprint_or_string_description=ConceptBlueprint(description="Processed item"),
         )
         concept_library.add_concepts([concept_item, concept_processed_item])
 

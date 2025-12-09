@@ -6,3 +6,4 @@ class URLs:
     discord = "https://go.pipelex.com/discord"
     pipe_func_docs = "https://docs.pipelex.com/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc/"
     backend_provider_docs = "https://docs.pipelex.com/home/5-setup/configure-ai-providers/"
+    native_concepts_docs = "https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/native-concepts/"

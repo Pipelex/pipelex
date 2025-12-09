@@ -7,7 +7,6 @@ __pycache__/
 
 # Distribution / packaging
 dist/
-build/
 *.egg-info/
 
 # mkdocs
@@ -53,3 +52,4 @@ gcp_credentials.json
 
 /pipelex.toml
 settings.local.json
+structures/
