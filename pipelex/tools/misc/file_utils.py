@@ -387,7 +387,25 @@ def find_files_in_dir(
         files = list(path.glob(pattern))
 
     for file in files:
-        is_excluded = excluded_dirs is not None and any(excluded_dir in file.parts for excluded_dir in excluded_dirs)
+        # Check if file is under any excluded directory
+        is_excluded = False
+        if excluded_dirs is not None:
+            for excluded_dir in excluded_dirs:
+                excluded_path = Path(excluded_dir)
+                # If excluded_dir is an absolute path, check if file is under it
+                if excluded_path.is_absolute():
+                    try:
+                        # Resolve both paths to handle symlinks (e.g., /var -> /private/var on macOS)
+                        file.resolve().relative_to(excluded_path.resolve())
+                        is_excluded = True
+                        break
+                    except ValueError:
+                        # file is not relative to excluded_path
+                        continue
+                # If excluded_dir is just a directory name, check if it's in the file path parts
+                elif excluded_dir in file.parts:
+                    is_excluded = True
+                    break
 
         # Check if file is in a force include directory (forced inclusion despite exclusions)
         # Force include dirs can be full paths or directory names

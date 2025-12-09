@@ -24,17 +24,17 @@ class TestPipeParallelValidation:
         concept_1 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Document",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Context",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_3 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Analysis",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
 
@@ -105,17 +105,17 @@ class TestPipeParallelValidation:
         concept_1 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Document",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Context",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_3 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="ProcessedAnalysis",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
 
@@ -156,17 +156,17 @@ class TestPipeParallelValidation:
         concept_1 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Document",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="Context",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_3 = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code="ProcessedAnalysis",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
         concept_library.add_concepts(concepts=[concept_1, concept_2, concept_3])
 

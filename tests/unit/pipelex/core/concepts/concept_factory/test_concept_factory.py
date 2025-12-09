@@ -1,5 +1,6 @@
 import pytest
 
+from pipelex import pretty_print
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import (
     ConceptBlueprint,
@@ -8,6 +9,7 @@ from pipelex.core.concepts.concept_blueprint import (
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import ConceptFactoryError
+from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from tests.unit.pipelex.core.concepts.concept_factory.data import TestCases
 
 
@@ -54,7 +56,7 @@ class TestConceptFactory:
             ),
         }
 
-        assert ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint) == expected_structure
+        assert normalize_structure_blueprint(mixed_structure_blueprint) == expected_structure
 
         mixed_structure_blueprint2: dict[str, str | ConceptStructureBlueprint] = {
             "name": ConceptStructureBlueprint(description="The name of the person", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
@@ -78,7 +80,7 @@ class TestConceptFactory:
             ),
         }
 
-        assert ConceptFactory.normalize_structure_blueprint(mixed_structure_blueprint2) == expected_structure2
+        assert normalize_structure_blueprint(mixed_structure_blueprint2) == expected_structure2
 
     @pytest.mark.parametrize(
         ("domain", "concept_string_or_code", "expected_result"),
@@ -112,8 +114,10 @@ class TestConceptFactory:
         result = ConceptFactory.make_from_blueprint(
             domain=domain,
             concept_code=concept_code,
-            blueprint=blueprint,
+            blueprint_or_string_description=blueprint,
         )
+        pretty_print(result)
+        pretty_print(expected_concept)
 
         assert result == expected_concept, f"Concept mismatch for {test_name}"
 
@@ -125,5 +129,5 @@ class TestConceptFactory:
             ConceptFactory.make_from_blueprint(
                 domain="my_domain",
                 concept_code="TestConcept",
-                blueprint=blueprint,
+                blueprint_or_string_description=blueprint,
             )

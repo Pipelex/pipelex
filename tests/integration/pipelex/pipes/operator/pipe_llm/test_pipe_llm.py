@@ -89,7 +89,6 @@ class TestPipeLLMBasic:
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         # TODO: Add assertion on generated objects vs expected results
-        pretty_print(data, title="data")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.TEXT),
@@ -109,6 +108,7 @@ class TestPipeLLMBasic:
             structuring_method=structuring_method,
         )
 
+        pretty_print(pipe_llm_blueprint, title="pipe_llm_blueprint")
         pipe_code = f"extract_{topic}_{concept}_{structuring_method}"
         pipe_code = pipe_code.lower().replace(" ", "_")
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -124,7 +124,10 @@ class TestPipeLLMBasic:
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
+
         pipe_llm_output = await get_pipe_router().run(pipe_job=pipe_job)
+
+        pretty_print(pipe_llm_output, title="pipe_llm_dzqdzqoutput")
 
         # Log test information
         log.verbose(f"Testing {topic} with {structuring_method} method", title="Test Case")

@@ -36,7 +36,7 @@ class TestPipeExtract:
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="PageScan",
             domain="extract",
-            blueprint=ConceptBlueprint(description="Lorem Ipsum"),
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_library.add_new_concept(concept=concept_1)
 

@@ -64,11 +64,13 @@ class ConceptBlueprint(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_blueprint(cls, values: dict[str, Any] | str) -> dict[str, Any] | str:
+    def validate_mutually_exclusive_fields(cls, values: dict[str, Any] | str) -> dict[str, Any] | str:
+        """Validate that refines and structure are not both set."""
         if isinstance(values, dict) and values.get("refines") and values.get("structure"):
             msg = (
-                f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the definition `{values.get('description')}`"
+                f"A concept cannot have both 'refines' and 'structure'. "
+                f"Got refines='{values.get('refines')}' and structure='{values.get('structure')}'. "
+                f"Concept description: '{values.get('description')}'"
             )
             raise ValueError(msg)
         return values

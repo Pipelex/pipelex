@@ -1,101 +1,80 @@
-"""Unit tests for runner_generator module."""
+"""Unit tests for runner_code module."""
 
 from __future__ import annotations
 
-from pipelex.builder.runner_code import generate_compact_memory_entry, value_to_python_code
+from typing import Any, cast
+from unittest.mock import MagicMock
+
+import pytest
+
+from pipelex.builder.runner_code import generate_runner_code
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.pipes.inputs.input_requirements import InputRequirement, InputRequirements
 
 
-class TestValueToPythonCode:
-    """Test value_to_python_code function."""
+class TestConceptGenerateInputRepresentationJson:
+    """Test Concept.generate_input_representation for JSON format."""
 
-    def test_simple_string(self) -> None:
-        """Test conversion of a simple string."""
-        result = value_to_python_code("hello")
-        assert result == '"hello"'
-
-    def test_simple_number(self) -> None:
-        """Test conversion of a number."""
-        result = value_to_python_code(42)
-        assert result == "42"
-
-    def test_simple_boolean(self) -> None:
-        """Test conversion of a boolean."""
-        result = value_to_python_code(True)
-        assert result == "True"
-
-    def test_dict_with_class_image_content(self) -> None:
-        """Test conversion of ImageContent dict."""
-        value = {"_class": "ImageContent", "url": "test_url"}
-        result = value_to_python_code(value)
-        assert result == 'ImageContent(url="test_url")'
-
-    def test_dict_with_class_pdf_content(self) -> None:
-        """Test conversion of PDFContent dict."""
-        value = {"_class": "PDFContent", "url": "test_url"}
-        result = value_to_python_code(value)
-        assert result == 'PDFContent(url="test_url")'
-
-    def test_dict_with_concept_code_and_content_simple(self) -> None:
-        """Test conversion of refined concept with simple content."""
-        value = {
-            "concept_code": "test_domain.Question",
-            "content": "question_text",
-        }
-        result = value_to_python_code(value, indent_level=3)
-        expected = '{\n                "concept": "test_domain.Question",\n                "content": "question_text",\n            }'
-        assert result == expected
-
-    def test_dict_with_concept_code_and_content_image(self) -> None:
-        """Test conversion of refined Image concept."""
-        value = {
-            "concept_code": "tables.TableScreenshot",
-            "content": {"_class": "ImageContent", "url": "table_screenshot_url"},
-        }
-        result = value_to_python_code(value, indent_level=3)
-        expected = (
-            "{\n"
-            '                "concept": "tables.TableScreenshot",\n'
-            '                "content": ImageContent(url="table_screenshot_url"),\n'
-            "            }"
-        )
-        assert result == expected
-
-
-class TestGenerateCompactMemoryEntry:
-    """Test generate_compact_memory_entry function."""
-
-    def test_generate_entry_for_native_text(self) -> None:
-        """Test generating entry for native Text concept."""
+    def test_native_text_json(self) -> None:
+        """Test JSON representation for native Text concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
-        result = generate_compact_memory_entry("message", concept)
-        assert result == '            "message": "message_text",'
+        result, _ = concept.generate_input_representation(ConceptRepresentationFormat.JSON)
+        assert result["concept"] == "native.Text"
+        assert "content" in result
+        assert "text" in result["content"]
 
-    def test_generate_entry_for_native_image(self) -> None:
-        """Test generating entry for native Image concept."""
+    def test_native_image_json(self) -> None:
+        """Test JSON representation for native Image concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
-        result = generate_compact_memory_entry("photo", concept)
-        assert result == '            "photo": ImageContent(url="photo_url"),'
+        result, _ = concept.generate_input_representation(ConceptRepresentationFormat.JSON)
+        assert result["concept"] == "native.Image"
+        assert "content" in result
+        assert "url" in result["content"]
 
-    def test_generate_entry_for_refined_image(self) -> None:
-        """Test generating entry for a concept that refines Image."""
-        concept = ConceptFactory.make(
-            domain="tables",
-            concept_code="TableScreenshot",
-            description="A screenshot of a table",
-            structure_class_name="ImageContent",
-            refines="native.Image",
-        )
-        result = generate_compact_memory_entry("table_screenshot", concept)
+    def test_native_number_json(self) -> None:
+        """Test JSON representation for native Number concept."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.NUMBER)
+        result, _ = concept.generate_input_representation(ConceptRepresentationFormat.JSON)
+        assert result["concept"] == "native.Number"
+        assert "content" in result
+        assert "number" in result["content"]
 
-        # Should generate the full format with concept and content
-        assert '"concept": "tables.TableScreenshot"' in result
-        assert 'ImageContent(url="table_screenshot_url")' in result
-        assert "table_screenshot" in result
+    def test_native_pdf_json_with_multiplicity(self) -> None:
+        """Test JSON representation for PDF with multiplicity - content should be a list."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+        result, _ = concept.generate_input_representation(ConceptRepresentationFormat.JSON, is_multiple=True)
+        assert result["concept"] == "native.PDF"
+        assert "content" in result
+        # Content should be a list
+        content = cast("list[dict[str, Any]]", result["content"])
+        assert isinstance(content, list)
+        assert len(content) == 1
+        assert "url" in content[0]
 
-    def test_generate_entry_for_refined_text(self) -> None:
-        """Test generating entry for a concept that refines Text."""
+
+class TestConceptGenerateInputRepresentationPython:
+    """Test Concept.generate_input_representation for Python format."""
+
+    def test_native_text_python(self) -> None:
+        """Test Python representation for native Text concept."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
+        result, imports = concept.generate_input_representation(ConceptRepresentationFormat.PYTHON)
+        assert result["concept"] == "native.Text"
+        assert "TextContent" in result["content"]
+        assert "TextContent" in imports
+
+    def test_native_image_python(self) -> None:
+        """Test Python representation for native Image concept."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
+        result, imports = concept.generate_input_representation(ConceptRepresentationFormat.PYTHON)
+        assert result["concept"] == "native.Image"
+        assert "ImageContent" in result["content"]
+        assert "ImageContent" in imports
+
+    def test_refined_text_python(self) -> None:
+        """Test Python representation for a concept that refines Text."""
         concept = ConceptFactory.make(
             domain="test_domain",
             concept_code="Question",
@@ -103,9 +82,204 @@ class TestGenerateCompactMemoryEntry:
             structure_class_name="TextContent",
             refines="native.Text",
         )
-        result = generate_compact_memory_entry("question", concept)
+        result, imports = concept.generate_input_representation(ConceptRepresentationFormat.PYTHON)
+        assert result["concept"] == "test_domain.Question"
+        assert "TextContent" in result["content"]
+        assert "TextContent" in imports
 
-        # Should generate the full format with concept and content
-        assert '"concept": "test_domain.Question"' in result
-        assert '"question_text"' in result
-        assert "question" in result
+    def test_native_pdf_python_with_multiplicity(self) -> None:
+        """Test Python representation for PDF with multiplicity - for Python format, wrapping is handled by caller."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+        result, imports = concept.generate_input_representation(ConceptRepresentationFormat.PYTHON, is_multiple=True)
+        # For Python format, is_multiple doesn't wrap content (caller handles it)
+        assert result["concept"] == "native.PDF"
+        assert "PDFContent" in result["content"]
+        assert "PDFContent" in imports
+
+
+class TestInputRequirementsGenerateJsonRepresentation:
+    """Test InputRequirements.generate_json_representation method."""
+
+    def test_empty_inputs(self) -> None:
+        """Test JSON generation with no inputs."""
+        inputs = InputRequirements(root={})
+        result = inputs.generate_json_representation()
+        assert result == {}
+
+    def test_single_input(self) -> None:
+        """Test JSON generation with a single input."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
+        inputs = InputRequirements(root={"message": InputRequirement(concept=concept)})
+        result = inputs.generate_json_representation()
+        assert "message" in result
+        assert result["message"]["concept"] == "native.Text"
+
+    def test_multiple_inputs(self) -> None:
+        """Test JSON generation with multiple inputs."""
+        text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
+        image_concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
+        inputs = InputRequirements(
+            root={
+                "text_input": InputRequirement(concept=text_concept),
+                "image_input": InputRequirement(concept=image_concept),
+            }
+        )
+        result = inputs.generate_json_representation()
+        assert "text_input" in result
+        assert "image_input" in result
+        assert result["text_input"]["concept"] == "native.Text"
+        assert result["image_input"]["concept"] == "native.Image"
+
+
+class TestInputRequirementsJsonWithMultiplicity:
+    """Test InputRequirements.generate_json_representation with multiplicity - content is wrapped in list."""
+
+    def test_single_item_no_multiplicity(self) -> None:
+        """Test that single item (no multiplicity) has content as dict, not list."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+        inputs = InputRequirements(root={"document": InputRequirement(concept=concept, multiplicity=None)})
+        result = inputs.generate_json_representation()
+        assert "document" in result
+        # concept should be present
+        assert result["document"]["concept"] == "native.PDF"
+        # content should NOT be a list
+        content = result["document"]["content"]
+        assert isinstance(content, dict)
+        assert "url" in content
+
+    def test_multiple_items_true_multiplicity(self) -> None:
+        """Test that multiplicity=True wraps content in list."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+        inputs = InputRequirements(root={"documents": InputRequirement(concept=concept, multiplicity=True)})
+        result = inputs.generate_json_representation()
+        assert "documents" in result
+        # concept should be at the top level
+        assert result["documents"]["concept"] == "native.PDF"
+        # content should be a list
+        content = cast("list[dict[str, Any]]", result["documents"]["content"])
+        assert isinstance(content, list)
+        assert len(content) == 1
+        assert "url" in content[0]
+
+    def test_multiple_items_int_multiplicity(self) -> None:
+        """Test that multiplicity=N (int > 1) wraps content in list."""
+        concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
+        inputs = InputRequirements(root={"images": InputRequirement(concept=concept, multiplicity=3)})
+        result = inputs.generate_json_representation()
+        assert "images" in result
+        # concept should be at the top level
+        assert result["images"]["concept"] == "native.Image"
+        # content should be a list
+        content = cast("list[dict[str, Any]]", result["images"]["content"])
+        assert isinstance(content, list)
+        assert len(content) == 1
+        assert "url" in content[0]
+
+    def test_mixed_multiplicity(self) -> None:
+        """Test mixed single and multiple inputs."""
+        pdf_concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+        inputs = InputRequirements(
+            root={
+                "single_pdf": InputRequirement(concept=pdf_concept, multiplicity=None),
+                "multiple_pdfs": InputRequirement(concept=pdf_concept, multiplicity=True),
+            }
+        )
+        result = inputs.generate_json_representation()
+        # single_pdf content should be a dict
+        assert isinstance(result["single_pdf"]["content"], dict)
+        # multiple_pdfs content should be a list
+        assert isinstance(result["multiple_pdfs"]["content"], list)
+
+
+class TestGenerateRunnerCode:
+    """Test generate_runner_code function."""
+
+    @pytest.fixture
+    def mock_pipe_single_output(self) -> MagicMock:
+        """Create a mock pipe with a single output."""
+        text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
+        pdf_concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+
+        mock_pipe = MagicMock()
+        mock_pipe.code = "test_pipe"
+        mock_pipe.output = text_concept
+        mock_pipe.inputs = InputRequirements(root={"document": InputRequirement(concept=pdf_concept)})
+        return mock_pipe
+
+    @pytest.fixture
+    def mock_pipe_list_output(self) -> MagicMock:
+        """Create a mock pipe with a list output."""
+        text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
+        pdf_concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+
+        mock_pipe = MagicMock()
+        mock_pipe.code = "test_pipe_list"
+        mock_pipe.output = text_concept
+        mock_pipe.inputs = InputRequirements(root={"documents": InputRequirement(concept=pdf_concept, multiplicity=True)})
+        return mock_pipe
+
+    def test_runner_code_includes_imports(self, mock_pipe_single_output: MagicMock) -> None:
+        """Test that generated runner code includes necessary imports."""
+        runner_code = generate_runner_code(mock_pipe_single_output)
+        assert "import asyncio" in runner_code
+        assert "from pipelex.pipelex import Pipelex" in runner_code
+        assert "from pipelex.pipeline.execute import execute_pipeline" in runner_code
+
+    def test_runner_code_includes_structure_imports(self, mock_pipe_single_output: MagicMock) -> None:
+        """Test that generated runner code includes structure class imports."""
+        runner_code = generate_runner_code(mock_pipe_single_output)
+        assert "from pipelex.core.stuffs.pdf_content import PDFContent" in runner_code
+        assert "from pipelex.core.stuffs.text_content import TextContent" in runner_code
+
+    def test_runner_code_single_output_return_type(self, mock_pipe_single_output: MagicMock) -> None:
+        """Test that generated runner code has correct return type for single output."""
+        runner_code = generate_runner_code(mock_pipe_single_output, output_multiplicity=False)
+        assert "async def run_test_pipe() -> TextContent:" in runner_code
+        assert "pipe_output.main_stuff_as(content_type=TextContent)" in runner_code
+
+    def test_runner_code_list_output_return_type(self, mock_pipe_list_output: MagicMock) -> None:
+        """Test that generated runner code has correct return type for list output."""
+        runner_code = generate_runner_code(mock_pipe_list_output, output_multiplicity=True)
+        assert "async def run_test_pipe_list() -> list[TextContent]:" in runner_code
+        assert "pipe_output.main_stuff_as_items(item_type=TextContent)" in runner_code
+
+    def test_runner_code_includes_inputs(self, mock_pipe_single_output: MagicMock) -> None:
+        """Test that generated runner code includes input values."""
+        runner_code = generate_runner_code(mock_pipe_single_output)
+        assert '"document":' in runner_code
+        assert '"concept": "native.PDF"' in runner_code
+        assert "PDFContent(" in runner_code
+
+    def test_runner_code_includes_main_block(self, mock_pipe_single_output: MagicMock) -> None:
+        """Test that generated runner code includes main block."""
+        runner_code = generate_runner_code(mock_pipe_single_output)
+        assert 'if __name__ == "__main__":' in runner_code
+        assert "Pipelex.make()" in runner_code
+        assert "asyncio.run(run_test_pipe())" in runner_code
+
+    def test_runner_code_multiplicity_input(self, mock_pipe_list_output: MagicMock) -> None:
+        """Test that generated runner code handles input multiplicity correctly."""
+        runner_code = generate_runner_code(mock_pipe_list_output)
+        # Should have list-wrapped content for multiplicity input
+        assert "[PDFContent(" in runner_code
+
+    def test_runner_code_custom_class_import_format(self) -> None:
+        """Test that custom class imports use domain_conceptCode format for standalone scripts."""
+        # Create a custom concept (non-native)
+        custom_concept = ConceptFactory.make(
+            domain="test_domain",
+            concept_code="CustomOutput",
+            description="A custom output",
+            structure_class_name="CustomOutput",
+        )
+        pdf_concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
+
+        mock_pipe = MagicMock()
+        mock_pipe.code = "custom_pipe"
+        mock_pipe.output = custom_concept
+        mock_pipe.inputs = InputRequirements(root={"document": InputRequirement(concept=pdf_concept)})
+
+        runner_code = generate_runner_code(mock_pipe)
+        # Custom imports should NOT use relative import (no leading dot) for standalone scripts
+        assert "from structures.test_domain_CustomOutput import CustomOutput" in runner_code
+        assert "from .structures" not in runner_code

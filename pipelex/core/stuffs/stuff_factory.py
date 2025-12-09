@@ -10,7 +10,6 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_string
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -376,8 +375,8 @@ class StuffFactory:
             )
             raise StuffFactoryError(msg)
 
-        # Case 2.3: content is a StructuredContent object
-        if isinstance(content, StructuredContent):
+        # Case 2.3: content is a StuffContent object (includes both native and StructuredContent)
+        if isinstance(content, StuffContent):
             if concept.structure_class_name != content.__class__.__name__:
                 msg = (
                     f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
@@ -441,12 +440,12 @@ class StuffFactory:
                 msg = f"Concept '{concept_string}' is not compatible with list of text content"
                 raise StuffFactoryError(msg)
 
-            # Case 2.4: list[StructuredContent]
-            if isinstance(first_item, StructuredContent):
+            # Case 2.4: list[StuffContent] (includes both native and StructuredContent)
+            if isinstance(first_item, StuffContent):
                 for item in list_content_2:
                     if not isinstance(item, type(first_item)):
                         msg = (
-                            f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a list of StructuredContent "
+                            f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a list of StuffContent "
                             "but the items are not of the same type. Every items of the list should be a identical type. "
                             f"If its a '{type(first_item).__name__}', everything should be a '{type(first_item).__name__}'."
                         )
@@ -454,7 +453,7 @@ class StuffFactory:
 
                 return cls.make_stuff(
                     concept=concept,
-                    content=ListContent(items=cast("list[StructuredContent]", list_content_2)),
+                    content=ListContent(items=cast("list[StuffContent]", list_content_2)),
                     name=name,
                     code=code,
                 )

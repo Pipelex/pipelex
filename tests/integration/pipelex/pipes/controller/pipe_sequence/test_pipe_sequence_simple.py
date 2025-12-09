@@ -33,7 +33,7 @@ class TestPipeSequenceSimple:
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",
             domain=domain,
-            blueprint=ConceptBlueprint(description="Lorem Ipsum"),
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_library = get_concept_library()
         concept_library.add_concepts([concept_1])

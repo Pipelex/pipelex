@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import Field, model_validator
 from typing_extensions import Self, override
@@ -23,8 +23,9 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_concept_library, get_content_generator, get_model_deck, get_native_concept
+from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenRunError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
@@ -32,9 +33,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-
-if TYPE_CHECKING:
-    from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class PipeImgGenOutput(PipeOutput):
@@ -149,7 +147,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             strict=True,
         ):
             msg = (
-                f"The output of a ImgGen pipe must be compatible with the Image concept. "
+                f"The output of a PipeImgGen must be compatible with the Image concept. "
                 f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
             )
             raise PipeValidationError(
@@ -258,6 +256,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             nb_images = 1
 
+        # Get the structure class from the registry (might be a subclass of ImageContent)
+        structure_class = get_class_registry().get_required_subclass(
+            name=self.output.structure_class_name,
+            base_class=StuffContent,
+        )
+
         if nb_images > 1:
             generated_image_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
@@ -272,7 +276,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             image_content_items: list[StuffContent] = []
             for generated_image in generated_image_list:
                 image_content_items.append(
-                    ImageContent(
+                    structure_class(
                         url=generated_image.url,
                         source_prompt=img_gen_prompt_text,
                     ),
@@ -296,7 +300,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             generated_image_url = generated_image.url
             image_urls = [generated_image_url]
 
-            the_content = ImageContent(
+            the_content = structure_class(
                 url=generated_image_url,
                 source_prompt=img_gen_prompt_text,
             )
