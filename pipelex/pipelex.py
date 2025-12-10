@@ -396,24 +396,30 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(msg)
 
         pipelex_instance = cls()
-        pipelex_instance.setup(
-            integration_mode=integration_mode,
-            class_registry=class_registry,
-            secrets_provider=secrets_provider,
-            storage_provider=storage_provider,
-            models_manager=models_manager,
-            inference_manager=inference_manager,
-            content_generator=content_generator,
-            pipeline_manager=pipeline_manager,
-            pipeline_tracker=pipeline_tracker,
-            pipe_router=pipe_router,
-            reporting_delegate=reporting_delegate,
-            telemetry_config=telemetry_config,
-            telemetry_manager=telemetry_manager,
-            observers=observers,
-            **kwargs,
-        )
-        pipelex_instance.models_manager.validate_model_deck()
+        try:
+            pipelex_instance.setup(
+                integration_mode=integration_mode,
+                class_registry=class_registry,
+                secrets_provider=secrets_provider,
+                storage_provider=storage_provider,
+                models_manager=models_manager,
+                inference_manager=inference_manager,
+                content_generator=content_generator,
+                pipeline_manager=pipeline_manager,
+                pipeline_tracker=pipeline_tracker,
+                pipe_router=pipe_router,
+                reporting_delegate=reporting_delegate,
+                telemetry_config=telemetry_config,
+                telemetry_manager=telemetry_manager,
+                observers=observers,
+                **kwargs,
+            )
+            pipelex_instance.models_manager.validate_model_deck()
+        except BaseException:
+            # Cleanup the singleton instance if setup fails to avoid "already initialized" errors
+            if cls in MetaSingleton.instances:
+                del MetaSingleton.instances[cls]
+            raise
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 
