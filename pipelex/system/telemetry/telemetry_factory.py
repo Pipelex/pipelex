@@ -11,7 +11,7 @@ from pipelex.system.pipelex_service.exceptions import (
 from pipelex.system.pipelex_service.pipelex_credentials import PIPELEX_GATEWAY_API_KEY_VAR
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig, TelemetryMode, load_telemetry_config
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, PostHogMode, TelemetryConfig, load_telemetry_config
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
@@ -44,11 +44,19 @@ def make_telemetry_manager(
             telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
             telemetry_config = load_telemetry_config(path=telemetry_config_path, secrets_provider=secrets_provider)
 
-        match telemetry_config.telemetry_mode:
-            case TelemetryMode.OFF:
+        # Always respect DO_NOT_TRACK env var
+        if is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
+            if is_pipelex_telemetry_enabled:
+                # Gateway requires telemetry but DNT is set - we respect DNT
+                raise GatewayDoNotTrackConflictError(dnt_env_var=OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
+            chosen_telemetry_manager = TelemetryManagerNoOp()
+            log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
+            return chosen_telemetry_manager
+
+        match telemetry_config.posthog.mode:
+            case PostHogMode.OFF:
                 if is_pipelex_telemetry_enabled:
                     # Gateway requires telemetry - create manager with only Pipelex telemetry
-                    # Note: the telemetry_manager parameter is guaranteed to be None here (checked above)
                     chosen_telemetry_manager = TelemetryManager(
                         telemetry_config=telemetry_config,
                         pipelex_telemetry_enabled=True,
@@ -57,21 +65,13 @@ def make_telemetry_manager(
                     log.debug("Custom telemetry is off, but Pipelex Gateway telemetry is enabled")
                 else:
                     chosen_telemetry_manager = TelemetryManagerNoOp()
-                    log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
-            case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
-                if telemetry_config.respect_dnt and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
-                    if is_pipelex_telemetry_enabled:
-                        # Gateway requires telemetry but DNT is set - we respect DNT
-                        raise GatewayDoNotTrackConflictError(dnt_env_var=OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
-                    chosen_telemetry_manager = TelemetryManagerNoOp()
-                    log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
-                else:
-                    # Note: if pipelex_telemetry_enabled then the telemetry_manager parameter is guaranteed to be None here (checked above)
-                    chosen_telemetry_manager = injected_telemetry_manager or TelemetryManager(
-                        telemetry_config=telemetry_config,
-                        pipelex_telemetry_enabled=is_pipelex_telemetry_enabled,
-                        gateway_api_key=gateway_api_key,
-                    )
+                    log.debug("Telemetry is disabled because posthog.mode is set to 'off'")
+            case PostHogMode.ANONYMOUS | PostHogMode.IDENTIFIED:
+                chosen_telemetry_manager = injected_telemetry_manager or TelemetryManager(
+                    telemetry_config=telemetry_config,
+                    pipelex_telemetry_enabled=is_pipelex_telemetry_enabled,
+                    gateway_api_key=gateway_api_key,
+                )
     else:
         chosen_telemetry_manager = TelemetryManagerNoOp()
         log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")

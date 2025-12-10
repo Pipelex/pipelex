@@ -42,9 +42,8 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
 class BackendFileReport(BaseModel):
@@ -99,19 +98,21 @@ def check_telemetry_config() -> tuple[bool, str]:
     # Use hard-coded path to avoid needing Pipelex initialization
     telemetry_config_path = f".pipelex/{TELEMETRY_CONFIG_FILE_NAME}"
 
-    if not path_exists(telemetry_config_path):
-        return False, "Telemetry configuration file not found"
-
     try:
         toml_doc = load_toml_from_path(telemetry_config_path)
+    except FileNotFoundError:
+        return False, "Telemetry configuration file not found"
+    except TomlError as exc:
+        return False, f"TOML syntax error: {exc}"
+
+    try:
         telemetry_config = TelemetryConfig.model_validate(toml_doc)
-        return True, f"Telemetry configured (mode: {telemetry_config.telemetry_mode})"
-    except ValidationError as validation_error:
-        validation_error_msg = format_pydantic_validation_error(validation_error)
-        msg = f"Invalid telemetry configuration: {validation_error_msg}"
-        return False, msg
-    except Exception as exc:
-        return False, f"Error loading telemetry config: {exc}"
+        return True, f"Telemetry configured (mode: {telemetry_config.posthog.mode})"
+    except ValidationError:
+        # Check if this looks like the old config format (has telemetry_mode at root level)
+        if "posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
+            return False, "Config format has changed - run [cyan]pipelex init telemetry[/cyan] to update"
+        return False, "Invalid configuration - run [cyan]pipelex init telemetry --reset[/cyan] to fix"
 
 
 def check_backend_credentials() -> tuple[bool, dict[str, BackendCredentialsReport], str]:
@@ -506,7 +507,7 @@ def display_health_report(
             if can_auto_fix_telemetry:
                 console.print("  • Run [cyan]pipelex init telemetry[/cyan] to configure telemetry preferences")
 
-            if has_telemetry_validation_error:
+            if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
                 console.print("  • Fix validation errors in [cyan].pipelex/telemetry.toml[/cyan]")
                 console.print("    or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate")
 
@@ -692,7 +693,8 @@ def do_doctor_cmd(
 
     # Determine what can be auto-fixed
     can_fix_config = not config_healthy and config_missing_count > 0
-    can_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
+    # Telemetry can be fixed if not found OR if the format has changed (old config)
+    can_fix_telemetry = not telemetry_healthy and ("not found" in telemetry_message.lower() or "format has changed" in telemetry_message.lower())
 
     # Check for backend file issues that can be auto-fixed
     can_fix_backends = False
@@ -704,9 +706,10 @@ def do_doctor_cmd(
 
     has_auto_fixable_issues = can_fix_config or can_fix_telemetry or can_fix_backends
 
-    # Determine what requires manual fixes
+    # Determine what requires manual fixes (excludes auto-fixable issues)
     has_config_validation_error = not config_healthy and config_missing_count == 0
-    has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
+    # Telemetry validation error only if it's not auto-fixable (not "not found" and not "format has changed")
+    has_telemetry_validation_error = not telemetry_healthy and not can_fix_telemetry
     has_backend_credential_issues = not backends_healthy and backend_credential_reports
 
     # If --fix flag is provided, offer to fix auto-fixable issues
@@ -726,12 +729,19 @@ def do_doctor_cmd(
                     console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
                 console.print()
 
-        # Fix missing telemetry config
+        # Fix missing or outdated telemetry config
         if can_fix_telemetry:
-            if Confirm.ask("[bold]Configure telemetry preferences?[/bold]", default=True):
+            is_format_change = "format has changed" in telemetry_message.lower()
+            prompt_msg = (
+                "[bold]Reset telemetry configuration using the new format?[/bold]"
+                if is_format_change
+                else "[bold]Configure telemetry preferences?[/bold]"
+            )
+            if Confirm.ask(prompt_msg, default=True):
                 try:
                     console.print()
-                    init_cmd(focus=InitFocus.TELEMETRY, reset=False, skip_confirmation=True)
+                    # Use reset=True for format changes to overwrite the old config
+                    init_cmd(focus=InitFocus.TELEMETRY, reset=is_format_change, skip_confirmation=True)
                     console.print("[green]✓[/green] Telemetry configured")
                 except Exception as exc:
                     console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
@@ -777,8 +787,8 @@ def do_doctor_cmd(
             console.print("or run [cyan]pipelex init config --reset[/cyan] to regenerate from template.")
             console.print()
 
-        # Telemetry validation errors
-        if has_telemetry_validation_error:
+        # Telemetry validation errors (skip if message already contains the fix command)
+        if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
             console.print("[bold]Telemetry validation error:[/bold]")
             console.print(f"  {telemetry_message}")
             console.print()

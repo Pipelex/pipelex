@@ -29,7 +29,6 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import load_pipelex_service_config_if_exists
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
 
 
@@ -323,8 +322,7 @@ def execute_initialization(
 
     # Step 3: Set up telemetry if needed
     if needs_telemetry:
-        telemetry_mode = setup_telemetry(console, telemetry_config_path)
-        TelemetryManagerAbstract.telemetry_mode_just_set = telemetry_mode
+        setup_telemetry(console, telemetry_config_path)
 
     console.print()
 

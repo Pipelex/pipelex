@@ -23,7 +23,7 @@ from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.exceptions import LangfuseCredentialsError
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
-from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_config import OtlpExporterConfig, TelemetryRedactionConfig
 from pipelex.tools.log.log import log
 from pipelex.tools.misc.json_utils import JsonContent, pure_json_str
 from pipelex.tools.misc.package_utils import get_package_version
@@ -186,8 +186,7 @@ class OtelFactory:
         custom_redaction_config: TelemetryRedactionConfig,
         pipelex_posthog_client: Posthog | None = None,
         pipelex_distinct_id: str | None = None,
-        otlp_endpoint: str | None = None,
-        otlp_headers: dict[str, str] | None = None,
+        otlp_exporters: list[OtlpExporterConfig] | None = None,
         is_langfuse_enabled: bool = False,
         langfuse_base_url: str | None = None,
     ) -> tuple[OTelTracer, OTelTracerProvider]:
@@ -199,7 +198,7 @@ class OtelFactory:
         It can configure multiple types of exporters:
         1. Custom PostHog Exporter: User's PostHog for their own analytics
         2. Pipelex PostHog Exporter: Pipelex internal telemetry (mandatory for gateway)
-        3. OTLP Exporter: Sends standard OTLP traces to a collector
+        3. OTLP Exporters: Sends standard OTLP traces to collectors (supports multiple)
         4. Langfuse Exporter: Sends OTLP traces to Langfuse for LLM observability
 
         Args:
@@ -208,8 +207,7 @@ class OtelFactory:
             custom_redaction_config: Redaction config for custom PostHog exporter
             pipelex_posthog_client: Optional Pipelex internal PostHog client (for gateway)
             pipelex_distinct_id: Distinct ID for Pipelex telemetry
-            otlp_endpoint: Optional OTLP endpoint URL
-            otlp_headers: Optional headers for OTLP export
+            otlp_exporters: List of OTLP exporter configurations
             is_langfuse_enabled: Whether to enable Langfuse OTLP export
             langfuse_base_url: Optional base URL for self-hosted Langfuse
 
@@ -253,13 +251,15 @@ class OtelFactory:
             provider.add_span_processor(OTelBatchSpanProcessor(pipelex_posthog_exporter))
             log.verbose("Pipelex PostHog exporter enabled for gateway telemetry (with full redaction)")
 
-        # Add Generic OTLP Exporter if endpoint provided
-        if otlp_endpoint:
-            otlp_exporter = OTLPSpanExporter(
-                endpoint=otlp_endpoint,
-                headers=otlp_headers or {},
-            )
-            provider.add_span_processor(OTelBatchSpanProcessor(otlp_exporter))
+        # Add OTLP Exporters (supports multiple)
+        if otlp_exporters:
+            for exporter_config in otlp_exporters:
+                otlp_exporter = OTLPSpanExporter(
+                    endpoint=exporter_config.endpoint,
+                    headers=exporter_config.headers,
+                )
+                provider.add_span_processor(OTelBatchSpanProcessor(otlp_exporter))
+                log.verbose(f"OTLP exporter '{exporter_config.name}' enabled: {exporter_config.endpoint}")
 
         # Add Langfuse OTLP Exporter if enabled
         if is_langfuse_enabled:

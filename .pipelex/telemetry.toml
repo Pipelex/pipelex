@@ -10,26 +10,49 @@
 # service quality, enforce fair usage, and provide you with better support.
 # Gateway telemetry operates independently from your settings below - you can have both!
 #
+# To disable all telemetry, set the DO_NOT_TRACK=1 environment variable.
+#
 # Documentation: https://docs.pipelex.com
 # Support: https://go.pipelex.com/discord
 #
 ####################################################################################################
 
-telemetry_mode = "off"                                               # Values: "off" | "anonymous" | "identified"
-host = "https://us.i.posthog.com"                                    # US region (or "https://eu.i.posthog.com" for EU)
-project_api_key = "phc_YOUR_POSTHOG_PROJECT_API_KEY"                 # Get from PostHog Project Settings
-respect_dnt = true
-redact = ["prompt", "system_prompt", "response", "file_path", "url"]
-geoip_enabled = true
-dry_mode_enabled = false
-verbose_enabled = false
-# user_id = "set_if_mode_is_identified"
-ai_tracing_enabled = false      # Enable OpenTelemetry tracing for AI operations
-capture_content_enabled = false # Controls gen_ai.prompt/completion content capture for OTel
-# capture_content_max_length = 1000                                  # Max length for captured content (omit for unlimited)
-capture_pipe_codes_enabled = false        # Controls whether pipe codes appear in span names/attributes
-capture_output_class_name_enabled = false # Controls whether output class names appear in span names/attributes
-langfuse_enabled = false                  # Langfuse Integration (requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY env vars)
-# langfuse_base_url = "https://cloud.langfuse.com"  # Override for self-hosted Langfuse
-# otlp_endpoint = "https://..."
-# otlp_headers = { "Authorization" = "Bearer ..." }
+# PostHog Configuration (Event tracking + AI span tracing)
+[posthog]
+mode = "off" # Values: "off" | "anonymous" | "identified"
+# user_id = "your_user_id"                                  # Required when mode = "identified"
+host = "https://us.i.posthog.com" # US region (or "https://eu.i.posthog.com" for EU)
+api_key = "phc_YOUR_POSTHOG_PROJECT_API_KEY" # Get from PostHog Project Settings
+geoip = true # Enable GeoIP lookup
+debug = false # Enable PostHog debug mode
+redact_properties = [
+    "prompt",
+    "system_prompt",
+    "response",
+    "file_path",
+    "url",
+] # Event properties to redact
+
+# AI span tracing to YOUR PostHog (does NOT affect Langfuse/OTLP - they receive full data)
+[posthog.tracing]
+enabled = false # Send AI spans to your PostHog
+
+# Privacy controls for data sent to YOUR PostHog only
+[posthog.tracing.capture]
+content = false # Capture prompt/completion content
+# content_max_length = 1000                                 # Max length for captured content (omit for unlimited)
+pipe_codes = false         # Include pipe codes in span names/attributes
+output_class_names = false # Include output class names in span names/attributes
+
+# Langfuse Integration (requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY env vars)
+# Note: Langfuse receives FULL span data (no redaction)
+[langfuse]
+enabled = false
+# base_url = "https://cloud.langfuse.com"                   # Override for self-hosted Langfuse
+
+# Additional OTLP Exporters (array for multiple)
+# Note: OTLP exporters receive FULL span data (no redaction)
+# [[otlp]]
+# name = "my-collector"                                     # Identifier for logging
+# endpoint = "https://..."                                  # OTLP endpoint URL
+# headers = { Authorization = "Bearer ..." }               # Headers for OTLP export

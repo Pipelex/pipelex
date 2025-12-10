@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, NoReturn
+from typing import NoReturn
 
 import typer
 
@@ -6,11 +6,10 @@ from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
-
-if TYPE_CHECKING:
-    from pipelex.pipeline.validate_bundle import ValidateBundleError
 
 
 class ErrorContext(StrEnum):
@@ -115,7 +114,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
     raise typer.Exit(1) from exc
 
 
-def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | None = None) -> NoReturn:
+def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: str | None = None) -> NoReturn:
     """Handle and display ValidateBundleError with formatted output.
 
     Args:
@@ -170,5 +169,34 @@ def handle_validate_bundle_error(exc: "ValidateBundleError", bundle_path: str | 
         "Make sure all required fields are present and correctly formatted."
     )
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError) -> NoReturn:
+    """Handle and display TelemetryConfigValidationError with migration guidance.
+
+    This error typically occurs when users have an old telemetry.toml format
+    that doesn't match the new nested structure.
+
+    Args:
+        exc: The telemetry config validation error exception
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Telemetry configuration format has changed[/bold red]\n")
+
+    console.print(
+        "[bold yellow]⚠ Breaking Change:[/bold yellow] The telemetry.toml format has been updated.\n"
+        "Your existing configuration uses the old flat format.\n"
+    )
+
+    console.print("[bold green]💡 To fix:[/bold green] Run [cyan]pipelex init telemetry[/cyan] to create a new config\n")
+
+    console.print("[dim]This update brings powerful new telemetry options:[/dim]")
+    console.print("[dim]  • Langfuse integration for LLM observability[/dim]")
+    console.print("[dim]  • Support for any OpenTelemetry backend via OTLP exporters[/dim]")
+    console.print("[dim]  • Cleaner separation of PostHog, Langfuse, and OTLP settings[/dim]")
+    console.print()
+
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

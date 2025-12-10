@@ -91,7 +91,8 @@ def verify_telemetry_config(telemetry_config_path: str, expected_mode: str) -> N
         expected_mode: Expected telemetry mode ("off", "anonymous", or "identified").
     """
     toml_doc = load_toml_with_tomlkit(telemetry_config_path)
-    assert toml_doc["telemetry_mode"] == expected_mode, f"Expected telemetry_mode '{expected_mode}', got '{toml_doc['telemetry_mode']}'"
+    actual_mode = toml_doc["posthog"]["mode"]  # type: ignore[index]
+    assert actual_mode == expected_mode, f"Expected posthog.mode '{expected_mode}', got '{actual_mode}'"
 
 
 class MockedInitEnvironment:
@@ -198,10 +199,8 @@ class MockedInitEnvironment:
         self.mocker.patch("pipelex.cli.commands.init.routing.get_console", return_value=self.mock_console)
 
         # Patch UI modules that still instantiate Console directly
-        self.mocker.patch("pipelex.cli.commands.init.telemetry.Console")
         self.mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Console")
         self.mocker.patch("pipelex.cli.commands.init.ui.routing_ui.Console")
-        self.mocker.patch("pipelex.cli.commands.init.ui.telemetry_ui.Console")
 
     def add_prompt_input(self, value: str) -> None:
         """Add a prompt input to the sequence.
