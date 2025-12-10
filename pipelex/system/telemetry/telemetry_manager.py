@@ -10,10 +10,7 @@ from typing_extensions import Unpack, override
 from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
-from pipelex.system.pipelex_service.pipelex_credentials import (
-    PipelexServiceConfig,
-    hash_gateway_api_key,
-)
+from pipelex.system.pipelex_service.pipelex_credentials import PipelexServiceConfig
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
@@ -60,7 +57,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         self.pipelex_posthog_client: Posthog | None = None
         if pipelex_telemetry_enabled:
             if gateway_api_key:
-                self._pipelex_distinct_id = hash_gateway_api_key(gateway_api_key)
+                self._pipelex_distinct_id = PipelexServiceConfig.make_distinct_id(gateway_api_key)
             self.pipelex_posthog_client = Posthog(
                 project_api_key=PipelexServiceConfig.POSTHOG_PROJECT_API_KEY,
                 host=PipelexServiceConfig.POSTHOG_HOST,
@@ -217,11 +214,11 @@ class TelemetryManager(TelemetryManagerAbstract):
         else:
             tracked_properties = {}
 
-        # 1. Always track to Pipelex PostHog if enabled (independent of telemetry_mode)
-        if self._pipelex_telemetry_enabled and self.pipelex_posthog_client and self._pipelex_distinct_id:
+        # Always track to Pipelex PostHog if enabled (independent of telemetry_mode)
+        if self._pipelex_telemetry_enabled:
             self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
 
-        # 2. Track to custom PostHog based on user's telemetry_mode
+        # Track to custom PostHog based on user's telemetry_mode
         match self.telemetry_config.telemetry_mode:
             case TelemetryMode.ANONYMOUS:
                 self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
@@ -240,6 +237,7 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
         if not self.custom_posthog_client:
+            log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
             return
         if self.telemetry_config.dry_mode_enabled:
             if properties:
@@ -256,6 +254,7 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     def _track_identified_event(self, event_name: str, properties: dict[str, Any], user_id: str):
         if not self.custom_posthog_client:
+            log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
             return
         if self.telemetry_config.dry_mode_enabled:
             if properties:
@@ -269,13 +268,13 @@ class TelemetryManager(TelemetryManagerAbstract):
             self.custom_posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
             log.verbose(f"Tracked identified event '{event_name}' with properties: {properties}")
 
-    # TODO: RC - cleanup optionals
     def _track_to_pipelex(self, event_name: str, properties: dict[str, Any]):
-        """Track event to Pipelex's internal PostHog (always identified by hashed API key).
+        """Track event to Pipelex's PostHog (always identified).
 
         This is called independently of the user's telemetry_mode setting.
         """
         if not self.pipelex_posthog_client or not self._pipelex_distinct_id:
+            log.error("Could not track event to Pipelex telemetry because pipelex_posthog_client or _pipelex_distinct_id is not set")
             return
         self.pipelex_posthog_client.capture(event_name, distinct_id=self._pipelex_distinct_id, properties=properties)
         log.verbose(f"Tracked event '{event_name}' to Pipelex telemetry")

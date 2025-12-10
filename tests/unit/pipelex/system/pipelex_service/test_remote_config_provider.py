@@ -44,8 +44,8 @@ class TestApiKeyHashing:
 
     @staticmethod
     def _hash_api_key(api_key: str) -> str:
-        """Hash the API key using SHA256 - same logic as hash_gateway_api_key."""
-        return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+        """Hash the API key using truncated SHA256 - same logic as hash_gateway_api_key."""
+        return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:16]
 
     def test_hash_api_key_deterministic(self) -> None:
         """Test that API key hashing is deterministic."""
@@ -60,10 +60,10 @@ class TestApiKeyHashing:
         hash2 = self._hash_api_key("key2")
         assert hash1 != hash2
 
-    def test_hash_api_key_is_sha256(self) -> None:
-        """Test that hash is 64 characters (SHA256 hex)."""
+    def test_hash_api_key_is_truncated_sha256(self) -> None:
+        """Test that hash is 16 characters (truncated SHA256 hex)."""
         api_key = "test-key"
         hashed = self._hash_api_key(api_key)
-        assert len(hashed) == 64
+        assert len(hashed) == 16
         # Verify it's a valid hex string
         int(hashed, 16)

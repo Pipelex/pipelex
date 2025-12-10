@@ -13,20 +13,24 @@ import hashlib
 PIPELEX_GATEWAY_API_KEY_VAR = "PIPELEX_GATEWAY_API_KEY"
 
 
-def hash_gateway_api_key(api_key: str) -> str:
-    """Hash the gateway API key using SHA256 for use as PostHog distinct_id.
+def _hash_gateway_api_key(api_key: str, length: int) -> str:
+    """Hash the gateway API key using truncated SHA256 for use as PostHog distinct_id.
+
+    Uses the first `length` characters of SHA256 hex digest, which provides
+    excellent collision resistance for practical purposes while being compact.
 
     Args:
         api_key: The raw Pipelex Gateway API key.
+        length: The length of the hash to return.
 
     Returns:
-        SHA256 hex digest of the API key.
+        First `length` characters of SHA256 hex digest.
     """
-    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:length]
 
 
 class PipelexServiceConfig:
-    """Hardcoded configuration for Pipelex's services."""
+    """Base configuration for Pipelex's services."""
 
     # PostHog host for Pipelex services
     POSTHOG_HOST = "https://eu.i.posthog.com"
@@ -37,3 +41,15 @@ class PipelexServiceConfig:
 
     # Public URL for remote gateway configuration (JSON file on S3)
     REMOTE_CONFIG_URL = "https://pipelex-config.s3.amazonaws.com/pipelex_remote_config.json"
+
+    @classmethod
+    def make_distinct_id(cls, gateway_api_key: str) -> str:
+        """Make a distinct_id for PostHog from the gateway API key.
+
+        Args:
+            gateway_api_key: The raw Pipelex Gateway API key.
+
+        Returns:
+            First 16 characters of SHA256 hex digest.
+        """
+        return _hash_gateway_api_key(gateway_api_key, length=16)
