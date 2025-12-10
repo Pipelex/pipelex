@@ -37,10 +37,3 @@ class PipelexServiceConfig:
 
     # Public URL for remote gateway configuration (JSON file on S3)
     REMOTE_CONFIG_URL = "https://pipelex-config.s3.amazonaws.com/pipelex_remote_config.json"
-
-
-# Privacy flags for Pipelex telemetry
-# These ensure we don't capture sensitive user data
-PIPELEX_TELEMETRY_CAPTURE_CONTENT_ENABLED = False
-PIPELEX_TELEMETRY_CAPTURE_PIPE_CODES_ENABLED = False
-PIPELEX_TELEMETRY_CAPTURE_OUTPUT_CLASS_NAME_ENABLED = False

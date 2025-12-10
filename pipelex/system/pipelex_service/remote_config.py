@@ -12,7 +12,6 @@ from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigValidationError,
 )
 from pipelex.system.pipelex_service.pipelex_credentials import PipelexServiceConfig
-from pipelex.tools.log.log import log
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -51,8 +50,6 @@ def fetch_remote_config() -> RemoteConfig:
     except Exception as exc:
         msg = f"Failed to parse remote configuration JSON: {exc}"
         raise RemoteConfigValidationError(msg) from exc
-
-    log.verbose(config_dict, title="Received remote config from S3")
 
     # Validate the structure
     try:

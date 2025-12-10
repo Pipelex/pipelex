@@ -176,13 +176,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # Initialize secrets provider early - needed for gateway check
         secrets_provider = secrets_provider or EnvSecretsProvider()
 
+        # --- Pipelex Service and Telemetry --------------------------------------------------
+
         # Check if Pipelex Gateway is enabled
         # for now the only servic is the Pipelex Gateway
-        is_gateway_enabled = is_pipelex_gateway_enabled()
-        self.is_pipelex_service_enabled = is_gateway_enabled
+        is_pipelex_service_enabled = is_pipelex_gateway_enabled()
 
         gateway_model_specs: BackendModelSpecs | None = None
-        if self.is_pipelex_service_enabled:
+        if is_pipelex_service_enabled:
             # Check if terms are accepted
             pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
             if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
@@ -195,14 +196,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.telemetry_manager = make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
-            is_pipelex_telemetry_enabled=is_gateway_enabled,
+            is_pipelex_telemetry_enabled=is_pipelex_service_enabled,
             telemetry_config=telemetry_config,
             injected_telemetry_manager=telemetry_manager,
         )
         self.telemetry_manager.setup(integration_mode=integration_mode)
         self.pipelex_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
 
-        # tools
+        # --- Tools ----------------------------------------------------------------------------
+
         self.class_registry = class_registry or ClassRegistry()
         self.pipelex_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
@@ -212,7 +214,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.library_manager = library_manager or LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
-        # cogt
+        # --- AI Models and Inference Management ------------------------------------------------
+
         self.plugin_manager.setup()
 
         self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
@@ -258,18 +261,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
-        self.library_manager = library_manager or LibraryManager()
-        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
+        # --- Pipeline Tracking (deprecated) ----------------------------------------------------
 
-        # reporting
-        if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager()
-        else:
-            self.reporting_delegate = ReportingNoOp()
-        self.pipelex_hub.set_report_delegate(self.reporting_delegate)
-        self.reporting_delegate.setup()
-
-        # pipeline
         if pipeline_tracker:
             self.pipeline_tracker = pipeline_tracker
         elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
@@ -277,13 +270,30 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         else:
             self.pipeline_tracker = PipelineTrackerNoOp()
         self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
+        self.pipeline_tracker.setup()
+
+        # --- Libraries & Registries -------------------------------------------------------------
+
+        if get_config().pipelex.feature_config.is_reporting_enabled:
+            self.reporting_delegate = reporting_delegate or ReportingManager()
+        else:
+            self.reporting_delegate = ReportingNoOp()
+        self.pipelex_hub.set_report_delegate(self.reporting_delegate)
+        self.reporting_delegate.setup()
+
+        self.library_manager = library_manager or LibraryManager()
+        self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
+
         self.pipeline_manager = pipeline_manager or PipelineManager()
         self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
+        self.pipeline_manager.setup()
 
         self.class_registry.register_classes(CoreRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.verbose("Registering test models for unit testing")
             self.class_registry.register_classes(TestRegistryModels.get_all_models())
+
+        # --- Observers -------------------------------------------------------------------------
 
         if not observers:
             local_observer = LocalObserver()
@@ -291,10 +301,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             observers = {"local": local_observer, "telemetry": observer_telemetry}
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
 
-        self.pipeline_tracker.setup()
-        self.pipeline_manager.setup()
+        # --- Pipe Router -----------------------------------------------------------------------
+
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 

@@ -22,7 +22,7 @@ from pipelex.types import Self, StrEnum
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
 
 # Deprecated Pipelex PostHog API key that used to be in user's telemetry.toml
-# Pipelex's key is now hardcoded internally and the user's config should only have their own custom telemetry
+# Pipelex's key has moved and the user's config should only have their own custom telemetry
 _DEPRECATED_PIPELEX_POSTHOG_API_KEY = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
 _PLACEHOLDER_POSTHOG_API_KEY = "phc_YOUR_POSTHOG_PROJECT_API_KEY"
 

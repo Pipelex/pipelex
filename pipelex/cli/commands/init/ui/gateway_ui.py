@@ -60,7 +60,7 @@ def build_gateway_terms_panel() -> Panel:
 
     optional_explanation = Text(
         "Using Pipelex Gateway is entirely optional. If you prefer not to use our gateway:\n"
-        "  • Disable pipelex_gateway in your backends configuration\n"
+        "  • Disable pipelex_gateway in your backends configuration in .pipelex/inference/backends.toml\n"
         "  • Use your own API keys with direct provider backends (openai, anthropic, azure, bedrock, etc.)\n"
         "  • No telemetry will be sent to Pipelex servers\n",
         style="white",
