@@ -16,6 +16,9 @@ def setup_telemetry(console: Console, telemetry_config_path: str) -> None:
         console: Rich Console instance for user interaction.
         telemetry_config_path: Path to save the telemetry configuration.
     """
+    # Ensure parent directory exists (needed when running `pipelex init telemetry` on fresh project)
+    os.makedirs(os.path.dirname(telemetry_config_path), exist_ok=True)
+
     # Copy template to destination
     template_path = os.path.join(str(get_kit_configs_dir()), TELEMETRY_CONFIG_FILE_NAME)
     shutil.copy(template_path, telemetry_config_path)
