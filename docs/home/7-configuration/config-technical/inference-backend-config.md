@@ -132,7 +132,7 @@ Your API key is hashed for security. Gateway telemetry operates independently fr
    api_key = "${PIPELEX_GATEWAY_API_KEY}"
    ```
    
-   The environment variable `${PIPELEX_GATEWAY_API_KEY}` will be automatically loaded from your `.env` file.
+   The environment variable `${PIPELEX_GATEWAY_API_KEY}` will be automatically loaded from your environment.
 
 !!! warning "Migrating from pipelex_inference"
     The `pipelex_inference` backend is **deprecated** and will be removed in a future release. To migrate:
@@ -166,6 +166,30 @@ type = "PipeLLM"
 model = { model = "claude-4.5-sonnet", temperature = 0.7 }
 # Model automatically routed through Pipelex Gateway
 ```
+
+### Gateway Model Overrides
+
+!!! warning "Advanced Feature - Use at Your Own Risk"
+    The Pipelex Gateway model configuration is fetched remotely from Pipelex servers. Any local override may cause unexpected behavior or failures, as the remote configuration may change at any time.
+
+If you need to customize how a specific model behaves through the Gateway, you can add per-model overrides in `.pipelex/inference/backends/pipelex_gateway.toml`. However, only two keys are supported:
+
+- `sdk`: The SDK to use for the model (e.g., `gateway_completions`)
+- `structure_method`: The method for structured output (e.g., `instructor/openai_tools`)
+
+All other keys will be ignored.
+
+```toml
+# .pipelex/inference/backends/pipelex_gateway.toml
+
+# Per-model overrides example:
+[gpt-4o]
+sdk = "gateway_completions"
+structure_method = "instructor/openai_tools"
+```
+
+!!! tip "Prefer Direct Backends for Custom Configurations"
+    If you need custom configurations beyond `sdk` and `structure_method`, consider using your own API keys with direct provider backends (openai, anthropic, etc.) instead of Gateway overrides.
 
 ### Model Availability Note
 
