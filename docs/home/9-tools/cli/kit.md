@@ -131,6 +131,6 @@ These rules are configured in `pipelex/kit/index.toml`.
 
 ## Related Documentation
 
-- [Pipe Builder](pipe-builder.md) - Generate pipelines from natural language
+- [Pipe Builder](../pipe-builder.md) - Generate pipelines from natural language
 - [CLI Overview](index.md) - General Pipelex CLI documentation
 

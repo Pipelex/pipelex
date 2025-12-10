@@ -116,5 +116,5 @@ See the [Build Pipe CLI documentation](cli/build/pipe.md) for:
 
 - [Build Pipe CLI](cli/build/pipe.md) - Command reference and options
 - [Design and Run Pipelines](../6-build-reliable-ai-workflows/pipes/index.md) - Pipeline concepts
-- [Concepts](../6-build-reliable-ai-workflows/concepts/index.md) - Understanding concept definitions
+- [Concepts](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md) - Understanding concept definitions
 

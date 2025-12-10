@@ -87,5 +87,5 @@ class CandidateProfile(StructuredContent):
 
 - [Build Pipe](pipe.md) - Generate pipelines from natural language
 - [Build Runner](runner.md) - Generate Python runner scripts
-- [Concepts](../../../6-build-reliable-ai-workflows/concepts/index.md) - Understanding concept definitions
+- [Concepts](../../../6-build-reliable-ai-workflows/concepts/define_your_concepts.md) - Understanding concept definitions
 
