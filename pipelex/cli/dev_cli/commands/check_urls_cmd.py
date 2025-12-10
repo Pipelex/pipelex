@@ -17,6 +17,11 @@ from pipelex.urls import URLs
 # Default timeout in seconds for HTTP requests
 DEFAULT_TIMEOUT = 10
 
+# Connection limits for httpx client
+# - max_connections: Total concurrent connections across all hosts
+# - max_keepalive_connections: Connections to keep alive for reuse
+HTTP_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
+
 
 class URLCheckResult(BaseModel):
     """Result of checking a single URL."""
@@ -103,7 +108,10 @@ async def check_all_urls_async(
     url_pairs: list[tuple[str, str]],
     request_timeout: int,
 ) -> list[URLCheckResult]:
-    """Check all URLs concurrently.
+    """Check all URLs concurrently with connection pooling.
+
+    Uses httpx.Limits for connection management which automatically handles
+    per-host connection limits and connection reuse.
 
     Args:
         url_pairs: List of (name, url) tuples to check
@@ -112,7 +120,11 @@ async def check_all_urls_async(
     Returns:
         List of URLCheckResult for all URLs
     """
-    async with httpx.AsyncClient(follow_redirects=True, timeout=request_timeout) as client:
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        timeout=request_timeout,
+        limits=HTTP_LIMITS,
+    ) as client:
         tasks = [check_single_url_async(client, name, url) for name, url in url_pairs]
         results = await asyncio.gather(*tasks)
     return list(results)
@@ -186,6 +198,7 @@ def check_urls_cmd(quiet: bool = False, timeout: int = DEFAULT_TIMEOUT) -> None:
         # Some URLs are broken
         if quiet:
             console.print(f"[red]✗ URL check: FAILED[/red] ({broken_count} broken out of {len(results)})")
+            console.print("  Run [cyan]make cu[/cyan] for details")
         else:
             console.print()
             error_panel = Panel(
