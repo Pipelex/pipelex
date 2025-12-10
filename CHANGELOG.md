@@ -18,7 +18,13 @@
 
     **⚠️ Migration deadline:** If you were using `pipelex_inference`, please migrate soon—the legacy service will be shut down within a week. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
 
-- **Pydantic Structure Generation** — New CLI command `pipelex build structures /library_dir/` generates Pydantic models from your concept definitions. This bridges Pipelex's declarative concepts with your Python code, enabling you to receive LLM structured outputs as fully-typed Pydantic objects with IDE autocompletion, validation, and seamless integration into your application logic. The `pipelex build runner` command now automatically generates and imports these structures.
+- **Pydantic Structure Generation** — Two new CLI commands bridge Pipelex's declarative concepts with your Python code:
+
+    **`pipelex build structures /library_dir/`** — Generates Pydantic models from all concept definitions found in the specified library directory. Now you have your structures as Python code: you can iterate on them, add custom validation functions, or use them as type hints in your code.
+
+    **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
+
+    See the [Build Commands documentation](https://docs.pipelex.com/home/9-tools/cli/#build-commands) for usage examples.
 
 ### Added
 

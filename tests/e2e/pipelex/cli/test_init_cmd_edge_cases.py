@@ -35,7 +35,7 @@ class TestEdgeCases:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify pipelex_gateway_first is set automatically
         env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
@@ -58,7 +58,7 @@ class TestEdgeCases:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify routing is set to all_openai
         env.verify_routing("all_openai")
@@ -82,7 +82,7 @@ class TestEdgeCases:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify custom routing with automatic fallback
         env.verify_routing("custom_routing", expected_default="anthropic", expected_fallback_order=["anthropic", "openai"])
@@ -116,7 +116,7 @@ class TestEdgeCases:
         env.setup_mocks()
 
         # Execute with reset flag
-        init_cmd(focus=InitFocus.ALL, reset=True)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify configuration was reset
         env.verify_backends_enabled(["anthropic"])
@@ -141,7 +141,7 @@ class TestEdgeCases:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify detailed backends.toml contents
         toml_doc = load_toml_with_tomlkit(str(env.inference_dir / "backends.toml"))

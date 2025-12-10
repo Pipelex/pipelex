@@ -30,7 +30,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with CONFIG focus
-        init_cmd(focus=InitFocus.CONFIG, reset=False)
+        init_cmd(focus=InitFocus.CONFIG)
 
         # Verify config files exist
         env.verify_file_exists("pipelex.toml")
@@ -55,7 +55,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with INFERENCE focus
-        init_cmd(focus=InitFocus.INFERENCE, reset=False)
+        init_cmd(focus=InitFocus.INFERENCE)
 
         # Verify backends are enabled
         env.verify_backends_enabled(["openai", "anthropic"])
@@ -90,7 +90,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with INFERENCE focus
-        init_cmd(focus=InitFocus.INFERENCE, reset=False)
+        init_cmd(focus=InitFocus.INFERENCE)
 
         # Verify backend was changed
         env.verify_backends_enabled(["mistral"])
@@ -125,7 +125,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with ROUTING focus
-        init_cmd(focus=InitFocus.ROUTING, reset=False)
+        init_cmd(focus=InitFocus.ROUTING)
 
         # Verify routing was configured
         env.verify_routing("custom_routing", expected_default="anthropic")
@@ -153,7 +153,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with ROUTING focus
-        init_cmd(focus=InitFocus.ROUTING, reset=False)
+        init_cmd(focus=InitFocus.ROUTING)
 
         # Verify routing is set to all_openai
         env.verify_routing("all_openai")
@@ -170,7 +170,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with TELEMETRY focus
-        init_cmd(focus=InitFocus.TELEMETRY, reset=False)
+        init_cmd(focus=InitFocus.TELEMETRY)
 
         # Verify telemetry was created with default mode (off)
         env.verify_telemetry("off")
@@ -193,7 +193,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with TELEMETRY focus (will prompt to reconfigure since file exists)
-        init_cmd(focus=InitFocus.TELEMETRY, reset=False)
+        init_cmd(focus=InitFocus.TELEMETRY)
 
         # After reconfigure, telemetry should be reset to default (off)
         env.verify_telemetry("off")
@@ -225,7 +225,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with ROUTING focus and reset flag
-        init_cmd(focus=InitFocus.ROUTING, reset=True)
+        init_cmd(focus=InitFocus.ROUTING)
 
         # Verify routing was reset to pipelex_gateway_first (correct for pipelex_gateway)
         env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
@@ -242,7 +242,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute - should complete immediately since everything is configured
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Should complete without errors (no changes made)
         # Verify files still exist

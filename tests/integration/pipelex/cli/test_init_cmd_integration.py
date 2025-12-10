@@ -30,7 +30,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify all backends are enabled (except internal which is separate)
         toml_doc = load_toml_with_tomlkit(str(env.inference_dir / "backends.toml"))
@@ -64,7 +64,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends
         env.verify_backends_enabled(["openai", "anthropic", "mistral"])
@@ -93,7 +93,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify only openai is enabled
         env.verify_backends_enabled(["openai"])
@@ -118,7 +118,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute with CONFIG focus
-        init_cmd(focus=InitFocus.CONFIG, reset=False)
+        init_cmd(focus=InitFocus.CONFIG)
 
         # Verify config files exist
         env.verify_file_exists("pipelex.toml")
@@ -151,7 +151,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute with INFERENCE focus
-        init_cmd(focus=InitFocus.INFERENCE, reset=False)
+        init_cmd(focus=InitFocus.INFERENCE)
 
         # Verify backends
         env.verify_backends_enabled(["anthropic", "mistral"])
@@ -174,7 +174,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute with TELEMETRY focus
-        init_cmd(focus=InitFocus.TELEMETRY, reset=False)
+        init_cmd(focus=InitFocus.TELEMETRY)
 
         # Verify telemetry was created with default mode (off)
         env.verify_telemetry("off")
@@ -203,7 +203,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute with reset flag
-        init_cmd(focus=InitFocus.ALL, reset=True)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends were reset
         env.verify_backends_enabled(["mistral"])
@@ -235,7 +235,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute with INFERENCE focus
-        init_cmd(focus=InitFocus.INFERENCE, reset=False)
+        init_cmd(focus=InitFocus.INFERENCE)
 
         # Verify backend was changed
         env.verify_backends_enabled(["openai"])
@@ -262,7 +262,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends
         env.verify_backends_enabled(["openai", "anthropic"])
@@ -289,7 +289,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends
         env.verify_backends_enabled([PipelexBackend.GATEWAY, "openai"])

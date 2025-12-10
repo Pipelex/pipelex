@@ -33,7 +33,7 @@ class TestFirstTimeInitialization:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify
         env.verify_file_exists("pipelex.toml")
@@ -64,7 +64,7 @@ class TestFirstTimeInitialization:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends
         env.verify_backends_enabled(["openai", "anthropic", "mistral"])
@@ -89,7 +89,7 @@ class TestFirstTimeInitialization:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify all backends are enabled
         toml_doc = load_toml_with_tomlkit(str(env.inference_dir / "backends.toml"))
@@ -114,7 +114,7 @@ class TestFirstTimeInitialization:
 
         # Execute - may raise an exit exception on cancellation
         try:
-            init_cmd(focus=InitFocus.ALL, reset=False)
+            init_cmd(focus=InitFocus.ALL)
         except (typer.Exit, SystemExit):
             # Expected: user quit at backend selection
             pass
@@ -139,7 +139,7 @@ class TestFirstTimeInitialization:
 
         # Execute - should raise typer.Exit
         with pytest.raises(typer.Exit):
-            init_cmd(focus=InitFocus.ALL, reset=False)
+            init_cmd(focus=InitFocus.ALL)
 
         # Verify no files were created
         env.verify_file_not_exists("pipelex.toml")
