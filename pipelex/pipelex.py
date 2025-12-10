@@ -57,9 +57,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
-from pipelex.system.pipelex_service.remote_config import (
-    fetch_remote_config,
-)
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -191,7 +189,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
                     raise GatewayTermsNotAcceptedError
             # Fetch remote configuration
-            remote_config = fetch_remote_config()
+            remote_config = RemoteConfigFetcher.fetch_remote_config()
             log.verbose("Successfully fetched Pipelex Gateway remote configuration")
             gateway_model_specs = remote_config.backend_model_specs
 
