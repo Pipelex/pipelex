@@ -22,9 +22,12 @@
 
 ### Added
 
+- New backends & models
+    - **Scaleway** inference provider support for open-source models
+    - **Mistral** Document AI (OCR) via Pipelex Gateway (disclaimer: it's flaky, needs many retries via tenacity)
+    - **Portkey AI** backend integration for unified access to multiple models through a single API key
+    - Mistral Document AI (OCR) via Pipelex Gateway (disclaimer: it's flaky, needs many retries via tenacity)
 - OpenTelemetry-based observability system with native support for Langfuse and OTLP-compatible backends (Datadog, Honeycomb, etc.), configured via `.pipelex/telemetry.toml`
-- Portkey AI gateway integration for unified access to multiple models through a single API key
-- Scaleway inference provider support
 - Pipelex Gateway service with terms of service management via `.pipelex/pipelex_service.toml` and interactive acceptance flow in `pipelex init`
 - Configurable retry logic with exponential backoff for inference API calls, configurable in `pipelex.toml` under `[cogt.tenacity_config]`
 - Context manager support for the `Pipelex` class (`with Pipelex.make(): ...`) for graceful shutdown
