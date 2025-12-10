@@ -12,7 +12,7 @@
 
 [agreement]
 # Set to true after accepting Pipelex terms of service.
-terms_accepted = true
+terms_accepted = false
 
 # Note: when using pipelex_gateway, telemetry is enabled to monitor service usage.
 # We collect technical data (model, pipe type...) and quantitative data (token counts...)

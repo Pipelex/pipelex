@@ -186,7 +186,7 @@ check-rules: env
 
 up-kit-configs:
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
-	@rsync -av --delete .pipelex/ pipelex/kit/configs/
+	@rsync -av --delete --exclude='pipelex_service.toml' .pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
 	@echo "> done: ukc = up-kit-configs"
