@@ -7,6 +7,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.system.pipelex_service.exceptions import GatewayTermsNotAcceptedError
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
@@ -198,5 +199,31 @@ def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError
     console.print("[dim]  • Cleaner separation of PostHog, Langfuse, and OTLP settings[/dim]")
     console.print()
 
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_gateway_terms_not_accepted_error(exc: GatewayTermsNotAcceptedError) -> NoReturn:
+    """Handle and display GatewayTermsNotAcceptedError with user-friendly guidance.
+
+    This error occurs when Pipelex Gateway is enabled but the user hasn't
+    accepted the terms of service yet.
+
+    Args:
+        exc: The gateway terms not accepted error exception
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Pipelex Gateway terms not accepted[/bold red]\n")
+
+    console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but you haven't accepted\nthe terms of service yet.\n")
+
+    console.print("[bold green]💡 To fix:[/bold green] Run [cyan]pipelex init config[/cyan] to configure your backends and accept the terms\n")
+
+    console.print("[dim]Alternatively, you can:[/dim]")
+    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
+    console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
+    console.print()
+
+    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

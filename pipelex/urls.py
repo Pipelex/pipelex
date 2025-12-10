@@ -7,6 +7,7 @@ class URLs:
     discord = "https://go.pipelex.com/discord"
     privacy_policy = "https://go.pipelex.com/privacy-policy"
     telemetry_docs = "https://docs.pipelex.com/home/5-setup/telemetry/"
+    gateway_docs = "https://docs.pipelex.com/gateway"
     pipe_func_docs = "https://docs.pipelex.com/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc/"
     backend_provider_docs = "https://docs.pipelex.com/home/5-setup/configure-ai-providers/"
     native_concepts_docs = "https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/native-concepts/"
