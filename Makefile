@@ -58,8 +58,10 @@ make rules                    - Install agent rules for contributing to Pipelex
 make up-kit-configs           - Update kit configs from .pipelex/
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
-make check-rules              - Verify installed agent rules match kit templates
 make ccs                      - Shorthand -> check-config-sync
+make check-rules              - Verify installed agent rules match kit templates
+make check-urls               - Check all URLs in pipelex/urls.py for broken links (quiet)
+make cu                       - Check URLs with verbose output (shows details)
 
 make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
@@ -114,7 +116,7 @@ export HELP
 .PHONY: \
 	all help env lock install update build \
 	format lint pyright mypy pylint \
-    rules up-kit-configs ukc check-config-sync check-rules ccs \
+    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
@@ -184,9 +186,17 @@ check-rules: env
 	$(call PRINT_TITLE,"Checking installed agent rules against templates")
 	$(VENV_PIPELEX_DEV) check-rules --quiet
 
+check-urls: env
+	$(call PRINT_TITLE,"Checking URLs in pipelex/urls.py for broken links")
+	$(VENV_PIPELEX_DEV) check-urls --quiet
+
+cu: env
+	$(call PRINT_TITLE,"Checking URLs in pipelex/urls.py for broken links with detailed output")
+	$(VENV_PIPELEX_DEV) check-urls
+
 up-kit-configs:
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
-	@rsync -av --delete .pipelex/ pipelex/kit/configs/
+	@rsync -av --delete --exclude='pipelex_service.toml' .pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
 	@echo "> done: ukc = up-kit-configs"
@@ -550,7 +560,7 @@ c: format lint pyright mypy
 cc: cleanderived c
 	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
 
-check: cc check-unused-imports check-config-sync check-rules pylint
+check: cc check-unused-imports check-config-sync check-rules check-urls pylint
 	@echo "> done: check"
 
 v: validate

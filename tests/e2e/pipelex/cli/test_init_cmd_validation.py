@@ -22,9 +22,9 @@ class TestInputValidation:
 
         # User inputs: invalid index, then valid
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("99")  # Invalid index
         env.add_prompt_input("1")  # Valid: pipelex_gateway
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 
@@ -42,9 +42,9 @@ class TestInputValidation:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("abc")  # Invalid non-numeric
         env.add_prompt_input("1")  # Valid: pipelex_gateway
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 
@@ -70,7 +70,6 @@ class TestInputValidation:
         env.add_prompt_input(indices_str)  # Space-separated indices
         env.add_prompt_input("1")  # Primary backend
         env.add_prompt_input("")  # Accept default fallback order
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 
@@ -88,8 +87,8 @@ class TestInputValidation:
 
         # User inputs: empty string for default
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("")  # Empty = default (pipelex_gateway)
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 
@@ -98,26 +97,6 @@ class TestInputValidation:
 
         # Verify default backend is selected
         env.verify_backends_enabled([PipelexBackend.GATEWAY])
-
-    def test_invalid_telemetry_selection_then_valid(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case 8.6: Invalid telemetry selection."""
-        # Setup environment
-        env = MockedInitEnvironment(tmp_path, mocker)
-        env.setup_empty_dir()
-
-        # User inputs
-        env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("1")  # Backend selection
-        env.add_prompt_input("5")  # Invalid telemetry option
-        env.add_prompt_input("2")  # Valid: ANONYMOUS
-
-        env.setup_mocks()
-
-        # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
-
-        # Verify successful completion with valid telemetry
-        env.verify_telemetry("anonymous")
 
     def test_invalid_fallback_order_wrong_count(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 8.7: Invalid fallback order - wrong count."""
@@ -136,7 +115,6 @@ class TestInputValidation:
         env.add_prompt_input("1")  # Primary backend
         env.add_prompt_input("1")  # Invalid: only 1 index instead of 2
         env.add_prompt_input("1,2")  # Valid: 2 indices for remaining backends
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 
@@ -163,7 +141,6 @@ class TestInputValidation:
         env.add_prompt_input("1")  # Primary backend
         env.add_prompt_input("1,1")  # Invalid: duplicate indices
         env.add_prompt_input("1,2")  # Valid: unique indices
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 

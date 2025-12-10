@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -12,26 +12,7 @@ from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
-
-
-def get_backend_indices(backends_toml_path: str, backend_names: list[str]) -> list[int]:
-    """Get 1-based indices for given backend names from backends.toml.
-
-    Args:
-        backends_toml_path: Path to backends.toml file.
-        backend_names: List of backend keys to find indices for.
-
-    Returns:
-        List of 1-based indices corresponding to the backend names.
-    """
-    toml_doc = load_toml_with_tomlkit(backends_toml_path)
-    backend_list: list[str] = [key for key in toml_doc if key != "internal"]
-    indices: list[int] = []
-    for name in backend_names:
-        if name in backend_list:
-            # 1-based index for user input
-            indices.append(backend_list.index(name) + 1)
-    return indices
+from tests.helpers.init_cmd_helpers import get_backend_indices_helper
 
 
 class TestBackendCustomization:
@@ -46,14 +27,34 @@ class TestBackendCustomization:
         test_backends = inference_dir / "backends.toml"
         shutil.copy2(actual_backends, test_backends)
 
-        # Mock config_manager and user input
+        # Mock config_manager
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        # Mock console provider and Prompt to simulate user selecting default [1]
+        # Mock console provider
         mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
-        mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value="1")
+
+        # Setup input queues - global patching like MockedInitEnvironment
+        prompt_inputs = ["1"]  # Select pipelex_gateway
+        confirm_inputs = [True]  # Accept gateway terms
+
+        def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
+            if not prompt_inputs:
+                question = str(args[0]) if args else "<unknown prompt>"
+                msg = f"Unexpected prompt without predefined input: {question}"
+                raise AssertionError(msg)
+            return prompt_inputs.pop(0)
+
+        def confirm_side_effect(*args: Any, **_kwargs: Any) -> bool:
+            if not confirm_inputs:
+                question = str(args[0]) if args else "<unknown confirmation>"
+                msg = f"Unexpected confirm without predefined input: {question}"
+                raise AssertionError(msg)
+            return confirm_inputs.pop(0)
+
+        mocker.patch("rich.prompt.Prompt.ask", side_effect=prompt_side_effect)
+        mocker.patch("rich.prompt.Confirm.ask", side_effect=confirm_side_effect)
 
         # Execute
         customize_backends_config()
@@ -85,17 +86,28 @@ class TestBackendCustomization:
 
         # Dynamically get indices for the backends we want to test
         backend_names = ["openai", "anthropic", "mistral"]
-        indices = get_backend_indices(str(actual_backends), backend_names)
-        indices_str = ",".join(str(i) for i in indices)
+        indices = get_backend_indices_helper(str(actual_backends), backend_names)
+        indices_str = ",".join(str(idx) for idx in indices)
 
         # Mock config_manager
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        # Mock user input with dynamically determined indices
+        # Mock console provider
         mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
-        mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value=indices_str)
+
+        # Setup input queues - no gateway selected, so no confirm needed
+        prompt_inputs = [indices_str]
+
+        def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
+            if not prompt_inputs:
+                question = str(args[0]) if args else "<unknown prompt>"
+                msg = f"Unexpected prompt without predefined input: {question}"
+                raise AssertionError(msg)
+            return prompt_inputs.pop(0)
+
+        mocker.patch("rich.prompt.Prompt.ask", side_effect=prompt_side_effect)
 
         # Execute
         customize_backends_config()
@@ -128,16 +140,37 @@ class TestBackendCustomization:
 
         # Dynamically get indices for the backends we want to test
         backend_names = [PipelexBackend.GATEWAY, "openai", "fal"]
-        indices = get_backend_indices(str(actual_backends), backend_names)
-        indices_str = " ".join(str(i) for i in indices)
+        indices = get_backend_indices_helper(str(actual_backends), backend_names)
+        indices_str = " ".join(str(idx) for idx in indices)
 
+        # Mock config_manager
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
-        # Mock user input with spaces and dynamically determined indices
+        # Mock console provider
         mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=mocker.MagicMock())
-        mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Prompt.ask", return_value=indices_str)
+
+        # Setup input queues - gateway selected, so confirm needed
+        prompt_inputs = [indices_str]
+        confirm_inputs = [True]  # Accept gateway terms
+
+        def prompt_side_effect(*args: Any, **_kwargs: Any) -> str:
+            if not prompt_inputs:
+                question = str(args[0]) if args else "<unknown prompt>"
+                msg = f"Unexpected prompt without predefined input: {question}"
+                raise AssertionError(msg)
+            return prompt_inputs.pop(0)
+
+        def confirm_side_effect(*args: Any, **_kwargs: Any) -> bool:
+            if not confirm_inputs:
+                question = str(args[0]) if args else "<unknown confirmation>"
+                msg = f"Unexpected confirm without predefined input: {question}"
+                raise AssertionError(msg)
+            return confirm_inputs.pop(0)
+
+        mocker.patch("rich.prompt.Prompt.ask", side_effect=prompt_side_effect)
+        mocker.patch("rich.prompt.Confirm.ask", side_effect=confirm_side_effect)
 
         # Execute
         customize_backends_config()

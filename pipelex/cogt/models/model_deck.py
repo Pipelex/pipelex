@@ -353,12 +353,12 @@ class ModelDeck(ConfigModel):
                                 f"Consider getting access to '{ideal_model_handle}'."
                             )
                             enabled_backends = self._get_enabled_backends()
-                            if PipelexBackend.official_backend() not in enabled_backends and self._is_model_available_in_backend(
-                                model_handle=ideal_model_handle, backend_name=PipelexBackend.official_backend()
+                            if PipelexBackend.GATEWAY not in enabled_backends and self._is_model_available_in_backend(
+                                model_handle=ideal_model_handle, backend_name=PipelexBackend.GATEWAY
                             ):
                                 msg += (
                                     f" Note that many high quality models such as '{ideal_model_handle}' are available "
-                                    f"from the {PipelexBackend.official_backend_display_name()} "
+                                    f"from the {PipelexBackend.GATEWAY.display_name} "
                                     f"and you can get free credits to try them out."
                                 )
                                 if PipelexBackend.LEGACY_INFERENCE in enabled_backends:
@@ -368,7 +368,7 @@ class ModelDeck(ConfigModel):
                                     )
                                 msg += (
                                     f"\nPlease see our docs for more details about setting up "
-                                    f"{PipelexBackend.official_backend_display_name()} or other inference backends:\n{URLs.backend_provider_docs}"
+                                    f"{PipelexBackend.GATEWAY.display_name} or other inference backends:\n{URLs.backend_provider_docs}"
                                 )
                             else:
                                 msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"

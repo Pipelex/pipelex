@@ -8,12 +8,9 @@ from typing_extensions import override
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.telemetry_config import TelemetryMode
 
 
 class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
-    telemetry_mode_just_set: TelemetryMode | None = None
-
     @classmethod
     def clear_instance(cls) -> None:
         """Clear the singleton instance from MetaSingleton registry."""
@@ -39,22 +36,6 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         if instance is None:
             return None
         return instance.get_otel_tracer()
-
-    @classmethod
-    def is_capture_content_enabled(cls) -> bool:
-        """Check if content capture is enabled for telemetry.
-
-        When this returns False, prompt/completion content should not be
-        captured in span attributes.
-
-        Returns:
-            True if content capture is enabled, False otherwise (including when
-            no telemetry manager is configured).
-        """
-        instance = cls.get_instance()
-        if instance is None:
-            return False
-        return instance.capture_content_enabled
 
     @classmethod
     def is_capture_pipe_codes_enabled(cls) -> bool:
@@ -89,19 +70,6 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return instance.capture_output_class_name_enabled
 
     @classmethod
-    def get_capture_content_max_length(cls) -> int | None:
-        """Get the maximum length for captured content.
-
-        Returns:
-            The maximum length for captured content, or None if unlimited
-            (including when no telemetry manager is configured).
-        """
-        instance = cls.get_instance()
-        if instance is None:
-            return None
-        return instance.capture_content_max_length
-
-    @classmethod
     def get_langfuse_enabled(cls) -> bool:
         """Check if Langfuse OTLP exporter is enabled for telemetry.
 
@@ -113,13 +81,6 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         if instance is None:
             return False
         return instance.is_langfuse_enabled
-
-    @classmethod
-    def telemetry_was_just_enabled(cls) -> TelemetryMode | None:
-        if cls.telemetry_mode_just_set is None:
-            return None
-        else:
-            return cls.telemetry_mode_just_set if cls.telemetry_mode_just_set.is_enabled else None
 
     @abstractmethod
     def setup(self, integration_mode: IntegrationMode):
@@ -175,9 +136,20 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     def is_langfuse_enabled(self) -> bool:
         """Whether Langfuse OTLP exporter is enabled."""
 
+    @property
     @abstractmethod
-    def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
-        """Hook to do something when a trace starts and just got its trace_name and trace_id."""
+    def is_pipelex_telemetry_enabled(self) -> bool:
+        """Whether Pipelex internal telemetry is enabled (for gateway usage)."""
+
+    @abstractmethod
+    def handle_trace_start(self, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
+        """Hook to do something when a trace starts.
+
+        Args:
+            trace_name: Full trace name with pipe code (for custom telemetry).
+            trace_name_redacted: Redacted trace name without pipe code (for Pipelex telemetry).
+            trace_id: The trace ID.
+        """
 
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
@@ -237,6 +209,11 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     def is_langfuse_enabled(self) -> bool:
         return False
 
+    @property
     @override
-    def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
+    def is_pipelex_telemetry_enabled(self) -> bool:
+        return False
+
+    @override
+    def handle_trace_start(self, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         pass

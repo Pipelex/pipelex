@@ -25,10 +25,10 @@ class TestFirstTimeInitialization:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_empty_dir()
 
-        # User inputs: confirm, default backend (1), telemetry OFF (1)
-        env.add_confirm_input(True)
+        # User inputs: confirm init, default backend (1), accept gateway terms
+        env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input("1")  # Default: pipelex_gateway
-        env.add_prompt_input("1")  # Telemetry: OFF
 
         env.setup_mocks()
 
@@ -60,7 +60,6 @@ class TestFirstTimeInitialization:
         env.add_prompt_input(indices_str)  # Select 3 backends
         env.add_prompt_input("1")  # Primary: first one (anthropic)
         env.add_prompt_input("2,1")  # Custom fallback order (mistral, anthropic)
-        env.add_prompt_input("2")  # Telemetry: ANONYMOUS
 
         env.setup_mocks()
 
@@ -73,8 +72,8 @@ class TestFirstTimeInitialization:
         # Verify custom routing
         env.verify_routing("custom_routing", expected_default="anthropic")
 
-        # Verify telemetry
-        env.verify_telemetry("anonymous")
+        # Verify telemetry (default mode from template)
+        env.verify_telemetry("off")
 
     def test_init_with_all_backends(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 1.3: Initialization with all backends."""
@@ -84,8 +83,8 @@ class TestFirstTimeInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service (since all includes gateway)
         env.add_prompt_input("all")  # Select all backends
-        env.add_prompt_input("1")  # Telemetry: OFF
 
         env.setup_mocks()
 

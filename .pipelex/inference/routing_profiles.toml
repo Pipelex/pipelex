@@ -9,7 +9,8 @@
 # =========================================================================================
 
 # Which profile to use (change this to switch routing)
-active = "pipelex_gateway_first"
+# TODO: TBD
+active = "pipelex_gateway_first" # Change to "pipelex_gateway_first" after enabling gateway
 
 # We recommend using the "pipelex_first" profile to get a head start with all models.
 # The Pipelex Inference backend is currently not recommended for production use,

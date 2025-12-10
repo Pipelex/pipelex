@@ -24,8 +24,8 @@ class TestFocusedInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("1")  # Backend selection
-        env.add_prompt_input("1")  # Telemetry
+        env.add_confirm_input(True)  # Accept gateway terms of service
+        env.add_prompt_input("1")  # Backend selection (pipelex_gateway)
 
         env.setup_mocks()
 
@@ -159,46 +159,44 @@ class TestFocusedInitialization:
         env.verify_routing("all_openai")
 
     def test_telemetry_only_initialization(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case 5.1: Initialize telemetry only."""
+        """Test Case 5.1: Initialize telemetry only - just copies template."""
         # Setup environment with existing config but no telemetry
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=False)
 
-        # User inputs
+        # Only need to confirm initialization
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("2")  # Telemetry: ANONYMOUS
 
         env.setup_mocks()
 
         # Execute with TELEMETRY focus
         init_cmd(focus=InitFocus.TELEMETRY, reset=False)
 
-        # Verify telemetry was created
-        env.verify_telemetry("anonymous")
+        # Verify telemetry was created with default mode (off)
+        env.verify_telemetry("off")
 
     def test_reconfigure_telemetry(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case 5.2: Telemetry already configured - reconfigure."""
+        """Test Case 5.2: Telemetry already configured - reset replaces with template."""
         # Setup environment with existing telemetry
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Set initial telemetry to OFF
+        # Set initial telemetry to IDENTIFIED
         telemetry_path = env.pipelex_dir / "telemetry.toml"
         toml_doc = load_toml_with_tomlkit(str(telemetry_path))
-        toml_doc["telemetry_mode"] = "off"
+        toml_doc["posthog"]["mode"] = "identified"  # type: ignore[index]
         save_toml_to_path(toml_doc, str(telemetry_path))
 
-        # User inputs
+        # User inputs - confirm reconfigure
         env.add_confirm_input(True)  # Confirm reconfigure
-        env.add_prompt_input("3")  # Change to IDENTIFIED
 
         env.setup_mocks()
 
-        # Execute with TELEMETRY focus
+        # Execute with TELEMETRY focus (will prompt to reconfigure since file exists)
         init_cmd(focus=InitFocus.TELEMETRY, reset=False)
 
-        # Verify telemetry was changed
-        env.verify_telemetry("identified")
+        # After reconfigure, telemetry should be reset to default (off)
+        env.verify_telemetry("off")
 
     def test_reset_routing_with_pipelex_gateway(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case: Reset routing when only pipelex_gateway is enabled (bug fix test)."""

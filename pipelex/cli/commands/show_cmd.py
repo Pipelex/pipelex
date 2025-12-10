@@ -11,12 +11,9 @@ from rich.table import Table
 
 from pipelex import pretty_print
 from pipelex.base_exceptions import PipelexConfigError
-from pipelex.cli.error_handlers import (
-    ErrorContext,
-    handle_model_deck_preset_error,
-)
+from pipelex.cli.cli_factory import make_pipelex_for_cli
+from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_lists import ModelLister
 from pipelex.hub import (
@@ -196,10 +193,7 @@ def list_pipes_cmd() -> None:
     This includes pipes from your project's .plx files and any
     pipes from imported packages.
     """
-    try:
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
 
     try:
         library_manager = get_library_manager()
@@ -227,10 +221,7 @@ def show_pipe_cmd(
     Example:
         pipelex show pipe hello_world
     """
-    try:
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
 
     try:
         library_manager = get_library_manager()
@@ -265,10 +256,7 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    try:
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
 
     try:
         with get_telemetry_manager().telemetry_context():
@@ -298,10 +286,7 @@ def show_backends_cmd(
         pipelex show backends
         pipelex show backends --all
     """
-    try:
-        Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
 
     try:
         with get_telemetry_manager().telemetry_context():

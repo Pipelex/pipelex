@@ -10,6 +10,7 @@ from typing_extensions import override
 
 from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
+from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -20,7 +21,7 @@ class PipelexDevCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["check-config-sync", "check-rules"]
+        return ["check-config-sync", "check-rules", "check-urls"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -84,3 +85,12 @@ def check_rules_command(
 ) -> None:
     """Verify that installed agent rules match kit templates."""
     check_rules_sync_cmd(show_diff=show_diff, quiet=quiet)
+
+
+@app.command(name="check-urls", help="Check all URLs in pipelex/urls.py for broken links")
+def check_urls_command(
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
+    timeout: Annotated[int, typer.Option("--timeout", "-t", help="Request timeout in seconds")] = DEFAULT_TIMEOUT,
+) -> None:
+    """Check all URLs in pipelex/urls.py for broken links."""
+    check_urls_cmd(quiet=quiet, timeout=timeout)

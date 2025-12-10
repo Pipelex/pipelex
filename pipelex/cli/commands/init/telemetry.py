@@ -1,39 +1,36 @@
 """Telemetry configuration logic for the init command."""
 
 import os
+import shutil
 
 from rich.console import Console
 
-from pipelex.cli.commands.init.ui.telemetry_ui import build_telemetry_selection_panel, prompt_telemetry_mode
 from pipelex.kit.paths import get_kit_configs_dir
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryMode
-from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 
 
-def setup_telemetry(console: Console, telemetry_config_path: str) -> TelemetryMode:
-    """Set up telemetry configuration interactively.
+def setup_telemetry(console: Console, telemetry_config_path: str) -> None:
+    """Set up telemetry configuration by copying the template.
 
     Args:
         console: Rich Console instance for user interaction.
         telemetry_config_path: Path to save the telemetry configuration.
-
-    Returns:
-        The selected TelemetryMode.
-
-    Raises:
-        typer.Exit: If user chooses to quit.
     """
-    console.print()
-    console.print(build_telemetry_selection_panel())
+    # Ensure parent directory exists (needed when running `pipelex init telemetry` on fresh project)
+    os.makedirs(os.path.dirname(telemetry_config_path), exist_ok=True)
 
-    telemetry_mode = prompt_telemetry_mode(console)
-
-    # Save telemetry config
+    # Copy template to destination
     template_path = os.path.join(str(get_kit_configs_dir()), TELEMETRY_CONFIG_FILE_NAME)
-    toml_doc = load_toml_with_tomlkit(template_path)
-    toml_doc["telemetry_mode"] = telemetry_mode
-    save_toml_to_path(toml_doc, telemetry_config_path)
+    shutil.copy(template_path, telemetry_config_path)
 
-    console.print(f"\n[green]✓[/green] Telemetry mode set to: [bold cyan]{telemetry_mode}[/bold cyan]")
-
-    return telemetry_mode
+    console.print()
+    console.print("[green]✓[/green] Telemetry configuration created")
+    console.print(f"  [dim]File:[/dim] [cyan]{telemetry_config_path}[/cyan]")
+    console.print()
+    console.print("[dim]Edit this file to configure AI trace destinations:[/dim]")
+    console.print("[dim]  • \\[posthog] - Send traces to your own PostHog project[/dim]")
+    console.print("[dim]  • \\[langfuse] - Enable Langfuse LLM observability[/dim]")
+    console.print("[dim]  • \\[\\[otlp]] - Add custom OpenTelemetry exporters[/dim]")
+    console.print()
+    console.print("[dim]💡 Note: If you use Pipelex Gateway, separate telemetry is sent to Pipelex[/dim]")
+    console.print("[dim]servers regardless of these settings.[/dim]")

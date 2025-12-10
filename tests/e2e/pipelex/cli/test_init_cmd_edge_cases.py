@@ -29,8 +29,8 @@ class TestEdgeCases:
 
         # User inputs - no primary/fallback prompts expected
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
         env.add_prompt_input(indices_str)  # Select pipelex_gateway and openai
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 
@@ -54,7 +54,6 @@ class TestEdgeCases:
         env.add_confirm_input(True)  # Confirm initialization
         env.add_prompt_input(str(indices[0]))  # Select only openai
         env.add_confirm_input(True)  # Confirm creating profile if needed
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 
@@ -79,7 +78,6 @@ class TestEdgeCases:
         env.add_confirm_input(True)  # Confirm initialization
         env.add_prompt_input(indices_str)  # Select anthropic, openai
         env.add_prompt_input("1")  # Primary backend: anthropic (first in selection)
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 
@@ -103,7 +101,7 @@ class TestEdgeCases:
 
         telemetry_path = env.pipelex_dir / "telemetry.toml"
         toml_doc_tel = load_toml_with_tomlkit(str(telemetry_path))
-        toml_doc_tel["telemetry_mode"] = "identified"
+        toml_doc_tel["posthog"]["mode"] = "identified"  # type: ignore[index]
         save_toml_to_path(toml_doc_tel, str(telemetry_path))
 
         # Get index for anthropic
@@ -114,7 +112,6 @@ class TestEdgeCases:
         env.add_confirm_input(True)  # Confirm reset
         env.add_prompt_input(str(indices[0]))  # Select anthropic
         env.add_confirm_input(True)  # Confirm creating profile if needed
-        env.add_prompt_input("1")  # Telemetry: OFF
 
         env.setup_mocks()
 
@@ -140,7 +137,6 @@ class TestEdgeCases:
         env.add_confirm_input(True)  # Confirm initialization
         env.add_prompt_input(indices_str)  # Select openai, mistral
         env.add_prompt_input("1")  # Primary backend
-        env.add_prompt_input("1")  # Telemetry
 
         env.setup_mocks()
 

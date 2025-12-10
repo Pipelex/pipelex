@@ -32,7 +32,7 @@ def _migrate_profile_to_official_backend(profile: dict[str, Any]) -> None:
         profile: The profile dict to migrate (modified in place).
     """
     legacy_backend = PipelexBackend.LEGACY_INFERENCE.value
-    official_backend = PipelexBackend.official_backend().value
+    official_backend = PipelexBackend.GATEWAY.value
 
     # Update default
     if profile.get("default") == legacy_backend:
@@ -91,7 +91,7 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         backend_options = get_backend_options_from_toml(template_backends_path, backends_toml_path)
 
         # Case 1: pipelex_gateway is enabled - use pipelex_gateway_first
-        if PipelexBackend.official_backend() in selected_backend_keys:
+        if PipelexBackend.GATEWAY in selected_backend_keys:
             profiles: dict[str, dict[str, Any]] = toml_doc.get("profiles") or {}  # type: ignore[assignment]
 
             # Migrate legacy pipelex_first profile to pipelex_gateway_first

@@ -4,6 +4,7 @@ from pipelex.cogt.exceptions import ModelManagerError
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
@@ -50,11 +51,16 @@ class ModelManager(ModelManagerAbstract):
         self._routing_profile = None
 
     @override
-    def setup(self, secrets_provider: SecretsProviderAbstract) -> None:
+    def setup(
+        self,
+        secrets_provider: SecretsProviderAbstract,
+        gateway_model_specs: BackendModelSpecs | None,
+    ) -> None:
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_path=ConfigPaths.BACKENDS_FILE_PATH,
             backends_dir_path=ConfigPaths.BACKENDS_DIR_PATH,
+            gateway_model_specs=gateway_model_specs,
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
