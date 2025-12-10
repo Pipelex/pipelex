@@ -7,7 +7,13 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.validate_bundle import ValidateBundleError
-from pipelex.system.pipelex_service.exceptions import GatewayTermsNotAcceptedError
+from pipelex.system.pipelex_service.exceptions import (
+    GatewayApiKeyMissingError,
+    GatewayDoNotTrackConflictError,
+    GatewayTermsNotAcceptedError,
+    RemoteConfigFetchError,
+    RemoteConfigValidationError,
+)
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.types import StrEnum
 from pipelex.urls import URLs
@@ -226,4 +232,133 @@ def handle_gateway_terms_not_accepted_error(exc: GatewayTermsNotAcceptedError) -
 
     console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_gateway_api_key_missing_error(exc: GatewayApiKeyMissingError) -> NoReturn:
+    """Handle and display GatewayApiKeyMissingError with user-friendly guidance.
+
+    This error occurs when Pipelex Gateway is enabled but the PIPELEX_GATEWAY_API_KEY
+    environment variable is not set.
+
+    Args:
+        exc: The gateway API key missing error exception
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Pipelex Gateway API key not set[/bold red]\n")
+
+    console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but the API key\nenvironment variable is not set.\n")
+
+    console.print("[bold green]💡 To fix:[/bold green]")
+    console.print(f"  • Get your API key at: [cyan]{URLs.app}[/cyan]")
+    console.print("  • Set the [cyan]PIPELEX_GATEWAY_API_KEY[/cyan] environment variable")
+    console.print()
+
+    console.print("[dim]Alternatively, you can:[/dim]")
+    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
+    console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
+    console.print()
+
+    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_gateway_do_not_track_conflict_error(exc: GatewayDoNotTrackConflictError) -> NoReturn:
+    """Handle and display GatewayDoNotTrackConflictError with user-friendly guidance.
+
+    This error occurs when Pipelex Gateway is enabled but the user has set
+    a DO_NOT_TRACK environment variable, which conflicts with gateway's telemetry requirement.
+
+    Args:
+        exc: The gateway do not track conflict error exception
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Pipelex Gateway requires telemetry[/bold red]\n")
+
+    console.print(
+        "[bold yellow]⚠ Conflict:[/bold yellow] Pipelex Gateway requires telemetry for service monitoring,\n"
+        "but you have set DO_NOT_TRACK. We respect your privacy preference.\n"
+    )
+
+    console.print("[bold green]💡 To fix, choose one option:[/bold green]")
+    console.print("  • [cyan]Unset[/cyan] the DO_NOT_TRACK environment variable to use Gateway")
+    console.print("  • [cyan]Or[/cyan] disable pipelex_gateway in .pipelex/inference/backends.toml")
+    console.print("    and use your own API keys with direct provider backends")
+    console.print()
+
+    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_remote_config_fetch_error(exc: RemoteConfigFetchError) -> NoReturn:
+    """Handle and display RemoteConfigFetchError with user-friendly guidance.
+
+    This error occurs when Pipelex Gateway is enabled but the remote configuration
+    cannot be fetched (network issues, server unreachable, etc.).
+
+    Args:
+        exc: The remote config fetch error exception
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Could not connect to Pipelex Gateway[/bold red]\n")
+
+    console.print(
+        "[bold yellow]⚠ Network Issue:[/bold yellow] Pipelex Gateway requires network access to fetch\n"
+        "configuration, but we couldn't reach the Pipelex servers.\n"
+    )
+
+    console.print("[bold cyan]Error details:[/bold cyan]")
+    console.print(f"  {exc}\n")
+
+    console.print("[bold green]💡 To fix:[/bold green]")
+    console.print("  • Check your internet connection")
+    console.print("  • Verify that firewall/proxy settings allow outbound HTTPS requests")
+    console.print("  • Try again in a few moments (servers may be temporarily unavailable)")
+    console.print()
+
+    console.print("[dim]Alternatively, you can:[/dim]")
+    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
+    console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
+    console.print()
+
+    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> NoReturn:
+    """Handle and display RemoteConfigValidationError with user-friendly guidance.
+
+    This error occurs when Pipelex Gateway remote configuration was fetched but
+    the data is malformed or doesn't match the expected schema.
+
+    Args:
+        exc: The remote config validation error exception
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Pipelex Gateway configuration is invalid[/bold red]\n")
+
+    console.print(
+        "[bold yellow]⚠ Server Issue:[/bold yellow] The Pipelex Gateway configuration was received but\n"
+        "couldn't be validated. This is a server-side issue that we need to fix.\n"
+    )
+
+    console.print("[bold cyan]Error details:[/bold cyan]")
+    console.print(f"  {exc}\n")
+
+    console.print("[bold red]🚨 Please report this![/bold red]")
+    console.print("  This error shouldn't happen and we want to fix it ASAP.")
+    console.print("  Please copy-paste this error to:")
+    console.print(f"  • Discord: [cyan]{URLs.discord}[/cyan]")
+    console.print(f"  • GitHub Issues: [cyan]{URLs.repository}/issues[/cyan]")
+    console.print()
+
+    console.print("[dim]In the meantime, you can:[/dim]")
+    console.print("[dim]  • Disable pipelex_gateway in .pipelex/inference/backends.toml[/dim]")
+    console.print("[dim]  • Use your own API keys with direct provider backends[/dim]")
+    console.print()
+
+    console.print(f"[dim]For more information: {URLs.gateway_docs}[/dim]\n")
     raise typer.Exit(1) from exc

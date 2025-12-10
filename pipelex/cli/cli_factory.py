@@ -2,13 +2,23 @@
 
 from pipelex.cli.error_handlers import (
     ErrorContext,
+    handle_gateway_api_key_missing_error,
+    handle_gateway_do_not_track_conflict_error,
     handle_gateway_terms_not_accepted_error,
     handle_model_deck_preset_error,
+    handle_remote_config_fetch_error,
+    handle_remote_config_validation_error,
     handle_telemetry_config_validation_error,
 )
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.pipelex import Pipelex
-from pipelex.system.pipelex_service.exceptions import GatewayTermsNotAcceptedError
+from pipelex.system.pipelex_service.exceptions import (
+    GatewayApiKeyMissingError,
+    GatewayDoNotTrackConflictError,
+    GatewayTermsNotAcceptedError,
+    RemoteConfigFetchError,
+    RemoteConfigValidationError,
+)
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 
@@ -34,5 +44,13 @@ def make_pipelex_for_cli(context: ErrorContext) -> Pipelex:
         handle_telemetry_config_validation_error(exc)
     except GatewayTermsNotAcceptedError as exc:
         handle_gateway_terms_not_accepted_error(exc)
+    except GatewayApiKeyMissingError as exc:
+        handle_gateway_api_key_missing_error(exc)
+    except GatewayDoNotTrackConflictError as exc:
+        handle_gateway_do_not_track_conflict_error(exc)
+    except RemoteConfigFetchError as exc:
+        handle_remote_config_fetch_error(exc)
+    except RemoteConfigValidationError as exc:
+        handle_remote_config_validation_error(exc)
     except ModelDeckPresetValidatonError as exc:
         handle_model_deck_preset_error(exc, context=context)
