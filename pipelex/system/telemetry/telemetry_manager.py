@@ -10,7 +10,7 @@ from typing_extensions import Unpack, override
 from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
-from pipelex.system.pipelex_service.pipelex_credentials import PipelexServiceConfig
+from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
@@ -58,10 +58,10 @@ class TelemetryManager(TelemetryManagerAbstract):
         self.pipelex_posthog_client: Posthog | None = None
         if pipelex_telemetry_enabled:
             if gateway_api_key:
-                self._pipelex_distinct_id = PipelexServiceConfig.make_distinct_id(gateway_api_key)
+                self._pipelex_distinct_id = PipelexDetails.make_distinct_id(gateway_api_key)
             self.pipelex_posthog_client = Posthog(
-                project_api_key=PipelexServiceConfig.POSTHOG_PROJECT_API_KEY,
-                host=PipelexServiceConfig.POSTHOG_HOST,
+                project_api_key=PipelexDetails.POSTHOG_PROJECT_API_KEY,
+                host=PipelexDetails.POSTHOG_HOST,
                 disable_geoip=False,  # GeoIP enabled for Pipelex telemetry
                 debug=self.telemetry_config.posthog.debug,
                 on_error=self._handle_pipelex_transmission_error,

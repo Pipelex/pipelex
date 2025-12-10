@@ -8,7 +8,7 @@ from pipelex.system.pipelex_service.exceptions import (
     GatewayDoNotTrackConflictError,
     GatewayTelemetryManagerInjectedError,
 )
-from pipelex.system.pipelex_service.pipelex_credentials import PIPELEX_GATEWAY_API_KEY_VAR
+from pipelex.system.pipelex_service.pipelex_details import PIPELEX_GATEWAY_API_KEY_VAR
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, PostHogMode, TelemetryConfig, load_telemetry_config

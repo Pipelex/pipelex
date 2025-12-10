@@ -29,7 +29,7 @@ def _hash_gateway_api_key(api_key: str, length: int) -> str:
     return hashlib.sha256(api_key.encode("utf-8")).hexdigest()[:length]
 
 
-class PipelexServiceConfig:
+class PipelexDetails:
     """Base configuration for Pipelex's services."""
 
     # PostHog host for Pipelex services

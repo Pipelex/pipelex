@@ -11,7 +11,7 @@ from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
     RemoteConfigValidationError,
 )
-from pipelex.system.pipelex_service.pipelex_credentials import PipelexServiceConfig
+from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -29,7 +29,7 @@ def fetch_remote_config() -> RemoteConfig:
         RemoteConfigFetchError: If the HTTP request fails or returns an error.
         RemoteConfigValidationError: If the JSON doesn't match expected schema.
     """
-    url = PipelexServiceConfig.REMOTE_CONFIG_URL
+    url = PipelexDetails.REMOTE_CONFIG_URL
 
     try:
         response = httpx.get(url, timeout=10.0, follow_redirects=True)
