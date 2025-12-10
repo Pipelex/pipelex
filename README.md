@@ -49,7 +49,7 @@ To use AI models, you need an API key:
 - **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral
 - **Local AI**: Ollama, vLLM, LM Studio, llama.cpp... any endpoint based on the OpenAI API or not, as you can plug-in your own non-standard APIs.
 
-See [Configure AI Providers](https://docs.pipelex.com/pages/setup/configure-ai-providers/) for details.
+See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for details.
 
 ## 3. Generate Your First Workflow
 
@@ -318,9 +318,9 @@ Each pipe processes information using **Concepts** (typing with meaning) to ensu
 ## 📖 Next Steps
 
 **Learn More:**
-- [Writing Workflows Tutorial](https://docs.pipelex.com/pages/writing-workflows/) - Complete guide with examples
-- [Build Reliable AI Workflows](https://docs.pipelex.com/pages/build-reliable-ai-workflows-with-pipelex/kick-off-a-pipelex-workflow-project/) - Deep dive into Pipelex
-- [Configuration Guide](https://docs.pipelex.com/pages/setup/configure-ai-providers/) - Set up AI providers and models
+- [Design and Run Pipelines](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/pipes/) - Complete guide with examples
+- [Kick off a Pipeline Project](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project/) - Deep dive into Pipelex
+- [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) - Set up AI providers and models
 
 ## 🔧 IDE Extension
 
