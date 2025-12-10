@@ -16,7 +16,6 @@ from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import (
     GenAISpanAttr,
     LangfuseSpanAttr,
-    OTelConstants,
     PipelexSpanAttr,
     SpanCategory,
     make_otel_gen_ai_output_type,
@@ -83,7 +82,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         return "unknown"
 
     def _start_otel_span_llm(self, llm_job: LLMJob, output_type: LLMOutputType, output_class_name: str | None = None) -> Span | None:
-        """Start an OTel span for the LLM job and return it. Safe to call if otel_context is None."""
+        """Start an OTel span for the LLM job and return it.
+
+        Always includes full (non-redacted) values in Pipelex attributes for PostHog exporters.
+        Redaction is handled by individual exporters based on their TelemetryRedactionConfig.
+        Safe to call if otel_context is None.
+        """
         # Get context from job metadata
         job_metadata = llm_job.job_metadata
         otel_context = job_metadata.otel_context
@@ -109,27 +113,21 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             raise JobMetadataError(msg)
         pipeline_run_id = job_metadata.pipeline_run_id
 
-        # Determine if we need to redact output class names
+        # Build output description for span name (full values - exporter handles redaction)
         output_desc: str
         match output_type:
             case LLMOutputType.TEXT:
                 output_desc = output_type
             case LLMOutputType.OBJECT:
-                if TelemetryManagerAbstract.is_capture_output_class_name_enabled() and output_class_name:
-                    output_desc = output_class_name
-                else:
-                    output_desc = output_type
-
-        # Determine if we need to redact pipe code
-        if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
-            pipe_code_attr = pipe_code
-        else:
-            pipe_code_attr = OTelConstants.PIPE_CODE_REDACTED
+                # Always use full class name in span name, exporter will redact if needed
+                output_desc = output_class_name or output_type
 
         model_name = self._get_request_model_name()
-        span_name = f"{pipe_code_attr}: {unit_job_id} ({model_name}) -> {output_desc}"
+        # Always use full pipe code and class name - exporter handles redaction
+        span_name = f"{pipe_code}: {unit_job_id} ({model_name}) -> {output_desc}"
 
-        # Build all span attributes upfront
+        # Build all span attributes with FULL (non-redacted) values
+        # PostHog exporters will apply redaction based on their TelemetryRedactionConfig
         span_attributes: dict[str, AttributeValue] = {
             # GenAI standard attributes
             GenAISpanAttr.OPERATION_NAME: unit_job_id,
@@ -138,12 +136,18 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             GenAISpanAttr.REQUEST_MODEL: model_name,
             GenAISpanAttr.RESPONSE_MODEL: self._get_response_model_name(),
             GenAISpanAttr.REQUEST_TEMPERATURE: job_params.temperature,
-            # Pipelex specific context attributes
+            # Pipelex specific context attributes (always full values, exporters redact as needed)
             PipelexSpanAttr.TRACE_NAME: otel_context.trace_name,
+            PipelexSpanAttr.TRACE_NAME_REDACTED: otel_context.trace_name_redacted,
             PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.INFERENCE,
             PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
-            PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
+            PipelexSpanAttr.PIPE_CODE: pipe_code,  # Full pipe code, exporter handles redaction
         }
+
+        # Store output class name as separate attribute so exporter can rebuild span name with redaction
+        if output_class_name:
+            span_attributes[PipelexSpanAttr.OUTPUT_CLASS_NAME] = output_class_name
+
         if TelemetryManagerAbstract.get_langfuse_enabled():
             span_attributes[LangfuseSpanAttr.TRACE_NAME] = otel_context.trace_name
             span_attributes[LangfuseSpanAttr.RELEASE] = get_package_version()
@@ -151,41 +155,39 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span_attributes[GenAISpanAttr.REQUEST_MAX_TOKENS] = job_params.max_tokens
         if job_params.seed:
             span_attributes[GenAISpanAttr.REQUEST_SEED] = job_params.seed
-        if TelemetryManagerAbstract.is_capture_content_enabled():
-            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
-            messages: list[dict[str, Any]] = []
-            if llm_job.llm_prompt.system_text:
-                system_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.system_text, max_length=max_length)
-                system_text_dict = {
-                    "role": "system",
-                    "content": system_text,
-                }
-                messages.append(system_text_dict)
-            if llm_job.llm_prompt.user_text or llm_job.llm_prompt.user_images:
-                content_dict: list[dict[str, Any]] = []
-                if llm_job.llm_prompt.user_text:
-                    user_text = OtelFactory.make_truncated_content(content=llm_job.llm_prompt.user_text, max_length=max_length)
-                    user_text_dict = {
-                        "type": "text",
-                        "text": user_text,
-                    }
-                    content_dict.append(user_text_dict)
-                for prompt_image in llm_job.llm_prompt.user_images:
-                    image_dict = {
-                        "type": "image",
-                        "image": prompt_image.short_description(),
-                    }
-                    content_dict.append(image_dict)
-                user_dict = {
-                    "role": "user",
-                    "content": content_dict,
-                }
-                messages.append(user_dict)
 
-            messages_json = OtelFactory.stringify_json(json_conent=messages)
-            span_attributes[GenAISpanAttr.PROMPT_CONTENT] = messages_json
-            if TelemetryManagerAbstract.get_langfuse_enabled():
-                span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = messages_json
+        # Always capture full prompt content - exporters handle redaction as needed
+        messages: list[dict[str, Any]] = []
+        if llm_job.llm_prompt.system_text:
+            system_text_dict = {
+                "role": "system",
+                "content": llm_job.llm_prompt.system_text,
+            }
+            messages.append(system_text_dict)
+        if llm_job.llm_prompt.user_text or llm_job.llm_prompt.user_images:
+            content_dict: list[dict[str, Any]] = []
+            if llm_job.llm_prompt.user_text:
+                user_text_dict = {
+                    "type": "text",
+                    "text": llm_job.llm_prompt.user_text,
+                }
+                content_dict.append(user_text_dict)
+            for prompt_image in llm_job.llm_prompt.user_images:
+                image_dict = {
+                    "type": "image",
+                    "image": prompt_image.short_description(),
+                }
+                content_dict.append(image_dict)
+            user_dict = {
+                "role": "user",
+                "content": content_dict,
+            }
+            messages.append(user_dict)
+
+        messages_json = OtelFactory.stringify_json(json_conent=messages)
+        span_attributes[GenAISpanAttr.PROMPT_CONTENT] = messages_json
+        if TelemetryManagerAbstract.get_langfuse_enabled():
+            span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = messages_json
 
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
@@ -244,13 +246,10 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span.set_attribute(GenAISpanAttr.USAGE_INPUT_TOKENS, input_tokens)
             span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
 
-        # Capture response content if enabled and result is a string
-        if TelemetryManagerAbstract.is_capture_content_enabled():
-            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
-            content = OtelFactory.make_truncated_content(content=completion_text, max_length=max_length)
-            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, content)
-            if TelemetryManagerAbstract.get_langfuse_enabled():
-                span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, content)
+        # Always capture full completion content - exporters handle redaction as needed
+        span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_text)
+        if TelemetryManagerAbstract.get_langfuse_enabled():
+            span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, completion_text)
 
         span.set_status(Status(StatusCode.OK))
         span.end()
@@ -278,14 +277,11 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             span.set_attribute(GenAISpanAttr.USAGE_INPUT_TOKENS, input_tokens)
             span.set_attribute(GenAISpanAttr.USAGE_OUTPUT_TOKENS, output_tokens)
 
-        # Capture response content if enabled and result is an object
-        if TelemetryManagerAbstract.is_capture_content_enabled():
-            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
-            completion_object_json = OtelFactory.stringify_json(json_conent=completion_object.model_dump(serialize_as_any=True))
-            content = OtelFactory.make_truncated_content(content=completion_object_json, max_length=max_length)
-            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, content)
-            if TelemetryManagerAbstract.get_langfuse_enabled():
-                span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, content)
+        # Always capture full completion content - exporters handle redaction as needed
+        completion_object_json = OtelFactory.stringify_json(json_conent=completion_object.model_dump(serialize_as_any=True))
+        span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_object_json)
+        if TelemetryManagerAbstract.get_langfuse_enabled():
+            span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, completion_object_json)
 
         span.set_status(Status(StatusCode.OK))
         span.end()

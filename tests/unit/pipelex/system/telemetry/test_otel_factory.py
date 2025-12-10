@@ -1,7 +1,6 @@
 """Unit tests for OTel utility functions."""
 
 import pytest
-from pytest_mock import MockerFixture
 
 from pipelex.system.telemetry.otel_factory import OtelFactory
 
@@ -80,24 +79,19 @@ class TestOtelFactory:
         assert trace_id > 0
         assert trace_id.bit_length() <= 128
 
-    # --- make_trace_name tests ---
+    # --- make_trace_names tests ---
 
-    def test_make_trace_name_includes_pipe_code_when_enabled(self, mocker: MockerFixture) -> None:
-        """Test that trace name includes pipe code when capture is enabled."""
-        mocker.patch(
-            "pipelex.system.telemetry.otel_factory.TelemetryManagerAbstract.is_capture_pipe_codes_enabled",
-            return_value=True,
-        )
-        result = OtelFactory.make_trace_name("run_123", "my_pipe")
-        assert result.startswith("my_pipe_")
-        assert len(result) == len("my_pipe_") + 8  # pipe_code + underscore + 8-char hash
+    def test_make_trace_names_returns_full_and_redacted(self) -> None:
+        """Test that make_trace_names returns both full and redacted trace names."""
+        trace_name, trace_name_redacted = OtelFactory.make_trace_names("run_123", "my_pipe")
 
-    def test_make_trace_name_excludes_pipe_code_when_disabled(self, mocker: MockerFixture) -> None:
-        """Test that trace name is just hash when capture is disabled."""
-        mocker.patch(
-            "pipelex.system.telemetry.otel_factory.TelemetryManagerAbstract.is_capture_pipe_codes_enabled",
-            return_value=False,
-        )
-        result = OtelFactory.make_trace_name("run_123", "my_pipe")
-        assert "my_pipe" not in result
-        assert len(result) == 8  # just the 8-char hash
+        # Full trace name should include pipe code
+        assert trace_name.startswith("my_pipe_")
+        assert len(trace_name) == len("my_pipe_") + 8  # pipe_code + underscore + 8-char hash
+
+        # Redacted trace name should just be the hash
+        assert "my_pipe" not in trace_name_redacted
+        assert len(trace_name_redacted) == 8  # just the 8-char hash
+
+        # Both should share the same hash suffix
+        assert trace_name.endswith(trace_name_redacted)

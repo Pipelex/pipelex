@@ -21,6 +21,7 @@ class OTelConstants:
 
     DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
     PIPE_CODE_REDACTED = "[REDACTED]"
+    OUTPUT_CLASS_REDACTED = "Object"
     TRUNCATION_SUFFIX = "... [truncated]"
 
     # Virtual parent span ID for root spans.
@@ -106,12 +107,14 @@ class PipelexSpanAttr(StrEnum):
     """Pipelex-specific span attribute keys for workflow tracing."""
 
     TRACE_NAME = "pipelex.trace.name"
+    TRACE_NAME_REDACTED = "pipelex.trace.name.redacted"
     SPAN_CATEGORY = "pipelex.span.category"  # "pipe" or "inference"
     PIPE_CATEGORY = "pipelex.pipe.category"
     PIPE_TYPE = "pipelex.pipe.type"
     PIPE_CODE = "pipelex.pipe.code"
     PIPELINE_RUN_ID = "pipelex.pipeline.run_id"
     OUTCOME = "pipelex.outcome"  # "success" or "failure"
+    OUTPUT_CLASS_NAME = "pipelex.output.class_name"
 
 
 class LangfuseSpanAttr(StrEnum):

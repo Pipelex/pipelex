@@ -23,7 +23,7 @@ from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.exceptions import LangfuseCredentialsError
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
 from pipelex.tools.log.log import log
 from pipelex.tools.misc.json_utils import JsonContent, pure_json_str
 from pipelex.tools.misc.package_utils import get_package_version
@@ -130,22 +130,22 @@ class OtelFactory:
         return int(hashlib.md5(pipeline_run_id.encode("utf-8")).hexdigest(), 16)  # noqa: S324
 
     @classmethod
-    def make_trace_name(cls, pipeline_run_id: str, pipe_code: str) -> str:
-        """Create a trace name from pipeline run ID and optional pipe code.
+    def make_trace_names(cls, pipeline_run_id: str, pipe_code: str) -> tuple[str, str]:
+        """Create both full and redacted trace names from pipeline run ID and pipe code.
 
         Args:
             pipeline_run_id: The pipeline run identifier string.
-            pipe_code: pipe code to include in the trace name or not.
+            pipe_code: The pipe code to include in the full trace name.
 
         Returns:
-            A trace name combining the pipe code (if enabled) with a short deterministic
-            hash of the pipeline run ID.
+            A tuple of (trace_name, trace_name_redacted):
+            - trace_name: Full version with pipe code (e.g., "my_pipe_abc12345")
+            - trace_name_redacted: Just the hash (e.g., "abc12345")
         """
         hashed_id = hashlib.md5(pipeline_run_id.encode("utf-8")).hexdigest()[:8]  # noqa: S324
-        if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
-            return f"{pipe_code}_{hashed_id}"
-        else:
-            return hashed_id
+        trace_name = f"{pipe_code}_{hashed_id}"
+        trace_name_redacted = hashed_id
+        return trace_name, trace_name_redacted
 
     @classmethod
     def make_langfuse_exporter(cls, langfuse_base_url: str | None) -> OTLPSpanExporter:
@@ -183,6 +183,7 @@ class OtelFactory:
         cls,
         user_id: str | None,
         custom_posthog_client: Posthog | None,
+        custom_redaction_config: TelemetryRedactionConfig,
         pipelex_posthog_client: Posthog | None = None,
         pipelex_distinct_id: str | None = None,
         otlp_endpoint: str | None = None,
@@ -204,6 +205,7 @@ class OtelFactory:
         Args:
             user_id: Optional User ID for event attribution (custom telemetry)
             custom_posthog_client: Optional user's PostHog client for sending events
+            custom_redaction_config: Redaction config for custom PostHog exporter
             pipelex_posthog_client: Optional Pipelex internal PostHog client (for gateway)
             pipelex_distinct_id: Distinct ID for Pipelex telemetry
             otlp_endpoint: Optional OTLP endpoint URL
@@ -229,16 +231,27 @@ class OtelFactory:
         provider = OTelTracerProvider(resource=resource)
 
         # Add Custom PostHog Exporter if client provided (custom telemetry)
+        # Uses user's redaction config (may capture content/pipe codes based on user settings)
         if custom_posthog_client:
-            custom_posthog_exporter = PostHogSpanExporter(posthog_client=custom_posthog_client, distinct_id=user_id)
+            custom_posthog_exporter = PostHogSpanExporter(
+                posthog_client=custom_posthog_client,
+                distinct_id=user_id,
+                redaction_config=custom_redaction_config,
+            )
             provider.add_span_processor(OTelBatchSpanProcessor(custom_posthog_exporter))
             log.verbose("Custom PostHog exporter enabled for custom telemetry")
 
         # Add Pipelex PostHog Exporter if client provided (mandatory for gateway)
+        # Always uses full redaction config (never captures sensitive content/pipe codes)
         if pipelex_posthog_client:
-            pipelex_posthog_exporter = PostHogSpanExporter(posthog_client=pipelex_posthog_client, distinct_id=pipelex_distinct_id)
+            pipelex_redaction_config = TelemetryRedactionConfig.pipelex_config()
+            pipelex_posthog_exporter = PostHogSpanExporter(
+                posthog_client=pipelex_posthog_client,
+                distinct_id=pipelex_distinct_id,
+                redaction_config=pipelex_redaction_config,
+            )
             provider.add_span_processor(OTelBatchSpanProcessor(pipelex_posthog_exporter))
-            log.verbose("Pipelex PostHog exporter enabled for gateway telemetry")
+            log.verbose("Pipelex PostHog exporter enabled for gateway telemetry (with full redaction)")
 
         # Add Generic OTLP Exporter if endpoint provided
         if otlp_endpoint:

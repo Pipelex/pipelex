@@ -8,11 +8,11 @@ from portkey_ai import (
 )
 
 from pipelex import log
+from pipelex.cogt.llm.llm_constants import LLMOutputType
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.system.telemetry.otel_constants import OTelConstants
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
@@ -67,12 +67,10 @@ class GatewayFactory:
             extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
             extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"
 
-            # Build span name respecting privacy settings
-            pipe_code = llm_job.job_metadata.pipe_code or "main"
-            if not TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
-                pipe_code = OTelConstants.PIPE_CODE_REDACTED
-
+            # Build span name with redacted output class name (consistent with Pipelex telemetry policy)
+            # Pipelex services always redact sensitive data to protect user privacy
             unit_job_id = llm_job.job_metadata.unit_job_id or "unknown"
-            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {unit_job_id} -> {output_desc}"
+            display_output = output_desc if output_desc == LLMOutputType.TEXT else OTelConstants.OUTPUT_CLASS_REDACTED
+            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{unit_job_id} -> {display_output}"
 
         return extra_headers, {}

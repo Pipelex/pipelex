@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from portkey_ai import PORTKEY_GATEWAY_URL
 
+from pipelex.cogt.llm.llm_constants import LLMOutputType
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.openai.openai_constants import OpenAIBodyKey
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
@@ -56,7 +57,13 @@ class PortkeyFactory:
             if not TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
                 pipe_code = OTelConstants.PIPE_CODE_REDACTED
 
+            # Redact output class name if not "text" and capture is disabled
+            if output_desc == LLMOutputType.TEXT or TelemetryManagerAbstract.is_capture_output_class_name_enabled():
+                display_output = output_desc
+            else:
+                display_output = OTelConstants.OUTPUT_CLASS_REDACTED
+
             unit_job_id = llm_job.job_metadata.unit_job_id or "unknown"
-            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {unit_job_id} -> {output_desc}"
+            extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{pipe_code}: {unit_job_id} -> {display_output}"
 
         return extra_headers, extra_body

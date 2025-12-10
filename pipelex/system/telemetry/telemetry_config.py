@@ -1,6 +1,6 @@
 from functools import partial
 
-from pydantic import Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.text import Text
@@ -79,6 +79,62 @@ class TelemetryConfig(ConfigModel):
             msg = "user_id is required when telemetry_mode is IDENTIFIED"
             raise ValueError(msg)
         return self
+
+
+class TelemetryRedactionConfig(BaseModel):
+    """Configuration for what telemetry data to redact at export time.
+
+    This config is passed to span exporters so they can apply appropriate
+    redaction rules before sending telemetry data to their destinations.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    redact_content: bool = False
+    redact_pipe_codes: bool = False
+    redact_output_class_names: bool = False
+    content_max_length: int | None = None
+
+    @classmethod
+    def from_user_config(cls, config: TelemetryConfig) -> Self:
+        """Create from user's TelemetryConfig (inverse of capture settings).
+
+        Args:
+            config: The user's telemetry configuration.
+
+        Returns:
+            A TelemetryRedactionConfig with redaction settings derived from the user's config.
+        """
+        return cls(
+            redact_content=not config.capture_content_enabled,
+            redact_pipe_codes=not config.capture_pipe_codes_enabled,
+            redact_output_class_names=not config.capture_output_class_name_enabled,
+            content_max_length=config.capture_content_max_length,
+        )
+
+    @classmethod
+    def pipelex_config(cls) -> Self:
+        """Create config for Pipelex telemetry (redact everything).
+
+        Pipelex internal telemetry always redacts sensitive data like content,
+        pipe codes, and output class names to protect user privacy.
+
+        Returns:
+            A TelemetryRedactionConfig with all redaction options enabled.
+        """
+        return cls(redact_content=True, redact_pipe_codes=True, redact_output_class_names=True)
+
+    @classmethod
+    def no_redaction(cls) -> Self:
+        """Create config with no redaction (pass-through).
+
+        Use this when you want to explicitly indicate no redaction should occur,
+        rather than relying on default values.
+
+        Returns:
+            A TelemetryRedactionConfig with all redaction options disabled.
+        """
+        return cls()
 
 
 def _build_deprecated_api_key_panel(config_path: str) -> Panel:

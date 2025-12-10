@@ -309,6 +309,9 @@ class PipeAbstract(ABC, BaseModel):
     ) -> tuple[Span | None, bool]:
         """Start an OTel span for this pipe execution.
 
+        Always includes full (non-redacted) pipe codes and content in span attributes.
+        Redaction is handled by individual exporters based on their TelemetryRedactionConfig.
+
         Args:
             parent_otel_context: The parent's OTel context.
             pipeline_run_id: The pipeline run ID for span attributes.
@@ -323,13 +326,8 @@ class PipeAbstract(ABC, BaseModel):
             log.verbose(f"[OTel] No tracer available for pipe '{self.code}'")
             return None, False
 
-        # Determine if we need to redact pipe codes for privacy
-        if TelemetryManagerAbstract.is_capture_pipe_codes_enabled():
-            pipe_code_attr = self.code
-        else:
-            pipe_code_attr = OTelConstants.PIPE_CODE_REDACTED
-
-        span_name = f"{self.pipe_type}: {pipe_code_attr}"
+        # Always use full pipe code - redaction is handled by exporters
+        span_name = f"{self.pipe_type}: {self.code}"
 
         # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
         # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
@@ -338,16 +336,21 @@ class PipeAbstract(ABC, BaseModel):
         parent_span_id = parent_otel_context.span_id
         is_root_span = parent_span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
 
-        # Build all span attributes upfront
+        # Build all span attributes upfront with FULL (non-redacted) values
+        # PostHog exporters will apply redaction based on their TelemetryRedactionConfig
+        # Langfuse gets full data - users who configure Langfuse control their own data exposure
         span_attributes: dict[str, str] = {
-            # Pipelex-specific attributes
+            # Pipelex-specific attributes (always full values, exporters redact as needed)
             PipelexSpanAttr.TRACE_NAME: parent_otel_context.trace_name,
+            PipelexSpanAttr.TRACE_NAME_REDACTED: parent_otel_context.trace_name_redacted,
             PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.PIPE,
             PipelexSpanAttr.PIPELINE_RUN_ID: pipeline_run_id,
             PipelexSpanAttr.PIPE_CATEGORY: self.pipe_category,
             PipelexSpanAttr.PIPE_TYPE: self.pipe_type,
-            PipelexSpanAttr.PIPE_CODE: pipe_code_attr,
+            PipelexSpanAttr.PIPE_CODE: self.code,  # Full pipe code, exporter handles redaction
         }
+
+        # Langfuse-specific attributes: always send full data
         if TelemetryManagerAbstract.get_langfuse_enabled():
             span_attributes.update(
                 {
@@ -356,22 +359,19 @@ class PipeAbstract(ABC, BaseModel):
                     LangfuseSpanAttr.OBSERVATION_TYPE: SpanCategory.PIPE,
                     LangfuseSpanAttr.OBSERVATION_PIPE_CATEGORY: self.pipe_category,
                     LangfuseSpanAttr.OBSERVATION_PIPE_TYPE: self.pipe_type,
-                    LangfuseSpanAttr.OBSERVATION_PIPE_CODE: pipe_code_attr,
+                    LangfuseSpanAttr.OBSERVATION_PIPE_CODE: self.code,
                     LangfuseSpanAttr.OBSERVATION_PIPELINE_RUN_ID: pipeline_run_id,
                 }
             )
-
-        # Capture input content for Langfuse if enabled
-        # TODO: support OTel custom fields via a plugin / dependency injection mechanism
-        if TelemetryManagerAbstract.is_capture_content_enabled() and TelemetryManagerAbstract.get_langfuse_enabled():
             if self.description:
                 span_attributes[LangfuseSpanAttr.OBSERVATION_DESCRIPTION] = self.description
-            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
+
+            # Capture full input content for Langfuse
             needed_input_names = set(self.needed_inputs().required_names)
             inputs_json = OtelFactory.make_inputs_json(
                 working_memory=working_memory,
                 needed_input_names=needed_input_names,
-                max_length=max_length,
+                max_length=None,  # No truncation for Langfuse
             )
             span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = inputs_json
 
@@ -379,7 +379,7 @@ class PipeAbstract(ABC, BaseModel):
             if is_root_span:
                 span_attributes[LangfuseSpanAttr.TRACE_INPUT] = inputs_json
                 # Set trace-level metadata (filterable in Langfuse UI)
-                span_attributes[LangfuseSpanAttr.TRACE_PIPE_CODE] = pipe_code_attr
+                span_attributes[LangfuseSpanAttr.TRACE_PIPE_CODE] = self.code
                 span_attributes[LangfuseSpanAttr.TRACE_PIPE_TYPE] = self.pipe_type
                 span_attributes[LangfuseSpanAttr.TRACE_PIPE_CATEGORY] = self.pipe_category
                 span_attributes[LangfuseSpanAttr.TRACE_PIPELINE_RUN_ID] = pipeline_run_id
@@ -430,12 +430,11 @@ class PipeAbstract(ABC, BaseModel):
         span_ctx = span.get_span_context()
         log.verbose(f"[OTel] PIPE SPAN ENDING:\n  pipe_code='{self.code}'\n  trace_id={span_ctx.trace_id:032x}\n  span_id={span_ctx.span_id:016x}")
 
-        # Capture output content for Langfuse if enabled
-        if TelemetryManagerAbstract.is_capture_content_enabled() and TelemetryManagerAbstract.get_langfuse_enabled():
-            max_length = TelemetryManagerAbstract.get_capture_content_max_length()
+        # Always capture full output content for Langfuse
+        if TelemetryManagerAbstract.get_langfuse_enabled():
             output_json = OtelFactory.make_output_json(
                 pipe_output=pipe_output,
-                max_length=max_length,
+                max_length=None,  # No truncation for Langfuse
             )
             span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, output_json)
 
@@ -529,6 +528,7 @@ class PipeAbstract(ABC, BaseModel):
                 this_otel_context = OtelContext(
                     trace_id=parent_otel_context.trace_id,
                     trace_name=parent_otel_context.trace_name,
+                    trace_name_redacted=parent_otel_context.trace_name_redacted,
                     span_id=span_context.span_id,
                 )
 

@@ -41,22 +41,6 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return instance.get_otel_tracer()
 
     @classmethod
-    def is_capture_content_enabled(cls) -> bool:
-        """Check if content capture is enabled for telemetry.
-
-        When this returns False, prompt/completion content should not be
-        captured in span attributes.
-
-        Returns:
-            True if content capture is enabled, False otherwise (including when
-            no telemetry manager is configured).
-        """
-        instance = cls.get_instance()
-        if instance is None:
-            return False
-        return instance.capture_content_enabled
-
-    @classmethod
     def is_capture_pipe_codes_enabled(cls) -> bool:
         """Check if pipe code capture is enabled for telemetry.
 
@@ -87,19 +71,6 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         if instance is None:
             return False
         return instance.capture_output_class_name_enabled
-
-    @classmethod
-    def get_capture_content_max_length(cls) -> int | None:
-        """Get the maximum length for captured content.
-
-        Returns:
-            The maximum length for captured content, or None if unlimited
-            (including when no telemetry manager is configured).
-        """
-        instance = cls.get_instance()
-        if instance is None:
-            return None
-        return instance.capture_content_max_length
 
     @classmethod
     def get_langfuse_enabled(cls) -> bool:
@@ -181,8 +152,14 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         """Whether Pipelex internal telemetry is enabled (for gateway usage)."""
 
     @abstractmethod
-    def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
-        """Hook to do something when a trace starts and just got its trace_name and trace_id."""
+    def handle_trace_start(self, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
+        """Hook to do something when a trace starts.
+
+        Args:
+            trace_name: Full trace name with pipe code (for custom telemetry).
+            trace_name_redacted: Redacted trace name without pipe code (for Pipelex telemetry).
+            trace_id: The trace ID.
+        """
 
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
@@ -248,5 +225,5 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         return False
 
     @override
-    def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
+    def handle_trace_start(self, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         pass

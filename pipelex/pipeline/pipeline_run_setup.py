@@ -168,15 +168,16 @@ async def pipeline_run_setup(
     otel_context: OtelContext | None = None
     if pipe_run_mode.is_live and get_otel_tracer() is not None:
         trace_id = OtelFactory.make_trace_id(pipeline_run_id=pipeline_run_id)
-        trace_name = OtelFactory.make_trace_name(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
+        trace_name, trace_name_redacted = OtelFactory.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
         otel_context = OtelContext(
             trace_id=trace_id,
             trace_name=trace_name,
+            trace_name_redacted=trace_name_redacted,
             span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
         )
         # Emit trace start event immediately to establish trace name in PostHog
         # This must happen before any pipe spans are created/exported
-        get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_id=trace_id)
+        get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline.pipeline_run_id,

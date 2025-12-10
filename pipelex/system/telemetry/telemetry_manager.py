@@ -15,7 +15,7 @@ from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Setting
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.otel_factory import OtelFactory
-from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode
+from pipelex.system.telemetry.telemetry_config import TelemetryConfig, TelemetryMode, TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.log.log import log
 from pipelex.tools.misc.package_utils import get_package_version
@@ -72,9 +72,12 @@ class TelemetryManager(TelemetryManagerAbstract):
         self._tracer_provider: OTelTracerProvider | None
         if telemetry_config.ai_tracing_enabled or pipelex_telemetry_enabled:
             # AI tracing is enabled if either custom or pipelex telemetry wants it
+            # Create redaction config from user settings for custom telemetry
+            custom_redaction_config = TelemetryRedactionConfig.from_user_config(telemetry_config)
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 user_id=telemetry_config.user_id,
                 custom_posthog_client=self.custom_posthog_client if telemetry_config.ai_tracing_enabled else None,
+                custom_redaction_config=custom_redaction_config,
                 pipelex_posthog_client=self.pipelex_posthog_client,
                 pipelex_distinct_id=self._pipelex_distinct_id,
                 otlp_endpoint=telemetry_config.otlp_endpoint,
@@ -342,44 +345,59 @@ class TelemetryManager(TelemetryManagerAbstract):
         return self._pipelex_telemetry_enabled
 
     @override
-    def handle_trace_start(self, trace_name: str, trace_id: int) -> None:
-        """Hook to do something when a trace starts and just got its trace_name and trace_id.
-        Here we emit a trace start event to establish the trace name in PostHog:
-        we send a minimal $ai_span event with the trace_name as the span name.
+    def handle_trace_start(self, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
+        """Hook to do something when a trace starts.
+
+        Emits a trace start event to establish the trace name in PostHog.
+        We send a minimal $ai_span event with the trace_name as the span name.
         This event is sent directly (not via OTel spans) to ensure it arrives
         before any batched pipe spans, establishing the correct trace name.
+
+        Args:
+            trace_name: Full trace name with pipe code (for custom telemetry).
+            trace_name_redacted: Redacted trace name without pipe code (for Pipelex telemetry).
+            trace_id: The trace ID.
         """
-        properties: dict[str, Any] = {
-            PostHogAttr.TRACE_ID: f"{trace_id:032x}",
-            PostHogAttr.SPAN_NAME: trace_name,
-            PostHogAttr.TRACE_NAME: trace_name,
-            # No PARENT_ID - this is a root-level marker
-        }
+        log.verbose(
+            f"[Telemetry] Emitting trace start event:\n"
+            f"  trace_name='{trace_name}'\n"
+            f"  trace_name_redacted='{trace_name_redacted}'\n"
+            f"  trace_id={trace_id:032x}"
+        )
 
-        log.verbose(f"[Telemetry] Emitting trace start event:\n  trace_name='{trace_name}'\n  trace_id={trace_id:032x}")
-
-        # Send to custom PostHog if configured
+        # Send to custom PostHog if configured (uses full trace name based on user's capture settings)
         if self.custom_posthog_client and self.telemetry_config.ai_tracing_enabled:
+            # Use full or redacted trace name based on user's capture_pipe_codes_enabled setting
+            custom_trace_name = trace_name if self.telemetry_config.capture_pipe_codes_enabled else trace_name_redacted
+            custom_properties: dict[str, Any] = {
+                PostHogAttr.TRACE_ID: f"{trace_id:032x}",
+                PostHogAttr.SPAN_NAME: custom_trace_name,
+                PostHogAttr.TRACE_NAME: custom_trace_name,
+                # No PARENT_ID - this is a root-level marker
+            }
             if self.telemetry_config.user_id:
                 # Identified user: pass distinct_id
                 self.custom_posthog_client.capture(
                     distinct_id=self.telemetry_config.user_id,
                     event=PostHogEvent.SPAN,
-                    properties=properties,
+                    properties=custom_properties,
                 )
             else:
                 # Anonymous user: don't pass distinct_id, mark as anonymous
-                custom_properties = dict(properties)
                 custom_properties[PostHogAttr.PROCESS_PERSON_PROFILE] = False
                 self.custom_posthog_client.capture(
                     event=PostHogEvent.SPAN,
                     properties=custom_properties,
                 )
 
-        # Send to Pipelex PostHog if gateway telemetry is enabled
+        # Send to Pipelex PostHog if gateway telemetry is enabled (always uses redacted trace name)
         if self.pipelex_posthog_client:
-            # TODO: RC - this dict thing
-            pipelex_properties = dict(properties)
+            pipelex_properties: dict[str, Any] = {
+                PostHogAttr.TRACE_ID: f"{trace_id:032x}",
+                PostHogAttr.SPAN_NAME: trace_name_redacted,
+                PostHogAttr.TRACE_NAME: trace_name_redacted,
+                # No PARENT_ID - this is a root-level marker
+            }
             if self._pipelex_distinct_id:
                 self.pipelex_posthog_client.capture(
                     distinct_id=self._pipelex_distinct_id,
