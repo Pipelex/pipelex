@@ -21,8 +21,8 @@
 [posthog]
 mode = "off" # Values: "off" | "anonymous" | "identified"
 # user_id = "your_user_id"                                  # Required when mode = "identified"
-host = "https://us.i.posthog.com" # US region (or "https://eu.i.posthog.com" for EU)
-api_key = "phc_YOUR_POSTHOG_PROJECT_API_KEY" # Get from PostHog Project Settings
+endpoint = "${POSTHOG_ENDPOINT}" # Default: https://us.i.posthog.com (or https://eu.i.posthog.com for EU)
+api_key = "${POSTHOG_API_KEY}" # Get from PostHog Project Settings
 geoip = true # Enable GeoIP lookup
 debug = false # Enable PostHog debug mode
 redact_properties = [
@@ -44,15 +44,17 @@ content = false # Capture prompt/completion content
 pipe_codes = false         # Include pipe codes in span names/attributes
 output_class_names = false # Include output class names in span names/attributes
 
-# Langfuse Integration (requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY env vars)
+# Langfuse Integration
 # Note: Langfuse receives FULL span data (no redaction)
 [langfuse]
 enabled = false
-# base_url = "https://cloud.langfuse.com"                   # Override for self-hosted Langfuse
+# endpoint = "https://cloud.langfuse.com"                    # Override for self-hosted Langfuse
+# public_key = "${LANGFUSE_PUBLIC_KEY}"                      # Langfuse public key
+# secret_key = "${LANGFUSE_SECRET_KEY}"                      # Langfuse secret key
 
 # Additional OTLP Exporters (array for multiple)
 # Note: OTLP exporters receive FULL span data (no redaction)
 # [[otlp]]
 # name = "my-collector"                                     # Identifier for logging
 # endpoint = "https://..."                                  # OTLP endpoint URL
-# headers = { Authorization = "Bearer ..." }               # Headers for OTLP export
+# headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" } # Headers for OTLP export

@@ -18,12 +18,12 @@ from posthog import Posthog  # type: ignore[attr-defined]
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.system.environment import EnvVarNotFoundError, get_optional_env, get_required_env
+from pipelex.system.environment import get_optional_env
 from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.exceptions import LangfuseCredentialsError
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
-from pipelex.system.telemetry.telemetry_config import OtlpExporterConfig, TelemetryRedactionConfig
+from pipelex.system.telemetry.telemetry_config import LangfuseConfig, OtlpExporterConfig, TelemetryRedactionConfig
 from pipelex.tools.log.log import log
 from pipelex.tools.misc.json_utils import JsonContent, pure_json_str
 from pipelex.tools.misc.package_utils import get_package_version
@@ -148,33 +148,46 @@ class OtelFactory:
         return trace_name, trace_name_redacted
 
     @classmethod
-    def make_langfuse_exporter(cls, langfuse_base_url: str | None) -> OTLPSpanExporter:
-        """Create a Langfuse OTLP exporter using environment credentials.
+    def _is_unresolved_placeholder(cls, value: str | None) -> bool:
+        """Check if a value is an unresolved env var placeholder."""
+        return value is not None and value.startswith("${")
 
-        Requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY environment variables.
-        Optionally LANGFUSE_BASE_URL can be set via env var or config.
+    @classmethod
+    def make_langfuse_exporter(cls, langfuse_config: LangfuseConfig) -> OTLPSpanExporter:
+        """Create a Langfuse OTLP exporter using config credentials.
+
+        Credentials can be provided via config (with env var substitution) or
+        fall back to LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY environment variables.
 
         Args:
-            langfuse_base_url: Optional base URL override from config
+            langfuse_config: Langfuse configuration with credentials
 
         Returns:
-            OTLPSpanExporter configured for Langfuse, or None if credentials missing
+            OTLPSpanExporter configured for Langfuse
+
+        Raises:
+            LangfuseCredentialsError: If credentials are missing or unresolved
         """
-        try:
-            public_key = get_required_env("LANGFUSE_PUBLIC_KEY")
-            secret_key = get_required_env("LANGFUSE_SECRET_KEY")
-        except EnvVarNotFoundError as exc:
-            msg = "Langfuse enabled but credentials not found"
-            raise LangfuseCredentialsError(msg) from exc
+        # Get credentials from config, falling back to env vars
+        public_key = langfuse_config.public_key or get_optional_env("LANGFUSE_PUBLIC_KEY")
+        secret_key = langfuse_config.secret_key or get_optional_env("LANGFUSE_SECRET_KEY")
+
+        # Check for missing or unresolved credentials
+        if not public_key or cls._is_unresolved_placeholder(public_key):
+            msg = "Langfuse enabled but public_key not found (set LANGFUSE_PUBLIC_KEY or configure in telemetry.toml)"
+            raise LangfuseCredentialsError(msg)
+        if not secret_key or cls._is_unresolved_placeholder(secret_key):
+            msg = "Langfuse enabled but secret_key not found (set LANGFUSE_SECRET_KEY or configure in telemetry.toml)"
+            raise LangfuseCredentialsError(msg)
 
         # Config takes precedence, then env var, then default
-        base_url = langfuse_base_url or get_optional_env("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com"
+        endpoint = langfuse_config.endpoint or get_optional_env("LANGFUSE_BASE_URL") or "https://cloud.langfuse.com"
 
         # Build Basic auth header
         langfuse_auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
 
         return OTLPSpanExporter(
-            endpoint=f"{base_url}/api/public/otel/v1/traces",
+            endpoint=f"{endpoint}/api/public/otel/v1/traces",
             headers={"Authorization": f"Basic {langfuse_auth}"},
         )
 
@@ -187,8 +200,7 @@ class OtelFactory:
         pipelex_posthog_client: Posthog | None = None,
         pipelex_distinct_id: str | None = None,
         otlp_exporters: list[OtlpExporterConfig] | None = None,
-        is_langfuse_enabled: bool = False,
-        langfuse_base_url: str | None = None,
+        langfuse_config: LangfuseConfig | None = None,
     ) -> tuple[OTelTracer, OTelTracerProvider]:
         """Create an isolated OpenTelemetry Tracer for GenAI instrumentation.
 
@@ -208,8 +220,7 @@ class OtelFactory:
             pipelex_posthog_client: Optional Pipelex internal PostHog client (for gateway)
             pipelex_distinct_id: Distinct ID for Pipelex telemetry
             otlp_exporters: List of OTLP exporter configurations
-            is_langfuse_enabled: Whether to enable Langfuse OTLP export
-            langfuse_base_url: Optional base URL for self-hosted Langfuse
+            langfuse_config: Optional Langfuse configuration (enables Langfuse if provided and enabled)
 
         Returns:
             A tuple of (Tracer, TracerProvider). The caller should call
@@ -262,8 +273,8 @@ class OtelFactory:
                 log.verbose(f"OTLP exporter '{exporter_config.name}' enabled: {exporter_config.endpoint}")
 
         # Add Langfuse OTLP Exporter if enabled
-        if is_langfuse_enabled:
-            langfuse_exporter = cls.make_langfuse_exporter(langfuse_base_url)
+        if langfuse_config and langfuse_config.enabled:
+            langfuse_exporter = cls.make_langfuse_exporter(langfuse_config)
             provider.add_span_processor(OTelBatchSpanProcessor(langfuse_exporter))
             log.verbose("Langfuse OTLP exporter enabled")
 

@@ -48,7 +48,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         if telemetry_config.posthog.mode.is_enabled:
             self.custom_posthog_client = Posthog(
                 project_api_key=self.telemetry_config.posthog.api_key,
-                host=self.telemetry_config.posthog.host,
+                host=self.telemetry_config.posthog.endpoint,
                 disable_geoip=not self.telemetry_config.posthog.geoip,
                 debug=self.telemetry_config.posthog.debug,
                 on_error=self._handle_transmission_error,
@@ -82,8 +82,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 pipelex_posthog_client=self.pipelex_posthog_client,
                 pipelex_distinct_id=self._pipelex_distinct_id,
                 otlp_exporters=telemetry_config.otlp,
-                is_langfuse_enabled=telemetry_config.langfuse.enabled,
-                langfuse_base_url=telemetry_config.langfuse.base_url,
+                langfuse_config=telemetry_config.langfuse,
             )
             log.verbose("AI tracing enabled: OpenTelemetry tracer created")
         else:

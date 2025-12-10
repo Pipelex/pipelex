@@ -9,8 +9,6 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import (
     UnknownVarPrefixError,
-    VarFallbackPatternError,
-    VarNotFoundError,
     substitute_vars,
 )
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of, format_pydantic_validation_error
@@ -76,7 +74,7 @@ class PostHogConfig(BaseModel):
 
     mode: PostHogMode = Field(default=PostHogMode.OFF, strict=False, description="Event tracking mode")
     user_id: str | None = Field(default=None, description="Required when mode is 'identified'")
-    host: str = Field(default="https://us.i.posthog.com", description="PostHog host URL")
+    endpoint: str = Field(default="https://us.i.posthog.com", description="PostHog endpoint URL")
     api_key: str = Field(description="PostHog project API key")
     geoip: bool = Field(default=True, description="Enable GeoIP lookup")
     debug: bool = Field(default=False, description="Enable PostHog debug mode")
@@ -97,7 +95,9 @@ class LangfuseConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = Field(default=False, description="Enable Langfuse OTLP exporter")
-    base_url: str | None = Field(default=None, description="Override for self-hosted Langfuse (defaults to cloud)")
+    endpoint: str | None = Field(default=None, description="Override for self-hosted Langfuse (defaults to cloud)")
+    public_key: str | None = Field(default=None, description="Langfuse public key")
+    secret_key: str | None = Field(default=None, description="Langfuse secret key")
 
 
 class OtlpExporterConfig(BaseModel):
@@ -195,11 +195,11 @@ def load_telemetry_config(path: str, secrets_provider: SecretsProviderAbstract) 
     """
     telemetry_config_toml_raw = load_toml_from_path(path=path)
 
-    # Apply variable substitution to all string values
-    substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider)
+    # Apply variable substitution to all string values (keep placeholders for missing vars)
+    substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider, raise_on_missing_var=False)
     try:
         telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, substitute_vars_with_provider)
-    except (VarNotFoundError, UnknownVarPrefixError, VarFallbackPatternError) as exc:
+    except UnknownVarPrefixError as exc:
         msg = f"Variable substitution failed in telemetry configuration '{path}': {exc}"
         raise TelemetryConfigValidationError(msg) from exc
 
