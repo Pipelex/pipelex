@@ -473,8 +473,12 @@ def display_health_report(
     if not all_healthy:
         # Check what can be auto-fixed
         can_auto_fix_config = not config_healthy and config_missing_count > 0
-        can_auto_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
-        has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
+        can_auto_fix_telemetry = not telemetry_healthy and (
+            "not found" in telemetry_message.lower()
+            or "format has changed" in telemetry_message.lower()
+            or "invalid configuration" in telemetry_message.lower()
+        )
+        has_telemetry_validation_error = not telemetry_healthy and not can_auto_fix_telemetry
 
         # Check for backend file issues
         has_backend_file_issues = False
@@ -693,8 +697,12 @@ def do_doctor_cmd(
 
     # Determine what can be auto-fixed
     can_fix_config = not config_healthy and config_missing_count > 0
-    # Telemetry can be fixed if not found OR if the format has changed (old config)
-    can_fix_telemetry = not telemetry_healthy and ("not found" in telemetry_message.lower() or "format has changed" in telemetry_message.lower())
+    # Telemetry can be fixed if not found, format changed, OR invalid configuration
+    can_fix_telemetry = not telemetry_healthy and (
+        "not found" in telemetry_message.lower()
+        or "format has changed" in telemetry_message.lower()
+        or "invalid configuration" in telemetry_message.lower()
+    )
 
     # Check for backend file issues that can be auto-fixed
     can_fix_backends = False
@@ -732,16 +740,19 @@ def do_doctor_cmd(
         # Fix missing or outdated telemetry config
         if can_fix_telemetry:
             is_format_change = "format has changed" in telemetry_message.lower()
-            prompt_msg = (
-                "[bold]Reset telemetry configuration using the new format?[/bold]"
-                if is_format_change
-                else "[bold]Configure telemetry preferences?[/bold]"
-            )
+            is_invalid_config = "invalid configuration" in telemetry_message.lower()
+            needs_reset = is_format_change or is_invalid_config
+            if is_format_change:
+                prompt_msg = "[bold]Reset telemetry configuration using the new format?[/bold]"
+            elif is_invalid_config:
+                prompt_msg = "[bold]Reset telemetry configuration to fix validation errors?[/bold]"
+            else:
+                prompt_msg = "[bold]Configure telemetry preferences?[/bold]"
             if Confirm.ask(prompt_msg, default=True):
                 try:
                     console.print()
-                    # Use reset=True for format changes to overwrite the old config
-                    init_cmd(focus=InitFocus.TELEMETRY, reset=is_format_change, skip_confirmation=True)
+                    # Use reset=True for format changes or invalid config to overwrite
+                    init_cmd(focus=InitFocus.TELEMETRY, reset=needs_reset, skip_confirmation=True)
                     console.print("[green]✓[/green] Telemetry configured")
                 except Exception as exc:
                     console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
