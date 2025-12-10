@@ -18,26 +18,6 @@ class IntegrationMode(StrEnum):
     PYTHON = "python"
 
     @property
-    def allows_telemetry(self) -> bool:
-        match self:
-            case IntegrationMode.CI:
-                return False
-            case IntegrationMode.CLI:
-                return True
-            case IntegrationMode.DOCKER:
-                return True
-            case IntegrationMode.FASTAPI:
-                return True
-            case IntegrationMode.MCP:
-                return True
-            case IntegrationMode.N8N:
-                return True
-            case IntegrationMode.PYTEST:
-                return False
-            case IntegrationMode.PYTHON:
-                return False
-
-    @property
     def requires_terms_acceptance(self) -> bool:
         match self:
             case IntegrationMode.CI:

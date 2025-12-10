@@ -116,6 +116,21 @@ class TelemetryConfig(ConfigModel):
     posthog: PostHogConfig = Field(description="PostHog configuration")
     langfuse: LangfuseConfig = Field(default_factory=LangfuseConfig, description="Langfuse configuration")
     otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
+    custom_telemetry_allowed_modes: dict[str, bool] = Field(
+        default_factory=dict,
+        description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false)",
+    )
+
+    def is_custom_telemetry_allowed_for_mode(self, mode: str) -> bool:
+        """Check if custom telemetry is allowed for the given integration mode.
+
+        Args:
+            mode: The integration mode string to check.
+
+        Returns:
+            True if custom telemetry is allowed for this mode, False otherwise.
+        """
+        return self.custom_telemetry_allowed_modes.get(mode, False)
 
 
 class TelemetryRedactionConfig(BaseModel):

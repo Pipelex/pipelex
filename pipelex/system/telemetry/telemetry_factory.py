@@ -38,12 +38,15 @@ def make_telemetry_manager(
         if not gateway_api_key:
             raise GatewayApiKeyMissingError
 
-    chosen_telemetry_manager: TelemetryManagerAbstract
-    if integration_mode.allows_telemetry or is_pipelex_telemetry_enabled:
-        if not telemetry_config:
-            telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
-            telemetry_config = load_telemetry_config(path=telemetry_config_path, secrets_provider=secrets_provider)
+    # Always load telemetry config first to determine allowed modes
+    if not telemetry_config:
+        telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
+        telemetry_config = load_telemetry_config(path=telemetry_config_path, secrets_provider=secrets_provider)
 
+    allows_custom_telemetry = telemetry_config.is_custom_telemetry_allowed_for_mode(integration_mode)
+
+    chosen_telemetry_manager: TelemetryManagerAbstract
+    if allows_custom_telemetry or is_pipelex_telemetry_enabled:
         # Always respect DO_NOT_TRACK env var
         if is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
             if is_pipelex_telemetry_enabled:
