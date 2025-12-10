@@ -37,7 +37,7 @@ class PipelexDetails:
 
     # Pipelex PostHog project API key (write-only, safe to embed)
     # This is used for event capture only
-    POSTHOG_PROJECT_API_KEY = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
+    POSTHOG_PROJECT_API_KEY = "phc_GXvlRgWMQ9c4xrxAMBsMeyOqHKyfSK0sAc2oEgu4jpT"
 
     # Public URL for remote gateway configuration (JSON file on S3)
     REMOTE_CONFIG_URL = "https://pipelex-config.s3.amazonaws.com/pipelex_remote_config.json"
