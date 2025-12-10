@@ -21,12 +21,15 @@ def build_gateway_terms_panel() -> Panel:
         style="white",
     )
 
-    telemetry_header = Text("\n📊 Telemetry Requirement\n", style="bold cyan")
+    telemetry_header = Text("\n📊 Identified Telemetry Requirement\n", style="bold cyan")
 
-    # TODO: RC - use triple quotes for multi-line strings
     telemetry_explanation = Text(
-        "When using Pipelex Gateway, telemetry is automatically enabled to monitor service usage.\n"
-        "This helps us ensure service quality, prevent abuse, and improve the platform.\n\n"
+        "When using Pipelex Gateway, identified telemetry is automatically enabled.\n"
+        "Your usage is associated with your Gateway API key (hashed for security).\n\n"
+        "This is independent from your telemetry.toml settings and allows us to:\n"
+        "  • Monitor and improve service quality\n"
+        "  • Enforce fair usage limits and prevent abuse\n"
+        "  • Provide you with usage insights and better support\n\n"
         "We collect ONLY technical and quantitative data:\n",
         style="white",
     )
@@ -46,10 +49,7 @@ def build_gateway_terms_panel() -> Panel:
     )
 
     not_collected_items = Text(
-        "  ✗ Your prompts or completions (capture_content_enabled = false)\n"
-        "  ✗ Your pipe codes (capture_pipe_codes_enabled = false)\n"
-        "  ✗ Your output class names (capture_output_class_name_enabled = false)\n"
-        "  ✗ Any personally identifiable information\n",
+        "  ✗ Your prompts or completions\n  ✗ Your pipe codes or output class names\n  ✗ File contents or business data\n",
         style="red",
     )
 
@@ -141,4 +141,4 @@ def display_gateway_accepted_message(console: Console) -> None:
     """
     console.print()
     console.print("[green]✓ Pipelex Gateway terms accepted.[/green]")
-    console.print("[dim]Gateway telemetry will be enabled for service monitoring.[/dim]")
+    console.print("[dim]Identified telemetry (tied to your API key) will be enabled for service monitoring.[/dim]")

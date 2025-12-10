@@ -5,9 +5,10 @@
 # This file controls YOUR custom telemetry settings for observability and analytics.
 # Configure your own PostHog, Langfuse, or OTLP-compatible backends here.
 #
-# NOTE: When using Pipelex Gateway, separate telemetry is enabled for service
-# monitoring (configured in pipelex_service.toml). That telemetry operates
-# independently from your custom settings below - you can have both!
+# NOTE: When using Pipelex Gateway, identified telemetry is automatically enabled
+# (tied to your Gateway API key, hashed for security). This allows us to monitor
+# service quality, enforce fair usage, and provide you with better support.
+# Gateway telemetry operates independently from your settings below - you can have both!
 #
 # Documentation: https://docs.pipelex.com
 # Support: https://go.pipelex.com/discord

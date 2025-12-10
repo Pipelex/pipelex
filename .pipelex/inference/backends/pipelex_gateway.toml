@@ -2,6 +2,18 @@
 # Pipelex Gateway Local Overrides
 ################################################################################
 #
+# TELEMETRY NOTICE:
+#
+# Using Pipelex Gateway enables identified telemetry tied to your API key
+# (hashed for security). This is independent from your telemetry.toml settings.
+#
+# We collect only technical data (model names, token counts, latency, error rates).
+# We do NOT collect prompts, completions, pipe codes, or business data.
+#
+# This allows us to monitor service quality, enforce fair usage, and support you.
+#
+################################################################################
+#
 # WARNING: USE AT YOUR OWN RISK!
 #
 # The actual model configuration is fetched remotely from Pipelex servers.
