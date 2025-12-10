@@ -4,30 +4,50 @@
 
 To run pipelines with LLMs, you need to configure API access. **You have three options** - choose what works best for you:
 
-### Option 1: Pipelex Inference (Easiest for Getting Started)
+### Option 1: Pipelex Gateway (Easiest for Getting Started)
 
-Get **free credits** for testing and development with a single API key that works with all major LLM providers:
+Get **free credits** for testing and development with a single API key that works with all major LLM providers. Unlock the **full power of Pipelex** with many models already available and new ones being added constantly.
 
 **Benefits:**
 
 - No credit card required
-- Access to OpenAI, Anthropic Claude, Google Gemini, and xAI Grok
+- Access to OpenAI, Anthropic Claude, Google Gemini, xAI Grok, and more
+- New models added constantly
 - Perfect for development and testing
 - Single API key for all models
 
 **Setup:**
 
 1. Join our Discord community to get your free API key:
-   
-- Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
-- Request your key in the appropriate channel
+
+    - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
+    - Request your key in the appropriate channel
 
 2. Create a `.env` file in your project root:
-   ```env
-   PIPELEX_INFERENCE_API_KEY=your-key-here
-   ```
+
+    ```env
+    PIPELEX_GATEWAY_API_KEY=your-key-here
+    ```
+
+3. Run `pipelex init` and accept the Gateway terms of service when prompted.
 
 That's it! Your pipelines can now access any supported LLM.
+
+!!! info "Terms of Service & Telemetry"
+    When using Pipelex Gateway, you'll be prompted to accept our terms of service. By using the Gateway, identified telemetry is automatically enabled (tied to your hashed API key) to help us monitor service quality and enforce fair usage.
+    
+    **We collect only technical data** (model names, token counts, latency, error rates). We do **NOT** collect your prompts, completions, or business data. See our [Privacy Policy](https://go.pipelex.com/privacy-policy) for details.
+
+!!! note "Migration from pipelex_inference"
+    If you were using the deprecated `pipelex_inference` backend, migrate to `pipelex_gateway`:
+    
+    1. **Get your new Gateway API key**:
+        - If you had a `pipelex_inference` key: get your new key at [app.pipelex.com](https://app.pipelex.com/)
+        - New users: join our [Discord](https://go.pipelex.com/discord) and request a free key with credits
+    2. Update your `.env`: set `PIPELEX_GATEWAY_API_KEY` with your new key
+    3. Run `pipelex init` and accept the Gateway terms
+    
+    The `pipelex_inference` backend is deprecated and will be removed in a future release.
 
 ### Option 2: Bring Your Own API Keys
 
@@ -36,6 +56,7 @@ Use your existing API keys from LLM providers. This is ideal if you:
 - Already have API keys from providers
 - Need to use specific accounts for billing
 - Have negotiated rates or enterprise agreements
+- Prefer not to send any telemetry to Pipelex servers
 
 **Setup:**
 
@@ -78,21 +99,22 @@ You only need to add keys for the providers you plan to use.
 When using your own keys, enable the corresponding backends:
 
 1. Initialize configuration:
-   ```bash
-   pipelex init config
-   ```
+
+    ```bash
+    pipelex init config
+    ```
 
 2. Edit `.pipelex/inference/backends.toml`:
 
-```toml
-[google]
-enabled = true
+    ```toml
+    [google]
+    enabled = true
 
-[openai]
-enabled = true
+    [openai]
+    enabled = true
 
-# Enable any providers you have keys for
-```
+    # Enable any providers you have keys for
+    ```
 
 See [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md) for all options.
 
@@ -132,9 +154,11 @@ pipelex init config
 ```
 
 This creates a `.pipelex/` directory with:
+
 ```
 .pipelex/
 ├── pipelex.toml              # Feature flags, logging, cost reporting
+├── telemetry.toml            # Custom telemetry configuration
 └── inference/                # LLM configuration and model presets
     ├── backends.toml         # Enable/disable model providers
     ├── deck/
@@ -157,4 +181,3 @@ Now that you have your backend configured:
 
 !!! tip "Advanced Configuration"
     For detailed backend configuration options, see [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md).
-

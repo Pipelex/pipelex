@@ -6,7 +6,7 @@ The Inference Backend Configuration System manages how Pipelex handles AI model 
 
 Pipelex supports three flexible approaches for accessing AI models:
 
-### Option A: Pipelex Inference (Optional & Free)
+### Option A: Pipelex Gateway (Optional & Free)
 
 Get a single API key that works with all major providers (OpenAI, Anthropic, Google, Mistral, FAL, and more). This is the **recommended approach for getting started quickly**.
 
@@ -14,6 +14,9 @@ Get a single API key that works with all major providers (OpenAI, Anthropic, Goo
 - ✅ Simplified configuration
 - ✅ Automatic model routing
 - ✅ Free on Discord (limited time offer)
+
+!!! note "Terms of Service"
+    Using Pipelex Gateway requires accepting our terms of service. When you run `pipelex init`, you'll be prompted to review and accept the terms. Gateway usage enables identified telemetry (tied to your hashed API key) for service monitoring. See our [Privacy Policy](https://go.pipelex.com/privacy-policy) for details.
 
 ### Option B: Bring Your Own Keys
 
@@ -28,7 +31,7 @@ See [Inference Backends](#inference-backends) section below for configuration.
 
 ### Option C: Mix & Match (Custom Routing)
 
-Configure custom routing profiles to use your own keys for some models and Pipelex Inference for others. This gives you full flexibility to optimize for cost, performance, or rate limits.
+Configure custom routing profiles to use your own keys for some models and Pipelex Gateway for others. This gives you full flexibility to optimize for cost, performance, or rate limits.
 
 - ✅ Hybrid approach
 - ✅ Cost optimization
@@ -69,9 +72,9 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
         └── overrides.toml      # Custom overrides
 ```
 
-## Pipelex Inference (Optional & Free)
+## Pipelex Gateway (Optional & Free)
 
-Pipelex Inference is a unified inference backend that provides access to all major AI providers through a single API key. This is the **recommended approach for getting started quickly** with Pipelex, and it's **completely optional**.
+Pipelex Gateway is a unified inference backend that provides access to all major AI providers through a single API key. This is the **recommended approach for getting started quickly** with Pipelex and **unlocking its full power**—with many models already available and new ones being added constantly. Using Pipelex Gateway is **completely optional**.
 
 ### Benefits
 
@@ -81,34 +84,65 @@ Pipelex Inference is a unified inference backend that provides access to all maj
 - **Automatic Routing**: All AI models (LLMs, OCR, image generation) are automatically routed to their respective providers
 - **Unified Interface**: Same configuration system for text generation, OCR, and image generation
 
+### Terms of Service & Telemetry
+
+Using Pipelex Gateway requires accepting our terms of service. When you enable Gateway and run `pipelex init`, you'll be prompted with a terms panel explaining:
+
+- **What we collect**: Model names, token counts, latency, error rates (technical data only)
+- **What we do NOT collect**: Your prompts, completions, pipe codes, or business data
+- **Why**: To monitor service quality, enforce fair usage, and provide better support
+- **Your choice**: If you decline, Gateway is disabled and you can use direct provider backends instead
+
+Your API key is hashed for security. Gateway telemetry operates independently from your `telemetry.toml` settings. See our [Privacy Policy](https://go.pipelex.com/privacy-policy) for details.
+
 ### Setup
 
 1. **Get your API key:**
-- Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join our Discord
-- Request your free API key in the appropriate channel
-- No credit card required (limited time offer)
+
+    - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join our Discord
+    - Request your free API key in the appropriate channel
+    - No credit card required (limited time offer)
 
 2. **Configure environment variables:**
-   ```bash
-   # Copy the example environment file
-   cp .env.example .env
-   
-   # Edit .env and add your Pipelex Inference API key
-   # PIPELEX_INFERENCE_API_KEY="your-api-key"
-   ```
 
-3. **Verify backend configuration:**
+    ```bash
+    # Copy the example environment file
+    cp .env.example .env
+    
+    # Edit .env and add your Pipelex Gateway API key
+    PIPELEX_GATEWAY_API_KEY="your-api-key"
+    ```
+
+3. **Accept terms and verify configuration:**
+
+    ```bash
+    pipelex init
+    ```
+    
+    When prompted, review and accept the Gateway terms of service.
+
+4. **Verify backend configuration:**
    
-   The `pipelex_inference` backend should already be enabled in `.pipelex/inference/backends.toml`:
+   The `pipelex_gateway` backend should be enabled in `.pipelex/inference/backends.toml`:
    
    ```toml
-   [pipelex_inference]
+   [pipelex_gateway]
+   display_name = "⭐ Pipelex Gateway"
    enabled = true
-   endpoint = "https://inference.pipelex.com/v1"
-   api_key = "${PIPELEX_INFERENCE_API_KEY}"
+   api_key = "${PIPELEX_GATEWAY_API_KEY}"
    ```
    
-   The environment variable `${PIPELEX_INFERENCE_API_KEY}` will be automatically loaded from your `.env` file.
+   The environment variable `${PIPELEX_GATEWAY_API_KEY}` will be automatically loaded from your `.env` file.
+
+!!! warning "Migrating from pipelex_inference"
+    The `pipelex_inference` backend is **deprecated** and will be removed in a future release. To migrate:
+    
+    1. **Get your new Gateway API key**:
+        - If you had a `pipelex_inference` key: get your new key at [app.pipelex.com](https://app.pipelex.com/)
+        - New users: join our [Discord](https://go.pipelex.com/discord) and request a free key with credits
+    2. Update your `.env`: set `PIPELEX_GATEWAY_API_KEY` with your new key
+    3. Run `pipelex init` and accept the Gateway terms
+    4. Update any routing profiles that reference `pipelex_inference` to use `pipelex_gateway`
 
 4. **Verify routing configuration:**
    
@@ -130,18 +164,18 @@ Once configured, all models are available through the unified backend. Use stand
 [pipe.example]
 type = "PipeLLM"
 model = { model = "claude-4.5-sonnet", temperature = 0.7 }
-# Model automatically routed through Pipelex Inference
+# Model automatically routed through Pipelex Gateway
 ```
 
 ### Model Availability Note
 
-While Pipelex Inference provides access to most AI models through a unified API, certain specialized models require their native backend to be enabled directly:
+While Pipelex Gateway provides access to most AI models through a unified API, certain specialized models require their native backend to be enabled directly:
 
 - **FAL image generation models** (e.g., Flux models) - Enable the FAL backend
 - **OpenAI image generation** (`gpt-image-1`) - Enable the OpenAI backend (should also work via Azure OpenAI, but we haven't been able to test this - if you've successfully used it on Azure, please let us know on [Discord](https://go.pipelex.com/discord) so we can validate this configuration)
 - **Mistral OCR models** - Enable the Mistral backend
 
-These models are not proxied through Pipelex Inference and require direct configuration of their respective backends with appropriate API keys.
+These models are not proxied through Pipelex Gateway and require direct configuration of their respective backends with appropriate API keys.
 
 ## Inference Backends
 
@@ -165,8 +199,8 @@ cp .env.example .env
 The `.env.example` file contains all available providers with helpful comments:
 
 ```bash
-# [OPTIONAL] Free Pipelex Inference API key - Get yours on Discord: https://go.pipelex.com/discord
-PIPELEX_INFERENCE_API_KEY=
+# [OPTIONAL] Free Pipelex Gateway API key - Get yours on Discord: https://go.pipelex.com/discord
+PIPELEX_GATEWAY_API_KEY=
 
 OPENAI_API_KEY=
 
@@ -253,12 +287,12 @@ Routing profiles determine which backend handles specific models. This is where 
 
 ### Profile Examples
 
-**All Pipelex Inference (Option A):**
+**All Pipelex Gateway (Option A):**
 
 Setup:
 ```bash
 # In .env
-PIPELEX_INFERENCE_API_KEY="your-pipelex-key"
+PIPELEX_GATEWAY_API_KEY="your-pipelex-key"
 ```
 
 In `.pipelex/inference/routing_profiles.toml`:
@@ -304,7 +338,7 @@ default = "openai"
 Setup:
 ```bash
 # In .env - combine Pipelex with specific provider keys
-PIPELEX_INFERENCE_API_KEY="your-pipelex-key"
+PIPELEX_GATEWAY_API_KEY="your-pipelex-key"
 OPENAI_API_KEY="your-openai-key"  # For GPT models
 FAL_API_KEY="your-fal-key"        # For image generation
 ```
@@ -314,15 +348,15 @@ In `.pipelex/inference/routing_profiles.toml`:
 active = "hybrid"
 
 [profiles.hybrid]
-description = "Use Pipelex for most models, native providers for specific ones"
-default = "pipelex_inference"
+description = "Use Pipelex Gateway for most models, native providers for specific ones"
+default = "pipelex_gateway"
 
 [profiles.hybrid.routes]
 # Use your own OpenAI key for GPT models (better rate limits)
 "gpt-*" = "openai"
 # Use your own FAL key for image generation (direct billing)
 "flux-*" = "fal"
-# All other models use Pipelex Inference (claude, gemini, mistral, etc.)
+# All other models use Pipelex Gateway (claude, gemini, mistral, etc.)
 ```
 
 ### Routing System Features
@@ -334,16 +368,16 @@ The routing system supports:
   - Prefix: `"gpt-*" = "openai"`
   - Suffix: `"*-turbo" = "openai"`
   - Contains: `"*-vision-*" = "openai"`
-- **Default fallback**: `default = "pipelex_inference"`
+- **Default fallback**: `default = "pipelex_gateway"`
 
 ### Use Cases for Mix & Match
 
 Common scenarios for hybrid routing:
 
-1. **Cost Optimization**: Use Pipelex Inference for expensive models, your own keys for cheaper ones
+1. **Cost Optimization**: Use Pipelex Gateway for expensive models, your own keys for cheaper ones
 2. **Rate Limits**: Use your own keys for high-volume models to avoid shared rate limits
-3. **Gradual Migration**: Start with Pipelex Inference, gradually move to your own keys as usage grows
-4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Inference
+3. **Gradual Migration**: Start with Pipelex Gateway, gradually move to your own keys as usage grows
+4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Gateway
 
 ## Model Deck
 
@@ -483,7 +517,7 @@ Common error types:
 ## Best Practices
 
 1. **Choosing Your Configuration Approach**:
-   - **Starting out?** Use Pipelex Inference (Option A) to get running quickly
+   - **Starting out?** Use Pipelex Gateway (Option A) to get running quickly
    - **Production deployment?** Consider bringing your own keys (Option B) for direct billing control
    - **Optimizing costs/performance?** Use Mix & Match (Option C) for maximum flexibility
    - You can switch between approaches at any time by changing your routing profile

@@ -67,7 +67,7 @@ def build_gateway_terms_panel() -> Panel:
     )
 
     links = Text(
-        f"\n📚 Documentation: {URLs.documentation}\n💬 Questions? Join Discord: {URLs.discord}\n",
+        f"\n📚 Documentation: {URLs.documentation}\n🔒 Privacy Policy: {URLs.privacy_policy}\n💬 Questions? Join Discord: {URLs.discord}\n",
         style="dim",
     )
 
