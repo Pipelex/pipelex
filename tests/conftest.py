@@ -6,13 +6,25 @@ import pytest
 from pipelex import log
 from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
-from pipelex.system.runtime import IntegrationMode
+from pipelex.system.runtime import IntegrationMode, runtime_manager
 
 pytest_plugins = [
     "pipelex.test_extras.shared_pytest_plugins",
 ]
 
 TEST_OUTPUTS_DIR = "temp/test_outputs"
+
+
+def _get_test_integration_mode() -> IntegrationMode:
+    """Return the appropriate integration mode for tests.
+
+    Uses CI mode in CI environments (no terms acceptance required),
+    PYTEST mode for local development (terms acceptance required).
+    """
+    if runtime_manager.is_ci_testing:
+        return IntegrationMode.CI
+    else:
+        return IntegrationMode.PYTEST
 
 
 @pytest.fixture(scope="module")
@@ -27,7 +39,7 @@ def routing_profile_setup(request: pytest.FixtureRequest):  # noqa: ARG001  # py
 
 @pytest.fixture(scope="module", autouse=True)
 def reset_pipelex_config_fixture(routing_profile_setup: str | None):  # noqa: ARG001
-    Pipelex.make(integration_mode=IntegrationMode.PYTEST)
+    Pipelex.make(integration_mode=_get_test_integration_mode())
     yield
     Pipelex.teardown_if_needed()
 

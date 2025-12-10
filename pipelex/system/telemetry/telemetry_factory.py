@@ -39,7 +39,7 @@ def make_telemetry_manager(
             raise GatewayApiKeyMissingError
 
     chosen_telemetry_manager: TelemetryManagerAbstract
-    if integration_mode.allows_telemetry() or is_pipelex_telemetry_enabled:
+    if integration_mode.allows_telemetry or is_pipelex_telemetry_enabled:
         if not telemetry_config:
             telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
             telemetry_config = load_telemetry_config(path=telemetry_config_path, secrets_provider=secrets_provider)

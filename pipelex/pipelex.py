@@ -184,10 +184,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         gateway_model_specs: BackendModelSpecs | None = None
         if is_pipelex_service_enabled:
-            # Check if terms are accepted
-            pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
-            if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
-                raise GatewayTermsNotAcceptedError
+            # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
+            if integration_mode.requires_terms_acceptance:
+                # Check if terms are accepted
+                pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+                if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
+                    raise GatewayTermsNotAcceptedError
             # Fetch remote configuration
             remote_config = fetch_remote_config()
             log.verbose("Successfully fetched Pipelex Gateway remote configuration")

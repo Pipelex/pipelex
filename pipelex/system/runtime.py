@@ -8,30 +8,54 @@ CODEX_CLOUD_ENV_VAR_KEY = "CODEX_CLOUD"
 
 
 class IntegrationMode(StrEnum):
+    CI = "ci"
     CLI = "cli"
-    FASTAPI = "fastapi"
     DOCKER = "docker"
+    FASTAPI = "fastapi"
     MCP = "mcp"
     N8N = "n8n"
-    PYTHON = "python"
     PYTEST = "pytest"
+    PYTHON = "python"
 
+    @property
     def allows_telemetry(self) -> bool:
         match self:
+            case IntegrationMode.CI:
+                return False
             case IntegrationMode.CLI:
                 return True
-            case IntegrationMode.FASTAPI:
-                return True
             case IntegrationMode.DOCKER:
+                return True
+            case IntegrationMode.FASTAPI:
                 return True
             case IntegrationMode.MCP:
                 return True
             case IntegrationMode.N8N:
                 return True
-            case IntegrationMode.PYTHON:
-                return False
             case IntegrationMode.PYTEST:
                 return False
+            case IntegrationMode.PYTHON:
+                return False
+
+    @property
+    def requires_terms_acceptance(self) -> bool:
+        match self:
+            case IntegrationMode.CI:
+                return False
+            case IntegrationMode.CLI:
+                return True
+            case IntegrationMode.DOCKER:
+                return True
+            case IntegrationMode.FASTAPI:
+                return True
+            case IntegrationMode.MCP:
+                return True
+            case IntegrationMode.N8N:
+                return True
+            case IntegrationMode.PYTEST:
+                return True
+            case IntegrationMode.PYTHON:
+                return True
 
 
 class RunMode(StrEnum):
