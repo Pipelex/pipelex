@@ -36,66 +36,88 @@ model_id = "pipelex/gpt-4o"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 2.75, output = 11.00 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 [gpt-4o-mini]
 model_id = "pipelex/gpt-4o-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.17, output = 0.66 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 ["gpt-4.1"]
 model_id = "pipelex/gpt-4.1"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 ["gpt-4.1-mini"]
 model_id = "pipelex/gpt-4.1-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.4, output = 1.6 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 ["gpt-4.1-nano"]
 model_id = "pipelex/gpt-4.1-nano"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 [gpt-5-nano]
 model_id = "pipelex/gpt-5-nano"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.40 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 [gpt-5-mini]
 model_id = "pipelex/gpt-5-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.00 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 [gpt-5-chat]
 model_id = "pipelex/gpt-5-chat"
 inputs = ["text", "images"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.00 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 [gpt-5]
 model_id = "pipelex/gpt-5"
 inputs = ["text", "images"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.00 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 ["gpt-5.1"]
 model_id = "pipelex/gpt-5.1"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.00 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 ["gpt-5.1-chat"]
 model_id = "pipelex/gpt-5.1-chat"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.00 }
+sdk = "openai_responses"
+structure_method = "instructor/openai_responses_tools"
 
 # --- Claude LLMs --------------------------------------------------------------
 ["claude-4-sonnet"]

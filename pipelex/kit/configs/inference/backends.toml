@@ -10,16 +10,15 @@
 #
 ####################################################################################################
 
-[pipelex_inference]
-display_name = "⭐ Pipelex Inference"
-enabled = true
-endpoint = "https://inference.pipelex.com/v1"
-api_key = "${PIPELEX_INFERENCE_API_KEY}"
+[pipelex_gateway]
+display_name = "⭐ Pipelex Gateway"
+enabled = true                         # Enable after accepting terms via `pipelex init config`
+api_key = "${PIPELEX_GATEWAY_API_KEY}"
 
 [anthropic]
 enabled = true
 api_key = "${ANTHROPIC_API_KEY}"
-claude_4_tokens_limit = 8192
+valued_constraints = { max_output_tokens_limit = 8192 }
 
 [azure_openai]
 display_name = "Azure OpenAI"
@@ -69,6 +68,18 @@ display_name = "OpenAI"
 enabled = true
 api_key = "${OPENAI_API_KEY}"
 
+[portkey]
+display_name = "Portkey"
+enabled = true
+endpoint = "https://api.portkey.ai/v1"
+api_key = "${PORTKEY_API_KEY}"
+
+[scaleway]
+display_name = "Scaleway"
+enabled = true
+endpoint = "${SCALEWAY_ENDPOINT}"
+api_key = "${SCALEWAY_API_KEY}"
+
 [vertexai]
 display_name = "Google Vertex AI"
 enabled = false                                            # This is the only one we disable beacuse setting it up requires internet access just to get credentials so it fails in CI sandboxes
@@ -84,3 +95,10 @@ api_key = "${XAI_API_KEY}"
 
 [internal] # software-only backend, runs internally, without AI
 enabled = true
+
+# Deprecated
+[pipelex_inference]
+display_name = "🛑 Legacy Pipelex Inference"
+enabled = false
+endpoint = "https://inference.pipelex.com/v1"
+api_key = "${PIPELEX_INFERENCE_API_KEY}"

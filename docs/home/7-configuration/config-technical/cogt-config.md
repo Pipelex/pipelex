@@ -35,7 +35,6 @@ is_structure_prompt_enabled = false
 
 # Job configuration
 [cogt.llm_config.llm_job_config]
-is_streaming_enabled = false
 max_retries = 3  # Between 1 and 10
 ```
 
@@ -172,7 +171,6 @@ default_max_images = 100
 is_structure_prompt_enabled = false
 
 [cogt.llm_config.llm_job_config]
-is_streaming_enabled = false
 max_retries = 3
 
 [cogt.img_gen_config.img_gen_job_config]

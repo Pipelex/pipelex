@@ -10,14 +10,13 @@ from posthog import tag
 from rich.traceback import Traceback
 
 from pipelex import log
+from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
-    handle_model_deck_preset_error,
     handle_validate_bundle_error,
 )
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -78,12 +77,13 @@ def validate_cmd(
         pipelex validate --bundle my_bundle.plx --pipe my_pipe
         pipelex validate all
     """
-    pipelex_instance: Pipelex
     # Check for "all" keyword
     if target == "all" and not pipe and not bundle:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-        do_validate_all_libraries_and_dry_run()
-        pipelex_instance.teardown()
+        try:
+            make_pipelex_for_cli(context=ErrorContext.VALIDATION)
+            do_validate_all_libraries_and_dry_run()
+        finally:
+            Pipelex.teardown_if_needed()
         return
 
     # Validate mutual exclusivity
@@ -159,10 +159,7 @@ def validate_cmd(
             typer.secho("Failed to validate: no pipe code or bundle specified", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
 
-    try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION)
 
     try:
         with get_telemetry_manager().telemetry_context():
@@ -179,4 +176,4 @@ def validate_cmd(
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()

@@ -3,6 +3,7 @@ from contextvars import ContextVar
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
+from opentelemetry.trace import Tracer as OTelTracer
 from rich.console import Console
 
 from pipelex import log
@@ -358,6 +359,10 @@ def get_class_registry() -> ClassRegistryAbstract:
 
 def get_telemetry_manager() -> TelemetryManagerAbstract:
     return get_pipelex_hub().get_telemetry_manager()
+
+
+def get_otel_tracer() -> OTelTracer | None:
+    return get_telemetry_manager().get_otel_tracer()
 
 
 # cogt

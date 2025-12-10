@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -29,7 +28,6 @@ if TYPE_CHECKING:
 class TestPipeSequenceDryRun:
     async def test_discord_newsletter_dry_run_working_memory(
         self,
-        request: FixtureRequest,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ) -> None:
@@ -63,7 +61,7 @@ class TestPipeSequenceDryRun:
                 pipe=get_required_pipe(pipe_code="write_discord_newsletter"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
             ),
         )
 

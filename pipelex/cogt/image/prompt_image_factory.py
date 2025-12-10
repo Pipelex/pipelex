@@ -4,12 +4,12 @@ from pipelex.cogt.image.prompt_image import (
     PromptImageBase64,
     PromptImageBinary,
     PromptImagePath,
+    PromptImageTypedBase64,
     PromptImageUrl,
 )
 from pipelex.tools.misc.base_64_utils import (
     encode_to_base64_async,
-    load_binary_as_base64_async,
-    load_binary_async,
+    make_base_64_url,
     strip_base_64_str_if_needed,
 )
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
@@ -55,29 +55,8 @@ class PromptImageFactory:
         return PromptImageBinary(binary=raw_image_bytes)
 
     @classmethod
-    async def promptimage_to_b64_async(cls, prompt_image: PromptImage) -> bytes:
-        match prompt_image:
-            case PromptImagePath():
-                return await load_binary_as_base64_async(prompt_image.file_path)
-            case PromptImageBase64():
-                return prompt_image.base_64
-            case PromptImageUrl():
-                image_bytes = await cls.make_promptimagebase64_from_url_async(prompt_image)
-                return image_bytes.base_64
-            case _:
-                msg = f"Unknown PromptImage type: {prompt_image}"
-                raise PromptImageFactoryError(msg)
-
-    @classmethod
-    async def promptimage_to_bytes_async(cls, prompt_image: PromptImage) -> bytes:
-        match prompt_image:
-            case PromptImagePath():
-                return await load_binary_async(prompt_image.file_path)
-            case PromptImageBase64():
-                return prompt_image.get_decoded_bytes()
-            case PromptImageUrl():
-                image_bytes = await cls.make_promptimagebinary_from_url_async(prompt_image)
-                return image_bytes.binary
-            case _:
-                msg = f"Unknown PromptImage type: {prompt_image}"
-                raise PromptImageFactoryError(msg)
+    def make_base_64_url_from_prompt_image_typed_base64(
+        cls,
+        prompt_image: PromptImageTypedBase64,
+    ) -> str:
+        return make_base_64_url(base_64=prompt_image.base_64, file_type=prompt_image.file_type)

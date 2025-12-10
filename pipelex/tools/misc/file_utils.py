@@ -3,6 +3,8 @@ import os
 import shutil
 from pathlib import Path
 
+import aiofiles
+
 ########################################################
 # Save & Load
 ########################################################
@@ -89,6 +91,16 @@ def failable_load_text_from_path(path: str) -> str | None:
     if not path_exists(path):
         return None
     return load_text_from_path(path)
+
+
+def load_binary(path: str) -> bytes:
+    with open(path, "rb") as file_pointer:
+        return file_pointer.read()
+
+
+async def load_binary_async(path: str) -> bytes:
+    async with aiofiles.open(path, "rb") as fp:  # pyright: ignore[reportUnknownMemberType]
+        return await fp.read()
 
 
 ########################################################

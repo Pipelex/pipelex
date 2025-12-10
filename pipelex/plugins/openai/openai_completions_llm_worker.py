@@ -3,28 +3,28 @@ from typing import TYPE_CHECKING, Any
 import instructor
 import openai
 from instructor.exceptions import InstructorRetryException
-from openai import NOT_GIVEN, APIConnectionError, BadRequestError, NotFoundError, omit
+from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
-from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
-from pipelex.cogt.model_backends.model_constraints import ModelConstraints
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
-from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.telemetry.otel_constants import LLMOutputType
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class OpenAILLMWorker(LLMWorkerInternalAbstract):
+class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
+        openai_completions_factory: OpenAICompletionsFactory,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -40,6 +40,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             raise SdkTypeError(msg)
 
         self.openai_client_for_text: openai.AsyncOpenAI = sdk_instance
+        self.openai_completions_factory = openai_completions_factory
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_openai(client=sdk_instance, mode=instructor_mode)
         else:
@@ -67,34 +68,34 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
-        messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
+        job_params = llm_job.applied_job_params or llm_job.job_params
+        messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
 
         try:
-            temperature = llm_job.job_params.temperature
-            if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
-                temperature *= 2
-            if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
-                log.warning(
-                    f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
-                )
-                temperature = 1
+            extra_headers, extra_body = self.openai_completions_factory.make_extras(
+                inference_model=self.inference_model, llm_job=llm_job, output_desc=LLMOutputType.TEXT
+            )
             response = await self.openai_client_for_text.chat.completions.create(
                 model=self.inference_model.model_id,
-                temperature=temperature,
-                max_tokens=llm_job.job_params.max_tokens or omit,
-                seed=llm_job.job_params.seed,
+                temperature=job_params.temperature,
+                max_tokens=job_params.max_tokens or omit,
+                seed=job_params.seed,
                 messages=messages,
+                extra_headers=extra_headers,
+                extra_body=extra_body,
             )
-        except NotFoundError as not_found_error:
-            # TODO: record llm config so it can be displayed here
-            msg = f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
-            raise LLMModelNotFoundError(msg) from not_found_error
+        except NotFoundError as exc:
+            msg = f"LLM model or deployment '{self.inference_model.model_id}' not found: {exc}"
+            raise LLMCompletionError(msg) from exc
         except APIConnectionError as api_connection_error:
-            msg = f"OpenAI API connection error: {api_connection_error}"
+            msg = f"LLM API connection error: {api_connection_error}"
             raise LLMCompletionError(msg) from api_connection_error
         except BadRequestError as bad_request_error:
-            msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
+            msg = f"LLM bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
+        except AuthenticationError as authentication_error:
+            msg = f"LLM authentication error: {authentication_error}"
+            raise LLMCompletionError(msg) from authentication_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
@@ -103,7 +104,7 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
-            llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)
+            llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
         return response_text
 
     @override
@@ -112,37 +113,44 @@ class OpenAILLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        messages = OpenAIFactory.make_simple_messages(llm_job=llm_job)
+        job_params = llm_job.applied_job_params or llm_job.job_params
+        messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         try:
-            temperature = llm_job.job_params.temperature
-            if ModelConstraints.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.constraints:
-                temperature *= 2
-            if ModelConstraints.TEMPERATURE_MUST_BE_1 in self.inference_model.constraints and temperature != 1:
-                log.warning(
-                    f"Model {self.inference_model.desc} used with temperature {temperature}, but it must be 1 for this model so we forced it to 1"
-                )
-                temperature = 1
             try:
+                extra_headers, extra_body = self.openai_completions_factory.make_extras(
+                    inference_model=self.inference_model, llm_job=llm_job, output_desc=schema.__name__
+                )
                 result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                     model=self.inference_model.model_id,
-                    temperature=temperature,
-                    max_tokens=llm_job.job_params.max_tokens or NOT_GIVEN,
-                    seed=llm_job.job_params.seed,
+                    temperature=job_params.temperature,
+                    max_tokens=job_params.max_tokens or NOT_GIVEN,
+                    seed=job_params.seed,
                     messages=messages,
                     response_model=schema,
                     max_retries=llm_job.job_config.max_retries,
+                    extra_headers=extra_headers,
+                    extra_body=extra_body,
                 )
             except InstructorRetryException as exc:
-                msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
+                msg = (
+                    f"LLM structured generation via 'instructor' failed with model: {self.inference_model.desc} "
+                    f"trying to generate schema: {schema} with error: {exc}"
+                )
                 raise LLMCompletionError(msg) from exc
         except NotFoundError as exc:
-            msg = f"OpenAI model or deployment '{self.inference_model.model_id}' not found: {exc}"
+            msg = f"LLM model or deployment '{self.inference_model.model_id}' not found: {exc}"
             raise LLMCompletionError(msg) from exc
+        except APIConnectionError as api_connection_error:
+            msg = f"LLM API connection error: {api_connection_error}"
+            raise LLMCompletionError(msg) from api_connection_error
         except BadRequestError as bad_request_error:
-            msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
+            msg = f"LLM bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
+        except AuthenticationError as authentication_error:
+            msg = f"LLM authentication error: {authentication_error}"
+            raise LLMCompletionError(msg) from authentication_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
-            llm_tokens_usage.nb_tokens_by_category = OpenAIFactory.make_nb_tokens_by_category(usage=usage)
+            llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
 
         return result_object

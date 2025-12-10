@@ -79,6 +79,7 @@ class TestExternalPlugin:
             llm_job_params=LLMJobParams(
                 temperature=0.5,
                 max_tokens=None,
+                image_detail=None,
                 seed=None,
             ),
         )

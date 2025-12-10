@@ -11,24 +11,26 @@ from pipelex.cogt.exceptions import (
     InferenceBackendLibraryValidationError,
     InferenceModelSpecError,
 )
-from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsReport, CredentialsValidationReport
 from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendBlueprint,
     InferenceBackendFactory,
 )
 from pipelex.cogt.model_backends.model_spec_factory import (
+    BackendModelSpecs,
     InferenceModelSpecBlueprint,
     InferenceModelSpecFactory,
 )
-from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.environment import get_optional_env
+from pipelex.system.pipelex_service.gateway_config_merger import GatewayConfigMerger
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.dict_utils import (
     apply_to_strings_recursive,
     extract_vars_from_strings_recursive,
 )
 from pipelex.tools.misc.placeholder import value_is_placeholder
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import (
     UnknownVarPrefixError,
@@ -45,31 +47,6 @@ if TYPE_CHECKING:
 InferenceBackendLibraryRoot = dict[str, InferenceBackend]
 
 
-class BackendCredentialStatus(ConfigModel):
-    """Status of a single credential variable."""
-
-    var_name: str
-    is_set: bool
-    is_placeholder: bool  # True if value exists but is a placeholder like "${VAR}"
-
-
-class BackendCredentialsReport(ConfigModel):
-    """Report of credential status for a backend."""
-
-    backend_name: str
-    required_vars: list[str]
-    missing_vars: list[str]
-    placeholder_vars: list[str]
-    all_credentials_valid: bool
-
-
-class CredentialsValidationReport(ConfigModel):
-    """Complete report of credentials validation across all backends."""
-
-    backend_reports: dict[str, BackendCredentialsReport]
-    all_backends_valid: bool
-
-
 class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     root: InferenceBackendLibraryRoot = Field(default_factory=dict)
 
@@ -80,7 +57,25 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def make_empty(cls) -> Self:
         return cls(root={})
 
-    def load(self, secrets_provider: SecretsProviderAbstract, backends_library_path: str, backends_dir_path: str, include_disabled: bool = False):
+    def load(
+        self,
+        secrets_provider: SecretsProviderAbstract,
+        backends_library_path: str,
+        backends_dir_path: str,
+        include_disabled: bool = False,
+        gateway_model_specs: BackendModelSpecs | None = None,
+    ):
+        """Load backend configurations from TOML files.
+
+        For pipelex_gateway, uses the provided remote config and merges with local overrides.
+
+        Args:
+            secrets_provider: Provider for secrets/credentials.
+            backends_library_path: Path to backends.toml.
+            backends_dir_path: Path to directory containing per-backend TOML files.
+            include_disabled: Whether to include disabled backends.
+            gateway_model_specs: Remote model specs for Pipelex Gateway backend.
+        """
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
         except FileNotFoundError as file_not_found_exc:
@@ -94,9 +89,10 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         # Create a partial function with the secrets provider bound
         substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider)
 
+        # We'll split the read settings into standard fields and extra config
+        backend_blueprint_standard_fields = InferenceBackendBlueprint.model_fields.keys()
+        model_spec_blueprint_standard_fields = InferenceModelSpecBlueprint.model_fields.keys()
         for backend_name, backend_dict in backends_dict.items():
-            # We'll split the read settings into standard fields and extra config
-            standard_fields = InferenceBackendBlueprint.model_fields.keys()
             extra_config: dict[str, Any] = {}
             inference_backend_blueprint_dict_raw = backend_dict.copy()
             enabled = inference_backend_blueprint_dict_raw.get("enabled", True)
@@ -138,27 +134,34 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     key_name=unknown_var_prefix_exc.var_name,
                 ) from unknown_var_prefix_exc
 
-            for key in backend_dict:
-                if key not in standard_fields:
-                    extra_config[key] = inference_backend_blueprint_dict.pop(key)
+            for backend_blueprint_key in backend_dict:
+                if backend_blueprint_key not in backend_blueprint_standard_fields:
+                    extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
             backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
 
-            path_to_model_specs_toml = f"{backends_dir_path}/{backend_name}.toml"
-            try:
-                model_specs_dict_raw = load_toml_from_path(path=path_to_model_specs_toml)
-                try:
-                    model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, substitute_vars_with_provider)
-                except (VarNotFoundError, UnknownVarPrefixError) as exc:
-                    msg = f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}"
-                    raise InferenceModelSpecError(msg) from exc
-            except (FileNotFoundError, InferenceModelSpecError) as exc:
-                msg = f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}"
-                raise InferenceBackendLibraryError(msg) from exc
+            # Handle pipelex_gateway specially - use remote config
+            backend_config_source: str
+            if PipelexBackend.is_gateway_backend(backend_name):
+                if gateway_model_specs is None:
+                    msg = "Pipelex Gateway backend is enabled but remote model specs were not provided"
+                    raise InferenceBackendLibraryError(msg)
+                model_specs_dict, backend_config_source = self._load_gateway_model_specs(
+                    gateway_model_specs=gateway_model_specs,
+                    backends_dir_path=backends_dir_path,
+                    substitute_vars_with_provider=substitute_vars_with_provider,
+                )
+            else:
+                model_specs_dict, backend_config_source = self._load_local_model_specs(
+                    backend_name=backend_name,
+                    backends_dir_path=backends_dir_path,
+                    substitute_vars_with_provider=substitute_vars_with_provider,
+                )
+
             defaults_dict: dict[str, Any] = model_specs_dict.pop("defaults", {})
             backend_model_specs: dict[str, InferenceModelSpec] = {}
             for model_spec_name, value in model_specs_dict.items():
                 if not isinstance(value, dict):
-                    msg = f"Model spec '{model_spec_name}' for backend '{backend_name}' at path '{path_to_model_specs_toml}' is not a dictionary"
+                    msg = f"Model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source} is not a dictionary"
                     raise InferenceModelSpecError(msg)
                 model_spec_dict: dict[str, Any] = cast("dict[str, Any]", value)
                 try:
@@ -166,24 +169,31 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     model_spec_blueprint_dict = defaults_dict.copy()
                     # Override with the attributes from the model spec dict
                     model_spec_blueprint_dict.update(model_spec_dict)
+
+                    # We'll split the read settings into standard fields and extra headers
+                    extra_headers: dict[str, str] = {}
+                    for model_spec_key in model_spec_dict:
+                        if model_spec_key not in model_spec_blueprint_standard_fields:
+                            extra_headers[model_spec_key] = model_spec_blueprint_dict.pop(model_spec_key)
                     model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_blueprint_dict)
                     model_spec = InferenceModelSpecFactory.make_inference_model_spec(
                         backend_name=backend_name,
                         name=model_spec_name,
                         blueprint=model_spec_blueprint,
+                        backend_listed_constraints=backend_blueprint.listed_constraints,
+                        backend_valued_constraints=backend_blueprint.valued_constraints,
+                        extra_headers=extra_headers,
                     )
                     backend_model_specs[model_spec_name] = model_spec
                 except ValidationError as validation_error:
                     validation_error_msg = format_pydantic_validation_error(validation_error)
                     msg = (
                         f"Invalid inference model spec '{model_spec_name}' for backend '{backend_name}' "
-                        f"in file '{path_to_model_specs_toml}': {validation_error_msg}"
+                        f"from {backend_config_source}: {validation_error_msg}"
                     )
                     raise InferenceBackendLibraryError(msg) from validation_error
                 except InferenceModelSpecError as exc:
-                    msg = (
-                        f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from file '{path_to_model_specs_toml}'"
-                    )
+                    msg = f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source}"
                     raise InferenceBackendLibraryError(msg) from exc
             backend = InferenceBackendFactory.make_inference_backend(
                 name=backend_name,
@@ -192,6 +202,76 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 model_specs=backend_model_specs,
             )
             self.root[backend_name] = backend
+
+    def _load_gateway_model_specs(
+        self,
+        gateway_model_specs: BackendModelSpecs,
+        backends_dir_path: str,
+        substitute_vars_with_provider: Any,
+    ) -> tuple[BackendModelSpecs, str]:
+        """Load model specs for pipelex_gateway from remote config.
+
+        Args:
+            gateway_model_specs: dict of the model specs from the Pipelex Gateway.
+            backends_dir_path: Path to directory containing local override file.
+            substitute_vars_with_provider: Function to substitute variables.
+
+        Returns:
+            Model specs dictionary merged from remote and local overrides.
+
+        Raises:
+            InferenceModelSpecError: If variable substitution fails.
+        """
+        # Load local overrides if they exist
+        path_to_local_overrides = f"{backends_dir_path}/{PipelexBackend.GATEWAY}.toml"
+        local_overrides = load_toml_from_path_if_exists(path=path_to_local_overrides) or {}
+
+        # Merge remote config with local overrides
+        model_specs_dict = GatewayConfigMerger.merge(
+            gateway_model_specs=gateway_model_specs,
+            local_overrides=local_overrides,
+        )
+
+        # Apply variable substitution (in case remote config has any variables)
+        try:
+            model_specs_dict = apply_to_strings_recursive(model_specs_dict, substitute_vars_with_provider)
+        except (VarNotFoundError, UnknownVarPrefixError) as exc:
+            msg = f"Variable substitution failed in remote gateway config: {exc}"
+            raise InferenceModelSpecError(msg) from exc
+
+        return model_specs_dict, f"remote config with local overrides from '{path_to_local_overrides}'"
+
+    def _load_local_model_specs(
+        self,
+        backend_name: str,
+        backends_dir_path: str,
+        substitute_vars_with_provider: Any,
+    ) -> tuple[BackendModelSpecs, str]:
+        """Load model specs from local TOML file.
+
+        Args:
+            backend_name: Name of the backend.
+            backends_dir_path: Path to directory containing TOML files.
+            substitute_vars_with_provider: Function to substitute variables.
+
+        Returns:
+            Model specs dictionary from local TOML.
+
+        Raises:
+            InferenceBackendLibraryError: If loading fails.
+        """
+        path_to_model_specs_toml = f"{backends_dir_path}/{backend_name}.toml"
+        try:
+            model_specs_dict_raw = load_toml_from_path(path=path_to_model_specs_toml)
+            try:
+                model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, substitute_vars_with_provider)
+            except (VarNotFoundError, UnknownVarPrefixError) as exc:
+                msg = f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}"
+                raise InferenceModelSpecError(msg) from exc
+        except (FileNotFoundError, InferenceModelSpecError) as exc:
+            msg = f"Failed to load inference model specs from file '{path_to_model_specs_toml}': {exc}"
+            raise InferenceBackendLibraryError(msg) from exc
+        return model_specs_dict, f"file '{path_to_model_specs_toml}'"
 
     def check_backend_credentials(self, path: str, include_disabled: bool = False) -> CredentialsValidationReport:
         """Check if required environment variables are set for enabled backends.

@@ -169,6 +169,10 @@ class ExtractCapabilityError(CogtError):
     pass
 
 
+class ExtractJobFailureError(CogtError):
+    pass
+
+
 class RoutingProfileLibraryNotFoundError(CogtError):
     pass
 

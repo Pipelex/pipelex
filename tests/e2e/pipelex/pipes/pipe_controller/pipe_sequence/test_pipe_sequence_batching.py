@@ -42,7 +42,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
         )
         pipe = get_required_pipe(pipe_code="analyze_reviews_sequence")
         pipe_output = await pipe.run_pipe(
-            job_metadata=JobMetadata(job_name="test_review_analysis_sequence_with_batching"),
+            job_metadata=JobMetadata(),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             working_memory=working_memory,
         )

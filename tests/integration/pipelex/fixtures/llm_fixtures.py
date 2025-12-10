@@ -3,6 +3,7 @@
 import pytest
 
 from pipelex import log
+from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.hub import get_model_deck
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
@@ -54,8 +55,6 @@ AMAZON_MODELS = [
 ANTHROPIC_MODELS = [
     "claude-3-haiku",
     "claude-3-opus",
-    "claude-3.5-haiku",
-    "claude-3.5-sonnet",
     "claude-3.7-sonnet",
     "claude-4-opus",
     "claude-4-sonnet",
@@ -68,17 +67,19 @@ ANTHROPIC_MODELS = [
 
 # --- DeepSeek Models ----------------------------------------------------------------------------
 DEEPSEEK_MODELS = [
-    "deepseek-chat-free",
-    "deepseek-r1-free",
+    "deepseek-chat",
+    "deepseek-r1",
+    "deepseek-v3.1",
+    "deepseek-r1-distill-llama-70b",
 ]
 
 # --- Google Models (Gemini) ---------------------------------------------------------------------
 GOOGLE_MODELS = [
+    "gemini-flash-1.5-8b",
     "gemini-2.0-flash",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
-    "gemini-flash-1.5-8b",
     "gemini-3.0-pro",
 ]
 
@@ -92,6 +93,7 @@ GROQ_MODELS = [
 META_MODELS = [
     "bedrock-meta-llama-3-3-70b-instruct",
     "llama-3.1-8b-instant",
+    "llama-3.1-8b-instruct",
     "llama-3.2-11b-vision-instruct",
     "llama-3.3-70b-instruct",
     "llama-3.3-70b-instruct-free",
@@ -101,7 +103,7 @@ META_MODELS = [
 ]
 
 # --- Mistral Models -----------------------------------------------------------------------------
-MISTRAL_MODELS = [
+MISTRALAI_MODELS = [
     "bedrock-mistral-large",
     "ministral-3b",
     "ministral-8b",
@@ -120,51 +122,57 @@ MISTRAL_MODELS = [
 ]
 
 # --- Moonshot AI Models -------------------------------------------------------------------------
-MOONSHOT_MODELS = [
-    "moonshotai/kimi-k2-instruct-0905",
+MOONSHOTAI_MODELS = [
+    "kimi-k2-instruct-0905",
 ]
 
 # --- OpenAI Models ------------------------------------------------------------------------------
 OPENAI_MODELS = [
-    "gpt-3.5-turbo",
-    "gpt-4",
-    "gpt-4-turbo",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-    "gpt-4.1-nano",
-    "gpt-4o",
-    "gpt-4o-2024-11-20",
     "gpt-4o-mini",
-    "gpt-4o-mini-2024-07-18",
-    "gpt-5",
-    "gpt-5-chat",
-    "gpt-5-mini",
-    "gpt-5-nano",
-    "gpt-5.1",
-    "gpt-5.1-chat",
-    "o1",
+    "gpt-4o",
+    "gpt-4.1-nano",
+    "gpt-4.1-mini",
+    "gpt-4.1",
     "o1-mini",
-    "o3",
+    "o1",
     "o3-mini",
+    "o3",
     "o4-mini",
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "openai/gpt-oss-safeguard-20b",
+    "gpt-5-nano",
+    "gpt-5-mini",
+    "gpt-5-chat",
+    "gpt-5",
+    "gpt-5.1-chat",
+    "gpt-5.1",
+    "gpt-5.1-codex",
+]
+
+# --- OpenAI OSS Models --------------------------------------------------------------------------
+OPENAI_OSS_MODELS = [
+    "gpt-oss-20b",
+    "gpt-oss-120b",
+    "gpt-oss-safeguard-20b",
 ]
 
 # --- Qwen Models --------------------------------------------------------------------------------
 QWEN_MODELS = [
     "qwen-2.5-72b-instruct",
-    "qwen/qwen3-32b",
+    "qwen3-32b",
     "qwen2.5-vl-72b-instruct",
+    "qwen3-vl-235b-a22b",
+    "qwen3-235b-a22b-instruct-2507",
+    "qwen3-coder-30b-a3b-instruct",
 ]
 
 # --- XAI Models (Grok) --------------------------------------------------------------------------
 XAI_MODELS = [
     "grok-3",
-    "grok-3-fast",
     "grok-3-mini",
+    "grok-4",
+    "grok-3-fast",
     "grok-3-mini-fast",
+    "grok-4-fast-reasoning",
+    "grok-4-fast-non-reasoning",
 ]
 
 # --- All LLM Handles ----------------------------------------------------------------------------
@@ -175,9 +183,10 @@ ALL_LLM_HANDLES = [
     *GOOGLE_MODELS,
     *GROQ_MODELS,
     *META_MODELS,
-    *MISTRAL_MODELS,
-    *MOONSHOT_MODELS,
+    *MISTRALAI_MODELS,
+    *MOONSHOTAI_MODELS,
     *OPENAI_MODELS,
+    *OPENAI_OSS_MODELS,
     *QWEN_MODELS,
     *XAI_MODELS,
 ]
@@ -188,6 +197,7 @@ ALL_LLM_HANDLES = [
         LLMJobParams(
             temperature=0.5,
             max_tokens=None,
+            image_detail=PromptImageDetail.AUTO,
             seed=None,
         ),
     ],

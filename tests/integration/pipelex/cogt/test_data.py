@@ -47,11 +47,10 @@ class ImageDescription(BaseModel):
 
 
 class LLMVisionTestCases:
-    VISION_USER_TEXT_1 = "Describe the provide image."
-    VISION_USER_TEXT_2 = "What is this image about?"
-    VISION_IMAGES_COMPARE_PROMPT = "Compare these two images"
+    VISION_USER_TEXT = "Describe the provide image in 1-2 concise sentences."
+    VISION_IMAGES_COMPARE_PROMPT = "Compare these two images in 2-3 concise bullet points."
 
-    URL_CLOUDFRONT_ALAN_TURING = "https://d2cinlfp2qnig1.cloudfront.net/tests/alan_turing.jpg"
+    URL_CLOUDFRONT_ALAN_TURING_JPG = "https://d2cinlfp2qnig1.cloudfront.net/tests/alan_turing.jpg"
 
     TEST_IMAGE_DIRECTORY = "tests/data/images"
 
@@ -67,10 +66,12 @@ class LLMVisionTestCases:
     PATH_IMG_GANTT_1 = f"{TEST_IMAGE_DIRECTORY}/diagram.png"
 
     IMAGE_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, image_path
-        ("AI Lympics PNG", PATH_IMG_PNG_1),
-        ("AI Lympics JPEG", PATH_IMG_JPEG_1),
         ("Gantt Chart", PATH_IMG_GANTT_1),
+        ("AI Lympics PNG", PATH_IMG_PNG_1),
+        ("Animal Lympics PNG", PATH_IMG_PNG_2),
+        ("AI Lympics JPEG", PATH_IMG_JPEG_1),
         ("Eiffel Tower", PATH_IMG_JPEG_3),
+        ("Eiffel Tower", PATH_IMG_PNG_3),
     ]
     IMAGE_PATH_PAIRS: ClassVar[list[tuple[str, tuple[str, str]]]] = [  # topic, image_pair
         ("AI Lympics PNG", (PATH_IMG_PNG_1, PATH_IMG_PNG_2)),
@@ -79,18 +80,26 @@ class LLMVisionTestCases:
     IMAGE_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, image_uri
         (
             "Alan Turing",
-            URL_CLOUDFRONT_ALAN_TURING,
+            URL_CLOUDFRONT_ALAN_TURING_JPG,
         ),
         (
             "Gantt chart",
-            PipeTestCases.URL_IMG_GANTT_1,
+            PipeTestCases.URL_IMG_GANTT_PNG,
         ),
     ]
 
 
 class LLMTestConstants:
-    USER_TEXT_SHORT = "In one sentence, who is Bill Gates?"
+    USER_TEXT_SHORT = "In one short sentence, who is Bill Gates?"
+    USER_TEXT_SUPER_SHORT = "In one short sentence (< 5 words), who is Bill Gates?"
     USER_TEXT_TO_EXTRACT_PERSON = "It's Robert, the nice plumber, he turns 57 next week."
+    USER_TEXT_TRICKY_1 = """
+When my son was 7 he was 3ft tall. When he was 8 he was 4ft tall. When he was 9 he was 5ft tall.
+How tall do you think he was when he was 12? and at 15?
+"""
+    USER_TEXT_TRICKY_2 = """
+Count the Rs in "Strawberry"
+"""
     # USER_TEXT_SHORT = "What's the biggest football match tonight in Europe?"
     PROMPT_TEMPLATE_TEXT = "Can you give one example of flower which is {color} in color ?"
     PROMPT_COLOR_EXAMPLES: ClassVar[list[str]] = [

@@ -15,20 +15,22 @@ from tests.integration.pipelex.cogt.test_data import ImageDescription, LLMTestCo
 @pytest.mark.asyncio(loop_scope="class")
 @pytest.mark.usefixtures("routing_profile_override")
 class TestLLMInference:
-    async def test_simple_gen_text_from_text(self, llm_job_params: LLMJobParams, llm_handle: str):
+    @pytest.mark.parametrize("user_text", [LLMTestConstants.USER_TEXT_SUPER_SHORT])
+    async def test_simple_gen_text_from_text(self, llm_job_params: LLMJobParams, llm_handle: str, user_text: str):
         log.info(f"test_simple_gen_text_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
                 system_text=None,
-                user_text=LLMTestConstants.USER_TEXT_SHORT,
+                user_text=user_text,
             ),
             llm_job_params=llm_job_params,
         )
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
+        # get_report_delegate().generate_report()
 
     async def test_simple_gen_object_from_text(self, llm_job_params: LLMJobParams, llm_handle: str):
         log.info(f"test_simple_gen_object_from_text: Testing llm_handle '{llm_handle}'")
@@ -47,6 +49,7 @@ class TestLLMInference:
         generated_object = await llm_worker.gen_object(llm_job=llm_job, schema=Person)
         assert generated_object
         pretty_print(generated_object)
+        # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
     async def test_gen_text_from_image(self, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
@@ -60,7 +63,7 @@ class TestLLMInference:
 
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
-                user_text=LLMVisionTestCases.VISION_USER_TEXT_2,
+                user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
             llm_job_params=llm_job_params,
@@ -71,6 +74,7 @@ class TestLLMInference:
             pretty_print(generated_text, title=f"Vision of {image_path}")
         except PromptImageFormatError as exc:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
+        # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
     async def test_gen_object_from_image(self, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
@@ -104,3 +108,4 @@ class TestLLMInference:
             pretty_print(generated_object, title=f"Image Description of {image_path}")
         except PromptImageFormatError as exc:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
+        # get_report_delegate().generate_report()

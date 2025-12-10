@@ -22,9 +22,9 @@
 
 [defaults]
 model_type = "llm"
-sdk = "openai"
+sdk = "openai_responses"
 prompting_target = "openai"
-structure_method = "instructor/openai_tools"
+structure_method = "instructor/openai_responses_tools"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -93,40 +93,33 @@ outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
 
 # --- o Series ----------------------------------------------------------------
-[o1-mini]
-model_id = "o1-mini"
-inputs = ["text"]
-outputs = ["text"]
-costs = { input = 3.0, output = 12.0 }
-constraints = ["temperature_must_be_1"]
-
 [o1]
 model_id = "o1"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 15.0, output = 60.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 
 [o3-mini]
 model_id = "o3-mini"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 
 [o3]
 model_id = "o3"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 10.0, output = 40.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 
 [o4-mini]
 model_id = "o4-mini"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 
 # --- GPT-5 Series -------------------------------------------------------------
 [gpt-5]
@@ -134,28 +127,28 @@ model_id = "gpt-5"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 
 [gpt-5-mini]
 model_id = "gpt-5-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 
 [gpt-5-nano]
 model_id = "gpt-5-nano"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.4 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 
 [gpt-5-chat]
 model_id = "gpt-5-chat-latest"
 inputs = ["text", "images"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
 
 # --- GPT-5.1 Series -------------------------------------------------------------
 ["gpt-5.1"]
@@ -170,6 +163,7 @@ costs = { input = 1.25, output = 10.0 }
 
 # --- OpenAI Image Generation --------------------------------------------------
 [gpt-image-1]
+sdk = "openai_img_gen"
 model_type = "img_gen"
 model_id = "gpt-image-1"
 inputs = ["text"]

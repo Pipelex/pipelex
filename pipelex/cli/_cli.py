@@ -72,6 +72,7 @@ def app_callback(ctx: typer.Context) -> None:
     # Check system readiness (dependencies and venv for dev installs)
     check_readiness()
 
+    # Silently create missing config files if needed (doesn't validate existing ones)
     init_cmd(silent=True)
 
 

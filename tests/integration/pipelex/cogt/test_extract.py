@@ -34,17 +34,17 @@ class TestExtract:
             extract_input=ExtractInput(pdf_uri=url),
         )
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
-        pretty_print(extract_output, title="OCR Output")
+        pretty_print(extract_output, title="Extract Output")
         assert extract_output.pages
 
-    @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_FILE_PATHS)
-    async def test_extract_image_file(self, extract_handle_from_image: str, file_path: str):
+    @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_TEXT_FILE_PATHS)
+    async def test_extract_image_path(self, extract_handle_from_image: str, file_path: str):
         extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
         extract_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(image_uri=file_path),
         )
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
-        pretty_print(extract_output, title="OCR Output")
+        pretty_print(extract_output, title="Extract Output")
         assert extract_output.pages
 
     @pytest.mark.parametrize("url", ImageTestCases.IMAGE_URLS)
@@ -54,7 +54,7 @@ class TestExtract:
             extract_input=ExtractInput(image_uri=url),
         )
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
-        pretty_print(extract_output, title="OCR Output")
+        pretty_print(extract_output, title="Extract Output")
         assert extract_output.pages
 
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
@@ -73,7 +73,7 @@ class TestExtract:
             extract_job_params=extract_job_params,
         )
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
-        pretty_print(extract_output, title="OCR Output")
+        pretty_print(extract_output, title="Extract Output")
         directory = get_incremental_directory_path(
             base_path="results/test_ocr_image_save",
             base_name="extract_output",

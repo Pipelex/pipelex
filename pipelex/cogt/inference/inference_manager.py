@@ -14,17 +14,12 @@ from pipelex.hub import get_models_manager, get_report_delegate
 
 class InferenceManager(InferenceManagerProtocol):
     def __init__(self):
-        # TODO: we don't need instances of the factories, we can just use them via class methods
-        self.img_gen_worker_factory = ImgGenWorkerFactory()
-        self.extract_worker_factory = ExtractWorkerFactory()
         self.llm_workers: dict[str, LLMWorkerAbstract] = {}
         self.img_gen_workers: dict[str, ImgGenWorkerAbstract] = {}
         self.extract_workers: dict[str, ExtractWorkerAbstract] = {}
 
     @override
     def teardown(self):
-        self.img_gen_worker_factory = ImgGenWorkerFactory()
-        self.extract_worker_factory = ExtractWorkerFactory()
         for llm_worker in self.llm_workers.values():
             llm_worker.teardown()
         self.llm_workers = {}
@@ -91,7 +86,7 @@ class InferenceManager(InferenceManagerProtocol):
     def _setup_one_img_gen_worker(self, img_gen_handle: str) -> ImgGenWorkerAbstract:
         inference_model = get_models_manager().get_inference_model(model_handle=img_gen_handle)
         log.verbose(f"Setting up Image Generation Worker for '{img_gen_handle}'")
-        img_gen_worker = self.img_gen_worker_factory.make_img_gen_worker(
+        img_gen_worker = ImgGenWorkerFactory.make_img_gen_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )
@@ -114,7 +109,7 @@ class InferenceManager(InferenceManagerProtocol):
         extract_handle: str,
     ) -> ExtractWorkerAbstract:
         inference_model = get_models_manager().get_inference_model(model_handle=extract_handle)
-        extract_worker = self.extract_worker_factory.make_extract_worker(
+        extract_worker = ExtractWorkerFactory.make_extract_worker(
             inference_model=inference_model,
             reporting_delegate=get_report_delegate(),
         )

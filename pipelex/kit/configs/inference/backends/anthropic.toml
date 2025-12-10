@@ -101,7 +101,7 @@ costs = { input = 1.0, output = 5.0 }
 
 ["claude-4.5-opus"]
 model_id = "claude-opus-4-5-20251101"
-max_tokens = 32000
+max_tokens = 64000
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100

@@ -12,14 +12,13 @@ from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
+from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
-    handle_model_deck_preset_error,
 )
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
@@ -66,6 +65,9 @@ pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and ge
 pipelex build pipe \
     "Take a Job offer text and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
 
+pipelex build pipe \
+    "Take a Job offer and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
+
 # Other ideas:
 pipelex build pipe "Take a photo as input, and render the opposite of the photo, don't structure anything, use only text content, be super concise"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
@@ -104,10 +106,7 @@ def build_pipe_cmd(
     # Import here to avoid circular imports
     from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints  # noqa: PLC0415
 
-    try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
 
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
@@ -257,7 +256,7 @@ def build_pipe_cmd(
         handle_model_availability_error(exc, context=ErrorContext.BUILD)
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @build_app.command(SUB_COMMAND_ONE_SHOT_PIPE, help="Developer utility for contributors: deliver pipeline in one shot, without validation loop")
@@ -279,10 +278,7 @@ def build_one_shot_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
 
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
@@ -335,7 +331,7 @@ def build_one_shot_cmd(
         handle_model_availability_error(exc, context=ErrorContext.BUILD)
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()
 
 
 @build_app.command(
@@ -368,10 +364,7 @@ def build_partial_cmd(
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
 ) -> None:
-    try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
 
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
 
@@ -442,4 +435,4 @@ def build_partial_cmd(
         handle_model_availability_error(exc, context=ErrorContext.BUILD)
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()

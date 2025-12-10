@@ -41,7 +41,7 @@ class PipeTestCases:
         The moon is white.
     """
     MULTI_IMG_DESC_PROMPT = "If there is one image, describe it. If there are multiple images, compare them."
-    URL_IMG_GANTT_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/diagrams/gantt_tree_house.png"  # AI generated
+    URL_IMG_GANTT_PNG = "https://pipelex-web.s3.amazonaws.com/tests/gantt_tree_house.png"  # AI generated
     URL_IMG_FASHION_PHOTO_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg"  # AI generated
     URL_IMG_FASHION_PHOTO_2 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png"  # AI generated
 
@@ -67,7 +67,7 @@ class PipeTestCases:
         content=ListContent(
             items=[
                 TextContent(text="The quick brown fox jumps over the lazy dog"),
-                ImageContent(url=URL_IMG_GANTT_1),
+                ImageContent(url=URL_IMG_GANTT_PNG),
             ],
         ),
     )
@@ -156,7 +156,7 @@ class PipeTestCases:
 
 class PipeExtractTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
-        ImageTestCases.IMAGE_FILE_PATH_PNG,
+        ImageTestCases.IMAGE_FILE_PATH_PNG_1,
         ImageTestCases.IMAGE_URL_PNG,
     ]
     PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS

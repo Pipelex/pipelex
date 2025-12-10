@@ -17,6 +17,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_to
 # ================================================================================================
 
 ALL_BACKENDS = [
+    "pipelex_gateway",
     "anthropic",
     "azure_openai",
     "bedrock",
@@ -27,9 +28,11 @@ ALL_BACKENDS = [
     "mistral",
     "ollama",
     "openai",
-    "pipelex_inference",
+    "portkey",
+    "scaleway",
     "vertexai",
     "xai",
+    "internal",
 ]
 
 
@@ -40,6 +43,7 @@ def get_all_routing_profiles() -> list[str]:
 
     # Get all profiles starting with 'all_'
     all_profiles = [profile_name for profile_name in profiles if profile_name.startswith("all_")]
+    # all_profiles.append()
 
     # Filter to only include profiles for enabled backends
     enabled_profiles: list[str] = []
@@ -48,7 +52,7 @@ def get_all_routing_profiles() -> list[str]:
         if backend_name and backend_name in ALL_BACKENDS:
             enabled_profiles.append(profile_name)
 
-    return sorted(enabled_profiles) or ["pipelex_first"]
+    return sorted(enabled_profiles)
 
 
 def extract_backend_from_profile_name_if_possible(profile_name: str) -> str | None:

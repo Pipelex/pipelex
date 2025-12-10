@@ -22,7 +22,7 @@ class TestPipeLLMVision:
             pipe_code="describe_image_e2e",
             library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"],
             inputs={
-                "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING),
+                "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG),
             },
             pipe_run_mode=pipe_run_mode,
         )
@@ -57,7 +57,7 @@ class TestPipeLLMVision:
             pipe_code=pipe_code,
             library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"],
             inputs={
-                "image_a": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING),
+                "image_a": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG),
                 "image_b": ImageContent(url=PipeTestCases.URL_IMG_FASHION_PHOTO_1),
             },
             pipe_run_mode=pipe_run_mode,
@@ -72,7 +72,7 @@ class TestPipeLLMVision:
         pipe_output = await execute_pipeline(
             pipe_code="vision_analysis_e2e",
             inputs={
-                "image": ImageContent(url=PipeTestCases.URL_IMG_GANTT_1),
+                "image": ImageContent(url=PipeTestCases.URL_IMG_GANTT_PNG),
             },
             pipe_run_mode=pipe_run_mode,
         )

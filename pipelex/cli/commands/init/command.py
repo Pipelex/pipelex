@@ -7,18 +7,66 @@ import typer
 from rich.console import Console
 from rich.prompt import Confirm
 
-from pipelex.cli.commands.init.backends import customize_backends_config, get_selected_backend_keys
+from pipelex.cli.commands.init.backends import (
+    customize_backends_config,
+    disable_gateway_backend,
+    get_selected_backend_keys,
+)
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.routing import customize_routing_profile
 from pipelex.cli.commands.init.telemetry import setup_telemetry
+from pipelex.cli.commands.init.ui.gateway_ui import (
+    display_gateway_accepted_message,
+    display_gateway_declined_message,
+    prompt_gateway_acceptance,
+)
 from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel, display_already_configured_message
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
+from pipelex.system.pipelex_service.pipelex_service_config import load_pipelex_service_config_if_exists
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.file_utils import path_exists
+
+
+def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) -> None:
+    """Check if gateway is enabled and terms not yet accepted, then prompt for acceptance.
+
+    This is called after init_config() to ensure users who have gateway enabled
+    in their existing backends.toml are prompted to accept terms when pipelex_service.toml
+    is first created.
+
+    Args:
+        console: Rich Console instance for user interaction.
+        backends_toml_path: Path to backends.toml file.
+    """
+    # Check if backends.toml exists and gateway is enabled
+    if not path_exists(backends_toml_path):
+        return
+
+    selected_backend_keys = get_selected_backend_keys(backends_toml_path)
+    if PipelexBackend.GATEWAY not in selected_backend_keys:
+        return
+
+    # Gateway is enabled - check if terms are already accepted
+    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+    if pipelex_service_config is not None and pipelex_service_config.agreement.terms_accepted:
+        return
+
+    # Gateway is enabled but terms not accepted - prompt user
+    gateway_accepted = prompt_gateway_acceptance(console)
+
+    if gateway_accepted:
+        display_gateway_accepted_message(console)
+        update_service_terms_acceptance(accepted=True)
+    else:
+        display_gateway_declined_message(console)
+        update_service_terms_acceptance(accepted=False)
+        # Actually disable the gateway in backends.toml
+        disable_gateway_backend(backends_toml_path)
 
 
 def determine_needs(
@@ -194,12 +242,59 @@ def execute_initialization(
         if backends_just_copied_during_config or (check_inference and backends_exists_now):
             needs_inference = True
 
+        # If we're NOT going to run customize_backends_config (which handles gateway terms),
+        # we need to check if gateway is enabled and terms not accepted
+        if not needs_inference and backends_existed_before:
+            _check_gateway_terms_if_needed(console, backends_toml_path)
+
     # Determine if this is truly a first-time setup (either tracked from before or just copied now)
     first_time_setup = is_first_time_backends_setup or backends_just_copied_during_config
 
     # Step 2: Set up inference backends if needed
     if needs_inference:
         console.print()
+
+        # If reset is True and we didn't already copy via config init, copy the template files
+        if reset and not backends_just_copied_during_config:
+            template_inference_dir = os.path.join(str(get_kit_configs_dir()), "inference")
+            target_inference_dir = os.path.join(config_manager.pipelex_config_dir, "inference")
+
+            # Reset backends.toml
+            template_backends_path = os.path.join(template_inference_dir, "backends.toml")
+            os.makedirs(os.path.dirname(backends_toml_path), exist_ok=True)
+            shutil.copy2(template_backends_path, backends_toml_path)
+            console.print("✅ Reset backends.toml from template")
+
+            # Reset all individual backend files in backends/ directory
+            template_backends_dir = os.path.join(template_inference_dir, "backends")
+            target_backends_dir = os.path.join(target_inference_dir, "backends")
+            os.makedirs(target_backends_dir, exist_ok=True)
+            reset_backend_files: list[str] = []
+            for backend_file in os.listdir(template_backends_dir):
+                if backend_file.endswith(".toml"):
+                    src_path = os.path.join(template_backends_dir, backend_file)
+                    dst_path = os.path.join(target_backends_dir, backend_file)
+                    shutil.copy2(src_path, dst_path)
+                    reset_backend_files.append(backend_file)
+            if reset_backend_files:
+                console.print(f"✅ Reset {len(reset_backend_files)} backend config files from template")
+
+            # Reset deck/ directory files (model deck configurations)
+            template_deck_dir = os.path.join(template_inference_dir, "deck")
+            target_deck_dir = os.path.join(target_inference_dir, "deck")
+            os.makedirs(target_deck_dir, exist_ok=True)
+            reset_deck_files: list[str] = []
+            for deck_file in os.listdir(template_deck_dir):
+                if deck_file.endswith(".toml"):
+                    src_path = os.path.join(template_deck_dir, deck_file)
+                    dst_path = os.path.join(target_deck_dir, deck_file)
+                    shutil.copy2(src_path, dst_path)
+                    reset_deck_files.append(deck_file)
+            if reset_deck_files:
+                console.print(f"✅ Reset {len(reset_deck_files)} model deck config files from template")
+
+            first_time_setup = True  # Treat as first-time setup since we just replaced the files
+
         customize_backends_config(is_first_time_setup=first_time_setup)
 
         # Automatically set up routing after backends (unless routing is the specific focus)
@@ -216,10 +311,8 @@ def execute_initialization(
         if reset:
             routing_profiles_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "routing_profiles.toml")
             template_routing_path = os.path.join(str(get_kit_configs_dir()), "inference", "routing_profiles.toml")
-
-            if path_exists(template_routing_path):
-                shutil.copy2(template_routing_path, routing_profiles_toml_path)
-                console.print("✅ Reset routing_profiles.toml from template")
+            shutil.copy2(template_routing_path, routing_profiles_toml_path)
+            console.print("✅ Reset routing_profiles.toml from template")
 
         selected_backend_keys = get_selected_backend_keys(backends_toml_path)
         if selected_backend_keys:
@@ -229,8 +322,7 @@ def execute_initialization(
 
     # Step 3: Set up telemetry if needed
     if needs_telemetry:
-        telemetry_mode = setup_telemetry(console, telemetry_config_path)
-        TelemetryManagerAbstract.telemetry_mode_just_set = telemetry_mode
+        setup_telemetry(console, telemetry_config_path)
 
     console.print()
 

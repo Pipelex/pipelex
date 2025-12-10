@@ -20,6 +20,7 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 class MistralLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
+        mistral_factory: MistralFactory,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -40,6 +41,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             msg = f"No max_tokens provided for llm model '{self.inference_model.desc}', but it is required for Mistral"
             raise MistralWorkerConfigurationError(msg)
         self.mistral_client_for_text: Mistral = sdk_instance
+        self.mistral_factory = mistral_factory
 
         if instructor_mode := self.inference_model.get_instructor_mode():
             self.instructor_for_objects = instructor.from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
@@ -51,12 +53,13 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
-        messages = MistralFactory.make_simple_messages(llm_job=llm_job)
+        job_params = llm_job.applied_job_params or llm_job.job_params
+        messages = self.mistral_factory.make_simple_messages(llm_job=llm_job)
         response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
             messages=messages,
             model=self.inference_model.model_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
+            temperature=job_params.temperature,
+            max_tokens=job_params.max_tokens or self.default_max_tokens,
         )
         if not response:
             msg = "Mistral response is None"
@@ -70,7 +73,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             raise LLMCompletionError(msg)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
-            llm_tokens_usage.nb_tokens_by_category = MistralFactory.make_nb_tokens_by_category(usage=usage)
+            llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)
 
         return mistral_response_content
 
@@ -80,14 +83,16 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
+        job_params = llm_job.applied_job_params or llm_job.job_params
+        messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
             response_model=schema,
-            messages=MistralFactory.make_simple_messages_openai_typed(llm_job=llm_job),
+            messages=messages,
             model=self.inference_model.model_id,
-            temperature=llm_job.job_params.temperature,
-            max_tokens=llm_job.job_params.max_tokens or self.default_max_tokens,
+            temperature=job_params.temperature,
+            max_tokens=job_params.max_tokens or self.default_max_tokens,
         )
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
-            llm_tokens_usage.nb_tokens_by_category = MistralFactory.make_nb_tokens_by_category(usage=usage)
+            llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)
 
         return result_object

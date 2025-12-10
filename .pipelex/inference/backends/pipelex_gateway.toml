@@ -1,0 +1,41 @@
+################################################################################
+# Pipelex Gateway Local Overrides
+################################################################################
+#
+# TELEMETRY NOTICE:
+#
+# Using Pipelex Gateway enables identified telemetry tied to your API key
+# (hashed for security). This is independent from your telemetry.toml settings.
+#
+# We collect only technical data (model names, token counts, latency, error rates).
+# We do NOT collect prompts, completions, pipe codes, or business data.
+#
+# This allows us to monitor service quality, enforce fair usage, and support you.
+#
+################################################################################
+#
+# WARNING: USE AT YOUR OWN RISK!
+#
+# The actual model configuration is fetched remotely from Pipelex servers.
+# Any override in this file may cause unexpected behavior or failures,
+# as the remote configuration may change at any time.
+#
+# If you must override, you may ONLY use these keys per model:
+#   - sdk
+#   - structure_method
+#
+# All other keys will be ignored.
+#
+# If you need custom configurations, consider using your own API keys
+# with direct provider backends (openai, anthropic, etc.) instead.
+#
+# Documentation:
+# https://docs.pipelex.com/home/7-configuration/config-technical/inference-backend-config/
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+# Per-model overrides example:
+# [gpt-4o]
+# sdk = "gateway_completions"
+# structure_method = "instructor/openai_tools"

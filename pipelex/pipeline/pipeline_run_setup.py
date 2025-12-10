@@ -6,6 +6,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.hub import (
     get_library_manager,
+    get_otel_tracer,
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
@@ -21,10 +22,12 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.system.telemetry.otel_factory import OtelFactory
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -97,7 +100,7 @@ async def pipeline_run_setup(
         msg = "Either pipe_code or plx_content must be provided to the pipeline API."
         raise ValueError(msg)
 
-    pipeline = get_pipeline_manager().add_new_pipeline()
+    pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code)
     pipeline_run_id = pipeline.pipeline_run_id
 
     if not library_id:
@@ -124,13 +127,18 @@ async def pipeline_run_setup(
             raise PipeExecutionError(message=msg)
     elif pipe_code:
         if library_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=[Path(library_dir) for library_dir in library_dirs])
+            library_manager.load_libraries(
+                library_id=library_id,
+                library_dirs=[Path(library_dir) for library_dir in library_dirs],
+            )
         else:
             library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
         msg = "Either provide pipe_code or plx_content to the pipeline API. 'pipe_code' must be provided when 'plx_content' is None"
         raise PipeExecutionError(message=msg)
+
+    pipe_code = pipe.code
 
     search_domains = search_domains or []
     if pipe.domain not in search_domains:
@@ -155,8 +163,25 @@ async def pipeline_run_setup(
 
     get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
 
+    # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
+    # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
+    otel_context: OtelContext | None = None
+    if pipe_run_mode.is_live and get_otel_tracer() is not None:
+        trace_id = OtelFactory.make_trace_id(pipeline_run_id=pipeline_run_id)
+        trace_name, trace_name_redacted = OtelFactory.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
+        otel_context = OtelContext(
+            trace_id=trace_id,
+            trace_name=trace_name,
+            trace_name_redacted=trace_name_redacted,
+            span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+        )
+        # Emit trace start event immediately to establish trace name in PostHog
+        # This must happen before any pipe spans are created/exported
+        get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
+
     job_metadata = JobMetadata(
         pipeline_run_id=pipeline.pipeline_run_id,
+        otel_context=otel_context,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(

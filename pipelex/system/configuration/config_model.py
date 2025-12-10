@@ -1,4 +1,4 @@
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -47,6 +47,23 @@ class ConfigModel(BaseModel):
 
         Args:
             input_dict: Dictionary with string values to be transformed.
+            key_enum_cls: The StrEnum class to convert the keys to
+
+        Returns:
+            A dictionary where the keys are converted to the given StrEnum type.
+
+        """
+        return {key_enum_cls(key): value for key, value in input_dict.items()}
+
+    @staticmethod
+    def transform_dict_keys_str_to_enum(
+        input_dict: dict[str, Any],
+        key_enum_cls: type[StrEnumType],
+    ) -> dict[StrEnumType, Any]:
+        """Transforms a dictionary with str keys and Any values into a dictionary with enum keys and Any values.
+
+        Args:
+            input_dict: Dictionary with string keys to be transformed.
             key_enum_cls: The StrEnum class to convert the keys to
 
         Returns:

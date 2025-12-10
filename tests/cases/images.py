@@ -10,7 +10,9 @@ class ImageTestCases:
     TEST_IMAGE_DIRECTORY = "tests/data/images"
 
     # Individual file paths
-    IMAGE_FILE_PATH_PNG = f"{TEST_IMAGE_DIRECTORY}/ai_lympics.png"
+    IMAGE_FILE_PATH_PNG_1 = f"{TEST_IMAGE_DIRECTORY}/ai_lympics.png"
+    IMAGE_FILE_PATH_JPG_1 = f"{TEST_IMAGE_DIRECTORY}/solar_system.jpg"
+    IMAGE_FILE_PATH_PNG_2 = f"{TEST_IMAGE_DIRECTORY}/solar_system.png"
 
     # Remote URLs
     IMAGE_URL_PNG = "https://www.python.org/static/community_logos/python-logo-master-v3-TM.png"
@@ -19,6 +21,10 @@ class ImageTestCases:
     IMAGE_FILE_PATHS: ClassVar[list[str]] = [
         f"{TEST_IMAGE_DIRECTORY}/ai_lympics.png",
         f"{TEST_IMAGE_DIRECTORY}/animal_lympics.jpg",
+    ]
+    IMAGE_TEXT_FILE_PATHS: ClassVar[list[str]] = [
+        IMAGE_FILE_PATH_JPG_1,
+        IMAGE_FILE_PATH_PNG_2,
     ]
 
     # URL collections

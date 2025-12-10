@@ -11,11 +11,31 @@ from pipelex.types import StrEnum
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
 
 T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 def empty_list_factory_of(_: type[T]) -> Callable[[], list[T]]:
     def _factory() -> list[T]:
         return []
+
+    return _factory
+
+
+def empty_dict_factory_of(_key: type[K], _val: type[V] | None = None) -> Callable[[], dict[K, Any]]:
+    """Create a typed empty dict factory.
+
+    Args:
+        _key: The key type (used for type inference)
+        _val: The value type (optional, used for type inference)
+
+    Returns:
+        A callable that returns an empty dict
+
+    """
+
+    def _factory() -> dict[K, Any]:
+        return {}
 
     return _factory
 
@@ -248,25 +268,59 @@ def serialize_model(
     return data
 
 
+def _truncated_rich_repr_from_items(rich_repr_items: RichReprResult) -> RichReprResult:
+    """Apply truncation to rich repr items.
+
+    This applies AttributePolisher truncation to field values recursively,
+    handling nested dicts, lists, and BaseModel objects.
+    """
+    for item in rich_repr_items:
+        if isinstance(item, tuple):
+            tuple_item = cast("tuple[Any, ...]", item)
+            if len(tuple_item) >= 2:
+                name = tuple_item[0]
+                value = tuple_item[1]
+                # Apply recursive truncation to handle nested structures
+                truncated_value = AttributePolisher.apply_truncation_recursive(value, name=name)
+                if len(tuple_item) == 3:
+                    yield name, truncated_value, tuple_item[2]
+                else:
+                    yield name, truncated_value
+        else:
+            yield item
+
+
+def make_truncated_wrapper(model: BaseModel) -> Any:
+    """Create a wrapper that provides truncated __rich_repr__ for a BaseModel.
+
+    This dynamically creates a class with the same name as the model's class,
+    so Rich's Pretty displays the correct type name while applying
+    AttributePolisher truncation to long string values.
+    """
+    model_class_name = model.__class__.__name__
+
+    def rich_repr_method(_self: Any) -> RichReprResult:
+        # Call BaseModel's __rich_repr__ directly to avoid recursion if model is a CustomBaseModel
+        base_repr = BaseModel.__rich_repr__(model)  # type: ignore[misc, arg-type]
+        return _truncated_rich_repr_from_items(base_repr)
+
+    # Create a dynamic class with the correct name
+    wrapper_class = type(
+        model_class_name,
+        (),
+        {
+            "__rich_repr__": rich_repr_method,
+        },
+    )
+
+    return wrapper_class()
+
+
 class CustomBaseModel(BaseModel):
     @override
     def __rich_repr__(self) -> RichReprResult:
-        for item in super().__rich_repr__():  # type: ignore[misc]
-            if isinstance(item, tuple):
-                tuple_item = cast("tuple[Any, ...]", item)
-                if len(tuple_item) >= 2:
-                    name = tuple_item[0]
-                    value = tuple_item[1]
-                    if AttributePolisher.should_truncate(name=name, value=value):
-                        truncated_value = AttributePolisher.get_truncated_value(name, value)
-                        if len(tuple_item) == 3:
-                            yield name, truncated_value, tuple_item[2]
-                        else:
-                            yield name, truncated_value
-                    else:
-                        yield item
-            else:
-                yield item
+        # Use super().__rich_repr__() to get base items, avoiding recursion
+        yield from _truncated_rich_repr_from_items(super().__rich_repr__())  # type: ignore[misc]
 
     @override
     def __repr_args__(self) -> Sequence[tuple[str | None, Any]]:
@@ -295,40 +349,5 @@ class CustomBaseModel(BaseModel):
         # Get the model dump with serialize_as_any=True
         dumped_data = self.model_dump(**kwargs)
 
-        # Apply truncation logic recursively
-        return self._apply_truncation_recursive(dumped_data)
-
-    def _apply_truncation_recursive(self, obj: Any, name: str | None = None) -> Any:
-        """Recursively apply AttributePolisher truncation logic to a data structure.
-
-        Args:
-            obj: The object to process
-            name: The field name (for truncation logic)
-
-        Returns:
-            The processed object with truncation applied where appropriate
-
-        """
-        # First check if this specific object should be truncated
-        if name and AttributePolisher.should_truncate(name=name, value=obj):
-            return AttributePolisher.get_truncated_value(name, obj)
-
-        # If it's a dictionary, recurse into its values
-        if isinstance(obj, dict):
-            obj_dict = cast("dict[str, Any]", obj)
-            truncated_dict: dict[str, Any] = {}
-            for key, value in obj_dict.items():
-                truncated_dict[key] = self._apply_truncation_recursive(value, name=key)
-            return truncated_dict
-
-        # If it's a list, recurse into its items
-        if isinstance(obj, list):
-            obj_list = cast("list[Any]", obj)
-            return [self._apply_truncation_recursive(item, name=name) for item in obj_list]
-
-        # If it's a tuple, recurse into its items and return as tuple
-        if isinstance(obj, tuple):
-            return tuple(self._apply_truncation_recursive(item, name=name) for item in obj)  # pyright: ignore[reportUnknownVariableType]
-
-        # For all other types, return as-is
-        return obj
+        # Apply truncation logic recursively using the shared utility
+        return AttributePolisher.apply_truncation_recursive(dumped_data)

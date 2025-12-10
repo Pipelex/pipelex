@@ -268,10 +268,9 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
             "",
             'if __name__ == "__main__":',
             "    # Initialize Pipelex",
-            "    Pipelex.make()",
-            "",
-            "    # Run the pipeline",
-            f"    result = asyncio.run(run_{pipe.code}())",
+            "    with Pipelex.make():",
+            "        # Run the pipeline",
+            f"        result = asyncio.run(run_{pipe.code}())",
             "",
         ]
     )

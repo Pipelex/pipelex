@@ -23,7 +23,6 @@ def get_async_worker_and_job(llm_preset_id: str, user_text: str):
         ),
         llm_job_params=llm_job_params,
         llm_job_config=LLMJobConfig(
-            is_streaming_enabled=False,
             max_retries=3,
         ),
     )
@@ -46,7 +45,6 @@ class TestLLMGenObject:
             ),
             llm_job_params=llm_job_params,
             llm_job_config=LLMJobConfig(
-                is_streaming_enabled=False,
                 max_retries=3,
             ),
         )
@@ -87,7 +85,6 @@ class TestLLMGenObject:
                 ),
                 llm_job_params=llm_job_params,
                 llm_job_config=LLMJobConfig(
-                    is_streaming_enabled=False,
                     max_retries=3,
                 ),
             )
@@ -117,7 +114,6 @@ class TestLLMGenObject:
                 ),
                 llm_job_params=llm_job.job_params,
                 llm_job_config=LLMJobConfig(
-                    is_streaming_enabled=False,
                     max_retries=3,
                 ),
             )

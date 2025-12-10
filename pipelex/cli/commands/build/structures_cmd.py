@@ -7,17 +7,17 @@ from kajson.kajson_manager import KajsonManager
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
+from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.build.app import build_app
+from pipelex.cli.error_handlers import ErrorContext
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.pipelex import Pipelex
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from pipelex.system.runtime import IntegrationMode
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -204,7 +204,7 @@ def build_structures_command(
         # Determine if target is a file or directory
         is_plx_file = target_path.is_file() and target_path.suffix == ".plx"
 
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
+        pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD)
 
         try:
             if is_plx_file:

@@ -1,5 +1,4 @@
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.cogt.exceptions import ModelNotFoundError
@@ -56,11 +55,11 @@ Write a haiku about the meaning of life
 class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_llm_text_only(self, request: FixtureRequest):
+    async def test_make_llm_text_only(self):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_text")
 
         text: str = await get_content_generator().make_llm_text(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
             llm_setting_main=llm_setting_main,
         )
@@ -70,11 +69,11 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_object_direct(self, request: FixtureRequest):
+    async def test_make_object_direct(self):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
         person_direct: Employee = await get_content_generator().make_object_direct(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             object_class=Employee,
             llm_prompt_for_object=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON),
             llm_setting_for_object=llm_setting_for_object,
@@ -85,11 +84,11 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_object_list_direct(self, request: FixtureRequest):
+    async def test_make_object_list_direct(self):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
         person_list_direct: list[Employee] = await get_content_generator().make_object_list_direct(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             object_class=Employee,
             llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),
             llm_setting_for_object_list=llm_setting_for_object,
@@ -101,11 +100,11 @@ class TestContentGenerator:
 
     @pytest.mark.img_gen
     @pytest.mark.inference
-    async def test_make_image(self, request: FixtureRequest):
+    async def test_make_image(self):
         img_gen_handle = "fast-lightning-sdxl"
         positive_text = "A dog with sunglasses coding on a laptop"
         image: GeneratedImage = await get_content_generator().make_single_image(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             img_gen_handle=img_gen_handle,
             img_gen_prompt=ImgGenPrompt(
                 positive_text=positive_text,
@@ -129,11 +128,11 @@ class TestContentGenerator:
 
     @pytest.mark.extract
     @pytest.mark.inference
-    async def test_make_extract_pages_from_image(self, extract_handle_from_image: str, request: FixtureRequest):
+    async def test_make_extract_pages_from_image(self, extract_handle_from_image: str):
         extract_output = await get_content_generator().make_extract_pages(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             extract_handle=extract_handle_from_image,
-            extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG),
+            extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
@@ -142,9 +141,9 @@ class TestContentGenerator:
 
     @pytest.mark.extract
     @pytest.mark.inference
-    async def test_make_extract_pages_from_pdf(self, extract_handle: str, request: FixtureRequest):
+    async def test_make_extract_pages_from_pdf(self, extract_handle: str):
         extract_output = await get_content_generator().make_extract_pages(
-            job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             extract_handle=extract_handle,
             extract_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
@@ -155,11 +154,11 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_llm_text_with_error(self, request: FixtureRequest):
+    async def test_make_llm_text_with_error(self):
         llm_setting_main = LLMSetting(model="bad_handle_to_test_failure", temperature=0.5, max_tokens=100)
         with pytest.raises(ModelNotFoundError) as excinfo:
             await get_content_generator().make_llm_text(
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=JobMetadata(),
                 llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
                 llm_setting_main=llm_setting_main,
             )

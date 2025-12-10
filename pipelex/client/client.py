@@ -20,7 +20,7 @@ class PipelexClient(PipelexProtocol):
     the remote API.
 
     Args:
-        api_token: The API token to use for authentication. If not provided, it will be loaded from the PIPELEX_API_TOKEN environment variable.
+        api_token: The API token to use for authentication. If not provided, it will be loaded from the PIPELEX_API_KEY environment variable.
         If the environment variable is not set, an error will be raised.
 
     """

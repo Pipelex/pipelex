@@ -6,19 +6,18 @@ import click
 import typer
 from posthog import tag
 
+from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
-    handle_model_deck_preset_error,
 )
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.hub import get_required_pipe, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipelex import PACKAGE_VERSION, Pipelex
+from pipelex.pipelex import PACKAGE_VERSION
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -184,10 +183,7 @@ def generate_inputs_cmd(
             typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
 
-    try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
+    pipelex_instance = make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS)
 
     try:
         with get_telemetry_manager().telemetry_context():

@@ -9,13 +9,12 @@ import typer
 from posthog import tag
 
 from pipelex import log
+from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
-    handle_model_deck_preset_error,
 )
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.hub import get_console, get_telemetry_manager
@@ -196,10 +195,7 @@ def run_cmd(
         typer.secho("✅ Pipeline execution completed successfully", fg=typer.colors.GREEN)
 
     # Initialize Pipelex BEFORE telemetry context to ensure proper setup
-    try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI)
-    except ModelDeckPresetValidatonError as model_deck_error:
-        handle_model_deck_preset_error(model_deck_error, context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
 
     try:
         with get_telemetry_manager().telemetry_context():
@@ -225,4 +221,4 @@ def run_cmd(
         raise typer.Exit(1) from exc
 
     finally:
-        pipelex_instance.teardown()
+        Pipelex.teardown_if_needed()

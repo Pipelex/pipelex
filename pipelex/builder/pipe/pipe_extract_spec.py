@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 
 
 class ExtractSkill(StrEnum):
-    EXTRACT_TEXT_FROM_VISUALS = "extract_text_from_visuals"
-    EXTRACT_TEXT_FROM_PDF = "extract_text_from_pdf"
+    PDF_TEXT_EXTRACTOR = "pdf_text_extractor"
+    IMAGE_TEXT_EXTRACTOR = "image_text_extractor"
 
 
 class PipeExtractSpec(PipeSpec):

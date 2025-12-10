@@ -27,7 +27,7 @@ from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, Prom
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.openai.openai_factory import OpenAIFactory
+from pipelex.plugins.openai.openai_utils import make_image_url_obj
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_path
 
@@ -48,15 +48,14 @@ class MistralFactory:
     # Message
     #########################################################
 
-    @classmethod
-    def make_simple_messages(cls, llm_job: LLMJob) -> list[Messages]:
+    def make_simple_messages(self, llm_job: LLMJob) -> list[Messages]:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         messages: list[Messages] = []
         user_content: list[ContentChunk] = []
         if user_text := llm_job.llm_prompt.user_text:
             user_content.append(TextChunk(text=user_text))
         if user_images := llm_job.llm_prompt.user_images:
-            user_content.extend(cls.make_mistral_image_url(user_image) for user_image in user_images)
+            user_content.extend(self.make_mistral_image_url(user_image) for user_image in user_images)
         if user_content:
             messages.append(UserMessage(content=user_content))
 
@@ -65,8 +64,7 @@ class MistralFactory:
 
         return messages
 
-    @classmethod
-    def make_mistral_image_url(cls, prompt_image: PromptImage) -> ImageURLChunk:
+    def make_mistral_image_url(self, prompt_image: PromptImage) -> ImageURLChunk:
         if isinstance(prompt_image, PromptImageUrl):
             return ImageURLChunk(image_url=prompt_image.url)
         if isinstance(prompt_image, PromptImagePath):
@@ -80,9 +78,8 @@ class MistralFactory:
         msg = f"prompt_image of type {type(prompt_image)} is not supported"
         raise PromptImageFormatError(msg)
 
-    @classmethod
-    def make_simple_messages_openai_typed(
-        cls,
+    async def make_simple_messages_openai_typed(
+        self,
         llm_job: LLMJob,
     ) -> list[ChatCompletionMessageParam]:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
@@ -99,15 +96,14 @@ class MistralFactory:
 
         if user_images := llm_prompt.user_images:
             for prompt_image in user_images:
-                openai_image_url = OpenAIFactory.make_openai_image_url(prompt_image=prompt_image)
-                image_param = ChatCompletionContentPartImageParam(image_url=openai_image_url, type="image_url")
+                image_url_obj = await make_image_url_obj(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
+                image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)
 
         messages.append(ChatCompletionUserMessageParam(role="user", content=user_contents))
         return messages
 
-    @staticmethod
-    def make_nb_tokens_by_category(usage: UsageInfo) -> NbTokensByCategoryDict:
+    def make_nb_tokens_by_category(self, usage: UsageInfo) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
             TokenCategory.INPUT: usage.prompt_tokens,
             TokenCategory.OUTPUT: usage.completion_tokens,

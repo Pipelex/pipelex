@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Callable, cast
+from typing import Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -27,9 +26,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestPipeSequenceSimple:
     """Simple integration test for PipeSequence controller."""
 
-    async def test_simple_sequence_processing(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
-    ):
+    async def test_simple_sequence_processing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
         domain = "test_integration"
@@ -91,7 +88,7 @@ class TestPipeSequenceSimple:
 
         # Actually run the PipeSequence pipe
         pipe_output = await pipe_sequence.run_pipe(
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=JobMetadata(),
             working_memory=working_memory,
             output_name="sequence_result",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
