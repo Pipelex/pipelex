@@ -17,7 +17,10 @@
 #
 ####################################################################################################
 
+# ──────────────────────────────────────────────────────────────────────────────
 # PostHog Configuration (Event tracking + AI span tracing)
+# ──────────────────────────────────────────────────────────────────────────────
+
 [posthog]
 mode = "off" # Values: "off" | "anonymous" | "identified"
 # user_id = "your_user_id"                                  # Required when mode = "identified"
@@ -44,16 +47,22 @@ content = false # Capture prompt/completion content
 pipe_codes = false         # Include pipe codes in span names/attributes
 output_class_names = false # Include output class names in span names/attributes
 
+# ──────────────────────────────────────────────────────────────────────────────
 # Langfuse Integration
 # Note: Langfuse receives FULL span data (no redaction)
+# ──────────────────────────────────────────────────────────────────────────────
+
 [langfuse]
 enabled = false
 # endpoint = "https://cloud.langfuse.com"                    # Override for self-hosted Langfuse
 # public_key = "${LANGFUSE_PUBLIC_KEY}"                      # Langfuse public key
 # secret_key = "${LANGFUSE_SECRET_KEY}"                      # Langfuse secret key
 
+# ──────────────────────────────────────────────────────────────────────────────
 # Additional OTLP Exporters (array for multiple)
 # Note: OTLP exporters receive FULL span data (no redaction)
+# ──────────────────────────────────────────────────────────────────────────────
+
 # [[otlp]]
 # name = "my-collector"                                     # Identifier for logging
 # endpoint = "https://..."                                  # OTLP endpoint URL

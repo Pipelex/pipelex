@@ -2,20 +2,58 @@
 
 ## Unreleased
 
+**Highlights:**
+
+- **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
+
+    **Getting your API key:**
+
+    1. Join our Discord community at [go.pipelex.com/discord](https://go.pipelex.com/discord)
+    2. Request your free API key (includes credits for testing and development)
+    3. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+
+    **Accepting the Terms of Service:**
+
+    When you run `pipelex init`, you'll be prompted to accept the Gateway terms of service. By using Pipelex Gateway, telemetry is automatically enabled and identified by your API key (hashed for security) to monitor service quality and enforce fair usage. **We only collect technical data** (model names, token counts, latency, error rates)—never your prompts, completions, or business data. See our [Privacy Policy](https://go.pipelex.com/privacy-policy).
+
+    **⚠️ Migration deadline:** If you were using `pipelex_inference`, please migrate soon—the legacy service will be shut down within a week. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
+
+- **Pydantic Structure Generation** — New CLI command `pipelex build structures /library_dir/` generates Pydantic models from your concept definitions. This bridges Pipelex's declarative concepts with your Python code, enabling you to receive LLM structured outputs as fully-typed Pydantic objects with IDE autocompletion, validation, and seamless integration into your application logic. The `pipelex build runner` command now automatically generates and imports these structures.
+
 ### Added
 
-- Can now generate the pydantic structure of a concept with the cli: `pipelex build structures /library_dir/`.
-- The Pipelex CLI `pipelex build runner` that creates the python file to run a pipe now runs the `structures` build command and then imports those structures in the runner file.
-- Added validation for output concepts of `PipeCompose`: must be strictly compatible with the Text concept.
-- Added validation for the Pipelex Bundle on the concept keys: Cannot create a native concept.
+- OpenTelemetry-based observability system with native support for Langfuse and OTLP-compatible backends (Datadog, Honeycomb, etc.), configured via `.pipelex/telemetry.toml`
+- Portkey AI gateway integration for unified access to multiple models through a single API key
+- Scaleway inference provider support
+- Pipelex Gateway service with terms of service management via `.pipelex/pipelex_service.toml` and interactive acceptance flow in `pipelex init`
+- Configurable retry logic with exponential backoff for inference API calls, configurable in `pipelex.toml` under `[cogt.tenacity_config]`
+- Context manager support for the `Pipelex` class (`with Pipelex.make(): ...`) for graceful shutdown
+- Validation for `PipeCompose` output concepts: must be strictly compatible with the Text concept
+- Validation for Pipelex Bundle concept keys: cannot create a native concept
 
 ### Changed
 
-- The Pipelex cli for the `runner`, `structures`, and `inputs` commands now accept a `--output-dir` option to specify the output directory, by default it in the `target_dir`
+- **`pipelex_inference` replaced by `pipelex_gateway`** with remote model configuration fetching for always-current model support
+    - New environment variable `PIPELEX_GATEWAY_API_KEY`
+    - Default routing profiles updated from `pipelex_first` to `pipelex_gateway_first` with automatic migration in `pipelex init`
+- Telemetry system split into two streams:
+    1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
+    2. Custom telemetry to user-configured backends
+- `pipelex init` now creates a documented `telemetry.toml` template instead of prompting for preferences
+- Model catalog updated with latest models (gpt-5.1, claude-4.5-opus, gemini-3.0-pro, etc.) and updated waterfalls in `base_deck.toml`
+- Model constraints refactored from simple lists to structured `valued_constraints` dictionaries (e.g., `valued_constraints = { fixed_temperature = 1 }`)
+- New OpenAI Responses API implemented—now differentiates between `openai_completions` and `openai_responses`
+- CLI commands refactored to use centralized `Pipelex` initialization factory for improved error handling
+- `pipelex doctor` command enhanced to detect outdated `telemetry.toml` formats and suggest fixes
+- The `runner`, `structures`, and `inputs` CLI commands now accept `--output-dir` option (defaults to `target_dir`)
+
+### Deprecated
+
+- `pipelex_inference` backend in favor of `pipelex_gateway` (marked as "🛑 Legacy" in configuration template)
 
 ### Refactored
 
-- Refactored the `ConceptFactory.make_from_blueprint` method: Now it correctly handles native concepts.
+- `ConceptFactory.make_from_blueprint` method now correctly handles native concepts
 
 ## [v0.17.3] - 2025-12-01
 
