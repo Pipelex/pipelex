@@ -3,6 +3,10 @@
 from pipelex.system.exceptions import PipelexError
 
 
+class PipelexServiceConfigValidationError(PipelexError):
+    """Raised when pipelex_service.toml validation fails."""
+
+
 class PipelexServiceError(PipelexError):
     """Base exception for Pipelex service errors."""
 

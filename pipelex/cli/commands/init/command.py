@@ -11,7 +11,6 @@ from pipelex.cli.commands.init.backends import (
     customize_backends_config,
     disable_gateway_backend,
     get_selected_backend_keys,
-    update_gateway_terms_acceptance,
 )
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.routing import customize_routing_profile
@@ -27,6 +26,7 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.system.pipelex_service.pipelex_service_config import load_pipelex_service_config_if_exists
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -54,7 +54,7 @@ def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) ->
 
     # Gateway is enabled - check if terms are already accepted
     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
-    if pipelex_service_config is not None and pipelex_service_config.gateway.terms_accepted:
+    if pipelex_service_config is not None and pipelex_service_config.agreement.terms_accepted:
         return
 
     # Gateway is enabled but terms not accepted - prompt user
@@ -62,10 +62,10 @@ def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) ->
 
     if gateway_accepted:
         display_gateway_accepted_message(console)
-        update_gateway_terms_acceptance(accepted=True)
+        update_service_terms_acceptance(accepted=True)
     else:
         display_gateway_declined_message(console)
-        update_gateway_terms_acceptance(accepted=False)
+        update_service_terms_acceptance(accepted=False)
         # Actually disable the gateway in backends.toml
         disable_gateway_backend(backends_toml_path)
 

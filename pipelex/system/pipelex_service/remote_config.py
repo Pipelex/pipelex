@@ -3,11 +3,10 @@
 Fetches gateway configuration from a public S3 URL.
 """
 
-from typing import Any
-
 import httpx
 from pydantic import BaseModel, Field, ValidationError
 
+from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
     RemoteConfigValidationError,
@@ -18,7 +17,7 @@ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
 class RemoteConfig(BaseModel):
-    backend: dict[str, Any] = Field(description="Model specifications for Pipelex Gateway (model_name -> spec dict)")
+    backend_model_specs: BackendModelSpecs = Field(description="Model specifications for Pipelex Gateway (model_name -> spec dict)")
 
 
 def fetch_remote_config() -> RemoteConfig:

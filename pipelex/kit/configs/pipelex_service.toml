@@ -10,10 +10,10 @@
 #
 ####################################################################################################
 
-[gateway]
-# Set to true after accepting Pipelex Gateway terms of service.
-# When using pipelex_gateway, telemetry is enabled to monitor service usage.
-# We collect technical data (model, pipe type) and quantitative data (token counts)
-# but NOT your content, pipe codes, or output class names.
-# This value should only be set to true via 'pipelex init config' after user acceptance.
+[agreement]
+# Set to true after accepting Pipelex terms of service.
 terms_accepted = false
+
+# Note: when using pipelex_gateway, telemetry is enabled to monitor service usage.
+# We collect technical data (model, pipe type...) and quantitative data (token counts...)
+# but NOT your content, pipe codes, or output class names.

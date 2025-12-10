@@ -1,4 +1,3 @@
-import os
 import types
 from typing import TYPE_CHECKING, Any, cast
 
@@ -51,14 +50,9 @@ from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtoco
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
-from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.pipelex_service.exceptions import (
-    GatewayApiKeyMissingError,
-    GatewayDoNotTrackConflictError,
-    GatewayTelemetryManagerInjectedError,
     GatewayTermsNotAcceptedError,
 )
-from pipelex.system.pipelex_service.pipelex_credentials import PIPELEX_GATEWAY_API_KEY_VAR
 from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
@@ -70,17 +64,12 @@ from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
-from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_config import (
-    TELEMETRY_CONFIG_FILE_NAME,
     TelemetryConfig,
-    TelemetryMode,
-    load_telemetry_config,
 )
-from pipelex.system.telemetry.telemetry_manager import TelemetryManager
+from pipelex.system.telemetry.telemetry_factory import make_telemetry_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
-    TelemetryManagerNoOp,
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
@@ -174,7 +163,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
-        force_enable_telemetry: bool = False,
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
@@ -197,69 +185,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if self.is_pipelex_service_enabled:
             # Check if terms are accepted
             pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
-            if pipelex_service_config is None or not pipelex_service_config.gateway.terms_accepted:
+            if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
                 raise GatewayTermsNotAcceptedError
             # Fetch remote configuration
             remote_config = fetch_remote_config()
             log.verbose("Successfully fetched Pipelex Gateway remote configuration")
-            gateway_model_specs = remote_config.backend
+            gateway_model_specs = remote_config.backend_model_specs
 
-        pipelex_telemetry_enabled = False
-        gateway_api_key: str | None = None
-
-        if is_gateway_enabled:
-            # Get gateway API key for telemetry distinct_id
-            gateway_api_key = secrets_provider.get_optional_secret(PIPELEX_GATEWAY_API_KEY_VAR)
-            if not gateway_api_key:
-                raise GatewayApiKeyMissingError
-
-            # Cannot inject custom TelemetryManager when gateway is enabled
-            if telemetry_manager is not None:
-                raise GatewayTelemetryManagerInjectedError
-
-            pipelex_telemetry_enabled = True
-            log.verbose("Pipelex Gateway enabled - mandatory telemetry will be active")
-
-        # Telemetry ------------------------------------------------------------------------------------
-        chosen_telemetry_manager: TelemetryManagerAbstract
-        if integration_mode.allows_telemetry() or force_enable_telemetry or pipelex_telemetry_enabled:
-            if not telemetry_config:
-                telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
-                telemetry_config = load_telemetry_config(path=telemetry_config_path, secrets_provider=secrets_provider)
-
-            match telemetry_config.telemetry_mode:
-                case TelemetryMode.OFF:
-                    if pipelex_telemetry_enabled:
-                        # Gateway requires telemetry - create manager with only Pipelex telemetry
-                        # Note: the telemetry_manager parameter is guaranteed to be None here (checked above)
-                        chosen_telemetry_manager = TelemetryManager(
-                            telemetry_config=telemetry_config,
-                            pipelex_telemetry_enabled=True,
-                            gateway_api_key=gateway_api_key,
-                        )
-                        log.debug("Custom telemetry is off, but Pipelex Gateway telemetry is enabled")
-                    else:
-                        chosen_telemetry_manager = TelemetryManagerNoOp()
-                        log.debug("Telemetry is disabled because telemetry_mode is set to 'off'")
-                case TelemetryMode.ANONYMOUS | TelemetryMode.IDENTIFIED:
-                    if telemetry_config.respect_dnt and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
-                        if pipelex_telemetry_enabled:
-                            # Gateway requires telemetry but DNT is set - we respect DNT
-                            raise GatewayDoNotTrackConflictError(dnt_env_var=OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
-                        chosen_telemetry_manager = TelemetryManagerNoOp()
-                        log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
-                    else:
-                        # Note: if pipelex_telemetry_enabled then the telemetry_manager parameter is guaranteed to be None here (checked above)
-                        chosen_telemetry_manager = telemetry_manager or TelemetryManager(
-                            telemetry_config=telemetry_config,
-                            pipelex_telemetry_enabled=pipelex_telemetry_enabled,
-                            gateway_api_key=gateway_api_key,
-                        )
-        else:
-            chosen_telemetry_manager = TelemetryManagerNoOp()
-            log.verbose(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
-
-        self.telemetry_manager = chosen_telemetry_manager
+        self.telemetry_manager = make_telemetry_manager(
+            secrets_provider=secrets_provider,
+            integration_mode=integration_mode,
+            is_pipelex_telemetry_enabled=is_gateway_enabled,
+            telemetry_config=telemetry_config,
+            injected_telemetry_manager=telemetry_manager,
+        )
         self.telemetry_manager.setup(integration_mode=integration_mode)
         self.pipelex_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
 
@@ -405,7 +344,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
-        force_enable_telemetry: bool = False,
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
@@ -429,7 +367,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipeline_tracker: Custom pipeline tracking/logging
             pipe_router: Custom pipe routing logic
             reporting_delegate: Custom reporting handler
-            force_enable_telemetry: Force enable telemetry even if the integration mode does not allow it
             telemetry_config: Custom telemetry configuration
             telemetry_manager: Custom telemetry manager
             observers: Custom observers for pipeline events
@@ -459,7 +396,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipeline_tracker=pipeline_tracker,
             pipe_router=pipe_router,
             reporting_delegate=reporting_delegate,
-            force_enable_telemetry=force_enable_telemetry,
             telemetry_config=telemetry_config,
             telemetry_manager=telemetry_manager,
             observers=observers,

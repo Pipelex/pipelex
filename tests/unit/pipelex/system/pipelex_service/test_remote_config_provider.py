@@ -14,14 +14,14 @@ class TestGatewayRemoteConfig:
     def test_gateway_remote_config_valid(self) -> None:
         """Test creating a valid GatewayRemoteConfig."""
         payload = {
-            "backend": {
+            "backend_model_specs": {
                 "defaults": {"sdk": "gateway_completions"},
                 "gpt-4o": {"model_id": "gpt-4o-2024-11-20"},
             }
         }
         config = RemoteConfig.model_validate(payload)
-        assert "defaults" in config.backend
-        assert "gpt-4o" in config.backend
+        assert "defaults" in config.backend_model_specs
+        assert "gpt-4o" in config.backend_model_specs
 
     def test_gateway_remote_config_missing_backend_fails(self) -> None:
         """Test that missing backend key raises validation error."""
@@ -31,9 +31,9 @@ class TestGatewayRemoteConfig:
 
     def test_gateway_remote_config_empty_backend(self) -> None:
         """Test GatewayRemoteConfig with empty backend dict."""
-        payload: dict[str, dict[str, str]] = {"backend": {}}
+        payload: dict[str, dict[str, str]] = {"backend_model_specs": {}}
         config = RemoteConfig.model_validate(payload)
-        assert config.backend == {}
+        assert config.backend_model_specs == {}
 
 
 class TestApiKeyHashing:

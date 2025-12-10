@@ -3,8 +3,6 @@
 import os
 from typing import Any
 
-import tomlkit
-
 from pipelex.cli.commands.init.ui.backends_ui import (
     build_backend_selection_panel,
     display_selected_backends,
@@ -21,7 +19,7 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.pipelex_service_config import PIPELEX_SERVICE_CONFIG_FILE_NAME
+from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
@@ -87,33 +85,6 @@ def disable_gateway_backend(backends_toml_path: str) -> None:
         save_toml_to_path(toml_doc, backends_toml_path)
 
 
-def update_gateway_terms_acceptance(accepted: bool) -> None:
-    """Update the gateway terms acceptance in pipelex_service.toml.
-
-    Args:
-        accepted: Whether the user accepted the terms.
-    """
-    service_config_path = os.path.join(config_manager.pipelex_config_dir, PIPELEX_SERVICE_CONFIG_FILE_NAME)
-
-    if path_exists(service_config_path):
-        toml_doc = load_toml_with_tomlkit(service_config_path)
-    else:
-        # Create a new document if it doesn't exist
-        toml_doc = tomlkit.document()
-        toml_doc.add(tomlkit.comment("Pipelex Service Configuration"))
-        toml_doc.add(tomlkit.nl())
-
-    # Ensure gateway section exists
-    if "gateway" not in toml_doc:
-        gateway_section = tomlkit.table()
-        toml_doc["gateway"] = gateway_section  # type: ignore[index]
-
-    # Update terms_accepted
-    toml_doc["gateway"]["terms_accepted"] = accepted  # type: ignore[index]
-
-    save_toml_to_path(toml_doc, service_config_path)
-
-
 def customize_backends_config(is_first_time_setup: bool = False) -> None:
     """Interactively customize which inference backends are enabled in backends.toml.
 
@@ -160,10 +131,10 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
 
             if gateway_accepted:
                 display_gateway_accepted_message(console)
-                update_gateway_terms_acceptance(accepted=True)
+                update_service_terms_acceptance(accepted=True)
             else:
                 display_gateway_declined_message(console)
-                update_gateway_terms_acceptance(accepted=False)
+                update_service_terms_acceptance(accepted=False)
 
                 # Remove pipelex_gateway from selected indices
                 selected_indices = [idx for idx in selected_indices if backend_options[idx][0] != PipelexBackend.GATEWAY]
