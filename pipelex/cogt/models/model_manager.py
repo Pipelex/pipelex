@@ -54,7 +54,7 @@ class ModelManager(ModelManagerAbstract):
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract,
-        gateway_model_specs: BackendModelSpecs | None = None,
+        gateway_model_specs: BackendModelSpecs | None,
     ) -> None:
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,

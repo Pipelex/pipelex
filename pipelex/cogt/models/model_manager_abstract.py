@@ -20,7 +20,7 @@ class ModelManagerAbstract(ABC):
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract,
-        gateway_model_specs: BackendModelSpecs | None = None,
+        gateway_model_specs: BackendModelSpecs | None,
     ) -> None:
         pass
 
