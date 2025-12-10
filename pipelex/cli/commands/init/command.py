@@ -20,7 +20,7 @@ from pipelex.cli.commands.init.ui.gateway_ui import (
     display_gateway_declined_message,
     prompt_gateway_acceptance,
 )
-from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel, display_already_configured_message
+from pipelex.cli.commands.init.ui.general_ui import build_initialization_panel
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_console
@@ -99,54 +99,6 @@ def determine_needs(
     needs_inference = check_inference and (not path_exists(backends_toml_path) or reset)
     needs_routing = check_routing and (not path_exists(routing_profiles_toml_path) or reset)
     needs_telemetry = check_telemetry and (not path_exists(telemetry_config_path) or reset)
-
-    return needs_config, needs_inference, needs_routing, needs_telemetry
-
-
-def handle_already_configured(
-    focus: InitFocus,
-    console: Console,
-    backends_toml_path: str,
-    routing_profiles_toml_path: str,
-    telemetry_config_path: str,
-) -> bool:
-    """Handle the case when everything is already configured.
-
-    Args:
-        focus: The initialization focus area.
-        console: Rich Console instance for output.
-        backends_toml_path: Path to backends.toml file.
-        routing_profiles_toml_path: Path to routing_profiles.toml file.
-        telemetry_config_path: Path to telemetry config file.
-
-    Returns:
-        True if user wants to reconfigure, False otherwise.
-    """
-    # Map focus to config path for display
-    config_path_map = {
-        InitFocus.INFERENCE: backends_toml_path,
-        InitFocus.ROUTING: routing_profiles_toml_path,
-        InitFocus.TELEMETRY: telemetry_config_path,
-        InitFocus.CONFIG: ".pipelex/",
-    }
-
-    config_path = config_path_map.get(focus, "")
-    return display_already_configured_message(focus, console, config_path)
-
-
-def update_needs_for_reconfigure(focus: InitFocus) -> tuple[bool, bool, bool, bool]:
-    """Update needs flags when user wants to reconfigure.
-
-    Args:
-        focus: The initialization focus area.
-
-    Returns:
-        Tuple of (needs_config, needs_inference, needs_routing, needs_telemetry) booleans.
-    """
-    needs_config = focus == InitFocus.CONFIG
-    needs_inference = focus == InitFocus.INFERENCE
-    needs_routing = focus == InitFocus.ROUTING
-    needs_telemetry = focus == InitFocus.TELEMETRY
 
     return needs_config, needs_inference, needs_routing, needs_telemetry
 
@@ -329,18 +281,20 @@ def execute_initialization(
 
 def init_cmd(
     focus: InitFocus = InitFocus.ALL,
-    reset: bool = False,
     skip_confirmation: bool = False,
-    silent: bool = False,
 ):
-    """Initialize Pipelex configuration, inference backends, routing, and telemetry if needed, in a unified flow.
+    """Initialize Pipelex configuration, inference backends, routing, and telemetry.
+
+    Note: Config updates are not yet supported. This command always performs a full reset
+    of the configuration, overwriting any existing files.
 
     Args:
         focus: What to initialize - 'config', 'inference', 'routing', 'telemetry', or 'all' (default)
-        reset: Whether to reset/overwrite existing files
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
-        silent: If True, suppress all output when everything is already configured
     """
+    # Config updates are not yet supported - always reset
+    reset = True
+
     console = get_console()
     pipelex_config_dir = config_manager.pipelex_config_dir
     telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
@@ -368,28 +322,14 @@ def init_cmd(
         telemetry_config_path=telemetry_config_path,
     )
 
-    # Track if user already confirmed to avoid double prompting
-    user_already_confirmed = False
-
-    # If nothing needs to be done, handle based on focus
-    if not needs_config and not needs_inference and not needs_routing and not needs_telemetry:
-        # In silent mode, just return without any output
-        if silent:
-            return
-
-        if handle_already_configured(focus, console, backends_toml_path, routing_profiles_toml_path, telemetry_config_path):
-            # User wants to reconfigure
-            needs_config, needs_inference, needs_routing, needs_telemetry = update_needs_for_reconfigure(focus)
-            user_already_confirmed = True
-        else:
-            # User doesn't want to reconfigure, exit
-            console.print("\n[dim]No changes made.[/dim]")
-            console.print()
-            return
+    # Show info message if config already exists
+    if not is_first_time_backends_setup and not skip_confirmation:
+        console.print()
+        console.print("[dim]ℹ Config updates are not yet supported. Running a full reset.[/dim]")
 
     try:
-        # Show unified initialization prompt (skip if user already confirmed or skip_confirmation is True)
-        if not user_already_confirmed and not skip_confirmation:
+        # Show unified initialization prompt (skip if skip_confirmation is True)
+        if not skip_confirmation:
             confirm_initialization(
                 console=console,
                 needs_config=needs_config,
@@ -400,7 +340,7 @@ def init_cmd(
                 focus=focus,
             )
         else:
-            # User already confirmed or skip_confirmation is True, just add a blank line for spacing
+            # skip_confirmation is True, just add a blank line for spacing
             console.print()
 
         # Execute initialization steps

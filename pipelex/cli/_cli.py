@@ -72,17 +72,17 @@ def app_callback(ctx: typer.Context) -> None:
     # Check system readiness (dependencies and venv for dev installs)
     check_readiness()
 
-    # Silently create missing config files if needed (doesn't validate existing ones)
-    init_cmd(silent=True)
-
 
 @app.command(name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")
 def init_command(
     focus: Annotated[InitFocus, typer.Argument(help="What to initialize: 'config', 'telemetry', or 'all'")] = InitFocus.ALL,
-    reset: Annotated[bool, typer.Option("--reset", "-r", help="Reset existing configuration files")] = False,
 ) -> None:
-    """Initialize Pipelex configuration and telemetry."""
-    init_cmd(focus=focus, reset=reset)
+    """Initialize Pipelex configuration and telemetry.
+
+    Note: Config updates are not yet supported. This command always performs a full
+    reset of the configuration.
+    """
+    init_cmd(focus=focus)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and suggest fixes")

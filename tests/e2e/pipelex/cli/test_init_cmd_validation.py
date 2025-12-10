@@ -29,7 +29,7 @@ class TestInputValidation:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify successful completion with valid selection
         env.verify_backends_enabled([PipelexBackend.GATEWAY])
@@ -49,7 +49,7 @@ class TestInputValidation:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify successful completion
         env.verify_backends_enabled([PipelexBackend.GATEWAY])
@@ -74,7 +74,7 @@ class TestInputValidation:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify all backends are enabled
         env.verify_backends_enabled(["openai", "anthropic", "mistral"])
@@ -93,7 +93,7 @@ class TestInputValidation:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify default backend is selected
         env.verify_backends_enabled([PipelexBackend.GATEWAY])
@@ -119,7 +119,7 @@ class TestInputValidation:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify successful completion
         env.verify_backends_enabled(["openai", "anthropic", "mistral"])
@@ -145,7 +145,7 @@ class TestInputValidation:
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify successful completion
         env.verify_backends_enabled(["openai", "anthropic", "mistral"])

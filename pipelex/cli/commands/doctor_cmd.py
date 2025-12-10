@@ -731,7 +731,7 @@ def do_doctor_cmd(
             if Confirm.ask(f"[bold]Install {config_missing_count} missing configuration file(s)?[/bold]", default=True):
                 try:
                     console.print()
-                    init_cmd(focus=InitFocus.CONFIG, reset=False, skip_confirmation=True)
+                    init_cmd(focus=InitFocus.CONFIG, skip_confirmation=True)
                     console.print("[green]✓[/green] Configuration files installed")
                 except Exception as exc:
                     console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
@@ -741,7 +741,6 @@ def do_doctor_cmd(
         if can_fix_telemetry:
             is_format_change = "format has changed" in telemetry_message.lower()
             is_invalid_config = "invalid configuration" in telemetry_message.lower()
-            needs_reset = is_format_change or is_invalid_config
             if is_format_change:
                 prompt_msg = "[bold]Reset telemetry configuration using the new format?[/bold]"
             elif is_invalid_config:
@@ -751,8 +750,7 @@ def do_doctor_cmd(
             if Confirm.ask(prompt_msg, default=True):
                 try:
                     console.print()
-                    # Use reset=True for format changes or invalid config to overwrite
-                    init_cmd(focus=InitFocus.TELEMETRY, reset=needs_reset, skip_confirmation=True)
+                    init_cmd(focus=InitFocus.TELEMETRY, skip_confirmation=True)
                     console.print("[green]✓[/green] Telemetry configured")
                 except Exception as exc:
                     console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
