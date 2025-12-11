@@ -23,9 +23,9 @@ class TestExtract:
             extract_input=ExtractInput(pdf_uri=file_path),
         )
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
-        pretty_print(extract_output, title="Extract Output")
-
         assert extract_output.pages
+        for page_index, page in extract_output.pages.items():
+            pretty_print(page.text, title=f"Page {page_index + 1}")
 
     @pytest.mark.parametrize("url", PDFTestCases.DOCUMENT_URLS)
     async def test_extract_pdf_url(self, extract_handle: str, url: str):

@@ -68,6 +68,24 @@ class ExtractWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case "docling":
+                if importlib.util.find_spec("docling") is None:
+                    lib_name = "docling"
+                    lib_extra_name = "docling"
+                    msg = "The docling library is required in order to use Docling for PDF text extraction."
+                    raise MissingDependencyError(
+                        lib_name,
+                        lib_extra_name,
+                        msg,
+                    )
+
+                from pipelex.plugins.docling.docling_extract_worker import DoclingExtractWorker  # noqa: PLC0415
+
+                extract_worker = DoclingExtractWorker(
+                    extra_config=backend.extra_config,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
             case _:
                 msg = f"Plugin '{plugin}' is not supported"
                 raise NotImplementedError(msg)
