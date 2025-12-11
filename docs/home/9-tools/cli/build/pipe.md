@@ -29,7 +29,7 @@ The resulting pipeline will be saved in a folder `pipeline_01/` (with increasing
 | `bundle_view.svg` | SVG visualization of the build process and plan |
 | `__init__.py` | Python package init file |
 
-The HTML and SVG files provide a visual representation of what happened during the build: the analysis, the plan the AI took, and the resulting structure.
+The HTML and SVG files provide a visual representation of the resulting workflow.
 
 **Example:**
 
