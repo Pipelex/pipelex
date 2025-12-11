@@ -65,7 +65,7 @@ from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
 from pipelex.system.telemetry.telemetry_config import (
     TelemetryConfig,
 )
-from pipelex.system.telemetry.telemetry_factory import make_telemetry_manager
+from pipelex.system.telemetry.telemetry_factory import TelemetryFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
 )
@@ -79,6 +79,7 @@ from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
+    from pipelex.system.pipelex_service.remote_config import RemoteConfig
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
@@ -180,6 +181,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # for now the only servic is the Pipelex Gateway
         is_pipelex_service_enabled = is_pipelex_gateway_enabled()
 
+        remote_config: RemoteConfig | None = None
         gateway_model_specs: BackendModelSpecs | None = None
         if is_pipelex_service_enabled:
             # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
@@ -193,9 +195,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             log.verbose("Successfully fetched Pipelex Gateway remote configuration")
             gateway_model_specs = remote_config.backend_model_specs
 
-        self.telemetry_manager = make_telemetry_manager(
+        self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
+            remote_config=remote_config,
             is_pipelex_telemetry_enabled=is_pipelex_service_enabled,
             telemetry_config=telemetry_config,
             injected_telemetry_manager=telemetry_manager,
