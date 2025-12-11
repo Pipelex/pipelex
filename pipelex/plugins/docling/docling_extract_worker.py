@@ -1,6 +1,7 @@
 import asyncio
 from typing import Any
 
+from docling.document_converter import DocumentConverter
 from typing_extensions import override
 
 from pipelex.cogt.extract.extract_input import ExtractInputError
@@ -44,7 +45,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
                 assert pdf_path is not None
                 extract_output = await self._extract_from_pdf_file(pdf_path=pdf_path)
         else:
-            msg = "No PDF URI provided in ExtractJob"
+            msg = "Neither PDF URI nor PDF file path provided in ExtractJob"
             raise ExtractInputError(msg)
 
         return extract_output
@@ -54,12 +55,14 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
 
         Docling supports URLs directly through its DocumentConverter.
         """
+        converter = DocumentConverter()
         # Run synchronous Docling conversion in a thread pool to avoid blocking
-        conversion_result = await asyncio.to_thread(DoclingFactory.convert_pdf, pdf_url)
+        conversion_result = await asyncio.to_thread(converter.convert, pdf_url)
         return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)
 
     async def _extract_from_pdf_file(self, pdf_path: str) -> ExtractOutput:
         """Extract text from a local PDF file."""
+        converter = DocumentConverter()
         # Run synchronous Docling conversion in a thread pool to avoid blocking
-        conversion_result = await asyncio.to_thread(DoclingFactory.convert_pdf, pdf_path)
+        conversion_result = await asyncio.to_thread(converter.convert, pdf_path)
         return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)

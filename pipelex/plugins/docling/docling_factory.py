@@ -1,5 +1,3 @@
-from docling.datamodel.document import ConversionResult
-from docling.document_converter import DocumentConverter
 from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, MarkdownParams
 from docling_core.types.doc.document import DoclingDocument
 
@@ -7,15 +5,6 @@ from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 
 
 class DoclingFactory:
-    @classmethod
-    def make_document_converter(cls) -> DocumentConverter:
-        return DocumentConverter()
-
-    @classmethod
-    def convert_pdf(cls, pdf_path: str) -> ConversionResult:
-        converter = cls.make_document_converter()
-        return converter.convert(pdf_path)
-
     @classmethod
     def make_extract_output_from_docling_document(
         cls,

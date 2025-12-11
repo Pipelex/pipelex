@@ -7,7 +7,6 @@ from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, M
 
 from pipelex import pretty_print_md
 
-# PDF_PATH = "tests/data/documents/Job-Offer.pdf"
 PDF_PATH = "tests/data/documents/Job-Offer-Scan.pdf"
 
 

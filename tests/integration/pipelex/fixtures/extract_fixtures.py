@@ -24,7 +24,8 @@ def is_extract_handle_supported_by_enabled_backends(extract_handle: str) -> bool
 
 # --- Internal Models (PyPDFium2) ----------------------------------------------------------------
 INTERNAL_EXTRACT_MODELS = [
-    "pypdfium2-extract-text",
+    # "pypdfium2-extract-text",
+    "docling-extract-text",
 ]
 
 # --- Mistral Models -----------------------------------------------------------------------------
@@ -35,7 +36,7 @@ MISTRAL_EXTRACT_MODELS = [
 # --- All Extract Handles ------------------------------------------------------------------------
 ALL_EXTRACT_HANDLES = [
     *INTERNAL_EXTRACT_MODELS,
-    *MISTRAL_EXTRACT_MODELS,
+    # *MISTRAL_EXTRACT_MODELS,
 ]
 
 ALL_EXTRACT_HANDLES_FROM_IMAGE = [
