@@ -1,4 +1,4 @@
-# Pipelex Kit Commands
+# Kit Commands
 
 The Pipelex Kit provides commands for managing agent rules and migration instructions. These commands help you integrate Pipelex guidelines into your AI coding assistants and keep track of breaking changes across versions.
 
@@ -131,6 +131,6 @@ These rules are configured in `pipelex/kit/index.toml`.
 
 ## Related Documentation
 
-- [Pipe Builder](pipe-builder.md) - Generate pipelines from natural language
-- [CLI Commands](cli.md) - General Pipelex CLI documentation
+- [Pipe Builder](../pipe-builder.md) - Generate pipelines from natural language
+- [CLI Overview](index.md) - General Pipelex CLI documentation
 

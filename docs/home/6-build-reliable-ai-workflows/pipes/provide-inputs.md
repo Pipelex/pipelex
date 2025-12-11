@@ -16,7 +16,7 @@ This creates a `results/inputs.json` file with the structure needed for your pip
 pipelex run path/to/my_pipe.plx --inputs results/inputs.json
 ```
 
-See more about the options of the CLI [here](../../../home/9-tools/cli.md).
+See more about the options of the CLI [here](../../9-tools/cli/index.md).
 
 !!! tip "Starting Point for Input Structure"
     Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in.
