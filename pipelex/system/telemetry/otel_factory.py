@@ -25,6 +25,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_config import LangfuseConfig, OtlpExporterConfig, TelemetryRedactionConfig
 from pipelex.tools.log.log import log
+from pipelex.tools.misc.hash_utils import hash_md5_to_int
 from pipelex.tools.misc.json_utils import JsonContent, pure_json_str
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -127,7 +128,7 @@ class OtelFactory:
         Returns:
             A 128-bit integer suitable for use as an OTel trace ID.
         """
-        return int(hashlib.md5(pipeline_run_id.encode("utf-8")).hexdigest(), 16)  # noqa: S324
+        return hash_md5_to_int(pipeline_run_id)
 
     @classmethod
     def make_trace_names(cls, pipeline_run_id: str, pipe_code: str) -> tuple[str, str]:

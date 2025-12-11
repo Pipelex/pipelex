@@ -37,7 +37,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
     load_pipelex_service_config_if_exists,
 )
-from pipelex.system.pipelex_service.remote_config import fetch_remote_config
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
@@ -608,7 +608,7 @@ def check_models() -> tuple[bool, str, dict[str, BackendFileReport]]:
         if not pipelex_service_config.agreement.terms_accepted:
             return False, "Pipelex Gateway is enabled but terms have not been accepted", backend_file_reports
         try:
-            remote_config = fetch_remote_config()
+            remote_config = RemoteConfigFetcher.fetch_remote_config()
             gateway_model_specs = remote_config.backend_model_specs
         except (RemoteConfigFetchError, RemoteConfigValidationError) as exc:
             return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
