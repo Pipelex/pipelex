@@ -6,10 +6,11 @@ from pipelex.builder.builder import (
     PipeSpecUnion,
     reconstruct_bundle_with_pipe_fixes,
 )
+from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity
 from pipelex.hub import get_required_pipe
@@ -90,7 +91,36 @@ class BuilderLoop:
         is_save_second_iteration_enabled: bool,
     ) -> PipelexBundleSpec:
         fixed_pipes: list[PipeSpecUnion] = []
+        added_concepts: list[str] = []
 
+        # Handle pipe factory errors (e.g., missing output concepts)
+        for factory_error in bundle_error.pipe_factory_errors:
+            match factory_error.error_type:
+                case PipeFactoryErrorType.UNKNOWN_CONCEPT:
+                    # Fix unknown concept by adding a new concept that refines Text to the bundle
+                    unknown_concept_code = factory_error.missing_concept_code
+                    if not unknown_concept_code:
+                        continue
+
+                    # Create a simple concept that refines Text
+                    new_concept = ConceptSpec(
+                        the_concept_code=unknown_concept_code,
+                        description=unknown_concept_code,
+                        refines="Text",
+                    )
+
+                    # Add the concept to the bundle
+                    if pipelex_bundle_spec.concept is None:
+                        pipelex_bundle_spec.concept = {}
+
+                    pipelex_bundle_spec.concept[unknown_concept_code] = new_concept
+                    added_concepts.append(unknown_concept_code)
+                    log.info(f"🔧 Added unknown concept '{unknown_concept_code}' (refines Text) to bundle for pipe '{factory_error.pipe_code}'")
+
+                case PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR:
+                    continue
+
+        # Handle pipe validation errors
         for val_error in bundle_error.pipe_validation_error_data:
             if not val_error.pipe_code or not pipelex_bundle_spec.pipe:
                 continue
@@ -196,16 +226,18 @@ class BuilderLoop:
                 ):
                     continue
 
-        # Reconstruct bundle if we made changes
+        # Reconstruct bundle if we made pipe changes
         if fixed_pipes:
             pipelex_bundle_spec = reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes)
-            if is_save_second_iteration_enabled:
-                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-                second_iteration_path = get_incremental_file_path(
-                    base_path="results",
-                    base_name="generated_pipeline_2nd_iteration",
-                    extension="plx",
-                )
-                save_text_to_path(text=plx_content, path=second_iteration_path)
+
+        # Save second iteration if we made any changes (pipes or concepts)
+        if (fixed_pipes or added_concepts) and is_save_second_iteration_enabled:
+            plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+            second_iteration_path = get_incremental_file_path(
+                base_path="results",
+                base_name="generated_pipeline_2nd_iteration",
+                extension="plx",
+            )
+            save_text_to_path(text=plx_content, path=second_iteration_path)
 
         return pipelex_bundle_spec
