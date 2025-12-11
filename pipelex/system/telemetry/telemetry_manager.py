@@ -7,10 +7,12 @@ from posthog import Posthog, new_context  # type: ignore[attr-defined]
 from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
@@ -29,6 +31,7 @@ class TelemetryManager(TelemetryManagerAbstract):
     def __init__(
         self,
         telemetry_config: TelemetryConfig,
+        remote_config: RemoteConfig | None,
         pipelex_telemetry_enabled: bool = False,
         gateway_api_key: str | None = None,
     ):
@@ -36,6 +39,7 @@ class TelemetryManager(TelemetryManagerAbstract):
 
         Args:
             telemetry_config: User's telemetry configuration.
+            remote_config: Remote configuration for Pipelex Service (including telemetry).
             pipelex_telemetry_enabled: Whether Pipelex internal telemetry is enabled (for gateway).
             gateway_api_key: The user's Pipelex Gateway API key (required if pipelex_telemetry_enabled).
         """
@@ -59,11 +63,15 @@ class TelemetryManager(TelemetryManagerAbstract):
         if pipelex_telemetry_enabled:
             if gateway_api_key:
                 self._pipelex_distinct_id = PipelexDetails.make_distinct_id(gateway_api_key)
+            if not remote_config:
+                msg = "Pipelex Gateway telemetry is enabled but remote config is not set"
+                raise PipelexUnexpectedError(msg)
+            pipelex_posthog_config = remote_config.posthog
             self.pipelex_posthog_client = Posthog(
-                project_api_key=PipelexDetails.POSTHOG_PROJECT_API_KEY,
-                host=PipelexDetails.POSTHOG_HOST,
-                disable_geoip=False,  # GeoIP enabled for Pipelex telemetry
-                debug=self.telemetry_config.posthog.debug,
+                project_api_key=pipelex_posthog_config.project_api_key,
+                host=pipelex_posthog_config.endpoint,
+                disable_geoip=not pipelex_posthog_config.is_geoip_enabled,
+                debug=pipelex_posthog_config.is_debug_enabled,
                 on_error=self._handle_pipelex_transmission_error,
             )
             log.verbose("Pipelex Gateway telemetry enabled")

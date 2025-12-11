@@ -1,5 +1,3 @@
-"""Configuration model for Pipelex managed services."""
-
 import os
 from typing import Any, cast
 
