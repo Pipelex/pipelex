@@ -15,10 +15,9 @@ def hash_sha256(string: str, length: int | None = None) -> str:
         First `length` characters of SHA256 hex digest if length is provided, otherwise the full hash.
     """
     the_hash = hashlib.sha256(string.encode("utf-8")).hexdigest()
-    if length:
+    if length is not None:
         return the_hash[:length]
-    else:
-        return the_hash
+    return the_hash
 
 
 def hash_md5_to_int(string: str) -> int:

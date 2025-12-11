@@ -17,6 +17,8 @@ class TestHashSha256:
             ("", 8, "e3b0c442"),
             # Short length
             ("test", 1, "9"),
+            # Zero length edge case
+            ("test", 0, ""),
         ],
     )
     def test_hash_sha256(self, input_string: str, length: int | None, expected: str) -> None:
