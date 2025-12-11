@@ -170,8 +170,18 @@ nav:
     - Analytics:
       - Observer Data Extraction: home/8-analytics/data-extraction.md
     - Tools:
-      - CLI: home/9-tools/cli.md
-      - Kit Commands: home/9-tools/kit.md
+      - CLI:
+        - Overview: home/9-tools/cli/index.md
+        - Init: home/9-tools/cli/init.md
+        - Validate: home/9-tools/cli/validate.md
+        - Run: home/9-tools/cli/run.md
+        - Show: home/9-tools/cli/show.md
+        - Kit: home/9-tools/cli/kit.md
+        - Build:
+          - Overview: home/9-tools/cli/build/index.md
+          - Pipe: home/9-tools/cli/build/pipe.md
+          - Runner: home/9-tools/cli/build/runner.md
+          - Structures: home/9-tools/cli/build/structures.md
       - Pipe Builder: home/9-tools/pipe-builder.md
       - Logging: home/9-tools/logging.md
     - Advanced Customizations:

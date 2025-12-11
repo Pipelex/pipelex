@@ -36,6 +36,9 @@ The pipe builder generates three files in a numbered directory (e.g., `results/p
 !!! tip "Pipe Builder Requirements"
     For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BlackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key, otherwise, you can also create the workflows yourself, following our [documentation guide](./write-workflows-manually.md).
 
+!!! info "Learn More"
+    Want to understand how the Pipe Builder works under the hood? See [Pipe Builder Deep Dive](../9-tools/pipe-builder.md) for the full explanation of its multi-step generation process.
+
 ## Run your pipeline
 
 **Option 1: CLI**

@@ -18,7 +18,7 @@ Then you can execute the pipeline with the CLI.
 pipelex run path/to/my_pipe.plx --inputs results/inputs.json
 ```
 
-See more about the CLI [here](../../../home/9-tools/cli.md).
+See more about the CLI [here](../../9-tools/cli/index.md).
 
 ## Option 2: Using the python method `execute_pipeline`
 
