@@ -40,35 +40,23 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
         self,
         extract_job: ExtractJob,
     ) -> ExtractOutput:
-        if extract_job.extract_input.image_uri:
-            msg = "Docling extract worker only supports PDF extraction, not images"
-            raise NotImplementedError(msg)
-
-        if pdf_uri := extract_job.extract_input.pdf_uri:
-            pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
-            extract_output: ExtractOutput
-            if pdf_url:
-                extract_output = await self._extract_from_pdf_url(pdf_url=pdf_url)
-            else:
-                assert pdf_path is not None
-                extract_output = await self._extract_from_pdf_file(pdf_path=pdf_path)
+        source_uri: str
+        if image_uri := extract_job.extract_input.image_uri:
+            source_uri = image_uri
+        elif pdf_uri := extract_job.extract_input.pdf_uri:
+            source_uri = pdf_uri
         else:
-            msg = "Neither PDF URI nor PDF file path provided in ExtractJob"
+            msg = "Neither image URI nor PDF URI provided in ExtractJob"
             raise ExtractInputError(msg)
 
-        return extract_output
+        return await self._extract_from_source(source_uri=source_uri)
 
-    async def _extract_from_pdf_url(self, pdf_url: str) -> ExtractOutput:
-        """Extract text from a PDF URL.
+    async def _extract_from_source(self, source_uri: str) -> ExtractOutput:
+        """Extract text from a source URI (file path, file:// URI, or http(s) URL)."""
+        source_path, source_url = clarify_path_or_url(path_or_uri=source_uri)
+        resolved_source = source_url or source_path
+        assert resolved_source is not None
 
-        Docling supports URLs directly through its DocumentConverter.
-        """
         # Run synchronous Docling conversion in a thread pool to avoid blocking
-        conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, pdf_url)
-        return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)
-
-    async def _extract_from_pdf_file(self, pdf_path: str) -> ExtractOutput:
-        """Extract text from a local PDF file."""
-        # Run synchronous Docling conversion in a thread pool to avoid blocking
-        conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, pdf_path)
+        conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, resolved_source)
         return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)

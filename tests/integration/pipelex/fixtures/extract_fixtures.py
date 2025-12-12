@@ -41,6 +41,7 @@ ALL_EXTRACT_HANDLES = [
 
 ALL_EXTRACT_HANDLES_FROM_IMAGE = [
     *MISTRAL_EXTRACT_MODELS,
+    "docling-extract-text",
 ]
 
 

@@ -72,7 +72,7 @@ class ExtractWorkerFactory:
                 if importlib.util.find_spec("docling") is None:
                     lib_name = "docling"
                     lib_extra_name = "docling"
-                    msg = "The docling library is required in order to use Docling for PDF text extraction."
+                    msg = "The docling library is required in order to use Docling for PDF and image text extraction."
                     raise MissingDependencyError(
                         lib_name,
                         lib_extra_name,
