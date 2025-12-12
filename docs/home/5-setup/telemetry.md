@@ -101,6 +101,6 @@ We take your privacy seriously:
 - PostHog tracing includes privacy controls to redact sensitive content
 - All telemetry can be completely disabled
 
-For detailed configuration options, see [Telemetry Configuration](../../home/7-configuration/config-practical/telemetry-config.md).
+For detailed configuration options, see [Telemetry Configuration](../7-configuration/config-practical/telemetry-config.md).
 
 For more information about our data practices, see our [Privacy Policy](https://go.pipelex.com/privacy-policy).

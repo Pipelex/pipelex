@@ -4,11 +4,12 @@ from io import BytesIO
 
 from PIL import Image
 from typing_extensions import override
-from yattag import Doc
 
 from pipelex.cogt.exceptions import ImageContentError
 from pipelex.cogt.extract.extract_output import ExtractedImage
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str, save_base_64_str_to_binary_file
 from pipelex.tools.misc.file_utils import ensure_directory_exists, get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
@@ -34,10 +35,14 @@ class ImageContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        doc = Doc()
-        doc.stag("img", src=self.url, klass="msg-img")
-
-        return doc.getvalue()
+        template_source = '<img src="{{ url|e }}" class="msg-img">'
+        return render_jinja2_sync(
+            template_source=template_source,
+            template_category=TemplateCategory.HTML,
+            temlating_context={
+                "url": self.url,
+            },
+        )
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:

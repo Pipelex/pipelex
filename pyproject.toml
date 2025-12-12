@@ -47,7 +47,6 @@ dependencies = [
     "tomlkit>=0.13.2",
     "typer>=0.16.0",
     "typing-extensions>=4.13.2",
-    "yattag>=1.15.2",
 ]
 
 [project.urls]
