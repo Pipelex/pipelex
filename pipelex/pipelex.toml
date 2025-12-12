@@ -167,7 +167,7 @@ If some information is not present for an attribute, output the default value or
 ####################################################################################################
 
 [cogt.img_gen_config.img_gen_job_config]
-is_sync_mode = true
+is_sync_mode = false
 
 [cogt.img_gen_config.img_gen_param_defaults]
 nb_steps = 28           # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning

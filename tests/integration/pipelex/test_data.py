@@ -173,7 +173,7 @@ Woman typing on a laptop. On the laptop screen you see python code to generate c
         # (IMG_GEN_PROMPT_1, IMG_GEN_PROMPT_1),
         # (IMG_GEN_PROMPT_2, IMG_GEN_PROMPT_2),
         # (IMG_GEN_PROMPT_3, IMG_GEN_PROMPT_3),
-        ("coding woman with dragon tatoo", "a woman with a dragon tatoo, coding in python"),
+        ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python"),
     ]
 
 
