@@ -41,7 +41,6 @@ fallback_order = [
 
 [profiles.pipelex_gateway_first.routes]
 # Pattern matching: "model-pattern" = "backend-name"
-"mistral-ocr" = "mistral"
 "gpt-*" = "pipelex_gateway"
 "claude-*" = "pipelex_gateway"
 "grok-*" = "pipelex_gateway"
@@ -51,7 +50,7 @@ fallback_order = [
 "*-sdxl" = "fal"
 "flux-*" = "fal"
 "gpt-image-1" = "openai"
-# "mistral-ocr" = "mistral"
+"mistral-ocr" = "mistral"
 
 [profiles.all_pipelex_gateway]
 description = "Use Pipelex Gateway for all its supported models"
