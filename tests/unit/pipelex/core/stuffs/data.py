@@ -1,11 +1,19 @@
+from typing import ClassVar
+
+from markupsafe import escape
 from pydantic import Field
 
 from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.mermaid_content import MermaidContent
+from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 
 
@@ -676,3 +684,43 @@ ERROR_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, list[str]
         "not compatible",
     ),
 ]
+
+
+class RenderedHtmlTestData:
+    HTML_INNER_HTML = "<h1>Title</h1><p>Hi <strong>there</strong>.</p>"
+    HTML_CSS_CLASS = 'report-content x" onclick="alert(1)'
+    HTML_EXPECTED = f'<div class="{escape(HTML_CSS_CLASS)!s}">{HTML_INNER_HTML}</div>'
+
+    IMAGE_URL = 'https://example.com/image.png?x=1&y="2"'
+    IMAGE_EXPECTED = f'<img src="{escape(IMAGE_URL)!s}" class="msg-img">'
+
+    MERMAID_CODE = 'graph TD; A-- "<b>&</b>" -->B'
+    MERMAID_EXPECTED = f'<div class="mermaid">{escape(MERMAID_CODE)!s}</div>'
+
+    PDF_URL = "https://example.com/doc.pdf?x=1&y=2"
+    PDF_EXPECTED = f'<a href="{escape(PDF_URL)!s}" class="msg-pdf">{escape(PDF_URL)!s}</a>'
+
+    RENDERED_HTML_TEST_CASES: ClassVar[list[tuple[StuffContent, str]]] = [
+        (
+            HtmlContent(
+                inner_html=HTML_INNER_HTML,
+                css_class=HTML_CSS_CLASS,
+            ),
+            HTML_EXPECTED,
+        ),
+        (
+            ImageContent(url=IMAGE_URL),
+            IMAGE_EXPECTED,
+        ),
+        (
+            MermaidContent(
+                mermaid_code=MERMAID_CODE,
+                mermaid_url="https://example.com/diagram.svg",
+            ),
+            MERMAID_EXPECTED,
+        ),
+        (
+            PDFContent(url=PDF_URL),
+            PDF_EXPECTED,
+        ),
+    ]

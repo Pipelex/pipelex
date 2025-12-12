@@ -1,9 +1,10 @@
 import json
 
 from typing_extensions import override
-from yattag import Doc
 
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 
 
 class HtmlContent(StuffContent):
@@ -25,10 +26,15 @@ class HtmlContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        doc, tag, text = Doc().tagtext()
-        with tag("div", klass=self.css_class):
-            text(self.inner_html)
-        return doc.getvalue()
+        template_source = '<div class="{{ css_class|e }}">{{ inner_html | safe }}</div>'
+        return render_jinja2_sync(
+            template_source=template_source,
+            template_category=TemplateCategory.HTML,
+            temlating_context={
+                "inner_html": self.inner_html,
+                "css_class": self.css_class,
+            },
+        )
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:

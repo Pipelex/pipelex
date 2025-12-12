@@ -24,6 +24,62 @@ def _add_to_templating_context(temlating_context: dict[str, Any], jinja2_context
     temlating_context[jinja2_context_key] = value
 
 
+def render_jinja2_sync(
+    template_source: str,
+    template_category: TemplateCategory,
+    temlating_context: dict[str, Any],
+    templating_style: TemplatingStyle | None = None,
+) -> str:
+    jinja2_env = make_jinja2_env_without_loader(
+        template_category=template_category,
+    )
+
+    try:
+        template = jinja2_env.from_string(template_source)
+    except TemplateAssertionError as exc:
+        msg = f"Jinja2 render error: '{exc}', template_source:\n{template_source}"
+        raise Jinja2TemplateRenderError(msg) from exc
+
+    # Create a copy to avoid mutating the caller's original dictionary
+    temlating_context = temlating_context.copy()
+    if templating_style:
+        _add_to_templating_context(
+            temlating_context=temlating_context,
+            jinja2_context_key=Jinja2ContextKey.TAG_STYLE,
+            value=templating_style.tag_style,
+        )
+        _add_to_templating_context(
+            temlating_context=temlating_context,
+            jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT,
+            value=templating_style.text_format,
+        )
+
+    try:
+        generated_text: str = template.render(**temlating_context)
+    except Jinja2StuffError as stuff_error:
+        msg = f"Jinja2 render — stuff error: '{stuff_error}', template_source:\n{template_source}"
+        raise Jinja2TemplateRenderError(msg) from stuff_error
+    except TemplateSyntaxError as syntax_error:
+        msg = f"Jinja2 render — syntax error: '{syntax_error}', template_source:\n{template_source}"
+        raise Jinja2TemplateRenderError(msg) from syntax_error
+    except UndefinedError as undef_error:
+        msg = f"Jinja2 render — undefined error: '{undef_error}', template_source:\n{template_source}"
+        raise Jinja2TemplateRenderError(msg) from undef_error
+    except Jinja2ContextError as context_error:
+        msg = f"Jinja2 render — context error: '{context_error}', template_source:\n{template_source}"
+        raise Jinja2TemplateRenderError(msg) from context_error
+    except TypeError as type_error:
+        context_vars = ", ".join(f"'{key}'" for key in temlating_context)
+        msg = (
+            f"Jinja2 render — type error: '{type_error}'. "
+            f"This often happens when trying to iterate over a method or accessing an attribute incorrectly. "
+            f"Template source:\n{template_source}\n"
+            f"Available context variables: {context_vars}"
+        )
+        raise Jinja2TemplateRenderError(msg) from type_error
+    return generated_text
+
+
 async def render_jinja2(
     template_source: str,
     template_category: TemplateCategory,
