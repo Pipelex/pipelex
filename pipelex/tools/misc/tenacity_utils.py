@@ -11,5 +11,5 @@ def log_retry(retry_state: RetryCallState) -> None:
     exc = retry_state.outcome.exception()
     attempt = retry_state.attempt_number
     wait_duration = retry_state.next_action.sleep if retry_state.next_action else 0.0
-    log.dev(f"Tenacity retry #{attempt} due to '{type(exc).__name__}'.")
-    log.dev(f"Wait duration before next attempt: {wait_duration:.4f}s")
+    log.verbose(f"Tenacity retry #{attempt} due to '{type(exc).__name__}'.")
+    log.verbose(f"Wait duration before next attempt: {wait_duration:.4f}s")

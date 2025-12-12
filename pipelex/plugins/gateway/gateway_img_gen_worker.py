@@ -15,7 +15,6 @@ from tenacity import (
 )
 from typing_extensions import override
 
-from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -124,12 +123,9 @@ class PortkeyImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> list[GeneratedImage]:
-        # mime_subtype = GatewayImgGenFactory.mime_subtype_for_output_format(output_format=img_gen_job.job_params.output_format)
-
         common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
         args_for_model = FalFactory.make_args_for_model(model_id=self.inference_model.model_id, img_gen_job=img_gen_job)
         args_dict: dict[str, Any] = {**common_args, **args_for_model}
-        pretty_print(args_dict, title="Gateway img-gen args")
 
         endpoint_path = f"/{self.inference_model.model_id}"
         response = await self.portkey_client.with_options(virtual_key="fal").post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
@@ -145,11 +141,9 @@ class PortkeyImgGenWorker(ImgGenWorkerAbstract):
         response_dict: dict[str, Any] = response.model_dump()
 
         # Handle FAL queue responses that require polling
-        log.dev(f"FAL job status: {response_dict.get('status')}")
         if response_dict.get("status") in {"IN_QUEUE", "IN_PROGRESS"}:
             response_dict = await _poll_fal_queue_until_complete(response_dict)
 
-        pretty_print(response_dict, title="FAL completed response")
         generated_images: list[GeneratedImage] = []
         for item in response_dict.get("images", []):
             generated_image = GeneratedImage(url=item.get("url"), width=item.get("width"), height=item.get("height"))
