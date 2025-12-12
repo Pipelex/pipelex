@@ -1,7 +1,8 @@
 from typing_extensions import override
-from yattag import Doc
 
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.path_utils import interpret_path_or_url
 
 
@@ -20,11 +21,14 @@ class PDFContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        doc = Doc()
-        doc.stag("a", href=self.url, klass="msg-pdf")
-        doc.text(self.url)
-
-        return doc.getvalue()
+        template_source = '<a href="{{ url|e }}" class="msg-pdf">{{ url|e }}</a>'
+        return render_jinja2_sync(
+            template_source=template_source,
+            template_category=TemplateCategory.HTML,
+            temlating_context={
+                "url": self.url,
+            },
+        )
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
