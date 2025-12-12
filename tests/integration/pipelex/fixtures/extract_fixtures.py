@@ -22,25 +22,18 @@ def is_extract_handle_supported_by_enabled_backends(extract_handle: str) -> bool
 # Comment out handles you don't want to test
 # ================================================================================================
 
-# --- Internal Models (PyPDFium2) ----------------------------------------------------------------
-INTERNAL_EXTRACT_MODELS = [
+EXTRACT_HANDLE_FROM_PDF = [
     "pypdfium2-extract-text",
-]
-
-# --- Mistral Models -----------------------------------------------------------------------------
-MISTRAL_EXTRACT_MODELS = [
+    "docling-extract-text",
     "mistral-ocr",
 ]
 
-# --- All Extract Handles ------------------------------------------------------------------------
-ALL_EXTRACT_HANDLES = [
-    *INTERNAL_EXTRACT_MODELS,
-    *MISTRAL_EXTRACT_MODELS,
+EXTRACT_HANDLE_FROM_IMAGE = [
+    "docling-extract-text",
+    "mistral-ocr",
 ]
 
-ALL_EXTRACT_HANDLES_FROM_IMAGE = [
-    *MISTRAL_EXTRACT_MODELS,
-]
+ALL_EXTRACT_HANDLES: list[str] = list(set(EXTRACT_HANDLE_FROM_PDF + EXTRACT_HANDLE_FROM_IMAGE))
 
 
 @pytest.fixture(
@@ -57,7 +50,20 @@ def extract_handle(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture(
-    params=ALL_EXTRACT_HANDLES_FROM_IMAGE,
+    params=EXTRACT_HANDLE_FROM_PDF,
+)
+def extract_handle_from_pdf(request: pytest.FixtureRequest) -> str:
+    assert isinstance(request.param, str)
+    extract_handle_param = request.param
+    if not is_extract_handle_supported(extract_handle_param):
+        pytest.skip(f"Extract handle '{extract_handle_param}' not available in model deck")
+    if not is_extract_handle_supported_by_enabled_backends(extract_handle_param):
+        pytest.skip(f"Extract handle '{extract_handle_param}' not supported by any enabled backend")
+    return extract_handle_param
+
+
+@pytest.fixture(
+    params=EXTRACT_HANDLE_FROM_IMAGE,
 )
 def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
     assert isinstance(request.param, str)

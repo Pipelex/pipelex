@@ -45,6 +45,14 @@ class InferenceModelSpec(ConfigModel):
     def is_vision_supported(self) -> bool:
         return "images" in self.inputs
 
+    @property
+    def is_pdf_supported_for_extract(self) -> bool:
+        return "pdf" in self.inputs
+
+    @property
+    def is_image_supported_for_extract(self) -> bool:
+        return "image" in self.inputs
+
     def get_instructor_mode(self) -> InstructorMode | None:
         if self.structure_method:
             return self.structure_method.as_instructor_mode()
