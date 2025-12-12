@@ -81,21 +81,37 @@ class FalFactory:
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> dict[str, Any]:
+        common_args = cls.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
+        fal_application_parts = fal_application.split("/", maxsplit=1)
+        model_id = fal_application_parts[-1]
+        log.dev(f"fal_application: {fal_application}, model_id: {model_id}")
+        args_for_model = cls.make_args_for_model(model_id=model_id, img_gen_job=img_gen_job)
+        args_dict: dict[str, Any] = {**common_args, **args_for_model}
+
+        return args_dict
+
+    @classmethod
+    def make_common_args(cls, img_gen_job: ImgGenJob, nb_images: int) -> dict[str, Any]:
+        return {
+            "prompt": img_gen_job.img_gen_prompt.positive_text,
+            "num_images": nb_images,
+            "seed": img_gen_job.job_params.seed,
+            "output_format": cls.make_output_format_for_flux(img_gen_job.job_params.output_format),
+            "sync_mode": img_gen_job.job_config.is_sync_mode,
+        }
+
+    @classmethod
+    def make_args_for_model(
+        cls,
+        model_id: str,
+        img_gen_job: ImgGenJob,
+    ) -> dict[str, Any]:
         params = img_gen_job.job_params
         args_dict: dict[str, Any]
         num_inference_steps: int | None
 
-        # Common arguments for all fal applications
-        common_args: dict[str, Any] = {
-            "prompt": img_gen_job.img_gen_prompt.positive_text,
-            "num_images": nb_images,
-            "seed": params.seed,
-            "output_format": cls.make_output_format_for_flux(params.output_format),
-            "sync_mode": img_gen_job.job_config.is_sync_mode,
-        }
-
-        match fal_application:
-            case "fal-ai/fast-lightning-sdxl":
+        match model_id:
+            case "fast-lightning-sdxl":
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps and (quality := params.quality):
                     num_inference_steps = cls.make_nb_steps_from_quality_for_sdxl_lightning(quality=quality)
@@ -104,44 +120,40 @@ class FalFactory:
                     log.warning(f"Number of inference steps {num_inference_steps}' for SDXL Lightning must be one of {acceptable_steps}")
                     num_inference_steps = 8
                 args_dict = {
-                    **common_args,
                     "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
                 }
-            case "fal-ai/flux-pro" | "fal-ai/flux-pro/v1.1":
+            case "flux-pro" | "flux-pro/v1.1":
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps:
                     if not params.quality:
-                        msg = f"Either nb_steps or quality must be set for image generation with '{fal_application}'"
+                        msg = f"Either nb_steps or quality must be set for image generation with '{model_id}'"
                         raise ImgGenParameterError(msg)
                     num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=params.quality)
 
                 args_dict = {
-                    **common_args,
                     "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": params.guidance_scale,
                     "enable_safety_checker": params.is_moderated,
                     "safety_tolerance": params.safety_tolerance,
                 }
-            case "fal-ai/flux-pro/v1.1-ultra":
+            case "flux-pro/v1.1-ultra":
                 args_dict = {
-                    **common_args,
                     "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
                     "enable_safety_checker": params.is_moderated,
                     "safety_tolerance": params.safety_tolerance,
                     "raw": params.is_raw,
                 }
-            case "fal-ai/flux-2":
+            case "flux-2":
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps:
                     if not params.quality:
-                        msg = f"Either nb_steps or quality must be set for image generation with '{fal_application}'"
+                        msg = f"Either nb_steps or quality must be set for image generation with '{model_id}'"
                         raise ImgGenParameterError(msg)
                     num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=params.quality)
 
                 args_dict = {
-                    **common_args,
                     "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
                     "guidance_scale": params.guidance_scale,
@@ -149,7 +161,7 @@ class FalFactory:
                     "safety_tolerance": params.safety_tolerance,
                 }
             case _:
-                msg = f"Invalid fal application: '{fal_application}'"
+                msg = f"Invalid fal model id: '{model_id}'"
                 raise ImgGenParameterError(msg)
 
         return args_dict
