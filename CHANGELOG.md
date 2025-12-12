@@ -48,6 +48,7 @@
 - Telemetry system split into two streams:
     1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
     2. Custom telemetry to user-configured backends
+- Documentation: clarified **Setup (first run)** vs **Configuration (TOML reference)**, added a Setup overview page, and added contributor docs for configuration defaults/overrides.
 - `pipelex init` now creates a documented `telemetry.toml` template instead of prompting for preferences
 - Model catalog updated with latest models (gpt-5.1, claude-4.5-opus, gemini-3.0-pro, etc.) and updated waterfalls in `base_deck.toml`
 - Model constraints refactored from simple lists to structured `valued_constraints` dictionaries (e.g., `valued_constraints = { fixed_temperature = 1 }`)
