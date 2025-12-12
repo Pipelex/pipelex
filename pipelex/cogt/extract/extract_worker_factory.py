@@ -68,7 +68,7 @@ class ExtractWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "docling":
+            case "docling_sdk":
                 if importlib.util.find_spec("docling") is None:
                     lib_name = "docling"
                     lib_extra_name = "docling"
@@ -80,8 +80,15 @@ class ExtractWorkerFactory:
                     )
 
                 from pipelex.plugins.docling.docling_extract_worker import DoclingExtractWorker  # noqa: PLC0415
+                from pipelex.plugins.docling.docling_factory import DoclingFactory  # noqa: PLC0415
+
+                extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=DoclingFactory.make_docling_sdk(),
+                )
 
                 extract_worker = DoclingExtractWorker(
+                    sdk_instance=extract_sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

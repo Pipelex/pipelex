@@ -2,9 +2,14 @@ from docling_core.transforms.serializer.markdown import MarkdownDocSerializer, M
 from docling_core.types.doc.document import DoclingDocument
 
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
+from pipelex.plugins.docling.docling_sdk import DoclingSdk
 
 
 class DoclingFactory:
+    @classmethod
+    def make_docling_sdk(cls) -> DoclingSdk:
+        return DoclingSdk()
+
     @classmethod
     def make_extract_output_from_docling_document(
         cls,

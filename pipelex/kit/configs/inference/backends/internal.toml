@@ -30,9 +30,8 @@ costs = {}
 # --- Docling Text Extractor ---------------------------------------------------
 [docling-extract-text]
 model_type = "text_extractor"
-sdk = "docling"
+sdk = "docling_sdk"
 model_id = "extract-text"
 inputs = ["pdf"]
 outputs = ["pages"]
 costs = {}
-

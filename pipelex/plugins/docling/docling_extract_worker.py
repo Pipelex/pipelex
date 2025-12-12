@@ -1,15 +1,16 @@
 import asyncio
 from typing import Any
 
-from docling.document_converter import DocumentConverter
 from typing_extensions import override
 
+from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.docling.docling_factory import DoclingFactory
+from pipelex.plugins.docling.docling_sdk import DoclingSdk
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
@@ -17,6 +18,7 @@ from pipelex.tools.misc.path_utils import clarify_path_or_url
 class DoclingExtractWorker(ExtractWorkerAbstract):
     def __init__(
         self,
+        sdk_instance: Any,
         extra_config: dict[str, Any],
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -26,6 +28,12 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,
         )
+
+        if not isinstance(sdk_instance, DoclingSdk):
+            msg = f"Provided sdk_instance for {self.__class__.__name__} is not of type DoclingSdk: it's a '{type(sdk_instance)}'"
+            raise SdkTypeError(msg)
+
+        self.docling_sdk: DoclingSdk = sdk_instance
 
     @override
     async def _extract_pages(
@@ -55,14 +63,12 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
 
         Docling supports URLs directly through its DocumentConverter.
         """
-        converter = DocumentConverter()
         # Run synchronous Docling conversion in a thread pool to avoid blocking
-        conversion_result = await asyncio.to_thread(converter.convert, pdf_url)
+        conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, pdf_url)
         return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)
 
     async def _extract_from_pdf_file(self, pdf_path: str) -> ExtractOutput:
         """Extract text from a local PDF file."""
-        converter = DocumentConverter()
         # Run synchronous Docling conversion in a thread pool to avoid blocking
-        conversion_result = await asyncio.to_thread(converter.convert, pdf_path)
+        conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, pdf_path)
         return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)
