@@ -170,7 +170,7 @@ If some information is not present for an attribute, output the default value or
 is_sync_mode = false
 
 [cogt.img_gen_config.img_gen_param_defaults]
-nb_steps = 1            # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
+nb_steps = 28           # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
 aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
 guidance_scale = 3.5

@@ -23,10 +23,11 @@ TEMP_OUTPUTS_DIR = "temp/img_gen_by_gpt_image"
 @pytest.mark.usefixtures("routing_profile_override")
 class TestImageGeneration:
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
-    async def test_img_gen_opaque(self, img_gen_handle: str, topic: str, img_gen_prompt_text: str):
+    async def test_img_gen_opaque(self, img_gen_handle: str, img_gen_job_params: ImgGenJobParams, topic: str, img_gen_prompt_text: str):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,
+            img_gen_job_params=img_gen_job_params,
         )
         generated_image = await img_gen_worker_async.gen_image(
             img_gen_job=img_gen_job,

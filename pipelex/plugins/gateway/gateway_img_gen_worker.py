@@ -13,7 +13,6 @@ from pipelex.cogt.exceptions import ImgGenGeneratedTypeError, ImgGenGenerationEr
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.plugins.gateway.gateway_img_gen_factory import GatewayImgGenFactory
-from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 
 if TYPE_CHECKING:
     from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -23,10 +22,6 @@ if TYPE_CHECKING:
 # FAL queue polling constants
 FAL_POLL_INTERVAL_SECONDS = 1.0
 FAL_MAX_POLL_DURATION_SECONDS = 300.0
-
-
-def _drop_none_values(payload: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in payload.items() if value is not None}
 
 
 def _as_str_or_none(value: Any) -> str | None:
@@ -121,28 +116,26 @@ def make_generated_image_list_from_portkey_payload(
     return generated_images
 
 
-def _is_fal_queued_response(response_dict: dict[str, Any]) -> bool:
-    """Check if the response is a FAL queued response that requires polling."""
-    status = response_dict.get("status")
-    return status in {"IN_QUEUE", "IN_PROGRESS"} and "response_url" in response_dict
-
-
 async def _poll_fal_queue_until_complete(response_dict: dict[str, Any]) -> dict[str, Any]:
     """Poll FAL queue status until the job completes and return the final result."""
     response_url = response_dict.get("response_url")
     status_url = response_dict.get("status_url")
 
-    if not response_url or not status_url:
-        msg = "FAL queued response is missing response_url or status_url"
+    if not response_url:
+        msg = "FAL queued response is missing response_url"
+        raise ImgGenGenerationError(msg)
+    if not status_url:
+        msg = "FAL queued response is missing status_url"
         raise ImgGenGenerationError(msg)
 
     log.verbose(f"FAL job queued, polling status at: {status_url}")
 
-    start_time = asyncio.get_event_loop().time()
+    loop = asyncio.get_event_loop()
+    start_time = loop.time()
 
     async with httpx.AsyncClient() as client:
         while True:
-            elapsed = asyncio.get_event_loop().time() - start_time
+            elapsed = loop.time() - start_time
             if elapsed > FAL_MAX_POLL_DURATION_SECONDS:
                 msg = f"FAL job timed out after {FAL_MAX_POLL_DURATION_SECONDS} seconds"
                 raise ImgGenGenerationError(msg)
@@ -201,28 +194,24 @@ class PortkeyImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> list[GeneratedImage]:
-        portkey_client = self._make_portkey_client_for_model()
-
         image_size = GatewayImgGenFactory.image_size_for_gateway(aspect_ratio=img_gen_job.job_params.aspect_ratio)
         output_format = GatewayImgGenFactory.output_format_for_gateway(output_format=img_gen_job.job_params.output_format)
         mime_subtype = GatewayImgGenFactory.mime_subtype_for_output_format(output_format=img_gen_job.job_params.output_format)
 
-        payload = _drop_none_values(
-            {
-                "prompt": img_gen_job.img_gen_prompt.positive_text,
-                "guidance_scale": img_gen_job.job_params.guidance_scale,
-                "num_inference_steps": img_gen_job.job_params.nb_steps,
-                "image_size": image_size,
-                "num_images": nb_images,
-                "enable_safety_checker": img_gen_job.job_params.is_moderated,
-                "output_format": output_format,
-                "seed": img_gen_job.job_params.seed,
-            }
-        )
+        payload = {
+            "prompt": img_gen_job.img_gen_prompt.positive_text,
+            "guidance_scale": img_gen_job.job_params.guidance_scale,
+            "num_inference_steps": img_gen_job.job_params.nb_steps,
+            "image_size": image_size,
+            "num_images": 2,
+            "enable_safety_checker": img_gen_job.job_params.is_moderated,
+            "output_format": output_format,
+            "seed": img_gen_job.job_params.seed,
+        }
 
-        # endpoint_path = f"/{self.inference_model.model_id}"
-        endpoint_path = "/flux-2"
-        response = await portkey_client.with_options(virtual_key="fal").post(url=endpoint_path, **payload)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        endpoint_path = f"/{self.inference_model.model_id}"
+        # endpoint_path = "/flux-2"
+        response = await self.portkey_client.with_options(virtual_key="fal").post(url=endpoint_path, **payload)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
@@ -233,32 +222,17 @@ class PortkeyImgGenWorker(ImgGenWorkerAbstract):
             raise TypeError(msg)
 
         pretty_print(response, title="Gateway img-gen response")
-        payload_for_parse: dict[str, Any] = response.model_dump()
+        response_dict: dict[str, Any] = response.model_dump()
 
         # Handle FAL queue responses that require polling
-        if _is_fal_queued_response(payload_for_parse):
-            payload_for_parse = await _poll_fal_queue_until_complete(payload_for_parse)
+        if response_dict.get("status") in {"IN_QUEUE", "IN_PROGRESS"} and "response_url" in response_dict:
+            response_dict = await _poll_fal_queue_until_complete(response_dict)
 
         generated_images = make_generated_image_list_from_portkey_payload(
-            payload=payload_for_parse,
+            payload=response_dict,
             default_mime_subtype=mime_subtype,
         )
         if not generated_images:
             msg = "No images returned by Portkey"
             raise ImgGenGenerationError(msg)
         return generated_images[:nb_images]
-
-    def _make_portkey_client_for_model(self) -> AsyncPortkey:
-        extra_headers = self.inference_model.extra_headers or {}
-
-        config_id = extra_headers.get(PortkeyHeaderKey.CONFIG)
-        provider = extra_headers.get(PortkeyHeaderKey.PROVIDER) or self.inference_model.backend_name
-
-        # Portkey option (not a header). We accept both a plain key and a header-like key for convenience.
-        virtual_key = extra_headers.get("virtual_key") or extra_headers.get("x-portkey-virtual-key")
-
-        return self.portkey_client.with_options(  # pyright: ignore[reportUnknownMemberType]
-            config=config_id,
-            provider=provider,
-            virtual_key=virtual_key,
-        )

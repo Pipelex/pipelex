@@ -48,10 +48,15 @@ inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.06, output = 0.0 }
 
+["flux-2"]
+model_id = "fal-ai/flux-2"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.05, output = 0.0 }
+
 # --- SDXL models --------------------------------------------------------------
 [fast-lightning-sdxl]
 model_id = "fal-ai/fast-lightning-sdxl"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0003, output = 0.0 }
-

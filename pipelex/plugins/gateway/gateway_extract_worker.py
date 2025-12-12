@@ -139,6 +139,7 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
+
         return GatewayCompletionsFactory.make_extract_output_from_portkey_response(
             response=response,
         )

@@ -12,7 +12,7 @@ from pipelex.config import get_config
 
 class FalFactory:
     @classmethod
-    def make_nb_steps_from_quality_for_flux_pro(cls, quality: Quality) -> int:
+    def make_nb_steps_from_quality_for_flux(cls, quality: Quality) -> int:
         flux_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.flux_map_quality_to_steps
         return flux_map_quality_to_steps[quality]
 
@@ -84,39 +84,17 @@ class FalFactory:
         params = img_gen_job.job_params
         args_dict: dict[str, Any]
         num_inference_steps: int | None
-        match fal_application:
-            case "fal-ai/flux-pro" | "fal-ai/flux-pro/v1.1":
-                num_inference_steps = params.nb_steps
-                if not num_inference_steps:
-                    if not params.quality:
-                        msg = f"Either nb_steps or quality must be set for image generation with '{fal_application}'"
-                        raise ImgGenParameterError(msg)
-                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux_pro(quality=params.quality)
 
-                args_dict = {
-                    "prompt": img_gen_job.img_gen_prompt.positive_text,
-                    "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
-                    "num_inference_steps": num_inference_steps,
-                    "guidance_scale": params.guidance_scale,
-                    "num_images": nb_images,
-                    "enable_safety_checker": params.is_moderated,
-                    "safety_tolerance": params.safety_tolerance,
-                    "seed": params.seed,
-                    "output_format": cls.make_output_format_for_flux(params.output_format),
-                    "sync_mode": img_gen_job.job_config.is_sync_mode,
-                }
-            case "fal-ai/flux-pro/v1.1-ultra":
-                args_dict = {
-                    "prompt": img_gen_job.img_gen_prompt.positive_text,
-                    "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
-                    "num_images": nb_images,
-                    "enable_safety_checker": params.is_moderated,
-                    "safety_tolerance": params.safety_tolerance,
-                    "raw": params.is_raw,
-                    "seed": params.seed,
-                    "output_format": cls.make_output_format_for_flux(params.output_format),
-                    "sync_mode": img_gen_job.job_config.is_sync_mode,
-                }
+        # Common arguments for all fal applications
+        common_args: dict[str, Any] = {
+            "prompt": img_gen_job.img_gen_prompt.positive_text,
+            "num_images": nb_images,
+            "seed": params.seed,
+            "output_format": cls.make_output_format_for_flux(params.output_format),
+            "sync_mode": img_gen_job.job_config.is_sync_mode,
+        }
+
+        match fal_application:
             case "fal-ai/fast-lightning-sdxl":
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps and (quality := params.quality):
@@ -126,13 +104,49 @@ class FalFactory:
                     log.warning(f"Number of inference steps {num_inference_steps}' for SDXL Lightning must be one of {acceptable_steps}")
                     num_inference_steps = 8
                 args_dict = {
-                    "prompt": img_gen_job.img_gen_prompt.positive_text,
+                    **common_args,
                     "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
-                    "num_images": nb_images,
-                    "seed": params.seed,
-                    "output_format": cls.make_output_format_for_flux(params.output_format),
-                    "sync_mode": img_gen_job.job_config.is_sync_mode,
+                }
+            case "fal-ai/flux-pro" | "fal-ai/flux-pro/v1.1":
+                num_inference_steps = params.nb_steps
+                if not num_inference_steps:
+                    if not params.quality:
+                        msg = f"Either nb_steps or quality must be set for image generation with '{fal_application}'"
+                        raise ImgGenParameterError(msg)
+                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=params.quality)
+
+                args_dict = {
+                    **common_args,
+                    "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": params.guidance_scale,
+                    "enable_safety_checker": params.is_moderated,
+                    "safety_tolerance": params.safety_tolerance,
+                }
+            case "fal-ai/flux-pro/v1.1-ultra":
+                args_dict = {
+                    **common_args,
+                    "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
+                    "enable_safety_checker": params.is_moderated,
+                    "safety_tolerance": params.safety_tolerance,
+                    "raw": params.is_raw,
+                }
+            case "fal-ai/flux-2":
+                num_inference_steps = params.nb_steps
+                if not num_inference_steps:
+                    if not params.quality:
+                        msg = f"Either nb_steps or quality must be set for image generation with '{fal_application}'"
+                        raise ImgGenParameterError(msg)
+                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=params.quality)
+
+                args_dict = {
+                    **common_args,
+                    "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
+                    "num_inference_steps": num_inference_steps,
+                    "guidance_scale": params.guidance_scale,
+                    "enable_safety_checker": params.is_moderated,
+                    "safety_tolerance": params.safety_tolerance,
                 }
             case _:
                 msg = f"Invalid fal application: '{fal_application}'"
