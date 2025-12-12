@@ -25,7 +25,7 @@ class TestExtract:
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
         assert extract_output.pages
         for page_index, page in extract_output.pages.items():
-            pretty_print(page.text, title=f"Page {page_index + 1}")
+            pretty_print(page.text, title=f"Page {page_index}")
 
     @pytest.mark.parametrize("url", PDFTestCases.DOCUMENT_URLS)
     async def test_extract_pdf_url(self, extract_handle: str, url: str):
@@ -34,8 +34,9 @@ class TestExtract:
             extract_input=ExtractInput(pdf_uri=url),
         )
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
-        pretty_print(extract_output, title="Extract Output")
         assert extract_output.pages
+        for page_index, page in extract_output.pages.items():
+            pretty_print(page.text, title=f"Page {page_index}")
 
     @pytest.mark.parametrize("file_path", ImageTestCases.IMAGE_TEXT_FILE_PATHS)
     async def test_extract_image_path(self, extract_handle_from_image: str, file_path: str):
