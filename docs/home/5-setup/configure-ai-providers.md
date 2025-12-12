@@ -36,7 +36,7 @@ That's it! Your pipelines can now access any supported LLM.
 !!! info "Terms of Service & Telemetry"
     When using Pipelex Gateway, you'll be prompted to accept our terms of service. By using the Gateway, identified telemetry is automatically enabled (tied to your hashed API key) to help us monitor service quality and enforce fair usage.
     
-    **We collect only technical data** (model names, token counts, latency, error rates). We do **NOT** collect your prompts, completions, or business data. See our [Privacy Policy](https://go.pipelex.com/privacy-policy) for details.
+    **We collect only technical data** (model names, token counts, latency, error rates). We do **NOT** collect your prompts, completions, or business data. See [Telemetry](./telemetry.md) for details and trade-offs, and our [Privacy Policy](https://go.pipelex.com/privacy-policy) for more.
 
 !!! note "Migration from pipelex_inference"
     If you were using the deprecated `pipelex_inference` backend, migrate to `pipelex_gateway`:

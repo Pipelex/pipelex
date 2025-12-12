@@ -10,7 +10,7 @@ Telemetry configuration is stored in `.pipelex/telemetry.toml`. This file contro
     1. **Gateway Telemetry** (Pipelex-controlled): Automatic when using Pipelex Gateway, tied to your API key
     2. **Custom Telemetry** (User-controlled): Configured in this file, sent to your own backends
 
-    For an overview, see [Telemetry Setup](../../../home/5-setup/telemetry.md).
+    For an overview, see [Telemetry Setup](../../5-setup/telemetry.md).
 
 ## Configuration File Location
 

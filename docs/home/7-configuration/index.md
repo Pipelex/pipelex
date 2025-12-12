@@ -2,7 +2,12 @@
 
 ## Overview
 
-Pipelex uses a TOML-based configuration system. The main configuration file `pipelex.toml` must be located at the root of your project. You can create this file by running:
+Pipelex uses a TOML-based configuration system with **shipped defaults** plus **project-level overrides**.
+
+- **Shipped defaults**: Pipelex ships default values that are maintained in the Pipelex repository (contributors will see them in the repo root `pipelex.toml`). This is the baseline used by the installed package.
+- **Project overrides**: a project that *uses* Pipelex typically customizes behavior via files created in `.pipelex/`.
+
+You can create the project configuration files by running:
 
 ```bash
 pipelex init config
@@ -13,6 +18,26 @@ pipelex init config
     2. Using `pipelex init config --reset` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before using this flag.
 
 For a complete list of all possible configuration options, refer to the configuration group documentation below.
+
+## Where to edit configuration in a project
+
+The main project configuration files are:
+
+- `.pipelex/pipelex.toml`: project customization (logging, reporting, tracker, feature flags, etc.)
+- `.pipelex/telemetry.toml`: custom telemetry destinations
+- `.pipelex/inference/…`: inference backends, routing profiles, and model presets
+
+## Overrides (advanced)
+
+In addition to `.pipelex/pipelex.toml`, Pipelex can apply override files at the **project root** (not in `.pipelex/`) for machine- and environment-specific settings:
+
+1. `pipelex_local.toml`
+2. `pipelex_{environment}.toml` (example: `pipelex_dev.toml`)
+3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; unit tests may use `tests/pipelex_unit_test.toml`)
+4. `pipelex_super.toml` (recommended to gitignore)
+
+!!! info "Contributor details"
+    For the full “where defaults live” and “how config is merged” explanation, see [Configuration Internals](../../contribute/configuration-defaults-and-overrides.md).
 
 ## Configuration Structure
 
