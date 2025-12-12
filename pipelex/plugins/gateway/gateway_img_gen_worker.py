@@ -222,26 +222,22 @@ class PortkeyImgGenWorker(ImgGenWorkerAbstract):
 
         # endpoint_path = f"/{self.inference_model.model_id}"
         endpoint_path = "/flux-2"
-        response = cast("Any", await portkey_client.with_options(virtual_key="fal").post(url=endpoint_path, **payload))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        response = await portkey_client.with_options(virtual_key="fal").post(url=endpoint_path, **payload)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-        payload_for_parse: Any = response
-        if isinstance(response, GenericResponse):
-            payload_for_parse = response.data if response.data is not None else response.model_dump()
-        elif hasattr(response, "data"):
-            payload_for_parse = response.data
+        if response is None:
+            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
+            raise ImgGenGenerationError(msg)
 
-        # If payload_for_parse is None or not useful, fall back to model_dump
-        if payload_for_parse is None and hasattr(response, "model_dump"):
-            payload_for_parse = response.model_dump()
+        if not isinstance(response, GenericResponse):
+            msg = "Response is not of type GenericResponse"
+            raise TypeError(msg)
 
-        log.verbose(payload_for_parse, title="Gateway img-gen response payload")
+        pretty_print(response, title="Gateway img-gen response")
+        payload_for_parse: dict[str, Any] = response.model_dump()
 
         # Handle FAL queue responses that require polling
-        if isinstance(payload_for_parse, dict):
-            payload_dict = cast("dict[str, Any]", payload_for_parse)
-            pretty_print(payload_dict, title="Gateway img-gen response payload")
-            if _is_fal_queued_response(payload_dict):
-                payload_for_parse = await _poll_fal_queue_until_complete(payload_dict)
+        if _is_fal_queued_response(payload_for_parse):
+            payload_for_parse = await _poll_fal_queue_until_complete(payload_for_parse)
 
         generated_images = make_generated_image_list_from_portkey_payload(
             payload=payload_for_parse,

@@ -14,7 +14,6 @@ GatewayImageSizeType = Literal[
     "portrait_9_21",
 ]
 
-GatewayOutputFormatType = Literal["png", "jpg", "webp"]
 GatewayMimeSubtypeType = Literal["png", "jpeg", "webp"]
 
 
@@ -43,12 +42,12 @@ class GatewayImgGenFactory:
                 return "portrait_9_21"
 
     @classmethod
-    def output_format_for_gateway(cls, output_format: OutputFormat) -> GatewayOutputFormatType:
+    def output_format_for_gateway(cls, output_format: OutputFormat) -> str:
         match output_format:
             case OutputFormat.PNG:
                 return "png"
             case OutputFormat.JPG:
-                return "jpg"
+                return "jpeg"
             case OutputFormat.WEBP:
                 return "webp"
 
