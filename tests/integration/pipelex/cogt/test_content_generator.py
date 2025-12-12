@@ -132,7 +132,7 @@ class TestContentGenerator:
         extract_output = await get_content_generator().make_extract_pages(
             job_metadata=JobMetadata(),
             extract_handle=extract_handle_from_image,
-            extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
+            extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_JPG_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
@@ -141,10 +141,10 @@ class TestContentGenerator:
 
     @pytest.mark.extract
     @pytest.mark.inference
-    async def test_make_extract_pages_from_pdf(self, extract_handle: str):
+    async def test_make_extract_pages_from_pdf(self, extract_handle_from_pdf: str):
         extract_output = await get_content_generator().make_extract_pages(
             job_metadata=JobMetadata(),
-            extract_handle=extract_handle,
+            extract_handle=extract_handle_from_pdf,
             extract_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
