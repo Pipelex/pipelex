@@ -12,7 +12,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.docling.docling_factory import DoclingFactory
 from pipelex.plugins.docling.docling_sdk import DoclingSdk
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.path_utils import clarify_path_or_url
+from pipelex.tools.misc.path_utils import resolve_path_or_url_for_reading
 
 
 class DoclingExtractWorker(ExtractWorkerAbstract):
@@ -53,9 +53,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
 
     async def _extract_from_source(self, source_uri: str) -> ExtractOutput:
         """Extract text from a source URI (file path, file:// URI, or http(s) URL)."""
-        source_path, source_url = clarify_path_or_url(path_or_uri=source_uri)
-        resolved_source = source_url or source_path
-        assert resolved_source is not None
+        resolved_source = resolve_path_or_url_for_reading(path_or_uri=source_uri)
 
         # Run synchronous Docling conversion in a thread pool to avoid blocking
         conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, resolved_source)
