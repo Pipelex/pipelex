@@ -32,6 +32,7 @@ FAL_IMG_GEN_MODELS = [
     "flux-pro",
     "flux-pro/v1.1",
     "flux-pro/v1.1-ultra",
+    "flux-2",
 ]
 
 # --- OpenAI Models ------------------------------------------------------------------------------
