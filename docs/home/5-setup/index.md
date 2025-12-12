@@ -2,7 +2,7 @@
 
 This section is for **first-time onboarding**: the key choices you need to make to get a project running quickly and safely.
 
-If you already have a project running and want to tune behavior, jump to **Configuration (TOML reference)**.
+If you already have a project running and want to tune behavior, jump to [Configuration (TOML reference)](../7-configuration/index.md).
 
 ## What belongs where?
 
