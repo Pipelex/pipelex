@@ -16,11 +16,10 @@ from tenacity import (
 from typing_extensions import override
 
 from pipelex import log, pretty_print
-from pipelex.cogt.exceptions import ImgGenGeneratedTypeError, ImgGenGenerationError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.plugins.fal.fal_factory import FalFactory
-from pipelex.plugins.gateway.gateway_img_gen_factory import GatewayImgGenFactory
 from pipelex.tools.misc.tenacity_utils import log_retry
 
 if TYPE_CHECKING:
