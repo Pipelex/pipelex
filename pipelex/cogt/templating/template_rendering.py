@@ -3,7 +3,7 @@ from typing import Any
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 
 
 async def render_template(
@@ -14,7 +14,7 @@ async def render_template(
 ) -> str:
     template_source = preprocess_template(template)
 
-    return await render_jinja2(
+    return await render_jinja2_async(
         template_source=template_source,
         template_category=category,
         temlating_context=context,
