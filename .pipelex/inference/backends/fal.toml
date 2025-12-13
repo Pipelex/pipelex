@@ -48,7 +48,7 @@ inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.06, output = 0.0 }
 
-["flux-2"]
+[flux-2]
 model_id = "fal-ai/flux-2"
 inputs = ["text"]
 outputs = ["image"]

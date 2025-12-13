@@ -1,6 +1,7 @@
 import httpx
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -44,7 +45,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         if not backend.api_key:
             msg = "Azure OpenAI API key (subscription_key) is not configured"
             raise AzureCredentialsError(msg)
-        self.subscription_key: str = backend.api_key
+        self.api_key: str = backend.api_key
 
     #########################################################
     # Instance methods
@@ -101,7 +102,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             response = await client.post(
                 generation_url,
                 headers={
-                    "Api-Key": self.subscription_key,
+                    "Api-Key": self.api_key,
                     "Content-Type": "application/json",
                 },
                 json=generation_body,

@@ -21,7 +21,7 @@ class ExtractWorkerFactory:
         extract_worker: ExtractWorkerAbstract
         match plugin.sdk:
             case "gateway_extract":
-                from pipelex.plugins.gateway.gateway_extract_worker import PortkeyExtractWorker  # noqa: PLC0415
+                from pipelex.plugins.gateway.gateway_extract_worker import GatewayExtractWorker  # noqa: PLC0415
                 from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
 
                 extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
@@ -29,7 +29,7 @@ class ExtractWorkerFactory:
                     sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
                 )
 
-                extract_worker = PortkeyExtractWorker(
+                extract_worker = GatewayExtractWorker(
                     sdk_instance=extract_sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,

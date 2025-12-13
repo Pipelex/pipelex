@@ -77,15 +77,12 @@ class FalFactory:
     @classmethod
     def make_fal_arguments(
         cls,
-        fal_application: str,
+        model_name: str,
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> dict[str, Any]:
         common_args = cls.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
-        fal_application_parts = fal_application.split("/", maxsplit=1)
-        model_id = fal_application_parts[-1]
-        log.dev(f"fal_application: {fal_application}, model_id: {model_id}")
-        args_for_model = cls.make_args_for_model(model_id=model_id, img_gen_job=img_gen_job)
+        args_for_model = cls.make_args_for_model(model_name=model_name, img_gen_job=img_gen_job)
         args_dict: dict[str, Any] = {**common_args, **args_for_model}
 
         return args_dict
@@ -103,14 +100,14 @@ class FalFactory:
     @classmethod
     def make_args_for_model(
         cls,
-        model_id: str,
+        model_name: str,
         img_gen_job: ImgGenJob,
     ) -> dict[str, Any]:
         params = img_gen_job.job_params
         args_dict: dict[str, Any]
         num_inference_steps: int | None
 
-        match model_id:
+        match model_name:
             case "fast-lightning-sdxl":
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps and (quality := params.quality):
@@ -127,7 +124,7 @@ class FalFactory:
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps:
                     if not params.quality:
-                        msg = f"Either nb_steps or quality must be set for image generation with '{model_id}'"
+                        msg = f"Either nb_steps or quality must be set for image generation with '{model_name}'"
                         raise ImgGenParameterError(msg)
                     num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=params.quality)
 
@@ -149,7 +146,7 @@ class FalFactory:
                 num_inference_steps = params.nb_steps
                 if not num_inference_steps:
                     if not params.quality:
-                        msg = f"Either nb_steps or quality must be set for image generation with '{model_id}'"
+                        msg = f"Either nb_steps or quality must be set for image generation with '{model_name}'"
                         raise ImgGenParameterError(msg)
                     num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=params.quality)
 
@@ -161,7 +158,7 @@ class FalFactory:
                     "safety_tolerance": params.safety_tolerance,
                 }
             case _:
-                msg = f"Invalid fal model id: '{model_id}'"
+                msg = f"Invalid fal model id: '{model_name}'"
                 raise ImgGenParameterError(msg)
 
         return args_dict

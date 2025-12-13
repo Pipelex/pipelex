@@ -34,7 +34,7 @@ class DocumentKind(StrEnum):
                 return "document_url"
 
 
-class PortkeyExtractWorker(ExtractWorkerAbstract):
+class GatewayExtractWorker(ExtractWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,

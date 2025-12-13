@@ -36,7 +36,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImage:
         fal_application = self.inference_model.model_id
         arguments = FalFactory.make_fal_arguments(
-            fal_application=fal_application,
+            model_name=self.inference_model.name,
             img_gen_job=img_gen_job,
             nb_images=1,
         )
@@ -69,7 +69,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
     ) -> list[GeneratedImage]:
         application = self.inference_model.model_id
         arguments = FalFactory.make_fal_arguments(
-            fal_application=application,
+            model_name=self.inference_model.name,
             img_gen_job=img_gen_job,
             nb_images=nb_images,
         )

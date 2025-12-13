@@ -27,14 +27,14 @@ class ImgGenWorkerFactory:
         match plugin.sdk:
             case "gateway_img_gen":
                 from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
-                from pipelex.plugins.gateway.gateway_img_gen_worker import PortkeyImgGenWorker  # noqa: PLC0415
+                from pipelex.plugins.gateway.gateway_img_gen_worker import GatewayImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
                     sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
                 )
 
-                img_gen_worker = PortkeyImgGenWorker(
+                img_gen_worker = GatewayImgGenWorker(
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

@@ -94,7 +94,7 @@ async def _poll_fal_queue_until_complete(response_dict: dict[str, Any]) -> dict[
     raise RuntimeError(msg)
 
 
-class PortkeyImgGenWorker(ImgGenWorkerAbstract):
+class GatewayImgGenWorker(ImgGenWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
@@ -124,7 +124,7 @@ class PortkeyImgGenWorker(ImgGenWorkerAbstract):
         nb_images: int,
     ) -> list[GeneratedImage]:
         common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
-        args_for_model = FalFactory.make_args_for_model(model_id=self.inference_model.model_id, img_gen_job=img_gen_job)
+        args_for_model = FalFactory.make_args_for_model(model_name=self.inference_model.name, img_gen_job=img_gen_job)
         args_dict: dict[str, Any] = {**common_args, **args_for_model}
 
         endpoint_path = f"/{self.inference_model.model_id}"
