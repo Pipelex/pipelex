@@ -1,7 +1,6 @@
 import httpx
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob

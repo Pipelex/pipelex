@@ -34,16 +34,14 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> GeneratedImage:
+        common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=1)
+        args_for_model = FalFactory.make_args_for_model(model_name=self.inference_model.name, jop_params=img_gen_job.job_params)
+        args_dict: dict[str, Any] = {**common_args, **args_for_model}
         fal_application = self.inference_model.model_id
-        arguments = FalFactory.make_fal_arguments(
-            model_name=self.inference_model.name,
-            img_gen_job=img_gen_job,
-            nb_images=1,
-        )
-        log.verbose(arguments, title=f"Fal arguments, application={fal_application}")
+        log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(
             application=fal_application,
-            arguments=arguments,
+            arguments=args_dict,
         )
 
         log_index = 0
@@ -67,15 +65,14 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> list[GeneratedImage]:
-        application = self.inference_model.model_id
-        arguments = FalFactory.make_fal_arguments(
-            model_name=self.inference_model.name,
-            img_gen_job=img_gen_job,
-            nb_images=nb_images,
-        )
+        common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
+        args_for_model = FalFactory.make_args_for_model(model_name=self.inference_model.name, jop_params=img_gen_job.job_params)
+        args_dict: dict[str, Any] = {**common_args, **args_for_model}
+        fal_application = self.inference_model.model_id
+        log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(
-            application=application,
-            arguments=arguments,
+            application=fal_application,
+            arguments=args_dict,
         )
 
         log_index = 0

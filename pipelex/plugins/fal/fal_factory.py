@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, ImgGenJobParams, OutputFormat, Quality
 from pipelex.config import get_config
 
 
@@ -75,19 +75,6 @@ class FalFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def make_fal_arguments(
-        cls,
-        model_name: str,
-        img_gen_job: ImgGenJob,
-        nb_images: int,
-    ) -> dict[str, Any]:
-        common_args = cls.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
-        args_for_model = cls.make_args_for_model(model_name=model_name, img_gen_job=img_gen_job)
-        args_dict: dict[str, Any] = {**common_args, **args_for_model}
-
-        return args_dict
-
-    @classmethod
     def make_common_args(cls, img_gen_job: ImgGenJob, nb_images: int) -> dict[str, Any]:
         return {
             "prompt": img_gen_job.img_gen_prompt.positive_text,
@@ -101,61 +88,60 @@ class FalFactory:
     def make_args_for_model(
         cls,
         model_name: str,
-        img_gen_job: ImgGenJob,
+        jop_params: ImgGenJobParams,
     ) -> dict[str, Any]:
-        params = img_gen_job.job_params
         args_dict: dict[str, Any]
         num_inference_steps: int | None
 
         match model_name:
             case "fast-lightning-sdxl":
-                num_inference_steps = params.nb_steps
-                if not num_inference_steps and (quality := params.quality):
+                num_inference_steps = jop_params.nb_steps
+                if not num_inference_steps and (quality := jop_params.quality):
                     num_inference_steps = cls.make_nb_steps_from_quality_for_sdxl_lightning(quality=quality)
                 acceptable_steps = [1, 2, 4, 8]
                 if num_inference_steps not in acceptable_steps:
                     log.warning(f"Number of inference steps {num_inference_steps}' for SDXL Lightning must be one of {acceptable_steps}")
                     num_inference_steps = 8
                 args_dict = {
-                    "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
+                    "image_size": cls.make_image_size_for_flux_1(jop_params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
                 }
             case "flux-pro" | "flux-pro/v1.1":
-                num_inference_steps = params.nb_steps
+                num_inference_steps = jop_params.nb_steps
                 if not num_inference_steps:
-                    if not params.quality:
+                    if not jop_params.quality:
                         msg = f"Either nb_steps or quality must be set for image generation with '{model_name}'"
                         raise ImgGenParameterError(msg)
-                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=params.quality)
+                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=jop_params.quality)
 
                 args_dict = {
-                    "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
+                    "image_size": cls.make_image_size_for_flux_1(jop_params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
-                    "guidance_scale": params.guidance_scale,
-                    "enable_safety_checker": params.is_moderated,
-                    "safety_tolerance": params.safety_tolerance,
+                    "guidance_scale": jop_params.guidance_scale,
+                    "enable_safety_checker": jop_params.is_moderated,
+                    "safety_tolerance": jop_params.safety_tolerance,
                 }
             case "flux-pro/v1.1-ultra":
                 args_dict = {
-                    "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(params.aspect_ratio),
-                    "enable_safety_checker": params.is_moderated,
-                    "safety_tolerance": params.safety_tolerance,
-                    "raw": params.is_raw,
+                    "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(jop_params.aspect_ratio),
+                    "enable_safety_checker": jop_params.is_moderated,
+                    "safety_tolerance": jop_params.safety_tolerance,
+                    "raw": jop_params.is_raw,
                 }
             case "flux-2":
-                num_inference_steps = params.nb_steps
+                num_inference_steps = jop_params.nb_steps
                 if not num_inference_steps:
-                    if not params.quality:
+                    if not jop_params.quality:
                         msg = f"Either nb_steps or quality must be set for image generation with '{model_name}'"
                         raise ImgGenParameterError(msg)
-                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=params.quality)
+                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=jop_params.quality)
 
                 args_dict = {
-                    "image_size": cls.make_image_size_for_flux_1(params.aspect_ratio),
+                    "image_size": cls.make_image_size_for_flux_1(jop_params.aspect_ratio),
                     "num_inference_steps": num_inference_steps,
-                    "guidance_scale": params.guidance_scale,
-                    "enable_safety_checker": params.is_moderated,
-                    "safety_tolerance": params.safety_tolerance,
+                    "guidance_scale": jop_params.guidance_scale,
+                    "enable_safety_checker": jop_params.is_moderated,
+                    "safety_tolerance": jop_params.safety_tolerance,
                 }
             case _:
                 msg = f"Invalid fal model id: '{model_name}'"

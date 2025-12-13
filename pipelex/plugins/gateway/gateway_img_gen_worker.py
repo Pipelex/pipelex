@@ -124,7 +124,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         nb_images: int,
     ) -> list[GeneratedImage]:
         common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
-        args_for_model = FalFactory.make_args_for_model(model_name=self.inference_model.name, img_gen_job=img_gen_job)
+        args_for_model = FalFactory.make_args_for_model(model_name=self.inference_model.name, jop_params=img_gen_job.job_params)
         args_dict: dict[str, Any] = {**common_args, **args_for_model}
 
         endpoint_path = f"/{self.inference_model.model_id}"
