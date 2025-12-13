@@ -35,24 +35,28 @@ model_id = "fal-ai/flux-pro"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.05, output = 0.0 }
+img_gen_rules = { aspect_ratio = "flux", inference = "flux", safety_checker = "available" }
 
 ["flux-pro/v1.1"]
 model_id = "fal-ai/flux-pro/v1.1"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.05, output = 0.0 }
+img_gen_rules = { aspect_ratio = "flux", inference = "flux", safety_checker = "available" }
 
 ["flux-pro/v1.1-ultra"]
 model_id = "fal-ai/flux-pro/v1.1-ultra"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.06, output = 0.0 }
+img_gen_rules = { aspect_ratio = "flux_11_ultra", inference = "flux_11_ultra", safety_checker = "available" }
 
-["flux-2"]
+[flux-2]
 model_id = "fal-ai/flux-2"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.05, output = 0.0 }
+img_gen_rules = { aspect_ratio = "flux", inference = "flux", safety_checker = "available" }
 
 # --- SDXL models --------------------------------------------------------------
 [fast-lightning-sdxl]
@@ -60,3 +64,4 @@ model_id = "fal-ai/fast-lightning-sdxl"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0003, output = 0.0 }
+img_gen_rules = { aspect_ratio = "flux", inference = "sdxl_lightning", safety_checker = "unavailable" }

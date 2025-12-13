@@ -2,6 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenArgTopic, ImgGenModelRules
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -28,6 +29,17 @@ class InferenceModelSpecBlueprint(ConfigModel):
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
     listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
+    img_gen_rules: ImgGenModelRules | None = None
+
+    @field_validator("img_gen_rules", mode="before")
+    @staticmethod
+    def validate_img_gen_rules(value: dict[str, str] | None) -> ImgGenModelRules | None:
+        if value is None:
+            return None
+        return ConfigModel.transform_dict_keys_str_to_enum(
+            input_dict=value,
+            key_enum_cls=ImgGenArgTopic,
+        )
 
     @field_validator("costs", mode="before")
     @staticmethod
@@ -87,4 +99,5 @@ class InferenceModelSpecFactory(BaseModel):
             listed_constraints=merged_listed_constraints,
             valued_constraints=merged_valued_constraints,
             extra_headers=extra_headers,
+            img_gen_rules=blueprint.img_gen_rules,
         )

@@ -4,8 +4,9 @@ from fal_client import AsyncClient, InProgress
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import SdkTypeError
+from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -34,8 +35,11 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> GeneratedImage:
+        if self.inference_model.img_gen_rules is None:
+            msg = f"Model '{self.inference_model.name}' does not have img_gen_rules configured"
+            raise ImgGenParameterError(msg)
         common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=1)
-        args_for_model = FalFactory.make_args_for_model(model_name=self.inference_model.name, jop_params=img_gen_job.job_params)
+        args_for_model = ImgGenArgsFactory.make_args_for_model(model_rules=self.inference_model.img_gen_rules, job_params=img_gen_job.job_params)
         args_dict: dict[str, Any] = {**common_args, **args_for_model}
         fal_application = self.inference_model.model_id
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
@@ -65,8 +69,11 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> list[GeneratedImage]:
+        if self.inference_model.img_gen_rules is None:
+            msg = f"Model '{self.inference_model.name}' does not have img_gen_rules configured"
+            raise ImgGenParameterError(msg)
         common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
-        args_for_model = FalFactory.make_args_for_model(model_name=self.inference_model.name, jop_params=img_gen_job.job_params)
+        args_for_model = ImgGenArgsFactory.make_args_for_model(model_rules=self.inference_model.img_gen_rules, job_params=img_gen_job.job_params)
         args_dict: dict[str, Any] = {**common_args, **args_for_model}
         fal_application = self.inference_model.model_id
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")

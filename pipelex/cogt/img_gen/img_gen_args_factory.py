@@ -1,113 +1,59 @@
-from typing import Any, cast
-
-from pydantic import ValidationError
+from typing import Any
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError
-from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, ImgGenJobConfig, ImgGenJobParams, ImgGenJobReport, OutputFormat, Quality
-from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
+from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, ImgGenJobParams, Quality
+from pipelex.cogt.img_gen.img_gen_model_rules import (
+    AspectRatioTaxonomy,
+    ImgGenArgTopic,
+    ImgGenModelRules,
+    InferenceTaxonomy,
+    SafetyCheckerTaxonomy,
+)
 from pipelex.config import get_config
-from pipelex.pipeline.job_metadata import JobCategory, JobMetadata
-from pipelex.types import StrEnum
-
-
-class ImgGenArgTopic(StrEnum):
-    ASPECT_RATIO = "aspect_ratio"
-    INFERENCE = "inference"
-    SAFETY_CHECKER = "safety_checker"
-
-
-class AspectRatioTaxonomy(StrEnum):
-    FLUX = "flux"
-    FLUX_11_ULTRA = "flux_11_ultra"
-
-
-class InferenceTaxonomy(StrEnum):
-    SDXL_LIGHTNING = "sdxl_lightning"
-    FLUX = "flux"
-    FLUX_11_ULTRA = "flux_11_ultra"
-
-
-class SafetyCheckerTaxonomy(StrEnum):
-    AVAILABLE = "available"
-    UNAVAILABLE = "unavailable"
-
-
-ImgGenModelRules = dict[ImgGenArgTopic, str]
 
 
 class ImgGenArgsFactory:
     @classmethod
     def make_args_for_model(
         cls,
-        model_name: str,
-        jop_params: ImgGenJobParams,
+        model_rules: ImgGenModelRules,
+        job_params: ImgGenJobParams,
     ) -> dict[str, Any]:
-        args_dict: dict[str, Any]
-        num_inference_steps: int | None
+        args_dict: dict[str, Any] = {}
 
-        match model_name:
-            case "fast-lightning-sdxl":
-                num_inference_steps = jop_params.nb_steps
-                if not num_inference_steps and (quality := jop_params.quality):
-                    num_inference_steps = cls.make_nb_steps_from_quality_for_sdxl_lightning(quality=quality)
-                acceptable_steps = [1, 2, 4, 8]
-                if num_inference_steps not in acceptable_steps:
-                    log.warning("Number of inference steps %s' for SDXL Lightning must be one of %s", num_inference_steps, acceptable_steps)
-                    num_inference_steps = 8
-                args_dict = {
-                    **cls.make_args_from_aspect_ratio(aspect_ratio_taxonomy=AspectRatioTaxonomy.FLUX, aspect_ratio=jop_params.aspect_ratio),
-                    "num_inference_steps": num_inference_steps,
-                }
-            case "flux-pro" | "flux-pro/v1.1":
-                num_inference_steps = jop_params.nb_steps
-                if not num_inference_steps:
-                    if not jop_params.quality:
-                        msg = f"Either nb_steps or quality must be set for image generation with '{model_name}'"
-                        raise ImgGenParameterError(msg)
-                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=jop_params.quality)
-
-                args_dict = {
-                    "image_size": cls.make_image_size_for_flux_1(jop_params.aspect_ratio),
-                    "num_inference_steps": num_inference_steps,
-                    "guidance_scale": jop_params.guidance_scale,
-                    "enable_safety_checker": jop_params.is_moderated,
-                    "safety_tolerance": jop_params.safety_tolerance,
-                }
-            case "flux-pro/v1.1-ultra":
-                args_dict = {
-                    "aspect_ratio": cls.make_aspect_ratio_for_flux_1_1_ultra(jop_params.aspect_ratio),
-                    "enable_safety_checker": jop_params.is_moderated,
-                    "safety_tolerance": jop_params.safety_tolerance,
-                    "raw": jop_params.is_raw,
-                }
-            case "flux-2":
-                num_inference_steps = jop_params.nb_steps
-                if not num_inference_steps:
-                    if not jop_params.quality:
-                        msg = f"Either nb_steps or quality must be set for image generation with '{model_name}'"
-                        raise ImgGenParameterError(msg)
-                    num_inference_steps = cls.make_nb_steps_from_quality_for_flux(quality=jop_params.quality)
-
-                args_dict = {
-                    "image_size": cls.make_image_size_for_flux_1(jop_params.aspect_ratio),
-                    "num_inference_steps": num_inference_steps,
-                    "guidance_scale": jop_params.guidance_scale,
-                    "enable_safety_checker": jop_params.is_moderated,
-                    "safety_tolerance": jop_params.safety_tolerance,
-                }
-            case _:
-                msg = f"Invalid fal model id: '{model_name}'"
-                raise ImgGenParameterError(msg)
+        for topic, taxonomy_value in model_rules.items():
+            match topic:
+                case ImgGenArgTopic.ASPECT_RATIO:
+                    aspect_ratio_taxonomy = AspectRatioTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_aspect_ratio(
+                            aspect_ratio_taxonomy=aspect_ratio_taxonomy,
+                            aspect_ratio=job_params.aspect_ratio,
+                        )
+                    )
+                case ImgGenArgTopic.INFERENCE:
+                    inference_taxonomy = InferenceTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_inference(
+                            inference_taxonomy=inference_taxonomy,
+                            num_inference_steps=job_params.nb_steps,
+                            quality=job_params.quality,
+                            guidance_scale=job_params.guidance_scale,
+                            is_raw=job_params.is_raw,
+                        )
+                    )
+                case ImgGenArgTopic.SAFETY_CHECKER:
+                    safety_checker_taxonomy = SafetyCheckerTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_safety_checker(
+                            safety_checker_taxonomy=safety_checker_taxonomy,
+                            is_moderated=job_params.is_moderated,
+                            safety_tolerance=job_params.safety_tolerance,
+                        )
+                    )
 
         return args_dict
-
-    @classmethod
-    def make_nb_steps_from_quality_for_sdxl_lightning(cls, quality: Quality) -> int:
-        sdxl_lightning_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.sdxl_lightning_map_quality_to_steps
-        return sdxl_lightning_map_quality_to_steps[quality]
 
     @classmethod
     def make_args_from_aspect_ratio(cls, aspect_ratio_taxonomy: AspectRatioTaxonomy, aspect_ratio: AspectRatio) -> dict[str, Any]:

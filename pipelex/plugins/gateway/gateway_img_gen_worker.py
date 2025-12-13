@@ -15,8 +15,9 @@ from tenacity import (
 )
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.tools.misc.tenacity_utils import log_retry
@@ -123,8 +124,11 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> list[GeneratedImage]:
+        if self.inference_model.img_gen_rules is None:
+            msg = f"Model '{self.inference_model.name}' does not have img_gen_rules configured"
+            raise ImgGenParameterError(msg)
         common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
-        args_for_model = FalFactory.make_args_for_model(model_name=self.inference_model.name, jop_params=img_gen_job.job_params)
+        args_for_model = ImgGenArgsFactory.make_args_for_model(model_rules=self.inference_model.img_gen_rules, job_params=img_gen_job.job_params)
         args_dict: dict[str, Any] = {**common_args, **args_for_model}
 
         endpoint_path = f"/{self.inference_model.model_id}"
