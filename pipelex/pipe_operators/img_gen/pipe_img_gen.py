@@ -32,6 +32,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.base_64_utils import strip_base_64_str_if_needed
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
@@ -270,10 +271,13 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
             image_content_items: list[StuffContent] = []
             for generated_image in generated_image_list:
+                generated_url = generated_image.url
+                base_64_str = strip_base_64_str_if_needed(generated_url) if generated_url.startswith("data:") else None
                 image_content_items.append(
                     structure_class(
-                        url=generated_image.url,
+                        url=generated_url,
                         source_prompt=img_gen_prompt_text,
+                        base_64=base_64_str,
                     ),
                 )
             the_content = ListContent(
@@ -292,10 +296,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
 
             generated_image_url = generated_image.url
+            base_64_str = strip_base_64_str_if_needed(generated_image_url) if generated_image_url.startswith("data:") else None
 
             the_content = structure_class(
                 url=generated_image_url,
                 source_prompt=img_gen_prompt_text,
+                base_64=base_64_str,
             )
             log.verbose(the_content, title="Single image content")
 
