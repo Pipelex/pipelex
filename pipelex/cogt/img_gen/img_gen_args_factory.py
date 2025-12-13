@@ -3,9 +3,10 @@ from typing import Any
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
+    BackgroundTaxonomy,
     ImgGenArgTopic,
     ImgGenModelRules,
     InferenceTaxonomy,
@@ -77,6 +78,14 @@ class ImgGenArgsFactory:
                             safety_tolerance=job_params.safety_tolerance,
                         )
                     )
+                case ImgGenArgTopic.BACKGROUND:
+                    background_taxonomy = BackgroundTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_background(
+                            background_taxonomy=background_taxonomy,
+                            background=job_params.background,
+                        )
+                    )
 
         return args_dict
 
@@ -96,12 +105,26 @@ class ImgGenArgsFactory:
         match num_images_taxonomy:
             case NumImagesTaxonomy.FAL:
                 return {"num_images": nb_images}
+            case NumImagesTaxonomy.GPT:
+                return {"n": nb_images}
 
     @classmethod
     def make_args_from_specific(cls, specific_taxonomy: SpecificTaxonomy) -> dict[str, Any]:
         match specific_taxonomy:
             case SpecificTaxonomy.FAL:
                 return {"sync_mode": False}
+
+    @classmethod
+    def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background) -> dict[str, Any]:
+        match background_taxonomy:
+            case BackgroundTaxonomy.GPT:
+                match background:
+                    case Background.AUTO:
+                        return {"background": "auto"}
+                    case Background.TRANSPARENT:
+                        return {"background": "transparent"}
+                    case Background.OPAQUE:
+                        return {"background": "opaque"}
 
     @classmethod
     def make_args_from_aspect_ratio(cls, aspect_ratio_taxonomy: AspectRatioTaxonomy, aspect_ratio: AspectRatio) -> dict[str, Any]:
@@ -148,6 +171,26 @@ class ImgGenArgsFactory:
                     case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model"
                         raise ImgGenParameterError(msg)
+            case AspectRatioTaxonomy.GPT:
+                key = "size"
+                match aspect_ratio:
+                    case AspectRatio.SQUARE:
+                        value = "1024x1024"
+                    case AspectRatio.LANDSCAPE_4_3:
+                        value = "1536x1024"
+                    case AspectRatio.LANDSCAPE_16_9:
+                        value = "1536x1024"
+                    case AspectRatio.LANDSCAPE_3_2:
+                        value = "1536x1024"
+                    case AspectRatio.PORTRAIT_3_4:
+                        value = "1024x1536"
+                    case AspectRatio.PORTRAIT_9_16:
+                        value = "1024x1536"
+                    case AspectRatio.PORTRAIT_2_3:
+                        value = "1024x1536"
+                    case AspectRatio.LANDSCAPE_21_9 | AspectRatio.PORTRAIT_9_21:
+                        msg = f"Aspect ratio '{aspect_ratio}' is not supported by GPT image generation model"
+                        raise ImgGenParameterError(msg)
         return {key: value}
 
     @classmethod
@@ -185,6 +228,10 @@ class ImgGenArgsFactory:
             case InferenceTaxonomy.FLUX_11_ULTRA:
                 if is_raw:
                     args_dict["raw"] = is_raw
+            case InferenceTaxonomy.GPT:
+                # GPT uses quality directly if provided
+                if quality:
+                    args_dict["quality"] = quality
         return args_dict
 
     @classmethod
