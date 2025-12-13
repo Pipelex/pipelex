@@ -41,15 +41,15 @@ fallback_order = [
 
 [profiles.pipelex_gateway_first.routes]
 # Pattern matching: "model-pattern" = "backend-name"
+
+[profiles.pipelex_gateway_first.optional_routes] # Each optional route is considered only if its backend is available
 "gpt-*" = "pipelex_gateway"
+"gpt-image-1" = "openai"
 "claude-*" = "pipelex_gateway"
 "grok-*" = "pipelex_gateway"
 "gemini-*" = "pipelex_gateway"
-
-[profiles.pipelex_gateway_first.optional_routes] # Each optional route is considered only if its backend is available
 "*-sdxl" = "fal"
 "flux-*" = "fal"
-"gpt-image-1" = "openai"
 "mistral-ocr" = "mistral"
 
 [profiles.all_pipelex_gateway]
