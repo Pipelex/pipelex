@@ -53,10 +53,10 @@ async def _poll_fal_queue_until_complete(response_dict: dict[str, Any]) -> dict[
 
         async def _try_once() -> dict[str, Any] | None:
             # 1) poll status
-            st = await client.get(status_url)
-            st.raise_for_status()  # will be retried on 429/5xx via tenacity
+            status = await client.get(status_url)
+            status.raise_for_status()  # will be retried on 429/5xx via tenacity
 
-            payload = st.json()
+            payload = status.json()
             status = payload.get("status")
 
             if status in {"IN_QUEUE", "IN_PROGRESS"}:

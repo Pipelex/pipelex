@@ -13,10 +13,7 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import save_base_64_str_to_binary_file
-from pipelex.tools.misc.file_utils import ensure_path
-
-TEMP_OUTPUTS_DIR = "temp/img_gen_by_gpt_image"
+from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 
 
 class OpenAIImgGenWorker(ImgGenWorkerAbstract):
@@ -77,14 +74,11 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 msg = "No base64 image data received from OpenAI"
                 raise ImgGenGenerationError(msg)
 
-            folder_path = TEMP_OUTPUTS_DIR
-            ensure_path(folder_path)
-            img_path = f"{folder_path}/{image_id}_{image_index}.png"
-            save_base_64_str_to_binary_file(base_64_str=image_base64, file_path=img_path)
-            log.verbose(f"Saved image to {img_path}")
+            base64_url = prefixed_base64_str_from_base64_str(b64_str=image_base64)
+            log.verbose(f"Generated image {image_id}_{image_index}")
             generated_image_list.append(
                 GeneratedImage(
-                    url=img_path,
+                    url=base64_url,
                     width=1024,
                     height=1024,
                 ),
