@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, model_validator
 from typing_extensions import Self, override
@@ -23,7 +23,6 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_model_deck, get_native_concept
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenRunError
@@ -34,21 +33,12 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff_content import StuffContent
+
 
 class PipeImgGenOutput(PipeOutput):
-    @property
-    def image_urls(self) -> list[str]:
-        the_urls: list[str] = []
-        content = self.main_stuff.content
-        if isinstance(content, ListContent):
-            items = self.main_stuff_as_items(item_type=ImageContent)
-            the_urls = [item.url for item in items]
-        elif isinstance(content, ImageContent):
-            the_urls = [content.url]
-        else:
-            msg = f"PipeImgGen output should be a ListContent or an ImageContent, got {type(content)}"
-            raise PipeRunParamsError(msg)
-        return the_urls
+    pass
 
 
 class PipeImgGen(PipeOperator[PipeImgGenOutput]):
@@ -112,7 +102,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     @override
     def validate_inputs_with_library(self):
+        if self.inputs.is_empty:
+            # No inputs means that the prompt is in the img_gen_prompt attribute, and we have no inputs to validate
+            return
         concept_library = get_concept_library()
+        log.debug(self.inputs, title="Inputs")
+        log.debug(self.inputs.variables, title="Input variables")
         input_name = self.inputs.variables[0]
         input_requirement = self.inputs.get_required_input_requirement(input_name)
 
@@ -241,7 +236,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         log.verbose(f"Using img_gen handle: {img_gen_handle}")
 
         the_content: StuffContent
-        image_urls: list[str] = []
+        # image_urls: list[str] = []
         nb_images: int
         if isinstance(applied_output_multiplicity, bool):
             if self.output_multiplicity:
@@ -259,7 +254,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # Get the structure class from the registry (might be a subclass of ImageContent)
         structure_class = get_class_registry().get_required_subclass(
             name=self.output.structure_class_name,
-            base_class=StuffContent,
+            base_class=ImageContent,
         )
 
         if nb_images > 1:
@@ -281,7 +276,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                         source_prompt=img_gen_prompt_text,
                     ),
                 )
-                image_urls.append(generated_image.url)
             the_content = ListContent(
                 items=image_content_items,
             )
@@ -298,7 +292,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
 
             generated_image_url = generated_image.url
-            image_urls = [generated_image_url]
 
             the_content = structure_class(
                 url=generated_image_url,
