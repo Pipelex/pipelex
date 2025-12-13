@@ -19,7 +19,6 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError,
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
-from pipelex.plugins.fal.fal_factory import FalFactory
 from pipelex.tools.misc.tenacity_utils import log_retry
 
 if TYPE_CHECKING:
@@ -127,9 +126,11 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
             raise ImgGenParameterError(msg)
-        common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
-        args_for_model = ImgGenArgsFactory.make_args_for_model(model_rules=self.inference_model.rules, job_params=img_gen_job.job_params)
-        args_dict: dict[str, Any] = {**common_args, **args_for_model}
+        args_dict = ImgGenArgsFactory.make_args_for_model(
+            model_rules=self.inference_model.rules,
+            img_gen_job=img_gen_job,
+            nb_images=nb_images,
+        )
 
         endpoint_path = f"/{self.inference_model.model_id}"
         response = await self.portkey_client.with_options(virtual_key="fal").post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]

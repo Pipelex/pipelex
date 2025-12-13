@@ -2,13 +2,16 @@ from typing import Any
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, ImgGenJobParams, Quality
+from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat, Quality
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
     ImgGenArgTopic,
     ImgGenModelRules,
     InferenceTaxonomy,
+    NumImagesTaxonomy,
     SafetyCheckerTaxonomy,
+    SpecificTaxonomy,
 )
 from pipelex.config import get_config
 
@@ -18,12 +21,34 @@ class ImgGenArgsFactory:
     def make_args_for_model(
         cls,
         model_rules: ImgGenModelRules,
-        job_params: ImgGenJobParams,
+        img_gen_job: ImgGenJob,
+        nb_images: int,
     ) -> dict[str, Any]:
-        args_dict: dict[str, Any] = {}
+        job_params = img_gen_job.job_params
+
+        # Common args that don't need rules
+        args_dict: dict[str, Any] = {
+            "prompt": img_gen_job.img_gen_prompt.positive_text,
+            "output_format": cls._convert_output_format(job_params.output_format),
+        }
 
         for topic, taxonomy_value in model_rules.items():
             match topic:
+                case ImgGenArgTopic.NUM_IMAGES:
+                    num_images_taxonomy = NumImagesTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_num_images(
+                            num_images_taxonomy=num_images_taxonomy,
+                            nb_images=nb_images,
+                        )
+                    )
+                case ImgGenArgTopic.SPECIFIC:
+                    specific_taxonomy = SpecificTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_specific(
+                            specific_taxonomy=specific_taxonomy,
+                        )
+                    )
                 case ImgGenArgTopic.ASPECT_RATIO:
                     aspect_ratio_taxonomy = AspectRatioTaxonomy(taxonomy_value)
                     args_dict.update(
@@ -54,6 +79,29 @@ class ImgGenArgsFactory:
                     )
 
         return args_dict
+
+    @classmethod
+    def _convert_output_format(cls, output_format: OutputFormat) -> str:
+        match output_format:
+            case OutputFormat.PNG:
+                return "png"
+            case OutputFormat.JPG:
+                return "jpeg"
+            case OutputFormat.WEBP:
+                msg = "Output format WebP is not supported"
+                raise ImgGenParameterError(msg)
+
+    @classmethod
+    def make_args_from_num_images(cls, num_images_taxonomy: NumImagesTaxonomy, nb_images: int) -> dict[str, Any]:
+        match num_images_taxonomy:
+            case NumImagesTaxonomy.FAL:
+                return {"num_images": nb_images}
+
+    @classmethod
+    def make_args_from_specific(cls, specific_taxonomy: SpecificTaxonomy) -> dict[str, Any]:
+        match specific_taxonomy:
+            case SpecificTaxonomy.FAL:
+                return {"sync_mode": False}
 
     @classmethod
     def make_args_from_aspect_ratio(cls, aspect_ratio_taxonomy: AspectRatioTaxonomy, aspect_ratio: AspectRatio) -> dict[str, Any]:

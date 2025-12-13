@@ -38,9 +38,11 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
             raise ImgGenParameterError(msg)
-        common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=1)
-        args_for_model = ImgGenArgsFactory.make_args_for_model(model_rules=self.inference_model.rules, job_params=img_gen_job.job_params)
-        args_dict: dict[str, Any] = {**common_args, **args_for_model}
+        args_dict = ImgGenArgsFactory.make_args_for_model(
+            model_rules=self.inference_model.rules,
+            img_gen_job=img_gen_job,
+            nb_images=1,
+        )
         fal_application = self.inference_model.model_id
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(
@@ -72,9 +74,11 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
             raise ImgGenParameterError(msg)
-        common_args = FalFactory.make_common_args(img_gen_job=img_gen_job, nb_images=nb_images)
-        args_for_model = ImgGenArgsFactory.make_args_for_model(model_rules=self.inference_model.rules, job_params=img_gen_job.job_params)
-        args_dict: dict[str, Any] = {**common_args, **args_for_model}
+        args_dict = ImgGenArgsFactory.make_args_for_model(
+            model_rules=self.inference_model.rules,
+            img_gen_job=img_gen_job,
+            nb_images=nb_images,
+        )
         fal_application = self.inference_model.model_id
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(

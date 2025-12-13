@@ -2,34 +2,11 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError
+from pipelex.cogt.exceptions import ImgGenGenerationError
 from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import OutputFormat
 
 
 class FalFactory:
-    @classmethod
-    def make_output_format_for_flux(cls, output_format: OutputFormat) -> str:
-        match output_format:
-            case OutputFormat.PNG:
-                return "png"
-            case OutputFormat.JPG:
-                return "jpeg"
-            case OutputFormat.WEBP:
-                msg = "Output format WebP is not supported for Flux"
-                raise ImgGenParameterError(msg)
-
-    @classmethod
-    def make_common_args(cls, img_gen_job: ImgGenJob, nb_images: int) -> dict[str, Any]:
-        return {
-            "prompt": img_gen_job.img_gen_prompt.positive_text,
-            "num_images": nb_images,
-            "seed": img_gen_job.job_params.seed,
-            "output_format": cls.make_output_format_for_flux(img_gen_job.job_params.output_format),
-            "sync_mode": img_gen_job.job_config.is_sync_mode,
-        }
-
     @classmethod
     def make_generated_image(cls, fal_result: dict[str, Any]) -> GeneratedImage:
         generated_image_list = cls.make_generated_image_list(fal_result=fal_result)
