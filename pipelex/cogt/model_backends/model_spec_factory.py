@@ -29,11 +29,11 @@ class InferenceModelSpecBlueprint(ConfigModel):
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
     listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
-    img_gen_rules: ImgGenModelRules | None = None
+    rules: ImgGenModelRules | None = None
 
-    @field_validator("img_gen_rules", mode="before")
+    @field_validator("rules", mode="before")
     @staticmethod
-    def validate_img_gen_rules(value: dict[str, str] | None) -> ImgGenModelRules | None:
+    def validate_rules(value: dict[str, str] | None) -> ImgGenModelRules | None:
         if value is None:
             return None
         return ConfigModel.transform_dict_keys_str_to_enum(
@@ -99,5 +99,5 @@ class InferenceModelSpecFactory(BaseModel):
             listed_constraints=merged_listed_constraints,
             valued_constraints=merged_valued_constraints,
             extra_headers=extra_headers,
-            img_gen_rules=blueprint.img_gen_rules,
+            rules=blueprint.rules,
         )
