@@ -215,7 +215,7 @@ inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0, output = 0.06 }
 
-["fast-lightning-sdxl"]
+[fast-lightning-sdxl]
 model_type = "img_gen"
 sdk = "blackboxai_img_gen"
 model_id = "blackboxai/bytedance/sdxl-lightning-4step"
@@ -227,6 +227,14 @@ costs = { input = 0.0, output = 0.0014 }
 model_type = "img_gen"
 sdk = "blackboxai_img_gen"
 model_id = "blackboxai/google/nano-banana"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.0, output = 0.039 }
+
+[nano-banana-pro]
+model_type = "img_gen"
+sdk = "blackboxai_img_gen"
+model_id = "blackboxai/google/nano-banana-pro"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0, output = 0.039 }
