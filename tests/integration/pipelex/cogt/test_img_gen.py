@@ -34,7 +34,7 @@ class TestImageGeneration:
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
-            is_raw=False,
+            is_raw=None,
             background=Background.TRANSPARENT,
             output_format=OutputFormat.PNG,
         )
