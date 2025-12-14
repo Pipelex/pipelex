@@ -98,7 +98,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
 
         # Build generation config with image output
         generation_config = types.GenerateContentConfig(
-            response_modalities=["TEXT", "IMAGE"],
+            response_modalities=["Image"],
             image_config=image_config,
         )
 
