@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, cast
 
 import instructor
 from google import genai
-from google.genai import types
+from google.genai import types as genai_types
 from typing_extensions import override
 
 from pipelex import log
@@ -106,7 +106,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         contents = await GoogleFactory.prepare_user_contents(llm_prompt=llm_job.llm_prompt)
 
         # Build generation config
-        generation_config = types.GenerateContentConfig(
+        generation_config = genai_types.GenerateContentConfig(
             temperature=job_params.temperature,
             max_output_tokens=job_params.max_tokens,
             candidate_count=1,  # Generate one candidate
@@ -156,7 +156,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
         # Build generation config
-        generation_config = types.GenerateContentConfig(
+        generation_config = genai_types.GenerateContentConfig(
             system_instruction=llm_job.llm_prompt.system_text,
             temperature=job_params.temperature,
             max_output_tokens=job_params.max_tokens,

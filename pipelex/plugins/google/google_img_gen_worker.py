@@ -3,7 +3,7 @@ import base64
 from typing import Any
 
 from google import genai
-from google.genai import types
+from google.genai import types as genai_types
 from typing_extensions import override
 
 from pipelex import log
@@ -92,12 +92,12 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         width, height = GoogleImgGenFactory.image_size_for_aspect_ratio(img_gen_job.job_params.aspect_ratio)
 
         # Build image config for aspect ratio
-        image_config = types.ImageConfig(
+        image_config = genai_types.ImageConfig(
             aspect_ratio=aspect_ratio_str,
         )
 
         # Build generation config with image output
-        generation_config = types.GenerateContentConfig(
+        generation_config = genai_types.GenerateContentConfig(
             response_modalities=["Image"],
             image_config=image_config,
         )
