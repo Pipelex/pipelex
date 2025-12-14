@@ -1,4 +1,3 @@
-import random
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
@@ -73,7 +72,7 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
         if (content := openai_message.content) and content.startswith("http"):
             url = openai_message.content
         elif hasattr(openai_message, "content_blocks"):
-            content_blocks = cast("list[dict[str, Any]]", openai_message.content_blocks)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownVariableType]
+            content_blocks = cast("list[dict[str, Any]]", openai_message.content_blocks)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
             for part in content_blocks:
                 if part.get("type") == "image_url":
                     if image_url := part.get("image_url"):
