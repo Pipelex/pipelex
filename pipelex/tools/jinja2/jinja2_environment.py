@@ -35,6 +35,10 @@ def make_jinja2_env_from_loader(
             autoescape = False
             trim_blocks = False
             lstrip_blocks = False
+        case TemplateCategory.IMG_GEN_PROMPT:
+            autoescape = False
+            trim_blocks = False
+            lstrip_blocks = False
 
     return Environment(
         loader=loader,

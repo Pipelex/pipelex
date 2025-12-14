@@ -31,7 +31,7 @@ class TestPipeImgGenRun:
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
             description="Image generation test",
-            img_gen_prompt=image_desc,
+            prompt=image_desc,
             model=img_gen_handle,
             output=NativeConceptCode.IMAGE,
         )

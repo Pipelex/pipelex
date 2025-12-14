@@ -5,14 +5,17 @@ from typing_extensions import override
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
-    img_gen_prompt: str | None = None
-    img_gen_prompt_var_name: str | None = None
+    prompt: str
 
     model: ImgGenModelChoice | None = None
 
@@ -25,19 +28,30 @@ class PipeImgGenBlueprint(PipeBlueprint):
 
     @override
     def validate_inputs(self):
-        # check that we have either an img_gen_prompt passed as attribute or as a single text input
-        if not self.inputs:
-            if not self.img_gen_prompt:
-                msg = "If no inputs are provided, you must provide an 'img_gen_prompt' as attribute."
-                raise ValueError(msg)
+        # Get all required variables from prompt
+        preprocessed_template = preprocess_template(self.prompt)
+        try:
+            required_variables = detect_jinja2_required_variables(
+                template_category=TemplateCategory.IMG_GEN_PROMPT,
+                template_source=preprocessed_template,
+            )
+        except Jinja2DetectVariablesError as exc:
+            msg = f"Could not detect required variables in prompt for PipeImgGen: {exc}"
+            raise ValueError(msg) from exc
 
-        if self.inputs and self.img_gen_prompt:
-            msg = "You must provide either an 'img_gen_prompt' as attribute or as a single text input, but not both"
-            raise ValueError(msg)
+        # Filter out internal variables that start with underscore
+        required_variables = {var for var in required_variables if not var.startswith("_")}
 
-        nb_inputs = self.nb_inputs
-        if nb_inputs > 1:
-            msg = f"Too many inputs provided for PipeImgGen: {self.input_names}. Only one input is allowed."
+        # Check that all required variables are in inputs
+        input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
+        missing_variables: set[str] = required_variables - input_names
+
+        if missing_variables:
+            missing_vars_str = ", ".join(sorted(missing_variables))
+            msg = (
+                f"Missing input variable(s) in prompt template: {missing_vars_str}. "
+                "These variables are used in the prompt but not declared in inputs."
+            )
             raise ValueError(msg)
 
     @override

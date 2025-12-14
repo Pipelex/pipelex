@@ -99,6 +99,7 @@ class TestBracketNotationInOperators:
             description="Generate 3 images",
             inputs={"prompt": NativeConceptCode.TEXT},
             output=f"{NativeConceptCode.IMAGE}[3]",
+            prompt="@prompt",
         )
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(

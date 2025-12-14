@@ -56,7 +56,7 @@ This pipe generates one image of a futuristic car without requiring any input.
 type = "PipeImgGen"
 description = "Generate a futuristic car image"
 output = "Image"
-img_gen_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
+prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
 model = "gen_image_basic"
 aspect_ratio = "16:9"
 quality = "hd"
