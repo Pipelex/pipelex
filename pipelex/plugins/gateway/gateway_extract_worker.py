@@ -16,7 +16,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
-from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_async
 from pipelex.types import StrEnum

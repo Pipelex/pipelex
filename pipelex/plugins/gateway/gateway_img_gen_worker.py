@@ -2,100 +2,22 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-import httpx
 from portkey_ai import AsyncPortkey
 from portkey_ai.api_resources.utils import GenericResponse
-from tenacity import (
-    AsyncRetrying,
-    retry_if_exception,
-    retry_if_exception_type,
-    retry_if_result,
-    stop_after_delay,
-    wait_random_exponential,
-)
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
-from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
-from pipelex.tools.misc.tenacity_utils import log_retry
 
 if TYPE_CHECKING:
     from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.reporting.reporting_protocol import ReportingProtocol
-
-
-def _is_transient_http(exc: BaseException) -> bool:
-    if not isinstance(exc, httpx.HTTPStatusError):
-        return False
-    code = exc.response.status_code
-    return code == 429 or 500 <= code <= 599
-
-
-async def _poll_fal_queue_until_complete(response_dict: dict[str, Any]) -> dict[str, Any]:
-    """Poll fal Queue API until completion and return the final response JSON.
-
-    Expects response_dict to include:
-      - status_url (str)
-      - response_url (str)
-
-    Reads API key from env var FAL_KEY.
-    """
-    status_url = response_dict.get("status_url")
-    response_url = response_dict.get("response_url")
-    if not isinstance(status_url, str) or not isinstance(response_url, str):
-        msg = "response_dict must include 'status_url' and 'response_url' as strings"
-        raise TypeError(msg)
-
-    async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as client:
-
-        async def _try_once() -> dict[str, Any] | None:
-            # 1) poll status
-            status = await client.get(status_url)
-            status.raise_for_status()  # will be retried on 429/5xx via tenacity
-
-            payload = status.json()
-            status = payload.get("status")
-
-            if status in {"IN_QUEUE", "IN_PROGRESS"}:
-                return None  # tells tenacity to retry
-
-            if status == "COMPLETED":
-                # 2) fetch the actual response
-                res = await client.get(response_url)
-                res.raise_for_status()
-                return cast("dict[str, Any]", res.json())
-
-            # Terminal / unexpected states: fail fast (no retry)
-            msg = f"fal request ended with status={status!r}: {payload}"
-            raise RuntimeError(msg)
-
-        retrying = AsyncRetrying(
-            retry=(
-                retry_if_result(lambda r: r is None)
-                | retry_if_exception_type((httpx.TimeoutException, httpx.TransportError))
-                | retry_if_exception(_is_transient_http)
-            ),
-            before_sleep=log_retry,
-            wait=wait_random_exponential(multiplier=0.5, max=8.0),  # jittered backoff
-            stop=stop_after_delay(300.0),  # total polling budget (seconds)
-            reraise=True,
-        )
-
-        async for attempt in retrying:
-            with attempt:
-                result = await _try_once()
-                if result is not None:
-                    return result
-
-    msg = "Polling ended unexpectedly"
-    raise RuntimeError(msg)
 
 
 class GatewayImgGenWorker(ImgGenWorkerAbstract):
@@ -171,8 +93,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 generated_images.append(generated_image)
 
         elif response_dict.get("status") in {"IN_QUEUE", "IN_PROGRESS"}:
-            # Handle Azure queue responses that require polling
-            response_dict = await _poll_fal_queue_until_complete(response_dict)
+            # Handle FAL queue responses that require polling
+            fal_poller = FalPoller()
+            response_dict = await fal_poller.poll_queue_until_complete(response_dict=response_dict)
 
             for item in response_dict.get("images", []):
                 generated_image = GeneratedImage(url=item.get("url"), width=item.get("width"), height=item.get("height"))

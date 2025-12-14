@@ -103,7 +103,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         """Generate text using Google Gemini API."""
         job_params = llm_job.applied_job_params or llm_job.job_params
 
-        contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
+        contents = await GoogleFactory.prepare_user_contents(llm_prompt=llm_job.llm_prompt)
 
         # Build generation config
         generation_config = types.GenerateContentConfig(

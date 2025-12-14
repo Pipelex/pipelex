@@ -1,10 +1,8 @@
 from typing import Any
 
 import openai
-import shortuuid
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
