@@ -20,6 +20,8 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError,
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.plugins.gateway.gateway_deck import GatewayDeck
+from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 from pipelex.tools.misc.tenacity_utils import log_retry
 
@@ -135,7 +137,8 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         )
 
         endpoint_path = f"/{self.inference_model.model_id}"
-        response = await self.portkey_client.with_options(virtual_key="azure-rest").post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
+        response = await self.portkey_client.with_options(config=config_id).post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"

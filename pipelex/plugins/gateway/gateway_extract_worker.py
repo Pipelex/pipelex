@@ -15,6 +15,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
+from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_async
@@ -115,7 +116,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         document_type: DocumentKind,
         should_include_images: bool = False,
     ) -> ExtractOutput:
-        config_id = self._get_portkey_config_id()
+        config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
         doc_tag = document_type.document_tag
 
@@ -143,16 +144,6 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         return GatewayCompletionsFactory.make_extract_output_from_portkey_response(
             response=response,
         )
-
-    def _get_portkey_config_id(self) -> str:
-        if not self.inference_model.extra_headers:
-            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
-            raise ExtractInputError(msg)
-        config_id = self.inference_model.extra_headers.get(PortkeyHeaderKey.CONFIG)
-        if not config_id:
-            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
-            raise ExtractInputError(msg)
-        return config_id
 
     def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
         if isinstance(exc, portkey_exceptions.NotFoundError):

@@ -1,13 +1,17 @@
 from pipelex.cogt.exceptions import CogtError
 
 
-class PortkeyError(CogtError):
+class GatewayError(CogtError):
     pass
 
 
-class GatewayFactoryError(PortkeyError):
+class GatewayFactoryError(GatewayError):
     pass
 
 
-class GatewayCredentialsError(PortkeyError):
+class GatewayCredentialsError(GatewayError):
+    pass
+
+
+class GatewayDeckError(GatewayError):
     pass
