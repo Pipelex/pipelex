@@ -4,6 +4,7 @@ from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_models_manager, get_plugin_manager
+from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
@@ -93,7 +94,10 @@ class ImgGenWorkerFactory:
                     ),
                 )
 
+                openai_completions_factory = OpenAICompletionsFactory(is_http_url_enabled=True)
+
                 img_gen_worker = OpenAIImgGenAlternativeWorker(
+                    openai_completions_factory=openai_completions_factory,
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
@@ -129,6 +133,26 @@ class ImgGenWorkerFactory:
                 )
 
                 img_gen_worker = GoogleImgGenWorker(
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "gateway_completions":
+                from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_img_gen_alt_worker import OpenAIImgGenAlternativeWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=GatewayCompletionsFactory.make_portkey_openai_client_for_completions(
+                        plugin=plugin,
+                        backend=backend,
+                    ),
+                )
+
+                gateway_completions_factory = GatewayCompletionsFactory(is_http_url_enabled=False)
+
+                img_gen_worker = OpenAIImgGenAlternativeWorker(
+                    openai_completions_factory=gateway_completions_factory,
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

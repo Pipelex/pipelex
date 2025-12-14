@@ -8,8 +8,8 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
-from pipelex.cogt.llm.llm_constants import LLMOutputType
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.exceptions import JobMetadataError
 from pipelex.pipeline.job_metadata import UnitJobId
@@ -81,7 +81,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Get the response model name. Override in subclass."""
         return "unknown"
 
-    def _start_otel_span_llm(self, llm_job: LLMJob, output_type: LLMOutputType, output_class_name: str | None = None) -> Span | None:
+    def _start_otel_span_llm(self, llm_job: LLMJob, output_type: InferenceOutputType, output_class_name: str | None = None) -> Span | None:
         """Start an OTel span for the LLM job and return it.
 
         Always includes full (non-redacted) values in Pipelex attributes for PostHog exporters.
@@ -116,11 +116,14 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Build output description for span name (full values - exporter handles redaction)
         output_desc: str
         match output_type:
-            case LLMOutputType.TEXT:
+            case InferenceOutputType.TEXT:
                 output_desc = output_type
-            case LLMOutputType.OBJECT:
+            case InferenceOutputType.OBJECT:
                 # Always use full class name in span name, exporter will redact if needed
                 output_desc = output_class_name or output_type
+            case InferenceOutputType.IMAGE:
+                msg = "Image output type is not supported for LLM span"
+                raise NotImplementedError(msg)
 
         model_name = self._get_request_model_name()
         # Always use full pipe code and class name - exporter handles redaction
@@ -364,7 +367,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         await self._before_job(llm_job=llm_job)
 
         # Start OTel span after _before_job (which may set model info)
-        span = self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.TEXT)
+        span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.TEXT)
 
         try:
             text_result = await self._gen_text(llm_job=llm_job)
@@ -397,7 +400,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         await self._before_job(llm_job=llm_job)
 
         # Start OTel span after _before_job (which may set model info)
-        span = self._start_otel_span_llm(llm_job=llm_job, output_type=LLMOutputType.OBJECT, output_class_name=schema.__name__)
+        span = self._start_otel_span_llm(llm_job=llm_job, output_type=InferenceOutputType.OBJECT, output_class_name=schema.__name__)
 
         try:
             object_result = await self._gen_object(llm_job=llm_job, schema=schema)

@@ -14,7 +14,7 @@ from pipelex.plugins.portkey.portkey_exceptions import PortkeyFactoryError
 from pipelex.plugins.portkey.portkey_factory import PortkeyFactory
 
 if TYPE_CHECKING:
-    from pipelex.cogt.llm.llm_job import LLMJob
+    from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.plugins.plugin_sdk_registry import Plugin
@@ -46,5 +46,7 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
         )
 
     @override
-    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
-        return PortkeyFactory.make_extras(inference_model=inference_model, llm_job=llm_job, output_desc=output_desc)
+    def make_extras(
+        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+    ) -> tuple[dict[str, str], dict[str, Any]]:
+        return PortkeyFactory.make_extras(inference_model=inference_model, inference_job=inference_job, output_desc=output_desc)

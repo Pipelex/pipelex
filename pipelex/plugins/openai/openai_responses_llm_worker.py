@@ -12,7 +12,7 @@ from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, S
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.config import get_config
-from pipelex.system.telemetry.otel_constants import LLMOutputType
+from pipelex.system.telemetry.otel_constants import InferenceOutputType
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -73,7 +73,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
         try:
             extra_headers, extra_body = self.openai_responses_factory.make_extras(
-                inference_model=self.inference_model, llm_job=llm_job, output_desc=LLMOutputType.TEXT
+                inference_model=self.inference_model, inference_job=llm_job, output_desc=InferenceOutputType.TEXT
             )
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
@@ -119,7 +119,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
                 raise LLMCompletionError(msg)
             extra_headers, extra_body = self.openai_responses_factory.make_extras(
-                inference_model=self.inference_model, llm_job=llm_job, output_desc=schema.__name__
+                inference_model=self.inference_model, inference_job=llm_job, output_desc=schema.__name__
             )
             input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
             result_object, completion = await self.instructor_for_objects.responses.create_with_completion(  # pyright: ignore[reportUnknownMemberType]

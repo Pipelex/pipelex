@@ -10,7 +10,9 @@ from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, S
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 if TYPE_CHECKING:
@@ -20,6 +22,7 @@ if TYPE_CHECKING:
 class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
     def __init__(
         self,
+        openai_completions_factory: OpenAICompletionsFactory,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -31,6 +34,7 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
             raise SdkTypeError(msg)
 
         self.openai_client = sdk_instance
+        self.openai_completions_factory = openai_completions_factory
 
     @override
     async def _gen_image(
@@ -42,10 +46,15 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
         messages = [{"role": "user", "content": img_gen_prompt_text}]
         seed = img_gen_job.job_params.seed or random.randint(0, 2**32 - 1)
         try:
+            extra_headers, extra_body = self.openai_completions_factory.make_extras(
+                inference_model=self.inference_model, inference_job=img_gen_job, output_desc=InferenceOutputType.IMAGE
+            )
             response = await self.openai_client.chat.completions.create(
                 model=self.inference_model.model_id,
                 messages=messages,  # type: ignore[arg-type]
                 seed=seed,
+                extra_headers=extra_headers,
+                extra_body=extra_body,
             )
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here

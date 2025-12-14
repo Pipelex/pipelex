@@ -8,14 +8,14 @@ from portkey_ai import (
 )
 
 from pipelex import log
-from pipelex.cogt.llm.llm_constants import LLMOutputType
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 if TYPE_CHECKING:
-    from pipelex.cogt.llm.llm_job import LLMJob
+    from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
@@ -54,7 +54,9 @@ class GatewayFactory:
         )
 
     @classmethod
-    def make_extras(cls, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
+    def make_extras(
+        cls, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+    ) -> tuple[dict[str, str], dict[str, Any]]:
         extra_headers: dict[str, str] = {}
         if inference_model.extra_headers:
             extra_headers.update(inference_model.extra_headers)
@@ -62,15 +64,15 @@ class GatewayFactory:
             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
 
         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
-        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := llm_job.job_metadata.otel_context):
+        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
             # Use OTel trace_id and span_id for correlation
             extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
             extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"
 
             # Build span name with redacted output class name (consistent with Pipelex telemetry policy)
             # Pipelex services always redact sensitive data to protect user privacy
-            unit_job_id = llm_job.job_metadata.unit_job_id or "unknown"
-            display_output = output_desc if output_desc == LLMOutputType.TEXT else OTelConstants.OUTPUT_CLASS_REDACTED
+            unit_job_id = inference_job.job_metadata.unit_job_id or "unknown"
+            display_output = output_desc if output_desc == InferenceOutputType.TEXT else OTelConstants.OUTPUT_CLASS_REDACTED
             extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{unit_job_id} -> {display_output}"
 
         return extra_headers, {}
