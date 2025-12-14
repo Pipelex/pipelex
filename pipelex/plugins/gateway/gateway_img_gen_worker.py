@@ -15,10 +15,12 @@ from tenacity import (
 )
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 from pipelex.tools.misc.tenacity_utils import log_retry
 
 if TYPE_CHECKING:
@@ -133,7 +135,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         )
 
         endpoint_path = f"/{self.inference_model.model_id}"
-        response = await self.portkey_client.with_options(virtual_key="fal").post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        response = await self.portkey_client.with_options(virtual_key="azure-rest").post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
@@ -144,13 +146,36 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             raise TypeError(msg)
 
         response_dict: dict[str, Any] = response.model_dump()
+        generated_images: list[GeneratedImage] = []
 
-        # Handle FAL queue responses that require polling
-        if response_dict.get("status") in {"IN_QUEUE", "IN_PROGRESS"}:
+        if images := response_dict.get("data"):
+            size = cast("str", response_dict.get("size"))
+            width_str, height_str = size.split("x")
+            for image in images:
+                b64_str = image.get("b64_json")
+                if not isinstance(b64_str, str):
+                    msg = f"No base64 image data received from model '{self.inference_model.model_id}'"
+                    raise ImgGenGenerationError(msg)
+                base64_url = prefixed_base64_str_from_base64_str(b64_str=b64_str)
+                generated_images.append(
+                    GeneratedImage(
+                        url=base64_url,
+                        width=1024,
+                        height=1024,
+                    ),
+                )
+                generated_image = GeneratedImage(url=image.get("b64_json"), width=int(width_str), height=int(height_str))
+                generated_images.append(generated_image)
+
+        elif response_dict.get("status") in {"IN_QUEUE", "IN_PROGRESS"}:
+            # Handle Azure queue responses that require polling
             response_dict = await _poll_fal_queue_until_complete(response_dict)
 
-        generated_images: list[GeneratedImage] = []
-        for item in response_dict.get("images", []):
-            generated_image = GeneratedImage(url=item.get("url"), width=item.get("width"), height=item.get("height"))
-            generated_images.append(generated_image)
+            for item in response_dict.get("images", []):
+                generated_image = GeneratedImage(url=item.get("url"), width=item.get("width"), height=item.get("height"))
+                generated_images.append(generated_image)
+        else:
+            msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
+            raise ImgGenGenerationError(msg)
+
         return generated_images

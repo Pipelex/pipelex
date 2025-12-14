@@ -3,11 +3,11 @@ from pipelex.types import StrEnum
 
 class ImgGenArgTopic(StrEnum):
     NUM_IMAGES = "num_images"
-    SPECIFIC = "specific"
     ASPECT_RATIO = "aspect_ratio"
     INFERENCE = "inference"
     SAFETY_CHECKER = "safety_checker"
     BACKGROUND = "background"
+    SPECIFIC = "specific"
 
 
 class NumImagesTaxonomy(StrEnum):

@@ -66,21 +66,19 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             msg = "No result from OpenAI"
             raise ImgGenGenerationError(msg)
 
-        generated_image_list: list[GeneratedImage] = []
-        image_id = shortuuid.uuid()[:4]
-        for image_index, image_data in enumerate(result.data):
+        generated_images: list[GeneratedImage] = []
+        for image_data in result.data:
             image_base64 = image_data.b64_json
             if not image_base64:
                 msg = "No base64 image data received from OpenAI"
                 raise ImgGenGenerationError(msg)
 
             base64_url = prefixed_base64_str_from_base64_str(b64_str=image_base64)
-            log.verbose(f"Generated image {image_id}_{image_index}")
-            generated_image_list.append(
+            generated_images.append(
                 GeneratedImage(
                     url=base64_url,
                     width=1024,
                     height=1024,
                 ),
             )
-        return generated_image_list
+        return generated_images

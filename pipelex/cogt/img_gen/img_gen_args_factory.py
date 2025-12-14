@@ -15,6 +15,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SpecificTaxonomy,
 )
 from pipelex.config import get_config
+from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 
 
 class ImgGenArgsFactory:
@@ -118,13 +119,7 @@ class ImgGenArgsFactory:
     def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background) -> dict[str, Any]:
         match background_taxonomy:
             case BackgroundTaxonomy.GPT:
-                match background:
-                    case Background.AUTO:
-                        return {"background": "auto"}
-                    case Background.TRANSPARENT:
-                        return {"background": "transparent"}
-                    case Background.OPAQUE:
-                        return {"background": "opaque"}
+                return {"background": background.value}
 
     @classmethod
     def make_args_from_aspect_ratio(cls, aspect_ratio_taxonomy: AspectRatioTaxonomy, aspect_ratio: AspectRatio) -> dict[str, Any]:
@@ -173,24 +168,7 @@ class ImgGenArgsFactory:
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.GPT:
                 key = "size"
-                match aspect_ratio:
-                    case AspectRatio.SQUARE:
-                        value = "1024x1024"
-                    case AspectRatio.LANDSCAPE_4_3:
-                        value = "1536x1024"
-                    case AspectRatio.LANDSCAPE_16_9:
-                        value = "1536x1024"
-                    case AspectRatio.LANDSCAPE_3_2:
-                        value = "1536x1024"
-                    case AspectRatio.PORTRAIT_3_4:
-                        value = "1024x1536"
-                    case AspectRatio.PORTRAIT_9_16:
-                        value = "1024x1536"
-                    case AspectRatio.PORTRAIT_2_3:
-                        value = "1024x1536"
-                    case AspectRatio.LANDSCAPE_21_9 | AspectRatio.PORTRAIT_9_21:
-                        msg = f"Aspect ratio '{aspect_ratio}' is not supported by GPT image generation model"
-                        raise ImgGenParameterError(msg)
+                value = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio)
         return {key: value}
 
     @classmethod
@@ -229,9 +207,8 @@ class ImgGenArgsFactory:
                 if is_raw:
                     args_dict["raw"] = is_raw
             case InferenceTaxonomy.GPT:
-                # GPT uses quality directly if provided
                 if quality:
-                    args_dict["quality"] = quality
+                    args_dict["quality"] = quality.value
         return args_dict
 
     @classmethod
