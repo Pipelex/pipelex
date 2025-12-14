@@ -67,3 +67,25 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
+
+################################################################################
+# IMAGE GENERATION MODELS (Nano Banana)
+################################################################################
+
+# --- Gemini 2.5 Flash Image (Nano Banana) ----------------------------------------
+[nano-banana]
+model_type = "img_gen"
+sdk = "google_img_gen"
+model_id = "gemini-2.5-flash-image"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.0, output = 0.039 }
+
+# --- Gemini 3 Pro Image Preview (Nano Banana Pro) ----------------------------------------
+[nano-banana-pro]
+model_type = "img_gen"
+sdk = "google_img_gen"
+model_id = "gemini-3-pro-image-preview"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.0, output = 0.039 }

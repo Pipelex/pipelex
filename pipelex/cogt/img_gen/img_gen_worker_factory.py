@@ -106,6 +106,33 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case "google_img_gen":
+                if importlib.util.find_spec("google.genai") is None:
+                    lib_name = "google-genai"
+                    lib_extra_name = "google"
+                    msg = (
+                        "The google-genai SDK is required in order to use Google Gemini Image models. "
+                        "You can install it with 'pip install google-genai'."
+                    )
+                    raise MissingDependencyError(
+                        lib_name,
+                        lib_extra_name,
+                        msg,
+                    )
+
+                from pipelex.plugins.google.google_factory import GoogleFactory  # noqa: PLC0415
+                from pipelex.plugins.google.google_img_gen_worker import GoogleImgGenWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=GoogleFactory.make_google_client(backend=backend),
+                )
+
+                img_gen_worker = GoogleImgGenWorker(
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
             case _:
                 msg = f"Plugin '{plugin}' is not supported for image generation"
                 raise NotImplementedError(msg)
