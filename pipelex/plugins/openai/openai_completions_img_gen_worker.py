@@ -16,9 +16,10 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
+    from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 
-class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
+class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
     def __init__(
         self,
         openai_completions_factory: OpenAICompletionsFactory,
@@ -42,16 +43,14 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImage:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
         img_gen_prompt_text = img_gen_job.img_gen_prompt.positive_text
-        messages = [{"role": "user", "content": img_gen_prompt_text}]
-        # seed = img_gen_job.job_params.seed or random.randint(0, 2**32 - 1)
+        messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": img_gen_prompt_text}]
         try:
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
                 inference_model=self.inference_model, inference_job=img_gen_job, output_desc=InferenceOutputType.IMAGE
             )
             response = await self.openai_client.chat.completions.create(
                 model=self.inference_model.model_id,
-                messages=messages,  # type: ignore[arg-type]
-                # seed=seed,
+                messages=messages,
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
@@ -67,7 +66,6 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
             raise LLMCompletionError(msg) from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
-        pretty_print(openai_message, title="openai_message")
         url: str | None = None
         if (content := openai_message.content) and content.startswith("http"):
             url = openai_message.content

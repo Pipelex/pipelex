@@ -84,7 +84,7 @@ class ImgGenWorkerFactory:
                 )
             case "blackboxai_img_gen":
                 from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_img_gen_alt_worker import OpenAIImgGenAlternativeWorker  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -96,7 +96,7 @@ class ImgGenWorkerFactory:
 
                 openai_completions_factory = BlackboxaiCompletionsFactory(is_http_url_enabled=True)
 
-                img_gen_worker = OpenAIImgGenAlternativeWorker(
+                img_gen_worker = OpenAICompletionsImgGenWorker(
                     openai_completions_factory=openai_completions_factory,
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
@@ -139,7 +139,7 @@ class ImgGenWorkerFactory:
                 )
             case "gateway_completions":
                 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_img_gen_alt_worker import OpenAIImgGenAlternativeWorker  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -151,7 +151,7 @@ class ImgGenWorkerFactory:
 
                 gateway_completions_factory = GatewayCompletionsFactory(is_http_url_enabled=False)
 
-                img_gen_worker = OpenAIImgGenAlternativeWorker(
+                img_gen_worker = OpenAICompletionsImgGenWorker(
                     openai_completions_factory=gateway_completions_factory,
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
