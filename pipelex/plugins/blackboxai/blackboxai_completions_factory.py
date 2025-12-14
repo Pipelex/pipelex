@@ -19,7 +19,11 @@ class BlackboxaiCompletionsFactory(OpenAICompletionsFactory):
         self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         if isinstance(inference_job, ImgGenJob):
-            extra_body = {"seed": inference_job.job_params.seed or random.randint(0, 2**32 - 1)}
+            if isinstance(inference_job.job_params.seed, int):
+                seed = inference_job.job_params.seed
+            else:
+                seed = random.randint(0, 2**32 - 1)
+            extra_body = {"seed": seed}
         else:
             extra_body = {}
         return inference_model.extra_headers or {}, extra_body
