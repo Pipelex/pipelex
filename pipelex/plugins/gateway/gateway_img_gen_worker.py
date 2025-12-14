@@ -76,6 +76,8 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         if images := response_dict.get("data"):
             size = cast("str", response_dict.get("size"))
             width_str, height_str = size.split("x")
+            width = int(width_str)
+            height = int(height_str)
             for image in images:
                 b64_str = image.get("b64_json")
                 if not isinstance(b64_str, str):
@@ -85,12 +87,10 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 generated_images.append(
                     GeneratedImage(
                         url=base64_url,
-                        width=1024,
-                        height=1024,
+                        width=width,
+                        height=height,
                     ),
                 )
-                generated_image = GeneratedImage(url=image.get("b64_json"), width=int(width_str), height=int(height_str))
-                generated_images.append(generated_image)
 
         elif response_dict.get("status") in {"IN_QUEUE", "IN_PROGRESS"}:
             # Handle FAL queue responses that require polling
