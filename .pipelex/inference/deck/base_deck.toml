@@ -95,8 +95,8 @@ cheap_llm = [
     "grok-3-mini",
 ]
 cheap_llm_for_vision = [
-    "gpt-4o-mini",
     "gemini-2.5-flash-lite",
+    "gpt-4o-mini",
     "claude-3-haiku",
 ]
 cheap_llm_for_structured = ["gpt-4o-mini", "mistral-small", "claude-3-haiku"]

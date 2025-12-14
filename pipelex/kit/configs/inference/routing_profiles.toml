@@ -34,6 +34,7 @@ fallback_order = [
     "pipelex_gateway",
     "azure_openai",
     "bedrock",
+    "google",
     "blackboxai",
     "mistral",
     "fal",
