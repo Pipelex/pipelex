@@ -191,7 +191,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             guidance_scale=img_gen_setting.guidance_scale,
             is_moderated=img_gen_setting.is_moderated,
             safety_tolerance=img_gen_setting.safety_tolerance,
-            is_raw=self.is_raw if self.is_raw is not None else img_gen_param_defaults.is_raw,
+            is_raw=self.is_raw or img_gen_param_defaults.is_raw,
             output_format=self.output_format or img_gen_param_defaults.output_format,
             seed=seed,
         )

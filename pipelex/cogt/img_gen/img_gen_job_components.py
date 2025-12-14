@@ -42,9 +42,9 @@ class ImgGenJobParams(BaseModel):
     quality: Quality | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
     guidance_scale: float | None = Field(default=None, gt=0)
-    is_moderated: bool = False
+    is_moderated: bool | None = None
     safety_tolerance: int | None = Field(default=None, ge=1, le=6)
-    is_raw: bool
+    is_raw: bool | None = None
     output_format: OutputFormat = Field(strict=False)
     seed: int | None = Field(default=None, ge=0)
 
@@ -69,9 +69,9 @@ class ImgGenJobParamsDefaults(ConfigModel):
     quality: Quality | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
     guidance_scale: float = Field(..., gt=0)
-    is_moderated: bool
+    is_moderated: bool | None = None
     safety_tolerance: int = Field(..., ge=1, le=6)
-    is_raw: bool
+    is_raw: bool | None = None
     output_format: OutputFormat = Field(strict=False)
     seed: int | Literal["auto"]
 

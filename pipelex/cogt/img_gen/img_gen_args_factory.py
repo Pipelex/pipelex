@@ -178,7 +178,7 @@ class ImgGenArgsFactory:
         num_inference_steps: int | None,
         quality: Quality | None,
         guidance_scale: float | None,
-        is_raw: bool,
+        is_raw: bool | None,
     ) -> dict[str, Any]:
         args_dict: dict[str, Any] = {}
         match inference_taxonomy:
@@ -213,15 +213,18 @@ class ImgGenArgsFactory:
 
     @classmethod
     def make_args_from_safety_checker(
-        cls, safety_checker_taxonomy: SafetyCheckerTaxonomy, is_moderated: bool, safety_tolerance: int | None
+        cls,
+        safety_checker_taxonomy: SafetyCheckerTaxonomy,
+        is_moderated: bool | None,
+        safety_tolerance: int | None,
     ) -> dict[str, Any]:
         args_dict: dict[str, Any] = {}
         match safety_checker_taxonomy:
             case SafetyCheckerTaxonomy.UNAVAILABLE:
                 pass
             case SafetyCheckerTaxonomy.AVAILABLE:
-                if is_moderated:
+                if is_moderated is not None:
                     args_dict["enable_safety_checker"] = is_moderated
-                if safety_tolerance:
+                if safety_tolerance is not None:
                     args_dict["safety_tolerance"] = safety_tolerance
         return args_dict

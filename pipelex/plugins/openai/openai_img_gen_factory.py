@@ -1,11 +1,13 @@
 from typing import Literal
 
+from openai import Omit, omit
+
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
 
 GptImage1SizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
 GptImage1OutputFormatType = Literal["png", "jpeg", "webp"]
-GptImage1ModerationType = Literal["low", "auto"]
+GptImage1ModerationType = Literal["low", "auto"] | Omit
 GptImage1QualityType = Literal["low", "medium", "high"]
 GptImage1BackgroundType = Literal["transparent", "opaque", "auto"]
 
@@ -42,8 +44,13 @@ class OpenAIImgGenFactory:
                 return "webp"
 
     @classmethod
-    def moderation_for_gpt_image_1(cls, is_moderated: bool) -> GptImage1ModerationType:
-        return "auto" if is_moderated else "low"
+    def moderation_for_gpt_image_1(cls, is_moderated: bool | None) -> GptImage1ModerationType:
+        if is_moderated is None:
+            return omit
+        elif is_moderated:
+            return "low"
+        else:
+            return "auto"
 
     @classmethod
     def quality_for_gpt_image_1(cls, quality: Quality) -> GptImage1QualityType:
