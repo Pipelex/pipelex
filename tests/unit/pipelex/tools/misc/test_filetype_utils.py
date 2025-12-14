@@ -28,7 +28,7 @@ class TestFileType:
         assert file_type.mime == "image/png"
 
 
-class TestFileTypeException:
+class TestFileTypeError:
     def test_file_type_exception_inheritance(self):
         error = FileTypeError("test message")
         assert isinstance(error, Exception)
