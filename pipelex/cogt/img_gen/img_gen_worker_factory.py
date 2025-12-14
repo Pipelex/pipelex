@@ -106,7 +106,7 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "google_img_gen":
+            case "google":
                 if importlib.util.find_spec("google.genai") is None:
                     lib_name = "google-genai"
                     lib_extra_name = "google"

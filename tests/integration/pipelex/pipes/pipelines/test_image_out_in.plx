@@ -8,8 +8,7 @@ type = "PipeImgGen"
 description = "Generate an image from a prompt"
 output = "Image"
 img_gen_prompt = "A beautiful landscape"
-# model = "gen_image_openai_low_quality"
-model = "gpt-image-1"
+model = "img_gen_for_testing"
 
 [pipe.describe_image]
 type = "PipeLLM"

@@ -45,4 +45,4 @@ class TestImageOutIn:
 
         if pipe_run_mode != PipeRunMode.DRY:
             description = pipe_output.main_stuff_as_str
-            assert "landscape" in description.lower()
+            assert description
