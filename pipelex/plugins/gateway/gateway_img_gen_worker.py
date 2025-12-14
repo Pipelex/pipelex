@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from portkey_ai import AsyncPortkey
 from portkey_ai.api_resources.utils import GenericResponse
@@ -74,8 +74,15 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         generated_images: list[GeneratedImage] = []
 
         if images := response_dict.get("data"):
-            size = cast("str", response_dict.get("size"))
-            width_str, height_str = size.split("x")
+            size = response_dict.get("size")
+            if not isinstance(size, str):
+                msg = f"Size from img gen response is not a string: '{size}'"
+                raise ImgGenGenerationError(msg)
+            size_split = size.split("x")
+            if len(size_split) != 2:
+                msg = f"Size from img gen response is not a valid size: '{size}'"
+                raise ImgGenGenerationError(msg)
+            width_str, height_str = size_split
             width = int(width_str)
             height = int(height_str)
             for image in images:
