@@ -17,7 +17,7 @@ from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsF
 if TYPE_CHECKING:
     from portkey_ai.api_resources.utils import GenericResponse
 
-    from pipelex.cogt.llm.llm_job import LLMJob
+    from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.plugins.plugin_sdk_registry import Plugin
@@ -92,5 +92,7 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         )
 
     @override
-    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
-        return GatewayFactory.make_extras(inference_model=inference_model, llm_job=llm_job, output_desc=output_desc)
+    def make_extras(
+        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+    ) -> tuple[dict[str, str], dict[str, Any]]:
+        return GatewayFactory.make_extras(inference_model=inference_model, inference_job=inference_job, output_desc=output_desc)

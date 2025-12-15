@@ -17,8 +17,8 @@ from tests.cases import ImageTestCases, PDFTestCases
 @pytest.mark.filterwarnings("ignore:Accessing the 'model_fields' attribute on the instance is deprecated:DeprecationWarning")
 class TestExtract:
     @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
-    async def test_extract_pdf_path(self, extract_handle: str, file_path: str):
-        extract_worker = get_extract_worker(extract_handle=extract_handle)
+    async def test_extract_pdf_path(self, extract_handle_from_pdf: str, file_path: str):
+        extract_worker = get_extract_worker(extract_handle=extract_handle_from_pdf)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -31,8 +31,8 @@ class TestExtract:
             pretty_print(page.text, title=f"Page {page_index}")
 
     @pytest.mark.parametrize("url", PDFTestCases.DOCUMENT_URLS)
-    async def test_extract_pdf_url(self, extract_handle: str, url: str):
-        extract_worker = get_extract_worker(extract_handle=extract_handle)
+    async def test_extract_pdf_url(self, extract_handle_from_pdf: str, url: str):
+        extract_worker = get_extract_worker(extract_handle=extract_handle_from_pdf)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)

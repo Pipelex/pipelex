@@ -1,10 +1,8 @@
 from typing import Any
 
 import openai
-import shortuuid
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -13,10 +11,7 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import save_base_64_str_to_binary_file
-from pipelex.tools.misc.file_utils import ensure_path
-
-TEMP_OUTPUTS_DIR = "temp/img_gen_by_gpt_image"
+from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 
 
 class OpenAIImgGenWorker(ImgGenWorkerAbstract):
@@ -69,24 +64,19 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             msg = "No result from OpenAI"
             raise ImgGenGenerationError(msg)
 
-        generated_image_list: list[GeneratedImage] = []
-        image_id = shortuuid.uuid()[:4]
-        for image_index, image_data in enumerate(result.data):
+        generated_images: list[GeneratedImage] = []
+        for image_data in result.data:
             image_base64 = image_data.b64_json
             if not image_base64:
                 msg = "No base64 image data received from OpenAI"
                 raise ImgGenGenerationError(msg)
 
-            folder_path = TEMP_OUTPUTS_DIR
-            ensure_path(folder_path)
-            img_path = f"{folder_path}/{image_id}_{image_index}.png"
-            save_base_64_str_to_binary_file(base_64_str=image_base64, file_path=img_path)
-            log.verbose(f"Saved image to {img_path}")
-            generated_image_list.append(
+            base64_url = prefixed_base64_str_from_base64_str(b64_str=image_base64)
+            generated_images.append(
                 GeneratedImage(
-                    url=img_path,
+                    url=base64_url,
                     width=1024,
                     height=1024,
                 ),
             )
-        return generated_image_list
+        return generated_images

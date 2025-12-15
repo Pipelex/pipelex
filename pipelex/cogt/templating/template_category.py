@@ -16,6 +16,7 @@ class TemplateCategory(StrEnum):
     MARKDOWN = "markdown"
     MERMAID = "mermaid"
     LLM_PROMPT = "llm_prompt"
+    IMG_GEN_PROMPT = "img_gen_prompt"
 
     @property
     def filters(self) -> dict[Jinja2FilterName, Callable[[Context, Any, TextFormat | None], Any]]:
@@ -33,6 +34,11 @@ class TemplateCategory(StrEnum):
                     Jinja2FilterName.TAG: tag,
                 }
             case TemplateCategory.LLM_PROMPT:
+                return {
+                    Jinja2FilterName.FORMAT: text_format,
+                    Jinja2FilterName.TAG: tag,
+                }
+            case TemplateCategory.IMG_GEN_PROMPT:
                 return {
                     Jinja2FilterName.FORMAT: text_format,
                     Jinja2FilterName.TAG: tag,

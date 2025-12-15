@@ -6,12 +6,10 @@ from pipelex import log
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
-from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
-from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderError
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 
@@ -32,22 +30,9 @@ class LLMPromptBlueprint(BaseModel):
             required_variables.update(user_images_top_object_name)
 
         if self.prompt_blueprint:
-            template_source = preprocess_template(self.prompt_blueprint.template)
-            required_variables.update(
-                detect_jinja2_required_variables(
-                    template_category=self.prompt_blueprint.category,
-                    template_source=template_source,
-                )
-            )
-
+            required_variables.update(self.prompt_blueprint.required_variables())
         if self.system_prompt_blueprint:
-            system_prompt_template_source = preprocess_template(self.system_prompt_blueprint.template)
-            required_variables.update(
-                detect_jinja2_required_variables(
-                    template_category=self.system_prompt_blueprint.category,
-                    template_source=system_prompt_template_source,
-                )
-            )
+            required_variables.update(self.system_prompt_blueprint.required_variables())
         return {
             variable_name
             for variable_name in required_variables

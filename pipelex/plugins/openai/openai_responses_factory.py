@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         ResponseUsage,
     )
 
+    from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
@@ -76,5 +77,7 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
         return nb_tokens_by_category
 
     @override
-    def make_extras(self, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
+    def make_extras(
+        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+    ) -> tuple[dict[str, str], dict[str, Any]]:
         return inference_model.extra_headers or {}, {}

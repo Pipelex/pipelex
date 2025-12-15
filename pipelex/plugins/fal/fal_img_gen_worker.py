@@ -4,8 +4,9 @@ from fal_client import AsyncClient, InProgress
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import SdkTypeError
+from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -34,16 +35,19 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> GeneratedImage:
-        fal_application = self.inference_model.model_id
-        arguments = FalFactory.make_fal_arguments(
-            fal_application=fal_application,
+        if self.inference_model.rules is None:
+            msg = f"Model '{self.inference_model.name}' does not have rules configured"
+            raise ImgGenParameterError(msg)
+        args_dict = ImgGenArgsFactory.make_args_for_model(
+            model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
             nb_images=1,
         )
-        log.verbose(arguments, title=f"Fal arguments, application={fal_application}")
+        fal_application = self.inference_model.model_id
+        log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(
             application=fal_application,
-            arguments=arguments,
+            arguments=args_dict,
         )
 
         log_index = 0
@@ -67,15 +71,19 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> list[GeneratedImage]:
-        application = self.inference_model.model_id
-        arguments = FalFactory.make_fal_arguments(
-            fal_application=application,
+        if self.inference_model.rules is None:
+            msg = f"Model '{self.inference_model.name}' does not have rules configured"
+            raise ImgGenParameterError(msg)
+        args_dict = ImgGenArgsFactory.make_args_for_model(
+            model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
             nb_images=nb_images,
         )
+        fal_application = self.inference_model.model_id
+        log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(
-            application=application,
-            arguments=arguments,
+            application=fal_application,
+            arguments=args_dict,
         )
 
         log_index = 0

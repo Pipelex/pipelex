@@ -2,6 +2,8 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -30,15 +32,10 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         # Convert bracket notation to output_multiplicity (default to 1 if no brackets)
         final_multiplicity = output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, int) else 1
 
-        img_gen_prompt = blueprint.img_gen_prompt
-        img_gen_prompt_var_name = blueprint.img_gen_prompt_var_name
-
-        # If we have inputs, that means that the prompt is in the inputs.
-        # The blueprint already validated that there is only 1 input.
-        if blueprint.inputs:
-            img_gen_prompt_var_name = blueprint.input_names[0]
-        else:
-            img_gen_prompt = blueprint.img_gen_prompt
+        prompt_blueprint = TemplateBlueprint(
+            template=blueprint.prompt,
+            category=TemplateCategory.IMG_GEN_PROMPT,
+        )
 
         return PipeImgGen(
             domain=domain_code,
@@ -47,8 +44,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             inputs=inputs,
             output=output,
             output_multiplicity=final_multiplicity,
-            img_gen_prompt=img_gen_prompt,
-            img_gen_prompt_var_name=img_gen_prompt_var_name,
+            prompt_blueprint=prompt_blueprint,
             img_gen_choice=blueprint.model,
             aspect_ratio=blueprint.aspect_ratio,
             is_raw=blueprint.is_raw,

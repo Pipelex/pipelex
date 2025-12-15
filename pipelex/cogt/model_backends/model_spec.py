@@ -3,6 +3,7 @@ from typing import Any
 from instructor import Mode as InstructorMode
 from pydantic import Field
 
+from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenModelRules
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -28,6 +29,7 @@ class InferenceModelSpec(ConfigModel):
     listed_constraints: list[ListedConstraint] = Field(default_factory=empty_list_factory_of(ListedConstraint))
     valued_constraints: dict[ValuedConstraint, Any] = Field(default_factory=empty_dict_factory_of(ValuedConstraint))
     extra_headers: dict[str, str] | None = None
+    rules: ImgGenModelRules | None = None
 
     @property
     def tag(self) -> str:

@@ -4,6 +4,7 @@ from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.hub import get_models_manager, get_plugin_manager
+from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
@@ -25,6 +26,20 @@ class ImgGenWorkerFactory:
         plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
         img_gen_worker: ImgGenWorkerAbstract
         match plugin.sdk:
+            case "gateway_img_gen":
+                from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
+                from pipelex.plugins.gateway.gateway_img_gen_worker import GatewayImgGenWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
+                )
+
+                img_gen_worker = GatewayImgGenWorker(
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
             case "fal":
                 if importlib.util.find_spec("fal_client") is None:
                     lib_name = "fal-client"
@@ -67,9 +82,9 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
-            case "openai_alt_img_gen":
+            case "blackboxai_img_gen":
                 from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_img_gen_alt_worker import OpenAIImgGenAlternativeWorker  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
 
                 img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
                     plugin=plugin,
@@ -79,7 +94,10 @@ class ImgGenWorkerFactory:
                     ),
                 )
 
-                img_gen_worker = OpenAIImgGenAlternativeWorker(
+                openai_completions_factory = BlackboxaiCompletionsFactory(is_http_url_enabled=True)
+
+                img_gen_worker = OpenAICompletionsImgGenWorker(
+                    openai_completions_factory=openai_completions_factory,
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
@@ -89,6 +107,53 @@ class ImgGenWorkerFactory:
 
                 img_gen_worker = AzureImgGenWorker(
                     plugin=plugin,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "google":
+                if importlib.util.find_spec("google.genai") is None:
+                    lib_name = "google-genai"
+                    lib_extra_name = "google"
+                    msg = (
+                        "The google-genai SDK is required in order to use Google Gemini Image models. "
+                        "You can install it with 'pip install google-genai'."
+                    )
+                    raise MissingDependencyError(
+                        lib_name,
+                        lib_extra_name,
+                        msg,
+                    )
+
+                from pipelex.plugins.google.google_factory import GoogleFactory  # noqa: PLC0415
+                from pipelex.plugins.google.google_img_gen_worker import GoogleImgGenWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=GoogleFactory.make_google_client(backend=backend),
+                )
+
+                img_gen_worker = GoogleImgGenWorker(
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "gateway_completions":
+                from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=GatewayCompletionsFactory.make_portkey_openai_client_for_completions(
+                        plugin=plugin,
+                        backend=backend,
+                    ),
+                )
+
+                gateway_completions_factory = GatewayCompletionsFactory(is_http_url_enabled=False)
+
+                img_gen_worker = OpenAICompletionsImgGenWorker(
+                    openai_completions_factory=gateway_completions_factory,
+                    sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )

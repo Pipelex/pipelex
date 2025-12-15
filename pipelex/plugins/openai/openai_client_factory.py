@@ -17,7 +17,7 @@ class OpenAISdkVariant(StrEnum):
     OPENAI = "openai"
     OPENAI_RESPONSES = "openai_responses"
     OPENAI_IMG_GEN = "openai_img_gen"
-    OPENAI_ALT_IMG_GEN = "openai_alt_img_gen"
+    BLACKBOXAI_IMG_GEN = "blackboxai_img_gen"
 
 
 class AzureExtraField(StrEnum):
@@ -39,7 +39,7 @@ class OpenAIClientFactory:
 
         # We have a workaround here:
         # OpenAI can be used without any API key (for instance when pointing to local Ollama) but the SDK,
-        # as it is, raises if there is not API key (api_key is None and there is not env var).
+        # as it is, raises if there is no API key (api_key is None and there is no env var).
         # But it works fine with an empty string.
         api_key = backend.api_key or ""
 
@@ -55,7 +55,7 @@ class OpenAIClientFactory:
                     api_key=api_key,
                     api_version=backend.get_extra_config(AzureExtraField.API_VERSION),
                 )
-            case OpenAISdkVariant.OPENAI | OpenAISdkVariant.OPENAI_RESPONSES | OpenAISdkVariant.OPENAI_IMG_GEN | OpenAISdkVariant.OPENAI_ALT_IMG_GEN:
+            case OpenAISdkVariant.OPENAI | OpenAISdkVariant.OPENAI_RESPONSES | OpenAISdkVariant.OPENAI_IMG_GEN | OpenAISdkVariant.BLACKBOXAI_IMG_GEN:
                 log.verbose(f"Making AsyncOpenAI client with endpoint: {backend.endpoint}")
                 the_client = openai.AsyncOpenAI(
                     api_key=api_key,
