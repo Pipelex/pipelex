@@ -191,6 +191,7 @@ class PipeSorterTestCases:
             description="Generates the opposite image using AI",
             inputs={"generation_prompt": "ImagePrompt"},
             output="Image",
+            prompt="@generation_prompt",
         ),
         "photo_opposite_pipeline": PipeSequenceBlueprint(
             description="Main pipeline that generates the opposite of an input photo",

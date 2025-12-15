@@ -28,7 +28,7 @@ def detect_file_type_from_path(path: str | Path) -> FileType:
         A FileType object containing the file extension and MIME type of the file.
 
     Raises:
-        FileTypeException: If the file type cannot be identified.
+        FileTypeError: If the file type cannot be identified.
 
     """
     kind = filetype.guess(path)  # pyright: ignore[reportUnknownMemberType]
@@ -50,7 +50,7 @@ def detect_file_type_from_bytes(buf: bytes) -> FileType:
         A FileType object containing the file extension and MIME type of the file.
 
     Raises:
-        FileTypeException: If the file type cannot be identified.
+        FileTypeError: If the file type cannot be identified.
 
     """
     kind = filetype.guess(buf)  # pyright: ignore[reportUnknownMemberType]
@@ -72,7 +72,7 @@ def detect_file_type_from_base64(b64: str | bytes) -> FileType:
         A FileType object containing the file extension and MIME type of the file.
 
     Raises:
-        FileTypeException: If the file type cannot be identified.
+        FileTypeError: If the file type cannot be identified.
 
     """
     # Normalise to bytes holding only the Base-64 alphabet

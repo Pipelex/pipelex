@@ -163,17 +163,10 @@ class PipeExtractTestCases:
 
 
 class ImageGenTestCases:
-    IMG_GEN_PROMPT_1 = "woman wearing marino cargo pants"
-    IMG_GEN_PROMPT_2 = "wide legged denim pants with hippy addition"
-    IMG_GEN_PROMPT_3 = """
-Woman typing on a laptop. On the laptop screen you see python code to generate code to write a prompt for an AI model.
-"""
-
     IMAGE_DESC: ClassVar[list[tuple[str, str]]] = [  # topic, img_gen_prompt_text
-        # (IMG_GEN_PROMPT_1, IMG_GEN_PROMPT_1),
-        # (IMG_GEN_PROMPT_2, IMG_GEN_PROMPT_2),
-        # (IMG_GEN_PROMPT_3, IMG_GEN_PROMPT_3),
-        ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python"),
+        ("dog wearing sunglasses", "a dog wearing sunglasses"),
+        # ("otter playing poker", "an otter playing poker"),
+        # ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python"),
     ]
 
 

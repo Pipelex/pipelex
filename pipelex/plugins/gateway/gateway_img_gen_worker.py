@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from portkey_ai import AsyncPortkey
+from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
 from typing_extensions import override
 
@@ -12,6 +13,7 @@ from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
+from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 
 if TYPE_CHECKING:
@@ -60,7 +62,12 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
 
         endpoint_path = f"/{self.inference_model.model_id}"
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
-        response = await self.portkey_client.with_options(config=config_id).post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        try:
+            response = await self.portkey_client.with_options(config=config_id).post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        except portkey_exceptions.APIError as exc:
+            error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
+            msg = f"Image generation service error for model '{self.inference_model.model_id}': {error_summary}"
+            raise ImgGenGenerationError(msg) from exc
 
         if response is None:
             msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"

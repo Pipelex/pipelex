@@ -11,7 +11,7 @@ description = "Domain with image generation pipe"
 type = "PipeImgGen"
 description = "Generate an image from a prompt"
 output = "Image"
-img_gen_prompt = "A beautiful landscape"
+prompt = "A beautiful landscape"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -21,7 +21,7 @@ img_gen_prompt = "A beautiful landscape"
                 type="PipeImgGen",
                 description="Generate an image from a prompt",
                 output=NativeConceptCode.IMAGE,
-                img_gen_prompt="A beautiful landscape",
+                prompt="A beautiful landscape",
             ),
         },
     ),

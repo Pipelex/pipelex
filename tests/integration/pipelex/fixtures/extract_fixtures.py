@@ -26,6 +26,7 @@ EXTRACT_HANDLE_FROM_PDF = [
     "pypdfium2-extract-text",
     "docling-extract-text",
     "mistral-ocr",
+    "azure-document-intelligence",
 ]
 
 EXTRACT_HANDLE_FROM_IMAGE = [

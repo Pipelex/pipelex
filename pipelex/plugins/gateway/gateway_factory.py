@@ -4,8 +4,9 @@ from typing import TYPE_CHECKING, Any
 
 from portkey_ai import (
     PORTKEY_GATEWAY_URL,
-    AsyncPortkey,  # type: ignore[reportUnknownVariableType]
+    AsyncPortkey,
 )
+from portkey_ai.api_resources import exceptions as portkey_exc
 
 from pipelex import log
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
@@ -13,8 +14,11 @@ from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
+    from portkey_ai.api_resources import exceptions as portkey_exceptions
+
     from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -76,3 +80,45 @@ class GatewayFactory:
             extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{unit_job_id} -> {display_output}"
 
         return extra_headers, {}
+
+    @classmethod
+    def make_error_summary_from_portkey_error(cls, exc: portkey_exceptions.APIError) -> str:
+        """Extract a clean, human-readable error summary from a Portkey API error.
+
+        Args:
+            exc: The Portkey API error
+
+        Returns:
+            A concise error message suitable for logging and user display
+        """
+        error_type = type(exc).__name__
+        support_hint = f"If the problem persists, get support on Discord: {URLs.discord}"
+
+        # Connection errors (no HTTP response received)
+        if isinstance(exc, portkey_exc.APITimeoutError):
+            return f"{error_type}: Request timed out - service may be overloaded. {support_hint}"
+        if isinstance(exc, portkey_exc.APIConnectionError):
+            return f"{error_type}: Cannot connect to Pipelex Gateway - check network or service availability. {support_hint}"
+
+        # HTTP status errors (4xx/5xx)
+        if isinstance(exc, portkey_exc.APIStatusError):
+            status_code = exc.status_code
+            error_body = str(exc)
+
+            # For HTML responses, provide a generic message (gateway/proxy error pages)
+            if error_body.strip().startswith("<!DOCTYPE") or "<html" in error_body.lower():
+                return f"{error_type} (HTTP {status_code}): Pipelex Gateway unavailable. {support_hint}"
+
+            # For other errors, truncate if too long
+            max_length = 200
+            if len(error_body) > max_length:
+                error_body = error_body[:max_length] + "..."
+
+            return f"{error_type} (HTTP {status_code}): {error_body}"
+
+        # Response validation errors
+        if isinstance(exc, portkey_exc.APIResponseValidationError):
+            return f"{error_type}: Invalid response from Pipelex Gateway. {support_hint}"
+
+        # Fallback for any other APIError
+        return f"{error_type}: {exc.message}. {support_hint}"
