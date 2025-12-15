@@ -41,13 +41,25 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug validate pipe",
+            "name": "Debug validate bundle",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "validate",
                 "temp/bundle.plx",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug validate pipe",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "validate",
+                "analyze_image_collection",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
