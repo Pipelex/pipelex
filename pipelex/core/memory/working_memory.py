@@ -1,5 +1,5 @@
 from operator import attrgetter
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import override
@@ -270,15 +270,52 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
                 )
 
             return stuff_content
-        content = self.get_stuff(name).content
 
-        if wanted_type is not None and not isinstance(content, wanted_type):
+        top_level_content = self.get_stuff(name).content
+        if isinstance(top_level_content, ListContent):
+            if not accept_list:
+                raise WorkingMemoryTypeError(
+                    variable_name=name,
+                    message=f"Content of '{name}' is ListContent, but accept_list is False",
+                )
+            top_level_content = cast("ListContent[Any]", top_level_content)
+            top_level_content_items = self._get_typed_items_from_list_content(list_content=top_level_content, wanted_type=wanted_type)
+            if not top_level_content_items and wanted_type is not None:
+                raise WorkingMemoryTypeError(
+                    variable_name=name,
+                    message=f"Content of '{name}' is ListContent, but some of its items are not of type '{wanted_type.__name__}'",
+                )
+            return top_level_content_items
+
+        if wanted_type is not None and not isinstance(top_level_content, wanted_type):
             raise WorkingMemoryTypeError(
                 variable_name=name,
-                message=f"Content of '{name}' is of type '{type(content).__name__}', it should be '{wanted_type.__name__}'",
+                message=f"Content of '{name}' is of type '{type(top_level_content).__name__}', it should be '{wanted_type.__name__}'",
             )
 
-        return content
+        return top_level_content
+
+    def _get_typed_items_from_list_content(self, list_content: ListContent[Any], wanted_type: type[Any] | None) -> list[Any] | None:
+        # attr_path_str = ""
+        the_items: list[Any] = []
+        for item in list_content.items:
+            # item_content = attrgetter(attr_path_str)(item)
+            item_content = item
+            # check type
+            if isinstance(item_content, list):
+                for item_content_item in item_content:  # pyright: ignore[reportUnknownVariableType]
+                    if item_content_item is None:
+                        continue
+                    if wanted_type and not isinstance(item_content_item, wanted_type):
+                        return None
+                    the_items.append(item_content_item)
+            else:
+                if item_content is None:
+                    continue
+                if wanted_type and not isinstance(item_content, wanted_type):
+                    return None
+                the_items.append(item_content)
+        return the_items
 
     ################################################################################################
     # Stuff accessors
