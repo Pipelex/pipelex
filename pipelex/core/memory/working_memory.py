@@ -273,19 +273,22 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
         top_level_content = self.get_stuff(name).content
         if isinstance(top_level_content, ListContent):
-            if not accept_list:
-                raise WorkingMemoryTypeError(
-                    variable_name=name,
-                    message=f"Content of '{name}' is ListContent, but accept_list is False",
-                )
             top_level_content = cast("ListContent[Any]", top_level_content)
-            top_level_content_items = self._get_typed_items_from_list_content(list_content=top_level_content, wanted_type=wanted_type)
-            if not top_level_content_items and wanted_type is not None:
-                raise WorkingMemoryTypeError(
-                    variable_name=name,
-                    message=f"Content of '{name}' is ListContent, but some of its items are not of type '{wanted_type.__name__}'",
-                )
-            return top_level_content_items
+            if wanted_type is ListContent:
+                return top_level_content.items
+            else:
+                if not accept_list:
+                    raise WorkingMemoryTypeError(
+                        variable_name=name,
+                        message=f"Content of '{name}' is ListContent, but accept_list is False",
+                    )
+                top_level_content_items = self._get_typed_items_from_list_content(list_content=top_level_content, wanted_type=wanted_type)
+                if not top_level_content_items and wanted_type is not None:
+                    raise WorkingMemoryTypeError(
+                        variable_name=name,
+                        message=f"Content of '{name}' is ListContent, but some of its items are not of type '{wanted_type.__name__}'",
+                    )
+                return top_level_content_items
 
         if wanted_type is not None and not isinstance(top_level_content, wanted_type):
             raise WorkingMemoryTypeError(

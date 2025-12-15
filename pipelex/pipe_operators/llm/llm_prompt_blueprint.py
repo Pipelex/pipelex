@@ -83,10 +83,11 @@ class LLMPromptBlueprint(BaseModel):
                         image_collection = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=None)
                         # Check if it's a list or tuple
                         if isinstance(image_collection, (list, tuple)):
-                            for image_item in image_collection:  # type: ignore[assignment]
-                                if isinstance(image_item, ImageContent):
-                                    user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
-                                    prompt_user_images[user_image_name] = user_image
+                            image_collection = cast("list[ImageContent] | tuple[ImageContent]", image_collection)
+                            for image_index, image_item in enumerate(image_collection, start=1):
+                                user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
+                                user_image_item_name = f"{user_image_name}[{image_index}]"
+                                prompt_user_images[user_image_item_name] = user_image
                         else:
                             msg = (
                                 f"Could not find a valid user image or image collection named '{user_image_name}' from the provided context_provider"
