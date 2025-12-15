@@ -68,6 +68,9 @@ class LLMPromptBlueprint(BaseModel):
                     elif isinstance(prompt_image_content, list):
                         prompt_image_content = cast("list[ImageContent]", prompt_image_content)
                         for image_index, image_item in enumerate(prompt_image_content, start=1):
+                            if not isinstance(image_item, ImageContent):  # pyright: ignore[reportUnnecessaryIsInstance]
+                                msg = f"Item of '{user_image_name}' is of type '{type(image_item).__name__}', it should be ImageContent"
+                                raise LLMPromptBlueprintValueError(msg)
                             user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
                             user_image_item_name = f"{user_image_name}[{image_index}]"
                             prompt_user_images[user_image_item_name] = user_image

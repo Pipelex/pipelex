@@ -283,10 +283,15 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
                         message=f"Content of '{name}' is ListContent, but accept_list is False",
                     )
                 top_level_content_items = self._get_typed_items_from_list_content(list_content=top_level_content, wanted_type=wanted_type)
-                if not top_level_content_items and wanted_type is not None:
+                if top_level_content_items is None and wanted_type is not None:
                     raise WorkingMemoryTypeError(
                         variable_name=name,
                         message=f"Content of '{name}' is ListContent, but some of its items are not of type '{wanted_type.__name__}'",
+                    )
+                if top_level_content_items is not None and len(top_level_content_items) == 0:
+                    raise WorkingMemoryTypeError(
+                        variable_name=name,
+                        message=f"Content of '{name}' is ListContent, but it is empty",
                     )
                 return top_level_content_items
 
