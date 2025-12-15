@@ -44,6 +44,7 @@ OPENAI_IMG_GEN_MODELS = [
 # --- Google Models --------------------------------------------------------------------------
 GOOGLE_IMG_GEN_MODELS = [
     "nano-banana",
+    "nano-banana-pro",
 ]
 
 # --- All Image Generation Handles ---------------------------------------------------------------
@@ -73,12 +74,11 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
         ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
             background=Background.OPAQUE,
-            quality=Quality.HIGH,
-            nb_steps=28,
+            quality=Quality.LOW,
             guidance_scale=3.5,
-            is_moderated=False,
+            is_moderated=None,
             safety_tolerance=1,
-            is_raw=False,
+            is_raw=None,
             output_format=OutputFormat.JPG,
         )
     ],

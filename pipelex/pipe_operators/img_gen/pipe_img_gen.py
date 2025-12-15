@@ -121,7 +121,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 context = substitute_nested_in_context(context=context, extra_params=extra_params)
             if extra_context := self.prompt_blueprint.extra_context:
                 context.update(**extra_context)
-            img_gen_prompt_text = await get_content_generator().make_templated_text(
+            img_gen_prompt_text = await content_generator.make_templated_text(
                 context=context,
                 template=self.prompt_blueprint.template,
                 templating_style=self.prompt_blueprint.templating_style,
@@ -173,7 +173,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         log.verbose(f"Using img_gen handle: {img_gen_handle}")
 
         the_content: StuffContent
-        # image_urls: list[str] = []
         nb_images: int
         if isinstance(applied_output_multiplicity, bool):
             if self.output_multiplicity:
