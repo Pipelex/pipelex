@@ -17,7 +17,7 @@ class TestPipeImgGenBlueprint:
         blueprint = PipeImgGenBlueprint(
             inputs={"topic": "Text"},
             output="Image",
-            prompt="Sketch black and white illustration of: @topic",
+            prompt="Sketch black and white illustration of: $topic",
         )
         assert blueprint.nb_inputs == 1
         assert blueprint.input_names == ["topic"]
@@ -27,6 +27,6 @@ class TestPipeImgGenBlueprint:
             PipeImgGenBlueprint(
                 inputs={"topic": "Text"},
                 output="Image",
-                prompt="Sketch black and white illustration of: @bingo",
+                prompt="Sketch black and white illustration of: $bingo",
             )
         assert "Missing input variable(s) in prompt template: bingo" in str(exc_info.value)

@@ -8,7 +8,7 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 
@@ -37,10 +37,9 @@ class PipeImgGenBlueprint(PipeBlueprint):
                 template_source=preprocessed_template,
                 template_category=template_category,
             )
-        except Jinja2DetectVariablesError as exc:
-            msg = f"Could not detect required variables in prompt for PipeImgGen: {exc}"
+        except Jinja2TemplateSyntaxError as exc:
+            msg = f"Could not parse template for PipeImgGen: {exc}"
             raise ValueError(msg) from exc
-
         # Filter out internal variables that start with underscore
         required_variables = {
             variable_name
