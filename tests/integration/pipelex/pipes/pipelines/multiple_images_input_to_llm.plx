@@ -17,3 +17,23 @@ Analyze this collection of images: their common features and differences.
 
 $collection_of_images
 """
+
+[pipe.compare_two_image_collections]
+type = "PipeLLM"
+description = """
+Compare two collections of images: identify similarities and differences between the two groups.
+"""
+inputs = { collection_a = "Image[]", collection_b = "Image[]" }
+output = "Analysis"
+model = "gemini-2.5-flash"
+prompt = """
+Analyze these two collections of images.
+
+First collection:
+$collection_a
+
+Second collection:
+$collection_b
+
+Describe the similarities and differences within each group and between the two groups.
+"""
