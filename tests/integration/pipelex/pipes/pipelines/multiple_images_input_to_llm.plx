@@ -11,9 +11,9 @@ Analyze the collection of images: their common features, differences, and any ot
 """
 inputs = { collection_of_images = "Image[]" }
 output = "Analysis"
-model = "llm_for_creative_writing"
+model = "gemini-2.5-flash"
 prompt = """
-Analyze this collection of images: their common features, differences, and any other relevant information.
+Analyze this collection of images: their common features and differences.
 
 $collection_of_images
 """
