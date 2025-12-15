@@ -146,7 +146,6 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
 
-        pretty_print(response, title="Response from Portkey")
         return GatewayCompletionsFactory.make_extract_output_from_portkey_response(
             response=response,
         )
