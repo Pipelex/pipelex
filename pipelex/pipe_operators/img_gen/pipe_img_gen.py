@@ -12,7 +12,6 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSettin
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.config import get_config
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -73,33 +72,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     @override
     def validate_inputs_with_library(self):
-        if self.inputs.is_empty:
-            # No inputs means that the prompt is in the img_gen_prompt attribute, and we have no inputs to validate
-            return
-        concept_library = get_concept_library()
-        log.debug(self.inputs, title="Inputs")
-        log.debug(self.inputs.variables, title="Input variables")
-        input_name = self.inputs.variables[0]
-        input_requirement = self.inputs.get_required_input_requirement(input_name)
-
-        if not concept_library.is_compatible(
-            tested_concept=input_requirement.concept,
-            wanted_concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
-            strict=True,
-        ):
-            msg = (
-                f"The input of a PipeImgGen must be compatible with the Text concept (or refine it). "
-                f"Input '{input_name}' has concept '{input_requirement.concept.concept_string}'. "
-                "Image generation requires a text prompt. Use native.Text or a concept that refines it."
-            )
-            raise PipeValidationError(
-                message=msg,
-                error_type=PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE,
-                pipe_code=self.code,
-                variable_names=[input_name],
-                required_concept_codes=["native.Text"],
-                provided_concept_code=input_requirement.concept.concept_string,
-            )
+        pass
 
     @override
     def validate_output_static(self):

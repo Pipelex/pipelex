@@ -9,6 +9,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 
 
@@ -29,18 +30,26 @@ class PipeImgGenBlueprint(PipeBlueprint):
     @override
     def validate_inputs(self):
         # Get all required variables from prompt
+        template_category = TemplateCategory.IMG_GEN_PROMPT
         preprocessed_template = preprocess_template(self.prompt)
         try:
-            required_variables = detect_jinja2_required_variables(
-                template_category=TemplateCategory.IMG_GEN_PROMPT,
+            check_jinja2_parsing(
                 template_source=preprocessed_template,
+                template_category=template_category,
             )
         except Jinja2DetectVariablesError as exc:
             msg = f"Could not detect required variables in prompt for PipeImgGen: {exc}"
             raise ValueError(msg) from exc
 
         # Filter out internal variables that start with underscore
-        required_variables = {var for var in required_variables if not var.startswith("_")}
+        required_variables = {
+            variable_name
+            for variable_name in detect_jinja2_required_variables(
+                template_category=template_category,
+                template_source=preprocessed_template,
+            )
+            if not variable_name.startswith("_")
+        }
 
         # Check that all required variables are in inputs
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
