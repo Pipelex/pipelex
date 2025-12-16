@@ -155,9 +155,9 @@ class PipelexGatewayTelemetryConfig(BaseModel):
 class TelemetryConfig(ConfigModel):
     """Main telemetry configuration with nested sections."""
 
-    custom_posthog: PostHogConfig = Field(description="PostHog configuration")
-    custom_portkey: PortkeyConfig = Field(description="Custom Portkey SDK configuration")
-    langfuse: LangfuseConfig = Field(description="Langfuse configuration")
+    custom_posthog: PostHogConfig = Field(default_factory=PostHogConfig, description="PostHog configuration")
+    custom_portkey: PortkeyConfig = Field(default_factory=PortkeyConfig, description="Custom Portkey SDK configuration")
+    langfuse: LangfuseConfig = Field(default_factory=LangfuseConfig, description="Langfuse configuration")
     otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
     telemetry_allowed_modes: dict[str, bool] = Field(
         default_factory=dict,
