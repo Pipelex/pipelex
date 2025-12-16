@@ -1,0 +1,314 @@
+"""Unit tests for StructuredContentComposer - composes StructuredContent from blueprints.
+
+The composer takes a ConstructBlueprint and WorkingMemory, resolves all fields
+according to their composition methods, and produces a StructuredContent instance.
+"""
+
+from typing import Any, Callable, ClassVar
+
+import pytest
+from pydantic import Field, ValidationError
+
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.hub import get_native_concept
+from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
+from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
+
+
+# Test StructuredContent classes for testing
+class SimpleReport(StructuredContent):
+    """Simple report for testing fixed values and variable references."""
+
+    title: str = Field(description="Report title")
+    author: str = Field(description="Author name")
+    score: float = Field(description="Report score")
+    is_draft: bool = Field(default=False, description="Whether this is a draft")
+
+
+class Address(StructuredContent):
+    """Address for nested structure testing."""
+
+    street: str = Field(description="Street address")
+    city: str = Field(description="City name")
+    country: str = Field(description="Country name")
+
+
+class Company(StructuredContent):
+    """Company with nested address for testing nested composition."""
+
+    name: str = Field(description="Company name")
+    headquarters: Address = Field(description="Company headquarters")
+
+
+class Deal(StructuredContent):
+    """Deal for working memory input testing."""
+
+    customer_name: str = Field(description="Customer name")
+    amount: float = Field(description="Deal amount")
+
+
+class SalesSummary(StructuredContent):
+    """Sales summary for template testing."""
+
+    report_title: str = Field(description="Title of the report")
+    customer_name: str = Field(description="Customer name")
+    deal_value: float = Field(description="Deal value")
+    summary_text: str = Field(description="Generated summary text")
+
+
+class ComposerTestData:
+    """Test data for StructuredContentComposer tests."""
+
+    # Fixed values only
+    FIXED_ONLY_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "title": "Annual Report",
+        "author": "John Doe",
+        "score": 95.5,
+        "is_draft": False,
+    }
+
+    # Variable references only
+    VAR_REF_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "report_title": {"from": "deal.customer_name"},
+        "customer_name": {"from": "deal.customer_name"},
+        "deal_value": {"from": "deal.amount"},
+        "summary_text": {"from": "deal.customer_name"},
+    }
+
+    # Mixed: fixed + variable refs
+    MIXED_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "report_title": "Monthly Sales Report",
+        "customer_name": {"from": "deal.customer_name"},
+        "deal_value": {"from": "deal.amount"},
+        "summary_text": {"template": "Deal worth $deal.amount with $deal.customer_name"},
+    }
+
+    # Nested construct
+    NESTED_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "name": {"from": "company_name"},
+        "headquarters": {
+            "street": {"from": "addr.street"},
+            "city": {"from": "addr.city"},
+            "country": "France",
+        },
+    }
+
+
+class TestStructuredContentComposerFixedValues:
+    """Tests for composing with fixed values only."""
+
+    def test_compose_all_fixed_values(self):
+        """Test composing a StructuredContent with all fixed values."""
+        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.FIXED_ONLY_CONSTRUCT)
+        working_memory = WorkingMemory()
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=SimpleReport,
+        )
+        result = composer.compose()
+
+        assert isinstance(result, SimpleReport)
+        assert result.title == "Annual Report"
+        assert result.author == "John Doe"
+        assert result.score == 95.5
+        assert result.is_draft is False
+
+
+class TestStructuredContentComposerVariableRefs:
+    """Tests for composing with variable references."""
+
+    @pytest.fixture
+    def working_memory_with_deal(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
+        """Create working memory with a Deal object."""
+        load_empty_library()
+        deal = Deal(customer_name="Acme Corp", amount=50000.0)
+        return WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),  # Using native concept for simplicity
+                content=deal,
+                name="deal",
+            ),
+        )
+
+    def test_compose_with_variable_refs(self, working_memory_with_deal: WorkingMemory):
+        """Test composing with variable references from working memory."""
+        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.VAR_REF_CONSTRUCT)
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_deal,
+            output_class=SalesSummary,
+        )
+        result = composer.compose()
+
+        assert isinstance(result, SalesSummary)
+        assert result.customer_name == "Acme Corp"
+        assert result.deal_value == 50000.0
+
+
+class TestStructuredContentComposerTemplates:
+    """Tests for composing with templates."""
+
+    @pytest.fixture
+    def working_memory_with_deal(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
+        """Create working memory with a Deal object."""
+        load_empty_library()
+        deal = Deal(customer_name="Acme Corp", amount=50000.0)
+        return WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=deal,
+                name="deal",
+            ),
+        )
+
+    def test_compose_with_template(self, working_memory_with_deal: WorkingMemory):
+        """Test composing with a template field."""
+        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.MIXED_CONSTRUCT)
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_deal,
+            output_class=SalesSummary,
+        )
+        result = composer.compose()
+
+        assert isinstance(result, SalesSummary)
+        assert result.report_title == "Monthly Sales Report"
+        assert result.customer_name == "Acme Corp"
+        assert result.deal_value == 50000.0
+        # Template should render the variables
+        assert "50000.0" in result.summary_text
+        assert "Acme Corp" in result.summary_text
+
+
+class TestStructuredContentComposerNested:
+    """Tests for composing nested structures."""
+
+    @pytest.fixture
+    def working_memory_with_address(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
+        """Create working memory with address components."""
+        load_empty_library()
+        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
+
+        addr = Address(street="123 Main St", city="Paris", country="France")
+        company_name_stuff = StuffFactory.make_stuff(
+            concept=get_native_concept(NativeConceptCode.TEXT),
+            content=TextContent(text="TechCorp"),
+            name="company_name",
+        )
+        addr_stuff = StuffFactory.make_stuff(
+            concept=get_native_concept(NativeConceptCode.TEXT),
+            content=addr,
+            name="addr",
+        )
+
+        working_memory = WorkingMemory()
+        working_memory.add_new_stuff(name="company_name", stuff=company_name_stuff)
+        working_memory.add_new_stuff(name="addr", stuff=addr_stuff)
+        return working_memory
+
+    def test_compose_nested_structure(self, working_memory_with_address: WorkingMemory):
+        """Test composing a StructuredContent with nested structure."""
+        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.NESTED_CONSTRUCT)
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_address,
+            output_class=Company,
+        )
+        result = composer.compose()
+
+        assert isinstance(result, Company)
+        assert result.name == "TechCorp"
+        assert isinstance(result.headquarters, Address)
+        assert result.headquarters.street == "123 Main St"
+        assert result.headquarters.city == "Paris"
+        assert result.headquarters.country == "France"
+
+
+class TestStructuredContentComposerErrors:
+    """Tests for error handling in the composer."""
+
+    def test_missing_variable_raises_error(self, load_empty_library: Callable[[], None]):
+        """Test that referencing a missing variable raises an appropriate error."""
+        load_empty_library()
+        blueprint = ConstructBlueprint.make_from_raw(
+            {
+                "title": {"from": "nonexistent.variable"},
+                "author": "Test",
+                "score": 1.0,
+            }
+        )
+        working_memory = WorkingMemory()
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=SimpleReport,
+        )
+
+        with pytest.raises(WorkingMemoryStuffNotFoundError):
+            composer.compose()
+
+    def test_type_mismatch_raises_error(self, load_empty_library: Callable[[], None]):
+        """Test that type mismatch between blueprint and class raises error."""
+        load_empty_library()
+        # score should be float but we provide a string that can't be converted
+        blueprint = ConstructBlueprint.make_from_raw(
+            {
+                "title": "Test Report",
+                "author": "Test Author",
+                "score": "not a number",  # This should cause validation error
+            }
+        )
+        working_memory = WorkingMemory()
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=SimpleReport,
+        )
+
+        with pytest.raises(ValidationError):
+            composer.compose()
+
+
+class TestStructuredContentComposerAsync:
+    """Tests for async composition (templates may require async rendering)."""
+
+    @pytest.fixture
+    def working_memory_with_deal(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
+        """Create working memory with a Deal object."""
+        load_empty_library()
+        deal = Deal(customer_name="Acme Corp", amount=50000.0)
+        return WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=deal,
+                name="deal",
+            ),
+        )
+
+    @pytest.mark.asyncio
+    async def test_compose_async_with_templates(self, working_memory_with_deal: WorkingMemory):
+        """Test async composition when templates are involved."""
+        blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.MIXED_CONSTRUCT)
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_deal,
+            output_class=SalesSummary,
+        )
+        result = await composer.compose_async()
+
+        assert isinstance(result, SalesSummary)
+        assert "50000.0" in result.summary_text or "50000" in result.summary_text
+        assert "Acme Corp" in result.summary_text

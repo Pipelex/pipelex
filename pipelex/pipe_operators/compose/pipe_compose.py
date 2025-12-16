@@ -20,6 +20,8 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
+from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
+from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -42,17 +44,37 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         native_concept_code=NativeConceptCode.TEXT,
     )
 
-    template: str
+    # Template mode fields (used when template is provided)
+    template: str | None = None
     templating_style: TemplatingStyle | None = None
     category: TemplateCategory = TemplateCategory.BASIC
     extra_context: dict[str, Any] | None = None
 
+    # Construct mode field (used when construct is provided)
+    construct_blueprint: ConstructBlueprint | None = None
+
+    @property
+    def is_construct_mode(self) -> bool:
+        """Return True if this pipe uses construct mode instead of template mode."""
+        return self.construct_blueprint is not None
+
     @property
     def desc(self) -> str:
+        if self.is_construct_mode:
+            return "PipeCompose in construct mode for StructuredContent output"
         return f"Jinja2 included template, prompting style {self.templating_style}"
 
     @override
     def required_variables(self) -> set[str]:
+        if self.is_construct_mode:
+            return self._required_variables_for_construct()
+        return self._required_variables_for_template()
+
+    def _required_variables_for_template(self) -> set[str]:
+        """Get required variables for template mode."""
+        if self.template is None:
+            return set()
+
         try:
             required_variables = detect_jinja2_required_variables(
                 template_category=self.category,
@@ -66,6 +88,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             for variable_name in required_variables
             if not variable_name.startswith("_") and variable_name not in {"preliminary_text", "place_holder"}
         }
+
+    def _required_variables_for_construct(self) -> set[str]:
+        """Get required variables for construct mode."""
+        if self.construct_blueprint is None:
+            return set()
+        return self.construct_blueprint.get_required_variables()
 
     @override
     # TODO: this needs testing!!!
@@ -89,15 +117,22 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     def validate_output_with_library(self):
+        # In construct mode, output can be any StructuredContent (not just Text)
+        if self.is_construct_mode:
+            # For construct mode, we just need to verify the output concept exists
+            # The actual structure validation happens at runtime
+            return
+
+        # In template mode, output must be Text-compatible
         if not get_concept_library().is_compatible(
             tested_concept=self.output,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
             strict=True,
         ):
             msg = (
-                f"The output of a PipeCompose must be strictly compatible with the Text concept. "
+                f"The output of a PipeCompose in template mode must be strictly compatible with the Text concept. "
                 f"In the pipe '{self.code}' the output is '{self.output.concept_string}'. "
-                "Make sure this concept refines the native Text concept."
+                "Make sure this concept refines the native Text concept, or use construct mode for StructuredContent."
             )
             raise PipeValidationError(
                 message=msg,
@@ -122,6 +157,33 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             msg = f"PipeCompose does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
             raise PipeRunParamsError(msg)
 
+        if self.is_construct_mode:
+            return await self._run_construct_mode(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                output_name=output_name,
+            )
+        return await self._run_template_mode(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            content_generator=content_generator,
+        )
+
+    async def _run_template_mode(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None,
+        content_generator: ContentGeneratorProtocol,
+    ) -> PipeComposeOutput:
+        """Run PipeCompose in template mode (produces Text output)."""
+        if self.template is None:
+            msg = "Template is required for template mode"
+            raise ValueError(msg)
+
         context: dict[str, Any] = working_memory.generate_context()
         if pipe_run_params:
             context.update(**pipe_run_params.params)
@@ -143,6 +205,44 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             base_class=StuffContent,
         )
         the_content = structure_class(text=jinja2_text)
+
+        output_stuff = StuffFactory.make_stuff(concept=self.output, content=the_content, name=output_name)
+
+        working_memory.set_new_main_stuff(
+            stuff=output_stuff,
+            name=output_name,
+        )
+
+        return PipeComposeOutput(
+            working_memory=working_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
+        )
+
+    async def _run_construct_mode(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        output_name: str | None,
+    ) -> PipeComposeOutput:
+        """Run PipeCompose in construct mode (produces StructuredContent output)."""
+        if self.construct_blueprint is None:
+            msg = "Construct blueprint is required for construct mode"
+            raise ValueError(msg)
+
+        # Get the output class from the registry
+        output_class = get_class_registry().get_required_subclass(
+            name=self.output.structure_class_name,
+            base_class=StuffContent,
+        )
+
+        # Create composer and compose the structured content
+        composer = StructuredContentComposer(
+            construct_blueprint=self.construct_blueprint,
+            working_memory=working_memory,
+            output_class=output_class,
+        )
+        the_content = await composer.compose_async()
+        log.verbose(f"Composed structured content: {the_content}")
 
         output_stuff = StuffFactory.make_stuff(concept=self.output, content=the_content, name=output_name)
 

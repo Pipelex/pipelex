@@ -1,5 +1,6 @@
 from typing import Any, Literal
 
+from pydantic import ConfigDict, Field, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -7,46 +8,96 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.types import Self
 
 
 class PipeComposeBlueprint(PipeBlueprint):
+    model_config = ConfigDict(populate_by_name=True)
+
     type: Literal["PipeCompose"] = "PipeCompose"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
-    template: str | TemplateBlueprint
+
+    # Either template or construct must be provided, but not both
+    # Note: The field is named 'construct_spec' internally to avoid conflict with Pydantic's
+    # BaseModel.construct() method. In PLX/TOML files, use 'construct' (via validation_alias).
+    template: str | TemplateBlueprint | None = None
+    construct_spec: dict[str, Any] | None = Field(default=None, validation_alias="construct")
+
+    @model_validator(mode="after")
+    def validate_template_or_construct(self) -> Self:
+        """Validate that exactly one of template or construct is provided."""
+        has_template = self.template is not None
+        has_construct = self.construct_spec is not None
+
+        if not has_template and not has_construct:
+            msg = "PipeComposeBlueprint requires either 'template' or 'construct' to be provided"
+            raise ValueError(msg)
+        if has_template and has_construct:
+            msg = "PipeComposeBlueprint cannot have both 'template' and 'construct' - use one or the other"
+            raise ValueError(msg)
+        return self
 
     @property
-    def template_source(self) -> str:
+    def construct_blueprint(self) -> ConstructBlueprint | None:
+        """Get the construct blueprint if construct mode is used."""
+        if self.construct_spec is None:
+            return None
+        return ConstructBlueprint.make_from_raw(self.construct_spec)
+
+    @property
+    def is_construct_mode(self) -> bool:
+        """Return True if this blueprint uses construct mode instead of template mode."""
+        return self.construct_spec is not None
+
+    @property
+    def template_source(self) -> str | None:
+        """Get the template source string, or None if in construct mode."""
+        if self.template is None:
+            return None
         if isinstance(self.template, TemplateBlueprint):
             return self.template.template
         return self.template
 
     @property
     def template_category(self) -> TemplateCategory:
+        """Get the template category (only relevant in template mode)."""
         if isinstance(self.template, TemplateBlueprint):
             return self.template.category
-        else:
-            return TemplateCategory.BASIC
+        return TemplateCategory.BASIC
 
     @property
     def templating_style(self) -> TemplatingStyle | None:
+        """Get the templating style (only relevant in template mode)."""
         if isinstance(self.template, TemplateBlueprint):
             return self.template.templating_style
-        else:
-            return None
+        return None
 
     @property
     def extra_context(self) -> dict[str, Any] | None:
+        """Get extra context (only relevant in template mode)."""
         if isinstance(self.template, TemplateBlueprint):
             return self.template.extra_context
-        else:
-            return None
+        return None
 
     @override
     def validate_inputs(self):
-        preprocessed_template = preprocess_template(self.template_source)
+        """Validate inputs based on mode (template or construct)."""
+        if self.is_construct_mode:
+            self._validate_construct_inputs()
+        else:
+            self._validate_template_inputs()
+
+    def _validate_template_inputs(self):
+        """Validate inputs for template mode."""
+        template_source = self.template_source
+        if template_source is None:
+            return
+
+        preprocessed_template = preprocess_template(template_source)
         try:
             check_jinja2_parsing(
                 template_source=preprocessed_template,
@@ -66,6 +117,26 @@ class PipeComposeBlueprint(PipeBlueprint):
         for required_variable_name in required_variables:
             if required_variable_name not in self.input_names:
                 msg = f"Required variable '{required_variable_name}' is not in the inputs of PipeCompose."
+                raise ValueError(msg)
+
+    def _validate_construct_inputs(self):
+        """Validate inputs for construct mode.
+
+        The construct blueprint may reference variables from working memory.
+        We validate that the root variable names (before any dots) are declared in inputs.
+        For example, 'deal.customer_name' requires 'deal' to be in inputs.
+        """
+        construct_bp = self.construct_blueprint
+        if construct_bp is None:
+            return
+
+        required_variables = construct_bp.get_required_variables()
+        # Extract root variable names (the part before any dot)
+        root_variable_names = {var.split(".")[0] for var in required_variables}
+
+        for root_name in root_variable_names:
+            if root_name not in self.input_names:
+                msg = f"Required variable '{root_name}' from construct is not in the inputs of PipeCompose."
                 raise ValueError(msg)
 
     @override

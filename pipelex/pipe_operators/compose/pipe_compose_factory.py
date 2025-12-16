@@ -27,7 +27,41 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         output: Concept,
         blueprint: PipeComposeBlueprint,
     ) -> PipeCompose:
-        preprocessed_template = preprocess_template(blueprint.template_source)
+        if blueprint.is_construct_mode:
+            return cls._make_construct_mode(
+                pipe_code=pipe_code,
+                domain_code=domain_code,
+                description=description,
+                inputs=inputs,
+                output=output,
+                blueprint=blueprint,
+            )
+        return cls._make_template_mode(
+            pipe_code=pipe_code,
+            domain_code=domain_code,
+            description=description,
+            inputs=inputs,
+            output=output,
+            blueprint=blueprint,
+        )
+
+    @classmethod
+    def _make_template_mode(
+        cls,
+        pipe_code: str,
+        domain_code: str,
+        description: str | None,
+        inputs: InputRequirements,
+        output: Concept,
+        blueprint: PipeComposeBlueprint,
+    ) -> PipeCompose:
+        """Create PipeCompose in template mode (produces Text output)."""
+        template_source = blueprint.template_source
+        if template_source is None:
+            msg = "Template source is required for template mode"
+            raise PipeComposeFactoryError(msg)
+
+        preprocessed_template = preprocess_template(template_source)
         try:
             check_jinja2_parsing(
                 template_source=preprocessed_template,
@@ -47,4 +81,29 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             templating_style=blueprint.templating_style,
             category=blueprint.template_category,
             extra_context=blueprint.extra_context,
+        )
+
+    @classmethod
+    def _make_construct_mode(
+        cls,
+        pipe_code: str,
+        domain_code: str,
+        description: str | None,
+        inputs: InputRequirements,
+        output: Concept,
+        blueprint: PipeComposeBlueprint,
+    ) -> PipeCompose:
+        """Create PipeCompose in construct mode (produces StructuredContent output)."""
+        construct_blueprint = blueprint.construct_blueprint
+        if construct_blueprint is None:
+            msg = "Construct blueprint is required for construct mode"
+            raise PipeComposeFactoryError(msg)
+
+        return PipeCompose(
+            domain=domain_code,
+            code=pipe_code,
+            description=description,
+            inputs=inputs,
+            output=output,
+            construct_blueprint=construct_blueprint,
         )
