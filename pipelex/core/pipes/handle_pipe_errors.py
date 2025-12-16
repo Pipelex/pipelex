@@ -1,9 +1,9 @@
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.interpreter.validation_error_categorizer import ErrorCatKey
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError, PipeValidationErrorType
 from pipelex.types import StrEnum
 
 
@@ -161,4 +161,27 @@ def categorize_pipe_validation_with_libraries_error(
         message=message,
         field_path=pipe_error.file_path or "",
         variable_names=pipe_error.variable_names,
+    )
+
+
+def categorize_pipe_factory_error(
+    factory_error: PipeFactoryError,
+) -> PipeFactoryErrorData:
+    """Categorize a PipeFactoryError and create structured error data.
+
+    This function handles errors from PipeFactory, particularly missing concept errors.
+
+    Args:
+        factory_error: PipeFactoryError with structured error information
+
+    Returns:
+        PipeFactoryErrorData with all relevant fields populated
+    """
+    return PipeFactoryErrorData(
+        error_type=factory_error.error_type,
+        domain=factory_error.domain,
+        pipe_code=factory_error.pipe_code,
+        missing_concept_code=factory_error.missing_concept_code,
+        declared_concepts=factory_error.declared_concepts,
+        message=factory_error.message,
     )

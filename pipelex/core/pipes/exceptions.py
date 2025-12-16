@@ -8,8 +8,50 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.types import StrEnum
 
 
+class PipeFactoryErrorType(StrEnum):
+    """Types of pipe factory errors.
+
+    These error types are raised during pipe creation from blueprints.
+    Some are auto-fixed in the builder loop (marked below).
+    """
+
+    # Errors that are auto-fixed in builder_loop.py
+    UNKNOWN_CONCEPT = "unknown_concept"  # AUTO-FIXED: concept not declared in domain
+
+    # Generic fallback for unexpected factory errors
+    UNKNOWN_FACTORY_ERROR = "unknown_factory_error"
+
+
 class PipeFactoryError(PipelexError):
-    pass
+    """Raised when a pipe cannot be created from a blueprint.
+
+    This error includes structured data about the failure, particularly useful
+    for missing concept errors that can be auto-fixed by the builder loop.
+
+    Attributes:
+        message: Human-readable error message
+        error_type: The type of factory error
+        pipe_code: The pipe code that failed to be created
+        domain: The domain of the pipe
+        missing_concept_code: The concept code that is missing (for MISSING_OUTPUT_CONCEPT errors)
+        declared_concepts: List of concepts declared in the domain
+    """
+
+    def __init__(
+        self,
+        message: str,
+        error_type: PipeFactoryErrorType = PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR,
+        pipe_code: str | None = None,
+        domain: str | None = None,
+        missing_concept_code: str | None = None,
+        declared_concepts: list[str] | None = None,
+    ):
+        self.error_type = error_type
+        self.pipe_code = pipe_code
+        self.domain = domain
+        self.missing_concept_code = missing_concept_code
+        self.declared_concepts = declared_concepts or []
+        super().__init__(message)
 
 
 class PipeVariableMultiplicityError(ValueError):

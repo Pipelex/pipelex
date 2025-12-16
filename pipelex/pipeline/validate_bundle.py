@@ -5,11 +5,12 @@ from pydantic import BaseModel, ValidationError
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
 from pipelex.core.pipes.handle_pipe_errors import (
+    categorize_pipe_factory_error,
     categorize_pipe_validation_error,
     categorize_pipe_validation_with_libraries_error,
 )
@@ -25,6 +26,7 @@ class ValidateBundleError(PipelexError):
 
     This error aggregates validation errors from different stages:
     - Blueprint validation errors (from interpreter)
+    - Pipe factory errors (from PipeFactoryError exceptions, e.g., missing concepts)
     - Pipe validation errors (from PipeValidationError exceptions)
     - Pipe/Concept instantiation errors (from Pydantic ValidationError during factory instantiation)
     - Dry run errors
@@ -36,12 +38,16 @@ class ValidateBundleError(PipelexError):
         self,
         message: str,
         pipelex_bundle_blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        pipe_factory_errors: list[PipeFactoryErrorData] | None = None,
         pipe_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         pipe_concept_instantiation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         dry_run_error_message: str | None = None,
     ):
         # Blueprint validation errors (e.g., PIPE_SEQUENCE_OUTPUT_MISMATCH)
         self.pipelex_bundle_blueprint_validation_errors = pipelex_bundle_blueprint_validation_errors or []
+
+        # Pipe factory errors (e.g., MISSING_OUTPUT_CONCEPT)
+        self.pipe_factory_errors = pipe_factory_errors or []
 
         # Pipe validation errors from PipeValidationError exceptions
         # (e.g., MISSING_INPUT_VARIABLE, EXTRANEOUS_INPUT_VARIABLE, INPUT_REQUIREMENT_MISMATCH, INADEQUATE_OUTPUT_CONCEPT)
@@ -111,6 +117,12 @@ async def validate_bundle(
             message=interpreter_error.message,
             pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
         ) from interpreter_error
+    except PipeFactoryError as factory_error:
+        factory_error_data = categorize_pipe_factory_error(factory_error=factory_error)
+        raise ValidateBundleError(
+            message=f"Pipe factory error: {factory_error}",
+            pipe_factory_errors=[factory_error_data],
+        ) from factory_error
     except PipeValidationError as pipe_error:
         pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
         raise ValidateBundleError(
@@ -153,6 +165,12 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
             message=interpreter_error.message,
             pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
         ) from interpreter_error
+    except PipeFactoryError as factory_error:
+        factory_error_data = categorize_pipe_factory_error(factory_error=factory_error)
+        raise ValidateBundleError(
+            message=f"Pipe factory error: {factory_error}",
+            pipe_factory_errors=[factory_error_data],
+        ) from factory_error
     except PipeValidationError as pipe_error:
         pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
         raise ValidateBundleError(
