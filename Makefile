@@ -196,7 +196,12 @@ cu: env
 
 up-kit-configs:
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
-	@rsync -av --delete --exclude='pipelex_service.toml' .pipelex/ pipelex/kit/configs/
+	@rsync -av --delete \
+		--exclude='.DS_Store' \
+		--exclude='pipelex_service.toml' \
+		--exclude='pipelex_super.toml' \
+		--exclude='telemetry_override.toml' \
+		.pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
 	@echo "> done: ukc = up-kit-configs"

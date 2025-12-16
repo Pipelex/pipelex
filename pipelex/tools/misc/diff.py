@@ -13,10 +13,12 @@ from rich.text import Text
 from pipelex.tools.misc.pretty import PrettyPrinter
 
 if TYPE_CHECKING:
+    from collections.abc import Set as AbstractSet
+
     from pipelex.tools.misc.pretty import PrettyPrintable
 
 
-def has_diff_dirs(dir1: str | Path, dir2: str | Path, exclude_files: set[str] | None = None) -> bool:
+def has_diff_dirs(dir1: str | Path, dir2: str | Path, exclude_files: AbstractSet[str] | None = None) -> bool:
     """Check if there are any differences between two directories.
 
     Args:
@@ -197,7 +199,7 @@ def _generate_diff_summary(diff_content: str, left_is_newer: bool) -> str | None
         return f"  Sync would {' and '.join(summary_parts)} in {obsolete_location}"
 
 
-def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: set[str] | None = None) -> PrettyPrintable:
+def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: AbstractSet[str] | None = None) -> PrettyPrintable:
     """Generate a PrettyPrintable representation of directory differences.
 
     Args:
