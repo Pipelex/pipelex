@@ -99,9 +99,19 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             response.raise_for_status()
             response_dict = response.json()
 
+        generated_images: list[GeneratedImage] = []
         if images := response_dict.get("data"):
-            generated_images: list[GeneratedImage] = []
-
+            size = response_dict.get("size")
+            if not isinstance(size, str):
+                msg = f"Size from img gen response is not a string: '{size}'"
+                raise ImgGenGenerationError(msg)
+            size_split = size.split("x")
+            if len(size_split) != 2:
+                msg = f"Size from img gen response is not a valid size: '{size}'"
+                raise ImgGenGenerationError(msg)
+            width_str, height_str = size_split
+            width = int(width_str)
+            height = int(height_str)
             for image in images:
                 b64_str = image.get("b64_json")
                 if not isinstance(b64_str, str):
@@ -111,8 +121,8 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                 generated_images.append(
                     GeneratedImage(
                         url=base64_url,
-                        width=1024,
-                        height=1024,
+                        width=width,
+                        height=height,
                     ),
                 )
         else:
