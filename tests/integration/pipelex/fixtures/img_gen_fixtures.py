@@ -40,6 +40,7 @@ FAL_IMG_GEN_MODELS = [
 OPENAI_IMG_GEN_MODELS = [
     "gpt-image-1",
     "gpt-image-1-mini",
+    # "gpt-image-1.5",  # Haven't seen it work yet
 ]
 
 # --- Google Models --------------------------------------------------------------------------

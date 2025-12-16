@@ -205,4 +205,4 @@ model_type = "img_gen"
 model_id = "gpt-image-1.5"
 inputs = ["text"]
 outputs = ["image"]
-costs = { input = 10, output = 40 }
+costs = { input = 8, output = 32 }
