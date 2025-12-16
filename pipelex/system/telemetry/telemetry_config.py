@@ -122,7 +122,29 @@ class OtlpExporterConfig(BaseModel):
 
 
 class PipelexGatewayTelemetryConfig(BaseModel):
-    """Pipelex Gateway telemetry configuration."""
+    """Pipelex Gateway telemetry configuration for internal maintainer use.
+
+    NOTE TO CONTRIBUTORS: This config class exists to support personal overrides used by
+    maintainers for improved observability while debugging and demoing Pipelex. It is NOT
+    included in the base `.pipelex/telemetry.toml` installed via `pipelex init telemetry`.
+
+    Maintainers can enable this by adding a `[pipelex_gateway]` section to their personal
+    `telemetry_override.toml` file, which is loaded after and merged with the base config.
+
+    IMPORTANT DISTINCTIONS:
+
+    - **This config** (`pipelex_gateway`): Internal maintainer tooling, applied via personal overrides
+    - **Custom telemetry** (`custom_posthog`, `langfuse`, `otlp`): User-controlled destinations
+    - **Gateway telemetry** (automatic): When using Pipelex Gateway as inference backend,
+      identified telemetry is automatically enabled (tied to Gateway API key, hashed for security)
+
+    Using Pipelex Gateway is entirely optional—you can BYOK (Bring Your Own Keys) with direct
+    provider backends (OpenAI, Anthropic, Azure, Bedrock, etc.) instead.
+
+    See Also:
+        - docs/home/5-setup/telemetry.md: Overview of telemetry streams
+        - docs/home/7-configuration/config-practical/telemetry-config.md: Custom telemetry configuration
+    """
 
     model_config = ConfigDict(extra="forbid")
 

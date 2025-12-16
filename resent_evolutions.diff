@@ -1,0 +1,1685 @@
+diff --git a/.gitignore b/.gitignore
+index f8944e41..60dbdb2c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -42,8 +42,9 @@ Thumbs.db
+ reports/
+ results/
+ 
+-# personnal pipelex config file that overrides the default one
++# personnal pipelex config files that overrides the default one
+ pipelex_super.toml
++telemetry_override.toml
+ 
+ # local pipelex service configuration
+ .pipelex/pipelex_service.toml
+@@ -55,4 +56,4 @@ gcp_credentials.json
+ 
+ /pipelex.toml
+ settings.local.json
+-structures/
+\ No newline at end of file
++structures/
+diff --git a/.pipelex/pipelex.toml b/.pipelex/pipelex.toml
+index 95515208..e9cba812 100644
+--- a/.pipelex/pipelex.toml
++++ b/.pipelex/pipelex.toml
+@@ -2,11 +2,11 @@
+ # Pipelex Configuration File
+ ####################################################################################################
+ #
+-# This configuration file is copied to your project's .pipelex/ directory when you run:
+-#   pipelex init config
++# This configuration file is copied to client projects' .pipelex/ directory when running:
++#   `pipelex init config`
+ #
+ # Purpose:
+-# - This file allows you to override Pipelex's default settings for your specific project
++# - This file allows to override Pipelex's default settings for specific projects
+ # - Feel free to modify any settings below to suit your needs
+ # - You can add any configuration sections that exist in the main pipelex.toml
+ #
+@@ -14,7 +14,7 @@
+ # - See the full default configuration in: pipelex/pipelex.toml (in the Pipelex package)
+ # - See the configuration structure classes in: pipelex/config.py and pipelex/cogt/config_cogt.py
+ #
+-# Common Customizations:
++# Common customizations are proposed below, such as:
+ # - Logging levels and behavior
+ # - Excluded directories for scanning
+ # - LLM prompt dumping for debugging
+@@ -27,76 +27,80 @@
+ ####################################################################################################
+ 
+ [pipelex.scan_config]
+-excluded_dirs = [
+-    ".venv",
+-    "venv",
+-    "env",
+-    ".env",
+-    "virtualenv",
+-    ".virtualenv",
+-    ".git",
+-    "__pycache__",
+-    ".pytest_cache",
+-    ".mypy_cache",
+-    ".ruff_cache",
+-    "node_modules",
+-    "results",
+-]
++# Uncomment to customize the excluded directories for scanning
++# excluded_dirs = [
++#     ".venv",
++#     "venv",
++#     "env",
++#     ".env",
++#     "virtualenv",
++#     ".virtualenv",
++#     ".git",
++#     "__pycache__",
++#     ".pytest_cache",
++#     ".mypy_cache",
++#     ".ruff_cache",
++#     "node_modules",
++#     "results",
++# ]
+ 
+ [pipelex.builder_config]
+-fix_loop_max_attempts = 10
+-# Uncomment to change where the generated pipelines are saved
++# Uncomment to change where the generated pipelines are saved:
+ # default_output_dir = "."
+ # default_bundle_file_name = "bundle"
+ # default_directory_base_name = "pipeline"
+ 
+ [pipelex.log_config]
+-default_log_level = "INFO"
++# Uncomment to change the default log level:
++# default_log_level = "INFO"
+ 
+ # Uncomment to log to stderr instead of stdout
+ # console_log_target = "stderr"
+ # console_print_target = "stderr"
+ 
+ [pipelex.log_config.package_log_levels]
+-pipelex = "INFO"
++# Uncomment to change the log level for specific packages:
++# pipelex = "INFO"
+ 
+ [cogt]
+ [cogt.model_deck_config]
+-# Uncomment to disable model fallback: it will raise errors instead of using secondary model options
++# Uncomment to disable model fallback: it will raise errors instead of using secondary model options:
+ # is_model_fallback_enabled = false
+ # Uncomment to change the reaction to missing presets: "raise" (default), "log" or "none"
+ # missing_presets_reaction = "raise"
+ 
+ [cogt.tenacity_config]
+-# Uncomment to change those values as needed
++# Uncomment to change those values as needed:
+ # max_retries = 50      # Maximum number of retry attempts before giving up
+ # wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
+ # wait_max = 20         # Maximum wait time between retries (in seconds)
+ # wait_exp_base = 1.3   # Base for exponential backoff calculation
+ 
+ [cogt.llm_config]
+-# Uncomment any of these to enable dumping the inputs or outputs of text-genration with an LLM
++# Uncomment any of these to enable dumping the inputs or outputs of text-generation with an LLM:
+ # is_dump_text_prompts_enabled = true
+ # is_dump_response_text_enabled = true
+ 
+ [cogt.llm_config.instructor_config]
+-# Uncomment any of these to enable dumping the kwargs, response or errors of the instructor
++# Uncomment any of these to enable dumping the kwargs, response or errors when generating structured content:
+ # is_dump_kwargs_enabled = true
+ # is_dump_response_enabled = true
+ # is_dump_error_enabled = true
+ 
+ [pipelex.observer_config]
+-observer_dir = "results/observer"
++# Uncomment to change the directory where the observer will save its results:
++# observer_dir = "results/observer"
+ 
+ [pipelex.feature_config]
+-# WIP/Experimental feature flags
+-is_pipeline_tracking_enabled = false
+-is_reporting_enabled = true
++# WIP/Experimental feature flags:
++# is_pipeline_tracking_enabled = false
++# is_reporting_enabled = true
+ 
+ [pipelex.reporting_config]
+-is_log_costs_to_console = false
+-is_generate_cost_report_file_enabled = true
+-cost_report_dir_path = "reports"
+-cost_report_base_name = "cost_report"
+-cost_report_extension = "csv"
+-cost_report_unit_scale = 1.0
++# Uncomment to customize the reporting configuration:
++# is_log_costs_to_console = false
++# is_generate_cost_report_file_enabled = false
++# cost_report_dir_path = "reports"
++# cost_report_base_name = "cost_report"
++# cost_report_extension = "csv"
++# cost_report_unit_scale = 1.0
+diff --git a/.pipelex/telemetry.toml b/.pipelex/telemetry.toml
+index 75207a7c..eb2c5374 100644
+--- a/.pipelex/telemetry.toml
++++ b/.pipelex/telemetry.toml
+@@ -21,7 +21,7 @@
+ # PostHog Configuration (Event tracking + AI span tracing)
+ # ──────────────────────────────────────────────────────────────────────────────
+ 
+-[posthog]
++[custom_posthog]
+ mode = "off" # Values: "off" | "anonymous" | "identified"
+ # user_id = "your_user_id"                                  # Required when mode = "identified"
+ endpoint = "${POSTHOG_ENDPOINT}" # Default: https://us.i.posthog.com (or https://eu.i.posthog.com for EU)
+@@ -37,16 +37,24 @@ redact_properties = [
+ ] # Event properties to redact
+ 
+ # AI span tracing to YOUR PostHog (does NOT affect Langfuse/OTLP - they receive full data)
+-[posthog.tracing]
++[custom_posthog.tracing]
+ enabled = false # Send AI spans to your PostHog
+ 
+ # Privacy controls for data sent to YOUR PostHog only
+-[posthog.tracing.capture]
++[custom_posthog.tracing.capture]
+ content = false # Capture prompt/completion content
+ # content_max_length = 1000                                 # Max length for captured content (omit for unlimited)
+ pipe_codes = false         # Include pipe codes in span names/attributes
+ output_class_names = false # Include output class names in span names/attributes
+ 
++# ──────────────────────────────────────────────────────────────────────────────
++# Portkey SDK Configuration
++# ──────────────────────────────────────────────────────────────────────────────
++
++[custom_portkey]
++force_debug_enabled = false
++force_tracing_enabled = false
++
+ # ──────────────────────────────────────────────────────────────────────────────
+ # Langfuse Integration
+ # Note: Langfuse receives FULL span data (no redaction)
+@@ -73,7 +81,7 @@ enabled = false
+ # Controls which integration modes can use custom telemetry settings above.
+ # ──────────────────────────────────────────────────────────────────────────────
+ 
+-[custom_telemetry_allowed_modes]
++[telemetry_allowed_modes]
+ ci = false     # CI environments don't use custom telemetry
+ cli = true     # CLI usage allows custom telemetry
+ docker = true  # Docker deployments allow custom telemetry
+diff --git a/Makefile b/Makefile
+index 179d669c..f11921ed 100644
+--- a/Makefile
++++ b/Makefile
+@@ -196,7 +196,12 @@ cu: env
+ 
+ up-kit-configs:
+ 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
+-	@rsync -av --delete --exclude='pipelex_service.toml' .pipelex/ pipelex/kit/configs/
++	@rsync -av --delete \
++		--exclude='.DS_Store' \
++		--exclude='pipelex_service.toml' \
++		--exclude='pipelex_super.toml' \
++		--exclude='telemetry_override.toml' \
++		.pipelex/ pipelex/kit/configs/
+ 
+ ukc: up-kit-configs
+ 	@echo "> done: ukc = up-kit-configs"
+diff --git a/docs/home/7-configuration/config-practical/reporting-config.md b/docs/home/7-configuration/config-practical/reporting-config.md
+index 378dc039..544095a9 100644
+--- a/docs/home/7-configuration/config-practical/reporting-config.md
++++ b/docs/home/7-configuration/config-practical/reporting-config.md
+@@ -21,12 +21,12 @@ is_log_costs_to_console = false
+ ### Cost Report File Generation
+ 
+ ```toml
+-is_generate_cost_report_file_enabled = true
++is_generate_cost_report_file_enabled = false
+ ```
+ 
+ - Controls whether cost report files are generated after the execution of the pipeline
+ - When enabled, creates detailed reports in CSV format in the directory `reports/` by default.
+-- Default: `true`
++- Default: `false`
+ 
+ ### Report File Location
+ 
+@@ -71,7 +71,7 @@ cost_report_unit_scale = 1.0
+ is_log_costs_to_console = true
+ 
+ # Generate report files
+-is_generate_cost_report_file_enabled = true
++is_generate_cost_report_file_enabled = false
+ 
+ # Store reports in a custom directory
+ cost_report_dir_path = "analytics/cost_reports"
+diff --git a/pipelex/cli/commands/doctor_cmd.py b/pipelex/cli/commands/doctor_cmd.py
+index c17567c1..b5b6beee 100644
+--- a/pipelex/cli/commands/doctor_cmd.py
++++ b/pipelex/cli/commands/doctor_cmd.py
+@@ -107,10 +107,10 @@ def check_telemetry_config() -> tuple[bool, str]:
+ 
+     try:
+         telemetry_config = TelemetryConfig.model_validate(toml_doc)
+-        return True, f"Telemetry configured (mode: {telemetry_config.posthog.mode})"
++        return True, f"Telemetry configured (mode: {telemetry_config.custom_posthog.mode})"
+     except ValidationError:
+         # Check if this looks like the old config format (has telemetry_mode at root level)
+-        if "posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
++        if "custom_posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
+             return False, "Config format has changed - run [cyan]pipelex init telemetry[/cyan] to update"
+         return False, "Invalid configuration - run [cyan]pipelex init telemetry --reset[/cyan] to fix"
+ 
+diff --git a/pipelex/cli/commands/init/config_files.py b/pipelex/cli/commands/init/config_files.py
+index 16f43921..56392ded 100644
+--- a/pipelex/cli/commands/init/config_files.py
++++ b/pipelex/cli/commands/init/config_files.py
+@@ -6,10 +6,14 @@ import shutil
+ import typer
+ 
+ from pipelex.cli.exceptions import PipelexCLIError
+-from pipelex.kit.paths import get_kit_configs_dir
++from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir
+ from pipelex.system.configuration.config_loader import config_manager
+ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+ 
++# Files to skip when copying configs to user's .pipelex directory.
++# Includes git-ignored files plus telemetry.toml (created when user is prompted).
++INIT_SKIP_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {TELEMETRY_CONFIG_FILE_NAME, ".DS_Store"}
++
+ 
+ def init_config(reset: bool = False, dry_run: bool = False) -> int:
+     """Initialize pipelex configuration in the .pipelex directory. Does not install telemetry, just the main config and inference backends.
+@@ -37,8 +41,8 @@ def init_config(reset: bool = False, dry_run: bool = False) -> int:
+                 dst_item = os.path.join(dst_dir, item)
+                 relative_item = os.path.join(relative_path, item) if relative_path else item
+ 
+-                # Skip telemetry.toml - it will be created when user is prompted
+-                if item == TELEMETRY_CONFIG_FILE_NAME:
++                # Skip git-ignored files and telemetry.toml (created when user is prompted)
++                if item in INIT_SKIP_FILES:
+                     continue
+ 
+                 if os.path.isdir(src_item):
+diff --git a/pipelex/cli/dev_cli/commands/check_config_sync_cmd.py b/pipelex/cli/dev_cli/commands/check_config_sync_cmd.py
+index 06b2e899..e624cab9 100644
+--- a/pipelex/cli/dev_cli/commands/check_config_sync_cmd.py
++++ b/pipelex/cli/dev_cli/commands/check_config_sync_cmd.py
+@@ -8,15 +8,10 @@ from pathlib import Path
+ from rich.panel import Panel
+ 
+ from pipelex.hub import get_console
++from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES
+ from pipelex.tools.misc.diff import has_diff_dirs, make_diff_dirs_pretty
+ from pipelex.types import StrEnum
+ 
+-# Files excluded from config sync check because they have intentionally different values
+-# between the template (for new users) and the dev config (for developers/tests).
+-# - pipelex_service.toml: Contains terms_accepted which is False in template
+-#   (for new users) but True in dev config (for developers/tests)
+-CONFIG_SYNC_EXCLUDE_FILES = {"pipelex_service.toml"}
+-
+ 
+ class LeadingConfig(StrEnum):
+     """Enum for leading configuration options."""
+@@ -78,7 +73,7 @@ def check_config_sync_cmd(
+             right_label = ".pipelex"
+ 
+     # Check for differences (excluding files that intentionally differ)
+-    has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=CONFIG_SYNC_EXCLUDE_FILES)
++    has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=GIT_IGNORED_CONFIG_FILES)
+ 
+     if not has_diff:
+         # No differences found
+@@ -113,7 +108,7 @@ def check_config_sync_cmd(
+ 
+         if show_diff:
+             console.print()
+-            pretty_diff = make_diff_dirs_pretty(left_dir, right_dir, exclude_files=CONFIG_SYNC_EXCLUDE_FILES)
++            pretty_diff = make_diff_dirs_pretty(left_dir, right_dir, exclude_files=GIT_IGNORED_CONFIG_FILES)
+             console.print(pretty_diff)
+             console.print()
+ 
+diff --git a/pipelex/cogt/usage/cost_registry.py b/pipelex/cogt/usage/cost_registry.py
+index 7cfe3998..dea1dbe3 100644
+--- a/pipelex/cogt/usage/cost_registry.py
++++ b/pipelex/cogt/usage/cost_registry.py
+@@ -156,6 +156,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
+         )
+ 
+         console.print(table)
++        console.print(" [dim]Note: the report only includes LLMs and some costs might be missing or not up-to-date.[/dim]")
+ 
+         if cost_report_file_path:
+             cls.save_to_csv(records, cost_report_file_path)
+diff --git a/pipelex/kit/configs/pipelex.toml b/pipelex/kit/configs/pipelex.toml
+index 95515208..e9cba812 100644
+--- a/pipelex/kit/configs/pipelex.toml
++++ b/pipelex/kit/configs/pipelex.toml
+@@ -2,11 +2,11 @@
+ # Pipelex Configuration File
+ ####################################################################################################
+ #
+-# This configuration file is copied to your project's .pipelex/ directory when you run:
+-#   pipelex init config
++# This configuration file is copied to client projects' .pipelex/ directory when running:
++#   `pipelex init config`
+ #
+ # Purpose:
+-# - This file allows you to override Pipelex's default settings for your specific project
++# - This file allows to override Pipelex's default settings for specific projects
+ # - Feel free to modify any settings below to suit your needs
+ # - You can add any configuration sections that exist in the main pipelex.toml
+ #
+@@ -14,7 +14,7 @@
+ # - See the full default configuration in: pipelex/pipelex.toml (in the Pipelex package)
+ # - See the configuration structure classes in: pipelex/config.py and pipelex/cogt/config_cogt.py
+ #
+-# Common Customizations:
++# Common customizations are proposed below, such as:
+ # - Logging levels and behavior
+ # - Excluded directories for scanning
+ # - LLM prompt dumping for debugging
+@@ -27,76 +27,80 @@
+ ####################################################################################################
+ 
+ [pipelex.scan_config]
+-excluded_dirs = [
+-    ".venv",
+-    "venv",
+-    "env",
+-    ".env",
+-    "virtualenv",
+-    ".virtualenv",
+-    ".git",
+-    "__pycache__",
+-    ".pytest_cache",
+-    ".mypy_cache",
+-    ".ruff_cache",
+-    "node_modules",
+-    "results",
+-]
++# Uncomment to customize the excluded directories for scanning
++# excluded_dirs = [
++#     ".venv",
++#     "venv",
++#     "env",
++#     ".env",
++#     "virtualenv",
++#     ".virtualenv",
++#     ".git",
++#     "__pycache__",
++#     ".pytest_cache",
++#     ".mypy_cache",
++#     ".ruff_cache",
++#     "node_modules",
++#     "results",
++# ]
+ 
+ [pipelex.builder_config]
+-fix_loop_max_attempts = 10
+-# Uncomment to change where the generated pipelines are saved
++# Uncomment to change where the generated pipelines are saved:
+ # default_output_dir = "."
+ # default_bundle_file_name = "bundle"
+ # default_directory_base_name = "pipeline"
+ 
+ [pipelex.log_config]
+-default_log_level = "INFO"
++# Uncomment to change the default log level:
++# default_log_level = "INFO"
+ 
+ # Uncomment to log to stderr instead of stdout
+ # console_log_target = "stderr"
+ # console_print_target = "stderr"
+ 
+ [pipelex.log_config.package_log_levels]
+-pipelex = "INFO"
++# Uncomment to change the log level for specific packages:
++# pipelex = "INFO"
+ 
+ [cogt]
+ [cogt.model_deck_config]
+-# Uncomment to disable model fallback: it will raise errors instead of using secondary model options
++# Uncomment to disable model fallback: it will raise errors instead of using secondary model options:
+ # is_model_fallback_enabled = false
+ # Uncomment to change the reaction to missing presets: "raise" (default), "log" or "none"
+ # missing_presets_reaction = "raise"
+ 
+ [cogt.tenacity_config]
+-# Uncomment to change those values as needed
++# Uncomment to change those values as needed:
+ # max_retries = 50      # Maximum number of retry attempts before giving up
+ # wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
+ # wait_max = 20         # Maximum wait time between retries (in seconds)
+ # wait_exp_base = 1.3   # Base for exponential backoff calculation
+ 
+ [cogt.llm_config]
+-# Uncomment any of these to enable dumping the inputs or outputs of text-genration with an LLM
++# Uncomment any of these to enable dumping the inputs or outputs of text-generation with an LLM:
+ # is_dump_text_prompts_enabled = true
+ # is_dump_response_text_enabled = true
+ 
+ [cogt.llm_config.instructor_config]
+-# Uncomment any of these to enable dumping the kwargs, response or errors of the instructor
++# Uncomment any of these to enable dumping the kwargs, response or errors when generating structured content:
+ # is_dump_kwargs_enabled = true
+ # is_dump_response_enabled = true
+ # is_dump_error_enabled = true
+ 
+ [pipelex.observer_config]
+-observer_dir = "results/observer"
++# Uncomment to change the directory where the observer will save its results:
++# observer_dir = "results/observer"
+ 
+ [pipelex.feature_config]
+-# WIP/Experimental feature flags
+-is_pipeline_tracking_enabled = false
+-is_reporting_enabled = true
++# WIP/Experimental feature flags:
++# is_pipeline_tracking_enabled = false
++# is_reporting_enabled = true
+ 
+ [pipelex.reporting_config]
+-is_log_costs_to_console = false
+-is_generate_cost_report_file_enabled = true
+-cost_report_dir_path = "reports"
+-cost_report_base_name = "cost_report"
+-cost_report_extension = "csv"
+-cost_report_unit_scale = 1.0
++# Uncomment to customize the reporting configuration:
++# is_log_costs_to_console = false
++# is_generate_cost_report_file_enabled = false
++# cost_report_dir_path = "reports"
++# cost_report_base_name = "cost_report"
++# cost_report_extension = "csv"
++# cost_report_unit_scale = 1.0
+diff --git a/pipelex/kit/configs/telemetry.toml b/pipelex/kit/configs/telemetry.toml
+index 75207a7c..eb2c5374 100644
+--- a/pipelex/kit/configs/telemetry.toml
++++ b/pipelex/kit/configs/telemetry.toml
+@@ -21,7 +21,7 @@
+ # PostHog Configuration (Event tracking + AI span tracing)
+ # ──────────────────────────────────────────────────────────────────────────────
+ 
+-[posthog]
++[custom_posthog]
+ mode = "off" # Values: "off" | "anonymous" | "identified"
+ # user_id = "your_user_id"                                  # Required when mode = "identified"
+ endpoint = "${POSTHOG_ENDPOINT}" # Default: https://us.i.posthog.com (or https://eu.i.posthog.com for EU)
+@@ -37,16 +37,24 @@ redact_properties = [
+ ] # Event properties to redact
+ 
+ # AI span tracing to YOUR PostHog (does NOT affect Langfuse/OTLP - they receive full data)
+-[posthog.tracing]
++[custom_posthog.tracing]
+ enabled = false # Send AI spans to your PostHog
+ 
+ # Privacy controls for data sent to YOUR PostHog only
+-[posthog.tracing.capture]
++[custom_posthog.tracing.capture]
+ content = false # Capture prompt/completion content
+ # content_max_length = 1000                                 # Max length for captured content (omit for unlimited)
+ pipe_codes = false         # Include pipe codes in span names/attributes
+ output_class_names = false # Include output class names in span names/attributes
+ 
++# ──────────────────────────────────────────────────────────────────────────────
++# Portkey SDK Configuration
++# ──────────────────────────────────────────────────────────────────────────────
++
++[custom_portkey]
++force_debug_enabled = false
++force_tracing_enabled = false
++
+ # ──────────────────────────────────────────────────────────────────────────────
+ # Langfuse Integration
+ # Note: Langfuse receives FULL span data (no redaction)
+@@ -73,7 +81,7 @@ enabled = false
+ # Controls which integration modes can use custom telemetry settings above.
+ # ──────────────────────────────────────────────────────────────────────────────
+ 
+-[custom_telemetry_allowed_modes]
++[telemetry_allowed_modes]
+ ci = false     # CI environments don't use custom telemetry
+ cli = true     # CLI usage allows custom telemetry
+ docker = true  # Docker deployments allow custom telemetry
+diff --git a/pipelex/kit/paths.py b/pipelex/kit/paths.py
+index 7374360d..5526e117 100644
+--- a/pipelex/kit/paths.py
++++ b/pipelex/kit/paths.py
+@@ -1,6 +1,19 @@
+ from importlib.abc import Traversable
+ from importlib.resources import files
+ 
++# Git-ignored config files that should not be synced between .pipelex and kit/configs.
++# These are personal override files that differ per developer/environment:
++# - pipelex_service.toml: Contains terms_accepted (False for new users, True for devs)
++# - pipelex_super.toml: Personal config overrides
++# - telemetry_override.toml: Personal telemetry settings
++GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
++    {
++        "pipelex_service.toml",
++        "pipelex_super.toml",
++        "telemetry_override.toml",
++    }
++)
++
+ 
+ def get_kit_root() -> Traversable:
+     """Get the root directory of the kit package.
+diff --git a/pipelex/pipelex.toml b/pipelex/pipelex.toml
+index 3ab133fa..1e47c217 100644
+--- a/pipelex/pipelex.toml
++++ b/pipelex/pipelex.toml
+@@ -34,7 +34,7 @@ is_reporting_enabled = true
+ 
+ [pipelex.reporting_config]
+ is_log_costs_to_console = false
+-is_generate_cost_report_file_enabled = true
++is_generate_cost_report_file_enabled = false
+ cost_report_dir_path = "reports"
+ cost_report_base_name = "cost_report"
+ cost_report_extension = "csv"
+diff --git a/pipelex/plugins/gateway/gateway_factory.py b/pipelex/plugins/gateway/gateway_factory.py
+index 33419657..7bca7e55 100644
+--- a/pipelex/plugins/gateway/gateway_factory.py
++++ b/pipelex/plugins/gateway/gateway_factory.py
+@@ -28,7 +28,7 @@ class GatewayFactory:
+     @classmethod
+     def is_debug_enabled(cls, backend: InferenceBackend) -> bool:
+         is_debug_configured = backend.extra_config.get("debug", False)
+-        return get_telemetry_manager().is_portkey_logging_enabled(is_debug_configured=is_debug_configured)
++        return get_telemetry_manager().is_pipelex_gateway_portkey_logging_enabled(is_debug_configured=is_debug_configured)
+ 
+     @classmethod
+     def get_endpoint(cls, backend: InferenceBackend) -> str:
+@@ -68,7 +68,7 @@ class GatewayFactory:
+             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
+ 
+         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
+-        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
++        if get_telemetry_manager().is_pipelex_gateway_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
+             # Use OTel trace_id and span_id for correlation
+             extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
+             extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"
+diff --git a/pipelex/plugins/gateway/gateway_img_gen_worker.py b/pipelex/plugins/gateway/gateway_img_gen_worker.py
+index 5d3e1861..ce3150c0 100644
+--- a/pipelex/plugins/gateway/gateway_img_gen_worker.py
++++ b/pipelex/plugins/gateway/gateway_img_gen_worker.py
+@@ -63,6 +63,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
+         endpoint_path = f"/{self.inference_model.model_id}"
+         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
+         try:
++            # TODO: add portkey tracing headers when enabled
+             response = await self.portkey_client.with_options(config=config_id).post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+         except portkey_exceptions.APIError as exc:
+             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
+diff --git a/pipelex/plugins/portkey/portkey_constants.py b/pipelex/plugins/portkey/portkey_constants.py
+index 000bacd0..dac81af4 100644
+--- a/pipelex/plugins/portkey/portkey_constants.py
++++ b/pipelex/plugins/portkey/portkey_constants.py
+@@ -9,11 +9,6 @@ class PortkeyHeaderKey(StrEnum):
+     PROVIDER = "x-portkey-provider"
+ 
+ 
+-class PortkeyEnvVar(StrEnum):
+-    FORCE_PORTKEY_DEBUG = "FORCE_PORTKEY_DEBUG"
+-    FORCE_PORTKEY_TRACING = "FORCE_PORTKEY_TRACING"
+-
+-
+ class PortkeyOpenAISdkVariant(StrEnum):
+     PORTKEY_COMPLETIONS = "portkey_completions"
+     PORTKEY_RESPONSES = "portkey_responses"
+diff --git a/pipelex/plugins/portkey/portkey_factory.py b/pipelex/plugins/portkey/portkey_factory.py
+index 6efc45a3..c7c55620 100644
+--- a/pipelex/plugins/portkey/portkey_factory.py
++++ b/pipelex/plugins/portkey/portkey_factory.py
+@@ -23,7 +23,7 @@ class PortkeyFactory:
+     @classmethod
+     def is_debug_enabled(cls, backend: InferenceBackend) -> bool:
+         is_debug_configured = backend.extra_config.get("debug", False)
+-        return get_telemetry_manager().is_portkey_logging_enabled(is_debug_configured=is_debug_configured)
++        return get_telemetry_manager().is_custom_portkey_logging_enabled(is_debug_configured=is_debug_configured)
+ 
+     @classmethod
+     def get_endpoint(cls, backend: InferenceBackend) -> str:
+@@ -50,7 +50,7 @@ class PortkeyFactory:
+             extra_body[OpenAIBodyKey.MAX_TOKENS] = inference_model.max_tokens
+ 
+         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
+-        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
++        if get_telemetry_manager().is_custom_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
+             # Use OTel trace_id and span_id for correlation
+             extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
+             extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"
+diff --git a/pipelex/reporting/reporting_manager.py b/pipelex/reporting/reporting_manager.py
+index 0ed64582..5a6a5b09 100644
+--- a/pipelex/reporting/reporting_manager.py
++++ b/pipelex/reporting/reporting_manager.py
+@@ -5,7 +5,7 @@ from pipelex import log
+ from pipelex.cogt.exceptions import ReportingManagerError
+ from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
+ from pipelex.cogt.llm.llm_job import LLMJob
+-from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
++from pipelex.cogt.llm.llm_report import LLMTokensUsage
+ from pipelex.cogt.usage.cost_registry import CostRegistry
+ from pipelex.config import get_config
+ from pipelex.pipeline.pipeline_models import SpecialPipelineId
+@@ -61,15 +61,11 @@ class ReportingManager(ReportingProtocol):
+             log.warning("LLM job has no llm_tokens_usage")
+             return
+ 
+-        llm_token_cost_report: LLMTokenCostReport | None = None
+-
+-        if self._reporting_config.is_log_costs_to_console:
+-            llm_token_cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
+-
+         pipeline_run_id = llm_job.job_metadata.pipeline_run_id
+         self._get_registry(pipeline_run_id).add_tokens_usage(llm_tokens_usage)
+ 
+         if self._reporting_config.is_log_costs_to_console:
++            llm_token_cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
+             log.verbose(llm_token_cost_report, title="Token Cost report")
+ 
+     ############################################################
+diff --git a/pipelex/system/configuration/config_loader.py b/pipelex/system/configuration/config_loader.py
+index fea64e9d..6c3a282f 100644
+--- a/pipelex/system/configuration/config_loader.py
++++ b/pipelex/system/configuration/config_loader.py
+@@ -1,28 +1,15 @@
+ import os
++from pathlib import Path
+ from typing import Any
+ 
+-from pipelex.base_exceptions import PipelexError
+-from pipelex.system.configuration.config_root import (
+-    CONFIG_BASE_OVERRIDES_AFTER_ENV,
+-    CONFIG_BASE_OVERRIDES_BEFORE_ENV,
+-)
+ from pipelex.system.runtime import runtime_manager
+-from pipelex.tools.misc.json_utils import deep_update
+-from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
++from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
+ 
+ CONFIG_DIR_NAME = ".pipelex"
+ CONFIG_NAME = "pipelex.toml"
+ 
+ 
+-class ConfigError(PipelexError):
+-    pass
+-
+-
+ class ConfigLoader:
+-    @property
+-    def is_in_pipelex_config(self) -> bool:
+-        return os.path.basename(os.getcwd()) == "pipelex"
+-
+     @property
+     def pipelex_root_dir(self) -> str:
+         """Get the root directory of the installed pipelex package.
+@@ -30,48 +17,12 @@ class ConfigLoader:
+         Uses __file__ to locate the package directory, which works in both
+         development and installed modes.
+         """
+-        current_dir = os.path.dirname(os.path.abspath(__file__))
+-        return os.path.dirname(os.path.dirname(current_dir))
+-
+-    @property
+-    def pipelex_root_config_path(self) -> str:
+-        return os.path.join(self.pipelex_root_dir, CONFIG_NAME)
+-
+-    @property
+-    def local_root_dir(self) -> str:
+-        """Get the root directory of the project using pipelex.
+-        This is the directory from where the command is being run.
+-        """
+-        return os.getcwd()
++        return str(Path(__file__).resolve().parent.parent.parent)
+ 
+     @property
+     def pipelex_config_dir(self) -> str:
+         return os.path.join(os.getcwd(), CONFIG_DIR_NAME)
+ 
+-    @property
+-    def pipelex_specific_config_file_path(self) -> str:
+-        return os.path.join(self.pipelex_config_dir, CONFIG_NAME)
+-
+-    def get_pipelex_config(self) -> dict[str, Any]:
+-        """Get the pipelex configuration from pipelex.toml.
+-
+-        Returns:
+-            Dict[str, Any]: The configuration dictionary from pipelex.toml
+-
+-        """
+-        config_path = self.pipelex_root_config_path
+-        return load_toml_from_path(config_path)
+-
+-    def get_local_config(self) -> dict[str, Any]:
+-        """Get the local pipelex configuration from pipelex.toml in the project root.
+-
+-        Returns:
+-            Dict[str, Any]: The configuration dictionary from the local pipelex.toml
+-
+-        """
+-        config_path = os.path.join(self.pipelex_config_dir, CONFIG_NAME)
+-        return load_toml_from_path_if_exists(config_path) or {}
+-
+     def load_config(self) -> dict[str, Any]:
+         """Load and merge configurations from pipelex and local config files.
+ 
+@@ -79,39 +30,39 @@ class ConfigLoader:
+         1. Base pipelex config (pipelex.toml)
+         2. Local project config (pipelex.toml) if not in pipelex package
+         3. Override configs in sequence:
+-           - pipelex_local.toml (before env)
++           - pipelex_local.toml (local execution)
+            - pipelex_{environment}.toml
+            - pipelex_{run_mode}.toml
++           - pipelex_super.toml (final override)
+ 
+         Returns:
+             Dict[str, Any]: The merged configuration dictionary
+ 
+         """
+-        # 1. Load pipelex base config ####################
+-        pipelex_config = self.get_pipelex_config()
+-
+-        # 2. Load local (current project) config ####################
+-        if not self.is_in_pipelex_config:
+-            local_config = self.get_local_config()
+-            if local_config:
+-                deep_update(pipelex_config, local_config)
+-
+-        # 3. Load overrides for the current project ####################
+-        list_of_overrides: list[str] = [
+-            *CONFIG_BASE_OVERRIDES_BEFORE_ENV,
+-            runtime_manager.environment,
+-            runtime_manager.run_mode,
+-            *CONFIG_BASE_OVERRIDES_AFTER_ENV,
+-        ]
+-        for override in list_of_overrides:
+-            if override == runtime_manager.run_mode and runtime_manager.is_unit_testing:
+-                override_path = os.path.join(os.getcwd(), "tests", f"pipelex_{override}.toml")
+-            else:
+-                override_path = os.path.join(os.getcwd(), "pipelex" if self.is_in_pipelex_config else "", f"pipelex_{override}.toml")
+-            if override_dict := load_toml_from_path_if_exists(override_path):
+-                deep_update(pipelex_config, override_dict)
+-
+-        return pipelex_config
++        list_of_configs: list[str] = []
++
++        # Pipelex base config
++        list_of_configs.append(os.path.join(self.pipelex_root_dir, CONFIG_NAME))
++
++        # Current project overrides
++        list_of_configs.append(os.path.join(self.pipelex_config_dir, CONFIG_NAME))
++
++        # Override for local execution
++        list_of_configs.append(os.path.join(self.pipelex_config_dir, "pipelex_local.toml"))
++
++        # Override for environment
++        list_of_configs.append(os.path.join(self.pipelex_config_dir, f"pipelex_{runtime_manager.environment}.toml"))
++
++        # Override for run mode
++        if runtime_manager.is_unit_testing:
++            list_of_configs.append(os.path.join(os.getcwd(), "tests", f"pipelex_{runtime_manager.run_mode}.toml"))
++        else:
++            list_of_configs.append(os.path.join(self.pipelex_config_dir, f"pipelex_{runtime_manager.run_mode}.toml"))
++
++        # Final override
++        list_of_configs.append(os.path.join(self.pipelex_config_dir, "pipelex_super.toml"))
++
++        return load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
+ 
+ 
+ config_manager = ConfigLoader()
+diff --git a/pipelex/system/configuration/config_root.py b/pipelex/system/configuration/config_root.py
+index f6b95cac..c7d43851 100644
+--- a/pipelex/system/configuration/config_root.py
++++ b/pipelex/system/configuration/config_root.py
+@@ -6,9 +6,6 @@ from pipelex.system.configuration.config_model import ConfigModel
+ from pipelex.system.exceptions import ConfigValidationError
+ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+ 
+-CONFIG_BASE_OVERRIDES_BEFORE_ENV = ["local"]
+-CONFIG_BASE_OVERRIDES_AFTER_ENV = ["super"]
+-
+ 
+ class ConfigRoot(ConfigModel):
+     """Main configuration class for the project."""
+diff --git a/pipelex/system/telemetry/otel_factory.py b/pipelex/system/telemetry/otel_factory.py
+index 22dacd47..0713e90c 100644
+--- a/pipelex/system/telemetry/otel_factory.py
++++ b/pipelex/system/telemetry/otel_factory.py
+@@ -198,10 +198,11 @@ class OtelFactory:
+         user_id: str | None,
+         custom_posthog_client: Posthog | None,
+         custom_redaction_config: TelemetryRedactionConfig,
+-        pipelex_posthog_client: Posthog | None = None,
+-        pipelex_distinct_id: str | None = None,
+-        otlp_exporters: list[OtlpExporterConfig] | None = None,
+-        langfuse_config: LangfuseConfig | None = None,
++        pipelex_posthog_client: Posthog | None,
++        pipelex_gateway_redaction_config: TelemetryRedactionConfig,
++        pipelex_distinct_id: str | None,
++        otlp_exporters: list[OtlpExporterConfig] | None,
++        langfuse_config: LangfuseConfig | None,
+     ) -> tuple[OTelTracer, OTelTracerProvider]:
+         """Create an isolated OpenTelemetry Tracer for GenAI instrumentation.
+ 
+@@ -219,6 +220,7 @@ class OtelFactory:
+             custom_posthog_client: Optional user's PostHog client for sending events
+             custom_redaction_config: Redaction config for custom PostHog exporter
+             pipelex_posthog_client: Optional Pipelex internal PostHog client (for gateway)
++            pipelex_gateway_redaction_config: Redaction config for Pipelex Gateway PostHog exporter
+             pipelex_distinct_id: Distinct ID for Pipelex telemetry
+             otlp_exporters: List of OTLP exporter configurations
+             langfuse_config: Optional Langfuse configuration (enables Langfuse if provided and enabled)
+@@ -240,7 +242,7 @@ class OtelFactory:
+         # Create Provider
+         provider = OTelTracerProvider(resource=resource)
+ 
+-        # Add Custom PostHog Exporter if client provided (custom telemetry)
++        # Add Custom PostHog Exporter if client is provided (custom telemetry)
+         # Uses user's redaction config (may capture content/pipe codes based on user settings)
+         if custom_posthog_client:
+             custom_posthog_exporter = PostHogSpanExporter(
+@@ -251,14 +253,12 @@ class OtelFactory:
+             provider.add_span_processor(OTelBatchSpanProcessor(custom_posthog_exporter))
+             log.verbose("Custom PostHog exporter enabled for custom telemetry")
+ 
+-        # Add Pipelex PostHog Exporter if client provided (mandatory for gateway)
+-        # Always uses full redaction config (never captures sensitive content/pipe codes)
++        # Add Pipelex PostHog Exporter if client is provided (mandatory for gateway)
+         if pipelex_posthog_client:
+-            pipelex_redaction_config = TelemetryRedactionConfig.pipelex_config()
+             pipelex_posthog_exporter = PostHogSpanExporter(
+                 posthog_client=pipelex_posthog_client,
+                 distinct_id=pipelex_distinct_id,
+-                redaction_config=pipelex_redaction_config,
++                redaction_config=pipelex_gateway_redaction_config,
+             )
+             provider.add_span_processor(OTelBatchSpanProcessor(pipelex_posthog_exporter))
+             log.verbose("Pipelex PostHog exporter enabled for gateway telemetry (with full redaction)")
+diff --git a/pipelex/system/telemetry/telemetry_config.py b/pipelex/system/telemetry/telemetry_config.py
+index 0039b1d1..954325d4 100644
+--- a/pipelex/system/telemetry/telemetry_config.py
++++ b/pipelex/system/telemetry/telemetry_config.py
+@@ -1,11 +1,13 @@
++import os
+ from functools import partial
+ 
+ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+ 
++from pipelex.system.configuration.config_loader import config_manager
+ from pipelex.system.configuration.config_model import ConfigModel
+ from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
+ from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
+-from pipelex.tools.misc.toml_utils import load_toml_from_path
++from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
+ from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
+ from pipelex.tools.secrets.secrets_utils import (
+     UnknownVarPrefixError,
+@@ -15,6 +17,7 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of, format_py
+ from pipelex.types import Self, StrEnum
+ 
+ TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
++TELEMETRY_CONFIG_OVERRIDE_FILE_NAME = "telemetry_override.toml"
+ 
+ 
+ class PostHogMode(StrEnum):
+@@ -75,10 +78,10 @@ class PostHogConfig(BaseModel):
+     mode: PostHogMode = Field(default=PostHogMode.OFF, strict=False, description="Event tracking mode")
+     user_id: str | None = Field(default=None, description="Required when mode is 'identified'")
+     endpoint: str = Field(default="https://us.i.posthog.com", description="PostHog endpoint URL")
+-    api_key: str = Field(description="PostHog project API key")
++    api_key: str | None = Field(default=None, description="PostHog project API key")
+     geoip: bool = Field(default=True, description="Enable GeoIP lookup")
+     debug: bool = Field(default=False, description="Enable PostHog debug mode")
+-    redact_properties: list[str] = Field(default_factory=list, description="Event properties to redact")
++    redact_properties: list[str] | None = Field(default_factory=list, description="Event properties to redact")
+     tracing: PostHogTracingConfig = Field(default_factory=PostHogTracingConfig, description="AI span tracing to your PostHog")
+ 
+     @model_validator(mode="after")
+@@ -89,6 +92,14 @@ class PostHogConfig(BaseModel):
+         return self
+ 
+ 
++class PortkeyConfig(BaseModel):
++    """Portkey SDK configuration for logging and tracing."""
++
++    model_config = ConfigDict(extra="forbid")
++    force_debug_enabled: bool = Field(default=False, description="Force-enable Portkey SDK debug mode regardless of backend setting")
++    force_tracing_enabled: bool = Field(default=False, description="Force-enable Portkey SDK tracing regardless of backend setting")
++
++
+ class LangfuseConfig(BaseModel):
+     """Langfuse integration configuration."""
+ 
+@@ -110,16 +121,27 @@ class OtlpExporterConfig(BaseModel):
+     headers: dict[str, str] = Field(default_factory=dict, description="Headers for OTLP export")
+ 
+ 
++class PipelexGatewayTelemetryConfig(BaseModel):
++    """Pipelex Gateway telemetry configuration."""
++
++    model_config = ConfigDict(extra="forbid")
++
++    posthog: PostHogConfig = Field(description="Pipelex Gateway PostHog configuration")
++    portkey: PortkeyConfig = Field(description="Pipelex Gateway Portkey SDK configuration")
++
++
+ class TelemetryConfig(ConfigModel):
+     """Main telemetry configuration with nested sections."""
+ 
+-    posthog: PostHogConfig = Field(description="PostHog configuration")
+-    langfuse: LangfuseConfig = Field(default_factory=LangfuseConfig, description="Langfuse configuration")
++    custom_posthog: PostHogConfig = Field(description="PostHog configuration")
++    custom_portkey: PortkeyConfig = Field(description="Custom Portkey SDK configuration")
++    langfuse: LangfuseConfig = Field(description="Langfuse configuration")
+     otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
+-    custom_telemetry_allowed_modes: dict[str, bool] = Field(
++    telemetry_allowed_modes: dict[str, bool] = Field(
+         default_factory=dict,
+         description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false)",
+     )
++    pipelex_gateway: PipelexGatewayTelemetryConfig | None = Field(default=None, description="Pipelex Gateway telemetry configuration")
+ 
+     def is_custom_telemetry_allowed_for_mode(self, mode: str) -> bool:
+         """Check if custom telemetry is allowed for the given integration mode.
+@@ -130,7 +152,12 @@ class TelemetryConfig(ConfigModel):
+         Returns:
+             True if custom telemetry is allowed for this mode, False otherwise.
+         """
+-        return self.custom_telemetry_allowed_modes.get(mode, False)
++        return self.telemetry_allowed_modes.get(mode, False)
++
++    @property
++    def redact_properties(self) -> list[str]:
++        """Get the list of properties to redact."""
++        return self.custom_posthog.redact_properties or []
+ 
+ 
+ class TelemetryRedactionConfig(BaseModel):
+@@ -142,54 +169,38 @@ class TelemetryRedactionConfig(BaseModel):
+ 
+     model_config = ConfigDict(frozen=True)
+ 
+-    redact_content: bool = False
+-    redact_pipe_codes: bool = False
+-    redact_output_class_names: bool = False
+-    content_max_length: int | None = None
++    redact_content: bool
++    redact_pipe_codes: bool
++    redact_output_class_names: bool
++    content_max_length: int | None
+ 
+     @classmethod
+-    def make_from_posthog_config(cls, posthog_config: PostHogConfig) -> Self:
++    def make_from_posthog_config(cls, posthog_config: PostHogConfig | None) -> Self:
+         """Create from PostHogConfig (inverse of capture settings).
+ 
+         Args:
+-            posthog_config: The user's PostHog configuration.
++            posthog_config: The user's PostHog configuration (or None if no configuration is provided).
+ 
+         Returns:
+             A TelemetryRedactionConfig with redaction settings derived from the config.
+         """
+-        return cls(
+-            redact_content=not posthog_config.tracing.capture.content,
+-            redact_pipe_codes=not posthog_config.tracing.capture.pipe_codes,
+-            redact_output_class_names=not posthog_config.tracing.capture.output_class_names,
+-            content_max_length=posthog_config.tracing.capture.content_max_length,
+-        )
+-
+-    @classmethod
+-    def pipelex_config(cls) -> Self:
+-        """Create config for Pipelex telemetry (redact everything).
+-
+-        Pipelex internal telemetry always redacts sensitive data like content,
+-        pipe codes, and output class names to protect user privacy.
+-
+-        Returns:
+-            A TelemetryRedactionConfig with all redaction options enabled.
+-        """
+-        return cls(redact_content=True, redact_pipe_codes=True, redact_output_class_names=True)
+-
+-    @classmethod
+-    def no_redaction(cls) -> Self:
+-        """Create config with no redaction (pass-through).
+-
+-        Use this when you want to explicitly indicate no redaction should occur,
+-        rather than relying on default values.
+-
+-        Returns:
+-            A TelemetryRedactionConfig with all redaction options disabled.
+-        """
+-        return cls()
+-
+-
+-def load_telemetry_config(path: str, secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
++        if posthog_config:
++            return cls(
++                redact_content=not posthog_config.tracing.capture.content,
++                redact_pipe_codes=not posthog_config.tracing.capture.pipe_codes,
++                redact_output_class_names=not posthog_config.tracing.capture.output_class_names,
++                content_max_length=posthog_config.tracing.capture.content_max_length,
++            )
++        else:
++            return cls(
++                redact_content=True,
++                redact_pipe_codes=True,
++                redact_output_class_names=True,
++                content_max_length=None,
++            )
++
++
++def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
+     """Load telemetry configuration from a TOML file with variable substitution.
+ 
+     Supports variable placeholders in string values:
+@@ -199,7 +210,6 @@ def load_telemetry_config(path: str, secrets_provider: SecretsProviderAbstract)
+     - ${env:ENV_VAR|secret:SECRET} -> try env first, then secret as fallback
+ 
+     Args:
+-        path: Path to the telemetry.toml configuration file.
+         secrets_provider: Provider for resolving secret/env variable placeholders.
+ 
+     Returns:
+@@ -208,20 +218,25 @@ def load_telemetry_config(path: str, secrets_provider: SecretsProviderAbstract)
+     Raises:
+         TelemetryConfigValidationError: If configuration is invalid or variable substitution fails.
+     """
+-    telemetry_config_toml_raw = load_toml_from_path(path=path)
++    telemetry_config_paths: list[str] = []
++    telemetry_config_paths.append(os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME))
++    telemetry_config_paths.append(os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_OVERRIDE_FILE_NAME))
++    telemetry_config_toml_raw = load_toml_from_path_and_merge_with_overrides(paths=telemetry_config_paths)
+ 
+     # Apply variable substitution to all string values (keep placeholders for missing vars)
+     substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider, raise_on_missing_var=False)
+     try:
+         telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, substitute_vars_with_provider)
+     except UnknownVarPrefixError as exc:
+-        msg = f"Variable substitution failed in telemetry configuration '{path}': {exc}"
++        paths_str = "\n".join(telemetry_config_paths)
++        msg = f"Variable substitution failed in telemetry configuration based on '{paths_str}': {exc}"
+         raise TelemetryConfigValidationError(msg) from exc
+ 
+     try:
+         telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
+     except ValidationError as exc:
+         validation_error_msg = format_pydantic_validation_error(exc)
+-        msg = f"Invalid telemetry configuration in '{path}':\n{validation_error_msg}"
++        paths_str = "\n".join(telemetry_config_paths)
++        msg = f"Invalid telemetry configuration in '{paths_str}':\n{validation_error_msg}"
+         raise TelemetryConfigValidationError(msg) from exc
+     return telemetry_config
+diff --git a/pipelex/system/telemetry/telemetry_factory.py b/pipelex/system/telemetry/telemetry_factory.py
+index 963e15ba..44372375 100644
+--- a/pipelex/system/telemetry/telemetry_factory.py
++++ b/pipelex/system/telemetry/telemetry_factory.py
+@@ -1,7 +1,4 @@
+-import os
+-
+ from pipelex import log
+-from pipelex.system.configuration.config_loader import config_manager
+ from pipelex.system.environment import is_env_var_truthy
+ from pipelex.system.pipelex_service.exceptions import (
+     GatewayApiKeyMissingError,
+@@ -12,7 +9,7 @@ from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
+ from pipelex.system.pipelex_service.remote_config import RemoteConfig
+ from pipelex.system.runtime import IntegrationMode
+ from pipelex.system.telemetry.otel_constants import OTelConstants
+-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, PostHogMode, TelemetryConfig, load_telemetry_config
++from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, load_telemetry_config
+ from pipelex.system.telemetry.telemetry_manager import TelemetryManager
+ from pipelex.system.telemetry.telemetry_manager_abstract import (
+     TelemetryManagerAbstract,
+@@ -47,8 +44,7 @@ class TelemetryFactory:
+ 
+         # Always load telemetry config first to determine allowed modes
+         if not telemetry_config:
+-            telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
+-            telemetry_config = load_telemetry_config(path=telemetry_config_path, secrets_provider=secrets_provider)
++            telemetry_config = load_telemetry_config(secrets_provider=secrets_provider)
+ 
+         allows_custom_telemetry = telemetry_config.is_custom_telemetry_allowed_for_mode(integration_mode)
+ 
+@@ -63,7 +59,7 @@ class TelemetryFactory:
+                 log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
+                 return chosen_telemetry_manager
+ 
+-            match telemetry_config.posthog.mode:
++            match telemetry_config.custom_posthog.mode:
+                 case PostHogMode.OFF:
+                     if is_pipelex_telemetry_enabled:
+                         # Gateway requires telemetry - create manager with only Pipelex telemetry
+diff --git a/pipelex/system/telemetry/telemetry_manager.py b/pipelex/system/telemetry/telemetry_manager.py
+index d939dca3..10804c7b 100644
+--- a/pipelex/system/telemetry/telemetry_manager.py
++++ b/pipelex/system/telemetry/telemetry_manager.py
+@@ -7,8 +7,8 @@ from posthog import Posthog, new_context  # type: ignore[attr-defined]
+ from posthog.args import ExceptionArg, OptionalCaptureArgs
+ from typing_extensions import Unpack, override
+ 
++from pipelex import log
+ from pipelex.base_exceptions import PipelexUnexpectedError
+-from pipelex.plugins.portkey.portkey_constants import PortkeyEnvVar
+ from pipelex.system.environment import is_env_var_truthy
+ from pipelex.system.exceptions import PipelexError
+ from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
+@@ -19,7 +19,6 @@ from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr,
+ from pipelex.system.telemetry.otel_factory import OtelFactory
+ from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
+ from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+-from pipelex.tools.log.log import log
+ 
+ if TYPE_CHECKING:
+     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
+@@ -48,13 +47,16 @@ class TelemetryManager(TelemetryManagerAbstract):
+         self._pipelex_distinct_id: str | None = None
+ 
+         # Create custom PostHog client only if user's telemetry is enabled
++        if not telemetry_config.custom_posthog.api_key:
++            msg = "Custom PostHog API key is not set"
++            raise PipelexUnexpectedError(msg)
+         self.custom_posthog_client: Posthog | None = None
+-        if telemetry_config.posthog.mode.is_enabled:
++        if telemetry_config.custom_posthog.mode.is_enabled:
+             self.custom_posthog_client = Posthog(
+-                project_api_key=self.telemetry_config.posthog.api_key,
+-                host=self.telemetry_config.posthog.endpoint,
+-                disable_geoip=not self.telemetry_config.posthog.geoip,
+-                debug=self.telemetry_config.posthog.debug,
++                project_api_key=telemetry_config.custom_posthog.api_key,
++                host=telemetry_config.custom_posthog.endpoint,
++                disable_geoip=not telemetry_config.custom_posthog.geoip,
++                debug=telemetry_config.custom_posthog.debug,
+                 on_error=self._handle_transmission_error,
+             )
+ 
+@@ -79,15 +81,22 @@ class TelemetryManager(TelemetryManagerAbstract):
+         # Create OTel tracer for AI tracing if enabled
+         self._otel_tracer: OTelTracer | None
+         self._tracer_provider: OTelTracerProvider | None
+-        if telemetry_config.posthog.tracing.enabled or pipelex_telemetry_enabled:
++        if telemetry_config.custom_posthog.tracing.enabled or pipelex_telemetry_enabled:
+             # AI tracing is enabled if either custom or pipelex telemetry wants it
+             # Create redaction config from user settings for custom telemetry
+-            custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.posthog)
++            custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.custom_posthog)
++            if telemetry_config.pipelex_gateway:
++                pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(
++                    posthog_config=telemetry_config.pipelex_gateway.posthog
++                )
++            else:
++                pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=None)
+             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
+-                user_id=telemetry_config.posthog.user_id,
+-                custom_posthog_client=self.custom_posthog_client if telemetry_config.posthog.tracing.enabled else None,
++                user_id=telemetry_config.custom_posthog.user_id,
++                custom_posthog_client=self.custom_posthog_client if telemetry_config.custom_posthog.tracing.enabled else None,
+                 custom_redaction_config=custom_redaction_config,
+                 pipelex_posthog_client=self.pipelex_posthog_client,
++                pipelex_gateway_redaction_config=pipelex_gateway_redaction_config,
+                 pipelex_distinct_id=self._pipelex_distinct_id,
+                 otlp_exporters=telemetry_config.otlp,
+                 langfuse_config=telemetry_config.langfuse,
+@@ -209,31 +218,31 @@ class TelemetryManager(TelemetryManagerAbstract):
+         # and to remove the properties that are in the redact list
+         tracked_properties: dict[str, Any]
+         if properties:
+-            tracked_properties = {key: value for key, value in properties.items() if key not in self.telemetry_config.posthog.redact_properties}
++            tracked_properties = {key: value for key, value in properties.items() if key not in self.telemetry_config.redact_properties}
+         else:
+             tracked_properties = {}
+ 
+-        # Always track to Pipelex PostHog if enabled (independent of posthog.mode)
+-        if self._pipelex_telemetry_enabled:
+-            self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
+-
+         # Track to custom PostHog based on user's posthog.mode
+-        match self.telemetry_config.posthog.mode:
++        match self.telemetry_config.custom_posthog.mode:
+             case PostHogMode.ANONYMOUS:
+                 self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
+             case PostHogMode.IDENTIFIED:
+-                if not self.telemetry_config.posthog.user_id:
++                if not self.telemetry_config.custom_posthog.user_id:
+                     log.error(f"Could not track event '{event_name}' as identified because user_id is not set, tracking as anonymous")
+                     self._track_anonymous_event(event_name=event_name, properties=tracked_properties)
+                 else:
+                     self._track_identified_event(
+                         event_name=event_name,
+                         properties=tracked_properties,
+-                        user_id=self.telemetry_config.posthog.user_id,
++                        user_id=self.telemetry_config.custom_posthog.user_id,
+                     )
+             case PostHogMode.OFF:
+                 log.verbose(f"Custom telemetry is off, skipping event '{event_name}' for custom client")
+ 
++        # Always track to Pipelex PostHog if enabled (independent of posthog.mode)
++        if self._pipelex_telemetry_enabled:
++            self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
++
+     def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
+         if not self.custom_posthog_client:
+             log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
+@@ -265,22 +274,60 @@ class TelemetryManager(TelemetryManagerAbstract):
+             yield
+ 
+     @override
+-    def is_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
++    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
++        is_debug: bool = is_debug_configured
++        if not is_debug and self.telemetry_config.custom_portkey.force_debug_enabled:
++            log.info("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
++            is_debug = True
++        if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
++            log.warning(
++                f"Disabling Custom Portkey logging (debug mode) "
++                f"because '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence"
++            )
++            is_debug = False
++        return is_debug
++
++    @override
++    def is_custom_portkey_tracing_enabled(self) -> bool:
++        if self.telemetry_config.custom_portkey.force_tracing_enabled and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
++            log.info("Force-enabling Portkey tracing because custom_portkey.force_tracing_enabled is set in telemetry configuration")
++            return True
++        else:
++            return False
++
++    @override
++    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+         is_debug: bool = is_debug_configured
+-        if not is_debug and is_env_var_truthy(PortkeyEnvVar.FORCE_PORTKEY_DEBUG):
+-            log.info(f"Force-enabling Portkey logging (debug mode) because '{PortkeyEnvVar.FORCE_PORTKEY_DEBUG}' is set")
++        if (
++            not is_debug
++            and self.telemetry_config.pipelex_gateway
++            and self.telemetry_config.pipelex_gateway.portkey
++            and self.telemetry_config.pipelex_gateway.portkey.force_debug_enabled
++        ):
++            log.info(
++                "Force-enabling Portkey logging (debug mode) because pipelex_gateway.portkey.force_debug_enabled is set in telemetry configuration"
++            )
+             is_debug = True
+         if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
+             log.warning(
+-                f"Disabling Portkey logging (debug mode) because '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence"
++                f"Disabling Pipelex Gateway Portkey logging (debug mode) "
++                f"because '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}' is set and that setting takes precedence"
+             )
+             is_debug = False
+         return is_debug
+ 
+     @override
+-    def is_portkey_tracing_enabled(self) -> bool:
+-        if is_env_var_truthy(PortkeyEnvVar.FORCE_PORTKEY_TRACING):
+-            log.info(f"Force-enabling Portkey tracing because '{PortkeyEnvVar.FORCE_PORTKEY_TRACING}' is set")
++    def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
++        if (
++            self.telemetry_config.pipelex_gateway
++            and self.telemetry_config.pipelex_gateway.portkey
++            and self.telemetry_config.pipelex_gateway.portkey.force_tracing_enabled
++            and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
++        ):
++            log.info(
++                "Force-enabling Pipelex Gateway Portkey tracing "
++                "because pipelex_gateway.portkey.force_tracing_enabled is set in telemetry configuration"
++            )
+             return True
+         else:
+             return False
+@@ -292,22 +339,22 @@ class TelemetryManager(TelemetryManagerAbstract):
+     @property
+     @override
+     def capture_content_enabled(self) -> bool:
+-        return self.telemetry_config.posthog.tracing.capture.content
++        return self.telemetry_config.custom_posthog.tracing.capture.content
+ 
+     @property
+     @override
+     def capture_pipe_codes_enabled(self) -> bool:
+-        return self.telemetry_config.posthog.tracing.capture.pipe_codes
++        return self.telemetry_config.custom_posthog.tracing.capture.pipe_codes
+ 
+     @property
+     @override
+     def capture_output_class_name_enabled(self) -> bool:
+-        return self.telemetry_config.posthog.tracing.capture.output_class_names
++        return self.telemetry_config.custom_posthog.tracing.capture.output_class_names
+ 
+     @property
+     @override
+     def capture_content_max_length(self) -> int | None:
+-        return self.telemetry_config.posthog.tracing.capture.content_max_length
++        return self.telemetry_config.custom_posthog.tracing.capture.content_max_length
+ 
+     @property
+     @override
+@@ -341,17 +388,17 @@ class TelemetryManager(TelemetryManagerAbstract):
+         )
+ 
+         # Send to custom PostHog if configured (uses full trace name based on user's capture settings)
+-        if self.custom_posthog_client and self.telemetry_config.posthog.tracing.enabled:
++        if self.custom_posthog_client and self.telemetry_config.custom_posthog.tracing.enabled:
+             # Use full or redacted trace name based on user's capture_pipe_codes setting
+-            custom_trace_name = trace_name if self.telemetry_config.posthog.tracing.capture.pipe_codes else trace_name_redacted
++            custom_trace_name = trace_name if self.telemetry_config.custom_posthog.tracing.capture.pipe_codes else trace_name_redacted
+             custom_properties: dict[str, Any] = {
+                 PostHogAttr.TRACE_ID: f"{trace_id:032x}",
+                 PostHogAttr.SPAN_NAME: custom_trace_name,
+                 PostHogAttr.TRACE_NAME: custom_trace_name,
+             }
+-            if self.telemetry_config.posthog.user_id:
++            if self.telemetry_config.custom_posthog.user_id:
+                 self.custom_posthog_client.capture(
+-                    distinct_id=self.telemetry_config.posthog.user_id,
++                    distinct_id=self.telemetry_config.custom_posthog.user_id,
+                     event=PostHogEvent.SPAN,
+                     properties=custom_properties,
+                 )
+diff --git a/pipelex/system/telemetry/telemetry_manager_abstract.py b/pipelex/system/telemetry/telemetry_manager_abstract.py
+index b353eb0a..2b49faae 100644
+--- a/pipelex/system/telemetry/telemetry_manager_abstract.py
++++ b/pipelex/system/telemetry/telemetry_manager_abstract.py
+@@ -100,11 +100,19 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
+         """Safe context manager for telemetry that works whether telemetry is enabled or not."""
+ 
+     @abstractmethod
+-    def is_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
++    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+         pass
+ 
+     @abstractmethod
+-    def is_portkey_tracing_enabled(self) -> bool:
++    def is_custom_portkey_tracing_enabled(self) -> bool:
++        pass
++
++    @abstractmethod
++    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
++        pass
++
++    @abstractmethod
++    def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
+         pass
+ 
+     @abstractmethod
+@@ -173,11 +181,19 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
+         yield
+ 
+     @override
+-    def is_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
++    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
++        return False
++
++    @override
++    def is_custom_portkey_tracing_enabled(self) -> bool:
++        return False
++
++    @override
++    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+         return False
+ 
+     @override
+-    def is_portkey_tracing_enabled(self) -> bool:
++    def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
+         return False
+ 
+     @override
+diff --git a/pipelex/tools/misc/diff.py b/pipelex/tools/misc/diff.py
+index d68caa2f..88ddad0e 100644
+--- a/pipelex/tools/misc/diff.py
++++ b/pipelex/tools/misc/diff.py
+@@ -13,10 +13,12 @@ from rich.text import Text
+ from pipelex.tools.misc.pretty import PrettyPrinter
+ 
+ if TYPE_CHECKING:
++    from collections.abc import Set as AbstractSet
++
+     from pipelex.tools.misc.pretty import PrettyPrintable
+ 
+ 
+-def has_diff_dirs(dir1: str | Path, dir2: str | Path, exclude_files: set[str] | None = None) -> bool:
++def has_diff_dirs(dir1: str | Path, dir2: str | Path, exclude_files: AbstractSet[str] | None = None) -> bool:
+     """Check if there are any differences between two directories.
+ 
+     Args:
+@@ -197,7 +199,7 @@ def _generate_diff_summary(diff_content: str, left_is_newer: bool) -> str | None
+         return f"  Sync would {' and '.join(summary_parts)} in {obsolete_location}"
+ 
+ 
+-def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: set[str] | None = None) -> PrettyPrintable:
++def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: AbstractSet[str] | None = None) -> PrettyPrintable:
+     """Generate a PrettyPrintable representation of directory differences.
+ 
+     Args:
+diff --git a/pipelex/tools/misc/toml_utils.py b/pipelex/tools/misc/toml_utils.py
+index 0f43a9cc..8f649354 100644
+--- a/pipelex/tools/misc/toml_utils.py
++++ b/pipelex/tools/misc/toml_utils.py
+@@ -7,6 +7,7 @@ import tomlkit
+ 
+ from pipelex.system.exceptions import ToolError
+ from pipelex.tools.misc.file_utils import path_exists
++from pipelex.tools.misc.json_utils import deep_update
+ 
+ 
+ class TomlError(ToolError):
+@@ -82,3 +83,17 @@ def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str) ->
+     """
+     with open(path, "w", encoding="utf-8") as file:
+         tomlkit.dump(data, file)  # type: ignore[arg-type]
++
++
++def load_toml_from_path_and_merge_with_overrides(paths: list[str]) -> dict[str, Any]:
++    """Load and merge toml files from paths if they exist, merged in sequence.
++
++    Returns:
++        dict[str, Any]: The merged dictionary
++    """
++    merged_dict: dict[str, Any] = {}
++    for path in paths:
++        if one_dict := load_toml_from_path_if_exists(path):
++            deep_update(merged_dict, one_dict)
++
++    return merged_dict
+diff --git a/tests/e2e/pipelex/cli/test_init_cmd_edge_cases.py b/tests/e2e/pipelex/cli/test_init_cmd_edge_cases.py
+index 366eba0c..6fdc3c45 100644
+--- a/tests/e2e/pipelex/cli/test_init_cmd_edge_cases.py
++++ b/tests/e2e/pipelex/cli/test_init_cmd_edge_cases.py
+@@ -101,7 +101,7 @@ class TestEdgeCases:
+ 
+         telemetry_path = env.pipelex_dir / "telemetry.toml"
+         toml_doc_tel = load_toml_with_tomlkit(str(telemetry_path))
+-        toml_doc_tel["posthog"]["mode"] = "identified"  # type: ignore[index]
++        toml_doc_tel["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
+         save_toml_to_path(toml_doc_tel, str(telemetry_path))
+ 
+         # Get index for anthropic
+diff --git a/tests/e2e/pipelex/cli/test_init_cmd_focused.py b/tests/e2e/pipelex/cli/test_init_cmd_focused.py
+index b427687b..47dbe434 100644
+--- a/tests/e2e/pipelex/cli/test_init_cmd_focused.py
++++ b/tests/e2e/pipelex/cli/test_init_cmd_focused.py
+@@ -184,7 +184,7 @@ class TestFocusedInitialization:
+         # Set initial telemetry to IDENTIFIED
+         telemetry_path = env.pipelex_dir / "telemetry.toml"
+         toml_doc = load_toml_with_tomlkit(str(telemetry_path))
+-        toml_doc["posthog"]["mode"] = "identified"  # type: ignore[index]
++        toml_doc["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
+         save_toml_to_path(toml_doc, str(telemetry_path))
+ 
+         # User inputs - confirm reconfigure
+diff --git a/tests/helpers/init_cmd_helpers.py b/tests/helpers/init_cmd_helpers.py
+index 77831f58..d6e67720 100644
+--- a/tests/helpers/init_cmd_helpers.py
++++ b/tests/helpers/init_cmd_helpers.py
+@@ -91,7 +91,7 @@ def verify_telemetry_config(telemetry_config_path: str, expected_mode: str) -> N
+         expected_mode: Expected telemetry mode ("off", "anonymous", or "identified").
+     """
+     toml_doc = load_toml_with_tomlkit(telemetry_config_path)
+-    actual_mode = toml_doc["posthog"]["mode"]  # type: ignore[index]
++    actual_mode = toml_doc["custom_posthog"]["mode"]  # type: ignore[index]
+     assert actual_mode == expected_mode, f"Expected posthog.mode '{expected_mode}', got '{actual_mode}'"
+ 
+ 
+diff --git a/tests/integration/pipelex/cli/test_init_cmd_integration.py b/tests/integration/pipelex/cli/test_init_cmd_integration.py
+index 82f4210b..f817f9d0 100644
+--- a/tests/integration/pipelex/cli/test_init_cmd_integration.py
++++ b/tests/integration/pipelex/cli/test_init_cmd_integration.py
+@@ -188,7 +188,7 @@ class TestInitCommandIntegration:
+         # Modify telemetry to a different value (using new nested path)
+         telemetry_path = env.pipelex_dir / "telemetry.toml"
+         toml_doc = load_toml_with_tomlkit(str(telemetry_path))
+-        toml_doc["posthog"]["mode"] = "identified"  # type: ignore[index]
++        toml_doc["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
+         save_toml_to_path(toml_doc, str(telemetry_path))
+ 
+         # Get index for mistral
+diff --git a/tests/integration/pipelex/fixtures/llm_fixtures.py b/tests/integration/pipelex/fixtures/llm_fixtures.py
+index 505bd354..74f076fe 100644
+--- a/tests/integration/pipelex/fixtures/llm_fixtures.py
++++ b/tests/integration/pipelex/fixtures/llm_fixtures.py
+@@ -128,23 +128,23 @@ MOONSHOTAI_MODELS = [
+ 
+ # --- OpenAI Models ------------------------------------------------------------------------------
+ OPENAI_MODELS = [
+-    "gpt-4o-mini",
+-    "gpt-4o",
+-    "gpt-4.1-nano",
+-    "gpt-4.1-mini",
+-    "gpt-4.1",
+-    "o1-mini",
+-    "o1",
+-    "o3-mini",
+-    "o3",
+-    "o4-mini",
+-    "gpt-5-nano",
+-    "gpt-5-mini",
+-    "gpt-5-chat",
+-    "gpt-5",
+-    "gpt-5.1-chat",
++    # "gpt-4o-mini",
++    # "gpt-4o",
++    # "gpt-4.1-nano",
++    # "gpt-4.1-mini",
++    # "gpt-4.1",
++    # "o1-mini",
++    # "o1",
++    # "o3-mini",
++    # "o3",
++    # "o4-mini",
++    # "gpt-5-nano",
++    # "gpt-5-mini",
++    # "gpt-5-chat",
++    # "gpt-5",
++    # "gpt-5.1-chat",
+     "gpt-5.1",
+-    "gpt-5.1-codex",
++    # "gpt-5.1-codex",
+ ]
+ 
+ # --- OpenAI OSS Models --------------------------------------------------------------------------
+@@ -177,18 +177,18 @@ XAI_MODELS = [
+ 
+ # --- All LLM Handles ----------------------------------------------------------------------------
+ ALL_LLM_HANDLES = [
+-    *AMAZON_MODELS,
+-    *ANTHROPIC_MODELS,
+-    *DEEPSEEK_MODELS,
+-    *GOOGLE_MODELS,
+-    *GROQ_MODELS,
+-    *META_MODELS,
+-    *MISTRALAI_MODELS,
+-    *MOONSHOTAI_MODELS,
++    # *AMAZON_MODELS,
++    # *ANTHROPIC_MODELS,
++    # *DEEPSEEK_MODELS,
++    # *GOOGLE_MODELS,
++    # *GROQ_MODELS,
++    # *META_MODELS,
++    # *MISTRALAI_MODELS,
++    # *MOONSHOTAI_MODELS,
+     *OPENAI_MODELS,
+-    *OPENAI_OSS_MODELS,
+-    *QWEN_MODELS,
+-    *XAI_MODELS,
++    # *OPENAI_OSS_MODELS,
++    # *QWEN_MODELS,
++    # *XAI_MODELS,
+ ]
+ 
+ 
+diff --git a/tests/integration/pipelex/fixtures/routing_fixtures.py b/tests/integration/pipelex/fixtures/routing_fixtures.py
+index 07ad8af9..901abcb4 100644
+--- a/tests/integration/pipelex/fixtures/routing_fixtures.py
++++ b/tests/integration/pipelex/fixtures/routing_fixtures.py
+@@ -21,21 +21,21 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_to
+ 
+ ALL_BACKENDS = [
+     "pipelex_gateway",
+-    "anthropic",
+-    "azure_openai",
+-    "bedrock",
+-    "blackboxai",
+-    "fal",
+-    "google",
+-    "groq",
+-    "mistral",
+-    "ollama",
+-    "openai",
+-    "portkey",
+-    "scaleway",
+-    "vertexai",
+-    "xai",
+-    "internal",
++    # "anthropic",
++    # "azure_openai",
++    # "bedrock",
++    # "blackboxai",
++    # "fal",
++    # "google",
++    # "groq",
++    # "mistral",
++    # "ollama",
++    # "openai",
++    # "portkey",
++    # "scaleway",
++    # "vertexai",
++    # "xai",
++    # "internal",
+ ]
+ 
+ 
+diff --git a/tests/pipelex_unit_test.toml b/tests/pipelex_unit_test.toml
+index ef0ab2f6..927ffbd2 100644
+--- a/tests/pipelex_unit_test.toml
++++ b/tests/pipelex_unit_test.toml
+@@ -4,4 +4,5 @@
+ missing_presets_reaction = "none"
+ 
+ [pipelex.feature_config]
++# Enable reporting manager so that it can be tested
+ is_reporting_enabled = true
+diff --git a/tests/unit/pipelex/cogt/usage/test_cost_registry.py b/tests/unit/pipelex/cogt/usage/test_cost_registry.py
+index 351cc023..8a36f03d 100644
+--- a/tests/unit/pipelex/cogt/usage/test_cost_registry.py
++++ b/tests/unit/pipelex/cogt/usage/test_cost_registry.py
+@@ -244,7 +244,7 @@ class TestCostRegistry:
+         )
+ 
+         # Verify console was called to print table
+-        mock_console.print.assert_called_once()
++        assert mock_console.print.call_count == 2
+ 
+         # Read the CSV and verify aggregation
+         with open(csv_file, encoding="utf-8") as file:

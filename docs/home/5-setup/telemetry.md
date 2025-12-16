@@ -54,15 +54,15 @@ This creates `.pipelex/telemetry.toml` with all options disabled by default. Edi
 ### Example: Enable PostHog Tracing
 
 ```toml
-[posthog]
+[custom_posthog]
 mode = "anonymous"  # or "identified" with user_id
 endpoint = "${POSTHOG_ENDPOINT}"
 api_key = "${POSTHOG_API_KEY}"
 
-[posthog.tracing]
+[custom_posthog.tracing]
 enabled = true
 
-[posthog.tracing.capture]
+[custom_posthog.tracing.capture]
 content = false        # Don't capture prompts/completions
 pipe_codes = true      # Include pipe codes in span names
 ```
