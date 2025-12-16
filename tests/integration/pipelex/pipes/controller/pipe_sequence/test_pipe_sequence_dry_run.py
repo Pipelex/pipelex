@@ -114,8 +114,6 @@ class TestPipeSequenceDryRun:
 
             # Verify each summary item (these should be proper ChannelSummary objects from the LLM mock)
             for i, summary in enumerate(channel_summaries_list.items):
-                print(summary)
-                print(type(summary))
                 assert isinstance(summary, ChannelSummary), f"Summary {i} should be ChannelSummary"
                 assert len(summary.channel_name) > 0, f"Summary {i} should have a non-empty channel name"
                 assert isinstance(summary.summary_items, list), f"Summary {i} should have a list of summary items"

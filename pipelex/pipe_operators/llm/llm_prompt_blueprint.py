@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
 
@@ -55,7 +55,7 @@ class LLMPromptBlueprint(BaseModel):
         if self.user_images:
             for user_image_name in self.user_images:
                 log.verbose(f"Getting user image '{user_image_name}' from context")
-                # Try to get as a single ImageContent first
+                # First: Try to get as a single ImageContent or ListContent[ImageContent]
                 try:
                     prompt_image_content = context_provider.get_typed_object_or_attribute(
                         name=user_image_name,
@@ -66,12 +66,14 @@ class LLMPromptBlueprint(BaseModel):
                         user_image = PromptImageFactory.make_prompt_image(url=prompt_image_content.url, base_64_str=prompt_image_content.base_64)
                         prompt_user_images[user_image_name] = user_image
                     elif isinstance(prompt_image_content, list):
-                        for image_item in prompt_image_content:  # pyright: ignore[reportUnknownVariableType]
-                            if not isinstance(image_item, ImageContent):
-                                msg = f"Item of '{user_image_name}' is of type '{type(image_item).__name__}', it should be ImageContent"  # pyright: ignore[reportUnknownArgumentType]
+                        prompt_image_content = cast("list[ImageContent]", prompt_image_content)
+                        for image_index, image_item in enumerate(prompt_image_content, start=1):
+                            if not isinstance(image_item, ImageContent):  # pyright: ignore[reportUnnecessaryIsInstance]
+                                msg = f"Item of '{user_image_name}' is of type '{type(image_item).__name__}', it should be ImageContent"
                                 raise LLMPromptBlueprintValueError(msg)
                             user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
-                            prompt_user_images[user_image_name] = user_image
+                            user_image_item_name = f"{user_image_name}[{image_index}]"
+                            prompt_user_images[user_image_item_name] = user_image
                     else:
                         msg = (
                             f"User image '{user_image_name}' is of type '{type(prompt_image_content).__name__}', "
@@ -84,10 +86,11 @@ class LLMPromptBlueprint(BaseModel):
                         image_collection = context_provider.get_typed_object_or_attribute(name=user_image_name, wanted_type=None)
                         # Check if it's a list or tuple
                         if isinstance(image_collection, (list, tuple)):
-                            for image_item in image_collection:  # type: ignore[assignment]
-                                if isinstance(image_item, ImageContent):
-                                    user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
-                                    prompt_user_images[user_image_name] = user_image
+                            image_collection = cast("list[ImageContent] | tuple[ImageContent]", image_collection)
+                            for image_index, image_item in enumerate(image_collection, start=1):
+                                user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
+                                user_image_item_name = f"{user_image_name}[{image_index}]"
+                                prompt_user_images[user_image_item_name] = user_image
                         else:
                             msg = (
                                 f"Could not find a valid user image or image collection named '{user_image_name}' from the provided context_provider"
