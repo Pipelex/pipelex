@@ -6,13 +6,17 @@ by specifying how each field should be constructed from inputs.
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_preprocessor import preprocess_template
+
 # pyright: reportImportCycles=false
 from pipelex.pipe_operators.compose.construct_field_blueprint import ConstructFieldBlueprint, ConstructFieldMethod
+from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 
 
 class ConstructBlueprint(BaseModel):
@@ -50,18 +54,24 @@ class ConstructBlueprint(BaseModel):
             match field_blueprint.method:
                 case ConstructFieldMethod.FROM_VAR:
                     if field_blueprint.from_path:
-                        # Add the full path
-                        required.add(field_blueprint.from_path)
-                        # Also add the base variable name for input validation
+                        # Also only the base variable name for input validation
                         base_var = field_blueprint.from_path.split(".")[0]
                         required.add(base_var)
 
                 case ConstructFieldMethod.TEMPLATE:
                     if field_blueprint.template:
-                        # Extract variable names from template
-                        # This is a simplified extraction - full implementation would use
-                        # the template preprocessor to find all variables
-                        template_vars = self._extract_template_variables(field_blueprint.template)
+                        # Use the same approach as template mode: preprocess then detect variables
+                        preprocessed = preprocess_template(field_blueprint.template)
+                        try:
+                            template_vars = detect_jinja2_required_variables(
+                                template_category=TemplateCategory.BASIC,
+                                template_source=preprocessed,
+                            )
+                        except Jinja2DetectVariablesError as exc:
+                            msg = f"Error detecting required variables in construct template: {exc}"
+                            raise ValueError(msg) from exc
+                        # Filter out internal variables
+                        template_vars = {var for var in template_vars if not var.startswith("_") and var not in {"preliminary_text", "place_holder"}}
                         required.update(template_vars)
 
                 case ConstructFieldMethod.NESTED:
@@ -74,39 +84,6 @@ class ConstructBlueprint(BaseModel):
                     pass
 
         return required
-
-    def _extract_template_variables(self, template: str) -> set[str]:
-        """Extract variable names from a template string.
-
-        Handles both $var and {{ var }} syntax.
-        Returns base variable names (e.g., 'deal' from '$deal.amount').
-
-        Args:
-            template: Template string to parse
-
-        Returns:
-            Set of base variable names found in the template
-        """
-        variables: set[str] = set()
-
-        # Match $variable.path patterns (our preprocessor syntax)
-        dollar_pattern = r"\$([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)"
-        for match in re.finditer(dollar_pattern, template):
-            full_path = match.group(1)
-            variables.add(full_path)
-            # Also add base variable name
-            base_var = full_path.split(".")[0]
-            variables.add(base_var)
-
-        # Match {{ variable }} Jinja2 patterns (simplified)
-        jinja2_pattern = r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)"
-        for match in re.finditer(jinja2_pattern, template):
-            full_path = match.group(1)
-            variables.add(full_path)
-            base_var = full_path.split(".")[0]
-            variables.add(base_var)
-
-        return variables
 
     @classmethod
     def make_from_raw(cls, raw: dict[str, Any]) -> ConstructBlueprint:
