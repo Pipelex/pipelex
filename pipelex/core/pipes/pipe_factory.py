@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_string_or_code
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.exceptions import PipeFactoryError, PipeVariableMultiplicityError
+from pipelex.core.pipes.exceptions import PipeFactoryError, PipeFactoryErrorType, PipeVariableMultiplicityError
 from pipelex.core.pipes.inputs.input_requirements import InputRequirements
 from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeType
@@ -82,7 +82,14 @@ class PipeFactory(Generic[PipeAbstractType]):
                     f"The concept must be either native, declared in domain '{domain_code}', or fully qualified with a domain prefix. "
                     f"Declared concepts are: '{concept_codes_from_the_same_domain}'"
                 )
-                raise PipeFactoryError(msg)
+                raise PipeFactoryError(
+                    message=msg,
+                    error_type=PipeFactoryErrorType.UNKNOWN_CONCEPT,
+                    pipe_code=pipe_code,
+                    domain=domain_code,
+                    missing_concept_code=stripped_output_concept_string_or_code,
+                    declared_concepts=concept_codes_from_the_same_domain,
+                )
 
         # Parse common attributes
         parsed_output = cls._parse_output_concept_string(domain=domain_code, pipe_code=pipe_code, output_string=blueprint.output)
