@@ -7,5 +7,5 @@ class StorageProviderAbstract(ABC):
         pass
 
     @abstractmethod
-    def store(self, data: bytes) -> str:
+    def store(self, data: bytes, uri: str) -> str:
         pass
