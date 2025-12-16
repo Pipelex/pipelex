@@ -78,10 +78,10 @@ class PostHogConfig(BaseModel):
     mode: PostHogMode = Field(default=PostHogMode.OFF, strict=False, description="Event tracking mode")
     user_id: str | None = Field(default=None, description="Required when mode is 'identified'")
     endpoint: str = Field(default="https://us.i.posthog.com", description="PostHog endpoint URL")
-    api_key: str = Field(description="PostHog project API key")
+    api_key: str | None = Field(default=None, description="PostHog project API key")
     geoip: bool = Field(default=True, description="Enable GeoIP lookup")
     debug: bool = Field(default=False, description="Enable PostHog debug mode")
-    redact_properties: list[str] = Field(default_factory=list, description="Event properties to redact")
+    redact_properties: list[str] | None = Field(default_factory=list, description="Event properties to redact")
     tracing: PostHogTracingConfig = Field(default_factory=PostHogTracingConfig, description="AI span tracing to your PostHog")
 
     @model_validator(mode="after")
@@ -121,6 +121,16 @@ class OtlpExporterConfig(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict, description="Headers for OTLP export")
 
 
+class PipelexGatewayTelemetryConfig(BaseModel):
+    """Pipelex Gateway telemetry configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    posthog: PostHogConfig = Field(description="Pipelex Gateway PostHog configuration")
+    portkey: PortkeyConfig = Field(description="Pipelex Gateway Portkey SDK configuration")
+    langfuse: LangfuseConfig = Field(description="Pipelex Gateway Langfuse configuration")
+
+
 class TelemetryConfig(ConfigModel):
     """Main telemetry configuration with nested sections."""
 
@@ -132,7 +142,7 @@ class TelemetryConfig(ConfigModel):
         default_factory=dict,
         description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false)",
     )
-    pipelex_gateway_portkey: PortkeyConfig | None = Field(default=None, description="Pipelex Gateway Portkey SDK configuration")
+    pipelex_gateway: PipelexGatewayTelemetryConfig = Field(description="Pipelex Gateway telemetry configuration")
 
     def is_custom_telemetry_allowed_for_mode(self, mode: str) -> bool:
         """Check if custom telemetry is allowed for the given integration mode.
@@ -145,6 +155,11 @@ class TelemetryConfig(ConfigModel):
         """
         return self.custom_telemetry_allowed_modes.get(mode, False)
 
+    @property
+    def redact_properties(self) -> list[str]:
+        """Get the list of properties to redact."""
+        return self.custom_posthog.redact_properties or []
+
 
 class TelemetryRedactionConfig(BaseModel):
     """Configuration for what telemetry data to redact at export time.
@@ -155,51 +170,35 @@ class TelemetryRedactionConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    redact_content: bool = False
-    redact_pipe_codes: bool = False
-    redact_output_class_names: bool = False
-    content_max_length: int | None = None
+    redact_content: bool
+    redact_pipe_codes: bool
+    redact_output_class_names: bool
+    content_max_length: int | None
 
     @classmethod
-    def make_from_posthog_config(cls, posthog_config: PostHogConfig) -> Self:
+    def make_from_posthog_config(cls, posthog_config: PostHogConfig | None) -> Self:
         """Create from PostHogConfig (inverse of capture settings).
 
         Args:
-            posthog_config: The user's PostHog configuration.
+            posthog_config: The user's PostHog configuration (or None if no configuration is provided).
 
         Returns:
             A TelemetryRedactionConfig with redaction settings derived from the config.
         """
-        return cls(
-            redact_content=not posthog_config.tracing.capture.content,
-            redact_pipe_codes=not posthog_config.tracing.capture.pipe_codes,
-            redact_output_class_names=not posthog_config.tracing.capture.output_class_names,
-            content_max_length=posthog_config.tracing.capture.content_max_length,
-        )
-
-    @classmethod
-    def pipelex_config(cls) -> Self:
-        """Create config for Pipelex telemetry (redact everything).
-
-        Pipelex internal telemetry always redacts sensitive data like content,
-        pipe codes, and output class names to protect user privacy.
-
-        Returns:
-            A TelemetryRedactionConfig with all redaction options enabled.
-        """
-        return cls(redact_content=True, redact_pipe_codes=True, redact_output_class_names=True)
-
-    @classmethod
-    def no_redaction(cls) -> Self:
-        """Create config with no redaction (pass-through).
-
-        Use this when you want to explicitly indicate no redaction should occur,
-        rather than relying on default values.
-
-        Returns:
-            A TelemetryRedactionConfig with all redaction options disabled.
-        """
-        return cls()
+        if posthog_config:
+            return cls(
+                redact_content=not posthog_config.tracing.capture.content,
+                redact_pipe_codes=not posthog_config.tracing.capture.pipe_codes,
+                redact_output_class_names=not posthog_config.tracing.capture.output_class_names,
+                content_max_length=posthog_config.tracing.capture.content_max_length,
+            )
+        else:
+            return cls(
+                redact_content=True,
+                redact_pipe_codes=True,
+                redact_output_class_names=True,
+                content_max_length=None,
+            )
 
 
 def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:

@@ -47,13 +47,16 @@ class TelemetryManager(TelemetryManagerAbstract):
         self._pipelex_distinct_id: str | None = None
 
         # Create custom PostHog client only if user's telemetry is enabled
+        if not telemetry_config.custom_posthog.api_key:
+            msg = "Custom PostHog API key is not set"
+            raise PipelexUnexpectedError(msg)
         self.custom_posthog_client: Posthog | None = None
         if telemetry_config.custom_posthog.mode.is_enabled:
             self.custom_posthog_client = Posthog(
-                project_api_key=self.telemetry_config.custom_posthog.api_key,
-                host=self.telemetry_config.custom_posthog.endpoint,
-                disable_geoip=not self.telemetry_config.custom_posthog.geoip,
-                debug=self.telemetry_config.custom_posthog.debug,
+                project_api_key=telemetry_config.custom_posthog.api_key,
+                host=telemetry_config.custom_posthog.endpoint,
+                disable_geoip=not telemetry_config.custom_posthog.geoip,
+                debug=telemetry_config.custom_posthog.debug,
                 on_error=self._handle_transmission_error,
             )
 
@@ -82,11 +85,15 @@ class TelemetryManager(TelemetryManagerAbstract):
             # AI tracing is enabled if either custom or pipelex telemetry wants it
             # Create redaction config from user settings for custom telemetry
             custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.custom_posthog)
+            pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(
+                posthog_config=telemetry_config.pipelex_gateway.posthog
+            )
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 user_id=telemetry_config.custom_posthog.user_id,
                 custom_posthog_client=self.custom_posthog_client if telemetry_config.custom_posthog.tracing.enabled else None,
                 custom_redaction_config=custom_redaction_config,
                 pipelex_posthog_client=self.pipelex_posthog_client,
+                pipelex_gateway_redaction_config=pipelex_gateway_redaction_config,
                 pipelex_distinct_id=self._pipelex_distinct_id,
                 otlp_exporters=telemetry_config.custom_otlp,
                 langfuse_config=telemetry_config.custom_langfuse,
@@ -208,15 +215,9 @@ class TelemetryManager(TelemetryManagerAbstract):
         # and to remove the properties that are in the redact list
         tracked_properties: dict[str, Any]
         if properties:
-            tracked_properties = {
-                key: value for key, value in properties.items() if key not in self.telemetry_config.custom_posthog.redact_properties
-            }
+            tracked_properties = {key: value for key, value in properties.items() if key not in self.telemetry_config.redact_properties}
         else:
             tracked_properties = {}
-
-        # Always track to Pipelex PostHog if enabled (independent of posthog.mode)
-        if self._pipelex_telemetry_enabled:
-            self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
 
         # Track to custom PostHog based on user's posthog.mode
         match self.telemetry_config.custom_posthog.mode:
@@ -234,6 +235,10 @@ class TelemetryManager(TelemetryManagerAbstract):
                     )
             case PostHogMode.OFF:
                 log.verbose(f"Custom telemetry is off, skipping event '{event_name}' for custom client")
+
+        # Always track to Pipelex PostHog if enabled (independent of posthog.mode)
+        if self._pipelex_telemetry_enabled:
+            self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
 
     def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
         if not self.custom_posthog_client:
@@ -290,9 +295,9 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
-        if not is_debug and self.telemetry_config.pipelex_gateway_portkey and self.telemetry_config.pipelex_gateway_portkey.force_debug_enabled:
+        if not is_debug and self.telemetry_config.pipelex_gateway.portkey and self.telemetry_config.pipelex_gateway.portkey.force_debug_enabled:
             log.info(
-                "Force-enabling Portkey logging (debug mode) because pipelex_gateway_portkey.force_debug_enabled is set in telemetry configuration"
+                "Force-enabling Portkey logging (debug mode) because pipelex_gateway.portkey.force_debug_enabled is set in telemetry configuration"
             )
             is_debug = True
         if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
@@ -306,13 +311,13 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
         if (
-            self.telemetry_config.pipelex_gateway_portkey
-            and self.telemetry_config.pipelex_gateway_portkey.force_tracing_enabled
+            self.telemetry_config.pipelex_gateway.portkey
+            and self.telemetry_config.pipelex_gateway.portkey.force_tracing_enabled
             and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
         ):
             log.info(
                 "Force-enabling Pipelex Gateway Portkey tracing "
-                "because pipelex_gateway_portkey.force_tracing_enabled is set in telemetry configuration"
+                "because pipelex_gateway.portkey.force_tracing_enabled is set in telemetry configuration"
             )
             return True
         else:
