@@ -4,4 +4,5 @@
 missing_presets_reaction = "none"
 
 [pipelex.feature_config]
+# Enable reporting manager so that it can be tested
 is_reporting_enabled = true

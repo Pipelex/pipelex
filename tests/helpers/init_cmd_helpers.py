@@ -91,7 +91,7 @@ def verify_telemetry_config(telemetry_config_path: str, expected_mode: str) -> N
         expected_mode: Expected telemetry mode ("off", "anonymous", or "identified").
     """
     toml_doc = load_toml_with_tomlkit(telemetry_config_path)
-    actual_mode = toml_doc["posthog"]["mode"]  # type: ignore[index]
+    actual_mode = toml_doc["custom_posthog"]["mode"]  # type: ignore[index]
     assert actual_mode == expected_mode, f"Expected posthog.mode '{expected_mode}', got '{actual_mode}'"
 
 

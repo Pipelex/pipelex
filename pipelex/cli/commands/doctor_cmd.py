@@ -107,10 +107,10 @@ def check_telemetry_config() -> tuple[bool, str]:
 
     try:
         telemetry_config = TelemetryConfig.model_validate(toml_doc)
-        return True, f"Telemetry configured (mode: {telemetry_config.posthog.mode})"
+        return True, f"Telemetry configured (mode: {telemetry_config.custom_posthog.mode})"
     except ValidationError:
         # Check if this looks like the old config format (has telemetry_mode at root level)
-        if "posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
+        if "custom_posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
             return False, "Config format has changed - run [cyan]pipelex init telemetry[/cyan] to update"
         return False, "Invalid configuration - run [cyan]pipelex init telemetry --reset[/cyan] to fix"
 

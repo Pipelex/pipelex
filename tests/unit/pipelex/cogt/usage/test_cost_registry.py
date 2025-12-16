@@ -244,7 +244,7 @@ class TestCostRegistry:
         )
 
         # Verify console was called to print table
-        mock_console.print.assert_called_once()
+        assert mock_console.print.call_count == 2
 
         # Read the CSV and verify aggregation
         with open(csv_file, encoding="utf-8") as file:

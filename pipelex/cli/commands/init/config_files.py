@@ -6,9 +6,13 @@ import shutil
 import typer
 
 from pipelex.cli.exceptions import PipelexCLIError
-from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+
+# Files to skip when copying configs to user's .pipelex directory.
+# Includes git-ignored files plus telemetry.toml (created when user is prompted).
+INIT_SKIP_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {TELEMETRY_CONFIG_FILE_NAME, ".DS_Store"}
 
 
 def init_config(reset: bool = False, dry_run: bool = False) -> int:
@@ -37,8 +41,8 @@ def init_config(reset: bool = False, dry_run: bool = False) -> int:
                 dst_item = os.path.join(dst_dir, item)
                 relative_item = os.path.join(relative_path, item) if relative_path else item
 
-                # Skip telemetry.toml - it will be created when user is prompted
-                if item == TELEMETRY_CONFIG_FILE_NAME:
+                # Skip git-ignored files and telemetry.toml (created when user is prompted)
+                if item in INIT_SKIP_FILES:
                     continue
 
                 if os.path.isdir(src_item):

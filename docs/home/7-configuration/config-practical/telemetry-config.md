@@ -24,7 +24,7 @@ This file is created when you run `pipelex init telemetry` or `pipelex init`.
 
 ```toml
 # PostHog Configuration (Event tracking + AI span tracing)
-[posthog]
+[custom_posthog]
 mode = "anonymous"                                   # "off" | "anonymous" | "identified"
 # user_id = "your_user_id"                           # Required when mode = "identified"
 endpoint = "${POSTHOG_ENDPOINT}"                     # Default: https://us.i.posthog.com
@@ -40,15 +40,20 @@ redact_properties = [
 ]                                                    # Event properties to redact
 
 # AI span tracing to YOUR PostHog
-[posthog.tracing]
+[custom_posthog.tracing]
 enabled = true                                       # Send AI spans to your PostHog
 
 # Privacy controls for data sent to YOUR PostHog only
-[posthog.tracing.capture]
+[custom_posthog.tracing.capture]
 content = false                                      # Capture prompt/completion content
 content_max_length = 1000                            # Max length for captured content
 pipe_codes = true                                    # Include pipe codes in span names
 output_class_names = true                            # Include output class names in spans
+
+# Portkey SDK Configuration
+[custom_portkey]
+force_debug_enabled = false                          # Force-enable Portkey SDK debug mode
+force_tracing_enabled = false                        # Force-enable Portkey SDK tracing
 
 # Langfuse Integration (receives FULL span data, no redaction)
 [langfuse]
@@ -68,9 +73,9 @@ headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 
 ## PostHog Configuration
 
-The `[posthog]` section configures event tracking and optional AI span tracing to your own PostHog instance.
+The `[custom_posthog]` section configures event tracking and optional AI span tracing to your own PostHog instance.
 
-### `[posthog]` Settings
+### `[custom_posthog]` Settings
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -88,7 +93,7 @@ The `[posthog]` section configures event tracking and optional AI span tracing t
 - **`"anonymous"`**: Events sent without user identification
 - **`"identified"`**: Events sent with your `user_id` for cross-session tracking
 
-### `[posthog.tracing]` Settings
+### `[custom_posthog.tracing]` Settings
 
 Controls AI span tracing to your PostHog instance.
 
@@ -96,7 +101,7 @@ Controls AI span tracing to your PostHog instance.
 |---------|------|---------|-------------|
 | `enabled` | boolean | `false` | Send AI spans to your PostHog |
 
-### `[posthog.tracing.capture]` Settings
+### `[custom_posthog.tracing.capture]` Settings
 
 Privacy controls for what data is included in spans sent to **your** PostHog.
 
@@ -109,6 +114,22 @@ Privacy controls for what data is included in spans sent to **your** PostHog.
 
 !!! warning "Privacy Note"
     These capture settings only affect data sent to **your** PostHog. Langfuse and OTLP exporters always receive full span data without redaction.
+
+---
+
+## Portkey SDK Configuration
+
+The `[custom_portkey]` section configures the Portkey SDK behavior when using a custom Portkey backend (not the Pipelex Gateway).
+
+### `[custom_portkey]` Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `force_debug_enabled` | boolean | `false` | Force-enable Portkey SDK debug mode regardless of backend setting |
+| `force_tracing_enabled` | boolean | `false` | Force-enable Portkey SDK tracing regardless of backend setting |
+
+!!! info "When to Use"
+    These settings are useful when you want to enable Portkey debugging or tracing globally without modifying individual backend configurations.
 
 ---
 
@@ -162,7 +183,7 @@ headers = { "x-honeycomb-team" = "${HONEYCOMB_API_KEY}" }
 All string values in `telemetry.toml` support environment variable substitution using the `${VAR_NAME}` syntax:
 
 ```toml
-[posthog]
+[custom_posthog]
 endpoint = "${POSTHOG_ENDPOINT}"
 api_key = "${POSTHOG_API_KEY}"
 
