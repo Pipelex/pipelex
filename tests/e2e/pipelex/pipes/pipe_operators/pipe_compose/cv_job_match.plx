@@ -43,15 +43,6 @@ purpose = { type = "text", description = "The reason for asking this question an
 [concept.InterviewSheet]
 description = "A comprehensive interview preparation document combining match analysis with targeted interview questions."
 
-[concept.InterviewSheet.structure]
-overall_match_score = { type = "number", description = "Percentage or rating indicating overall fit between candidate and position", required = true }
-matching_skills = { type = "text", description = "Skills the candidate has that match the job requirements", required = true }
-missing_skills = { type = "text", description = "Required skills the candidate appears to lack" }
-experience_alignment = { type = "text", description = "Assessment of how the candidate's experience level matches expectations", required = true }
-areas_of_concern = { type = "text", description = "Potential red flags or weaknesses identified" }
-areas_to_explore = { type = "text", description = "Topics that warrant further investigation during interview", required = true }
-questions = { type = "list", item_type = "dict", description = "List of interview questions with their purposes", required = true }
-
 [pipe.cv_job_matcher]
 type = "PipeSequence"
 description = """

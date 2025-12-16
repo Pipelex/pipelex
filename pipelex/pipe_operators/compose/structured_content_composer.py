@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from pipelex import pretty_print
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.hub import get_content_generator
@@ -78,6 +79,8 @@ class StructuredContentComposer:
             Populated StructuredContent instance
         """
         field_values = await self._resolve_all_fields()
+        pretty_print(self.output_class, title="Output class")
+        pretty_print(field_values, title="Field values")
         return self.output_class.model_validate(field_values)
 
     async def _resolve_all_fields(self) -> dict[str, Any]:
