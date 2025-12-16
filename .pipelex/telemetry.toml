@@ -60,7 +60,7 @@ force_tracing_enabled = false
 # Note: Langfuse receives FULL span data (no redaction)
 # ──────────────────────────────────────────────────────────────────────────────
 
-[custom_langfuse]
+[langfuse]
 enabled = false
 # endpoint = "https://cloud.langfuse.com"                    # Override for self-hosted Langfuse
 # public_key = "${LANGFUSE_PUBLIC_KEY}"                      # Langfuse public key
@@ -71,7 +71,7 @@ enabled = false
 # Note: OTLP exporters receive FULL span data (no redaction)
 # ──────────────────────────────────────────────────────────────────────────────
 
-# [[custom_otlp]]
+# [[otlp]]
 # name = "my-collector"                                     # Identifier for logging
 # endpoint = "https://..."                                  # OTLP endpoint URL
 # headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" } # Headers for OTLP export
@@ -81,7 +81,7 @@ enabled = false
 # Controls which integration modes can use custom telemetry settings above.
 # ──────────────────────────────────────────────────────────────────────────────
 
-[custom_telemetry_allowed_modes]
+[telemetry_allowed_modes]
 ci = false     # CI environments don't use custom telemetry
 cli = true     # CLI usage allows custom telemetry
 docker = true  # Docker deployments allow custom telemetry

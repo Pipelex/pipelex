@@ -85,9 +85,12 @@ class TelemetryManager(TelemetryManagerAbstract):
             # AI tracing is enabled if either custom or pipelex telemetry wants it
             # Create redaction config from user settings for custom telemetry
             custom_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=telemetry_config.custom_posthog)
-            pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(
-                posthog_config=telemetry_config.pipelex_gateway.posthog
-            )
+            if telemetry_config.pipelex_gateway:
+                pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(
+                    posthog_config=telemetry_config.pipelex_gateway.posthog
+                )
+            else:
+                pipelex_gateway_redaction_config = TelemetryRedactionConfig.make_from_posthog_config(posthog_config=None)
             self._otel_tracer, self._tracer_provider = OtelFactory.make_ai_tracer(
                 user_id=telemetry_config.custom_posthog.user_id,
                 custom_posthog_client=self.custom_posthog_client if telemetry_config.custom_posthog.tracing.enabled else None,
@@ -95,8 +98,8 @@ class TelemetryManager(TelemetryManagerAbstract):
                 pipelex_posthog_client=self.pipelex_posthog_client,
                 pipelex_gateway_redaction_config=pipelex_gateway_redaction_config,
                 pipelex_distinct_id=self._pipelex_distinct_id,
-                otlp_exporters=telemetry_config.custom_otlp,
-                langfuse_config=telemetry_config.custom_langfuse,
+                otlp_exporters=telemetry_config.otlp,
+                langfuse_config=telemetry_config.langfuse,
             )
             log.verbose("AI tracing enabled: OpenTelemetry tracer created")
         else:
@@ -295,7 +298,12 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
-        if not is_debug and self.telemetry_config.pipelex_gateway.portkey and self.telemetry_config.pipelex_gateway.portkey.force_debug_enabled:
+        if (
+            not is_debug
+            and self.telemetry_config.pipelex_gateway
+            and self.telemetry_config.pipelex_gateway.portkey
+            and self.telemetry_config.pipelex_gateway.portkey.force_debug_enabled
+        ):
             log.info(
                 "Force-enabling Portkey logging (debug mode) because pipelex_gateway.portkey.force_debug_enabled is set in telemetry configuration"
             )
@@ -311,7 +319,8 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
         if (
-            self.telemetry_config.pipelex_gateway.portkey
+            self.telemetry_config.pipelex_gateway
+            and self.telemetry_config.pipelex_gateway.portkey
             and self.telemetry_config.pipelex_gateway.portkey.force_tracing_enabled
             and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
         ):
@@ -350,7 +359,7 @@ class TelemetryManager(TelemetryManagerAbstract):
     @property
     @override
     def is_langfuse_enabled(self) -> bool:
-        return self.telemetry_config.custom_langfuse.enabled
+        return self.telemetry_config.langfuse.enabled
 
     @property
     @override

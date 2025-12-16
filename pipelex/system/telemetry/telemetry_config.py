@@ -128,7 +128,6 @@ class PipelexGatewayTelemetryConfig(BaseModel):
 
     posthog: PostHogConfig = Field(description="Pipelex Gateway PostHog configuration")
     portkey: PortkeyConfig = Field(description="Pipelex Gateway Portkey SDK configuration")
-    langfuse: LangfuseConfig = Field(description="Pipelex Gateway Langfuse configuration")
 
 
 class TelemetryConfig(ConfigModel):
@@ -136,13 +135,13 @@ class TelemetryConfig(ConfigModel):
 
     custom_posthog: PostHogConfig = Field(description="PostHog configuration")
     custom_portkey: PortkeyConfig = Field(description="Custom Portkey SDK configuration")
-    custom_langfuse: LangfuseConfig = Field(description="Langfuse configuration")
-    custom_otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
-    custom_telemetry_allowed_modes: dict[str, bool] = Field(
+    langfuse: LangfuseConfig = Field(description="Langfuse configuration")
+    otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
+    telemetry_allowed_modes: dict[str, bool] = Field(
         default_factory=dict,
         description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false)",
     )
-    pipelex_gateway: PipelexGatewayTelemetryConfig = Field(description="Pipelex Gateway telemetry configuration")
+    pipelex_gateway: PipelexGatewayTelemetryConfig | None = Field(default=None, description="Pipelex Gateway telemetry configuration")
 
     def is_custom_telemetry_allowed_for_mode(self, mode: str) -> bool:
         """Check if custom telemetry is allowed for the given integration mode.
@@ -153,7 +152,7 @@ class TelemetryConfig(ConfigModel):
         Returns:
             True if custom telemetry is allowed for this mode, False otherwise.
         """
-        return self.custom_telemetry_allowed_modes.get(mode, False)
+        return self.telemetry_allowed_modes.get(mode, False)
 
     @property
     def redact_properties(self) -> list[str]:
