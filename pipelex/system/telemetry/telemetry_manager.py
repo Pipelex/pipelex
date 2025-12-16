@@ -47,11 +47,11 @@ class TelemetryManager(TelemetryManagerAbstract):
         self._pipelex_distinct_id: str | None = None
 
         # Create custom PostHog client only if user's telemetry is enabled
-        if not telemetry_config.custom_posthog.api_key:
-            msg = "Custom PostHog API key is not set"
-            raise PipelexUnexpectedError(msg)
         self.custom_posthog_client: Posthog | None = None
         if telemetry_config.custom_posthog.mode.is_enabled:
+            if not telemetry_config.custom_posthog.api_key:
+                msg = "Custom PostHog API key is not set"
+                raise PipelexUnexpectedError(msg)
             self.custom_posthog_client = Posthog(
                 project_api_key=telemetry_config.custom_posthog.api_key,
                 host=telemetry_config.custom_posthog.endpoint,
