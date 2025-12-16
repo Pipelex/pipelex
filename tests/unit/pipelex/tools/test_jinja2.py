@@ -5,7 +5,7 @@ import pytest
 from pipelex import log, pretty_print
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 from tests.cases import Fruit, JINJA2TestCases
 
 PLACE_HOLDER = "place_holder"
@@ -22,7 +22,7 @@ class TestRenderJinja2:
             text_format=TextFormat.MARKDOWN,
         )
 
-        jinja2_text: str = await render_jinja2(
+        jinja2_text: str = await render_jinja2_async(
             template_category=TemplateCategory.LLM_PROMPT,
             temlating_context=temlating_context,
             template_source=template,
@@ -39,7 +39,7 @@ class TestRenderJinja2:
             text_format=TextFormat.MARKDOWN,
         )
 
-        jinja2_text: str = await render_jinja2(
+        jinja2_text: str = await render_jinja2_async(
             template_category=TemplateCategory.LLM_PROMPT,
             temlating_context=temlating_context,
             template_source=template,
@@ -53,7 +53,7 @@ class TestRenderJinja2:
     async def test_render_jinja2_from_any_object(self, template: str, templating_style: TemplatingStyle, topic: str, any_object: Any):
         temlating_context = {PLACE_HOLDER: any_object}
         log.verbose(f"Rendering Jinja2 for '{topic}' with style '{templating_style}'")
-        jinja2_text: str = await render_jinja2(
+        jinja2_text: str = await render_jinja2_async(
             template_category=TemplateCategory.LLM_PROMPT,
             temlating_context=temlating_context,
             template_source=template,

@@ -1,9 +1,10 @@
 from pipelex.types import StrEnum
 
 
-class LLMOutputType(StrEnum):
+class InferenceOutputType(StrEnum):
     TEXT = "Text"
     OBJECT = "Object"
+    IMAGE = "Image"
 
     @classmethod
     def is_text(cls, output_desc: str) -> bool:
@@ -15,4 +16,6 @@ class LLMOutputType(StrEnum):
             case cls.TEXT:
                 return True
             case cls.OBJECT:
+                return False
+            case cls.IMAGE:
                 return False

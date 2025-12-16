@@ -220,7 +220,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
     )
 
     # Build inputs entries
-    if pipe.inputs.nb_inputs > 0:
+    if not pipe.inputs.is_empty:
         input_entries: list[str] = []
         for var_name, input_req in pipe.inputs.root.items():
             is_multiple = _is_multiple(input_req.multiplicity)
@@ -251,7 +251,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
         f'        pipe_code="{pipe.code}",',
     ]
 
-    if pipe.inputs.nb_inputs > 0:
+    if not pipe.inputs.is_empty:
         function_lines.extend(
             [
                 "        inputs={",

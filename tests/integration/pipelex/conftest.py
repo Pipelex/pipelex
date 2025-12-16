@@ -13,8 +13,9 @@ from .fixtures.extract_fixtures import (
     extract_choice_for_pdf,
     extract_handle,
     extract_handle_from_image,
+    extract_handle_from_pdf,
 )
-from .fixtures.img_gen_fixtures import img_gen_handle
+from .fixtures.img_gen_fixtures import img_gen_handle, img_gen_job_params
 from .fixtures.llm_fixtures import llm_handle, llm_job_params, llm_preset_id
 from .fixtures.plugin_fixtures import plugin_for_anthropic, plugin_for_openai
 from .fixtures.routing_fixtures import (
@@ -39,9 +40,11 @@ __all__ = [
     "plugin_for_anthropic",
     # Image generation fixtures
     "img_gen_handle",
+    "img_gen_job_params",
     # Extract fixtures
     "extract_handle",
     "extract_handle_from_image",
+    "extract_handle_from_pdf",
     "extract_choice_for_pdf",
     "extract_choice_for_image",
 ]

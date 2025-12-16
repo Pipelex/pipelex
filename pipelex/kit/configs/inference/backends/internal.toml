@@ -27,3 +27,11 @@ inputs = ["pdf"]
 outputs = ["pages"]
 costs = {}
 
+# --- Docling Text Extractor ---------------------------------------------------
+[docling-extract-text]
+model_type = "text_extractor"
+sdk = "docling_sdk"
+model_id = "extract-text"
+inputs = ["pdf", "image"]
+outputs = ["pages"]
+costs = {}

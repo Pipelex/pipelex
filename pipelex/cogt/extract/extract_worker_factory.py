@@ -21,7 +21,7 @@ class ExtractWorkerFactory:
         extract_worker: ExtractWorkerAbstract
         match plugin.sdk:
             case "gateway_extract":
-                from pipelex.plugins.gateway.gateway_extract_worker import PortkeyExtractWorker  # noqa: PLC0415
+                from pipelex.plugins.gateway.gateway_extract_worker import GatewayExtractWorker  # noqa: PLC0415
                 from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
 
                 extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
@@ -29,7 +29,7 @@ class ExtractWorkerFactory:
                     sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
                 )
 
-                extract_worker = PortkeyExtractWorker(
+                extract_worker = GatewayExtractWorker(
                     sdk_instance=extract_sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
@@ -64,6 +64,31 @@ class ExtractWorkerFactory:
                 from pipelex.plugins.pypdfium2.pypdfium2_worker import Pypdfium2Worker  # noqa: PLC0415
 
                 extract_worker = Pypdfium2Worker(
+                    extra_config=backend.extra_config,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "docling_sdk":
+                if importlib.util.find_spec("docling") is None:
+                    lib_name = "docling"
+                    lib_extra_name = "docling"
+                    msg = "The docling library is required in order to use Docling for PDF and image text extraction."
+                    raise MissingDependencyError(
+                        lib_name,
+                        lib_extra_name,
+                        msg,
+                    )
+
+                from pipelex.plugins.docling.docling_extract_worker import DoclingExtractWorker  # noqa: PLC0415
+                from pipelex.plugins.docling.docling_factory import DoclingFactory  # noqa: PLC0415
+
+                extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=DoclingFactory.make_docling_sdk(),
+                )
+
+                extract_worker = DoclingExtractWorker(
+                    sdk_instance=extract_sdk_instance,
                     extra_config=backend.extra_config,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

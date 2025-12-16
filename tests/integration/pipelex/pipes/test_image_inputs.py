@@ -8,6 +8,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -125,3 +126,110 @@ class TestImageInputs:
 
         # Should find both the list of images in text_and_images and the single page_view image
         assert pipe_llm.llm_prompt_spec.user_images == ["page.text_and_images.images", "page.page_view"]
+
+    async def test_analyze_image_collection(
+        self,
+        pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
+    ) -> None:
+        """Test that a PipeLLM can process a ListContent of images (Image[] input)."""
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        # Create 3 images for the collection
+        image_contents = [
+            ImageContent(url=f"{ImageTestCases.IMAGE_FILE_PATH_PNG_1}"),
+            ImageContent(url=f"{ImageTestCases.IMAGE_FILE_PATH_JPG_1}"),
+            ImageContent(url=f"{ImageTestCases.IMAGE_FILE_PATH_JPG_3}"),
+        ]
+
+        # Create a ListContent containing the images
+        image_list_content = ListContent[ImageContent](items=image_contents)
+
+        # Create a stuff with the list of images
+        image_collection_stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
+            content=image_list_content,
+            name="collection_of_images",
+        )
+
+        # Create working memory with the image collection
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=image_collection_stuff)
+
+        # Run the pipe
+        pipe_output = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code="analyze_image_collection"),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                working_memory=working_memory,
+                job_metadata=JobMetadata(),
+            ),
+        )
+
+        # Verify the output
+        assert pipe_output is not None
+        assert pipe_output.working_memory is not None
+        assert pipe_output.main_stuff is not None
+
+        if pipe_run_mode != PipeRunMode.DRY:
+            # Verify that the output is the Analysis concept from the PLX file
+            assert pipe_output.main_stuff.concept.code == "Analysis"
+            # Verify the content is some kind of text output (analysis result)
+            assert pipe_output.main_stuff.content is not None
+
+    async def test_compare_two_image_collections(
+        self,
+        pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
+    ) -> None:
+        """Test that a PipeLLM can process two ListContent of images (Image[] inputs)."""
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        # Create collection_a with 2 images
+        collection_a_images = [
+            ImageContent(url=f"{ImageTestCases.IMAGE_FILE_PATH_PNG_1}"),
+            ImageContent(url=f"{ImageTestCases.IMAGE_FILE_PATH_JPG_1}"),
+        ]
+        collection_a_list_content = ListContent[ImageContent](items=collection_a_images)
+        collection_a_stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
+            content=collection_a_list_content,
+            name="collection_a",
+        )
+
+        # Create collection_b with 2 images
+        collection_b_images = [
+            ImageContent(url=f"{ImageTestCases.IMAGE_FILE_PATH_JPG_2}"),
+            ImageContent(url=f"{ImageTestCases.IMAGE_FILE_PATH_JPG_3}"),
+        ]
+        collection_b_list_content = ListContent[ImageContent](items=collection_b_images)
+        collection_b_stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
+            content=collection_b_list_content,
+            name="collection_b",
+        )
+
+        # Create working memory with both image collections
+        working_memory = WorkingMemoryFactory.make_from_multiple_stuffs(
+            stuff_list=[collection_a_stuff, collection_b_stuff],
+        )
+
+        # Run the pipe
+        pipe_output = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code="compare_two_image_collections"),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                working_memory=working_memory,
+                job_metadata=JobMetadata(),
+            ),
+        )
+
+        # Verify the output
+        assert pipe_output is not None
+        assert pipe_output.working_memory is not None
+        assert pipe_output.main_stuff is not None
+
+        if pipe_run_mode != PipeRunMode.DRY:
+            # Verify that the output is the Analysis concept from the PLX file
+            assert pipe_output.main_stuff.concept.code == "Analysis"
+            # Verify the content is some kind of text output (analysis result)
+            assert pipe_output.main_stuff.content is not None

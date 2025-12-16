@@ -111,7 +111,8 @@ nav:
       - Text Generation:
         - Screenplay Generator (wip): home/4-cookbook-examples/write-screenplay.md
         - Tweet Optimizer (wip): home/4-cookbook-examples/write-tweet.md
-    - Setup:
+    - Setup (first run):
+      - Overview: home/5-setup/index.md
       - Configure AI Providers: home/5-setup/configure-ai-providers.md
       - Project Organization: home/5-setup/project-organization.md
       - Telemetry: home/5-setup/telemetry.md
@@ -150,7 +151,7 @@ nav:
       - Optimize Cost & Quality: home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md
       - LLM Structured Generation: home/6-build-reliable-ai-workflows/llm-structured-generation-config.md
       - LLM Prompting Style: home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
-    - Configuration:
+    - Configuration (TOML reference):
       - Overview: home/7-configuration/index.md
       - Pipeline Validation Configuration:
         - Dry Run: home/7-configuration/config-pipeline-validation/dry-run-config.md
@@ -200,6 +201,7 @@ nav:
   - n8n: https://pipelex.github.io/n8n-nodes-pipelex/
   - Contribute:
     - Contributing: contributing.md
+    - Configuration Internals: contribute/configuration-defaults-and-overrides.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
   - Changelog: changelog.md

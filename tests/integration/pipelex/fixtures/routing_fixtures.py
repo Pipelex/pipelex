@@ -2,6 +2,7 @@
 
 import shutil
 import tempfile
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,8 @@ from pytest import MonkeyPatch
 
 from pipelex.hub import get_console
 from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
 # ================================================================================================
@@ -62,8 +65,27 @@ def extract_backend_from_profile_name_if_possible(profile_name: str) -> str | No
     return profile_name[4:]  # Remove 'all_' prefix
 
 
+@cache
+def _get_pipelex_gateway_backend_model_specs() -> dict[str, object]:
+    """Fetch Pipelex Gateway model specs from the same remote config Pipelex uses.
+
+    Cached to avoid repeated network calls during test collection/parametrization.
+    """
+    remote_config = RemoteConfigFetcher.fetch_remote_config()
+    # BackendModelSpecs is a dict-like "model_handle -> spec dict" mapping.
+    return dict(remote_config.backend_model_specs)
+
+
 def check_backend_supports_model(backend_name: str, model_handle: str) -> bool:
     """Check if a backend TOML file defines a specific model (statically, without initializing Pipelex)."""
+    if backend_name == "pipelex_gateway":
+        try:
+            gateway_specs = _get_pipelex_gateway_backend_model_specs()
+        except (RemoteConfigFetchError, RemoteConfigValidationError):
+            # If remote config cannot be fetched, behave as "unsupported" so tests skip cleanly.
+            return False
+        return model_handle in gateway_specs
+
     backend_file = Path(ConfigPaths.BACKENDS_DIR_PATH) / f"{backend_name}.toml"
     if not backend_file.exists():
         return False

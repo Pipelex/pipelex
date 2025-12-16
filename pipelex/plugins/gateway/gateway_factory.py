@@ -4,18 +4,22 @@ from typing import TYPE_CHECKING, Any
 
 from portkey_ai import (
     PORTKEY_GATEWAY_URL,
-    AsyncPortkey,  # type: ignore[reportUnknownVariableType]
+    AsyncPortkey,
 )
+from portkey_ai.api_resources import exceptions as portkey_exc
 
 from pipelex import log
-from pipelex.cogt.llm.llm_constants import LLMOutputType
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
-    from pipelex.cogt.llm.llm_job import LLMJob
+    from portkey_ai.api_resources import exceptions as portkey_exceptions
+
+    from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
@@ -54,7 +58,9 @@ class GatewayFactory:
         )
 
     @classmethod
-    def make_extras(cls, inference_model: InferenceModelSpec, llm_job: LLMJob, output_desc: str) -> tuple[dict[str, str], dict[str, Any]]:
+    def make_extras(
+        cls, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+    ) -> tuple[dict[str, str], dict[str, Any]]:
         extra_headers: dict[str, str] = {}
         if inference_model.extra_headers:
             extra_headers.update(inference_model.extra_headers)
@@ -62,15 +68,57 @@ class GatewayFactory:
             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
 
         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
-        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := llm_job.job_metadata.otel_context):
+        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
             # Use OTel trace_id and span_id for correlation
             extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
             extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"
 
             # Build span name with redacted output class name (consistent with Pipelex telemetry policy)
             # Pipelex services always redact sensitive data to protect user privacy
-            unit_job_id = llm_job.job_metadata.unit_job_id or "unknown"
-            display_output = output_desc if output_desc == LLMOutputType.TEXT else OTelConstants.OUTPUT_CLASS_REDACTED
+            unit_job_id = inference_job.job_metadata.unit_job_id or "unknown"
+            display_output = output_desc if output_desc == InferenceOutputType.TEXT else OTelConstants.OUTPUT_CLASS_REDACTED
             extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{unit_job_id} -> {display_output}"
 
         return extra_headers, {}
+
+    @classmethod
+    def make_error_summary_from_portkey_error(cls, exc: portkey_exceptions.APIError) -> str:
+        """Extract a clean, human-readable error summary from a Portkey API error.
+
+        Args:
+            exc: The Portkey API error
+
+        Returns:
+            A concise error message suitable for logging and user display
+        """
+        error_type = type(exc).__name__
+        support_hint = f"If the problem persists, get support on Discord: {URLs.discord}"
+
+        # Connection errors (no HTTP response received)
+        if isinstance(exc, portkey_exc.APITimeoutError):
+            return f"{error_type}: Request timed out - service may be overloaded. {support_hint}"
+        if isinstance(exc, portkey_exc.APIConnectionError):
+            return f"{error_type}: Cannot connect to Pipelex Gateway - check network or service availability. {support_hint}"
+
+        # HTTP status errors (4xx/5xx)
+        if isinstance(exc, portkey_exc.APIStatusError):
+            status_code = exc.status_code
+            error_body = str(exc)
+
+            # For HTML responses, provide a generic message (gateway/proxy error pages)
+            if error_body.strip().startswith("<!DOCTYPE") or "<html" in error_body.lower():
+                return f"{error_type} (HTTP {status_code}): Pipelex Gateway unavailable. {support_hint}"
+
+            # For other errors, truncate if too long
+            max_length = 200
+            if len(error_body) > max_length:
+                error_body = error_body[:max_length] + "..."
+
+            return f"{error_type} (HTTP {status_code}): {error_body}"
+
+        # Response validation errors
+        if isinstance(exc, portkey_exc.APIResponseValidationError):
+            return f"{error_type}: Invalid response from Pipelex Gateway. {support_hint}"
+
+        # Fallback for any other APIError
+        return f"{error_type}: {exc.message}. {support_hint}"

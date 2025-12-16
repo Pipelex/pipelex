@@ -126,8 +126,8 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
         return the_requirements
 
     @property
-    def nb_inputs(self) -> int:
-        return len(self.root)
+    def is_empty(self) -> bool:
+        return not bool(self.root)
 
     def _is_multiple(self, multiplicity: VariableMultiplicity | None) -> bool:
         """Check if multiplicity indicates multiple items."""

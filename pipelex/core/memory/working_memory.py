@@ -1,5 +1,5 @@
 from operator import attrgetter
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import override
@@ -210,6 +210,37 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
     @override
     def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
+        """Retrieve a typed object or nested attribute from working memory.
+
+        This method is primarily used to:
+
+        - Find specific content types that require special handling when passed to LLMs,
+          such as Images and Documents (PDFs). These types need to be formatted differently
+          in LLM prompts compared to plain text content.
+        - Find the list of items to iterate over in a PipeBatch operation.
+
+        Supports dot-notation for accessing nested attributes (e.g., "stuff_name.attribute.sub_attr").
+        When the base stuff contains ListContent, extracts the specified attribute from each item.
+
+        Args:
+            name: The name of the stuff, optionally followed by dot-separated attribute path
+                  (e.g., "my_stuff" or "my_stuff.nested_attr.deeper_attr")
+            wanted_type: Optional type to validate the retrieved content against. If provided
+                         and the content doesn't match, raises WorkingMemoryTypeError.
+                         Commonly used with ImageContent, PDFContent, etc.
+            accept_list: If True, allows retrieval from ListContent stuffs. If False and the
+                         content is ListContent, raises WorkingMemoryTypeError
+
+        Returns:
+            The retrieved content or attribute value. For ListContent with dot-notation,
+            returns a flattened list of attribute values from each item.
+
+        Raises:
+            WorkingMemoryStuffNotFoundError: If the base stuff name doesn't exist
+            WorkingMemoryStuffAttributeNotFoundError: If the attribute path is invalid
+            WorkingMemoryTypeError: If type validation fails or ListContent is encountered
+                                    when accept_list is False
+        """
         # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot
@@ -270,15 +301,75 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
                 )
 
             return stuff_content
-        content = self.get_stuff(name).content
 
-        if wanted_type is not None and not isinstance(content, wanted_type):
+        top_level_content = self.get_stuff(name).content
+        if isinstance(top_level_content, ListContent):
+            top_level_content = cast("ListContent[Any]", top_level_content)
+            if wanted_type is ListContent:
+                return top_level_content.items
+            else:
+                if not accept_list:
+                    raise WorkingMemoryTypeError(
+                        variable_name=name,
+                        message=f"Content of '{name}' is ListContent, but accept_list is False",
+                    )
+                top_level_content_items = self._get_typed_items_from_list_content(list_content=top_level_content, wanted_type=wanted_type)
+                if top_level_content_items is None and wanted_type is not None:
+                    raise WorkingMemoryTypeError(
+                        variable_name=name,
+                        message=f"Content of '{name}' is ListContent, but some of its items are not of type '{wanted_type.__name__}'",
+                    )
+                if top_level_content_items is not None and len(top_level_content_items) == 0:
+                    raise WorkingMemoryTypeError(
+                        variable_name=name,
+                        message=f"Content of '{name}' is ListContent, but it is empty",
+                    )
+                return top_level_content_items
+
+        if wanted_type is not None and not isinstance(top_level_content, wanted_type):
             raise WorkingMemoryTypeError(
                 variable_name=name,
-                message=f"Content of '{name}' is of type '{type(content).__name__}', it should be '{wanted_type.__name__}'",
+                message=f"Content of '{name}' is of type '{type(top_level_content).__name__}', it should be '{wanted_type.__name__}'",
             )
 
-        return content
+        return top_level_content
+
+    def _get_typed_items_from_list_content(self, list_content: ListContent[Any], wanted_type: type[Any] | None) -> list[Any] | None:
+        """Extract items from ListContent with optional type validation.
+
+        Used to collect specific content types (e.g., Images, Documents) from lists
+        that require special handling when passed to LLMs.
+
+        Flattens nested lists and filters out None values. If any item fails type
+        validation, returns None to indicate failure.
+
+        Args:
+            list_content: The ListContent to extract items from
+            wanted_type: Optional type to validate each item against (e.g., ImageContent,
+                         PDFContent). If None, no type checking is performed
+
+        Returns:
+            A list of extracted items if all items pass type validation,
+            or None if any item fails validation
+        """
+        the_items: list[Any] = []
+        for item in list_content.items:
+            item_content = item
+            # check type
+            if isinstance(item_content, list):
+                for item_content_item in item_content:  # pyright: ignore[reportUnknownVariableType]
+                    if item_content_item is None:
+                        continue
+                    if wanted_type and not isinstance(item_content_item, wanted_type):
+                        return None
+                    the_items.append(item_content_item)
+            else:
+                if item_content is None:
+                    continue
+                if wanted_type and not isinstance(item_content, wanted_type):
+                    return None
+                the_items.append(item_content)
+        return the_items
 
     ################################################################################################
     # Stuff accessors

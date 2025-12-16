@@ -2,6 +2,7 @@
 
 import pytest
 
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat, Quality
 from pipelex.hub import get_model_deck
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
 
@@ -32,6 +33,7 @@ FAL_IMG_GEN_MODELS = [
     "flux-pro",
     "flux-pro/v1.1",
     "flux-pro/v1.1-ultra",
+    "flux-2",
 ]
 
 # --- OpenAI Models ------------------------------------------------------------------------------
@@ -42,6 +44,7 @@ OPENAI_IMG_GEN_MODELS = [
 # --- Google Models --------------------------------------------------------------------------
 GOOGLE_IMG_GEN_MODELS = [
     "nano-banana",
+    "nano-banana-pro",
 ]
 
 # --- All Image Generation Handles ---------------------------------------------------------------
@@ -64,3 +67,22 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
     if not is_img_gen_handle_supported_by_enabled_backends(img_gen_handle_param):
         pytest.skip(f"Image generation handle '{img_gen_handle_param}' not supported by any enabled backend")
     return img_gen_handle_param
+
+
+@pytest.fixture(
+    params=[
+        ImgGenJobParams(
+            aspect_ratio=AspectRatio.SQUARE,
+            background=Background.OPAQUE,
+            quality=Quality.LOW,
+            guidance_scale=3.5,
+            is_moderated=None,
+            safety_tolerance=1,
+            is_raw=None,
+            output_format=OutputFormat.JPG,
+        )
+    ],
+)
+def img_gen_job_params(request: pytest.FixtureRequest) -> ImgGenJobParams:
+    assert isinstance(request.param, ImgGenJobParams)
+    return request.param

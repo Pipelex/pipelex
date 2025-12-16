@@ -1,5 +1,4 @@
-import random
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import openai
 from openai import APIConnectionError, BadRequestError, NotFoundError
@@ -10,16 +9,20 @@ from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, S
 from pipelex.cogt.image.generated_image import GeneratedImage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
+    from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 
-class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
+class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
     def __init__(
         self,
+        openai_completions_factory: OpenAICompletionsFactory,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
@@ -31,6 +34,7 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
             raise SdkTypeError(msg)
 
         self.openai_client = sdk_instance
+        self.openai_completions_factory = openai_completions_factory
 
     @override
     async def _gen_image(
@@ -39,13 +43,16 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImage:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
         img_gen_prompt_text = img_gen_job.img_gen_prompt.positive_text
-        messages = [{"role": "user", "content": img_gen_prompt_text}]
-        seed = img_gen_job.job_params.seed or random.randint(0, 2**32 - 1)
+        messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": img_gen_prompt_text}]
         try:
+            extra_headers, extra_body = self.openai_completions_factory.make_extras(
+                inference_model=self.inference_model, inference_job=img_gen_job, output_desc=InferenceOutputType.IMAGE
+            )
             response = await self.openai_client.chat.completions.create(
                 model=self.inference_model.model_id,
-                messages=messages,  # type: ignore[arg-type]
-                seed=seed,
+                messages=messages,
+                extra_headers=extra_headers,
+                extra_body=extra_body,
             )
         except NotFoundError as not_found_error:
             # TODO: record llm config so it can be displayed here
@@ -59,12 +66,22 @@ class OpenAIImgGenAlternativeWorker(ImgGenWorkerAbstract):
             raise LLMCompletionError(msg) from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
-        response_text = openai_message.content
-        if response_text is None:
-            msg = f"OpenAI response message content is None: {response}\nmodel: {self.inference_model.desc}"
+        url: str | None = None
+        if (content := openai_message.content) and content.startswith("http"):
+            url = openai_message.content
+        elif hasattr(openai_message, "content_blocks"):
+            content_blocks = cast("list[dict[str, Any]]", openai_message.content_blocks)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+            for part in content_blocks:
+                if part.get("type") == "image_url":
+                    if image_url := part.get("image_url"):
+                        if the_url := image_url.get("url"):
+                            url = the_url
+                            break
+        if not url:
+            msg = f"OpenAI response has no image. Model: {self.inference_model.desc}"
             raise LLMCompletionError(msg)
         return GeneratedImage(
-            url=response_text,
+            url=url,
             width=1024,
             height=1024,
         )

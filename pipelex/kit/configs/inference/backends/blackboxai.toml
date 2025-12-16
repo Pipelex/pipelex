@@ -193,7 +193,7 @@ costs = { input = 0.00, output = 0.00 }
 
 [flux-pro]
 model_type = "img_gen"
-sdk = "openai_alt_img_gen"
+sdk = "blackboxai_img_gen"
 model_id = "blackboxai/black-forest-labs/flux-pro"
 inputs = ["text"]
 outputs = ["image"]
@@ -201,7 +201,7 @@ costs = { input = 0.0, output = 0.04 }
 
 ["flux-pro/v1.1"]
 model_type = "img_gen"
-sdk = "openai_alt_img_gen"
+sdk = "blackboxai_img_gen"
 model_id = "blackboxai/black-forest-labs/flux-1.1-pro"
 inputs = ["text"]
 outputs = ["image"]
@@ -209,15 +209,15 @@ costs = { input = 0.0, output = 0.04 }
 
 ["flux-pro/v1.1-ultra"]
 model_type = "img_gen"
-sdk = "openai_alt_img_gen"
+sdk = "blackboxai_img_gen"
 model_id = "blackboxai/black-forest-labs/flux-1.1-pro-ultra"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0, output = 0.06 }
 
-["fast-lightning-sdxl"]
+[fast-lightning-sdxl]
 model_type = "img_gen"
-sdk = "openai_alt_img_gen"
+sdk = "blackboxai_img_gen"
 model_id = "blackboxai/bytedance/sdxl-lightning-4step"
 inputs = ["text"]
 outputs = ["image"]
@@ -225,8 +225,16 @@ costs = { input = 0.0, output = 0.0014 }
 
 [nano-banana]
 model_type = "img_gen"
-sdk = "openai_alt_img_gen"
+sdk = "blackboxai_img_gen"
 model_id = "blackboxai/google/nano-banana"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.0, output = 0.039 }
+
+[nano-banana-pro]
+model_type = "img_gen"
+sdk = "blackboxai_img_gen"
+model_id = "blackboxai/google/nano-banana-pro"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0, output = 0.039 }

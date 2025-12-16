@@ -36,6 +36,7 @@ class PipeImgGenSpec(PipeSpec):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     img_gen_skill: ImgGenSkill | str = Field(description="Select the most adequate image generation skill according to the task to be performed.")
+    prompt: str = Field(description="A finalized image generation prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).")
 
     @field_validator("img_gen_skill", mode="before")
     @classmethod
@@ -71,8 +72,7 @@ class PipeImgGenSpec(PipeSpec):
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
-            img_gen_prompt=None,
-            img_gen_prompt_var_name=base_blueprint.input_names[0] if base_blueprint.input_names else None,
+            prompt=self.prompt,
             model=img_gen_choice,
             aspect_ratio=None,
             background=None,

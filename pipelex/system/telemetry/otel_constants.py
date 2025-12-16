@@ -6,7 +6,7 @@ with OpenTelemetry, following the GenAI semantic conventions.
 
 from opentelemetry.semconv._incubating.attributes import gen_ai_attributes as otel_gen_ai_attributes  # noqa: PLC2701
 
-from pipelex.cogt.llm.llm_constants import LLMOutputType
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.types import StrEnum
 
 
@@ -92,12 +92,14 @@ class PostHogEvent(StrEnum):
 
 def make_otel_gen_ai_output_type(output_type: str) -> otel_gen_ai_attributes.GenAiOutputTypeValues:
     try:
-        llm_output_type = LLMOutputType(output_type)
+        llm_output_type = InferenceOutputType(output_type)
         match llm_output_type:
-            case LLMOutputType.TEXT:
+            case InferenceOutputType.TEXT:
                 return otel_gen_ai_attributes.GenAiOutputTypeValues.TEXT
-            case LLMOutputType.OBJECT:
+            case InferenceOutputType.OBJECT:
                 return otel_gen_ai_attributes.GenAiOutputTypeValues.JSON
+            case InferenceOutputType.IMAGE:
+                return otel_gen_ai_attributes.GenAiOutputTypeValues.IMAGE
     except ValueError as exc:
         msg = f"Invalid LLM output type: {output_type}, and we only support LLM output types for now in OpenTelemetry"
         raise ValueError(msg) from exc

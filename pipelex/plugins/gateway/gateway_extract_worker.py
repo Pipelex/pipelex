@@ -15,7 +15,8 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
-from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
+from pipelex.plugins.gateway.gateway_deck import GatewayDeck
+from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_async
 from pipelex.types import StrEnum
@@ -34,7 +35,7 @@ class DocumentKind(StrEnum):
                 return "document_url"
 
 
-class PortkeyExtractWorker(ExtractWorkerAbstract):
+class GatewayExtractWorker(ExtractWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
@@ -115,43 +116,39 @@ class PortkeyExtractWorker(ExtractWorkerAbstract):
         document_type: DocumentKind,
         should_include_images: bool = False,
     ) -> ExtractOutput:
-        config_id = self._get_portkey_config_id()
+        config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
         doc_tag = document_type.document_tag
 
         attempt_number = 0
         response: GenericResponse | None = None
         retryer = self._make_retryer()
-        async for attempt in retryer:
-            with attempt:
-                attempt_number += 1
-                response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                    "/",
-                    model=self.inference_model.model_id,
-                    document={"type": doc_tag, doc_tag: base64_url},
-                    include_image_base64=True,
-                )
+        try:
+            async for attempt in retryer:
+                with attempt:
+                    attempt_number += 1
+                    response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                        "/",
+                        model=self.inference_model.model_id,
+                        document={"type": doc_tag, doc_tag: base64_url},
+                        include_image_base64=True,
+                    )
+        except portkey_exceptions.APIError as exc:
+            error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
+            msg = f"Extract service error for model '{self.inference_model.tag}' after {attempt_number} attempt(s): {error_summary}"
+            raise ExtractJobFailureError(msg) from exc
 
         if response is None:
-            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey after {attempt_number} attempts"
+            msg = f"Could not get a response for model '{self.inference_model.tag}' via Portkey after {attempt_number} attempts"
             raise ExtractJobFailureError(msg)
 
         if not isinstance(response, GenericResponse):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
+
         return GatewayCompletionsFactory.make_extract_output_from_portkey_response(
             response=response,
         )
-
-    def _get_portkey_config_id(self) -> str:
-        if not self.inference_model.extra_headers:
-            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
-            raise ExtractInputError(msg)
-        config_id = self.inference_model.extra_headers.get(PortkeyHeaderKey.CONFIG)
-        if not config_id:
-            msg = f"{PortkeyHeaderKey.CONFIG} header is required"
-            raise ExtractInputError(msg)
-        return config_id
 
     def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
         if isinstance(exc, portkey_exceptions.NotFoundError):

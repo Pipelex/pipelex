@@ -44,7 +44,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         if not backend.api_key:
             msg = "Azure OpenAI API key (subscription_key) is not configured"
             raise AzureCredentialsError(msg)
-        self.subscription_key: str = backend.api_key
+        self.api_key: str = backend.api_key
 
     #########################################################
     # Instance methods
@@ -101,7 +101,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             response = await client.post(
                 generation_url,
                 headers={
-                    "Api-Key": self.subscription_key,
+                    "Api-Key": self.api_key,
                     "Content-Type": "application/json",
                 },
                 json=generation_body,

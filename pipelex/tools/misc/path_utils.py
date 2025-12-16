@@ -111,3 +111,16 @@ def clarify_path_or_url(path_or_uri: str) -> tuple[str | None, str | None]:
             msg = "Base 64 is not supported yet by clarify_path_or_url"
             raise NotImplementedError(msg)
     return file_path, url
+
+
+def resolve_path_or_url_for_reading(path_or_uri: str) -> str:
+    """Resolve a path-or-URI to a single string suitable for file-reading/conversion calls.
+
+    This is a convenience wrapper around `clarify_path_or_url()` that returns a single value:
+    - the http(s) URL if `path_or_uri` is a URL
+    - otherwise a local file path (including normalized `file://...` URIs)
+    """
+    file_path, url = clarify_path_or_url(path_or_uri=path_or_uri)
+    resolved = url or file_path
+    assert resolved is not None
+    return resolved
