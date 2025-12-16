@@ -210,6 +210,37 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
     @override
     def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
+        """Retrieve a typed object or nested attribute from working memory.
+
+        This method is primarily used to:
+
+        - Find specific content types that require special handling when passed to LLMs,
+          such as Images and Documents (PDFs). These types need to be formatted differently
+          in LLM prompts compared to plain text content.
+        - Find the list of items to iterate over in a PipeBatch operation.
+
+        Supports dot-notation for accessing nested attributes (e.g., "stuff_name.attribute.sub_attr").
+        When the base stuff contains ListContent, extracts the specified attribute from each item.
+
+        Args:
+            name: The name of the stuff, optionally followed by dot-separated attribute path
+                  (e.g., "my_stuff" or "my_stuff.nested_attr.deeper_attr")
+            wanted_type: Optional type to validate the retrieved content against. If provided
+                         and the content doesn't match, raises WorkingMemoryTypeError.
+                         Commonly used with ImageContent, PDFContent, etc.
+            accept_list: If True, allows retrieval from ListContent stuffs. If False and the
+                         content is ListContent, raises WorkingMemoryTypeError
+
+        Returns:
+            The retrieved content or attribute value. For ListContent with dot-notation,
+            returns a flattened list of attribute values from each item.
+
+        Raises:
+            WorkingMemoryStuffNotFoundError: If the base stuff name doesn't exist
+            WorkingMemoryStuffAttributeNotFoundError: If the attribute path is invalid
+            WorkingMemoryTypeError: If type validation fails or ListContent is encountered
+                                    when accept_list is False
+        """
         # TODO: Refactor this method. In the python paradigm, we should not have those ".", but arrays with field names.
         if "." in name:
             parts = name.split(".", 1)  # Split only at the first dot
@@ -304,10 +335,25 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         return top_level_content
 
     def _get_typed_items_from_list_content(self, list_content: ListContent[Any], wanted_type: type[Any] | None) -> list[Any] | None:
-        # attr_path_str = ""
+        """Extract items from ListContent with optional type validation.
+
+        Used to collect specific content types (e.g., Images, Documents) from lists
+        that require special handling when passed to LLMs.
+
+        Flattens nested lists and filters out None values. If any item fails type
+        validation, returns None to indicate failure.
+
+        Args:
+            list_content: The ListContent to extract items from
+            wanted_type: Optional type to validate each item against (e.g., ImageContent,
+                         PDFContent). If None, no type checking is performed
+
+        Returns:
+            A list of extracted items if all items pass type validation,
+            or None if any item fails validation
+        """
         the_items: list[Any] = []
         for item in list_content.items:
-            # item_content = attrgetter(attr_path_str)(item)
             item_content = item
             # check type
             if isinstance(item_content, list):
