@@ -168,4 +168,12 @@ model_type = "img_gen"
 model_id = "gpt-image-1"
 inputs = ["text"]
 outputs = ["image"]
-costs = { input = 0.04, output = 0.0 }
+costs = { input = 10, output = 40 }
+
+[gpt-image-1-mini]
+sdk = "openai_img_gen"
+model_type = "img_gen"
+model_id = "gpt-image-1-mini"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 2.5, output = 8 }

@@ -91,7 +91,7 @@ class TestExtract:
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
         pretty_print(extract_output, title="Extract Output")
         directory = get_incremental_directory_path(
-            base_path="results/test_ocr_image_save",
+            base_path="results/test_ocr_result_save",
             base_name="extract_output",
         )
         extract_output.save_to_directory(
