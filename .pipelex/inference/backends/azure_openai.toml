@@ -135,6 +135,20 @@ outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
+# --- GPT-5.2 Series -------------------------------------------------------------
+["gpt-5.2"]
+model_id = "gpt-5.2-2025-12-11"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.0 }
+
+["gpt-5.2-chat"]
+model_id = "gpt-5.2-chat-2025-12-11"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+
 ################################################################################
 # IMAGE GENERATION MODELS
 ################################################################################
