@@ -62,7 +62,7 @@ class ConfigLoader:
         # Final override
         list_of_configs.append(os.path.join(self.pipelex_config_dir, "pipelex_super.toml"))
 
-        return load_toml_from_path_and_merge_with_overrides(list_of_configs)
+        return load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
 
 
 config_manager = ConfigLoader()

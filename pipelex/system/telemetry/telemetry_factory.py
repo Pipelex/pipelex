@@ -1,7 +1,4 @@
-import os
-
 from pipelex import log
-from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -12,7 +9,7 @@ from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.otel_constants import OTelConstants
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, PostHogMode, TelemetryConfig, load_telemetry_config
+from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, load_telemetry_config
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
@@ -47,8 +44,7 @@ class TelemetryFactory:
 
         # Always load telemetry config first to determine allowed modes
         if not telemetry_config:
-            telemetry_config_path = os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
-            telemetry_config = load_telemetry_config(path=telemetry_config_path, secrets_provider=secrets_provider)
+            telemetry_config = load_telemetry_config(secrets_provider=secrets_provider)
 
         allows_custom_telemetry = telemetry_config.is_custom_telemetry_allowed_for_mode(integration_mode)
 
@@ -63,7 +59,7 @@ class TelemetryFactory:
                 log.debug(f"Telemetry is disabled by env var '{OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY}'")
                 return chosen_telemetry_manager
 
-            match telemetry_config.posthog.mode:
+            match telemetry_config.custom_posthog.mode:
                 case PostHogMode.OFF:
                     if is_pipelex_telemetry_enabled:
                         # Gateway requires telemetry - create manager with only Pipelex telemetry

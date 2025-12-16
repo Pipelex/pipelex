@@ -28,7 +28,7 @@ class GatewayFactory:
     @classmethod
     def is_debug_enabled(cls, backend: InferenceBackend) -> bool:
         is_debug_configured = backend.extra_config.get("debug", False)
-        return get_telemetry_manager().is_portkey_logging_enabled(is_debug_configured=is_debug_configured)
+        return get_telemetry_manager().is_pipelex_gateway_portkey_logging_enabled(is_debug_configured=is_debug_configured)
 
     @classmethod
     def get_endpoint(cls, backend: InferenceBackend) -> str:
@@ -68,7 +68,7 @@ class GatewayFactory:
             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
 
         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
-        if get_telemetry_manager().is_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
+        if get_telemetry_manager().is_pipelex_gateway_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
             # Use OTel trace_id and span_id for correlation
             extra_headers[PortkeyHeaderKey.TRACE_ID] = f"{otel_context.trace_id:032x}"
             extra_headers[PortkeyHeaderKey.SPAN_ID] = f"{otel_context.span_id:016x}"

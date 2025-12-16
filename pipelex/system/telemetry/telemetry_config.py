@@ -1,11 +1,13 @@
+import os
 from functools import partial
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import (
     UnknownVarPrefixError,
@@ -15,6 +17,7 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of, format_py
 from pipelex.types import Self, StrEnum
 
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
+TELEMETRY_CONFIG_OVERRIDE_FILE_NAME = "telemetry_override.toml"
 
 
 class PostHogMode(StrEnum):
@@ -89,6 +92,14 @@ class PostHogConfig(BaseModel):
         return self
 
 
+class PortkeyConfig(BaseModel):
+    """Portkey SDK configuration for logging and tracing."""
+
+    model_config = ConfigDict(extra="forbid")
+    force_debug_enabled: bool = Field(default=False, description="Force-enable Portkey SDK debug mode regardless of backend setting")
+    force_tracing_enabled: bool = Field(default=False, description="Force-enable Portkey SDK tracing regardless of backend setting")
+
+
 class LangfuseConfig(BaseModel):
     """Langfuse integration configuration."""
 
@@ -113,13 +124,15 @@ class OtlpExporterConfig(BaseModel):
 class TelemetryConfig(ConfigModel):
     """Main telemetry configuration with nested sections."""
 
-    posthog: PostHogConfig = Field(description="PostHog configuration")
-    langfuse: LangfuseConfig = Field(default_factory=LangfuseConfig, description="Langfuse configuration")
-    otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
+    custom_posthog: PostHogConfig = Field(description="PostHog configuration")
+    custom_portkey: PortkeyConfig = Field(description="Custom Portkey SDK configuration")
+    custom_langfuse: LangfuseConfig = Field(description="Langfuse configuration")
+    custom_otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
     custom_telemetry_allowed_modes: dict[str, bool] = Field(
         default_factory=dict,
         description="Which integration modes allow custom telemetry (e.g. cli=true, pytest=false)",
     )
+    pipelex_gateway_portkey: PortkeyConfig | None = Field(default=None, description="Pipelex Gateway Portkey SDK configuration")
 
     def is_custom_telemetry_allowed_for_mode(self, mode: str) -> bool:
         """Check if custom telemetry is allowed for the given integration mode.
@@ -189,7 +202,7 @@ class TelemetryRedactionConfig(BaseModel):
         return cls()
 
 
-def load_telemetry_config(path: str, secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
+def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
     """Load telemetry configuration from a TOML file with variable substitution.
 
     Supports variable placeholders in string values:
@@ -199,7 +212,6 @@ def load_telemetry_config(path: str, secrets_provider: SecretsProviderAbstract) 
     - ${env:ENV_VAR|secret:SECRET} -> try env first, then secret as fallback
 
     Args:
-        path: Path to the telemetry.toml configuration file.
         secrets_provider: Provider for resolving secret/env variable placeholders.
 
     Returns:
@@ -208,20 +220,25 @@ def load_telemetry_config(path: str, secrets_provider: SecretsProviderAbstract) 
     Raises:
         TelemetryConfigValidationError: If configuration is invalid or variable substitution fails.
     """
-    telemetry_config_toml_raw = load_toml_from_path(path=path)
+    telemetry_config_paths: list[str] = []
+    telemetry_config_paths.append(os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME))
+    telemetry_config_paths.append(os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_OVERRIDE_FILE_NAME))
+    telemetry_config_toml_raw = load_toml_from_path_and_merge_with_overrides(paths=telemetry_config_paths)
 
     # Apply variable substitution to all string values (keep placeholders for missing vars)
     substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider, raise_on_missing_var=False)
     try:
         telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, substitute_vars_with_provider)
     except UnknownVarPrefixError as exc:
-        msg = f"Variable substitution failed in telemetry configuration '{path}': {exc}"
+        paths_str = "\n".join(telemetry_config_paths)
+        msg = f"Variable substitution failed in telemetry configuration based on '{paths_str}': {exc}"
         raise TelemetryConfigValidationError(msg) from exc
 
     try:
         telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
     except ValidationError as exc:
         validation_error_msg = format_pydantic_validation_error(exc)
-        msg = f"Invalid telemetry configuration in '{path}':\n{validation_error_msg}"
+        paths_str = "\n".join(telemetry_config_paths)
+        msg = f"Invalid telemetry configuration in '{paths_str}':\n{validation_error_msg}"
         raise TelemetryConfigValidationError(msg) from exc
     return telemetry_config
