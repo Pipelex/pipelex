@@ -6,9 +6,6 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
-CONFIG_BASE_OVERRIDES_BEFORE_ENV = ["local"]
-CONFIG_BASE_OVERRIDES_AFTER_ENV = ["super"]
-
 
 class ConfigRoot(ConfigModel):
     """Main configuration class for the project."""
