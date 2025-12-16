@@ -2,6 +2,7 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 
+from pipelex import pretty_print
 from pipelex.cogt.exceptions import ImgGenGenerationError
 from pipelex.cogt.image.generated_image import GeneratedImage
 
@@ -29,10 +30,12 @@ class FalFactory:
                 raise ImgGenGenerationError(msg)
             image_dicts = cast("list[dict[str, Any]]", image_dicts)
             for image_dict in image_dicts:
+                pretty_print(image_dict, title="image_dict")
                 generated_image = GeneratedImage(
                     url=image_dict["url"],
                     width=image_dict["width"],
                     height=image_dict["height"],
+                    content_type=image_dict["content_type"],
                 )
                 generated_image_list.append(generated_image)
         except (KeyError, TypeError, ValidationError) as exc:

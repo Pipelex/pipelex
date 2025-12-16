@@ -149,6 +149,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         so we generate them sequentially.
         """
         generated_images: list[GeneratedImage] = []
+        # TODO: async gen images in parallel
         for _ in range(nb_images):
             image = await self._gen_image(img_gen_job=img_gen_job)
             generated_images.append(image)

@@ -30,9 +30,9 @@ STABLE_DIFFUSION_IMG_GEN_MODELS = [
 
 # --- FAL Models ---------------------------------------------------------------------------------
 FAL_IMG_GEN_MODELS = [
-    "flux-pro",
-    "flux-pro/v1.1",
-    "flux-pro/v1.1-ultra",
+    # "flux-pro",
+    # "flux-pro/v1.1",
+    # "flux-pro/v1.1-ultra",
     "flux-2",
 ]
 
@@ -51,10 +51,10 @@ GOOGLE_IMG_GEN_MODELS = [
 
 # --- All Image Generation Handles ---------------------------------------------------------------
 ALL_IMG_GEN_HANDLES = [
-    *STABLE_DIFFUSION_IMG_GEN_MODELS,
+    # *STABLE_DIFFUSION_IMG_GEN_MODELS,
+    # *OPENAI_IMG_GEN_MODELS,
     *FAL_IMG_GEN_MODELS,
-    *OPENAI_IMG_GEN_MODELS,
-    *GOOGLE_IMG_GEN_MODELS,
+    # *GOOGLE_IMG_GEN_MODELS,
 ]
 
 

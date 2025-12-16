@@ -187,8 +187,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             nb_images = 1
 
-        # Get the structure class from the registry (might be a subclass of ImageContent)
-        structure_class = get_class_registry().get_required_subclass(
+        # Get the structure class from the registry (must be a subclass of ImageContent)
+        image_content_subclass = get_class_registry().get_required_subclass(
             name=self.output.structure_class_name,
             base_class=ImageContent,
         )
@@ -208,13 +208,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             for generated_image in generated_image_list:
                 generated_image_url = generated_image.url
                 base_64_str = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
-                image_content_items.append(
-                    structure_class(
-                        url=generated_image_url,
-                        source_prompt=img_gen_prompt_text,
-                        base_64=base_64_str,
-                    ),
+                image_content = image_content_subclass(
+                    url=generated_image_url,
+                    source_prompt=img_gen_prompt_text,
+                    base_64=base_64_str,
                 )
+                image_content_items.append(image_content)
             the_content = ListContent(
                 items=image_content_items,
             )
@@ -233,7 +232,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             generated_image_url = generated_image.url
             base_64_str = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
 
-            the_content = structure_class(
+            the_content = image_content_subclass(
                 url=generated_image_url,
                 source_prompt=img_gen_prompt_text,
                 base_64=base_64_str,

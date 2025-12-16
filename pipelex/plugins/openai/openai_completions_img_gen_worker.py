@@ -55,14 +55,13 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                 extra_body=extra_body,
             )
         except NotFoundError as not_found_error:
-            # TODO: record llm config so it can be displayed here
-            msg = f"OpenAI model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
+            msg = f"ImgGen model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
             raise LLMModelNotFoundError(msg) from not_found_error
         except APIConnectionError as api_connection_error:
-            msg = f"OpenAI API connection error: {api_connection_error}"
+            msg = f"ImgGen API connection error: {api_connection_error}"
             raise LLMCompletionError(msg) from api_connection_error
         except BadRequestError as bad_request_error:
-            msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
+            msg = f"ImgGen bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
             raise LLMCompletionError(msg) from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
