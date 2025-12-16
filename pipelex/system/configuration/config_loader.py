@@ -34,35 +34,20 @@ class ConfigLoader:
         return os.path.dirname(os.path.dirname(current_dir))
 
     @property
-    def pipelex_root_config_path(self) -> str:
-        return os.path.join(self.pipelex_root_dir, CONFIG_NAME)
-
-    @property
-    def local_root_dir(self) -> str:
-        """Get the root directory of the project using pipelex.
-        This is the directory from where the command is being run.
-        """
-        return os.getcwd()
-
-    @property
     def pipelex_config_dir(self) -> str:
         return os.path.join(os.getcwd(), CONFIG_DIR_NAME)
 
-    @property
-    def pipelex_specific_config_file_path(self) -> str:
-        return os.path.join(self.pipelex_config_dir, CONFIG_NAME)
-
-    def get_pipelex_config(self) -> dict[str, Any]:
+    def _get_pipelex_config(self) -> dict[str, Any]:
         """Get the pipelex configuration from pipelex.toml.
 
         Returns:
             Dict[str, Any]: The configuration dictionary from pipelex.toml
 
         """
-        config_path = self.pipelex_root_config_path
+        config_path = os.path.join(self.pipelex_root_dir, CONFIG_NAME)
         return load_toml_from_path(config_path)
 
-    def get_local_config(self) -> dict[str, Any]:
+    def _get_local_config(self) -> dict[str, Any]:
         """Get the local pipelex configuration from pipelex.toml in the project root.
 
         Returns:
@@ -88,13 +73,12 @@ class ConfigLoader:
 
         """
         # 1. Load pipelex base config ####################
-        pipelex_config = self.get_pipelex_config()
+        pipelex_config = self._get_pipelex_config()
 
         # 2. Load local (current project) config ####################
-        if not self.is_in_pipelex_config:
-            local_config = self.get_local_config()
-            if local_config:
-                deep_update(pipelex_config, local_config)
+        local_config = self._get_local_config()
+        if local_config:
+            deep_update(pipelex_config, local_config)
 
         # 3. Load overrides for the current project ####################
         list_of_overrides: list[str] = [
@@ -105,10 +89,10 @@ class ConfigLoader:
         ]
         for override in list_of_overrides:
             if override == runtime_manager.run_mode and runtime_manager.is_unit_testing:
-                override_path = os.path.join(os.getcwd(), "tests", f"pipelex_{override}.toml")
+                path_of_override_config = os.path.join(os.getcwd(), "tests", f"pipelex_{override}.toml")
             else:
-                override_path = os.path.join(os.getcwd(), "pipelex" if self.is_in_pipelex_config else "", f"pipelex_{override}.toml")
-            if override_dict := load_toml_from_path_if_exists(override_path):
+                path_of_override_config = os.path.join(os.getcwd(), "pipelex" if self.is_in_pipelex_config else "", f"pipelex_{override}.toml")
+            if override_dict := load_toml_from_path_if_exists(path_of_override_config):
                 deep_update(pipelex_config, override_dict)
 
         return pipelex_config
