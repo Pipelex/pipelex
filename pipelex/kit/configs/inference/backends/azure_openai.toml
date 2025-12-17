@@ -135,6 +135,27 @@ outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
+["gpt-5.1-codex"]
+model_id = "gpt-5.1-codex-2025-11-13"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+
+# --- GPT-5.2 Series -------------------------------------------------------------
+["gpt-5.2"]
+model_id = "gpt-5.2-2025-12-11"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.0 }
+
+["gpt-5.2-chat"]
+model_id = "gpt-5.2-chat-2025-12-11"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+
 ################################################################################
 # IMAGE GENERATION MODELS
 ################################################################################
@@ -146,4 +167,41 @@ model_type = "img_gen"
 model_id = "gpt-image-1-2025-04-15"
 inputs = ["text"]
 outputs = ["image"]
-costs = { input = 0.04, output = 0.0 }
+costs = { input = 10, output = 40 }
+
+[gpt-image-1.rules]
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "gpt"
+inference = "gpt"
+safety_checker = "unavailable"
+
+[gpt-image-1-mini]
+sdk = "azure_rest_img_gen"
+model_type = "img_gen"
+model_id = "gpt-image-1-mini-2025-10-06"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 2.5, output = 8 }
+
+[gpt-image-1-mini.rules]
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "gpt"
+inference = "gpt"
+safety_checker = "unavailable"
+
+["gpt-image-1.5"]
+sdk = "azure_rest_img_gen"
+model_type = "img_gen"
+model_id = "gpt-image-1.5-2025-12-16"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 8, output = 32 }
+
+["gpt-image-1.5".rules]
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "gpt"
+inference = "gpt"
+safety_checker = "unavailable"
