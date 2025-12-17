@@ -168,7 +168,7 @@ class ImgGenArgsFactory:
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.GPT:
                 key = "size"
-                value = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio)
+                value = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio)[0]
         return {key: value}
 
     @classmethod

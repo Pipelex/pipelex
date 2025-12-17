@@ -14,14 +14,14 @@ GptImage1BackgroundType = Literal["transparent", "opaque", "auto"]
 
 class OpenAIImgGenFactory:
     @classmethod
-    def image_size_for_gpt_image_1(cls, aspect_ratio: AspectRatio) -> GptImage1SizeType:
+    def image_size_for_gpt_image_1(cls, aspect_ratio: AspectRatio) -> tuple[GptImage1SizeType, int, int]:
         match aspect_ratio:
             case AspectRatio.SQUARE:
-                return "1024x1024"
+                return "1024x1024", 1024, 1024
             case AspectRatio.LANDSCAPE_3_2:
-                return "1536x1024"
+                return "1536x1024", 1536, 1024
             case AspectRatio.PORTRAIT_2_3:
-                return "1024x1536"
+                return "1024x1536", 1024, 1536
             case (
                 AspectRatio.LANDSCAPE_4_3
                 | AspectRatio.LANDSCAPE_16_9

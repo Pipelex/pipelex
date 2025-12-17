@@ -5,10 +5,11 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.content_generation.generated_content_factory_dry import GeneratedContentFactoryDry
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -28,6 +29,9 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     """This class is used to generate mock content for testing purposes.
     It does not use any inference.
     """
+
+    def __init__(self) -> None:
+        self._generated_content_factory = GeneratedContentFactoryDry()
 
     @property
     def _text_gen_truncate_length(self) -> int:
@@ -142,15 +146,17 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageResolved:
         func_name = "make_single_image"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
         image_url = image_urls[0]
-        return GeneratedImage(
-            url=image_url,
-            width=1536,
-            height=2752,
+        return self._generated_content_factory.make_generated_image(
+            raw_details=GeneratedImageRawDetails(
+                actual_url=image_url,
+                width=1536,
+                height=2752,
+            ),
         )
 
     @override
@@ -163,15 +169,17 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> list[GeneratedImage]:
+    ) -> list[GeneratedImageResolved]:
         func_name = "make_image_list"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
         return [
-            GeneratedImage(
-                url=image_urls[image_index % len(image_urls)],
-                width=1536,
-                height=2752,
+            self._generated_content_factory.make_generated_image(
+                raw_details=GeneratedImageRawDetails(
+                    actual_url=image_urls[image_index % len(image_urls)],
+                    width=1536,
+                    height=2752,
+                ),
             )
             for image_index in range(nb_images)
         ]

@@ -1,5 +1,4 @@
 import asyncio
-import base64
 from typing import Any
 
 from google import genai
@@ -9,13 +8,12 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 
 
 class GoogleImgGenWorkerError(PipelexError):
@@ -85,7 +83,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image(
         self,
         img_gen_job: ImgGenJob,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageRawDetails:
         """Generate a single image using Google Gemini Image API."""
         prompt_text = img_gen_job.img_gen_prompt.positive_text
         aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_string(img_gen_job.job_params.aspect_ratio)
@@ -126,10 +124,10 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 if image_bytes is None:
                     continue
                 # Convert bytes to base64 data URL
-                base64_str = base64.b64encode(image_bytes).decode("utf-8")
-                base64_url = prefixed_base64_str_from_base64_str(base64_str)
-                return GeneratedImage(
-                    url=base64_url,
+                # base64_str = base64.b64encode(image_bytes).decode("utf-8")
+                # base64_url = prefixed_base64_str_from_base64_str(base64_str)
+                return GeneratedImageRawDetails(
+                    actual_bytes=image_bytes,
                     width=width,
                     height=height,
                 )
@@ -142,13 +140,13 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> list[GeneratedImage]:
+    ) -> list[GeneratedImageRawDetails]:
         """Generate multiple images by calling _gen_image multiple times.
 
         Google Gemini Image API does not support generating multiple images in a single call,
         so we generate them sequentially.
         """
-        generated_images: list[GeneratedImage] = []
+        generated_images: list[GeneratedImageRawDetails] = []
         # TODO: async gen images in parallel
         for _ in range(nb_images):
             image = await self._gen_image(img_gen_job=img_gen_job)

@@ -2,7 +2,7 @@ import httpx
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import CogtError, ImgGenGenerationError, ImgGenParameterError
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -11,7 +11,6 @@ from pipelex.hub import get_models_manager
 from pipelex.plugins.plugin import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
-from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 
 
 class AzureCredentialsError(CredentialsError):
@@ -56,7 +55,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image(
         self,
         img_gen_job: ImgGenJob,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageRawDetails:
         one_image_list = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=1)
         return one_image_list[0]
 
@@ -65,7 +64,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> list[GeneratedImage]:
+    ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
             raise ImgGenParameterError(msg)
@@ -99,7 +98,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             response.raise_for_status()
             response_dict = response.json()
 
-        generated_images: list[GeneratedImage] = []
+        generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
             size = response_dict.get("size")
             if not isinstance(size, str):
@@ -113,14 +112,13 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             width = int(width_str)
             height = int(height_str)
             for image in images:
-                b64_str = image.get("b64_json")
-                if not isinstance(b64_str, str):
+                base64_str = image.get("b64_json")
+                if not isinstance(base64_str, str):
                     msg = f"No base64 image data received from model '{self.inference_model.model_id}'"
                     raise ImgGenGenerationError(msg)
-                base64_url = prefixed_base64_str_from_base64_str(b64_str=b64_str)
                 generated_images.append(
-                    GeneratedImage(
-                        url=base64_url,
+                    GeneratedImageRawDetails(
+                        base64_str=base64_str,
                         width=width,
                         height=height,
                     ),

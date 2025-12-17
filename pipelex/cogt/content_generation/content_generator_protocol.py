@@ -5,7 +5,7 @@ from typing import Any, ParamSpec, Protocol, TypeVar
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageResolved
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -97,7 +97,7 @@ class ContentGeneratorProtocol(Protocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> Coroutine[Any, Any, GeneratedImage]: ...
+    ) -> Coroutine[Any, Any, GeneratedImageResolved]: ...
 
     def make_image_list(
         self,
@@ -107,7 +107,7 @@ class ContentGeneratorProtocol(Protocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> Coroutine[Any, Any, list[GeneratedImage]]: ...
+    ) -> Coroutine[Any, Any, list[GeneratedImageResolved]]: ...
 
     def make_templated_text(
         self,

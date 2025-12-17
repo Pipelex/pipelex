@@ -4,14 +4,13 @@ import openai
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 
 
 class OpenAIImgGenWorker(ImgGenWorkerAbstract):
@@ -33,7 +32,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image(
         self,
         img_gen_job: ImgGenJob,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageRawDetails:
         one_image_list = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=1)
         return one_image_list[0]
 
@@ -42,8 +41,8 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> list[GeneratedImage]:
-        image_size = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio=img_gen_job.job_params.aspect_ratio)
+    ) -> list[GeneratedImageRawDetails]:
+        image_size, width, height = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio=img_gen_job.job_params.aspect_ratio)
         output_format = OpenAIImgGenFactory.output_format_for_gpt_image_1(output_format=img_gen_job.job_params.output_format)
         moderation = OpenAIImgGenFactory.moderation_for_gpt_image_1(is_moderated=img_gen_job.job_params.is_moderated)
         background = OpenAIImgGenFactory.background_for_gpt_image_1(background=img_gen_job.job_params.background)
@@ -64,19 +63,19 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             msg = "No result from OpenAI"
             raise ImgGenGenerationError(msg)
 
-        generated_images: list[GeneratedImage] = []
+        generated_images: list[GeneratedImageRawDetails] = []
         for image_data in result.data:
-            image_base64 = image_data.b64_json
-            if not image_base64:
+            base64_str = image_data.b64_json
+            if not base64_str:
                 msg = "No base64 image data received from OpenAI"
                 raise ImgGenGenerationError(msg)
 
-            base64_url = prefixed_base64_str_from_base64_str(b64_str=image_base64)
+            # base64_url = prefixed_base64_str_from_base64_str(b64_str=base64_str)
             generated_images.append(
-                GeneratedImage(
-                    url=base64_url,
-                    width=1024,
-                    height=1024,
+                GeneratedImageRawDetails(
+                    base64_str=base64_str,
+                    width=width,
+                    height=height,
                 ),
             )
         return generated_images

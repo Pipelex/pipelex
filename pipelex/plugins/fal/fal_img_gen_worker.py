@@ -5,7 +5,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -34,7 +34,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image(
         self,
         img_gen_job: ImgGenJob,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageRawDetails:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
             raise ImgGenParameterError(msg)
@@ -70,7 +70,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> list[GeneratedImage]:
+    ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
             raise ImgGenParameterError(msg)

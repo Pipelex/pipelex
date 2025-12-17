@@ -9,12 +9,12 @@ import shortuuid
 from PIL import Image
 
 from pipelex import log
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.tools.misc.file_utils import ensure_path
 from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 
-def save_generated_image(generated_image: GeneratedImage, topic: str, output_dir: str | None = None) -> str | None:
+def save_generated_image(generated_image: GeneratedImageRawDetails, topic: str, output_dir: str | None = None) -> str | None:
     """Save a generated image to the output directory.
 
     Handles different URL formats:

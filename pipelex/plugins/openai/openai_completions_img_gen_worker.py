@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
@@ -40,7 +40,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image(
         self,
         img_gen_job: ImgGenJob,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageRawDetails:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
         img_gen_prompt_text = img_gen_job.img_gen_prompt.positive_text
         messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": img_gen_prompt_text}]
@@ -79,8 +79,9 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         if not url:
             msg = f"OpenAI response has no image. Model: {self.inference_model.desc}"
             raise LLMCompletionError(msg)
-        return GeneratedImage(
-            url=url,
+        # TODO: raise if other size than 1024x1024 was requested
+        return GeneratedImageRawDetails(
+            actual_url=url,
             width=1024,
             height=1024,
         )
@@ -90,7 +91,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> list[GeneratedImage]:
+    ) -> list[GeneratedImageRawDetails]:
         if nb_images > 1:
             msg = f"The image genration backend '{self.inference_model.desc}' can't generate multiple images at once: {nb_images}"
             raise NotImplementedError(msg)
