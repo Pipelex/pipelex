@@ -190,3 +190,18 @@ aspect_ratio = "gpt"
 background = "gpt"
 inference = "gpt"
 safety_checker = "unavailable"
+
+["gpt-image-1.5"]
+sdk = "azure_rest_img_gen"
+model_type = "img_gen"
+model_id = "gpt-image-1.5-2025-12-16"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 8, output = 32 }
+
+["gpt-image-1.5".rules]
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "gpt"
+inference = "gpt"
+safety_checker = "unavailable"

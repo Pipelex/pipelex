@@ -12,6 +12,7 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
+from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.exceptions import (
     InferenceBackendCredentialsError,
     InferenceBackendLibraryNotFoundError,
@@ -259,7 +260,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 var_name=var_name,
             )
             raise PipelexSetupError(error_msg) from credentials_exc
-        self.pipelex_hub.set_content_generator(content_generator or ContentGenerator())
+        self.pipelex_hub.set_content_generator(content_generator or ContentGenerator(generated_content_factory=GeneratedContentFactory()))
 
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)

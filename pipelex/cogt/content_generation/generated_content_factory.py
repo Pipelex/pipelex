@@ -1,6 +1,5 @@
 import base64
 
-from pydantic_core import Url
 from typing_extensions import override
 
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError

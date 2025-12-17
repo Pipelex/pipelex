@@ -151,7 +151,7 @@ costs = { input = 1.25, output = 10.0 }
 ["gpt-5.1-chat"]
 model_id = "gpt-5.1-chat-latest"
 inputs = ["text", "images"]
-outputs = ["text"]
+outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
