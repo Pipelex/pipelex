@@ -1,4 +1,5 @@
 import types
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from kajson.class_registry import ClassRegistry
@@ -74,6 +75,7 @@ from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
+from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.types import Self
 from pipelex.urls import URLs
@@ -260,7 +262,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 var_name=var_name,
             )
             raise PipelexSetupError(error_msg) from credentials_exc
-        self.pipelex_hub.set_content_generator(content_generator or ContentGenerator(generated_content_factory=GeneratedContentFactory()))
+        if content_generator:
+            self.pipelex_hub.set_content_generator(content_generator)
+        else:
+            storage_provider = storage_provider or LocalStorageProvider(root_path=Path("./storage"))
+            generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
+            self.pipelex_hub.set_content_generator(ContentGenerator(generated_content_factory=generated_content_factory))
 
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)

@@ -80,7 +80,7 @@ class LocalStorageProvider(StorageProviderAbstract):
             uri: The relative path where to store the file.
 
         Returns:
-            The URI of the stored file.
+            The absolute path of the stored file.
 
         Raises:
             StorageInvalidUriError: If the URI is invalid.
@@ -92,4 +92,4 @@ class LocalStorageProvider(StorageProviderAbstract):
 
         file_path.write_bytes(data)
 
-        return uri
+        return str(file_path)

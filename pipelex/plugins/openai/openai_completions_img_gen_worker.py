@@ -5,9 +5,10 @@ from openai import APIConnectionError, BadRequestError, NotFoundError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenParameterError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -42,6 +43,9 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
+        if img_gen_job.job_params.aspect_ratio != AspectRatio.SQUARE:
+            msg = f"OpenAI Completions ImgGen worker only supports square images. Aspect ratio: {img_gen_job.job_params.aspect_ratio}"
+            raise ImgGenParameterError(msg)
         img_gen_prompt_text = img_gen_job.img_gen_prompt.positive_text
         messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": img_gen_prompt_text}]
         try:
@@ -79,9 +83,8 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         if not url:
             msg = f"OpenAI response has no image. Model: {self.inference_model.desc}"
             raise LLMCompletionError(msg)
-        # TODO: raise if other size than 1024x1024 was requested
         return GeneratedImageRawDetails(
-            actual_url=url,
+            actual_url_or_prefixed_base64=url,
             width=1024,
             height=1024,
         )
