@@ -35,10 +35,11 @@ class OpenAIImgGenFactory:
 
     @classmethod
     def output_format_for_gpt_image_1(cls, output_format: OutputFormat) -> GptImage1OutputFormatType:
+        """This method only converts the OutputFormat StrEnum value to a Literal, as expected by the OpenAI API"""
         match output_format:
             case OutputFormat.PNG:
                 return "png"
-            case OutputFormat.JPG:
+            case OutputFormat.JPEG:
                 return "jpeg"
             case OutputFormat.WEBP:
                 return "webp"

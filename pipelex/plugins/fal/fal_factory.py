@@ -33,7 +33,7 @@ class FalFactory:
                     actual_url_or_prefixed_base64=image_dict["url"],
                     width=image_dict["width"],
                     height=image_dict["height"],
-                    content_type=image_dict["content_type"],
+                    mime_type=image_dict["content_type"],
                 )
                 generated_image_list.append(generated_image)
         except (KeyError, TypeError, ValidationError) as exc:

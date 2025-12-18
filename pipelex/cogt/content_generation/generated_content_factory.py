@@ -7,6 +7,7 @@ from pipelex import pretty_print
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.content_generation.generated_content_factory_abstract import GeneratedContentFactoryAbstract
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
+from pipelex.cogt.img_gen.img_gen_job_components import OutputFormat
 from pipelex.tools.misc.base_64_utils import (
     extract_base_64_str_from_base64_url_if_possible,
 )
@@ -17,27 +18,32 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
     def __init__(self, storage_provider: StorageProviderAbstract) -> None:
         self.storage_provider = storage_provider
 
-    def _build_filename_from_hash(self, data: bytes, content_type: str | None) -> str:
+    def _build_filename_from_hash(self, data: bytes, mime_type: str | None, output_format: OutputFormat | None) -> str:
         """Build a filename using a SHA-256 hash of the data.
 
         Args:
             data: The binary data to hash
-            content_type: Optional MIME type to determine file extension
-
+            mime_type: Optional MIME type to determine file extension
+            output_format: Optional output format to determine file extension
         Returns:
             A filename in the format "{hash}.{extension}"
         """
         hash_digest = hashlib.sha256(data).hexdigest()[:16]
 
-        extension = "jpg"
-        if content_type:
-            extension_map = {
-                "image/jpeg": "jpg",
-                "image/png": "png",
-                "image/gif": "gif",
-                "image/webp": "webp",
-            }
-            extension = extension_map.get(content_type, "jpg")
+        if output_format:
+            extension = output_format.as_file_extension
+        elif mime_type:
+            match mime_type:
+                case "image/jpeg":
+                    extension = "jpg"
+                case "image/png":
+                    extension = "png"
+                case "image/webp":
+                    extension = "webp"
+                case _:
+                    extension = "jpg"
+        else:
+            extension = "jpg"
 
         return f"{hash_digest}.{extension}"
 
@@ -46,6 +52,10 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
         self,
         raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
+        output_format: OutputFormat | None = None
+        if raw_details.output_format:
+            output_format = OutputFormat(raw_details.output_format)
+
         if raw_details.actual_url:
             url = raw_details.actual_url
         else:
@@ -70,7 +80,7 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
             if actual_url:
                 url = actual_url
             elif actual_bytes:
-                filename = self._build_filename_from_hash(data=actual_bytes, content_type=raw_details.content_type)
+                filename = self._build_filename_from_hash(data=actual_bytes, mime_type=raw_details.mime_type, output_format=output_format)
                 url = self.storage_provider.store(data=actual_bytes, uri=filename)
             else:
                 msg = "No URL or base64 string found"
@@ -78,9 +88,17 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
 
         pretty_print(url, title="Generated image URL")
 
+        mime_type: str | None = None
+        if raw_details.mime_type:
+            mime_type = raw_details.mime_type
+        elif output_format:
+            mime_type = output_format.as_mime_type
+        else:
+            mime_type = "image/jpeg"
+
         return GeneratedImageResolved(
             url=url,
             width=raw_details.width,
             height=raw_details.height,
-            content_type=raw_details.content_type,
+            mime_type=mime_type,
         )

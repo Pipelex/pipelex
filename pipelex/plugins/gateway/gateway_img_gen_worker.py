@@ -131,7 +131,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 if not isinstance(content_type, str):
                     msg = "Missing content_type field in image response"
                     raise ImgGenGenerationError(msg)
-                generated_image = GeneratedImageRawDetails(actual_url_or_prefixed_base64=url, width=width, height=height, content_type=content_type)
+                generated_image = GeneratedImageRawDetails(actual_url_or_prefixed_base64=url, width=width, height=height, mime_type=content_type)
                 generated_images.append(generated_image)
         else:
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"

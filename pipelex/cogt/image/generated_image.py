@@ -10,12 +10,12 @@ class GeneratedImageRawDetails(CustomBaseModel):
     actual_url_or_prefixed_base64: str | None = None
     actual_bytes: bytes | None = None
 
-    content_type: str | None = None
+    mime_type: str | None = None
+    output_format: str | None = None
 
 
 class GeneratedImageResolved(CustomBaseModel):
     url: str
-    # prefixed_base64_url: str | None = None
-    content_type: str | None = None
+    mime_type: str | None = None
     width: int
     height: int

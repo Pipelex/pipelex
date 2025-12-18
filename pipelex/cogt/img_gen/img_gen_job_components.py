@@ -20,8 +20,28 @@ class AspectRatio(StrEnum):
 
 class OutputFormat(StrEnum):
     PNG = "png"
-    JPG = "jpg"
+    JPEG = "jpeg"
     WEBP = "webp"
+
+    @property
+    def as_file_extension(self) -> str:
+        match self:
+            case OutputFormat.PNG:
+                return "png"
+            case OutputFormat.JPEG:
+                return "jpg"
+            case OutputFormat.WEBP:
+                return "webp"
+
+    @property
+    def as_mime_type(self) -> str:
+        match self:
+            case OutputFormat.PNG:
+                return "image/png"
+            case OutputFormat.JPEG:
+                return "image/jpeg"
+            case OutputFormat.WEBP:
+                return "image/webp"
 
 
 class Quality(StrEnum):
@@ -57,7 +77,7 @@ class ImgGenJobParams(BaseModel):
                 match self.output_format:
                     case OutputFormat.PNG:
                         pass
-                    case OutputFormat.JPG | OutputFormat.WEBP:
+                    case OutputFormat.JPEG | OutputFormat.WEBP:
                         msg = "ImgGenJobParams cannot have a non-PNG output format when background is transparent."
                         raise ValueError(msg)
         return self

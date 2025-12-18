@@ -87,16 +87,16 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
             is_raw=None,
             output_format=OutputFormat.PNG,
         ),
-        # ImgGenJobParams(
-        #     aspect_ratio=AspectRatio.SQUARE,
-        #     background=Background.OPAQUE,
-        #     quality=Quality.LOW,
-        #     guidance_scale=3.5,
-        #     is_moderated=None,
-        #     safety_tolerance=1,
-        #     is_raw=None,
-        #     output_format=OutputFormat.JPG,
-        # ),
+        ImgGenJobParams(
+            aspect_ratio=AspectRatio.SQUARE,
+            background=Background.OPAQUE,
+            quality=Quality.LOW,
+            guidance_scale=3.5,
+            is_moderated=None,
+            safety_tolerance=1,
+            is_raw=None,
+            output_format=OutputFormat.JPEG,
+        ),
     ],
 )
 def img_gen_job_params(request: pytest.FixtureRequest) -> ImgGenJobParams:

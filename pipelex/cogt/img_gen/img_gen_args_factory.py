@@ -240,7 +240,7 @@ class ImgGenArgsFactory:
                 match output_format:
                     case OutputFormat.PNG:
                         value = "png"
-                    case OutputFormat.JPG:
+                    case OutputFormat.JPEG:
                         value = "jpeg"
                     case OutputFormat.WEBP:
                         msg = "Output format WebP is not supported by SDXL image generation models"
@@ -250,21 +250,15 @@ class ImgGenArgsFactory:
                 match output_format:
                     case OutputFormat.PNG:
                         value = "png"
-                    case OutputFormat.JPG:
+                    case OutputFormat.JPEG:
                         value = "jpeg"
                     case OutputFormat.WEBP:
                         msg = "Output format WebP is not supported by Flux 1 image generation models"
                         raise ImgGenParameterError(msg)
             case OutputFormatTaxonomy.FLUX_2:
                 key = "output_format"
-                match output_format:
-                    case OutputFormat.PNG:
-                        value = "png"
-                    case OutputFormat.JPG:
-                        value = "jpeg"
-                    case OutputFormat.WEBP:
-                        value = "webp"
+                value = output_format
             case OutputFormatTaxonomy.GPT:
                 key = "output_format"
-                value = OpenAIImgGenFactory.output_format_for_gpt_image_1(output_format=output_format)
+                value = output_format
         return {key: value}

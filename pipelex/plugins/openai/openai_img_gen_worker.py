@@ -1,9 +1,8 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import openai
 from typing_extensions import override
 
-from pipelex import pretty_print
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -12,6 +11,9 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+
+if TYPE_CHECKING:
+    from openai.types.images_response import ImagesResponse, Usage
 
 
 class OpenAIImgGenWorker(ImgGenWorkerAbstract):
@@ -49,7 +51,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         background = OpenAIImgGenFactory.background_for_gpt_image_1(background=img_gen_job.job_params.background)
         quality = OpenAIImgGenFactory.quality_for_gpt_image_1(quality=img_gen_job.job_params.quality or Quality.LOW)
         output_compression = OpenAIImgGenFactory.output_compression_for_gpt_image_1()
-        result = await self.openai_client.images.generate(
+        images_response: ImagesResponse = await self.openai_client.images.generate(
             prompt=img_gen_job.img_gen_prompt.positive_text,
             model=self.inference_model.model_id,
             moderation=moderation,
@@ -60,24 +62,41 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             output_compression=output_compression,
             n=nb_images,
         )
-        if not result.data:
+        if not images_response.data:
             msg = "No result from OpenAI"
             raise ImgGenGenerationError(msg)
 
+        response_output_format: str | None = images_response.output_format
+        size: str | None = images_response.size
+        if not size:
+            msg = "No size received from OpenAI"
+            raise ImgGenGenerationError(msg)
+        size_split = size.split("x")
+        if len(size_split) != 2:
+            msg = f"Size from OpenAI is not a valid size: '{size}'"
+            raise ImgGenGenerationError(msg)
+        width_str, height_str = size_split
+        width = int(width_str)
+        height = int(height_str)
+
+        usage: Usage | None = images_response.usage
+        if not usage:
+            msg = "No usage received from OpenAI"
+            raise ImgGenGenerationError(msg)
+
         generated_images: list[GeneratedImageRawDetails] = []
-        for image_data in result.data:
-            pretty_print(image_data, title="image_data")
+        for image_data in images_response.data:
             base64_str = image_data.b64_json
             if not base64_str:
                 msg = "No base64 image data received from OpenAI"
                 raise ImgGenGenerationError(msg)
 
-            # base64_url = prefixed_base64_str_from_base64_str(b64_str=base64_str)
             generated_images.append(
                 GeneratedImageRawDetails(
                     base64_str=base64_str,
                     width=width,
                     height=height,
+                    output_format=response_output_format,
                 ),
             )
         return generated_images
