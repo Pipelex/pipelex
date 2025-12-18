@@ -22,7 +22,7 @@ class InferenceModelSpecBlueprint(ConfigModel):
     model_id: str | None = None
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
-    costs: CostsByCategoryDict = Field(strict=False)
+    costs: CostsByCategoryDict | None = Field(default=None, strict=False)
     structure_method: StructureMethod | None = Field(default=None, strict=False)
     max_tokens: int | None = None
     max_prompt_images: int | None = None
@@ -91,7 +91,7 @@ class InferenceModelSpecFactory(BaseModel):
             model_id=blueprint.model_id or name,
             inputs=blueprint.inputs,
             outputs=blueprint.outputs,
-            costs=blueprint.costs,
+            costs=blueprint.costs or {},
             structure_method=blueprint.structure_method,
             max_tokens=blueprint.max_tokens,
             max_prompt_images=blueprint.max_prompt_images,

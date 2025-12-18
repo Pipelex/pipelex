@@ -26,12 +26,18 @@ EXTRACT_HANDLE_FROM_PDF = [
     "pypdfium2-extract-text",
     "docling-extract-text",
     "mistral-ocr",
+    "mistral-ocr-2503",
+    "mistral-ocr-2505",
+    "mistral-ocr-2512",
     "azure-document-intelligence",
 ]
 
 EXTRACT_HANDLE_FROM_IMAGE = [
     "docling-extract-text",
     "mistral-ocr",
+    "mistral-ocr-2503",
+    "mistral-ocr-2505",
+    "mistral-ocr-2512",
 ]
 
 ALL_EXTRACT_HANDLES: list[str] = list(set(EXTRACT_HANDLE_FROM_PDF + EXTRACT_HANDLE_FROM_IMAGE))

@@ -95,8 +95,8 @@ costs = { input = 0.0003, output = 0.0 }
 
 [fast-lightning-sdxl.rules]
 num_images = "fal"
-specific = "fal"
 aspect_ratio = "flux"
 inference = "sdxl_lightning"
 safety_checker = "unavailable"
 output_format = "sdxl"
+specific = "fal"
