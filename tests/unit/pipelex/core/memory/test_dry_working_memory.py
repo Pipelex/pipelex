@@ -1,10 +1,10 @@
 import pytest
-from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_content import TextContent
 from tests.unit.pipelex.core.memory.tricky_questions import ThoughtfulAnswer
@@ -21,7 +21,7 @@ class TestDryWorkingMemory:
 
         # Test the specific inputs requested by the user
         needed_inputs = [
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="page",
                 concept=ConceptFactory.make(
                     concept_code=NativeConceptCode.PAGE, domain="test_tricky_questions", description="Lorem Ipsum", structure_class_name="Page"
@@ -62,7 +62,7 @@ class TestDryWorkingMemory:
 
         # Use ThoughtfulAnswer from tricky questions domain
         needed_inputs = [
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="thoughtful_answer",
                 concept=ConceptFactory.make(
                     concept_code="ThoughtfulAnswer",
@@ -72,7 +72,7 @@ class TestDryWorkingMemory:
                 ),
                 structure_class=ThoughtfulAnswer,
             ),
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="question",
                 concept=ConceptFactory.make(concept_code="Question", domain="answer", description="Question", structure_class_name="Question"),
                 structure_class=TextContent,
@@ -119,7 +119,7 @@ class TestDryWorkingMemory:
         log.info("Testing dry run with TextContent fallback")
 
         needed_inputs = [
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="question_analysis",
                 concept=ConceptFactory.make(
                     concept_code="QuestionAnalysis",
@@ -129,7 +129,7 @@ class TestDryWorkingMemory:
                 ),
                 structure_class=TextContent,
             ),
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="conclusion",
                 concept=ConceptFactory.make(
                     concept_code="ThoughtfulAnswerConclusion",
@@ -167,7 +167,7 @@ class TestDryWorkingMemory:
         log.info("Testing dry run with mixed content types")
 
         needed_inputs = [
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="thoughtful_answer",
                 concept=ConceptFactory.make(
                     concept_code="ThoughtfulAnswer",
@@ -177,12 +177,12 @@ class TestDryWorkingMemory:
                 ),
                 structure_class=ThoughtfulAnswer,
             ),
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="raw_question",
                 concept=ConceptFactory.make(concept_code="Question", domain="answer", description="Question", structure_class_name="Question"),
                 structure_class=TextContent,
             ),
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="analysis_result",
                 concept=ConceptFactory.make(
                     concept_code="QuestionAnalysis",
@@ -224,7 +224,7 @@ class TestDryWorkingMemory:
     ):
         log.info("Testing dry run with empty inputs")
 
-        needed_inputs: list[TypedNamedInputRequirement] = []
+        needed_inputs: list[TypedNamedStuffSpec] = []
 
         dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
 
@@ -240,12 +240,12 @@ class TestDryWorkingMemory:
 
         # Simulate the conclude_tricky_question_by_steps pipeline needs
         needed_inputs = [
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="question",
                 concept=ConceptFactory.make(concept_code="Question", domain="answer", description="Question", structure_class_name="Question"),
                 structure_class=TextContent,
             ),
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="question_analysis",
                 concept=ConceptFactory.make(
                     concept_code="QuestionAnalysis",
@@ -255,7 +255,7 @@ class TestDryWorkingMemory:
                 ),
                 structure_class=TextContent,
             ),
-            TypedNamedInputRequirement(
+            TypedNamedStuffSpec(
                 variable_name="thoughtful_answer",
                 concept=ConceptFactory.make(
                     concept_code="ThoughtfulAnswer",

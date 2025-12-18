@@ -20,8 +20,8 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -63,9 +63,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @model_validator(mode="after")
     def validate_output_concept_consistency(self) -> Self:
-        if self.structuring_method is not None and self.output.structure_class_name == NativeConceptCode.TEXT:
+        if self.structuring_method is not None and self.output.concept.structure_class_name == NativeConceptCode.TEXT:
             msg = (
-                f"Output concept '{self.output.code}' is considered a Text concept, "
+                f"Output concept '{self.output.concept.code}' is considered a Text concept, "
                 f"so it cannot be structured. Maybe you forgot to add '{NativeConceptCode.TEXT}' to the class registry?"
             )
             raise ValueError(msg)
@@ -91,29 +91,29 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         # and PipeLLM is not the only one with this kind of constraints
 
         # Allow Dynamic output concept as it's flexible and can represent anything
-        if NativeConceptCode.is_dynamic_concept(concept_code=self.output.code):
+        if NativeConceptCode.is_dynamic_concept(concept_code=self.output.concept.code):
             return
 
         if get_concept_library().is_compatible(
-            tested_concept=self.output,
+            tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
         ):
             msg = (
                 f"The output of the PipeLLM '{self.code}' cannot be compatible with the Image concept. "
-                f"The output concept is '{self.output.concept_string}'. "
+                f"The output concept is '{self.output.concept.concept_string}'. "
                 "Use a PipeImgGen if you want to generate images. You can use a PipeLLM to generate the prompt for a PipeImgGen."
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept_string,
+                provided_concept_code=self.output.concept.concept_string,
             )
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
-        needed_inputs = InputRequirementsFactory.make_empty()
+        needed_inputs = InputStuffSpecsFactory.make_empty()
 
         for input_name, requirement in self.inputs.items:
             needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept, multiplicity=requirement.multiplicity)
@@ -136,8 +136,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         llm_config = get_config().cogt.llm_config
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
-        output_concept = self.output
-        if self.output.code == SpecialDomain.NATIVE + "." + NativeConceptCode.DYNAMIC:
+        output_stuff_spec = self.output
+        if self.output.concept.code == SpecialDomain.NATIVE + "." + NativeConceptCode.DYNAMIC:
             # TODO: This DYNAMIC_OUTPUT_CONCEPT should not be a field in the params attribute of PipeRunParams.
             # It should be an attribute of PipeRunParams.
             output_concept_code = pipe_run_params.dynamic_output_concept_code or pipe_run_params.params.get(PipeRunParamKey.DYNAMIC_OUTPUT_CONCEPT)
@@ -145,7 +145,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             if not output_concept_code:
                 output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT
             else:
-                output_concept = get_required_concept(
+                output_stuff_spec.concept = get_required_concept(
                     concept_string=ConceptFactory.make_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code),
                 )
 
@@ -210,11 +210,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         the_content: StuffContent
 
         if (
-            Concept.are_concept_compatible(concept_1=output_concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True)
+            Concept.are_concept_compatible(concept_1=output_stuff_spec.concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True)
             and not is_multiple_output
         ):
             llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
-                output_concept_string=output_concept.concept_string,
+                output_concept_string=output_stuff_spec.concept.concept_string,
                 context_provider=working_memory,
                 output_structure_prompt=None,
                 extra_params=llm_prompt_run_params.params,
@@ -229,10 +229,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main])
                 msg = f"Error generating text with LLM {location}: {error_details}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
             structure_class = get_class_registry().get_required_subclass(
-                name=output_concept.structure_class_name,
+                name=output_stuff_spec.concept.structure_class_name,
                 base_class=StuffContent,
             )
 
@@ -244,12 +244,12 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
                 error_details = format_pydantic_validation_error(exc)
                 msg = f"Error generating text content with in PipeLLM {location}: {error_details}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
         else:
             if is_multiple_output:
                 log.verbose(f"PipeLLM generating {fixed_nb_output} output(s)" if fixed_nb_output else "PipeLLM generating a list of output(s)")
             else:
-                log.verbose(f"PipeLLM generating a single object output, class name: '{output_concept.structure_class_name}'")
+                log.verbose(f"PipeLLM generating a single object output, class name: '{output_stuff_spec.concept.structure_class_name}'")
 
             # TODO: we need a better solution for structuring_method (text then object), meanwhile,
             # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
@@ -273,11 +273,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             output_structure_prompt: str | None = None
             if llm_config.is_structure_prompt_enabled:
                 output_structure_prompt = await PipeLLM.get_output_structure_prompt(
-                    concept_string=pipe_run_params.dynamic_output_concept_code or output_concept.concept_string,
+                    concept_string=pipe_run_params.dynamic_output_concept_code or output_stuff_spec.concept.concept_string,
                     is_with_preliminary_text=is_with_preliminary_text,
                 )
             llm_prompt_1_for_object = await self.llm_prompt_spec.make_llm_prompt(
-                output_concept_string=output_concept.concept_string,
+                output_concept_string=output_stuff_spec.concept.concept_string,
                 context_provider=working_memory,
                 output_structure_prompt=output_structure_prompt,
                 extra_params=llm_prompt_run_params.params,
@@ -287,7 +287,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 pipe_run_params=pipe_run_params,
                 is_multiple_output=is_multiple_output,
                 fixed_nb_output=fixed_nb_output,
-                output_class_name=output_concept.structure_class_name,
+                output_class_name=output_stuff_spec.concept.structure_class_name,
                 llm_setting_main=llm_setting_main,
                 llm_setting_for_object=llm_setting_for_object,
                 llm_prompt_1=llm_prompt_1_for_object,
@@ -297,7 +297,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=output_concept,
+            concept=output_stuff_spec.concept,
             content=the_content,
             code=pipe_run_params.final_stuff_code,
         )
@@ -355,7 +355,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main, llm_setting_for_object])
                     msg = f"Error generating list of objects with text then object {location}: {error_details}"
-                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             else:
                 # We're generating a list of objects directly
                 method_desc = "object_direct"
@@ -372,7 +372,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
                     msg = f"Error generating list of objects with direct method {location}: {error_details}"
-                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
             the_content = ListContent(items=generated_objects)
         else:
@@ -397,7 +397,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main, llm_setting_for_object])
                     msg = f"Error generating single object with text then object {location}: {error_details}"
-                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             else:
                 # We're generating a single object directly
                 method_desc = "object_direct"
@@ -413,7 +413,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     location = self._format_error_location(pipe_run_params=pipe_run_params)
                     error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
                     msg = f"Error generating single object with direct method {location}: {error_details}"
-                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+                    raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             the_content = generated_object
 
         return the_content

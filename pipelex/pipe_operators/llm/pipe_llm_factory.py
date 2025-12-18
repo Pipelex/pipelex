@@ -9,8 +9,9 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
 from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
 from pipelex.pipe_operators.llm.exceptions import PipeLLMFactoryError
@@ -30,8 +31,8 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_code: str,
         domain_code: str,
         description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeLLMBlueprint,
     ) -> PipeLLM:
         system_prompt = blueprint.system_prompt

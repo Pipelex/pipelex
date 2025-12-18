@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.inputs.exceptions import PipeInputError, PipeInputNotFoundError
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError, PipeRunInputsError
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
@@ -45,24 +45,34 @@ class SubPipe(BaseModel):
                     f"Input list stuff named '{batch_params.input_list_stuff_name}' required by sub_pipe '{self.pipe_code}' "
                     f"of pipe '{calling_pipe_code}' not found in working memory: {exc}"
                 )
-                raise PipeInputError(
-                    message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_list_stuff_name, concept_code=None
+                raise PipeRunInputsError(
+                    message=msg,
+                    run_mode=sub_pipe_run_params.run_mode,
+                    pipe_code=self.pipe_code,
+                    missing_inputs={},
+                    variable_name=batch_params.input_list_stuff_name,
+                    concept_code=None,
                 ) from exc
 
             try:
-                item_stuff_requirement = sub_pipe.inputs.get_required_input_requirement(variable_name=batch_params.input_item_stuff_name)
-            except PipeInputNotFoundError as exc:
+                item_stuff_requirement = sub_pipe.inputs.get_required_stuff_spec(variable_name=batch_params.input_item_stuff_name)
+            except InputStuffSpecNotFoundError as exc:
                 msg = (
                     f"Batch input item named '{batch_params.input_item_stuff_name}' from '{calling_pipe_code}' is not "
                     f"in SubPipe '{self.pipe_code}' input requirements: {sub_pipe.inputs}"
                 )
-                raise PipeInputError(
-                    message=msg, pipe_code=self.pipe_code, variable_name=batch_params.input_item_stuff_name, concept_code=None
+                raise PipeRunInputsError(
+                    message=msg,
+                    run_mode=sub_pipe_run_params.run_mode,
+                    pipe_code=self.pipe_code,
+                    missing_inputs={},
+                    variable_name=batch_params.input_item_stuff_name,
+                    concept_code=None,
                 ) from exc
             pipe_batch_blueprint = PipeBatchBlueprint(
                 description=f"Batch processing for {self.pipe_code}",
                 branch_pipe_code=self.pipe_code,
-                output=sub_pipe.output.code,
+                output=sub_pipe.output.concept.code,
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
@@ -101,7 +111,14 @@ class SubPipe(BaseModel):
                 sub_pipe_path_str = ".".join(sub_pipe_path)
                 error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
                 msg = f"Some required stuff(s) not found: {error_details}"
-                raise PipeInputError(message=msg, pipe_code=self.pipe_code, variable_name=exc.variable_name, concept_code=None) from exc
+                raise PipeRunInputsError(
+                    message=msg,
+                    run_mode=sub_pipe_run_params.run_mode,
+                    pipe_code=self.pipe_code,
+                    missing_inputs={},
+                    variable_name=exc.variable_name,
+                    concept_code=None,
+                ) from exc
             log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
             pipe_output = await sub_pipe.run_pipe(
                 job_metadata=job_metadata,

@@ -16,6 +16,10 @@ class InputStuffSpecNotFoundError(InputStuffSpecsError):
 
 
 class PipeRunInputsError(PipeRunError):
-    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str, missing_inputs: dict[str, str]):
+    def __init__(
+        self, message: str, run_mode: PipeRunMode, pipe_code: str, missing_inputs: dict[str, str], variable_name: str, concept_code: str | None = None
+    ):
         self.missing_inputs = missing_inputs
+        self.variable_name = variable_name
+        self.concept_code = concept_code
         super().__init__(message, run_mode, pipe_code)

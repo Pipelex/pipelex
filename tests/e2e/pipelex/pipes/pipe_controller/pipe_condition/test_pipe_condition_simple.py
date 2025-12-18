@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Callable
 
 import pytest
-from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
 
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -10,6 +9,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
+from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
@@ -81,7 +81,7 @@ class TestPipeConditionSimple:
         # Test with proper working memory - should SUCCEED or fail at expression evaluation (not missing inputs)
         working_memory = WorkingMemoryFactory.make_for_dry_run(
             needed_inputs=[
-                TypedNamedInputRequirement(
+                TypedNamedStuffSpec(
                     variable_name="user_status",
                     concept=ConceptFactory.make(
                         concept_code="CategoryInput",

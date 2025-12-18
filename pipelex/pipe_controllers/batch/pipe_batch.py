@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -44,7 +44,7 @@ class PipeBatch(PipeController):
         return required_variables
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @override
@@ -79,11 +79,11 @@ class PipeBatch(PipeController):
         input_list_stuff_name = batch_params.input_list_stuff_name
         if not self.inputs.is_variable_existing(variable_name=input_list_stuff_name):
             msg = f"Batch input list named '{input_list_stuff_name}' is not in PipeBatch '{self.code}' input requirements: {self.inputs}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         if not working_memory.is_stuff_exists(input_list_stuff_name):
             msg = f"Input list stuff '{input_list_stuff_name}' required by this PipeBatch '{self.code}' not found in working memory"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         input_stuff = working_memory.get_stuff(input_list_stuff_name)
         if not isinstance(input_stuff.content, ListContent):
@@ -91,7 +91,7 @@ class PipeBatch(PipeController):
                 f"Input list stuff '{input_list_stuff_name}' of PipeBatch '{self.code}' must be ListContent, "
                 f"got {input_stuff.stuff_name or 'unnamed'} = {type(input_stuff.content)}. stuff: {input_stuff}"
             )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
     async def _run_batch_pipe(
         self,
@@ -131,7 +131,7 @@ class PipeBatch(PipeController):
             branch_input_item_code = f"{input_stuff.stuff_code}-branch-{branch_index}"
             item_input_stuff = StuffFactory.make_stuff(
                 code=branch_input_item_code,
-                concept=self.inputs.get_required_input_requirement(input_list_stuff_name).concept,
+                concept=self.inputs.get_required_stuff_spec(input_list_stuff_name).concept,
                 content=item,
                 name=input_item_stuff_name,
             )
@@ -176,7 +176,7 @@ class PipeBatch(PipeController):
         list_content: ListContent[StuffContent] = ListContent(items=output_items)
         output_stuff = StuffFactory.make_stuff(
             code=output_stuff_code,
-            concept=self.output,
+            concept=self.output.concept,
             content=list_content,
             name=output_name,
         )

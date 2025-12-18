@@ -2,9 +2,9 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.pipe_controllers.condition.exceptions import PipeConditionFactoryError
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
@@ -20,8 +20,8 @@ class PipeConditionFactory(PipeFactoryProtocol[PipeConditionBlueprint, PipeCondi
         pipe_code: str,
         domain_code: str,
         description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeConditionBlueprint,
     ) -> PipeCondition:
         # Compute expression from expression_template or expression in blueprint

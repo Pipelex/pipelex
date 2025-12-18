@@ -5,9 +5,9 @@ from typing_extensions import override
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
@@ -55,12 +55,12 @@ class PipeSequence(PipeController):
         """
         last_step_pipe_code = self.sequential_sub_pipes[-1].pipe_code
         last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
-        last_step_output_concept = last_step_pipe.output
-        if not get_concept_library().is_compatible(tested_concept=last_step_output_concept, wanted_concept=self.output):
+        last_step_output_concept = last_step_pipe.output.concept
+        if not get_concept_library().is_compatible(tested_concept=last_step_output_concept, wanted_concept=self.output.concept):
             msg = (
                 f"PipeSequence concept mismatch: the output concept '{last_step_output_concept.concept_string}' "
                 f"of the last step '{last_step_pipe_code}' of sequence pipe '{self.code}' "
-                f"is not compatible with the output concept '{self.output.concept_string}' of the sequence."
+                f"is not compatible with the output concept '{self.output.concept.concept_string}' of the sequence."
             )
             raise PipeValidationError(
                 message=msg,
@@ -68,22 +68,22 @@ class PipeSequence(PipeController):
                 domain=self.domain,
                 pipe_code=self.code,
                 provided_concept_code=last_step_output_concept.concept_string,
-                required_concept_codes=[self.output.concept_string],
+                required_concept_codes=[self.output.concept.concept_string],
             )
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
         # If we've already visited this pipe, stop recursion
         if self.code in visited_pipes:
-            return InputRequirementsFactory.make_empty()
+            return InputStuffSpecsFactory.make_empty()
 
         # Add this pipe to visited set for recursive calls
         visited_pipes_with_current = visited_pipes | {self.code}
 
-        needed_inputs = InputRequirementsFactory.make_empty()
+        needed_inputs = InputStuffSpecsFactory.make_empty()
         generated_outputs: set[str] = set()
 
         for sequential_sub_pipe in self.sequential_sub_pipes:
@@ -99,10 +99,10 @@ class PipeSequence(PipeController):
             if sequential_sub_pipe.batch_params:
                 if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
                     try:
-                        requirement = sub_pipe_needed_inputs.get_required_input_requirement(
+                        requirement = sub_pipe_needed_inputs.get_required_stuff_spec(
                             variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
                         )
-                    except PipeInputNotFoundError as exc:
+                    except InputStuffSpecNotFoundError as exc:
                         msg = (
                             f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
                             f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
@@ -173,17 +173,17 @@ class PipeSequence(PipeController):
     ) -> PipeOutput:
         if not pipe_run_params.run_mode.is_dry:
             msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
         # Verify the output of this pipe is matching the output of the last step.
-        concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output
+        concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output.concept
         # if self.output.concept_string != concept_string_of_last_step:
-        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
+        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output.concept):
             msg = f"""PipeSequence concept mismatch:
 the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
-of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
+of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept.concept_string}' of the sequence.
 """
             raise PipeControllerOutputConceptMismatchError(
-                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
+                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept.concept_string
             )
         return await self._run_controller_pipe(
             job_metadata=job_metadata,

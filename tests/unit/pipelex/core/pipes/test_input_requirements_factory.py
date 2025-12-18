@@ -1,10 +1,10 @@
 from typing import Callable
 
 import pytest
-from pipelex.core.pipes.inputs.input_requirements import PipePort
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactoryError
 
 from pipelex.core.concepts.exceptions import ConceptStringError
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory, InputStuffSpecsFactoryError
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from tests.unit.pipelex.core.pipes.data import (
     CONCEPT_CODE_RESOLUTION_TEST_CASES,
@@ -18,79 +18,79 @@ from tests.unit.pipelex.core.pipes.data import (
 
 
 class TestMakeInputRequirementsFromString:
-    """Test the InputRequirementsFactory.make_from_str method."""
+    """Test the InputStuffSpecsFactory.make_from_str method."""
 
     @pytest.mark.parametrize(
-        ("domain", "requirement_str", "expected_concept_string", "expected_multiplicity"),
+        ("domain", "stuff_spec_str", "expected_concept_string", "expected_multiplicity"),
         SINGLE_ITEM_NO_BRACKETS_TEST_CASES,
     )
     def test_single_item_default_no_brackets(
         self,
         domain: str,
-        requirement_str: str,
+        stuff_spec_str: str,
         expected_concept_string: str,
         expected_multiplicity: int | bool | None,
         load_empty_library: Callable[[], None],
     ):
         """Test parsing a concept string without brackets (single item, default)."""
         load_empty_library()
-        result = InputRequirementsFactory.make_from_string(domain=domain, requirement_str=requirement_str)
+        result = InputStuffSpecsFactory.make_from_string(domain=domain, stuff_spec_str=stuff_spec_str)
 
-        assert isinstance(result, PipePort)
+        assert isinstance(result, StuffSpec)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity == expected_multiplicity
 
     @pytest.mark.parametrize(
-        ("domain", "requirement_str", "expected_concept_string"),
+        ("domain", "stuff_spec_str", "expected_concept_string"),
         MULTIPLE_ITEMS_EMPTY_BRACKETS_TEST_CASES,
     )
     def test_multiple_items_with_empty_brackets(
-        self, domain: str, requirement_str: str, expected_concept_string: str, load_empty_library: Callable[[], None]
+        self, domain: str, stuff_spec_str: str, expected_concept_string: str, load_empty_library: Callable[[], None]
     ):
         load_empty_library()
         """Test parsing a concept string with empty brackets (multiple items)."""
-        result = InputRequirementsFactory.make_from_string(domain=domain, requirement_str=requirement_str)
+        result = InputStuffSpecsFactory.make_from_string(domain=domain, stuff_spec_str=stuff_spec_str)
 
-        assert isinstance(result, PipePort)
+        assert isinstance(result, StuffSpec)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity is True
 
     @pytest.mark.parametrize(
-        ("domain", "requirement_str", "expected_concept_string", "expected_multiplicity"),
+        ("domain", "stuff_spec_str", "expected_concept_string", "expected_multiplicity"),
         FIXED_COUNT_TEST_CASES,
     )
     def test_fixed_count_with_number_in_brackets(
-        self, domain: str, requirement_str: str, expected_concept_string: str, expected_multiplicity: int, load_empty_library: Callable[[], None]
+        self, domain: str, stuff_spec_str: str, expected_concept_string: str, expected_multiplicity: int, load_empty_library: Callable[[], None]
     ):
         """Test parsing a concept string with a number in brackets (fixed count)."""
         load_empty_library()
-        result = InputRequirementsFactory.make_from_string(domain=domain, requirement_str=requirement_str)
+        result = InputStuffSpecsFactory.make_from_string(domain=domain, stuff_spec_str=stuff_spec_str)
 
-        assert isinstance(result, PipePort)
+        assert isinstance(result, StuffSpec)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity == expected_multiplicity
 
     @pytest.mark.parametrize(
-        ("domain", "requirement_str", "expected_concept_string", "expected_multiplicity"),
+        ("domain", "stuff_spec_str", "expected_concept_string", "expected_multiplicity"),
         VARIOUS_FIXED_COUNTS_TEST_CASES,
     )
     def test_various_fixed_counts(
-        self, domain: str, requirement_str: str, expected_concept_string: str, expected_multiplicity: int, load_empty_library: Callable[[], None]
+        self, domain: str, stuff_spec_str: str, expected_concept_string: str, expected_multiplicity: int, load_empty_library: Callable[[], None]
     ):
         load_empty_library()
         """Test parsing concept strings with various numbers in brackets."""
-        result = InputRequirementsFactory.make_from_string(domain=domain, requirement_str=requirement_str)
-        assert result.multiplicity == expected_multiplicity, f"Failed for {requirement_str}"
+        result = InputStuffSpecsFactory.make_from_string(domain=domain, stuff_spec_str=stuff_spec_str)
+        assert result.multiplicity == expected_multiplicity, f"Failed for {stuff_spec_str}"
         assert result.concept.concept_string == expected_concept_string
 
     @pytest.mark.parametrize(
-        ("domain", "requirement_str", "expected_concept_string"),
+        ("domain", "stuff_spec_str", "expected_concept_string"),
         DIFFERENT_CONCEPT_CODES_TEST_CASES,
     )
-    def test_different_concept_codes(self, domain: str, requirement_str: str, expected_concept_string: str, load_empty_library: Callable[[], None]):
+    def test_different_concept_codes(self, domain: str, stuff_spec_str: str, expected_concept_string: str, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test parsing various concept codes without multiplicity."""
-        result = InputRequirementsFactory.make_from_string(domain=domain, requirement_str=requirement_str)
+        result = InputStuffSpecsFactory.make_from_string(domain=domain, stuff_spec_str=stuff_spec_str)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity is None
 
@@ -99,7 +99,7 @@ class TestMakeInputRequirementsFromString:
         """Test parsing concept codes from custom domains."""
         # Note: This test will only work if these concepts exist in the system
         # For now, we'll test with native concepts, but the pattern should work for any domain
-        result = InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[3]")
+        result = InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="native.Text[3]")
         assert result.concept.concept_string == "native.Text"
         assert result.multiplicity == 3
 
@@ -107,19 +107,19 @@ class TestMakeInputRequirementsFromString:
         load_empty_library()
         """Test that an invalid concept code raises ConceptLibraryConceptNotFoundError."""
         with pytest.raises(ConceptLibraryError):
-            InputRequirementsFactory.make_from_string(domain="nonexistent", requirement_str="nonexistent.InvalidConcept")
+            InputStuffSpecsFactory.make_from_string(domain="nonexistent", stuff_spec_str="nonexistent.InvalidConcept")
 
     def test_concept_not_found_with_multiplicity_raises_error(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test that an invalid concept code with multiplicity raises ConceptLibraryConceptNotFoundError."""
         with pytest.raises(ConceptLibraryError):
-            InputRequirementsFactory.make_from_string(domain="nonexistent", requirement_str="nonexistent.InvalidConcept[5]")
+            InputStuffSpecsFactory.make_from_string(domain="nonexistent", stuff_spec_str="nonexistent.InvalidConcept[5]")
 
     def test_empty_string_raises_value_error(self, load_empty_library: Callable[[], None]):
         load_empty_library()
-        """Test that an empty string raises InputRequirementsFactorySyntaxError."""
-        with pytest.raises(InputRequirementsFactoryError, match="Invalid input requirement string") as exc_info:
-            InputRequirementsFactory.make_from_string(domain="native", requirement_str="")
+        """Test that an empty string raises InputStuffSpecsFactorySyntaxError."""
+        with pytest.raises(InputStuffSpecsFactoryError, match="Invalid input requirement string") as exc_info:
+            InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="")
         # This error is raised directly without a cause
         assert exc_info.value.__cause__ is None
 
@@ -128,30 +128,30 @@ class TestMakeInputRequirementsFromString:
         """Test that brackets with non-digit content are treated as part of concept string."""
         # The regex will match "native.Text[abc]" as concept="native.Text[abc]", multiplicity=None
         # This will then fail during concept validation with ConceptCodeError
-        with pytest.raises(InputRequirementsFactoryError) as exc_info:
-            InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[abc]")
+        with pytest.raises(InputStuffSpecsFactoryError) as exc_info:
+            InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="native.Text[abc]")
         assert exc_info.value.__cause__ is not None
         assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
     def test_multiplicity_zero_in_brackets(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test parsing a concept string with 0 in brackets."""
-        result = InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[0]")
+        result = InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="native.Text[0]")
 
-        assert isinstance(result, PipePort)
+        assert isinstance(result, StuffSpec)
         assert result.concept.concept_string == "native.Text"
         assert result.multiplicity == 0
 
     def test_return_type(self, load_empty_library: Callable[[], None]):
         load_empty_library()
-        """Test that the method returns an PipePort instance."""
-        result = InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text")
-        assert isinstance(result, PipePort)
+        """Test that the method returns an StuffSpec instance."""
+        result = InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="native.Text")
+        assert isinstance(result, StuffSpec)
 
     def test_concept_attribute_access(self, load_empty_library: Callable[[], None]):
         load_empty_library()
-        """Test that the returned PipePort has proper concept attributes."""
-        result = InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[5]")
+        """Test that the returned StuffSpec has proper concept attributes."""
+        result = InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="native.Text[5]")
 
         assert hasattr(result, "concept")
         assert hasattr(result, "multiplicity")
@@ -161,7 +161,7 @@ class TestMakeInputRequirementsFromString:
     def test_edge_case_very_long_number(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test parsing with a very long number in brackets."""
-        result = InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[999999]")
+        result = InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="native.Text[999999]")
 
         assert result.multiplicity == 999999
         assert result.concept.concept_string == "native.Text"
@@ -170,14 +170,14 @@ class TestMakeInputRequirementsFromString:
         load_empty_library()
         """Test that whitespace is not automatically trimmed."""
         # Whitespace should cause domain validation to fail
-        with pytest.raises(InputRequirementsFactoryError) as exc_info:
-            InputRequirementsFactory.make_from_string(domain="native", requirement_str=" native.Text")
+        with pytest.raises(InputStuffSpecsFactoryError) as exc_info:
+            InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str=" native.Text")
         assert exc_info.value.__cause__ is not None
         assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
         # Trailing whitespace should cause concept code validation to fail
-        with pytest.raises(InputRequirementsFactoryError) as exc_info:
-            InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text ")
+        with pytest.raises(InputStuffSpecsFactoryError) as exc_info:
+            InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="native.Text ")
         assert exc_info.value.__cause__ is not None
         assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
@@ -186,8 +186,8 @@ class TestMakeInputRequirementsFromString:
         """Test that multiple brackets are treated as part of the concept name."""
         # "native.Text[5][10]" should match as concept="native.Text[5]", multiplicity=10
         # This will fail during concept code validation
-        with pytest.raises(InputRequirementsFactoryError) as exc_info:
-            InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[5][10]")
+        with pytest.raises(InputStuffSpecsFactoryError) as exc_info:
+            InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="native.Text[5][10]")
         assert exc_info.value.__cause__ is not None
         assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
@@ -195,19 +195,19 @@ class TestMakeInputRequirementsFromString:
         load_empty_library()
         """Test that brackets at the start are part of the concept name."""
         # This will fail during domain validation
-        with pytest.raises(InputRequirementsFactoryError) as exc_info:
-            InputRequirementsFactory.make_from_string(domain="native", requirement_str="[5]native.Text")
+        with pytest.raises(InputStuffSpecsFactoryError) as exc_info:
+            InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="[5]native.Text")
         assert exc_info.value.__cause__ is not None
         assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
     @pytest.mark.parametrize(
-        ("domain", "requirement_str", "expected_concept_string", "expected_multiplicity", "description"),
+        ("domain", "stuff_spec_str", "expected_concept_string", "expected_multiplicity", "description"),
         CONCEPT_CODE_RESOLUTION_TEST_CASES,
     )
     def test_concept_code_resolution(
         self,
         domain: str,
-        requirement_str: str,
+        stuff_spec_str: str,
         expected_concept_string: str,
         expected_multiplicity: int | bool | None,
         description: str,
@@ -220,34 +220,34 @@ class TestMakeInputRequirementsFromString:
         2. concept_codes_from_same_domain helps resolve ambiguous concept codes
         """
         load_empty_library()
-        result = InputRequirementsFactory.make_from_string(
+        result = InputStuffSpecsFactory.make_from_string(
             domain=domain,
-            requirement_str=requirement_str,
+            stuff_spec_str=stuff_spec_str,
         )
 
-        assert isinstance(result, PipePort)
+        assert isinstance(result, StuffSpec)
         assert result.concept.concept_string == expected_concept_string, f"Failed: {description}"
         assert result.multiplicity == expected_multiplicity, f"Failed: {description}"
 
     @pytest.mark.parametrize(
-        ("domain", "requirement_str", "expected_concept_string", "expected_multiplicity"),
+        ("domain", "stuff_spec_str", "expected_concept_string", "expected_multiplicity"),
         EXPLICIT_DOMAIN_IN_STRING_TEST_CASES,
     )
     def test_explicit_domain_in_string(
         self,
         domain: str,
-        requirement_str: str,
+        stuff_spec_str: str,
         expected_concept_string: str,
         expected_multiplicity: int | bool | None,
         load_empty_library: Callable[[], None],
     ):
         """Test that explicitly specifying a domain in the requirement string works correctly."""
         load_empty_library()
-        result = InputRequirementsFactory.make_from_string(
+        result = InputStuffSpecsFactory.make_from_string(
             domain=domain,
-            requirement_str=requirement_str,
+            stuff_spec_str=stuff_spec_str,
         )
 
-        assert isinstance(result, PipePort)
+        assert isinstance(result, StuffSpec)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity == expected_multiplicity
