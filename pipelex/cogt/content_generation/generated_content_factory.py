@@ -46,24 +46,14 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
         self,
         raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
-        pretty_print(raw_details, title="Raw details")
-        # the_prefixed_base64_url: str | None = None
         if raw_details.actual_url:
             url = raw_details.actual_url
         else:
             actual_url: str | None = None
             actual_bytes: bytes | None = None
             if raw_details.base64_str:
-                # the_prefixed_base64_url = prefixed_base64_str_from_base64_str(b64_str=raw_details.base64_str)
                 actual_bytes = base64.b64decode(raw_details.base64_str)
             elif raw_details.actual_url_or_prefixed_base64:
-                # if is_prefixed_base64_url(possibly_base64_url=raw_details.actual_url_or_prefixed_base64):
-                #     # the_prefixed_base64_url = raw_details.actual_url_or_prefixed_base64
-                #     # base64_str = strip_base_64_str_if_needed(base64_str=the_prefixed_base64_url)
-                #     base64_str = strip_base_64_str_if_needed(base64_str=raw_details.actual_url_or_prefixed_base64)
-                #     actual_bytes = base64.b64decode(base64_str)
-                # else:
-                #     the_url = raw_details.actual_url_or_prefixed_base64
                 if raw_details.actual_url_or_prefixed_base64.startswith("http"):
                     actual_url = raw_details.actual_url_or_prefixed_base64
                 elif base64_str := extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=raw_details.actual_url_or_prefixed_base64):
@@ -72,8 +62,6 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
                     msg = "No URL or base64 string found"
                     raise NeitherUrlNorDataError(msg)
             elif raw_details.actual_bytes:
-                # base64_str = base64.b64encode(raw_details.actual_bytes).decode("utf-8")
-                # prefixed_base64_url = prefixed_base64_str_from_base64_str(base64_str)
                 actual_bytes = raw_details.actual_bytes
             else:
                 msg = "No URL or base64 string found"
@@ -92,7 +80,6 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
 
         return GeneratedImageResolved(
             url=url,
-            # prefixed_base64_url=the_prefixed_base64_url,
             width=raw_details.width,
             height=raw_details.height,
             content_type=raw_details.content_type,
