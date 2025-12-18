@@ -98,6 +98,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             response.raise_for_status()
             response_dict = response.json()
 
+        response_output_format: str | None = response_dict.get("output_format")
         generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
             size = response_dict.get("size")
@@ -121,6 +122,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                         base64_str=base64_str,
                         width=width,
                         height=height,
+                        output_format=response_output_format,
                     ),
                 )
         else:
