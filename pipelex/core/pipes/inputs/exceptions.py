@@ -17,7 +17,13 @@ class InputStuffSpecNotFoundError(InputStuffSpecsError):
 
 class PipeRunInputsError(PipeRunError):
     def __init__(
-        self, message: str, run_mode: PipeRunMode, pipe_code: str, missing_inputs: dict[str, str], variable_name: str, concept_code: str | None = None
+        self,
+        message: str,
+        run_mode: PipeRunMode,
+        pipe_code: str,
+        missing_inputs: dict[str, str],
+        variable_name: str | None = None,
+        concept_code: str | None = None,
     ):
         self.missing_inputs = missing_inputs
         self.variable_name = variable_name
