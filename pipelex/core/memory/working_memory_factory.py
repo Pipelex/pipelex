@@ -149,10 +149,15 @@ class WorkingMemoryFactory(BaseModel):
 
             except Exception as exc:
                 log.warning(
-                    f"Failed to create mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code}): {exc}. Using fallback text content.",
+                    (
+                        f"Failed to create mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code}): "
+                        f"{exc}. Using fallback text content.",
+                    )
                 )
                 # Create fallback text content
-                fallback_content = TextContent(text=f"DRY RUN: Fallback mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code})")
+                fallback_content = TextContent(
+                    text=f"DRY RUN: Fallback mock for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code})"
+                )
                 fallback_stuff = StuffFactory.make_stuff(
                     concept=typed_named_stuff_spec.concept,
                     content=fallback_content,
