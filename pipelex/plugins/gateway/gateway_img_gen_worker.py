@@ -7,6 +7,7 @@ from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
 from typing_extensions import override
 
+from pipelex import pretty_print
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -59,6 +60,8 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             nb_images=nb_images,
         )
 
+        pretty_print(args_dict, title="Args dict")
+
         endpoint_path = f"/{self.inference_model.model_id}"
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         try:
@@ -110,10 +113,25 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             fal_poller = FalPoller()
             response_dict = await fal_poller.poll_queue_until_complete(response_dict=response_dict)
 
-            for item in response_dict.get("images", []):
-                generated_image = GeneratedImageRawDetails(
-                    actual_url_or_prefixed_base64=item.get("url"), width=item.get("width"), height=item.get("height")
-                )
+            for image in response_dict.get("images", []):
+                pretty_print(image, title="Image")
+                url = image.get("url")
+                if not isinstance(url, str):
+                    msg = "Missing url field in image response"
+                    raise ImgGenGenerationError(msg)
+                width = image.get("width")
+                if not isinstance(width, int):
+                    msg = "Missing width field in image response"
+                    raise ImgGenGenerationError(msg)
+                height = image.get("height")
+                if not isinstance(height, int):
+                    msg = "Missing height field in image response"
+                    raise ImgGenGenerationError(msg)
+                content_type = image.get("content_type")
+                if not isinstance(content_type, str):
+                    msg = "Missing content_type field in image response"
+                    raise ImgGenGenerationError(msg)
+                generated_image = GeneratedImageRawDetails(actual_url_or_prefixed_base64=url, width=width, height=height, content_type=content_type)
                 generated_images.append(generated_image)
         else:
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"

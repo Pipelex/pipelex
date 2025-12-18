@@ -3,7 +3,7 @@ from typing import Any
 from fal_client import AsyncClient, InProgress
 from typing_extensions import override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -43,6 +43,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=1,
         )
+        pretty_print(args_dict, title="Args dict")
         fal_application = self.inference_model.model_id
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")
         handler = await self.fal_async_client.submit(

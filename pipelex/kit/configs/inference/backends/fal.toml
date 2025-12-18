@@ -41,6 +41,7 @@ num_images = "fal"
 aspect_ratio = "flux"
 inference = "flux"
 safety_checker = "available"
+output_format = "flux_1"
 specific = "fal"
 
 ["flux-pro/v1.1"]
@@ -54,6 +55,7 @@ num_images = "fal"
 aspect_ratio = "flux"
 inference = "flux"
 safety_checker = "available"
+output_format = "flux_1"
 specific = "fal"
 
 ["flux-pro/v1.1-ultra"]
@@ -67,6 +69,7 @@ num_images = "fal"
 aspect_ratio = "flux_11_ultra"
 inference = "flux_11_ultra"
 safety_checker = "available"
+output_format = "flux_1"
 specific = "fal"
 
 [flux-2]
@@ -80,6 +83,7 @@ num_images = "fal"
 aspect_ratio = "flux"
 inference = "flux"
 safety_checker = "available"
+output_format = "flux_2"
 specific = "fal"
 
 # --- SDXL models --------------------------------------------------------------
@@ -95,3 +99,4 @@ specific = "fal"
 aspect_ratio = "flux"
 inference = "sdxl_lightning"
 safety_checker = "unavailable"
+output_format = "sdxl"

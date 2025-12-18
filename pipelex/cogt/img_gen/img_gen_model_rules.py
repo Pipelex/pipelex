@@ -7,6 +7,7 @@ class ImgGenArgTopic(StrEnum):
     INFERENCE = "inference"
     SAFETY_CHECKER = "safety_checker"
     BACKGROUND = "background"
+    OUTPUT_FORMAT = "output_format"
     SPECIFIC = "specific"
 
 
@@ -38,6 +39,13 @@ class SafetyCheckerTaxonomy(StrEnum):
 
 
 class BackgroundTaxonomy(StrEnum):
+    GPT = "gpt"
+
+
+class OutputFormatTaxonomy(StrEnum):
+    SDXL = "sdxl"
+    FLUX = "flux"
+    FLUX_2 = "flux_2"
     GPT = "gpt"
 
 

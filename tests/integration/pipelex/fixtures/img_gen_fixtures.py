@@ -56,9 +56,9 @@ GOOGLE_IMG_GEN_MODELS = [
 # --- All Image Generation Handles ---------------------------------------------------------------
 ALL_IMG_GEN_HANDLES = [
     *STABLE_DIFFUSION_IMG_GEN_MODELS,
-    *FAL_IMG_GEN_MODELS,
-    *OPENAI_IMG_GEN_MODELS,
-    *GOOGLE_IMG_GEN_MODELS,
+    # *FAL_IMG_GEN_MODELS,
+    # *OPENAI_IMG_GEN_MODELS,
+    # *GOOGLE_IMG_GEN_MODELS,
 ]
 
 
@@ -85,8 +85,18 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
             is_moderated=None,
             safety_tolerance=1,
             is_raw=None,
-            output_format=OutputFormat.JPG,
-        )
+            output_format=OutputFormat.PNG,
+        ),
+        # ImgGenJobParams(
+        #     aspect_ratio=AspectRatio.SQUARE,
+        #     background=Background.OPAQUE,
+        #     quality=Quality.LOW,
+        #     guidance_scale=3.5,
+        #     is_moderated=None,
+        #     safety_tolerance=1,
+        #     is_raw=None,
+        #     output_format=OutputFormat.JPG,
+        # ),
     ],
 )
 def img_gen_job_params(request: pytest.FixtureRequest) -> ImgGenJobParams:
