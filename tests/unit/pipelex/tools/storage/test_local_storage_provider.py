@@ -15,10 +15,10 @@ class TestLocalStorageProvider:
         test_data = b"Hello, World! \x00\x01\x02\xff"
         uri = "test_file.bin"
 
-        returned_uri = provider.store(data=test_data, uri=uri)
+        returned_path = provider.store(data=test_data, uri=uri)
         loaded_data = provider.load(uri=uri)
 
-        assert returned_uri == uri
+        assert returned_path == str(tmp_path / uri)
         assert loaded_data == test_data
 
     def test_store_creates_parent_directories(self, tmp_path: Path) -> None:

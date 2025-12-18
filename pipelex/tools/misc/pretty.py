@@ -19,7 +19,7 @@ from rich.text import Text, TextType
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor, print_to_stderr
-from pipelex.tools.typing.pydantic_utils import CustomBaseModel, make_truncated_wrapper
+from pipelex.tools.typing.pydantic_utils import make_truncated_wrapper
 from pipelex.types import StrEnum
 
 TEXT_COLOR = TerminalColor.WHITE
@@ -244,7 +244,7 @@ class PrettyPrinter:
         # Format the value
         if isinstance(value, PrettyPrintable):
             pretty = value
-        elif isinstance(value, BaseModel) and not isinstance(value, CustomBaseModel):
+        elif isinstance(value, BaseModel):
             # Wrap regular BaseModel to get truncated __rich_repr__ with proper class name
             pretty = Pretty(make_truncated_wrapper(value))
         elif isinstance(value, dict):

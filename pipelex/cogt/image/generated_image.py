@@ -12,14 +12,10 @@ class GeneratedImageRawDetails(CustomBaseModel):
 
     content_type: str | None = None
 
-    @property
-    def url(self) -> str:
-        return self.actual_url or ""
-
 
 class GeneratedImageResolved(CustomBaseModel):
     url: str
-    prefixed_base64_url: str | None = None
+    # prefixed_base64_url: str | None = None
     content_type: str | None = None
     width: int
     height: int

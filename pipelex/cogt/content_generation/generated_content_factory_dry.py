@@ -12,7 +12,7 @@ class GeneratedContentFactoryDry(GeneratedContentFactoryAbstract):
     ) -> GeneratedImageResolved:
         return GeneratedImageResolved(
             url=raw_details.actual_url or "",
-            prefixed_base64_url=raw_details.actual_url_or_prefixed_base64 or "",
+            # prefixed_base64_url=raw_details.actual_url_or_prefixed_base64 or "",
             content_type=raw_details.content_type or "",
             width=raw_details.width,
             height=raw_details.height,
