@@ -17,7 +17,7 @@ from pipelex.core.concepts.concept_representation_generator import (
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
@@ -118,7 +118,7 @@ def _collect_concept_info(concept: Concept) -> CustomClassInfo | None:
     )
 
 
-def _collect_imports_for_inputs(inputs: InputRequirements) -> tuple[set[str], dict[str, CustomClassInfo]]:
+def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict[str, CustomClassInfo]]:
     """Collect all imports needed for a pipe's inputs.
 
     Args:
@@ -165,9 +165,9 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
         output_multiplicity: Whether the output is a list (e.g., Text[])
     """
     # Get output information
-    structure_class_name = pipe.output.structure_class_name
+    structure_class_name = pipe.output.concept.structure_class_name
     is_native = NativeConceptCode.is_native_structure_class(structure_class_name)
-    custom_info = None if is_native else _collect_concept_info(pipe.output)
+    custom_info = None if is_native else _collect_concept_info(pipe.output.concept)
 
     # Collect all imports needed for inputs
     native_classes, custom_classes = _collect_imports_for_inputs(pipe.inputs)

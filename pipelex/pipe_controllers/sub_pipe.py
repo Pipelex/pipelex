@@ -55,11 +55,11 @@ class SubPipe(BaseModel):
                 ) from exc
 
             try:
-                item_stuff_requirement = sub_pipe.inputs.get_required_stuff_spec(variable_name=batch_params.input_item_stuff_name)
+                item_stuff_spec = sub_pipe.inputs.get_required_stuff_spec(variable_name=batch_params.input_item_stuff_name)
             except InputStuffSpecNotFoundError as exc:
                 msg = (
                     f"Batch input item named '{batch_params.input_item_stuff_name}' from '{calling_pipe_code}' is not "
-                    f"in SubPipe '{self.pipe_code}' input requirements: {sub_pipe.inputs}"
+                    f"in SubPipe '{self.pipe_code}' input stuff specs: {sub_pipe.inputs}"
                 )
                 raise PipeRunInputsError(
                     message=msg,
@@ -76,7 +76,7 @@ class SubPipe(BaseModel):
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
-                    batch_params.input_list_stuff_name: item_stuff_requirement.concept.concept_string,
+                    batch_params.input_list_stuff_name: item_stuff_spec.concept.concept_string,
                 },
             )
 

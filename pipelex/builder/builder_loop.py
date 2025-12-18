@@ -130,8 +130,8 @@ class BuilderLoop:
                 continue
 
             match val_error.error_type:
-                case PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH:
-                    # Fix input requirement mismatch by updating the specific mismatched input(s)
+                case PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH:
+                    # Fix input stuff spec mismatch by updating the specific mismatched input(s)
                     # This applies to ALL pipe categories (operators and controllers)
                     if not PipeCategory.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         continue
@@ -147,12 +147,12 @@ class BuilderLoop:
 
                     # Update only the mismatched inputs with the correct concept from needed_inputs
                     for variable_name in mismatched_variables:
-                        for named_requirement in needed_inputs.named_input_requirements:
-                            if named_requirement.variable_name == variable_name:
+                        for named_stuff_spec in needed_inputs.named_stuff_specs:
+                            if named_stuff_spec.variable_name == variable_name:
                                 old_value = new_inputs.get(variable_name, "NOT SET")
                                 concept_code_with_multiplicity = format_concept_with_multiplicity(
-                                    concept_code_or_string=named_requirement.concept.code,
-                                    multiplicity=named_requirement.multiplicity,
+                                    concept_code_or_string=named_stuff_spec.concept.code,
+                                    multiplicity=named_stuff_spec.multiplicity,
                                 )
                                 new_inputs[variable_name] = concept_code_with_multiplicity
                                 # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
@@ -174,12 +174,12 @@ class BuilderLoop:
                     needed_inputs = pipe.needed_inputs()
                     old_inputs = dict(pipe_spec.inputs) if pipe_spec.inputs else {}
                     fixed_inputs: dict[str, str] = {}
-                    for named_requirement in needed_inputs.named_input_requirements:
+                    for named_stuff_spec in needed_inputs.named_stuff_specs:
                         concept_code_with_multiplicity = format_concept_with_multiplicity(
-                            concept_code_or_string=named_requirement.concept.code,
-                            multiplicity=named_requirement.multiplicity,
+                            concept_code_or_string=named_stuff_spec.concept.code,
+                            multiplicity=named_stuff_spec.multiplicity,
                         )
-                        fixed_inputs[named_requirement.variable_name] = concept_code_with_multiplicity
+                        fixed_inputs[named_stuff_spec.variable_name] = concept_code_with_multiplicity
 
                     # Only apply fix if it actually changes something (avoid infinite loops)
                     if fixed_inputs != old_inputs:

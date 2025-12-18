@@ -65,7 +65,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         needed_inputs = InputStuffSpecsFactory.make_empty()
         for input_name, stuff_spec in self.inputs.root.items():
-            needed_inputs.add_requirement(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
         return needed_inputs
 
     @override

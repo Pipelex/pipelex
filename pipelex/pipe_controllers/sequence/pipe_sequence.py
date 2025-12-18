@@ -99,7 +99,7 @@ class PipeSequence(PipeController):
             if sequential_sub_pipe.batch_params:
                 if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
                     try:
-                        requirement = sub_pipe_needed_inputs.get_required_stuff_spec(
+                        stuff_spec = sub_pipe_needed_inputs.get_required_stuff_spec(
                             variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
                         )
                     except InputStuffSpecNotFoundError as exc:
@@ -108,18 +108,18 @@ class PipeSequence(PipeController):
                             f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
                         )
                         raise PipeSequenceValueError(msg) from exc
-                    needed_inputs.add_requirement(
+                    needed_inputs.add_stuff_spec(
                         variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
-                        concept=requirement.concept,
+                        concept=stuff_spec.concept,
                         multiplicity=True,
                     )
-                    for input_name, requirement in sub_pipe_needed_inputs.items:
+                    for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                         if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
-                            needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+                            needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
             else:
-                for input_name, requirement in sub_pipe_needed_inputs.items:
+                for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                     if input_name not in generated_outputs:
-                        needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+                        needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
 
             # Add this step's output to generated outputs
             if sequential_sub_pipe.output_name:

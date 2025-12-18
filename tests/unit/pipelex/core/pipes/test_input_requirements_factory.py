@@ -118,7 +118,7 @@ class TestMakeInputRequirementsFromString:
     def test_empty_string_raises_value_error(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test that an empty string raises InputStuffSpecsFactorySyntaxError."""
-        with pytest.raises(InputStuffSpecsFactoryError, match="Invalid input requirement string") as exc_info:
+        with pytest.raises(InputStuffSpecsFactoryError, match="Invalid input stuff spec string") as exc_info:
             InputStuffSpecsFactory.make_from_string(domain="native", stuff_spec_str="")
         # This error is raised directly without a cause
         assert exc_info.value.__cause__ is None

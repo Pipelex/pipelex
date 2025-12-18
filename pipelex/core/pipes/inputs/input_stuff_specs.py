@@ -63,23 +63,23 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         return transformed_dict
 
     def set_default_domain(self, domain: str):
-        for input_name, requirement in self.root.items():
-            input_concept_code = requirement.concept.code
+        for input_name, stuff_spec in self.root.items():
+            input_concept_code = stuff_spec.concept.code
             if "." not in input_concept_code:
-                requirement.concept.code = f"{domain}.{input_concept_code}"
-                self.root[input_name] = requirement
+                stuff_spec.concept.code = f"{domain}.{input_concept_code}"
+                self.root[input_name] = stuff_spec
 
     def get_required_stuff_spec(self, variable_name: str) -> StuffSpec:
         stuff_spec = self.root.get(variable_name)
         if not stuff_spec:
-            msg = f"Variable '{variable_name}' not found the input requirements"
+            msg = f"Variable '{variable_name}' not found the input stuff specs"
             raise InputStuffSpecNotFoundError(msg)
         return stuff_spec
 
     def is_variable_existing(self, variable_name: str) -> bool:
         return variable_name in self.root
 
-    def add_requirement(self, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
+    def add_stuff_spec(self, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
         self.root[variable_name] = StuffSpec(concept=concept, multiplicity=multiplicity)
 
     @property
@@ -89,9 +89,9 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     @property
     def concepts(self) -> list[Concept]:
         all_concepts: list[Concept] = []
-        for requirement in self.root.values():
-            if requirement.concept.concept_string not in [c.concept_string for c in all_concepts]:
-                all_concepts.append(requirement.concept)
+        for stuff_spec in self.root.values():
+            if stuff_spec.concept.concept_string not in [c.concept_string for c in all_concepts]:
+                all_concepts.append(stuff_spec.concept)
         return all_concepts
 
     @property

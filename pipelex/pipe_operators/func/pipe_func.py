@@ -152,7 +152,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         # TODO: Support PipeFunc returning with multiplicity. Create an equivalent of TypedNamedInputRequirement for outputs.
-        requirement = TypedNamedStuffSpec(
+        stuff_spec = TypedNamedStuffSpec(
             variable_name="mock_output",
             concept=ConceptFactory.make(
                 concept_code=self.output.concept.code,
@@ -163,7 +163,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             structure_class=return_type,
             multiplicity=False,
         )
-        mock_content = WorkingMemoryFactory.create_mock_content(requirement)
+        mock_content = WorkingMemoryFactory.create_mock_content(stuff_spec)
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,

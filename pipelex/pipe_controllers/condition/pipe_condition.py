@@ -94,7 +94,7 @@ class PipeCondition(PipeController):
             if not var_name.startswith("_"):  # exclude internal variables starting with `_`
                 # We don't know the concept code from just the variable name,
                 # so we'll use a generic placeholder that will be validated later
-                needed_inputs.add_requirement(
+                needed_inputs.add_stuff_spec(
                     variable_name=var_name,
                     concept=ConceptFactory.make_native_concept(
                         native_concept_code=NativeConceptCode.ANYTHING,
@@ -107,8 +107,8 @@ class PipeCondition(PipeController):
             # Use the centralized recursion detection
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
 
-            for input_name, requirement in pipe_needed_inputs.items:
-                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
+            for input_name, stuff_spec in pipe_needed_inputs.items:
+                needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept)
         return needed_inputs
 
     @override

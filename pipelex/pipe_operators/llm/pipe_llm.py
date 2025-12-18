@@ -115,8 +115,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
-        for input_name, requirement in self.inputs.items:
-            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept, multiplicity=requirement.multiplicity)
+        for input_name, stuff_spec in self.inputs.items:
+            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
         return needed_inputs
 
     @override

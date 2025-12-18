@@ -17,7 +17,7 @@ class LibraryLoadingError(LibraryError):
 
     2. Pipe/Concept validation errors (from Pipe or Concept class validation)
        - Stored in: pipe_concept_validation_errors
-       - Example: MISSING_INPUT_VARIABLE, INPUT_REQUIREMENT_MISMATCH
+       - Example: MISSING_INPUT_VARIABLE, INPUT_STUFF_SPEC_MISMATCH
 
     Also handles:
     - Factory errors (Domain, Concept, Pipe)

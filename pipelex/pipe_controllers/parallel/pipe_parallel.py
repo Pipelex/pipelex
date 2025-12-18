@@ -85,17 +85,17 @@ class PipeParallel(PipeController):
                         f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
                     )
                     raise PipeValidationError(message=msg) from exc
-                needed_inputs.add_requirement(
+                needed_inputs.add_stuff_spec(
                     variable_name=sub_pipe.batch_params.input_list_stuff_name,
                     concept=stuff_spec.concept,
                     multiplicity=True,
                 )
                 for input_name, stuff_spec in pipe_needed_inputs.items:
                     if input_name != sub_pipe.batch_params.input_item_stuff_name:
-                        needed_inputs.add_requirement(input_name, stuff_spec.concept, stuff_spec.multiplicity)
+                        needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
             else:
                 for input_name, stuff_spec in pipe_needed_inputs.items:
-                    needed_inputs.add_requirement(input_name, stuff_spec.concept, stuff_spec.multiplicity)
+                    needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
         return needed_inputs
 
     @model_validator(mode="after")

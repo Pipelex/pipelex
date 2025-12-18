@@ -15,6 +15,20 @@ class InputStuffSpecNotFoundError(InputStuffSpecsError):
     pass
 
 
+class PipeInputError(PipelexError):
+    def __init__(
+        self,
+        message: str,
+        pipe_code: str,
+        variable_name: str | None = None,
+        concept_code: str | None = None,
+    ):
+        self.pipe_code = pipe_code
+        self.variable_name = variable_name
+        self.concept_code = concept_code
+        super().__init__(message)
+
+
 class PipeRunInputsError(PipeRunError):
     def __init__(
         self,
