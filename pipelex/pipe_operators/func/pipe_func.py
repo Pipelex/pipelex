@@ -8,7 +8,7 @@ from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -34,7 +34,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         return set()
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @field_validator("function_name", mode="before")
@@ -102,7 +102,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=self.output,
+            concept=self.output.concept,
             content=the_content,
         )
 
@@ -132,33 +132,33 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         needed_inputs = self.needed_inputs()
 
         missing_input_names: list[str] = []
-        for named_input_requirement in needed_inputs.named_input_requirements:
-            if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
-                missing_input_names.append(named_input_requirement.variable_name)
+        for named_stuff_spec in needed_inputs.named_stuff_specs:
+            if not working_memory.get_optional_stuff(named_stuff_spec.variable_name):
+                missing_input_names.append(named_stuff_spec.variable_name)
         if missing_input_names:
             msg = f"Dry run failed for pipe '{self.code}' (PipeFunc): missing required inputs: {missing_input_names}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         return_type = get_type_hints(function).get("return")
 
         if return_type is None:
             msg = f"Dry run failed for pipe '{self.code}' (PipeFunc): function '{self.function_name}' has no return type annotation"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
         if not issubclass(return_type, StuffContent):
             msg = (
                 f"Dry run failed for pipe '{self.code}' (PipeFunc): "
                 f"function '{self.function_name}' return type {return_type} is not a subclass of StuffContent"
             )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         # TODO: Support PipeFunc returning with multiplicity. Create an equivalent of TypedNamedInputRequirement for outputs.
-        requirement = TypedNamedInputRequirement(
+        requirement = TypedNamedStuffSpec(
             variable_name="mock_output",
             concept=ConceptFactory.make(
-                concept_code=self.output.code,
+                concept_code=self.output.concept.code,
                 domain="generic",
                 description="Lorem Ipsum",
-                structure_class_name=self.output.structure_class_name,
+                structure_class_name=self.output.concept.structure_class_name,
             ),
             structure_class=return_type,
             multiplicity=False,
@@ -167,7 +167,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=self.output,
+            concept=self.output.concept,
             content=mock_content,
         )
 

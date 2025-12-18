@@ -5,44 +5,45 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_string_or_code
-from pipelex.core.pipes.inputs.input_requirements import InputRequirement, InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, PipeInputsRoot
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.hub import get_required_concept
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
 
-class InputRequirementsFactoryError(PipelexError):
+class InputStuffSpecsFactoryError(PipelexError):
     pass
 
 
-class InputRequirementsFactory:
+class InputStuffSpecsFactory:
     @classmethod
-    def make_empty(cls) -> InputRequirements:
-        return InputRequirements(root={})
+    def make_empty(cls) -> InputStuffSpecs:
+        return InputStuffSpecs(root={})
 
     @classmethod
     def make_from_blueprint(
         cls,
         domain: str,
         blueprint: dict[str, str],
-    ) -> InputRequirements:
-        input_requirements_dict: dict[str, InputRequirement] = {}
-        for var_name, requirement_str in blueprint.items():
-            input_requirement = InputRequirementsFactory.make_from_string(
+    ) -> InputStuffSpecs:
+        stuff_specs: PipeInputsRoot = {}
+        for var_name, stuff_spec_str in blueprint.items():
+            stuff_spec = InputStuffSpecsFactory.make_from_string(
                 domain=domain,
-                requirement_str=requirement_str,
+                stuff_spec_str=stuff_spec_str,
             )
-            input_requirements_dict[var_name] = input_requirement
-        return InputRequirements(root=input_requirements_dict)
+            stuff_specs[var_name] = stuff_spec
+        return InputStuffSpecs(root=stuff_specs)
 
     @classmethod
     def make_from_string(
         cls,
         domain: str,
-        requirement_str: str,
-    ) -> InputRequirement:
-        """Parse an input requirement string and return an InputRequirement.
+        stuff_spec_str: str,
+    ) -> StuffSpec:
+        """Parse an input requirement string and return an StuffSpec.
 
         Interprets multiplicity from a string in the form:
         - "domain.ConceptCode[5]" -> multiplicity = 5 (int)
@@ -52,23 +53,23 @@ class InputRequirementsFactory:
 
         Args:
             domain: The domain to use for resolving concept codes without domain prefix
-            requirement_str: String in the format "domain.ConceptCode" or "ConceptCode" with optional "[multiplicity]"
+            stuff_spec_str: String in the format "domain.ConceptCode" or "ConceptCode" with optional "[multiplicity]"
 
         Returns:
-            InputRequirement with the parsed concept and multiplicity
+            StuffSpec with the parsed concept and multiplicity
 
         Raises:
-            InputRequirementsFactorySyInputRequirementsFactoryErrorntaxError: If the requirement string format is invalid
+            InputStuffSpecsFactoryError: If the stuff spec string format is invalid
         """
         # Pattern to match concept string and optional multiplicity brackets
         # Group 1: concept string (everything before brackets)
         # Group 2: content inside brackets (empty string for [], digits for [5])
         pattern = r"^(.+?)(?:\[(\d*)\])?$"
-        match = re.match(pattern, requirement_str)
+        match = re.match(pattern, stuff_spec_str)
 
         if not match:
-            msg = f"Invalid input requirement string: {requirement_str}"
-            raise InputRequirementsFactoryError(msg)
+            msg = f"Invalid input stuff spec string: {stuff_spec_str}"
+            raise InputStuffSpecsFactoryError(msg)
 
         concept_string_or_code = match.group(1)
         multiplicity_str = match.group(2)
@@ -77,8 +78,8 @@ class InputRequirementsFactory:
         try:
             validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
         except ConceptStringError as exc:
-            msg = f"Invalid concept string '{concept_string_or_code}' when trying to make an 'InputRequirement' from string: {exc}"
-            raise InputRequirementsFactoryError(msg) from exc
+            msg = f"Invalid concept string '{concept_string_or_code}' when trying to make an 'StuffSpec' from string: {exc}"
+            raise InputStuffSpecsFactoryError(msg) from exc
 
         concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
             domain=domain,
@@ -87,6 +88,7 @@ class InputRequirementsFactory:
 
         # Determine multiplicity
         multiplicity: VariableMultiplicity | None = None
+
         if multiplicity_str is not None:  # Brackets were present
             if multiplicity_str == "":  # Empty brackets []
                 multiplicity = True
@@ -95,4 +97,4 @@ class InputRequirementsFactory:
         # else: No brackets, multiplicity stays None
 
         concept = get_required_concept(concept_string=concept_string_with_domain)
-        return InputRequirement(concept=concept, multiplicity=multiplicity)
+        return StuffSpec(concept=concept, multiplicity=multiplicity)

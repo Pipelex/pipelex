@@ -120,7 +120,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 inputs = pipe.inputs
                 formatted_inputs = [f"{name}: {_format_concept_code(requirement.concept.code, domain)}" for name, requirement in inputs.items]
                 formatted_inputs_str = ", ".join(formatted_inputs)
-                output_code = _format_concept_code(pipe.output.code, domain)
+                output_code = _format_concept_code(pipe.output.concept.code, domain)
 
                 table.add_row(
                     pipe.code,
@@ -132,7 +132,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 pipes_dict[domain][pipe.code] = {
                     "description": pipe.description or "",
                     "inputs": formatted_inputs_str,
-                    "output": pipe.output.code,
+                    "output": pipe.output.concept.code,
                 }
 
             pretty_print(table)

@@ -9,13 +9,11 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -37,11 +35,6 @@ class PipeComposeOutput(PipeOutput):
 class PipeCompose(PipeOperator[PipeComposeOutput]):
     type: Literal["PipeCompose"] = "PipeCompose"
     model_config = ConfigDict(extra="forbid", strict=False)
-
-    output: Concept = ConceptFactory.make_native_concept(
-        native_concept_code=NativeConceptCode.TEXT,
-    )
-
     template: str
     templating_style: TemplatingStyle | None = None
     category: TemplateCategory = TemplateCategory.BASIC
@@ -69,10 +62,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     # TODO: this needs testing!!!
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
-        needed_inputs = InputRequirementsFactory.make_empty()
-        for input_name, requirement in self.inputs.root.items():
-            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept, multiplicity=requirement.multiplicity)
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+        needed_inputs = InputStuffSpecsFactory.make_empty()
+        for input_name, stuff_spec in self.inputs.root.items():
+            needed_inputs.add_requirement(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
         return needed_inputs
 
     @override
@@ -90,13 +83,13 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     @override
     def validate_output_with_library(self):
         if not get_concept_library().is_compatible(
-            tested_concept=self.output,
+            tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
             strict=True,
         ):
             msg = (
                 f"The output of a PipeCompose must be strictly compatible with the Text concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'. "
+                f"In the pipe '{self.code}' the output is '{self.output.concept.concept_string}'. "
                 "Make sure this concept refines the native Text concept."
             )
             raise PipeValidationError(
@@ -104,7 +97,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain=self.domain,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept_string,
+                provided_concept_code=self.output.concept.concept_string,
                 required_concept_codes=[NativeConceptCode.TEXT.concept_string],
             )
 
@@ -139,12 +132,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         # Get the structure class from the registry (might be a subclass of TextContent)
         structure_class = get_class_registry().get_required_subclass(
-            name=self.output.structure_class_name,
+            name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
         the_content = structure_class(text=jinja2_text)
 
-        output_stuff = StuffFactory.make_stuff(concept=self.output, content=the_content, name=output_name)
+        output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
 
         working_memory.set_new_main_stuff(
             stuff=output_stuff,

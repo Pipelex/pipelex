@@ -1,10 +1,10 @@
 from typing import Callable
 
 import pytest
+from pipelex.core.pipes.inputs.input_requirements import PipePort
+from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactoryError
 
 from pipelex.core.concepts.exceptions import ConceptStringError
-from pipelex.core.pipes.inputs.input_requirements import InputRequirement
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory, InputRequirementsFactoryError
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from tests.unit.pipelex.core.pipes.data import (
     CONCEPT_CODE_RESOLUTION_TEST_CASES,
@@ -36,7 +36,7 @@ class TestMakeInputRequirementsFromString:
         load_empty_library()
         result = InputRequirementsFactory.make_from_string(domain=domain, requirement_str=requirement_str)
 
-        assert isinstance(result, InputRequirement)
+        assert isinstance(result, PipePort)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity == expected_multiplicity
 
@@ -51,7 +51,7 @@ class TestMakeInputRequirementsFromString:
         """Test parsing a concept string with empty brackets (multiple items)."""
         result = InputRequirementsFactory.make_from_string(domain=domain, requirement_str=requirement_str)
 
-        assert isinstance(result, InputRequirement)
+        assert isinstance(result, PipePort)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity is True
 
@@ -66,7 +66,7 @@ class TestMakeInputRequirementsFromString:
         load_empty_library()
         result = InputRequirementsFactory.make_from_string(domain=domain, requirement_str=requirement_str)
 
-        assert isinstance(result, InputRequirement)
+        assert isinstance(result, PipePort)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity == expected_multiplicity
 
@@ -138,19 +138,19 @@ class TestMakeInputRequirementsFromString:
         """Test parsing a concept string with 0 in brackets."""
         result = InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[0]")
 
-        assert isinstance(result, InputRequirement)
+        assert isinstance(result, PipePort)
         assert result.concept.concept_string == "native.Text"
         assert result.multiplicity == 0
 
     def test_return_type(self, load_empty_library: Callable[[], None]):
         load_empty_library()
-        """Test that the method returns an InputRequirement instance."""
+        """Test that the method returns an PipePort instance."""
         result = InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text")
-        assert isinstance(result, InputRequirement)
+        assert isinstance(result, PipePort)
 
     def test_concept_attribute_access(self, load_empty_library: Callable[[], None]):
         load_empty_library()
-        """Test that the returned InputRequirement has proper concept attributes."""
+        """Test that the returned PipePort has proper concept attributes."""
         result = InputRequirementsFactory.make_from_string(domain="native", requirement_str="native.Text[5]")
 
         assert hasattr(result, "concept")
@@ -225,7 +225,7 @@ class TestMakeInputRequirementsFromString:
             requirement_str=requirement_str,
         )
 
-        assert isinstance(result, InputRequirement)
+        assert isinstance(result, PipePort)
         assert result.concept.concept_string == expected_concept_string, f"Failed: {description}"
         assert result.multiplicity == expected_multiplicity, f"Failed: {description}"
 
@@ -248,6 +248,6 @@ class TestMakeInputRequirementsFromString:
             requirement_str=requirement_str,
         )
 
-        assert isinstance(result, InputRequirement)
+        assert isinstance(result, PipePort)
         assert result.concept.concept_string == expected_concept_string
         assert result.multiplicity == expected_multiplicity

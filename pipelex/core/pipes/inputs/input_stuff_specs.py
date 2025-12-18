@@ -2,67 +2,63 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import BaseModel, Field, RootModel, field_validator
+from pydantic import Field, RootModel, field_validator
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 
 
-class InputRequirement(BaseModel):
-    concept: Concept
-    multiplicity: VariableMultiplicity | None = None
-
-
-class NamedInputRequirement(InputRequirement):
+class NamedStuffSpec(StuffSpec):
     variable_name: str
     requirement_expression: str | None = None
 
 
-class TypedNamedInputRequirement(NamedInputRequirement):
+class TypedNamedStuffSpec(NamedStuffSpec):
     structure_class: type[StuffContent]
 
     @classmethod
     def make_from_named(
         cls,
-        named: NamedInputRequirement,
+        named: NamedStuffSpec,
         structure_class: type[StuffContent],
-    ) -> "TypedNamedInputRequirement":
+    ) -> "TypedNamedStuffSpec":
         return cls(**named.model_dump(), structure_class=structure_class)
 
 
-InputRequirementsRoot = dict[str, InputRequirement]
+PipeInputsRoot = dict[str, StuffSpec]
 
 
-class InputRequirements(RootModel[InputRequirementsRoot]):
-    root: InputRequirementsRoot = Field(default_factory=dict)
+class InputStuffSpecs(RootModel[PipeInputsRoot]):
+    root: PipeInputsRoot = Field(default_factory=dict)
 
     @field_validator("root", mode="wrap")
     @classmethod
     def validate_concept_codes(
         cls,
-        input_value: dict[str, InputRequirement],
-        handler: Callable[[dict[str, InputRequirement]], dict[str, InputRequirement]],
-    ) -> dict[str, InputRequirement]:
+        input_value: PipeInputsRoot,
+        handler: Callable[[PipeInputsRoot], PipeInputsRoot],
+    ) -> PipeInputsRoot:
         # First let Pydantic handle the basic type validation
-        validated_dict: dict[str, InputRequirement] = handler(input_value)
+        stuff_specs: PipeInputsRoot = handler(input_value)
 
         # Now we can transform and validate the keys and values
-        transformed_dict: dict[str, InputRequirement] = {}
-        for required_input, requirement in validated_dict.items():
+        transformed_dict: PipeInputsRoot = {}
+        for input_name, stuff_spec in stuff_specs.items():
             # in case of sub-attribute, the variable name is the object name, before the 1st dot
-            transformed_key: str = required_input.split(".", 1)[0]
-            if transformed_key != required_input:
-                log.verbose(f"Sub-attribute {required_input} detected, using {transformed_key} as variable name")
+            transformed_key: str = input_name.split(".", 1)[0]
+            if transformed_key != input_name:
+                log.verbose(f"Sub-attribute {input_name} detected, using {transformed_key} as variable name")
 
-            if transformed_key in transformed_dict and transformed_dict[transformed_key] != requirement:
+            if transformed_key in transformed_dict and transformed_dict[transformed_key] != stuff_spec:
                 log.verbose(
-                    f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {requirement}",
+                    f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {stuff_spec}",
                 )
-            transformed_dict[transformed_key] = InputRequirement(concept=requirement.concept, multiplicity=requirement.multiplicity)
+            transformed_dict[transformed_key] = StuffSpec(concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
 
         return transformed_dict
 
@@ -73,21 +69,21 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
                 requirement.concept.code = f"{domain}.{input_concept_code}"
                 self.root[input_name] = requirement
 
-    def get_required_input_requirement(self, variable_name: str) -> InputRequirement:
-        requirement = self.root.get(variable_name)
-        if not requirement:
+    def get_required_stuff_spec(self, variable_name: str) -> StuffSpec:
+        stuff_spec = self.root.get(variable_name)
+        if not stuff_spec:
             msg = f"Variable '{variable_name}' not found the input requirements"
-            raise PipeInputNotFoundError(msg)
-        return requirement
+            raise InputStuffSpecNotFoundError(msg)
+        return stuff_spec
 
     def is_variable_existing(self, variable_name: str) -> bool:
         return variable_name in self.root
 
     def add_requirement(self, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
-        self.root[variable_name] = InputRequirement(concept=concept, multiplicity=multiplicity)
+        self.root[variable_name] = StuffSpec(concept=concept, multiplicity=multiplicity)
 
     @property
-    def items(self) -> list[tuple[str, InputRequirement]]:
+    def items(self) -> list[tuple[str, StuffSpec]]:
         return list(self.root.items())
 
     @property
@@ -111,31 +107,23 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
         return the_required_names
 
     @property
-    def named_input_requirements(self) -> list[NamedInputRequirement]:
-        the_requirements: list[NamedInputRequirement] = []
-        for requirement_expression, requirement in self.root.items():
+    def named_stuff_specs(self) -> list[NamedStuffSpec]:
+        the_named_stuff_spec: list[NamedStuffSpec] = []
+        for requirement_expression, stuff_spec in self.root.items():
             required_variable_name = requirement_expression.split(".", 1)[0]
-            the_requirements.append(
-                NamedInputRequirement(
+            the_named_stuff_spec.append(
+                NamedStuffSpec(
                     variable_name=required_variable_name,
                     requirement_expression=requirement_expression,
-                    concept=requirement.concept,
-                    multiplicity=requirement.multiplicity,
+                    concept=stuff_spec.concept,
+                    multiplicity=stuff_spec.multiplicity,
                 ),
             )
-        return the_requirements
+        return the_named_stuff_spec
 
     @property
     def is_empty(self) -> bool:
         return not bool(self.root)
-
-    def _is_multiple(self, multiplicity: VariableMultiplicity | None) -> bool:
-        """Check if multiplicity indicates multiple items."""
-        if multiplicity is None:
-            return False
-        if isinstance(multiplicity, bool):
-            return multiplicity
-        return multiplicity > 1
 
     def generate_json_representation(self) -> dict[str, Any]:
         """Generate a JSON representation for all inputs.
@@ -144,11 +132,10 @@ class InputRequirements(RootModel[InputRequirementsRoot]):
             Dictionary with JSON representations for each input
         """
         json_inputs: dict[str, Any] = {}
-        for var_name, input_req in self.root.items():
-            is_multiple = self._is_multiple(input_req.multiplicity)
-            json_value, _ = input_req.concept.generate_input_representation(
+        for var_name, stuff_spec in self.root.items():
+            json_value, _ = stuff_spec.concept.generate_input_representation(
                 output_format=ConceptRepresentationFormat.JSON,
-                is_multiple=is_multiple,
+                is_multiple=stuff_spec.is_multiple(),
             )
             json_inputs[var_name] = json_value
 

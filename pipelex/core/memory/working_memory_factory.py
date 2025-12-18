@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
-from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -79,7 +79,7 @@ class WorkingMemoryFactory(BaseModel):
         return working_memory
 
     @classmethod
-    def create_mock_content(cls, requirement: TypedNamedInputRequirement) -> StuffContent:
+    def create_mock_content(cls, requirement: TypedNamedStuffSpec) -> StuffContent:
         """Helper method to create mock content for a requirement."""
         if requirement.structure_class:
             # Create mock object using polyfactory
@@ -95,7 +95,7 @@ class WorkingMemoryFactory(BaseModel):
         return TextContent(text=f"DRY RUN: Mock content for '{requirement.variable_name}' ({requirement.concept.code})")
 
     @classmethod
-    def make_for_dry_run(cls, needed_inputs: list[TypedNamedInputRequirement]) -> "WorkingMemory":
+    def make_for_dry_run(cls, needed_inputs: list[TypedNamedStuffSpec]) -> "WorkingMemory":
         """Create a WorkingMemory with mock objects for dry run mode.
 
         Args:
