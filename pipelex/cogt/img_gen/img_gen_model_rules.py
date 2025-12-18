@@ -44,7 +44,7 @@ class BackgroundTaxonomy(StrEnum):
 
 class OutputFormatTaxonomy(StrEnum):
     SDXL = "sdxl"
-    FLUX = "flux"
+    FLUX_1 = "flux_1"
     FLUX_2 = "flux_2"
     GPT = "gpt"
 

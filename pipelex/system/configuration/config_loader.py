@@ -33,7 +33,7 @@ class ConfigLoader:
            - pipelex_local.toml (local execution)
            - pipelex_{environment}.toml
            - pipelex_{run_mode}.toml
-           - pipelex_super.toml (final override)
+           - pipelex_override.toml (final override)
 
         Returns:
             Dict[str, Any]: The merged configuration dictionary
@@ -60,7 +60,7 @@ class ConfigLoader:
             list_of_configs.append(os.path.join(self.pipelex_config_dir, f"pipelex_{runtime_manager.run_mode}.toml"))
 
         # Final override
-        list_of_configs.append(os.path.join(self.pipelex_config_dir, "pipelex_super.toml"))
+        list_of_configs.append(os.path.join(self.pipelex_config_dir, "pipelex_override.toml"))
 
         return load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
 

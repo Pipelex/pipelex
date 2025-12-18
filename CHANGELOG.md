@@ -54,7 +54,7 @@
 - **Main configuration defaults updated** in `.pipelex/pipelex.toml`:
     - Most settings now commented out by default (shown as examples rather than active overrides)
     - `is_generate_cost_report_file_enabled` default changed from `true` to `false`
-    - `pipelex_super.toml` (final override) moved from repo root to `.pipelex/` directory
+    - `pipelex_override.toml` (final override) moved from repo root to `.pipelex/` directory
     - `telemetry_override.toml` (personal telemetry settings) moved from repo root to `.pipelex/` directory
 - Documentation: clarified **Setup (first run)** vs **Configuration (TOML reference)**, added a Setup overview page, and added contributor docs for configuration defaults/overrides.
 - `pipelex init` now creates a documented `telemetry.toml` template instead of prompting for preferences

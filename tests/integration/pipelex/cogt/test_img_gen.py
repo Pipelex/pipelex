@@ -22,6 +22,7 @@ class TestImageGeneration:
         img_gen_prompt_text: str,
         generated_content_factory: GeneratedContentFactory,
     ):
+        pretty_print(f"Testing image generation with handle '{img_gen_handle}', output format '{img_gen_job_params.output_format}'")
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,

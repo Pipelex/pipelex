@@ -31,7 +31,7 @@ At a high level, the load order is:
    1. `pipelex_local.toml`
    2. `pipelex_{environment}.toml`
    3. `pipelex_{run_mode}.toml`
-   4. `pipelex_super.toml`
+   4. `pipelex_override.toml`
 
 !!! note "Unit test special case"
     When unit testing, run-mode overrides may be loaded from `tests/pipelex_{run_mode}.toml` (example: `tests/pipelex_unit_test.toml`).

@@ -3,6 +3,7 @@ from typing import Any
 import openai
 from typing_extensions import override
 
+from pipelex import pretty_print
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -65,6 +66,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
 
         generated_images: list[GeneratedImageRawDetails] = []
         for image_data in result.data:
+            pretty_print(image_data, title="image_data")
             base64_str = image_data.b64_json
             if not base64_str:
                 msg = "No base64 image data received from OpenAI"

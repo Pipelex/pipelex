@@ -199,7 +199,7 @@ up-kit-configs:
 	@rsync -av --delete \
 		--exclude='.DS_Store' \
 		--exclude='pipelex_service.toml' \
-		--exclude='pipelex_super.toml' \
+		--exclude='pipelex_override.toml' \
 		--exclude='telemetry_override.toml' \
 		.pipelex/ pipelex/kit/configs/
 

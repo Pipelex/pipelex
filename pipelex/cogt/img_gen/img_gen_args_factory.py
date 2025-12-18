@@ -44,19 +44,20 @@ class ImgGenArgsFactory:
                             nb_images=nb_images,
                         )
                     )
-                case ImgGenArgTopic.SPECIFIC:
-                    specific_taxonomy = SpecificTaxonomy(taxonomy_value)
-                    args_dict.update(
-                        cls.make_args_from_specific(
-                            specific_taxonomy=specific_taxonomy,
-                        )
-                    )
                 case ImgGenArgTopic.ASPECT_RATIO:
                     aspect_ratio_taxonomy = AspectRatioTaxonomy(taxonomy_value)
                     args_dict.update(
                         cls.make_args_from_aspect_ratio(
                             aspect_ratio_taxonomy=aspect_ratio_taxonomy,
                             aspect_ratio=job_params.aspect_ratio,
+                        )
+                    )
+                case ImgGenArgTopic.BACKGROUND:
+                    background_taxonomy = BackgroundTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_background(
+                            background_taxonomy=background_taxonomy,
+                            background=job_params.background,
                         )
                     )
                 case ImgGenArgTopic.INFERENCE:
@@ -79,14 +80,6 @@ class ImgGenArgsFactory:
                             safety_tolerance=job_params.safety_tolerance,
                         )
                     )
-                case ImgGenArgTopic.BACKGROUND:
-                    background_taxonomy = BackgroundTaxonomy(taxonomy_value)
-                    args_dict.update(
-                        cls.make_args_from_background(
-                            background_taxonomy=background_taxonomy,
-                            background=job_params.background,
-                        )
-                    )
                 case ImgGenArgTopic.OUTPUT_FORMAT:
                     output_format_taxonomy = OutputFormatTaxonomy(taxonomy_value)
                     args_dict.update(
@@ -95,51 +88,15 @@ class ImgGenArgsFactory:
                             output_format=job_params.output_format,
                         )
                     )
+                case ImgGenArgTopic.SPECIFIC:
+                    specific_taxonomy = SpecificTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_specific(
+                            specific_taxonomy=specific_taxonomy,
+                        )
+                    )
 
         return args_dict
-
-    @classmethod
-    def make_args_from_output_format(
-        cls,
-        output_format_taxonomy: OutputFormatTaxonomy,
-        output_format: OutputFormat,
-    ) -> dict[str, Any]:
-        key: str
-        value: str
-        match output_format_taxonomy:
-            case OutputFormatTaxonomy.SDXL:
-                key = "format"
-                match output_format:
-                    case OutputFormat.PNG:
-                        value = "png"
-                    case OutputFormat.JPG:
-                        value = "jpeg"
-                    case OutputFormat.WEBP:
-                        msg = "Output format WebP is not supported by SDXL image generation models"
-                        raise ImgGenParameterError(msg)
-            case OutputFormatTaxonomy.FLUX:
-                key = "output_format"
-                match output_format:
-                    case OutputFormat.PNG:
-                        value = "png"
-                    case OutputFormat.JPG:
-                        value = "jpeg"
-                    case OutputFormat.WEBP:
-                        msg = "Output format WebP is not supported by Flux image generation models"
-                        raise ImgGenParameterError(msg)
-            case OutputFormatTaxonomy.FLUX_2:
-                key = "output_format"
-                match output_format:
-                    case OutputFormat.PNG:
-                        value = "png"
-                    case OutputFormat.JPG:
-                        value = "jpeg"
-                    case OutputFormat.WEBP:
-                        value = "webp"
-            case OutputFormatTaxonomy.GPT:
-                key = "output_format"
-                value = OpenAIImgGenFactory.output_format_for_gpt_image_1(output_format=output_format)
-        return {key: value}
 
     @classmethod
     def make_args_from_num_images(cls, num_images_taxonomy: NumImagesTaxonomy, nb_images: int) -> dict[str, Any]:
@@ -268,3 +225,46 @@ class ImgGenArgsFactory:
                 if safety_tolerance is not None:
                     args_dict["safety_tolerance"] = safety_tolerance
         return args_dict
+
+    @classmethod
+    def make_args_from_output_format(
+        cls,
+        output_format_taxonomy: OutputFormatTaxonomy,
+        output_format: OutputFormat,
+    ) -> dict[str, Any]:
+        key: str
+        value: str
+        match output_format_taxonomy:
+            case OutputFormatTaxonomy.SDXL:
+                key = "format"
+                match output_format:
+                    case OutputFormat.PNG:
+                        value = "png"
+                    case OutputFormat.JPG:
+                        value = "jpeg"
+                    case OutputFormat.WEBP:
+                        msg = "Output format WebP is not supported by SDXL image generation models"
+                        raise ImgGenParameterError(msg)
+            case OutputFormatTaxonomy.FLUX_1:
+                key = "output_format"
+                match output_format:
+                    case OutputFormat.PNG:
+                        value = "png"
+                    case OutputFormat.JPG:
+                        value = "jpeg"
+                    case OutputFormat.WEBP:
+                        msg = "Output format WebP is not supported by Flux 1 image generation models"
+                        raise ImgGenParameterError(msg)
+            case OutputFormatTaxonomy.FLUX_2:
+                key = "output_format"
+                match output_format:
+                    case OutputFormat.PNG:
+                        value = "png"
+                    case OutputFormat.JPG:
+                        value = "jpeg"
+                    case OutputFormat.WEBP:
+                        value = "webp"
+            case OutputFormatTaxonomy.GPT:
+                key = "output_format"
+                value = OpenAIImgGenFactory.output_format_for_gpt_image_1(output_format=output_format)
+        return {key: value}
