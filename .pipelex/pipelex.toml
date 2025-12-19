@@ -51,14 +51,14 @@ fix_loop_max_attempts = 10
 # default_directory_base_name = "pipeline"
 
 [pipelex.log_config]
-default_log_level = "INFO"
+default_log_level = "VERBOSE"
 
 # Uncomment to log to stderr instead of stdout
 # console_log_target = "stderr"
 # console_print_target = "stderr"
 
 [pipelex.log_config.package_log_levels]
-pipelex = "INFO"
+pipelex = "VERBOSE"
 
 [cogt]
 [cogt.model_deck_config]

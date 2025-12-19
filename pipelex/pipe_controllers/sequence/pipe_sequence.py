@@ -51,14 +51,18 @@ class PipeSequence(PipeController):
     @override
     def validate_output_with_library(self):
         """Validate the output for the pipe sequence.
-        The output of the pipe sequence should match the output of the last step.
+
+        The output of the pipe sequence should match the output of the last step,
+        both in terms of concept compatibility and multiplicity.
         """
         last_step_pipe_code = self.sequential_sub_pipes[-1].pipe_code
         last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
-        last_step_output_concept = last_step_pipe.output.concept
-        if not get_concept_library().is_compatible(tested_concept=last_step_output_concept, wanted_concept=self.output.concept):
+        last_step_stuff_spec = last_step_pipe.output
+
+        # Check concept compatibility
+        if not get_concept_library().is_compatible(tested_concept=last_step_stuff_spec.concept, wanted_concept=self.output.concept):
             msg = (
-                f"PipeSequence concept mismatch: the output concept '{last_step_output_concept.concept_string}' "
+                f"PipeSequence concept mismatch: the output concept '{last_step_stuff_spec.concept.concept_string}' "
                 f"of the last step '{last_step_pipe_code}' of sequence pipe '{self.code}' "
                 f"is not compatible with the output concept '{self.output.concept.concept_string}' of the sequence."
             )
@@ -67,7 +71,23 @@ class PipeSequence(PipeController):
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain=self.domain,
                 pipe_code=self.code,
-                provided_concept_code=last_step_output_concept.concept_string,
+                provided_concept_code=last_step_stuff_spec.concept.concept_string,
+                required_concept_codes=[self.output.concept.concept_string],
+            )
+
+        # Check multiplicity match
+        if self.output.multiplicity != last_step_stuff_spec.multiplicity:
+            msg = (
+                f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "
+                f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe_code}' "
+                f"has output multiplicity={last_step_stuff_spec.multiplicity}. They must be the same."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
+                domain=self.domain,
+                pipe_code=self.code,
+                provided_concept_code=last_step_stuff_spec.concept.concept_string,
                 required_concept_codes=[self.output.concept.concept_string],
             )
 
@@ -175,6 +195,7 @@ class PipeSequence(PipeController):
             msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
         # Verify the output of this pipe is matching the output of the last step.
+
         concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output.concept
         # if self.output.concept_string != concept_string_of_last_step:
         if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output.concept):

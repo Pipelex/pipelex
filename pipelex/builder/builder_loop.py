@@ -193,8 +193,8 @@ class BuilderLoop:
                                     This might be an intermediate variable that shouldn't be in inputs."
                         )
 
-                case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT:
-                    # Fix output concept mismatch for PipeSequence by updating to match last step's output
+                case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
+                    # Fix output concept/multiplicity mismatch for PipeSequence by updating to match last step's output
                     if not isinstance(pipe_spec, PipeSequenceSpec):
                         continue
 
@@ -213,8 +213,9 @@ class BuilderLoop:
                     pipe_spec.output = new_output
                     fixed_pipes.append(pipe_spec)
                     # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
+                    error_kind = "concept" if val_error.error_type == PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT else "multiplicity"
                     log.info(
-                        f"🔧 Fixed output concept for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
+                        f"🔧 Fixed output {error_kind} for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
                             '{new_output}' (matching last step '{last_step_pipe_code}')"
                     )
 

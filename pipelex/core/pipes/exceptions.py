@@ -105,6 +105,7 @@ class PipeValidationErrorType(StrEnum):
     EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"  # AUTO-FIXED
     INPUT_STUFF_SPEC_MISMATCH = "input_stuff_spec_mismatch"  # AUTO-FIXED
     INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"  # AUTO-FIXED
+    INADEQUATE_OUTPUT_MULTIPLICITY = "inadequate_output_multiplicity"  # AUTO-FIXED
 
     CIRCULAR_DEPENDENCY_ERROR = "circular_dependency_error"
 

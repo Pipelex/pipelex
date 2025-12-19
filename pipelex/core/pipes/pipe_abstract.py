@@ -12,7 +12,6 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
@@ -43,7 +42,7 @@ class PipeAbstract(ABC, BaseModel):
     code: str
     domain: str
     description: str | None = None
-    inputs: InputStuffSpecs = Field(default_factory=InputStuffSpecsFactory.make_empty)
+    inputs: InputStuffSpecs = Field(default_factory=InputStuffSpecs)
     output: StuffSpec
 
     @property
