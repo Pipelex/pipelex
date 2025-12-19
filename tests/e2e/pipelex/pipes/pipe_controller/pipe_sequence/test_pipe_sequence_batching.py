@@ -8,7 +8,7 @@ import pytest
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -28,7 +28,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     if pipe_run_mode == PipeRunMode.DRY:
         working_memory = WorkingMemoryFactory.make_for_dry_run(
             needed_inputs=[
-                TypedNamedInputRequirement(
+                TypedNamedStuffSpec(
                     variable_name="document",
                     concept=ConceptFactory.make(
                         concept_code="Document",

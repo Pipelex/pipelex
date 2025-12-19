@@ -4,9 +4,9 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
@@ -22,8 +22,8 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         pipe_code: str,
         domain_code: str,
         description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeImgGenBlueprint,
     ) -> PipeImgGen:
         # Parse output for multiplicity (may have brackets like "Image[]" or "Image[3]")

@@ -3,10 +3,10 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.hub import get_concept_library, get_native_concept
 from pipelex.pipe_operators.extract.exceptions import PipeExtractFactoryError
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
@@ -23,8 +23,8 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         pipe_code: str,
         domain_code: str,
         description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeExtractBlueprint,
     ) -> PipeExtract:
         concept_library = get_concept_library()
@@ -33,7 +33,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
 
         # Already validated above that we have exactly one input
         input_name = blueprint.input_names[0]
-        input_requirement = inputs.get_required_input_requirement(input_name)
+        input_requirement = inputs.get_required_stuff_spec(input_name)
 
         if concept_library.is_compatible(
             tested_concept=input_requirement.concept,

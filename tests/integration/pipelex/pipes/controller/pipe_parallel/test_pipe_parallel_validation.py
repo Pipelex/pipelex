@@ -2,7 +2,7 @@ from typing import Callable
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import get_concept_library, get_pipe_library
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
@@ -60,8 +60,8 @@ class TestPipeParallelValidation:
 
         # Verify the real pipe was created successfully
         assert real_pipe.domain == domain
-        assert real_pipe.output.code == concept_3.code
-        assert real_pipe.output.domain == domain
+        assert real_pipe.output.concept.code == concept_3.code
+        assert real_pipe.output.concept.domain == domain
 
         # Create PipeParallel that would reference this pipe
         pipe_parallel_blueprint = PipeParallelBlueprint(
@@ -140,8 +140,8 @@ class TestPipeParallelValidation:
         assert pipe_parallel.domain == domain
         assert len(pipe_parallel.parallel_sub_pipes) == 1
         assert pipe_parallel.inputs.root["input_var"].concept.code == concept_1.code
-        assert pipe_parallel.output.code == concept_3.code
-        assert pipe_parallel.output.domain == domain
+        assert pipe_parallel.output.concept.code == concept_3.code
+        assert pipe_parallel.output.concept.domain == domain
         assert pipe_parallel.add_each_output is True
         assert pipe_parallel.combined_output is None
 
@@ -193,8 +193,8 @@ class TestPipeParallelValidation:
         # Test that needed_inputs method can be called
         needed_inputs = pipe_parallel.needed_inputs()
 
-        # Verify it returns a PipeInput object
-        assert isinstance(needed_inputs, InputRequirements)
+        # Verify it returns a InputStuffSpecs object
+        assert isinstance(needed_inputs, InputStuffSpecs)
         assert hasattr(needed_inputs, "root")
         assert isinstance(needed_inputs.root, dict)
         # With no sub-pipes, should return empty inputs

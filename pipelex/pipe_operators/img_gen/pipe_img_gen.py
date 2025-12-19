@@ -16,7 +16,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
@@ -56,7 +56,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     output_multiplicity: VariableMultiplicity
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
         return self.inputs
 
@@ -81,20 +81,20 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     @override
     def validate_output_with_library(self):
         if not get_concept_library().is_compatible(
-            tested_concept=self.output,
+            tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
             strict=True,
         ):
             msg = (
                 f"The output of a PipeImgGen must be compatible with the Image concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
+                f"In the pipe '{self.code}' the output is '{self.output.concept.concept_string}'"
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain=self.domain,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept_string,
+                provided_concept_code=self.output.concept.concept_string,
                 required_concept_codes=[NativeConceptCode.IMAGE.concept_string],
             )
 
@@ -189,7 +189,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
         # Get the structure class from the registry (might be a subclass of ImageContent)
         structure_class = get_class_registry().get_required_subclass(
-            name=self.output.structure_class_name,
+            name=self.output.concept.structure_class_name,
             base_class=ImageContent,
         )
         base_64_str: str | None
@@ -242,7 +242,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=self.output,
+            concept=self.output.concept,
             content=the_content,
         )
 

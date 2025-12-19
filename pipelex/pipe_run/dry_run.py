@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements, TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -116,7 +116,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
     return results
 
 
-def _convert_to_working_memory_format(needed_inputs_spec: InputRequirements) -> list[TypedNamedInputRequirement]:
+def _convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
     """Convert PipeInput to the format needed by WorkingMemoryFactory.make_for_dry_run.
 
     Args:
@@ -126,44 +126,44 @@ def _convert_to_working_memory_format(needed_inputs_spec: InputRequirements) -> 
         List of tuples (variable_name, concept_code, structure_class)
 
     """
-    needed_inputs_for_factory: list[TypedNamedInputRequirement] = []
+    needed_inputs_for_factory: list[TypedNamedStuffSpec] = []
     class_registry = get_class_registry()
 
     # TODO: fail and raise properly
-    for named_input_requirement in needed_inputs_spec.named_input_requirements:
+    for named_stuff_spec in needed_inputs_spec.named_stuff_specs:
         try:
             # Get the concept and its structure class
-            concept = named_input_requirement.concept
+            concept = named_stuff_spec.concept
             structure_class_name = concept.structure_class_name
 
             # Get the actual class from the registry
             structure_class = class_registry.get_class(name=structure_class_name)
 
             if structure_class and issubclass(structure_class, StuffContent):
-                typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
-                    named=named_input_requirement,
+                typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
+                    named=named_stuff_spec,
                     structure_class=structure_class,
                 )
-                needed_inputs_for_factory.append(typed_named_input_requirement)
+                needed_inputs_for_factory.append(typed_named_stuff_spec)
             else:
                 # Fallback to TextContent if we can't get the proper class
                 log.verbose(
                     f"Could not get structure class '{structure_class_name}' for "
-                    f"concept '{named_input_requirement.concept.code}', falling back to TextContent",
+                    f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
                 )
-                text_typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
-                    named=named_input_requirement,
+                text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
+                    named=named_stuff_spec,
                     structure_class=TextContent,
                 )
-                needed_inputs_for_factory.append(text_typed_named_input_requirement)
+                needed_inputs_for_factory.append(text_typed_named_stuff_spec)
 
         except Exception as exc:
             # Fallback to TextContent for any errors
-            log.warning(f"Error getting structure class for concept '{named_input_requirement.concept.code}': {exc}, falling back to TextContent")
-            text_typed_named_input_requirement = TypedNamedInputRequirement.make_from_named(
-                named=named_input_requirement,
+            log.warning(f"Error getting structure class for concept '{named_stuff_spec.concept.code}': {exc}, falling back to TextContent")
+            text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
+                named=named_stuff_spec,
                 structure_class=TextContent,
             )
-            needed_inputs_for_factory.append(text_typed_named_input_requirement)
+            needed_inputs_for_factory.append(text_typed_named_stuff_spec)
 
     return needed_inputs_for_factory

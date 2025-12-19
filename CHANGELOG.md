@@ -39,6 +39,7 @@
 - Context manager support for the `Pipelex` class (`with Pipelex.make(): ...`) for graceful shutdown
 - Validation for `PipeCompose` output concepts: must be strictly compatible with the Text concept
 - Validation for Pipelex Bundle concept keys: cannot create a native concept
+- Validation for `PipeSequence`: The multiplicity of the output of the sequence must be the same as the multiplicity of the output of the last step.
 
 ### Changed
 
@@ -81,6 +82,7 @@
 ### Refactored
 
 - `ConceptFactory.make_from_blueprint` method now correctly handles native concepts
+- The output (and inputs) of a pipe is now a `StuffSpec` object instead, that holds the concept and the multiplicity.
 
 ## [v0.17.3] - 2025-12-01
 

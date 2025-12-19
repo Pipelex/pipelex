@@ -14,7 +14,7 @@ from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -51,7 +51,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     pdf_stuff_name: str | None = None
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @override
@@ -84,14 +84,14 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
     @override
     def validate_output_with_library(self):
-        if self.output != get_native_concept(native_concept=NativeConceptCode.PAGE):
-            msg = f"PipeExtract output should be a Page concept, but is {self.output.concept_string}"
+        if self.output.concept != get_native_concept(native_concept=NativeConceptCode.PAGE):
+            msg = f"PipeExtract output should be a Page concept, but is {self.output.concept.concept_string}"
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain=self.domain,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept_string,
+                provided_concept_code=self.output.concept.concept_string,
                 required_concept_codes=[NativeConceptCode.PAGE.concept_string],
             )
 
@@ -183,7 +183,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=self.output,
+            concept=self.output.concept,
             content=content,
         )
 
@@ -208,7 +208,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         log.verbose(f"PipeExtract: dry run operator pipe: {self.code}")
         if pipe_run_params.run_mode != PipeRunMode.DRY:
             msg = f"Running pipe '{self.code}' (PipeExtract) _dry_run_operator_pipe() in non-dry mode is not allowed."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         content_generator_dry = ContentGeneratorDry()
         return await self._run_operator_pipe(

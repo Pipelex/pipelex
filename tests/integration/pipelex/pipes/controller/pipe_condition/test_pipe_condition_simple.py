@@ -16,6 +16,7 @@ from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -222,7 +223,7 @@ class TestPipeConditionSimple:
         empty_working_memory = WorkingMemoryFactory.make_empty()
 
         # Run dry run using the real pipe - this should fail with PipeRouterError
-        with pytest.raises(PipeRunInputsError) as exc_info:
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
@@ -235,9 +236,13 @@ class TestPipeConditionSimple:
         # Verify the error details
         error = exc_info.value
         assert error.pipe_code == "basic_condition_by_category_2"
-        assert error.missing_inputs is not None
-        assert "input_data" in error.missing_inputs
         assert "Missing required inputs" in str(error)
+
+        # Check the underlying cause is PipeRunInputsError with missing_inputs details
+        cause = error.__cause__
+        assert isinstance(cause, PipeRunInputsError)
+        assert cause.missing_inputs is not None
+        assert "input_data" in cause.missing_inputs
 
     async def test_condition_dry_run_medium_category_validation(self, load_test_library: Callable[[list[Path]], None]):
         """Test PipeCondition dry run with medium category - should validate the 'medium' branch."""

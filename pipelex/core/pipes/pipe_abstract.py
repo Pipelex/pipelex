@@ -11,9 +11,10 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.exceptions import PipeStackOverflowError
@@ -41,8 +42,8 @@ class PipeAbstract(ABC, BaseModel):
     code: str
     domain: str
     description: str | None = None
-    inputs: InputRequirements = Field(default_factory=InputRequirements)
-    output: Concept
+    inputs: InputStuffSpecs = Field(default_factory=InputStuffSpecs)
+    output: StuffSpec
 
     @property
     def pipe_type(self) -> str:
@@ -55,8 +56,8 @@ class PipeAbstract(ABC, BaseModel):
         unique_concepts: list[Concept] = []
 
         # Add output concept first
-        unique_concepts.append(self.output)
-        seen_concept_strings.add(self.output.concept_string)
+        unique_concepts.append(self.output.concept)
+        seen_concept_strings.add(self.output.concept.concept_string)
 
         # Add input concepts (avoiding duplicates)
         for concept in self.inputs.concepts:
@@ -144,9 +145,9 @@ class PipeAbstract(ABC, BaseModel):
         # Then validate that all inputs are actually needed and match requirements exactly
         the_needed_inputs = self.needed_inputs()
 
-        # Check all required variables are in the inputs and match the required InputRequirement
-        for named_input_requirement in the_needed_inputs.named_input_requirements:
-            var_name = named_input_requirement.variable_name
+        # Check all required variables are in the inputs and match the required StuffSpec
+        for named_stuff_spec in the_needed_inputs.named_stuff_specs:
+            var_name = named_stuff_spec.variable_name
 
             if var_name not in self.inputs.variables:
                 msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
@@ -160,35 +161,35 @@ class PipeAbstract(ABC, BaseModel):
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
             if PipeCategory.is_controller_by_str(self.pipe_category):
-                # Compare the essential parts of InputRequirement (concept code + multiplicity)
-                # Skip validation if the needed requirement is Dynamic or Anything (flexible output types)
-                declared_requirement = self.inputs.root[var_name]
-                needed_requirement = the_needed_inputs.root[named_input_requirement.requirement_expression or var_name]
+                # Compare the essential parts of StuffSpec (concept code + multiplicity)
+                # Skip validation if the needed stuff_spec is Dynamic or Anything (flexible output types)
+                declared_stuff_spec = self.inputs.root[var_name]
+                needed_stuff_spec = the_needed_inputs.root[named_stuff_spec.requirement_expression or var_name]
 
-                # Allow mismatch if the needed requirement is a flexible type (Dynamic or Anything)
+                # Allow mismatch if the needed stuff_spec is a flexible type (Dynamic or Anything)
                 if (
-                    needed_requirement.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
-                    and declared_requirement != needed_requirement
+                    needed_stuff_spec.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
+                    and declared_stuff_spec != needed_stuff_spec
                 ):
                     # Identify the specific mismatched field(s)
                     mismatch_details: list[str] = []
-                    if declared_requirement.concept != needed_requirement.concept:
-                        mismatch_details.append(f"concept: declared='{declared_requirement.concept}' vs required='{needed_requirement.concept}'")
-                    if declared_requirement.multiplicity != needed_requirement.multiplicity:
+                    if declared_stuff_spec.concept != needed_stuff_spec.concept:
+                        mismatch_details.append(f"concept: declared='{declared_stuff_spec.concept}' vs required='{needed_stuff_spec.concept}'")
+                    if declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity:
                         mismatch_details.append(
-                            f"multiplicity: declared='{declared_requirement.multiplicity}' vs required='{needed_requirement.multiplicity}'"
+                            f"multiplicity: declared='{declared_stuff_spec.multiplicity}' vs required='{needed_stuff_spec.multiplicity}'"
                         )
 
                     mismatch_summary = ", ".join(mismatch_details)
                     msg = (
-                        f"In the pipe '{self.code}', the input variable '{var_name}' has a requirement mismatch.\n"
+                        f"In the pipe '{self.code}', the input variable '{var_name}' has a stuff spec mismatch.\n"
                         f"Mismatched field(s): {mismatch_summary}\n"
-                        f"Declared: {declared_requirement}\n"
-                        f"Required: {needed_requirement}"
+                        f"Declared: {declared_stuff_spec}\n"
+                        f"Required: {needed_stuff_spec}"
                     )
                     raise PipeValidationError(
                         message=msg,
-                        error_type=PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH,
+                        error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
                         domain=self.domain,
                         pipe_code=self.code,
                         variable_names=[var_name],
@@ -256,15 +257,15 @@ class PipeAbstract(ABC, BaseModel):
         """
 
     @abstractmethod
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
-        """Return the inputs that are needed for the pipe to run.
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+        """Return the stuff specs that are needed for the pipe to run.
 
         Args:
             visited_pipes: Set of pipe codes currently being processed to prevent infinite recursion.
                           If None, starts recursion detection with an empty set.
 
         Returns:
-            InputRequirements containing all needed inputs for this pipe
+            InputStuffSpecs containing all needed inputs for this pipe
 
         """
 
@@ -287,7 +288,7 @@ class PipeAbstract(ABC, BaseModel):
             case PipeRunMode.DRY:
                 pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
         pipe_code_label = f"[red]{self.code}[/red]"
-        concept_code_label = f"[bold green]{self.output.code}[/bold green]"
+        concept_code_label = f"[bold green]{self.output.concept.code}[/bold green]"
         arrow = "[yellow]→[/yellow]"
         return f"{indent}{pipe_type_label} {pipe_code_label} {arrow} {concept_code_label}"
 
@@ -490,12 +491,15 @@ class PipeAbstract(ABC, BaseModel):
 
         # check we have the required inputs in the working memory
         missing_inputs: dict[str, str] = {}
-        for required_stuff_name, requirement in self.needed_inputs().items:
+        for required_stuff_name, stuff_spec in self.needed_inputs().items:
             if not working_memory.is_stuff_exists(name=required_stuff_name):
-                missing_inputs[required_stuff_name] = requirement.concept.code
+                missing_inputs[required_stuff_name] = stuff_spec.concept.code
         if missing_inputs:
             error = PipeRunInputsError(
-                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}", pipe_code=self.code, missing_inputs=missing_inputs
+                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}",
+                run_mode=pipe_run_params.run_mode,
+                pipe_code=self.code,
+                missing_inputs=missing_inputs,
             )
             raise error
 
