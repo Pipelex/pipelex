@@ -1,6 +1,19 @@
 from importlib.abc import Traversable
 from importlib.resources import files
 
+# Git-ignored config files that should not be synced between .pipelex and kit/configs.
+# These are personal override files that differ per developer/environment:
+# - pipelex_service.toml: Contains terms_accepted (False for new users, True for devs)
+# - pipelex_super.toml: Personal config overrides
+# - telemetry_override.toml: Personal telemetry settings
+GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
+    {
+        "pipelex_service.toml",
+        "pipelex_super.toml",
+        "telemetry_override.toml",
+    }
+)
+
 
 def get_kit_root() -> Traversable:
     """Get the root directory of the kit package.

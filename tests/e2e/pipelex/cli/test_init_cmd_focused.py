@@ -184,7 +184,7 @@ class TestFocusedInitialization:
         # Set initial telemetry to IDENTIFIED
         telemetry_path = env.pipelex_dir / "telemetry.toml"
         toml_doc = load_toml_with_tomlkit(str(telemetry_path))
-        toml_doc["posthog"]["mode"] = "identified"  # type: ignore[index]
+        toml_doc["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
         save_toml_to_path(toml_doc, str(telemetry_path))
 
         # User inputs - confirm reconfigure

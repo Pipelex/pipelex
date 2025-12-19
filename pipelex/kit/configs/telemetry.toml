@@ -21,7 +21,7 @@
 # PostHog Configuration (Event tracking + AI span tracing)
 # ──────────────────────────────────────────────────────────────────────────────
 
-[posthog]
+[custom_posthog]
 mode = "off" # Values: "off" | "anonymous" | "identified"
 # user_id = "your_user_id"                                  # Required when mode = "identified"
 endpoint = "${POSTHOG_ENDPOINT}" # Default: https://us.i.posthog.com (or https://eu.i.posthog.com for EU)
@@ -37,15 +37,23 @@ redact_properties = [
 ] # Event properties to redact
 
 # AI span tracing to YOUR PostHog (does NOT affect Langfuse/OTLP - they receive full data)
-[posthog.tracing]
+[custom_posthog.tracing]
 enabled = false # Send AI spans to your PostHog
 
 # Privacy controls for data sent to YOUR PostHog only
-[posthog.tracing.capture]
+[custom_posthog.tracing.capture]
 content = false # Capture prompt/completion content
 # content_max_length = 1000                                 # Max length for captured content (omit for unlimited)
 pipe_codes = false         # Include pipe codes in span names/attributes
 output_class_names = false # Include output class names in span names/attributes
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Portkey SDK Configuration
+# ──────────────────────────────────────────────────────────────────────────────
+
+[custom_portkey]
+force_debug_enabled = false
+force_tracing_enabled = false
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Langfuse Integration
@@ -73,7 +81,7 @@ enabled = false
 # Controls which integration modes can use custom telemetry settings above.
 # ──────────────────────────────────────────────────────────────────────────────
 
-[custom_telemetry_allowed_modes]
+[telemetry_allowed_modes]
 ci = false     # CI environments don't use custom telemetry
 cli = true     # CLI usage allows custom telemetry
 docker = true  # Docker deployments allow custom telemetry

@@ -63,6 +63,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
         endpoint_path = f"/{self.inference_model.model_id}"
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         try:
+            # TODO: add portkey tracing headers when enabled
             response = await self.portkey_client.with_options(config=config_id).post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)

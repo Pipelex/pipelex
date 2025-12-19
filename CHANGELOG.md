@@ -48,6 +48,14 @@
 - Telemetry system split into two streams:
     1. Pipelex Gateway telemetry for service monitoring (never collects prompts/completions/business data)
     2. Custom telemetry to user-configured backends
+- **Telemetry configuration restructured** in `telemetry.toml`:
+    - Renamed `[posthog]` to `[custom_posthog]` to distinguish user's PostHog from Pipelex Gateway telemetry
+    - Added new `[custom_portkey]` section with `force_debug_enabled` and `force_tracing_enabled` settings (replaces `FORCE_PORTKEY_DEBUG` and `FORCE_PORTKEY_TRACING` environment variables)
+- **Main configuration defaults updated** in `.pipelex/pipelex.toml`:
+    - Most settings now commented out by default (shown as examples rather than active overrides)
+    - `is_generate_cost_report_file_enabled` default changed from `true` to `false`
+    - `pipelex_super.toml` (final override) moved from repo root to `.pipelex/` directory
+    - `telemetry_override.toml` (personal telemetry settings) moved from repo root to `.pipelex/` directory
 - Documentation: clarified **Setup (first run)** vs **Configuration (TOML reference)**, added a Setup overview page, and added contributor docs for configuration defaults/overrides.
 - `pipelex init` now creates a documented `telemetry.toml` template instead of prompting for preferences
 - Model catalog updated with latest models (gpt-5.1, claude-4.5-opus, gemini-3.0-pro, etc.) and updated waterfalls in `base_deck.toml`
@@ -56,10 +64,19 @@
 - CLI commands refactored to use centralized `Pipelex` initialization factory for improved error handling
 - `pipelex doctor` command enhanced to detect outdated `telemetry.toml` formats and suggest fixes
 - The `runner`, `structures`, and `inputs` CLI commands now accept `--output-dir` option (defaults to `target_dir`)
+- Cost report now displays a note clarifying that it only includes LLM costs
 
 ### Deprecated
 
 - `pipelex_inference` backend in favor of `pipelex_gateway` (marked as "🛑 Legacy" in configuration template)
+
+### Migration Notes
+
+- **Telemetry configuration migration**: If you have an existing `telemetry.toml`, rename:
+    - `[posthog]` → `[custom_posthog]`
+    - `[posthog.tracing]` → `[custom_posthog.tracing]`
+    - `[posthog.tracing.capture]` → `[custom_posthog.tracing.capture]`
+    - Or run `pipelex init telemetry --reset` to regenerate the file with the new structure
 
 ### Refactored
 
