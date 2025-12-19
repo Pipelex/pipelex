@@ -24,6 +24,22 @@ class OutputFormat(StrEnum):
     WEBP = "webp"
 
     @property
+    def is_transparent_compatible(self) -> bool:
+        match self:
+            case OutputFormat.PNG:
+                return True
+            case OutputFormat.JPEG | OutputFormat.WEBP:
+                return False
+
+    @property
+    def is_png(self) -> bool:
+        match self:
+            case OutputFormat.PNG:
+                return True
+            case OutputFormat.JPEG | OutputFormat.WEBP:
+                return False
+
+    @property
     def as_file_extension(self) -> str:
         match self:
             case OutputFormat.PNG:
@@ -65,7 +81,7 @@ class ImgGenJobParams(BaseModel):
     is_moderated: bool | None = None
     safety_tolerance: int | None = Field(default=None, ge=1, le=6)
     is_raw: bool | None = None
-    output_format: OutputFormat = Field(strict=False)
+    output_format: OutputFormat | None = Field(default=None, strict=False)
     seed: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
@@ -74,12 +90,13 @@ class ImgGenJobParams(BaseModel):
             case Background.OPAQUE | Background.AUTO:
                 pass
             case Background.TRANSPARENT:
-                match self.output_format:
-                    case OutputFormat.PNG:
-                        pass
-                    case OutputFormat.JPEG | OutputFormat.WEBP:
-                        msg = "ImgGenJobParams cannot have a non-PNG output format when background is transparent."
-                        raise ValueError(msg)
+                if not self.output_format:
+                    msg = "ImgGenJobParams cannot have a transparent background without setting output_format (to PNG)."
+                    raise ValueError(msg)
+
+                if not self.output_format.is_transparent_compatible:
+                    msg = "ImgGenJobParams transparent background requires a transparency-compatible output format (PNG)."
+                    raise ValueError(msg)
         return self
 
 

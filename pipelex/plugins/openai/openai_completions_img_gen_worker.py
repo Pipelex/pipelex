@@ -4,7 +4,7 @@ import openai
 from openai import APIConnectionError, BadRequestError, NotFoundError
 from typing_extensions import override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import ImgGenParameterError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -43,6 +43,9 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
+        if img_gen_job.job_params.output_format and not img_gen_job.job_params.output_format.is_png:
+            msg = f"OpenAI Completions ImgGen worker only supports PNG output format. Output format: {img_gen_job.job_params.output_format}"
+            raise ImgGenParameterError(msg)
         if img_gen_job.job_params.aspect_ratio != AspectRatio.SQUARE:
             msg = f"OpenAI Completions ImgGen worker only supports square images. Aspect ratio: {img_gen_job.job_params.aspect_ratio}"
             raise ImgGenParameterError(msg)
@@ -81,6 +84,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                             url = the_url
                             break
         if not url:
+            pretty_print(openai_message, title="OpenAI response message")
             msg = f"OpenAI response has no image. Model: {self.inference_model.desc}"
             raise LLMCompletionError(msg)
         return GeneratedImageRawDetails(

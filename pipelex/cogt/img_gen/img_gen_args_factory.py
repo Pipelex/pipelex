@@ -82,10 +82,11 @@ class ImgGenArgsFactory:
                     )
                 case ImgGenArgTopic.OUTPUT_FORMAT:
                     output_format_taxonomy = OutputFormatTaxonomy(taxonomy_value)
+                    # TODO: test without imposing the format
                     args_dict.update(
                         cls.make_args_from_output_format(
                             output_format_taxonomy=output_format_taxonomy,
-                            output_format=job_params.output_format,
+                            output_format=job_params.output_format or OutputFormat.PNG,
                         )
                     )
                 case ImgGenArgTopic.SPECIFIC:

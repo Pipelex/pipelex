@@ -207,7 +207,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             image_content_items: list[StuffContent] = []
             for generated_image in generated_image_list:
                 generated_image_url = generated_image.url
-                base_64_str = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
+                base64_extraction = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
+                base_64_str = base64_extraction[0] if base64_extraction else None
                 image_content = image_content_subclass(
                     url=generated_image_url,
                     source_prompt=img_gen_prompt_text,
@@ -230,7 +231,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
 
             generated_image_url = generated_image.url
-            base_64_str = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
+            base64_extraction = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
+            base_64_str = base64_extraction[0] if base64_extraction else None
 
             the_content = image_content_subclass(
                 url=generated_image_url,

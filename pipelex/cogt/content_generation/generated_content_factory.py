@@ -53,6 +53,7 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
         raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
         output_format: OutputFormat | None = None
+        base64_extracted_mime_type: str | None = None
         if raw_details.output_format:
             output_format = OutputFormat(raw_details.output_format)
 
@@ -66,7 +67,8 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
             elif raw_details.actual_url_or_prefixed_base64:
                 if raw_details.actual_url_or_prefixed_base64.startswith("http"):
                     actual_url = raw_details.actual_url_or_prefixed_base64
-                elif base64_str := extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=raw_details.actual_url_or_prefixed_base64):
+                elif result := extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=raw_details.actual_url_or_prefixed_base64):
+                    base64_str, base64_extracted_mime_type = result
                     actual_bytes = base64.b64decode(base64_str)
                 else:
                     msg = "No URL or base64 string found"
@@ -80,7 +82,9 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
             if actual_url:
                 url = actual_url
             elif actual_bytes:
-                filename = self._build_filename_from_hash(data=actual_bytes, mime_type=raw_details.mime_type, output_format=output_format)
+                filename = self._build_filename_from_hash(
+                    data=actual_bytes, mime_type=raw_details.mime_type or base64_extracted_mime_type, output_format=output_format
+                )
                 url = self.storage_provider.store(data=actual_bytes, uri=filename)
             else:
                 msg = "No URL or base64 string found"
@@ -91,6 +95,8 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
         mime_type: str | None = None
         if raw_details.mime_type:
             mime_type = raw_details.mime_type
+        elif base64_extracted_mime_type:
+            mime_type = base64_extracted_mime_type
         elif output_format:
             mime_type = output_format.as_mime_type
         else:
