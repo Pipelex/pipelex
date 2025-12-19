@@ -63,7 +63,7 @@ class LLMPromptBlueprint(BaseModel):
                         accept_list=True,
                     )
                     if isinstance(prompt_image_content, ImageContent):
-                        user_image = PromptImageFactory.make_prompt_image(url=prompt_image_content.url, base_64_str=prompt_image_content.base_64)
+                        user_image = PromptImageFactory.make_prompt_image(url=prompt_image_content.url)
                         prompt_user_images[user_image_name] = user_image
                     elif isinstance(prompt_image_content, list):
                         prompt_image_content = cast("list[ImageContent]", prompt_image_content)
@@ -71,7 +71,7 @@ class LLMPromptBlueprint(BaseModel):
                             if not isinstance(image_item, ImageContent):  # pyright: ignore[reportUnnecessaryIsInstance]
                                 msg = f"Item of '{user_image_name}' is of type '{type(image_item).__name__}', it should be ImageContent"
                                 raise LLMPromptBlueprintValueError(msg)
-                            user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
+                            user_image = PromptImageFactory.make_prompt_image(url=image_item.url)
                             user_image_item_name = f"{user_image_name}[{image_index}]"
                             prompt_user_images[user_image_item_name] = user_image
                     else:
@@ -88,7 +88,7 @@ class LLMPromptBlueprint(BaseModel):
                         if isinstance(image_collection, (list, tuple)):
                             image_collection = cast("list[ImageContent] | tuple[ImageContent]", image_collection)
                             for image_index, image_item in enumerate(image_collection, start=1):
-                                user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
+                                user_image = PromptImageFactory.make_prompt_image(url=image_item.url)
                                 user_image_item_name = f"{user_image_name}[{image_index}]"
                                 prompt_user_images[user_image_item_name] = user_image
                         else:

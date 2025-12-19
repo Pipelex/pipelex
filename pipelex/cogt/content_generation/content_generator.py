@@ -21,7 +21,7 @@ from pipelex.cogt.content_generation.templating_generate import templating_gen_t
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
-from pipelex.cogt.image.generated_image import GeneratedImageResolved
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -199,6 +199,13 @@ class ContentGenerator(ContentGeneratorProtocol):
         return cast("list[BaseModelTypeVar]", obj_list)
 
     @override
+    async def make_generated_image(
+        self,
+        generated_image_raw_details: GeneratedImageRawDetails,
+    ) -> GeneratedImageResolved:
+        return self._generated_content_factory.make_generated_image(raw_details=generated_image_raw_details)
+
+    @override
     @update_job_metadata
     async def make_single_image(
         self,
@@ -219,7 +226,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         generated_image_raw_details = await img_gen_single_image(img_gen_assignment=img_gen_assignment)
         log.verbose(f"{self.__class__.__name__} generated image raw details: {generated_image_raw_details}")
-        return self._generated_content_factory.make_generated_image(raw_details=generated_image_raw_details)
+        return await self.make_generated_image(generated_image_raw_details=generated_image_raw_details)
 
     @override
     @update_job_metadata
@@ -243,10 +250,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         generated_images_as_raw_details = await img_gen_image_list(img_gen_assignment=img_gen_assignment)
         log.verbose(f"{self.__class__.__name__} generated image list: {generated_images_as_raw_details}")
-        return [
-            self._generated_content_factory.make_generated_image(raw_details=generated_image_raw_details)
-            for generated_image_raw_details in generated_images_as_raw_details
-        ]
+        return [await self.make_generated_image(generated_image_raw_details=raw_details) for raw_details in generated_images_as_raw_details]
 
     @override
     async def make_templated_text(

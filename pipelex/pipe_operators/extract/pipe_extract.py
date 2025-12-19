@@ -1,3 +1,4 @@
+from io import BytesIO
 from typing import Literal
 
 from pydantic import model_validator
@@ -10,6 +11,7 @@ from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -160,7 +162,18 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
                 if needs_to_generate_page_views:
                     page_views = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.page_views_dpi)
-                    page_view_contents = [ImageContent.make_from_image(image=img) for img in page_views]
+                    for page_view in page_views:
+                        page_view_binary = BytesIO()
+                        page_view.save(page_view_binary, format="PNG")
+                        raw_details = GeneratedImageRawDetails(
+                            actual_bytes=page_view_binary.getvalue(),
+                            width=page_view.width,
+                            height=page_view.height,
+                            output_format="png",
+                        )
+                        generated_image = await content_generator.make_generated_image(generated_image_raw_details=raw_details)
+                        image_content = ImageContent(url=generated_image.url)
+                        page_view_contents.append(image_content)
             elif image_uri:
                 page_view_contents = [ImageContent(url=image_uri)]
 
@@ -168,14 +181,14 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         for page_index, page in extract_output.pages.items():
             images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
             log.verbose(f"images: {images}, page_view_contents: {page_view_contents}, index: {page_index}")
-            page_view = page_view_contents[page_index - 1] if self.should_include_page_views else None
+            page_view_content = page_view_contents[page_index - 1] if self.should_include_page_views else None
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(
                         text=TextContent(text=page.text) if page.text else None,
                         images=images,
                     ),
-                    page_view=page_view,
+                    page_view=page_view_content,
                 ),
             )
 

@@ -178,7 +178,6 @@ background = "auto"
 is_moderated = true
 safety_tolerance = 5
 is_raw = false
-output_format = "jpeg"
 seed = "auto"
 
 [cogt.img_gen_config.fal_config]

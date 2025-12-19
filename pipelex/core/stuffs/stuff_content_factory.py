@@ -39,5 +39,5 @@ class StuffContentFactory:
         return cls.make_content_from_value(stuff_content_subclass=the_structure_class, value=value)
 
     @classmethod
-    def make_image_content(cls, url: str, source_prompt: str | None = None, caption: str | None = None, base_64: str | None = None) -> ImageContent:
-        return ImageContent(url=url, source_prompt=source_prompt, caption=caption, base_64=base_64)
+    def make_image_content(cls, url: str, source_prompt: str | None = None, caption: str | None = None) -> ImageContent:
+        return ImageContent(url=url, source_prompt=source_prompt, caption=caption)

@@ -117,7 +117,6 @@ class ImgGenJobParamsDefaults(ConfigModel):
     is_moderated: bool | None = None
     safety_tolerance: int = Field(..., ge=1, le=6)
     is_raw: bool | None = None
-    output_format: OutputFormat = Field(strict=False)
     seed: int | Literal["auto"]
 
     def make_img_gen_job_params(self) -> ImgGenJobParams:
@@ -135,7 +134,7 @@ class ImgGenJobParamsDefaults(ConfigModel):
             is_moderated=self.is_moderated,
             safety_tolerance=self.safety_tolerance,
             is_raw=self.is_raw,
-            output_format=self.output_format,
+            output_format=None,
             seed=seed,
         )
 

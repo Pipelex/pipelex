@@ -31,7 +31,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.misc.base_64_utils import extract_base_64_str_from_base64_url_if_possible
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 
 if TYPE_CHECKING:
@@ -165,7 +164,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             is_moderated=img_gen_setting.is_moderated,
             safety_tolerance=img_gen_setting.safety_tolerance,
             is_raw=self.is_raw if self.is_raw is not None else img_gen_param_defaults.is_raw,
-            output_format=self.output_format or img_gen_param_defaults.output_format,
+            output_format=self.output_format,
             seed=seed,
         )
         # Get the image generation handle
@@ -192,7 +191,6 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             name=self.output.concept.structure_class_name,
             base_class=ImageContent,
         )
-        base_64_str: str | None
         if nb_images > 1:
             generated_image_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
@@ -206,13 +204,9 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
             image_content_items: list[StuffContent] = []
             for generated_image in generated_image_list:
-                generated_image_url = generated_image.url
-                base64_extraction = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
-                base_64_str = base64_extraction[0] if base64_extraction else None
                 image_content = image_content_subclass(
-                    url=generated_image_url,
+                    url=generated_image.url,
                     source_prompt=img_gen_prompt_text,
-                    base_64=base_64_str,
                 )
                 image_content_items.append(image_content)
             the_content = ListContent(
@@ -230,14 +224,9 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 img_gen_job_config=img_gen_config.img_gen_job_config,
             )
 
-            generated_image_url = generated_image.url
-            base64_extraction = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
-            base_64_str = base64_extraction[0] if base64_extraction else None
-
             the_content = image_content_subclass(
-                url=generated_image_url,
+                url=generated_image.url,
                 source_prompt=img_gen_prompt_text,
-                base_64=base_64_str,
             )
             log.verbose(the_content, title="Single image content")
 

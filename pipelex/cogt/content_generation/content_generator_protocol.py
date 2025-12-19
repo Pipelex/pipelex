@@ -5,7 +5,7 @@ from typing import Any, ParamSpec, Protocol, TypeVar
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
-from pipelex.cogt.image.generated_image import GeneratedImageResolved
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -89,6 +89,11 @@ class ContentGeneratorProtocol(Protocol):
         llm_prompt_factory_for_object_list: LLMPromptFactoryAbstract | None = None,
         nb_items: int | None = None,
     ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
+
+    async def make_generated_image(
+        self,
+        generated_image_raw_details: GeneratedImageRawDetails,
+    ) -> GeneratedImageResolved: ...
 
     def make_single_image(
         self,
