@@ -73,7 +73,6 @@ class RemoteConfigFetcher:
         url = PipelexDetails.REMOTE_CONFIG_URL
 
         try:
-            print("Fetching remote configuration")
             response = cls._fetch_remote_config_with_retry(url)
         except httpx.TimeoutException as exc:
             msg = f"Timeout while fetching remote configuration from {url}: {exc}"
