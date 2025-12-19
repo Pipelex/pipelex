@@ -105,7 +105,7 @@ class TestPipeSequenceDryRun:
             assert isinstance(channel_summaries_stuff, Stuff), "ChannelSurrmary Stuff is not a Stuff"
 
             # Verify channel_summaries is also a ListContent with multiple ChannelSummary items
-            channel_summaries_list: ListContent[ChannelSummary] = channel_summaries_stuff.as_list_of_fixed_content_type(item_type=ChannelSummary)
+            channel_summaries_list = channel_summaries_stuff.as_list_of_fixed_content_type(item_type=ChannelSummary)
 
             pretty_print(channel_summaries_stuff, "jiodisjdqosj")
             pretty_print(channel_summaries_list, title="Channel Summaries List")
