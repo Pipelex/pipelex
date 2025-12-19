@@ -16,6 +16,6 @@ class GeneratedImageRawDetails(CustomBaseModel):
 
 class GeneratedImageResolved(CustomBaseModel):
     url: str
-    mime_type: str | None = None
+    mime_type: str
     width: int
     height: int

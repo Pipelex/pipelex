@@ -154,8 +154,9 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         return self._generated_content_factory.make_generated_image(
             raw_details=GeneratedImageRawDetails(
                 actual_url=image_url,
-                width=1536,
-                height=2752,
+                width=1024,
+                height=1024,
+                mime_type="image/jpeg",
             ),
         )
 
@@ -177,8 +178,9 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             self._generated_content_factory.make_generated_image(
                 raw_details=GeneratedImageRawDetails(
                     actual_url=image_urls[image_index % len(image_urls)],
-                    width=1536,
-                    height=2752,
+                    width=1024,
+                    height=1024,
+                    mime_type="image/jpeg",
                 ),
             )
             for image_index in range(nb_images)
