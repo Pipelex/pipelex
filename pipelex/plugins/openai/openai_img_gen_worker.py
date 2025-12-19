@@ -67,6 +67,9 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             raise ImgGenGenerationError(msg)
 
         response_output_format: str | None = images_response.output_format
+        if response_output_format is None:
+            msg = "No output format received from OpenAI"
+            raise ImgGenGenerationError(msg)
         size: str | None = images_response.size
         if not size:
             msg = "No size received from OpenAI"

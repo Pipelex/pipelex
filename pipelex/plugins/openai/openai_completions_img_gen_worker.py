@@ -92,7 +92,15 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         base64_str: str | None = None
         base64_extracted_mime_type: str | None = None
         if (content := openai_message.content) and content.startswith("http"):
-            log.debug("OpenAI response message is a URL:")
+            # OpenAI response message is a URL, this happens with blackboxai and pipelex_gateway which have a fixed output format.
+            # Otherwise we won't know what format the image is in.
+            if output_format is None:
+                msg = (
+                    f"OpenAI response message is a URL but output_format is not set. This shouldn't be possible. "
+                    f"This response should only happen when using backend 'blackboxai' or 'pipelex_gateway'. "
+                    f"Backend is: '{self.inference_model.backend_name}'"
+                )
+                raise ImgGenParameterError(msg)
             actual_url = openai_message.content
         elif hasattr(openai_message, "content_blocks"):
             content_blocks = cast("list[dict[str, Any]]", openai_message.content_blocks)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
