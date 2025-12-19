@@ -1,3 +1,12 @@
+"""Factory for building image generation API arguments from model rules.
+
+This module translates high-level image generation parameters into provider-specific
+API arguments using the taxonomy system defined in `img_gen_model_rules`.
+
+The factory uses the model's rules (a mapping of topics to taxonomies) to determine
+how each parameter should be formatted for the specific provider's API.
+"""
+
 from typing import Any
 
 from pipelex import log
@@ -20,6 +29,12 @@ from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 
 
 class ImgGenArgsFactory:
+    """Factory that builds provider-specific API arguments from model rules and job parameters.
+
+    This factory iterates over the model's rules (topic -> taxonomy mappings) and uses
+    the appropriate taxonomy handler to generate the correct API arguments for each topic.
+    """
+
     @classmethod
     def make_args_for_model(
         cls,
@@ -27,6 +42,19 @@ class ImgGenArgsFactory:
         img_gen_job: ImgGenJob,
         nb_images: int,
     ) -> dict[str, Any]:
+        """Build provider-specific API arguments from model rules and job parameters.
+
+        Iterates over each topic in the model's rules and applies the corresponding
+        taxonomy handler to generate the correct API arguments.
+
+        Args:
+            model_rules: Mapping of argument topics to their taxonomy values for the target model
+            img_gen_job: The image generation job containing prompt and parameters
+            nb_images: Number of images to generate
+
+        Returns:
+            Dictionary of API arguments ready to be passed to the provider's API
+        """
         job_params = img_gen_job.job_params
 
         # Common args that don't need rules
@@ -101,6 +129,7 @@ class ImgGenArgsFactory:
 
     @classmethod
     def make_args_from_num_images(cls, num_images_taxonomy: NumImagesTaxonomy, nb_images: int) -> dict[str, Any]:
+        """Map number of images to provider-specific parameter name."""
         match num_images_taxonomy:
             case NumImagesTaxonomy.FAL:
                 return {"num_images": nb_images}
@@ -109,18 +138,25 @@ class ImgGenArgsFactory:
 
     @classmethod
     def make_args_from_specific(cls, specific_taxonomy: SpecificTaxonomy) -> dict[str, Any]:
+        """Generate provider-specific parameters not covered by other taxonomies."""
         match specific_taxonomy:
             case SpecificTaxonomy.FAL:
                 return {"sync_mode": False}
 
     @classmethod
     def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background) -> dict[str, Any]:
+        """Map background setting to provider-specific parameter."""
         match background_taxonomy:
             case BackgroundTaxonomy.GPT:
                 return {"background": background.value}
 
     @classmethod
     def make_args_from_aspect_ratio(cls, aspect_ratio_taxonomy: AspectRatioTaxonomy, aspect_ratio: AspectRatio) -> dict[str, Any]:
+        """Map aspect ratio to provider-specific parameter name and value format.
+
+        Raises:
+            ImgGenParameterError: If the aspect ratio is not supported by the target model
+        """
         key: str
         value: Any
         match aspect_ratio_taxonomy:
@@ -178,6 +214,11 @@ class ImgGenArgsFactory:
         guidance_scale: float | None,
         is_raw: bool | None,
     ) -> dict[str, Any]:
+        """Map inference parameters (steps, quality, guidance) to provider-specific format.
+
+        If num_inference_steps is not provided, it will be derived from the quality setting
+        using the configured quality-to-steps mapping for the specific model.
+        """
         args_dict: dict[str, Any] = {}
         match inference_taxonomy:
             case InferenceTaxonomy.SDXL_LIGHTNING:
@@ -216,6 +257,11 @@ class ImgGenArgsFactory:
         is_moderated: bool | None,
         safety_tolerance: int | None,
     ) -> dict[str, Any]:
+        """Map safety checker settings to provider-specific parameters.
+
+        Only generates arguments if the model supports safety checker configuration
+        (taxonomy is AVAILABLE) and the corresponding parameters are provided.
+        """
         args_dict: dict[str, Any] = {}
         match safety_checker_taxonomy:
             case SafetyCheckerTaxonomy.UNAVAILABLE:
@@ -233,6 +279,11 @@ class ImgGenArgsFactory:
         output_format_taxonomy: OutputFormatTaxonomy,
         output_format: OutputFormat,
     ) -> dict[str, Any]:
+        """Map output format to provider-specific parameter name and validate support.
+
+        Raises:
+            ImgGenParameterError: If the output format is not supported by the target model
+        """
         key: str
         value: str
         match output_format_taxonomy:
