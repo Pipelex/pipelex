@@ -4,17 +4,14 @@ from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFou
 from kajson.kajson_manager import KajsonManager
 from typing_extensions import runtime_checkable
 
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_string_or_code
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.exceptions import PipeFactoryError, PipeFactoryErrorType, PipeVariableMultiplicityError
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.exceptions import PipeFactoryError, PipeFactoryErrorType
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeType
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.hub import get_required_concept
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory, StuffSpecFactoryError
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -33,8 +30,8 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
         pipe_code: str,
         domain_code: str,
         description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeBlueprintType,
     ) -> PipeAbstractType: ...
 
@@ -92,8 +89,12 @@ class PipeFactory(Generic[PipeAbstractType]):
                 )
 
         # Parse common attributes
-        parsed_output = cls._parse_output_concept_string(domain=domain_code, pipe_code=pipe_code, output_string=blueprint.output)
-        parsed_inputs = InputRequirementsFactory.make_from_blueprint(
+        try:
+            parsed_output = StuffSpecFactory.make_from_blueprint(domain=domain_code, output_string=blueprint.output)
+        except StuffSpecFactoryError as exc:
+            msg = f"Error parsing output string '{blueprint.output}': {exc}"
+            raise PipeFactoryError(msg) from exc
+        parsed_inputs = InputStuffSpecsFactory.make_from_blueprint(
             domain=domain_code,
             blueprint=blueprint.inputs or {},
         )
@@ -126,35 +127,3 @@ class PipeFactory(Generic[PipeAbstractType]):
             blueprint=blueprint,
         )
         return pipe
-
-    @classmethod
-    def _parse_output_concept_string(
-        cls,
-        domain: str,
-        pipe_code: str,
-        output_string: str,
-    ) -> Concept:
-        """Parse the output concept string and return the Concept object."""
-        # Parse output to strip multiplicity brackets
-        try:
-            output_parse_result = parse_concept_with_multiplicity(output_string)
-        except PipeVariableMultiplicityError as exc:
-            msg = f"Error parsing concept with multiplicity for pipe '{pipe_code}': {exc}"
-            raise PipeFactoryError(msg) from exc
-
-        # Get output concept
-        try:
-            output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                domain=domain,
-                concept_string_or_code=output_parse_result.concept,
-            )
-        except ConceptFactoryError as exc:
-            msg = f"Error making domain and concept code for pipe '{pipe_code}': {exc}"
-            raise PipeFactoryError(msg) from exc
-
-        return get_required_concept(
-            concept_string=ConceptFactory.make_concept_string_with_domain(
-                domain=output_domain_and_code.domain,
-                concept_code=output_domain_and_code.concept_code,
-            ),
-        )

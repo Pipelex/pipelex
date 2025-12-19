@@ -76,7 +76,8 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
         MultiplicityParseResult with concept (without brackets) and multiplicity value
 
     Raises:
-        ValueError: If the concept specification has invalid syntax
+        PipeVariableMultiplicityError: If the concept specification has invalid syntax
+            or if multiplicity is zero or negative (a pipe must produce at least one output)
     """
     # Use strict pattern to validate identifier syntax
     # Concept must start with letter/underscore, optional domain prefix, optional brackets
@@ -105,6 +106,9 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
     else:
         # Number in brackets [N] - fixed count
         multiplicity = int(bracket_content)
+        if multiplicity <= 0:
+            msg = f"Invalid multiplicity value in '{concept_spec}': multiplicity must be at least 1. A pipe must produce at least one output."
+            raise PipeVariableMultiplicityError(msg)
 
     return MultiplicityParseResult(concept=concept, multiplicity=multiplicity)
 

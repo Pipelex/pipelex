@@ -51,7 +51,7 @@ class TestBracketNotationInControllers:
         )
 
         assert pipe.inputs.root["data"].multiplicity == 2
-        assert pipe.output.code == "ProcessedData"
+        assert pipe.output.concept.code == "ProcessedData"
 
         concept_library.teardown()
 
@@ -90,7 +90,7 @@ class TestBracketNotationInControllers:
         )
 
         assert pipe.inputs.root["items"].multiplicity is True
-        assert pipe.output.code == "Result"
+        assert pipe.output.concept.code == "Result"
 
         concept_library.teardown()
 
@@ -129,6 +129,6 @@ class TestBracketNotationInControllers:
         )
 
         assert pipe.inputs.root["items"].multiplicity is True
-        assert pipe.output.code == "ProcessedItem"
+        assert pipe.output.concept.code == "ProcessedItem"
 
         concept_library.teardown()

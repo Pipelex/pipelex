@@ -45,7 +45,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                         output_name=output_name,
                     )
                     main_stuff = pipe_output.main_stuff
-                    output_concept_code = self.output.code
+                    output_concept_code = self.output.concept.code
                     output_concept_with_multiplicity = f"[bold green]{output_concept_code}[/bold green]"
                     if main_stuff.is_list:
                         list_content: ListContent[StuffContent] = main_stuff.as_list_content()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]

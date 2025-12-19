@@ -11,7 +11,8 @@ from pipelex.builder.runner_code import generate_runner_code
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.inputs.input_requirements import InputRequirement, InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 
 
 class TestConceptGenerateInputRepresentationJson:
@@ -97,19 +98,19 @@ class TestConceptGenerateInputRepresentationPython:
         assert "PDFContent" in imports
 
 
-class TestInputRequirementsGenerateJsonRepresentation:
-    """Test InputRequirements.generate_json_representation method."""
+class TestInputStuffSpecsGenerateJsonRepresentation:
+    """Test InputStuffSpecs.generate_json_representation method."""
 
     def test_empty_inputs(self) -> None:
         """Test JSON generation with no inputs."""
-        inputs = InputRequirements(root={})
+        inputs = InputStuffSpecs(root={})
         result = inputs.generate_json_representation()
         assert result == {}
 
     def test_single_input(self) -> None:
         """Test JSON generation with a single input."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
-        inputs = InputRequirements(root={"message": InputRequirement(concept=concept)})
+        inputs = InputStuffSpecs(root={"message": StuffSpec(concept=concept)})
         result = inputs.generate_json_representation()
         assert "message" in result
         assert result["message"]["concept"] == "native.Text"
@@ -118,10 +119,10 @@ class TestInputRequirementsGenerateJsonRepresentation:
         """Test JSON generation with multiple inputs."""
         text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
         image_concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
-        inputs = InputRequirements(
+        inputs = InputStuffSpecs(
             root={
-                "text_input": InputRequirement(concept=text_concept),
-                "image_input": InputRequirement(concept=image_concept),
+                "text_input": StuffSpec(concept=text_concept),
+                "image_input": StuffSpec(concept=image_concept),
             }
         )
         result = inputs.generate_json_representation()
@@ -131,13 +132,13 @@ class TestInputRequirementsGenerateJsonRepresentation:
         assert result["image_input"]["concept"] == "native.Image"
 
 
-class TestInputRequirementsJsonWithMultiplicity:
-    """Test InputRequirements.generate_json_representation with multiplicity - content is wrapped in list."""
+class TestInputStuffSpecsJsonWithMultiplicity:
+    """Test InputStuffSpecs.generate_json_representation with multiplicity - content is wrapped in list."""
 
     def test_single_item_no_multiplicity(self) -> None:
         """Test that single item (no multiplicity) has content as dict, not list."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
-        inputs = InputRequirements(root={"document": InputRequirement(concept=concept, multiplicity=None)})
+        inputs = InputStuffSpecs(root={"document": StuffSpec(concept=concept, multiplicity=None)})
         result = inputs.generate_json_representation()
         assert "document" in result
         # concept should be present
@@ -150,7 +151,7 @@ class TestInputRequirementsJsonWithMultiplicity:
     def test_multiple_items_true_multiplicity(self) -> None:
         """Test that multiplicity=True wraps content in list."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
-        inputs = InputRequirements(root={"documents": InputRequirement(concept=concept, multiplicity=True)})
+        inputs = InputStuffSpecs(root={"documents": StuffSpec(concept=concept, multiplicity=True)})
         result = inputs.generate_json_representation()
         assert "documents" in result
         # concept should be at the top level
@@ -164,7 +165,7 @@ class TestInputRequirementsJsonWithMultiplicity:
     def test_multiple_items_int_multiplicity(self) -> None:
         """Test that multiplicity=N (int > 1) wraps content in list."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
-        inputs = InputRequirements(root={"images": InputRequirement(concept=concept, multiplicity=3)})
+        inputs = InputStuffSpecs(root={"images": StuffSpec(concept=concept, multiplicity=3)})
         result = inputs.generate_json_representation()
         assert "images" in result
         # concept should be at the top level
@@ -178,10 +179,10 @@ class TestInputRequirementsJsonWithMultiplicity:
     def test_mixed_multiplicity(self) -> None:
         """Test mixed single and multiple inputs."""
         pdf_concept = ConceptFactory.make_native_concept(NativeConceptCode.PDF)
-        inputs = InputRequirements(
+        inputs = InputStuffSpecs(
             root={
-                "single_pdf": InputRequirement(concept=pdf_concept, multiplicity=None),
-                "multiple_pdfs": InputRequirement(concept=pdf_concept, multiplicity=True),
+                "single_pdf": StuffSpec(concept=pdf_concept, multiplicity=None),
+                "multiple_pdfs": StuffSpec(concept=pdf_concept, multiplicity=True),
             }
         )
         result = inputs.generate_json_representation()
@@ -202,8 +203,8 @@ class TestGenerateRunnerCode:
 
         mock_pipe = MagicMock()
         mock_pipe.code = "test_pipe"
-        mock_pipe.output = text_concept
-        mock_pipe.inputs = InputRequirements(root={"document": InputRequirement(concept=pdf_concept)})
+        mock_pipe.output = StuffSpec(concept=text_concept)
+        mock_pipe.inputs = InputStuffSpecs(root={"document": StuffSpec(concept=pdf_concept)})
         return mock_pipe
 
     @pytest.fixture
@@ -214,8 +215,8 @@ class TestGenerateRunnerCode:
 
         mock_pipe = MagicMock()
         mock_pipe.code = "test_pipe_list"
-        mock_pipe.output = text_concept
-        mock_pipe.inputs = InputRequirements(root={"documents": InputRequirement(concept=pdf_concept, multiplicity=True)})
+        mock_pipe.output = StuffSpec(concept=text_concept)
+        mock_pipe.inputs = InputStuffSpecs(root={"documents": StuffSpec(concept=pdf_concept, multiplicity=True)})
         return mock_pipe
 
     def test_runner_code_includes_imports(self, mock_pipe_single_output: MagicMock) -> None:
@@ -276,8 +277,8 @@ class TestGenerateRunnerCode:
 
         mock_pipe = MagicMock()
         mock_pipe.code = "custom_pipe"
-        mock_pipe.output = custom_concept
-        mock_pipe.inputs = InputRequirements(root={"document": InputRequirement(concept=pdf_concept)})
+        mock_pipe.output = StuffSpec(concept=custom_concept)
+        mock_pipe.inputs = InputStuffSpecs(root={"document": StuffSpec(concept=pdf_concept)})
 
         runner_code = generate_runner_code(mock_pipe)
         # Custom imports should NOT use relative import (no leading dot) for standalone scripts

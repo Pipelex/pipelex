@@ -74,3 +74,19 @@ class TestParseConceptWithMultiplicity:
         result = parse_concept_with_multiplicity("_internal.Data[]")
         assert result.concept == "_internal.Data"
         assert result.multiplicity is True
+
+    def test_invalid_zero_multiplicity(self):
+        """Test that zero multiplicity is rejected since a pipe must produce at least one output."""
+        with pytest.raises(ValueError, match="multiplicity must be at least 1"):
+            parse_concept_with_multiplicity("Text[0]")
+
+        with pytest.raises(ValueError, match="multiplicity must be at least 1"):
+            parse_concept_with_multiplicity("domain.Concept[0]")
+
+    def test_invalid_negative_multiplicity(self):
+        """Test that negative multiplicity is rejected (fails regex pattern)."""
+        with pytest.raises(ValueError, match="Invalid concept specification syntax"):
+            parse_concept_with_multiplicity("Text[-1]")
+
+        with pytest.raises(ValueError, match="Invalid concept specification syntax"):
+            parse_concept_with_multiplicity("domain.Concept[-5]")
