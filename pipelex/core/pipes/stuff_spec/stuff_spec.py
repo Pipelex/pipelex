@@ -6,7 +6,6 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
 class StuffSpec(BaseModel):
     concept: Concept
-    # TODO: Why None here ? Why not just false ?
     multiplicity: VariableMultiplicity | None = None
 
     def is_multiple(self) -> bool:
