@@ -13,13 +13,13 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False, key:
         the_dict = cast("dict[str, Any]", data)
         # Treat keys as headings and values as their content
         dict_result_lines: list[str] = []
-        for _key, _value in the_dict.items():
+        for dict_key, dict_value in the_dict.items():
             heading_prefix = "#" * min(level, 6)  # Limit heading levels to 6
             # Use the key as a heading
-            converted_line = f"{heading_prefix} {snake_to_capitalize_first_letter(_key)}" if is_pretty else f"{heading_prefix} {_key}"
+            converted_line = f"{heading_prefix} {snake_to_capitalize_first_letter(dict_key)}" if is_pretty else f"{heading_prefix} {dict_key}"
             # Convert the value recursively, increasing the heading level
             # dict_result_lines.append(convert_to_markdown(data=value, level=level + 1))
-            converted_value = convert_to_markdown(data=_value, level=level + 1, key=_key)
+            converted_value = convert_to_markdown(data=dict_value, level=level + 1, key=dict_key)
             converted_value_nb_lines = len(converted_value.split("\n"))
             if converted_value_nb_lines > 1:
                 dict_result_lines.append(converted_line)

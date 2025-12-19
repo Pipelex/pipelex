@@ -203,7 +203,7 @@ class TestGenerateRunnerCode:
 
         mock_pipe = MagicMock()
         mock_pipe.code = "test_pipe"
-        mock_pipe.output = text_concept
+        mock_pipe.output = StuffSpec(concept=text_concept)
         mock_pipe.inputs = InputStuffSpecs(root={"document": StuffSpec(concept=pdf_concept)})
         return mock_pipe
 
@@ -215,7 +215,7 @@ class TestGenerateRunnerCode:
 
         mock_pipe = MagicMock()
         mock_pipe.code = "test_pipe_list"
-        mock_pipe.output = text_concept
+        mock_pipe.output = StuffSpec(concept=text_concept)
         mock_pipe.inputs = InputStuffSpecs(root={"documents": StuffSpec(concept=pdf_concept, multiplicity=True)})
         return mock_pipe
 
@@ -277,7 +277,7 @@ class TestGenerateRunnerCode:
 
         mock_pipe = MagicMock()
         mock_pipe.code = "custom_pipe"
-        mock_pipe.output = custom_concept
+        mock_pipe.output = StuffSpec(concept=custom_concept)
         mock_pipe.inputs = InputStuffSpecs(root={"document": StuffSpec(concept=pdf_concept)})
 
         runner_code = generate_runner_code(mock_pipe)
