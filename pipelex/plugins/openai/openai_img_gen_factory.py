@@ -34,8 +34,10 @@ class OpenAIImgGenFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def output_format_for_gpt_image_1(cls, output_format: OutputFormat) -> GptImage1OutputFormatType:
+    def output_format_for_gpt_image_1(cls, output_format: OutputFormat | None) -> GptImage1OutputFormatType | None:
         """This method only converts the OutputFormat StrEnum value to a Literal, as expected by the OpenAI API"""
+        if output_format is None:
+            return None
         match output_format:
             case OutputFormat.PNG:
                 return "png"
