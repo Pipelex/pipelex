@@ -34,30 +34,30 @@ STABLE_DIFFUSION_IMG_GEN_MODELS = [
 
 # --- FAL Models ---------------------------------------------------------------------------------
 FAL_IMG_GEN_MODELS = [
-    # "flux-pro",
-    # "flux-pro/v1.1",
+    "flux-pro",
+    "flux-pro/v1.1",
     "flux-pro/v1.1-ultra",
     "flux-2",
 ]
 
 # --- OpenAI Models ------------------------------------------------------------------------------
 OPENAI_IMG_GEN_MODELS = [
-    # "gpt-image-1",
+    "gpt-image-1",
     "gpt-image-1-mini",
-    # "gpt-image-1.5",
+    "gpt-image-1.5",
 ]
 
 # --- Google Models --------------------------------------------------------------------------
 GOOGLE_IMG_GEN_MODELS = [
     "nano-banana",
-    # "nano-banana-pro",
+    "nano-banana-pro",
 ]
 
 # --- All Image Generation Handles ---------------------------------------------------------------
 ALL_IMG_GEN_HANDLES = [
-    # *STABLE_DIFFUSION_IMG_GEN_MODELS,
-    # *FAL_IMG_GEN_MODELS,
-    # *OPENAI_IMG_GEN_MODELS,
+    *STABLE_DIFFUSION_IMG_GEN_MODELS,
+    *FAL_IMG_GEN_MODELS,
+    *OPENAI_IMG_GEN_MODELS,
     *GOOGLE_IMG_GEN_MODELS,
 ]
 
@@ -87,16 +87,16 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
             is_raw=None,
             output_format=OutputFormat.PNG,
         ),
-        # ImgGenJobParams(
-        #     aspect_ratio=AspectRatio.SQUARE,
-        #     background=Background.OPAQUE,
-        #     quality=Quality.LOW,
-        #     guidance_scale=3.5,
-        #     is_moderated=None,
-        #     safety_tolerance=1,
-        #     is_raw=None,
-        #     output_format=OutputFormat.JPEG,
-        # ),
+        ImgGenJobParams(
+            aspect_ratio=AspectRatio.SQUARE,
+            background=Background.OPAQUE,
+            quality=Quality.LOW,
+            guidance_scale=3.5,
+            is_moderated=None,
+            safety_tolerance=1,
+            is_raw=None,
+            output_format=OutputFormat.JPEG,
+        ),
     ],
 )
 def img_gen_job_params(request: pytest.FixtureRequest) -> ImgGenJobParams:

@@ -107,6 +107,10 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             config=generation_config,
         )
 
+        usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None = response.usage_metadata
+        if not usage_metadata:
+            log.warning("No usage metadata returned from Google")
+
         # Extract image from response
         if not response.candidates:
             msg = f"No candidates returned from model: {self.inference_model.desc}"
@@ -123,13 +127,15 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 image_bytes = part.inline_data.data
                 if image_bytes is None:
                     continue
-                # Convert bytes to base64 data URL
-                # base64_str = base64.b64encode(image_bytes).decode("utf-8")
-                # base64_url = prefixed_base64_str_from_base64_str(base64_str)
+                mime_type = part.inline_data.mime_type
+                if not mime_type:
+                    msg = "No mime type returned from Google"
+                    raise ImgGenGenerationError(msg)
                 return GeneratedImageRawDetails(
                     actual_bytes=image_bytes,
                     width=width,
                     height=height,
+                    mime_type=mime_type,
                 )
 
         msg = f"No image data in response from model: {self.inference_model.desc}"

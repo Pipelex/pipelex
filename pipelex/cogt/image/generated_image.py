@@ -1,4 +1,7 @@
+from pydantic import model_validator
+
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
+from pipelex.types import Self
 
 
 class GeneratedImageRawDetails(CustomBaseModel):
@@ -12,6 +15,13 @@ class GeneratedImageRawDetails(CustomBaseModel):
 
     mime_type: str | None = None
     output_format: str | None = None
+
+    @model_validator(mode="after")
+    def validate_mime_type_or_output_format(self) -> Self:
+        if self.mime_type is None and self.output_format is None:
+            msg = "Either mime_type or output_format must be provided"
+            raise ValueError(msg)
+        return self
 
 
 class GeneratedImageResolved(CustomBaseModel):

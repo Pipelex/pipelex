@@ -100,7 +100,7 @@ class ExtractHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
-class LLMModelNotFoundError(CogtError):
+class LLMModelNotFoundError(ModelNotFoundError):
     pass
 
 
@@ -133,6 +133,10 @@ class PromptImageFactoryError(CogtError):
 
 
 class PromptImageFormatError(CogtError):
+    pass
+
+
+class ImgGenModelNotFoundError(ModelNotFoundError):
     pass
 
 

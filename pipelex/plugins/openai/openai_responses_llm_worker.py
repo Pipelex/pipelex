@@ -88,7 +88,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             msg = (
                 f"OpenAI Responses model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
             )
-            raise LLMModelNotFoundError(msg) from not_found_error
+            raise LLMModelNotFoundError(message=msg, model_handle=self.inference_model.name) from not_found_error
         except APIConnectionError as api_connection_error:
             msg = f"OpenAI API connection error: {api_connection_error}"
             raise LLMCompletionError(msg) from api_connection_error

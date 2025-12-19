@@ -68,6 +68,13 @@ outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
 
+["gemini-3.0-flash-preview"]
+model_id = "gemini-3-flash-preview"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.5, output = 3.0 }
+
 ################################################################################
 # IMAGE GENERATION MODELS (Nano Banana)
 ################################################################################

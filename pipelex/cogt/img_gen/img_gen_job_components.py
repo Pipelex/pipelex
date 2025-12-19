@@ -40,6 +40,14 @@ class OutputFormat(StrEnum):
                 return False
 
     @property
+    def is_jpeg(self) -> bool:
+        match self:
+            case OutputFormat.JPEG:
+                return True
+            case OutputFormat.PNG | OutputFormat.WEBP:
+                return False
+
+    @property
     def as_file_extension(self) -> str:
         match self:
             case OutputFormat.PNG:
