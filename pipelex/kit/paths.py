@@ -14,6 +14,15 @@ GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
     }
 )
 
+# Directories that should not be synced between .pipelex and kit/configs.
+# These are runtime directories created locally:
+# - storage: Local storage directory for runtime data
+GIT_IGNORED_CONFIG_DIRS: frozenset[str] = frozenset(
+    {
+        "storage",
+    }
+)
+
 
 def get_kit_root() -> Traversable:
     """Get the root directory of the kit package.
