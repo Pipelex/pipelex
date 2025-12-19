@@ -145,7 +145,7 @@ class PipeAbstract(ABC, BaseModel):
         # Then validate that all inputs are actually needed and match requirements exactly
         the_needed_inputs = self.needed_inputs()
 
-        # Check all required variables are in the inputs and match the required PipePort
+        # Check all required variables are in the inputs and match the required StuffSpec
         for named_stuff_spec in the_needed_inputs.named_stuff_specs:
             var_name = named_stuff_spec.variable_name
 
@@ -161,7 +161,7 @@ class PipeAbstract(ABC, BaseModel):
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
             if PipeCategory.is_controller_by_str(self.pipe_category):
-                # Compare the essential parts of PipePort (concept code + multiplicity)
+                # Compare the essential parts of StuffSpec (concept code + multiplicity)
                 # Skip validation if the needed stuff_spec is Dynamic or Anything (flexible output types)
                 declared_stuff_spec = self.inputs.root[var_name]
                 needed_stuff_spec = the_needed_inputs.root[named_stuff_spec.requirement_expression or var_name]
