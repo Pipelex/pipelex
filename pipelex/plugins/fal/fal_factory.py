@@ -17,10 +17,6 @@ class FalFactory:
 
     @classmethod
     def make_generated_image_list(cls, fal_result: dict[str, Any]) -> list[GeneratedImageRawDetails]:
-        return cls._unpack_fal_result(fal_result=fal_result)
-
-    @classmethod
-    def _unpack_fal_result(cls, fal_result: dict[str, Any]) -> list[GeneratedImageRawDetails]:
         generated_image_list: list[GeneratedImageRawDetails] = []
         try:
             image_dicts = fal_result["images"]
