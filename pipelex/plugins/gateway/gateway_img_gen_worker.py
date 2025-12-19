@@ -60,8 +60,6 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             nb_images=nb_images,
         )
 
-        pretty_print(args_dict, title="Args dict")
-
         endpoint_path = f"/{self.inference_model.model_id}"
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         try:

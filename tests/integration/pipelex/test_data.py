@@ -164,9 +164,9 @@ class PipeExtractTestCases:
 
 class ImageGenTestCases:
     IMAGE_DESC: ClassVar[list[tuple[str, str]]] = [  # topic, img_gen_prompt_text
-        # ("dog wearing sunglasses", "a dog wearing sunglasses"),
+        ("dog wearing sunglasses", "a dog wearing sunglasses"),
         ("otter playing poker", "an otter playing poker"),
-        # ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python"),
+        ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python"),
     ]
 
 

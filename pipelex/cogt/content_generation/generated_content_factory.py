@@ -1,11 +1,8 @@
 import base64
 import hashlib
 
-from typing_extensions import override
-
 from pipelex import pretty_print
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
-from pipelex.cogt.content_generation.generated_content_factory_abstract import GeneratedContentFactoryAbstract
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
 from pipelex.cogt.img_gen.img_gen_job_components import OutputFormat
 from pipelex.tools.misc.base_64_utils import (
@@ -14,7 +11,7 @@ from pipelex.tools.misc.base_64_utils import (
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 
-class GeneratedContentFactory(GeneratedContentFactoryAbstract):
+class GeneratedContentFactory:
     def __init__(self, storage_provider: StorageProviderAbstract) -> None:
         self.storage_provider = storage_provider
 
@@ -47,7 +44,6 @@ class GeneratedContentFactory(GeneratedContentFactoryAbstract):
 
         return f"{hash_digest}.{extension}"
 
-    @override
     def make_generated_image(
         self,
         raw_details: GeneratedImageRawDetails,

@@ -265,7 +265,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if content_generator:
             self.pipelex_hub.set_content_generator(content_generator)
         else:
-            storage_provider = storage_provider or LocalStorageProvider(root_path=Path("./storage"))
+            storage_provider = storage_provider or LocalStorageProvider(root_path=Path(".pipelex/storage"))
             generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
             self.pipelex_hub.set_content_generator(ContentGenerator(generated_content_factory=generated_content_factory))
 

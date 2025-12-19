@@ -5,7 +5,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.content_generation.generated_content_factory_dry import GeneratedContentFactoryDry
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
@@ -30,12 +29,20 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     It does not use any inference.
     """
 
-    def __init__(self) -> None:
-        self._generated_content_factory = GeneratedContentFactoryDry()
-
     @property
     def _text_gen_truncate_length(self) -> int:
         return get_config().pipelex.dry_run_config.text_gen_truncate_length
+
+    def _make_generated_image_fake(
+        self,
+        raw_details: GeneratedImageRawDetails,
+    ) -> GeneratedImageResolved:
+        return GeneratedImageResolved(
+            url=raw_details.actual_url or "",
+            mime_type=raw_details.mime_type or "",
+            width=raw_details.width,
+            height=raw_details.height,
+        )
 
     @override
     @update_job_metadata
@@ -151,7 +158,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
         image_url = image_urls[0]
-        return self._generated_content_factory.make_generated_image(
+        return self._make_generated_image_fake(
             raw_details=GeneratedImageRawDetails(
                 actual_url=image_url,
                 width=1024,
@@ -175,7 +182,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
         return [
-            self._generated_content_factory.make_generated_image(
+            self._make_generated_image_fake(
                 raw_details=GeneratedImageRawDetails(
                     actual_url=image_urls[image_index % len(image_urls)],
                     width=1024,

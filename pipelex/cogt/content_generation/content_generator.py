@@ -14,7 +14,7 @@ from pipelex.cogt.content_generation.assignment_models import (
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
-from pipelex.cogt.content_generation.generated_content_factory_abstract import GeneratedContentFactoryAbstract
+from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
@@ -36,7 +36,7 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class ContentGenerator(ContentGeneratorProtocol):
-    def __init__(self, generated_content_factory: GeneratedContentFactoryAbstract) -> None:
+    def __init__(self, generated_content_factory: GeneratedContentFactory) -> None:
         self._generated_content_factory = generated_content_factory
 
     @override
