@@ -2,10 +2,13 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex import log
 from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 
 pytest_plugins = [
@@ -13,6 +16,23 @@ pytest_plugins = [
 ]
 
 TEST_OUTPUTS_DIR = "temp/test_outputs"
+
+# Session-level cache for remote config (using dict to avoid global statement)
+_remote_config_cache: dict[str, RemoteConfig] = {}
+_original_fetch_remote_config = RemoteConfigFetcher.fetch_remote_config
+
+
+def _cached_fetch_remote_config() -> RemoteConfig:
+    """Wrapper that caches the remote config for the entire test session."""
+    if "config" not in _remote_config_cache:
+        _remote_config_cache["config"] = _original_fetch_remote_config()
+    return _remote_config_cache["config"]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cache_remote_config_for_session(session_mocker: MockerFixture):
+    """Cache remote configuration for the entire test session to avoid repeated fetches."""
+    session_mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _cached_fetch_remote_config)
 
 
 def _get_test_integration_mode() -> IntegrationMode:
