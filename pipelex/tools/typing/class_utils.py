@@ -9,22 +9,59 @@ _NoneType = type(None)
 _UnionType = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType
 
 
-def _normalize_property_for_comparison(prop: dict[str, Any]) -> dict[str, Any]:
-    """Normalize a property dict by removing description and keeping only structural parts."""
+def normalize_property_for_comparison(prop: dict[str, Any]) -> dict[str, Any]:
+    """Normalize a property dict by removing description and keeping only structural parts.
+
+    This recursively removes 'description' keys from the property dict, allowing
+    structural comparison of JSON schemas that ignores field descriptions.
+
+    Args:
+        prop: A property dict from a JSON schema (e.g., {'type': 'string', 'description': 'A name'})
+
+    Returns:
+        The property dict with all 'description' keys removed at any nesting level.
+
+    Example:
+        >>> prop = {'type': 'string', 'description': 'The user name', 'title': 'Name'}
+        >>> normalize_property_for_comparison(prop)
+        {'type': 'string', 'title': 'Name'}
+
+        >>> nested_prop = {'type': 'object', 'properties': {'id': {'type': 'integer', 'description': 'ID'}}}
+        >>> normalize_property_for_comparison(nested_prop)
+        {'type': 'object', 'properties': {'id': {'type': 'integer'}}}
+    """
     normalized: dict[str, Any] = {}
     for key, value in prop.items():
         if key == "description":
             continue  # Skip descriptions for structural comparison
         if isinstance(value, dict):
-            normalized[key] = _normalize_property_for_comparison(cast("dict[str, Any]", value))
+            normalized[key] = normalize_property_for_comparison(cast("dict[str, Any]", value))
         else:
             normalized[key] = value
     return normalized
 
 
-def _normalize_properties_for_comparison(properties: dict[str, Any]) -> dict[str, Any]:
-    """Normalize all properties in a schema for structural comparison."""
-    return {name: _normalize_property_for_comparison(prop) for name, prop in properties.items()}
+def normalize_properties_for_comparison(properties: dict[str, Any]) -> dict[str, Any]:
+    """Normalize all properties in a schema for structural comparison.
+
+    Applies normalize_property_for_comparison to each property in a JSON schema's
+    'properties' dict, removing descriptions from all fields.
+
+    Args:
+        properties: The 'properties' dict from a JSON schema
+
+    Returns:
+        A new dict with all property descriptions removed.
+
+    Example:
+        >>> properties = {
+        ...     'name': {'type': 'string', 'description': 'User name'},
+        ...     'age': {'type': 'integer', 'description': 'User age'}
+        ... }
+        >>> normalize_properties_for_comparison(properties)
+        {'name': {'type': 'string'}, 'age': {'type': 'integer'}}
+    """
+    return {name: normalize_property_for_comparison(prop) for name, prop in properties.items()}
 
 
 def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
@@ -50,8 +87,8 @@ def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
             return False
 
         # Compare properties, normalized to ignore descriptions
-        props_1 = _normalize_properties_for_comparison(schema_1.get("properties", {}))
-        props_2 = _normalize_properties_for_comparison(schema_2.get("properties", {}))
+        props_1 = normalize_properties_for_comparison(schema_1.get("properties", {}))
+        props_2 = normalize_properties_for_comparison(schema_2.get("properties", {}))
         if props_1 != props_2:
             return False
 
