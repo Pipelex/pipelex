@@ -2,13 +2,13 @@ import httpx
 from pydantic import ValidationError
 from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from pipelex import log
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
     RemoteConfigValidationError,
 )
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
+from pipelex.tools.misc.terminal_utils import print_to_stderr
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -27,7 +27,7 @@ class RemoteConfigFetcher:
     def _log_retry_attempt(cls, retry_state: RetryCallState) -> None:
         """Log retry attempts for remote config fetch."""
         exc = retry_state.outcome.exception() if retry_state.outcome else None
-        log.verbose(f"Remote config fetch attempt {retry_state.attempt_number} failed: {exc}. Retrying...")
+        print_to_stderr(f"Remote config fetch attempt {retry_state.attempt_number} failed: {exc}. Retrying...")
 
     @classmethod
     def _fetch_remote_config_with_retry(cls, url: str) -> httpx.Response:
