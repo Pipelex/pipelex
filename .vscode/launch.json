@@ -65,7 +65,7 @@
             "justMyCode": false
         },
         {
-            "name": "Debug run pipe",
+            "name": "Debug run pipe bundle",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
@@ -74,6 +74,20 @@
                 "results/pipeline_01/bundle.plx",
                 "--inputs",
                 "results/pipeline_01/inputs.json",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug run pipe code",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "run",
+                "summarize_discord_channel_update_1",
+                "--inputs",
+                "tests/data/discord_newsletter/discord_sample_input.json",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
