@@ -2,7 +2,6 @@ from typing import Any
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError
-from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
@@ -37,7 +36,3 @@ class StuffContentFactory:
             raise StuffContentFactoryError(msg)
 
         return cls.make_content_from_value(stuff_content_subclass=the_structure_class, value=value)
-
-    @classmethod
-    def make_image_content(cls, url: str, source_prompt: str | None = None, caption: str | None = None) -> ImageContent:
-        return ImageContent(url=url, source_prompt=source_prompt, caption=caption)
