@@ -5,7 +5,6 @@ import markdown
 from rich.markdown import Markdown
 from typing_extensions import override
 
-from pipelex import pretty_print_md
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.file_utils import ensure_directory_exists, save_text_to_path
 from pipelex.tools.misc.pretty import PrettyPrintable
