@@ -85,7 +85,7 @@
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
-                "summarize_discord_channel_update_1",
+                "write_discord_newsletter",
                 "--inputs",
                 "tests/data/discord_newsletter/discord_sample_input.json",
             ],

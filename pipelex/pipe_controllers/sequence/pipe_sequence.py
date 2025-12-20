@@ -73,20 +73,17 @@ class PipeSequence(PipeController):
                 required_concept_codes=[self.output.concept.concept_string],
             )
 
-        # This is not right but mandatory. When constructing the SubPipe, we do not have access to the pipe library yet,
-        # so the referenced pipe might not be available yet, therefore we don't know the output multiplicity of the last step pipe.
-        # Therefore, we modify it here.
-        if not self.sequential_sub_pipes[-1].output_multiplicity:
-            self.sequential_sub_pipes[-1].output_multiplicity = get_required_pipe(
-                pipe_code=self.sequential_sub_pipes[-1].pipe_code
-            ).output.multiplicity
+        last_sub_pipe = self.sequential_sub_pipes[-1]
+        effective_last_step_output_multiplicity = last_sub_pipe.output_multiplicity
+        if not effective_last_step_output_multiplicity:
+            effective_last_step_output_multiplicity = get_required_pipe(pipe_code=last_sub_pipe.pipe_code).output.multiplicity
 
         # Check multiplicity match
-        if self.output.multiplicity != self.sequential_sub_pipes[-1].output_multiplicity:
+        if self.output.multiplicity != effective_last_step_output_multiplicity:
             msg = (
                 f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "
                 f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe.code}' "
-                f"has output multiplicity={self.sequential_sub_pipes[-1].output_multiplicity}. They must be the same."
+                f"would have an effective output multiplicity={effective_last_step_output_multiplicity}. They must be the same."
             )
             raise PipeValidationError(
                 message=msg,
