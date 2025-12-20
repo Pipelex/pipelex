@@ -106,7 +106,7 @@ class TestPipeSequenceDryRun:
         # Verify channel_summaries is also a ListContent with multiple ChannelSummary items
         channel_summaries_list = channel_summaries_stuff.as_list_of_fixed_content_type(item_type=ChannelSummary)
 
-        pretty_print(channel_summaries_stuff, "jiodisjdqosj")
+        pretty_print(channel_summaries_stuff, title="Channel Summaries Stuff")
         pretty_print(channel_summaries_list, title="Channel Summaries List")
         assert isinstance(channel_summaries_list, ListContent)
         assert len(channel_summaries_list.items) > 1, "Should have multiple ChannelSummary items from batch processing"
