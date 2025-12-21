@@ -29,6 +29,7 @@ class TestPipeConditionExpressionTemplate:
         pipe_run_mode: PipeRunMode,
         category: str,
         load_test_library: Callable[[list[Path]], None],
+        dummy_job_metadata: JobMetadata,
     ):
         """Test that PipeCondition routes to the correct pipe based on expression."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
@@ -54,7 +55,7 @@ class TestPipeConditionExpressionTemplate:
                 pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=dummy_job_metadata,
             ),
         )
 

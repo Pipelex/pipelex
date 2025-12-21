@@ -12,6 +12,7 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlue
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
 
@@ -28,6 +29,7 @@ class TestPipeImgGenRun:
         topic: str,  # noqa: ARG002
         image_desc: str,
         load_empty_library: Callable[[], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
@@ -44,6 +46,7 @@ class TestPipeImgGenRun:
                 blueprint=pipe_img_gen_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=dummy_job_metadata,
         )
         await get_pipe_router().run(
             pipe_job=pipe_job,
@@ -57,6 +60,7 @@ class TestPipeImgGenRun:
         topic: str,  # noqa: ARG002
         image_desc: str,
         load_empty_library: Callable[[], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
@@ -77,6 +81,7 @@ class TestPipeImgGenRun:
                 stuff=StuffFactory.make_from_str(str_value=image_desc, name="image_desc"),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=dummy_job_metadata,
         )
         await get_pipe_router().run(
             pipe_job=pipe_job,

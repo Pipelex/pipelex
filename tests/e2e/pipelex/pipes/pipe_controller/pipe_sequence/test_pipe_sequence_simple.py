@@ -20,7 +20,9 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.inference
 @pytest.mark.asyncio
 class TestPipeSequenceSimple:
-    async def test_simple_text_sequence(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_simple_text_sequence(
+        self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None], dummy_job_metadata: JobMetadata
+    ):
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence/")])
         """Test simple text processing sequence without batching."""
         # Create test input
@@ -40,7 +42,7 @@ class TestPipeSequenceSimple:
 
         pipe = get_required_pipe(pipe_code="simple_text_sequence")
         pipe_output = await pipe.run_pipe(
-            job_metadata=JobMetadata(),
+            job_metadata=dummy_job_metadata,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )

@@ -21,7 +21,9 @@ from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence impo
 @pytest.mark.dry_runnable
 @pytest.mark.inference
 @pytest.mark.asyncio
-async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+async def test_review_analysis_sequence_with_batching(
+    pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None], dummy_job_metadata: JobMetadata
+):
     load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
     """Test customer review analysis sequence with batching."""
     # Create test input - a document with reviews
@@ -42,7 +44,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
         )
         pipe = get_required_pipe(pipe_code="analyze_reviews_sequence")
         pipe_output = await pipe.run_pipe(
-            job_metadata=JobMetadata(),
+            job_metadata=dummy_job_metadata,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             working_memory=working_memory,
         )

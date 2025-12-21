@@ -6,6 +6,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.builder.concept.integration_test_data import ConceptSpecGenerationTestCases
 
 
@@ -26,6 +27,7 @@ class TestConceptSpecGeneration:
         llm_handle: str,
         topic: str,
         user_prompt: str,
+        dummy_job_metadata: JobMetadata,
     ):
         log.info(f"Testing {topic} with llm_handle '{llm_handle}'")
 
@@ -44,6 +46,7 @@ class TestConceptSpecGeneration:
                 system_text="You are an expert at generating concept specifications for a data modeling system.",
                 user_text=user_prompt,
             ),
+            job_metadata=dummy_job_metadata,
             llm_job_config=LLMJobConfig(
                 max_retries=3,
             ),

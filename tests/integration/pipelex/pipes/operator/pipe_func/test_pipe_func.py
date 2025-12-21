@@ -15,6 +15,7 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 from tests.cases.source_code import wrap_lines
 
@@ -37,6 +38,7 @@ class TestPipeFunc:
         self,
         pipe_run_mode: PipeRunMode,
         load_empty_library: Callable[[], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         # Sample source code to test with
@@ -71,6 +73,7 @@ if __name__ == "__main__":
                 blueprint=pipe_func_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=dummy_job_metadata,
             working_memory=working_memory,
         )
 

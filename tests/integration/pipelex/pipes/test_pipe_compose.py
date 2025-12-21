@@ -17,6 +17,7 @@ from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlu
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import JINJA2TestCases
 
 
@@ -29,6 +30,7 @@ class TestPipeCompose:
         pipe_run_mode: PipeRunMode,
         template_source: str,
         load_empty_library: Callable[[], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         pipe_compose_blueprint = PipeComposeBlueprint(
@@ -49,6 +51,7 @@ class TestPipeCompose:
                 blueprint=pipe_compose_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=dummy_job_metadata,
         )
         pipe_compose_output = cast("PipeComposeOutput", await get_pipe_router().run(pipe_job=pipe_job))
         rendered_text = pipe_compose_output.main_stuff_as_str
@@ -60,6 +63,7 @@ class TestPipeCompose:
         pipe_run_mode: PipeRunMode,
         template_source: str,
         load_empty_library: Callable[[], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
@@ -88,6 +92,7 @@ class TestPipeCompose:
                 blueprint=pipe_compose_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=dummy_job_metadata,
             working_memory=working_memory,
         )
         pipe_compose_output = cast("PipeComposeOutput", await get_pipe_router().run(pipe_job=pipe_job))

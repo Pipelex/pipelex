@@ -7,6 +7,7 @@ from pytest_mock import MockerFixture
 from pipelex import log
 from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -108,3 +109,12 @@ def load_empty_library() -> Generator[Callable[[], str], None, None]:
         library_manager = get_library_manager()
         library_manager.teardown(library_id=library_id)
         log.verbose(f"Torn down library: {library_id}")
+
+
+@pytest.fixture
+def dummy_job_metadata() -> JobMetadata:
+    """Provide a JobMetadata instance with dummy values for tests."""
+    return JobMetadata(
+        user_id="pytest_dummy_user",
+        pipeline_run_id="pytest_dummy_pipeline_run_id",
+    )

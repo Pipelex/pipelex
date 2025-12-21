@@ -18,6 +18,7 @@ from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlu
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeExtractTestCases
 
 
@@ -51,6 +52,7 @@ class TestPipeExtract:
         extract_choice_for_image: str,
         pipe_run_mode: PipeRunMode,
         image_url: str,
+        dummy_job_metadata: JobMetadata,
     ):
         pipe_extract_blueprint = PipeExtractBlueprint(
             description="OCR test for image processing",
@@ -70,6 +72,7 @@ class TestPipeExtract:
                 blueprint=pipe_extract_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=dummy_job_metadata,
             working_memory=WorkingMemoryFactory.make_from_single_stuff(
                 stuff=StuffFactory.make_stuff(
                     concept=ConceptFactory.make(
@@ -98,6 +101,7 @@ class TestPipeExtract:
         pipe_run_mode: PipeRunMode,
         pdf_url: str,
         page_image_captions: bool,
+        dummy_job_metadata: JobMetadata,
     ):
         input_name = "arbitrary_name"
         blueprint = PipeExtractBlueprint(
@@ -118,6 +122,7 @@ class TestPipeExtract:
                 blueprint=blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=dummy_job_metadata,
             working_memory=WorkingMemoryFactory.make_from_single_stuff(
                 stuff=StuffFactory.make_stuff(
                     concept=ConceptFactory.make_native_concept(

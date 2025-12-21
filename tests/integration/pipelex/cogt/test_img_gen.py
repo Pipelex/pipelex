@@ -5,6 +5,7 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.hub import get_img_gen_worker
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
 
@@ -21,11 +22,13 @@ class TestImageGeneration:
         topic: str,
         img_gen_prompt_text: str,
         generated_content_factory: GeneratedContentFactory,
+        dummy_job_metadata: JobMetadata,
     ):
         pretty_print(f"Testing image generation with handle '{img_gen_handle}', output format '{img_gen_job_params.output_format}'")
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,
+            job_metadata=dummy_job_metadata,
             img_gen_job_params=img_gen_job_params,
         )
         generated_image_raw_details = await img_gen_worker_async.gen_image(
@@ -46,6 +49,7 @@ class TestImageGeneration:
         topic: str,
         img_gen_prompt_text: str,
         generated_content_factory: GeneratedContentFactory,
+        dummy_job_metadata: JobMetadata,
     ):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job_params = ImgGenJobParams(
@@ -56,6 +60,7 @@ class TestImageGeneration:
         )
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,
+            job_metadata=dummy_job_metadata,
             img_gen_job_params=img_gen_job_params,
         )
         generated_image_raw_details = await img_gen_worker_async.gen_image(
@@ -77,10 +82,12 @@ class TestImageGeneration:
         topic: str,
         img_gen_prompt_text: str,
         generated_content_factory: GeneratedContentFactory,
+        dummy_job_metadata: JobMetadata,
     ):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,
+            job_metadata=dummy_job_metadata,
             img_gen_job_params=img_gen_job_params,
         )
         generated_image_raw_details_list = await img_gen_worker_async.gen_image_list(

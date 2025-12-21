@@ -18,6 +18,7 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 @pytest.mark.dry_runnable
@@ -27,6 +28,7 @@ class TestSpecialArgsConcept:
         self,
         pipe_run_mode: PipeRunMode,
         load_empty_library: Callable[[], None],
+        dummy_job_metadata: JobMetadata,
     ):
         """Test creating a concept with a 'content' field and running a pipe that uses it."""
         load_empty_library()
@@ -97,6 +99,7 @@ class TestSpecialArgsConcept:
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe_llm,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=dummy_job_metadata,
             working_memory=working_memory,
         )
 

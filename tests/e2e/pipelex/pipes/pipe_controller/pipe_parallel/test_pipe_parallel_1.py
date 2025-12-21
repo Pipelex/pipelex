@@ -33,6 +33,7 @@ class TestPipeParallelDocumentAnalysis:
         pipe_run_mode: PipeRunMode,
         document_text: str,
         load_test_library: Callable[[list[Path]], None],
+        dummy_job_metadata: JobMetadata,
     ):
         """Test that PipeParallel processes document analysis in parallel."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
@@ -58,7 +59,7 @@ class TestPipeParallelDocumentAnalysis:
                 pipe=get_required_pipe(pipe_code="parallel_document_analysis"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=dummy_job_metadata,
             ),
         )
 

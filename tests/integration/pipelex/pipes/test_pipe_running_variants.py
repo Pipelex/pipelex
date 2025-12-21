@@ -30,6 +30,7 @@ class TestPipeRunningVariants:
         stuff: Stuff,
         pipe_code: str,
         load_test_library: Callable[[list[Path]], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(stuff, title=f"{topic}: start from '{stuff.stuff_name}', run pipe '{pipe_code}'")
@@ -39,7 +40,7 @@ class TestPipeRunningVariants:
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=dummy_job_metadata,
             ),
         )
 
@@ -50,6 +51,7 @@ class TestPipeRunningVariants:
         topic: str,
         pipe_code: str,
         load_test_library: Callable[[list[Path]], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
@@ -58,7 +60,7 @@ class TestPipeRunningVariants:
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=WorkingMemoryFactory.make_empty(),
-                job_metadata=JobMetadata(),
+                job_metadata=dummy_job_metadata,
             ),
         )
 
@@ -75,6 +77,7 @@ class TestPipeRunningVariants:
         pipe_code: str,
         output_multiplicity: VariableMultiplicity | None,
         load_test_library: Callable[[list[Path]], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(f"{topic}: just run pipe '{pipe_code}'")
@@ -85,7 +88,7 @@ class TestPipeRunningVariants:
                     pipe_run_mode=pipe_run_mode,
                     output_multiplicity=output_multiplicity,
                 ),
-                job_metadata=JobMetadata(),
+                job_metadata=dummy_job_metadata,
                 working_memory=WorkingMemoryFactory.make_empty(),
             ),
         )
@@ -103,6 +106,7 @@ class TestPipeRunningVariants:
         exception: type[Exception],
         expected_error_message: str,
         load_test_library: Callable[[list[Path]], None],
+        dummy_job_metadata: JobMetadata,
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         log.verbose(f"This pipe '{pipe_code}' is supposed to cause an error of type: {exception.__name__}")
@@ -114,7 +118,7 @@ class TestPipeRunningVariants:
                         pipe_stack_limit=6,
                         pipe_run_mode=pipe_run_mode,
                     ),
-                    job_metadata=JobMetadata(),
+                    job_metadata=dummy_job_metadata,
                 ),
             )
         pretty_print(exc.value, title="exception")
