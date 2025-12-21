@@ -9,6 +9,6 @@ FilePath = "The path of a file"
 type = "PipeFunc"
 description = "Read the content of related codebase files"
 inputs = { related_file_paths = "FilePath" }
-output = "CodebaseFileContent"
+output = "CodebaseFileContent[]"
 function_name = "read_file_content"
 

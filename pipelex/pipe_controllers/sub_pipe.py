@@ -48,7 +48,6 @@ class SubPipe(BaseModel):
                     message=msg,
                     run_mode=sub_pipe_run_params.run_mode,
                     pipe_code=self.pipe_code,
-                    missing_inputs={},
                     variable_name=batch_params.input_list_stuff_name,
                     concept_code=None,
                 ) from exc
@@ -64,7 +63,6 @@ class SubPipe(BaseModel):
                     message=msg,
                     run_mode=sub_pipe_run_params.run_mode,
                     pipe_code=self.pipe_code,
-                    missing_inputs={},
                     variable_name=batch_params.input_item_stuff_name,
                     concept_code=None,
                 ) from exc
@@ -115,7 +113,6 @@ class SubPipe(BaseModel):
                     message=msg,
                     run_mode=sub_pipe_run_params.run_mode,
                     pipe_code=self.pipe_code,
-                    missing_inputs={},
                     variable_name=exc.variable_name,
                     concept_code=None,
                 ) from exc
