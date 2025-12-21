@@ -10,6 +10,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -248,10 +249,11 @@ class PipeAbstract(ABC, BaseModel):
 
         if missing_input_names:
             msg = f"Dry run of {self.type} '{self.code}': missing required inputs: {', '.join(missing_input_names)}"
-            raise PipeRunError(
+            raise PipeRunInputsError(
                 message=msg,
                 run_mode=pipe_run_params.run_mode,
                 pipe_code=self.code,
+                missing_inputs=missing_input_names,
             )
 
         # Specific pipe validation function
