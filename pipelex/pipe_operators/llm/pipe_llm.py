@@ -13,7 +13,6 @@ from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import get_config
-from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -21,6 +20,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
