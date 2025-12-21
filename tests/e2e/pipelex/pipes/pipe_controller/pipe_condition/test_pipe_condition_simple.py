@@ -57,7 +57,7 @@ class TestPipeConditionSimple:
         error = exc_info.value
         assert error.pipe_code == "test_condition_fail"
         assert "user_category" in error.missing_inputs
-        assert "Missing required inputs" in str(error)
+        assert "missing required inputs" in str(error)
 
     async def test_direct_pipe_condition_should_succeed(self, load_test_library: Callable[[list[Path]], None]):
         """Test a PipeCondition created directly in code that should SUCCEED dry run."""

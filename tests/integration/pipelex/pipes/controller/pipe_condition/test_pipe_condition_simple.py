@@ -242,7 +242,7 @@ class TestPipeConditionSimple:
         # Verify the error details
         error = exc_info.value
         assert error.pipe_code == "basic_condition_by_category_2"
-        assert "Missing required inputs" in str(error)
+        assert "missing required inputs" in str(error)
 
         # Check the underlying cause is PipeRunInputsError with missing_inputs details
         cause = error.__cause__
