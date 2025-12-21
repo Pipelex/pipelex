@@ -132,7 +132,6 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         output_name: str | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeLLMOutput:
-        llm_config = get_config().cogt.llm_config
         content_generator = content_generator or get_content_generator()
         # interpret / unwrap the arguments
         output_stuff_spec = self.output
@@ -270,7 +269,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 llm_prompt_2_factory = None
 
             output_structure_prompt: str | None = None
-            if llm_config.is_structure_prompt_enabled:
+            if get_config().cogt.llm_config.is_structure_prompt_enabled:
                 output_structure_prompt = await get_output_structure_prompt(
                     concept_ref=pipe_run_params.dynamic_output_concept_code or output_stuff_spec.concept.concept_ref,
                     is_with_preliminary_text=is_with_preliminary_text,

@@ -58,7 +58,7 @@ class MultiplicityParseResult:
         self.multiplicity: int | bool | None = multiplicity
 
 
-def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResult:
+def parse_concept_with_multiplicity(concept_ref: str) -> MultiplicityParseResult:
     """Parse a concept specification string to extract concept and multiplicity.
 
     Supported formats:
@@ -70,7 +70,7 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
     - "domain.ConceptName[5]" -> (domain.ConceptName, 5)
 
     Args:
-        concept_spec: Concept specification string with optional multiplicity brackets
+        concept_ref: Concept specification string with optional multiplicity brackets
 
     Returns:
         MultiplicityParseResult with concept (without brackets) and multiplicity value
@@ -82,11 +82,11 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
     # Use strict pattern to validate identifier syntax
     # Concept must start with letter/underscore, optional domain prefix, optional brackets
     pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
-    match = re.match(pattern, concept_spec)
+    match = re.match(pattern, concept_ref)
 
     if not match:
         msg = (
-            f"Invalid concept specification syntax: '{concept_spec}'. "
+            f"Invalid concept specification syntax: '{concept_ref}'. "
             f"Expected format: 'ConceptName', 'ConceptName[]', 'ConceptName[N]', "
             f"'domain.ConceptName', 'domain.ConceptName[]', or 'domain.ConceptName[N]' "
             f"where concept and domain names must start with a letter or underscore."
@@ -107,7 +107,7 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
         # Number in brackets [N] - fixed count
         multiplicity = int(bracket_content)
         if multiplicity <= 0:
-            msg = f"Invalid multiplicity value in '{concept_spec}': multiplicity must be at least 1. A pipe must produce at least one output."
+            msg = f"Invalid multiplicity value in '{concept_ref}': multiplicity must be at least 1. A pipe must produce at least one output."
             raise PipeVariableMultiplicityError(msg)
 
     return MultiplicityParseResult(concept=concept, multiplicity=multiplicity)

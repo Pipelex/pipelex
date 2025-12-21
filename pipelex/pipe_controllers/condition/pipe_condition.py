@@ -7,13 +7,12 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
+from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -204,13 +203,7 @@ class PipeCondition(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        log.verbose(f"{self.class_name} generating a '{self.output.concept.code}'")
-
-        # TODO: restore pipe_layer feature
-        # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
-
         evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
-
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 
@@ -223,56 +216,15 @@ class PipeCondition(PipeController):
             msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
-        chosen_pipe = get_required_pipe(pipe_code=outcome)
-
-        # Create condition details for tracking
-        condition_details = self._make_pipe_condition_details(
-            evaluated_expression=self.expression,
-            chosen_pipe_code=chosen_pipe.code,
-        )
-
-        # Get required variables and validate they exist in working memory
-        required_variables = chosen_pipe.required_variables()
-        required_stuff_names = {required_variable for required_variable in required_variables if not required_variable.startswith("_")}
-        try:
-            required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
-        except WorkingMemoryStuffNotFoundError as exc:
-            pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
-            pipe_condition_path_str = ".".join(pipe_condition_path)
-            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
-            msg = f"Some required stuff(s) not found: {error_details}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
-
-        # Track condition steps
-        for required_stuff in required_stuffs:
-            get_pipeline_tracker().add_condition_step(
-                from_stuff=required_stuff,
-                to_condition=condition_details,
-                condition_expression=self.expression,
-                pipe_layer=pipe_run_params.pipe_layers,
-                comment="PipeCondition required for condition",
-            )
-
-        # Execute the chosen pipe
-        log.verbose(f"Chosen pipe: {chosen_pipe.code}")
-        pipe_output = await get_pipe_router().run(
+        return await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=chosen_pipe,
+                pipe=get_required_pipe(pipe_code=outcome),
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
             ),
         )
-
-        # Track choice step
-        get_pipeline_tracker().add_choice_step(
-            from_condition=condition_details,
-            to_stuff=pipe_output.main_stuff,
-            pipe_layer=pipe_run_params.pipe_layers,
-            comment="PipeCondition chosen pipe",
-        )
-        return pipe_output
 
     @override
     async def _dry_run_controller_pipe(

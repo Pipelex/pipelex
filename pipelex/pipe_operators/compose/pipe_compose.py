@@ -19,7 +19,6 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -111,9 +110,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeComposeOutput:
         content_generator = content_generator or get_content_generator()
-        if pipe_run_params.is_multiple_output_required:
-            msg = f"PipeCompose does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-            raise PipeRunParamsError(msg)
 
         context: dict[str, Any] = working_memory.generate_context()
         if pipe_run_params:
