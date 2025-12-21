@@ -390,7 +390,7 @@ class ConceptFactory:
 
         match declaration_type:
             case ConceptDeclarationType.STRING:
-                structure_class_name, refines = cls._handle_basic_blueprint(
+                structure_class_name, _ = cls._handle_basic_blueprint(
                     concept_code=concept_code,
                     domain_code=domain_code,
                 )
@@ -399,7 +399,6 @@ class ConceptFactory:
                     code=domain_and_concept_code.concept_code,
                     description=cast("str", blueprint_or_string_description),
                     structure_class_name=structure_class_name,
-                    refines=refines,
                 )
 
             case ConceptDeclarationType.BASIC_BLUEPRINT:

@@ -143,7 +143,17 @@ class PipeBatch(PipeController):
             required_stuffs = branch_memory.get_existing_stuffs(names=required_variables)
             required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff.stuff_code]
             required_stuff_lists.append(required_stuffs)
-            branch_pipe_run_params = pipe_run_params.deep_copy_with_final_stuff_code(final_stuff_code=branch_output_item_code)
+            # We create a deep copy of the run params to avoid modifying the original run params,
+            # and we set the final stuff code to use the one provided fro the branch pipe.
+            # Note: the batching will yield a list by aggregating the outputs of each run of the branch pipe,
+            # but each run of the branch pipe will only yield one output, so we set the output multiplicity to False.
+            branch_pipe_run_params = pipe_run_params.model_copy(
+                deep=True,
+                update={
+                    "final_stuff_code": branch_output_item_code,
+                    "output_multiplicity": False,
+                },
+            )
 
             task: Coroutine[Any, Any, PipeOutput]
             if pipe_run_params.run_mode == PipeRunMode.DRY:
