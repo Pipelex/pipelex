@@ -2,8 +2,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from pipelex.pipeline.pipeline_models import SpecialPipelineId
-from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.types import StrEnum
 
@@ -36,8 +34,8 @@ class UnitJobId(StrEnum):
 
 
 class JobMetadata(BaseModel):
-    user_id: str = Field(default=OTelConstants.DEFAULT_USER_ID)
-    pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
+    user_id: str
+    pipeline_run_id: str
     pipe_code: str | None = None
 
     # Business ID for the current pipe execution (16-char hex string).

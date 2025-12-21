@@ -10,6 +10,7 @@ from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 
 
 async def start_pipeline(
+    user_id: str | None = None,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
@@ -30,6 +31,8 @@ async def start_pipeline(
 
     Parameters
     ----------
+    user_id:
+        Unique identifier for the user.
     library_id:
         Unique identifier for the library instance. If not provided, defaults to the
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
@@ -73,6 +76,7 @@ async def start_pipeline(
 
     """
     pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+        user_id=user_id,
         library_id=library_id,
         library_dirs=library_dirs,
         pipe_code=pipe_code,

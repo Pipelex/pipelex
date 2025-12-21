@@ -35,6 +35,7 @@ if TYPE_CHECKING:
 
 
 async def pipeline_run_setup(
+    user_id: str | None = None,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
@@ -54,6 +55,8 @@ async def pipeline_run_setup(
 
     Parameters
     ----------
+    user_id:
+        Unique identifier for the user.
     library_id:
         Unique identifier for the library instance. If not provided, defaults to the
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
@@ -96,6 +99,7 @@ async def pipeline_run_setup(
         and the library ID.
 
     """
+    user_id = user_id or OTelConstants.DEFAULT_USER_ID
     if not plx_content and not pipe_code:
         msg = "Either pipe_code or plx_content must be provided to the pipeline API."
         raise ValueError(msg)
@@ -180,6 +184,7 @@ async def pipeline_run_setup(
         get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
     job_metadata = JobMetadata(
+        user_id=user_id,
         pipeline_run_id=pipeline.pipeline_run_id,
         otel_context=otel_context,
     )

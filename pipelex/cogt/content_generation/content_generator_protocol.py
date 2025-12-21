@@ -34,10 +34,7 @@ def update_job_metadata(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P
             msg = "The job_metadata argument must be of type JobMetadata."
             raise TypeError(msg)
 
-        updated_metadata = JobMetadata(
-            content_generation_job_id=func.__name__,
-        )
-        job_metadata.update(updated_metadata=updated_metadata)
+        job_metadata.content_generation_job_id = func.__name__
 
         return await func(*args, **kwargs)
 

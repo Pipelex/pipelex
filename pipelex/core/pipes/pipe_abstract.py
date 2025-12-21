@@ -542,6 +542,8 @@ class PipeAbstract(ABC, BaseModel):
         # (even when None in dry mode) to avoid inheriting stale parent context
         child_metadata = job_metadata.copy_with_update(
             updated_metadata=JobMetadata(
+                user_id=job_metadata.user_id,
+                pipeline_run_id=job_metadata.pipeline_run_id,
                 pipe_code=self.code,
                 pipe_run_id=this_pipe_run_id,
             ),

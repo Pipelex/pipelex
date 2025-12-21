@@ -10,22 +10,13 @@ class LLMJobFactory:
     def make_llm_job(
         cls,
         llm_prompt: LLMPrompt,
+        job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
         llm_job_config: LLMJobConfig | None = None,
-        job_metadata: JobMetadata | None = None,
     ) -> LLMJob:
         config = get_config()
         llm_config = config.cogt.llm_config
-        if job_metadata:
-            job_metadata.update(
-                JobMetadata(
-                    job_category=JobCategory.LLM_JOB,
-                ),
-            )
-        else:
-            job_metadata = JobMetadata(
-                job_category=JobCategory.LLM_JOB,
-            )
+        job_metadata.job_category = JobCategory.LLM_JOB
         job_params = llm_job_params
         job_config = llm_job_config or llm_config.llm_job_config
 
