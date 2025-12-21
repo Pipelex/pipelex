@@ -21,9 +21,12 @@ class TestIsMultiplicityCompatible:
             # Case 3: Target expects fixed count (integer)
             (3, 3, True),
             (5, 5, True),
+            (1, 1, True),  # Fixed count of 1 matches itself
             (3, 5, False),  # Different fixed counts are incompatible
             (True, 3, False),  # Variable cannot fulfill fixed expectation
+            (True, 1, False),  # Variable (True) cannot fulfill fixed count of 1 (edge case: True == 1 in Python)
             (None, 3, False),
+            (None, 1, False),  # Single item cannot fulfill fixed count of 1
         ],
     )
     def test_multiplicity_compatibility(

@@ -162,7 +162,11 @@ def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None,
         return source_multiplicity is True or (isinstance(source_multiplicity, int) and not isinstance(source_multiplicity, bool))
 
     # Case 3: Target expects fixed count (integer)
-    # Source must match exactly
+    # Source must match exactly, but must not be a boolean
+    # Note: We must explicitly check for bool first because bool is a subclass of int in Python
+    # True == 1 evaluates to True, which would incorrectly match True (variable list) as compatible with 1 (fixed count)
+    if isinstance(source_multiplicity, bool):
+        return False
     return source_multiplicity == target_multiplicity
 
 
