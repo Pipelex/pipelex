@@ -7,8 +7,8 @@ from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.concepts.validation import validate_concept_ref
+from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
