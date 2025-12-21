@@ -8,7 +8,6 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
-from pipelex.tools.misc.file_utils import ensure_directory_exists, get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.path_utils import interpret_path_or_url
 from pipelex.types import Self
 
@@ -62,24 +61,3 @@ class ImageContent(StuffContent):
         else:
             msg = f"Base 64 is required for image content: {extracted_image}"
             raise ImageContentError(msg)
-
-    def save_to_directory(self, directory: str, base_name: str | None = None):
-        ensure_directory_exists(directory)
-        base_name = base_name or "img"
-
-        if caption := self.caption:
-            caption_file_path = get_incremental_file_path(
-                base_path=directory,
-                base_name=f"{base_name}_caption",
-                extension="txt",
-                avoid_suffix_if_possible=True,
-            )
-            save_text_to_path(text=caption, path=caption_file_path)
-        if source_prompt := self.source_prompt:
-            source_prompt_file_path = get_incremental_file_path(
-                base_path=directory,
-                base_name=f"{base_name}_source_prompt",
-                extension="txt",
-                avoid_suffix_if_possible=True,
-            )
-            save_text_to_path(text=source_prompt, path=source_prompt_file_path)

@@ -4,9 +4,7 @@ from pipelex import pretty_print
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
-from pipelex.config import get_config
 from pipelex.hub import get_extract_worker
-from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.cases import ImageTestCases, PDFTestCases
 
 
@@ -90,11 +88,3 @@ class TestExtract:
         )
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
         pretty_print(extract_output, title="Extract Output")
-        directory = get_incremental_directory_path(
-            base_path="results/test_ocr_result_save",
-            base_name="extract_output",
-        )
-        extract_output.save_to_directory(
-            directory=directory,
-            page_text_file_name=get_config().cogt.extract_config.page_output_text_file_name,
-        )

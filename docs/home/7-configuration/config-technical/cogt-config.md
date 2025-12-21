@@ -101,7 +101,6 @@ Configuration for Optical Character Recognition:
 
 ```toml
 [cogt.extract_config]
-page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 
 ## Unified Backend Integration
@@ -189,5 +188,5 @@ output_format = "jpeg"
 seed = "auto"
 
 [cogt.extract_config]
-page_output_text_file_name = "page_text.md"
+default_page_views_dpi = 72
 ```

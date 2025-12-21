@@ -9,7 +9,6 @@ from pipelex.system.configuration.config_model import ConfigModel
 
 
 class ExtractConfig(ConfigModel):
-    page_output_text_file_name: str
     default_page_views_dpi: int
 
 
