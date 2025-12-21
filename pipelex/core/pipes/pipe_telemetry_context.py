@@ -1,5 +1,4 @@
-from typing import Any
-from 
+from types import TracebackType
 
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
@@ -230,7 +229,7 @@ class PipeTelemetryContext:
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.SUCCESS)
         span.end()
 
-    def _end_pipe_span_error(self, span: Span | None, error: Exception, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Span | None, error: BaseException, is_root_span: bool = False) -> None:
         """End the pipe's OTel span with error status. Safe to call if span is None.
 
         Args:
