@@ -72,7 +72,7 @@ class PipeBatch(PipeController):
         pass
 
     @override
-    async def validate_before_run(
+    async def _validate_before_run(
         self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ) -> None:
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
@@ -225,7 +225,7 @@ class PipeBatch(PipeController):
         )
 
     @override
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -253,3 +253,9 @@ class PipeBatch(PipeController):
             pipe_run_params=pipe_run_params,
             output_name=output_name,
         )
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

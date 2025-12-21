@@ -10,12 +10,11 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_concept_library, get_required_pipe
-from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.exceptions import PipeRunError, PipeRunParamsError
+from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -151,7 +150,7 @@ class PipeSequence(PipeController):
         return {sub_pipe.pipe_code for sub_pipe in self.sequential_sub_pipes}
 
     @override
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -191,24 +190,21 @@ class PipeSequence(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        if not pipe_run_params.run_mode.is_dry:
-            msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-        # Verify the output of this pipe is matching the output of the last step.
-
-        concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output.concept
-        # if self.output.concept_ref != concept_ref_of_last_step:
-        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output.concept):
-            msg = f"""PipeSequence concept mismatch:
-the output concept '{concept_of_last_step.concept_ref}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
-of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept.concept_ref}' of the sequence.
-"""
-            raise PipeControllerOutputConceptMismatchError(
-                message=msg, tested_concept=concept_of_last_step.concept_ref, wanted_concept=self.output.concept.concept_ref
-            )
-        return await self._run_controller_pipe(
+        return await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

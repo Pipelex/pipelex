@@ -150,7 +150,7 @@ class PipeCondition(PipeController):
 
     # TODO: Restore this validation. The problem lies with needed_inputs that construct Anything concepts.
     # @override
-    # async def validate_before_run(
+    # async def _validate_before_run(
     #     self,
     #     job_metadata: JobMetadata,
     #     working_memory: WorkingMemory,
@@ -197,7 +197,7 @@ class PipeCondition(PipeController):
         return evaluated_expression
 
     @override
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -282,27 +282,7 @@ class PipeCondition(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        """Dry run implementation for PipeCondition.
-        Validates that all required inputs are present, expression is valid, and target pipes exist.
-        """
-        log.verbose(f"PipeCondition: dry run controller pipe: {self.code}")
-        # 1. Validate that all required inputs are present in the working memory
-        needed_inputs = self.needed_inputs()
-        missing_input_names: list[str] = []
-
-        for named_stuff_spec in needed_inputs.named_stuff_specs:
-            if not working_memory.get_optional_stuff(named_stuff_spec.variable_name):
-                missing_input_names.append(named_stuff_spec.variable_name)
-
-        if missing_input_names:
-            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
-            raise PipeRunError(
-                message=f"Dry run failed for pipe '{self.code}' (PipeCondition): missing required inputs: {', '.join(missing_input_names)}",
-                run_mode=pipe_run_params.run_mode,
-                pipe_code=self.code,
-            )
-
-        # 2. Validate that the expression template is valid
+        # 1. Validate that the expression template is valid
         try:
             required_variables = detect_jinja2_required_variables(
                 template_category=TemplateCategory.EXPRESSION,
@@ -317,7 +297,7 @@ class PipeCondition(PipeController):
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # 3. Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
+        # 2. Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
         all_pipe_codes = set(self.outcome_map.values())
         if self.default_outcome:
             all_pipe_codes.add(self.default_outcome)
@@ -341,3 +321,15 @@ class PipeCondition(PipeController):
                 pipe_run_params=pipe_run_params,
             )
         return PipeOutput(working_memory=working_memory)
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

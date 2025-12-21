@@ -102,7 +102,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             )
 
     @override
-    async def _run_operator_pipe(
+    async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -165,10 +165,22 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             log.verbose(f"PipeCompose: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
             content_generator_used = get_content_generator()
 
-        return await self._run_operator_pipe(
+        return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             output_name=output_name,
             content_generator=content_generator_used,
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

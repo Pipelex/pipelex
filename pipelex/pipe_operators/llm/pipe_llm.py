@@ -12,7 +12,6 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -35,6 +34,7 @@ from pipelex.hub import (
     get_native_concept,
     get_required_concept,
 )
+from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -46,7 +46,6 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.tools.typing.structure_printer import StructurePrinter
 from pipelex.types import Self
 
 
@@ -125,7 +124,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return {variable_name for variable_name in self.llm_prompt_spec.required_variables() if not variable_name.startswith("_")}
 
     @override
-    async def _run_operator_pipe(
+    async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -272,7 +271,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
             output_structure_prompt: str | None = None
             if llm_config.is_structure_prompt_enabled:
-                output_structure_prompt = await PipeLLM.get_output_structure_prompt(
+                output_structure_prompt = await get_output_structure_prompt(
                     concept_ref=pipe_run_params.dynamic_output_concept_code or output_stuff_spec.concept.concept_ref,
                     is_with_preliminary_text=is_with_preliminary_text,
                 )
@@ -440,37 +439,22 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeLLMOutput:
-        content_generator_dry = ContentGeneratorDry()
-        return await self._run_operator_pipe(
+        return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
-            content_generator=content_generator_dry,
+            content_generator=ContentGeneratorDry(),
         )
 
-    @staticmethod
-    async def get_output_structure_prompt(concept_ref: str, is_with_preliminary_text: bool) -> str | None:
-        concept = get_required_concept(concept_ref=concept_ref)
-        output_class = get_class_registry().get_class(concept.structure_class_name)
-        if not output_class:
-            return None
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
 
-        class_structure = StructurePrinter().get_type_structure(tp=output_class, base_class=StuffContent)
-
-        if not class_structure:
-            return None
-        class_structure_str = "\n".join(class_structure)
-        llm_config = get_config().cogt.llm_config
-        if is_with_preliminary_text:
-            template_source = llm_config.get_template(template_name="output_structure_prompt")
-        else:
-            template_source = llm_config.get_template(template_name="output_structure_prompt_no_preliminary_text")
-
-        return await get_content_generator().make_templated_text(
-            context={
-                "class_structure_str": class_structure_str,
-            },
-            template=template_source,
-            template_category=TemplateCategory.LLM_PROMPT,
-        )
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

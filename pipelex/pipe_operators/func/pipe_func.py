@@ -72,7 +72,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pass
 
     @override
-    async def _run_operator_pipe(
+    async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -124,31 +124,10 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        log.verbose(f"Dry run for PipeFunc '{self.function_name}'")
-
         function = func_registry.get_required_function(self.function_name)
-
-        # Check that all needed inputs are present in working memory
-        needed_inputs = self.needed_inputs()
-
-        missing_input_names: list[str] = []
-        for named_stuff_spec in needed_inputs.named_stuff_specs:
-            if not working_memory.get_optional_stuff(named_stuff_spec.variable_name):
-                missing_input_names.append(named_stuff_spec.variable_name)
-        if missing_input_names:
-            msg = f"Dry run failed for pipe '{self.code}' (PipeFunc): missing required inputs: {missing_input_names}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-
         return_type = get_type_hints(function).get("return")
-
         if return_type is None:
-            msg = f"Dry run failed for pipe '{self.code}' (PipeFunc): function '{self.function_name}' has no return type annotation"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-        if not issubclass(return_type, StuffContent):
-            msg = (
-                f"Dry run failed for pipe '{self.code}' (PipeFunc): "
-                f"function '{self.function_name}' return type {return_type} is not a subclass of StuffContent"
-            )
+            msg = f"Dry run of {self.type} '{self.code}' failed: The return type of the function is None. It should be a subclass of StuffContent."
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         # TODO: Support PipeFunc returning with multiplicity. Create an equivalent of TypedNamedInputRequirement for outputs.
@@ -180,3 +159,27 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        function = func_registry.get_required_function(self.function_name)
+        return_type = get_type_hints(function).get("return")
+        # TODO: this should not happend ever. The correct way to do this would be to have a unit test making sure
+        # that the FuncRegistry DOES CALL the 'is_eligible_function' function, and this function should be unit tested.
+        if return_type is None:
+            msg = f"Dry run failed for {self.type} '{self.code}': function '{self.function_name}' has no return type annotation"
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+        if not issubclass(return_type, StuffContent):
+            msg = (
+                f"Dry run failed for pipe {self.type} '{self.code}': "
+                f"function '{self.function_name}' return type {return_type} is not a subclass of StuffContent"
+            )
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
