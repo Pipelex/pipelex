@@ -15,7 +15,6 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.pipe_telemetry_context import PipeTelemetryContext
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.utils import monitor_pipe_stack
-from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
