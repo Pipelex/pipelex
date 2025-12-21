@@ -187,7 +187,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             nb_images = 1
 
-        # Get the structure class from the registry (might be a subclass of ImageContent)
+        # Get the structure class from the registry (Has to be a subclass of ImageContent)
         structure_class = get_class_registry().get_required_subclass(
             name=self.output.concept.structure_class_name,
             base_class=ImageContent,
