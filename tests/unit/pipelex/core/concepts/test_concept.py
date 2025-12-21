@@ -8,7 +8,7 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
-from pipelex.core.concepts.validation import validate_concept_string
+from pipelex.core.concepts.validation import validate_concept_ref
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.structured_content import StructuredContent
 
@@ -32,60 +32,57 @@ class DocumentWithNestedImage(StructuredContent):
 class TestConcept:
     """Test Concept class."""
 
-    def test_get_validated_native_concept_string(self):
-        assert NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.TEXT) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
-        assert NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.IMAGE) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}"
-        assert NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.PDF) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}"
+    def test_get_validated_native_concept_ref(self):
+        assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.TEXT) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.IMAGE) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}"
+        assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.PDF) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}"
         assert (
-            NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.TEXT_AND_IMAGES)
+            NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.TEXT_AND_IMAGES)
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}"
         )
-        assert NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.NUMBER) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.NUMBER}"
+        assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.NUMBER) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.NUMBER}"
         assert (
-            NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.ANYTHING)
-            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}"
+            NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.ANYTHING) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}"
         )
+        assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.DYNAMIC) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.DYNAMIC}"
         assert (
-            NativeConceptCode.get_validated_native_concept_string(NativeConceptCode.DYNAMIC) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.DYNAMIC}"
-        )
-        assert (
-            NativeConceptCode.get_validated_native_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}")
+            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}")
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
         )
         assert (
-            NativeConceptCode.get_validated_native_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}")
+            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}")
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}"
         )
         assert (
-            NativeConceptCode.get_validated_native_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}")
+            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}")
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}"
         )
         assert (
-            NativeConceptCode.get_validated_native_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}")
+            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}")
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}"
         )
         assert (
-            NativeConceptCode.get_validated_native_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.NUMBER}")
+            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.NUMBER}")
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.NUMBER}"
         )
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.TEXT}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.TEXT}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.IMAGE}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.IMAGE}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.PDF}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.PDF}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.TEXT_AND_IMAGES}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.TEXT_AND_IMAGES}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.NUMBER}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.NUMBER}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.ANYTHING}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.ANYTHING}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string(f"not_native.{NativeConceptCode.DYNAMIC}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.DYNAMIC}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string("RandomConcept")
+            NativeConceptCode.get_validated_native_concept_ref("RandomConcept")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_string("text")
+            NativeConceptCode.get_validated_native_concept_ref("text")
 
     def test_is_native_concept(self):
         """Test is_native_concept method."""
@@ -100,7 +97,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -110,7 +107,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -120,7 +117,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.IMAGE,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -130,7 +127,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.PDF,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -140,7 +137,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT_AND_IMAGES,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -150,7 +147,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.NUMBER,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -160,7 +157,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.ANYTHING,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -170,88 +167,88 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code="RandomConcept",
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
             is False
         )
 
-    def test_construct_concept_string_with_domain(self):
-        """Test construct_concept_string_with_domain method."""
+    def test_construct_concept_ref_with_domain(self):
+        """Test construct_concept_ref_with_domain method."""
         valid_domain = "valid_domain"
         assert (
-            ConceptFactory.make_concept_string_with_domain(domain=valid_domain, concept_code=NativeConceptCode.TEXT)
+            ConceptFactory.make_concept_ref_with_domain(domain_code=valid_domain, concept_code=NativeConceptCode.TEXT)
             == f"{valid_domain}.{NativeConceptCode.TEXT}"
         )
 
-    def test_validate_concept_string(self):
-        """Test validate_concept_string method."""
+    def test_validate_concept_ref(self):
+        """Test validate_concept_ref method."""
         valid_domain = "valid_domain"
         valid_concept_code = "ConceptCode"
-        valid_concept_string = f"{valid_domain}.{valid_concept_code}"
+        valid_concept_ref = f"{valid_domain}.{valid_concept_code}"
         # Valid cases - should not raise exceptions
-        validate_concept_string(valid_concept_string)
-        validate_concept_string(f"domain_123.{valid_concept_code}")
-        validate_concept_string(f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}")
-        validate_concept_string(f"{valid_domain}.UPPERCASE")
+        validate_concept_ref(valid_concept_ref)
+        validate_concept_ref(f"domain_123.{valid_concept_code}")
+        validate_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.ANYTHING}")
+        validate_concept_ref(f"{valid_domain}.UPPERCASE")
 
         # Invalid cases - should raise ConceptCodeError
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"snake_case_domaiN.{valid_concept_code}")
+            validate_concept_ref(f"snake_case_domaiN.{valid_concept_code}")
 
         # Multiple dots
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"domain.sub.{valid_concept_code}")
+            validate_concept_ref(f"domain.sub.{valid_concept_code}")
 
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"a.b.c.{valid_concept_code}")
+            validate_concept_ref(f"a.b.c.{valid_concept_code}")
 
         # Invalid domain (not snake_case)
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"InvalidDomain.{valid_concept_code}")
+            validate_concept_ref(f"InvalidDomain.{valid_concept_code}")
 
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"domain-name.{valid_concept_code}")
+            validate_concept_ref(f"domain-name.{valid_concept_code}")
 
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"Domain_Name.{valid_concept_code}")
+            validate_concept_ref(f"Domain_Name.{valid_concept_code}")
 
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"123domain.{valid_concept_code}")
+            validate_concept_ref(f"123domain.{valid_concept_code}")
 
         # Invalid concept code (not PascalCase)
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"{valid_domain}.invalidText")
+            validate_concept_ref(f"{valid_domain}.invalidText")
 
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"{valid_domain}.text")
+            validate_concept_ref(f"{valid_domain}.text")
 
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"{valid_domain}.Text_Name")
+            validate_concept_ref(f"{valid_domain}.Text_Name")
 
         with pytest.raises(ConceptStringError):
-            validate_concept_string(f"{valid_domain}.text-name")
+            validate_concept_ref(f"{valid_domain}.text-name")
 
     def test_are_concept_compatible(self):
         concept1 = ConceptFactory.make_from_blueprint(
             concept_code="Code1",
-            domain="domain1",
+            domain_code="domain1",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
         )
         concept2 = ConceptFactory.make_from_blueprint(
             concept_code="Code2",
-            domain="domain1",
+            domain_code="domain1",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
         )
         concept3 = ConceptFactory.make_from_blueprint(
             concept_code="Code3",
-            domain="domain2",
+            domain_code="domain2",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", structure="TextContent"),
         )
         concept4 = ConceptFactory.make_from_blueprint(
             concept_code="Code4",
-            domain="domain1",
+            domain_code="domain1",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", structure="ImageContent"),
         )
 
@@ -265,7 +262,7 @@ class TestConcept:
 
         concept_7 = ConceptFactory.make_from_blueprint(
             concept_code="VisualDescription",
-            domain="images",
+            domain_code="images",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
 
@@ -289,7 +286,7 @@ class TestConcept:
         """Test that a concept created with .make() that refines native.Text is strictly compatible with Text."""
         # Create a concept that refines native.Text using ConceptFactory.make()
         concept_not_native_text = ConceptFactory.make(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="MyConceptNotNativeText",
             description="Test concept for unit tests",
             structure_class_name="TextContent",
@@ -308,7 +305,7 @@ class TestConcept:
         # Create a concept with a structure blueprint that has exactly the same field as TextContent: text: str
         custom_text_like_concept = ConceptFactory.make_from_blueprint(
             concept_code="MyTextLikeConcept",
-            domain="test_structure_equiv",
+            domain_code="test_structure_equiv",
             blueprint_or_string_description=ConceptBlueprint(
                 description="A concept with the exact same structure as TextContent",
                 structure={
@@ -338,7 +335,7 @@ class TestConcept:
 
         # Create a concept using our custom DocumentWithNestedImage class
         concept_with_nested_image = ConceptFactory.make(
-            domain="test_nested",
+            domain_code="test_nested",
             concept_code="DocumentWithImage",
             description="A document containing nested image info",
             structure_class_name="DocumentWithNestedImage",
@@ -346,7 +343,7 @@ class TestConcept:
 
         # Create a concept using the NestedImageInfo class (same structure as ImageContent)
         concept_image_like = ConceptFactory.make(
-            domain="test_nested",
+            domain_code="test_nested",
             concept_code="ImageInfo",
             description="Image-like info",
             structure_class_name="NestedImageInfo",

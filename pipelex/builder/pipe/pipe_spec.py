@@ -8,7 +8,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -79,7 +79,7 @@ class PipeSpec(StructuredContent):
     def validate_output(cls, output: str) -> str:
         # Extract concept without multiplicity for validation
         parse_result = parse_concept_with_multiplicity(output)
-        validate_concept_string_or_code(concept_string_or_code=parse_result.concept)
+        validate_concept_ref_or_code(concept_ref_or_code=parse_result.concept)
         return output  # Return original with brackets intact
 
     @field_validator("inputs", mode="after")
@@ -104,8 +104,8 @@ class PipeSpec(StructuredContent):
                 raise ValueError(msg)
 
             # Extract the concept part (without multiplicity) and validate it
-            concept_string_or_code = match.group(1)
-            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            concept_ref_or_code = match.group(1)
+            validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
 
         return inputs
 

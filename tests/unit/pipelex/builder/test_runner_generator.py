@@ -77,7 +77,7 @@ class TestConceptGenerateInputRepresentationPython:
     def test_refined_text_python(self) -> None:
         """Test Python representation for a concept that refines Text."""
         concept = ConceptFactory.make(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="Question",
             description="A question",
             structure_class_name="TextContent",
@@ -268,7 +268,7 @@ class TestGenerateRunnerCode:
         """Test that custom class imports use domain_conceptCode format for standalone scripts."""
         # Create a custom concept (non-native)
         custom_concept = ConceptFactory.make(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="CustomOutput",
             description="A custom output",
             structure_class_name="CustomOutput",

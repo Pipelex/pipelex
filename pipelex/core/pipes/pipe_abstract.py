@@ -40,7 +40,7 @@ class PipeAbstract(ABC, BaseModel):
     pipe_category: Any  # Any so that subclasses can put a Literal
     type: Any  # Any so that subclasses can put a Literal
     code: str
-    domain: str
+    domain_code: str
     description: str | None = None
     inputs: InputStuffSpecs = Field(default_factory=InputStuffSpecs)
     output: StuffSpec
@@ -52,18 +52,18 @@ class PipeAbstract(ABC, BaseModel):
     @property
     def concept_dependencies(self) -> list[Concept]:
         """Return all unique concept dependencies (output + inputs) without duplicates."""
-        seen_concept_strings: set[str] = set()
+        seen_concept_refs: set[str] = set()
         unique_concepts: list[Concept] = []
 
         # Add output concept first
         unique_concepts.append(self.output.concept)
-        seen_concept_strings.add(self.output.concept.concept_string)
+        seen_concept_refs.add(self.output.concept.concept_ref)
 
         # Add input concepts (avoiding duplicates)
         for concept in self.inputs.concepts:
-            if concept.concept_string not in seen_concept_strings:
+            if concept.concept_ref not in seen_concept_refs:
                 unique_concepts.append(concept)
-                seen_concept_strings.add(concept.concept_string)
+                seen_concept_refs.add(concept.concept_ref)
 
         return unique_concepts
 
@@ -137,7 +137,7 @@ class PipeAbstract(ABC, BaseModel):
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[required_variable_name],
                 )
@@ -154,7 +154,7 @@ class PipeAbstract(ABC, BaseModel):
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[var_name],
                 )
@@ -190,7 +190,7 @@ class PipeAbstract(ABC, BaseModel):
                     raise PipeValidationError(
                         message=msg,
                         error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
-                        domain=self.domain,
+                        domain_code=self.domain_code,
                         pipe_code=self.code,
                         variable_names=[var_name],
                     )
@@ -202,7 +202,7 @@ class PipeAbstract(ABC, BaseModel):
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain=self.domain,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[input_name],
                 )

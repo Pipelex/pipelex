@@ -25,7 +25,7 @@ MAKE_VARIABLE_MULTIPLICITY_TEST_CASES: list[tuple[int | None, bool | None, Varia
 ]
 
 # Test cases for InputRequirementsFactory.make_from_string
-# Format: (domain, requirement_str, expected_concept_string, expected_multiplicity)
+# Format: (domain, requirement_str, expected_concept_ref, expected_multiplicity)
 SINGLE_ITEM_NO_BRACKETS_TEST_CASES: list[tuple[str, str, str, int | bool | None]] = [
     # Native domain tests with full concept strings
     ("native", "native.Text", "native.Text", None),
@@ -33,14 +33,14 @@ SINGLE_ITEM_NO_BRACKETS_TEST_CASES: list[tuple[str, str, str, int | bool | None]
     ("native", "native.PDF", "native.PDF", None),
 ]
 
-# Format: (domain, requirement_str, expected_concept_string)
+# Format: (domain, requirement_str, expected_concept_ref)
 MULTIPLE_ITEMS_EMPTY_BRACKETS_TEST_CASES: list[tuple[str, str, str]] = [
     # Native domain tests
     ("native", "native.Text[]", "native.Text"),
     ("native", "native.Image[]", "native.Image"),
 ]
 
-# Format: (domain, requirement_str, expected_concept_string, expected_multiplicity)
+# Format: (domain, requirement_str, expected_concept_ref, expected_multiplicity)
 FIXED_COUNT_TEST_CASES: list[tuple[str, str, str, int]] = [
     # Native domain tests
     ("native", "native.Text[5]", "native.Text", 5),
@@ -48,7 +48,7 @@ FIXED_COUNT_TEST_CASES: list[tuple[str, str, str, int]] = [
     ("native", "native.PDF[10]", "native.PDF", 10),
 ]
 
-# Format: (domain, requirement_str, concept_codes_from_same_domain, expected_concept_string, expected_multiplicity, description)
+# Format: (domain, requirement_str, concept_codes_from_same_domain, expected_concept_ref, expected_multiplicity, description)
 CONCEPT_CODE_RESOLUTION_TEST_CASES: list[tuple[str, str, str, int | bool | None, str]] = [
     # Native concepts resolved from concept code only (no multiplicity)
     ("native", "Text", "native.Text", None, "Native Text without brackets"),
@@ -62,7 +62,7 @@ CONCEPT_CODE_RESOLUTION_TEST_CASES: list[tuple[str, str, str, int | bool | None,
     ("accounting", "Text[3]", "native.Text", 3, "Native always wins"),
 ]
 
-# Format: (domain, requirement_str, expected_concept_string, expected_multiplicity)
+# Format: (domain, requirement_str, expected_concept_ref, expected_multiplicity)
 EXPLICIT_DOMAIN_IN_STRING_TEST_CASES: list[tuple[str, str, str, int | bool | None]] = [
     # Explicitly specifying native domain in string
     ("my_domain", "native.Text", "native.Text", None),
@@ -70,7 +70,7 @@ EXPLICIT_DOMAIN_IN_STRING_TEST_CASES: list[tuple[str, str, str, int | bool | Non
     ("test_domain", "native.PDF[]", "native.PDF", True),
 ]
 
-# Format: (domain, requirement_str, expected_concept_string, expected_multiplicity)
+# Format: (domain, requirement_str, expected_concept_ref, expected_multiplicity)
 VARIOUS_FIXED_COUNTS_TEST_CASES: list[tuple[str, str, str, int]] = [
     # Native domain with various counts
     ("native", "native.Image[1]", "native.Image", 1),
@@ -80,7 +80,7 @@ VARIOUS_FIXED_COUNTS_TEST_CASES: list[tuple[str, str, str, int]] = [
     ("native", "native.Image[999]", "native.Image", 999),
 ]
 
-# Format: (domain, requirement_str, expected_concept_string)
+# Format: (domain, requirement_str, expected_concept_ref)
 DIFFERENT_CONCEPT_CODES_TEST_CASES: list[tuple[str, str, str]] = [
     # Native concepts
     ("native", "native.Text", "native.Text"),

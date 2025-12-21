@@ -159,7 +159,9 @@ def complex_list_memory() -> WorkingMemory:
     )
 
     complex_stuff = StuffFactory.make_stuff(
-        concept=ConceptFactory.make(concept_code="List", domain=SpecialDomain.NATIVE, description="Lorem Ipsum", structure_class_name="ListContent"),
+        concept=ConceptFactory.make(
+            concept_code="List", domain_code=SpecialDomain.NATIVE, description="Lorem Ipsum", structure_class_name="ListContent"
+        ),
         name="mixed_list",
         content=complex_content,
     )
@@ -193,7 +195,9 @@ def html_content_memory() -> WorkingMemory:
     )
 
     stuff = StuffFactory.make_stuff(
-        concept=ConceptFactory.make(concept_code="Html", domain=SpecialDomain.NATIVE, description="Lorem Ipsum", structure_class_name="HtmlContent"),
+        concept=ConceptFactory.make(
+            concept_code="Html", domain_code=SpecialDomain.NATIVE, description="Lorem Ipsum", structure_class_name="HtmlContent"
+        ),
         name="test_report",
         content=html_content,
     )

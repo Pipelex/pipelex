@@ -76,13 +76,13 @@ class SubPipe(BaseModel):
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
-                    batch_params.input_list_stuff_name: item_stuff_spec.concept.concept_string,
+                    batch_params.input_list_stuff_name: item_stuff_spec.concept.concept_ref,
                 },
             )
 
             pipe_batch_adhoc_pipe_code = f"{self.pipe_code}_adhoc_batch"
             pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
-                domain_code=sub_pipe.domain,
+                domain_code=sub_pipe.domain_code,
                 pipe_code=pipe_batch_adhoc_pipe_code,
                 blueprint=pipe_batch_blueprint,
                 concept_codes_from_the_same_domain=[concept.code for concept in sub_pipe.concept_dependencies],

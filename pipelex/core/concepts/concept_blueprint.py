@@ -24,7 +24,7 @@ class ConceptBlueprint(BaseModel):
     def validate_refines(cls, refines: str | None = None) -> str | None:
         if refines is not None:
             try:
-                NativeConceptCode.validate_native_concept_string_or_code(concept_string_or_code=refines)
+                NativeConceptCode.validate_native_concept_ref_or_code(concept_ref_or_code=refines)
             except NativeConceptDefinitionError as exc:
                 msg = f"Could not validate refine '{refines}': {exc}"
                 raise ValueError(msg) from exc

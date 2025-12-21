@@ -7,9 +7,9 @@ class SpecialDomain(StrEnum):
     NATIVE = "native"
 
     @classmethod
-    def is_native(cls, domain: str) -> bool:
+    def is_native(cls, domain_code: str) -> bool:
         try:
-            enum_value = SpecialDomain(domain)
+            enum_value = SpecialDomain(domain_code)
         except ValueError:
             return False
 

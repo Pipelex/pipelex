@@ -33,15 +33,15 @@ class TestPipeBatchSimple:
         load_test_library: Callable[[list[Path]], None],
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_batch")])
-        domain = "test_integration"
+        domain_code = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",
-            domain=domain,
+            domain_code=domain_code,
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept2",
-            domain=domain,
+            domain_code=domain_code,
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_library = get_concept_library()
@@ -51,15 +51,15 @@ class TestPipeBatchSimple:
             description="Simple batch processing test",
             branch_pipe_code="uppercase_transformer",  # This exists in the PLX file
             inputs={
-                "text_list": concept_1.concept_string,
+                "text_list": concept_1.concept_ref,
             },
-            output=concept_2.concept_string,
+            output=concept_2.concept_ref,
             input_list_name="text_list",
             input_item_name="text_item",
         )
 
         pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="simple_batch",
             blueprint=pipe_batch_blueprint,
         )
@@ -81,7 +81,7 @@ class TestPipeBatchSimple:
 
         # Verify the PipeBatch instance was created correctly
         assert pipe_batch is not None
-        assert pipe_batch.domain == domain
+        assert pipe_batch.domain_code == domain_code
         assert pipe_batch.code == "simple_batch"
         assert pipe_batch.branch_pipe_code == "uppercase_transformer"
         assert pipe_batch.batch_params is not None
@@ -145,7 +145,7 @@ class TestPipeBatchSimple:
         batch_result = final_working_memory.get_stuff("batch_result")
         assert batch_result is not None
         assert batch_result.concept.code == concept_2.code
-        assert batch_result.concept.domain == domain
+        assert batch_result.concept.domain_code == domain_code
 
         # Verify the batch result content matches exactly
         assert isinstance(batch_result.content, ListContent)

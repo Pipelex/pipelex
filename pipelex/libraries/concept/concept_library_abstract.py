@@ -14,11 +14,11 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def remove_concepts_by_concept_strings(self, concept_strings: list[str]) -> None:
+    def remove_concepts_by_concept_refs(self, concept_refs: list[str]) -> None:
         pass
 
     @abstractmethod
-    def list_concepts_by_domain(self, domain: str) -> list[Concept]:
+    def list_concepts_by_domain(self, domain_code: str) -> list[Concept]:
         pass
 
     @abstractmethod
@@ -26,7 +26,7 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_required_concept(self, concept_string: str) -> Concept:
+    def get_required_concept(self, concept_ref: str) -> Concept:
         pass
 
     @abstractmethod
@@ -50,5 +50,5 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_required_concept_from_concept_string_or_code(self, concept_string_or_code: str, search_domains: list[str] | None = None) -> Concept:
+    def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code: str, search_domain_codes: list[str] | None = None) -> Concept:
         pass

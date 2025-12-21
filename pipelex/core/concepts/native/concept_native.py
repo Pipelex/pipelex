@@ -1,5 +1,5 @@
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
-from pipelex.core.concepts.validation import is_concept_string_or_code_valid
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -29,7 +29,7 @@ class NativeConceptCode(StrEnum):
         return f"{self.value}[]"
 
     @property
-    def concept_string(self) -> str:
+    def concept_ref(self) -> str:
         return f"{SpecialDomain.NATIVE}.{self.value}"
 
     @property
@@ -149,43 +149,43 @@ class NativeConceptCode(StrEnum):
         return [native_concept.structure_class_name for native_concept in cls]
 
     @classmethod
-    def is_native_concept_string_or_code(cls, concept_string_or_code: str) -> bool:
-        if not is_concept_string_or_code_valid(concept_string_or_code=concept_string_or_code):
+    def is_native_concept_ref_or_code(cls, concept_ref_or_code: str) -> bool:
+        if not is_concept_ref_or_code_valid(concept_ref_or_code=concept_ref_or_code):
             return False
 
-        if "." in concept_string_or_code:
-            domain_code, concept_code = concept_string_or_code.split(".", 1)
-            return SpecialDomain.is_native(domain=domain_code) and concept_code in cls.values_list()
-        return concept_string_or_code in cls.values_list()
+        if "." in concept_ref_or_code:
+            domain_code, concept_code = concept_ref_or_code.split(".", 1)
+            return SpecialDomain.is_native(domain_code=domain_code) and concept_code in cls.values_list()
+        return concept_ref_or_code in cls.values_list()
 
     @classmethod
-    def is_valid_native_concept_string(cls, concept_string: str) -> bool:
+    def is_valid_native_concept_ref(cls, concept_ref: str) -> bool:
         """Check if the string is a valid native concept string (e.g., native.Text, native.Image).
 
-        Unlike is_native_concept_string_or_code, this method requires the full concept string
+        Unlike is_native_concept_ref_or_code, this method requires the full concept string
         with the native domain prefix (e.g., "native.Text" is valid, but "Text" alone is not).
 
         Args:
-            concept_string: The concept string to validate
+            concept_ref: The concept string to validate
 
         Returns:
             True if the string is a valid native concept string with domain prefix
         """
-        if "." not in concept_string:
+        if "." not in concept_ref:
             return False
-        domain_code, concept_code = concept_string.split(".", 1)
-        return SpecialDomain.is_native(domain=domain_code) and concept_code in cls.values_list()
+        domain_code, concept_code = concept_ref.split(".", 1)
+        return SpecialDomain.is_native(domain_code=domain_code) and concept_code in cls.values_list()
 
     @classmethod
-    def validate_native_concept_string_or_code(cls, concept_string_or_code: str) -> None:
-        if not cls.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
-            msg = f"Concept string or code '{concept_string_or_code}' is not a valid native concept string or code"
+    def validate_native_concept_ref_or_code(cls, concept_ref_or_code: str) -> None:
+        if not cls.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
+            msg = f"Concept string or code '{concept_ref_or_code}' is not a valid native concept string or code"
             raise NativeConceptDefinitionError(msg)
 
     @classmethod
-    def get_validated_native_concept_string(cls, concept_string_or_code: str) -> str:
-        cls.validate_native_concept_string_or_code(concept_string_or_code=concept_string_or_code)
-        if "." in concept_string_or_code:
-            return concept_string_or_code
+    def get_validated_native_concept_ref(cls, concept_ref_or_code: str) -> str:
+        cls.validate_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
+        if "." in concept_ref_or_code:
+            return concept_ref_or_code
         else:
-            return f"{SpecialDomain.NATIVE}.{concept_string_or_code}"
+            return f"{SpecialDomain.NATIVE}.{concept_ref_or_code}"

@@ -42,13 +42,13 @@ class PipeFactoryError(PipelexError):
         message: str,
         error_type: PipeFactoryErrorType = PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR,
         pipe_code: str | None = None,
-        domain: str | None = None,
+        domain_code: str | None = None,
         missing_concept_code: str | None = None,
         declared_concepts: list[str] | None = None,
     ):
         self.error_type = error_type
         self.pipe_code = pipe_code
-        self.domain = domain
+        self.domain_code = domain_code
         self.missing_concept_code = missing_concept_code
         self.declared_concepts = declared_concepts or []
         super().__init__(message)
@@ -122,7 +122,7 @@ class PipeValidationError(ValueError):
         self,
         message: str,
         error_type: PipeValidationErrorType | None = None,
-        domain: str | None = None,
+        domain_code: str | None = None,
         pipe_code: str | None = None,
         variable_names: list[str] | None = None,
         required_concept_codes: list[str] | None = None,
@@ -131,7 +131,7 @@ class PipeValidationError(ValueError):
         explanation: str | None = None,
     ):
         self.error_type = error_type
-        self.domain = domain
+        self.domain_code = domain_code
         self.pipe_code = pipe_code
         self.variable_names = variable_names
         self.required_concept_codes = required_concept_codes
@@ -141,7 +141,7 @@ class PipeValidationError(ValueError):
         super().__init__(message)
 
     def desc(self) -> str:
-        msg = f"{self.error_type} • domain='{self.domain}'"
+        msg = f"{self.error_type} • domain_code='{self.domain_code}'"
         if self.pipe_code:
             msg += f" • pipe='{self.pipe_code}'"
         if self.variable_names:

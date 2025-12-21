@@ -214,7 +214,7 @@ pipelex show pipe YOUR_PIPE_CODE
 ### 1. Organization
 
 - Keep related concepts and pipes in the same `.plx` file
-- Use meaningful domain names that reflect functionality
+- Use meaningful domain codes that reflect functionality
 - Match Python file names with PLX file names (`finance.plx` → `finance.py`)
 - Group complex pipelines using subdirectories
 
@@ -238,7 +238,7 @@ pipelex show pipe YOUR_PIPE_CODE
 ### 4. Validation
 
 - Run `pipelex validate all` after making changes
-- Check for domain consistency
+- Check for domain code consistency
 - Verify concept relationships
 - Test pipes individually before composing them
 

@@ -29,7 +29,7 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
             input_item_name=blueprint.input_item_name,
         )
         return PipeBatch(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             inputs=inputs,

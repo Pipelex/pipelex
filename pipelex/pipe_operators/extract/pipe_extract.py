@@ -87,14 +87,14 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     @override
     def validate_output_with_library(self):
         if self.output.concept != get_native_concept(native_concept=NativeConceptCode.PAGE):
-            msg = f"PipeExtract output should be a Page concept, but is {self.output.concept.concept_string}"
+            msg = f"PipeExtract output should be a Page concept, but is {self.output.concept.concept_ref}"
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                domain=self.domain,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept.concept_string,
-                required_concept_codes=[NativeConceptCode.PAGE.concept_string],
+                provided_concept_code=self.output.concept.concept_ref,
+                required_concept_codes=[NativeConceptCode.PAGE.concept_ref],
             )
 
     @override

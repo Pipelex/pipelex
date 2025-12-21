@@ -25,7 +25,7 @@ class Concept(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     code: str
-    domain: str
+    domain_code: str
     description: str
     structure_class_name: str
     # TODO: rethink this refines field here.
@@ -37,41 +37,41 @@ class Concept(BaseModel):
         try:
             validate_concept_code(concept_code=code)
         except ConceptCodeError as exc:
-            msg = f"Concept code '{code}' is not a valid concept code for concept '{cls.concept_string}'"
+            msg = f"Concept code '{code}' is not a valid concept code for concept '{cls.concept_ref}'"
             raise ConceptValueError(msg) from exc
         return code
 
-    @field_validator("domain")
+    @field_validator("domain_code")
     @classmethod
-    def validate_domain(cls, domain: str) -> str:
+    def validate_domain(cls, domain_code: str) -> str:
         try:
-            validate_domain_code(code=domain)
+            validate_domain_code(code=domain_code)
         except DomainCodeError as exc:
-            msg = f"Domain code '{domain}' is not a valid domain code for concept '{cls.concept_string}'"
+            msg = f"Domain code '{domain_code}' is not a valid domain code for concept '{cls.concept_ref}'"
             raise ConceptValueError(msg) from exc
-        return domain
+        return domain_code
 
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None) -> str | None:
         if refines is None:
             return None
-        if not NativeConceptCode.is_valid_native_concept_string(concept_string=refines):
-            valid_native_concepts = ", ".join(native.concept_string for native in NativeConceptCode.values_list())
+        if not NativeConceptCode.is_valid_native_concept_ref(concept_ref=refines):
+            valid_native_concepts = ", ".join(native.concept_ref for native in NativeConceptCode.values_list())
             msg = f"Refines '{refines}' is not a valid native concept string. Valid options are: {valid_native_concepts}"
             raise ConceptValueError(msg)
         return refines
 
     @property
-    def concept_string(self) -> str:
-        return f"{self.domain}.{self.code}"
+    def concept_ref(self) -> str:
+        return f"{self.domain_code}.{self.code}"
 
     @property
-    def simple_concept_string(self) -> str:
-        if SpecialDomain.is_native(domain=self.domain):
+    def simple_concept_ref(self) -> str:
+        if SpecialDomain.is_native(domain_code=self.domain_code):
             return self.code
         else:
-            return self.concept_string
+            return self.concept_ref
 
     @classmethod
     def sentence_from_concept(cls, concept: "Concept") -> str:
@@ -79,7 +79,7 @@ class Concept(BaseModel):
 
     @classmethod
     def is_native_concept(cls, concept: "Concept") -> bool:
-        return NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=concept.concept_string)
+        return NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept.concept_ref)
 
     @classmethod
     def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept", strict: bool = False) -> bool:
@@ -87,13 +87,13 @@ class Concept(BaseModel):
             return True
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_2.code):
             return True
-        if concept_1.concept_string == concept_2.concept_string:
+        if concept_1.concept_ref == concept_2.concept_ref:
             return True
         if concept_1.structure_class_name == concept_2.structure_class_name:
             return True
 
         # If concept_1 refines concept_2 by string, they are strictly compatible
-        if concept_1.refines is not None and concept_1.refines == concept_2.concept_string:
+        if concept_1.refines is not None and concept_1.refines == concept_2.concept_ref:
             return True
 
         # If both concepts refine the same concept, they are compatible
@@ -180,7 +180,7 @@ class Concept(BaseModel):
 
         generator = ConceptRepresentationGenerator(output_format)
         # For inputs, we only want required fields (not optional ones)
-        result = generator.generate_representation(self.concept_string, structure_class, include_optional=False)
+        result = generator.generate_representation(self.concept_ref, structure_class, include_optional=False)
 
         # If multiple and JSON format, wrap content in a list
         # For Python format, the caller handles wrapping since content is a string

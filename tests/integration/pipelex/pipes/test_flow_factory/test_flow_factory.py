@@ -66,7 +66,7 @@ class TestFlowFactory:
 
             # Verify the flow was created correctly
             assert flow is not None
-            assert flow.domain is not None
+            assert flow.domain_code is not None
             assert flow.flow_elements is not None
             assert len(flow.flow_elements) > 0
 

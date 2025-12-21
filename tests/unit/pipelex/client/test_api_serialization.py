@@ -70,7 +70,7 @@ class TestApiSerialization:
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DateTimeEvent",
-                domain="event",
+                domain_code="event",
                 description="event.DateTimeEvent",
                 structure_class_name="DateTimeEvent",
             ),

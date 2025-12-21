@@ -32,7 +32,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
                     variable_name="document",
                     concept=ConceptFactory.make(
                         concept_code="Document",
-                        domain="customer_feedback",
+                        domain_code="customer_feedback",
                         description="Lorem ipsum",
                         structure_class_name="Document",
                     ),
@@ -51,7 +51,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
             name="document",
             concept=ConceptFactory.make(
                 concept_code="Document",
-                domain="customer_feedback",
+                domain_code="customer_feedback",
                 description="customer_feedback.Document",
                 structure_class_name="Document",
             ),
@@ -75,7 +75,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     assert pipe_output.working_memory is not None
     assert pipe_output.main_stuff is not None
     assert pipe_output.main_stuff.concept.code == "ProductRating"
-    assert pipe_output.main_stuff.concept.domain == "customer_feedback"
+    assert pipe_output.main_stuff.concept.domain_code == "customer_feedback"
 
     # Log the working memory for debugging
     log.verbose("Final working memory after pipeline execution:")

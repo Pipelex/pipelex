@@ -44,7 +44,7 @@ class ConceptRepresentationGenerator:
 
     def generate_representation(
         self,
-        concept_string: str,
+        concept_ref: str,
         structure_class: type[StuffContent],
         include_optional: bool = True,
     ) -> dict[str, Any]:
@@ -53,7 +53,7 @@ class ConceptRepresentationGenerator:
         This is the main entry point. It wraps the generated content with concept.
 
         Args:
-            concept_string: The concept string (e.g., "domain.ConceptCode")
+            concept_ref: The concept string (e.g., "domain.ConceptCode")
             structure_class: The StuffContent class to generate representation for
             include_optional: If False, exclude fields with default values (optional fields)
 
@@ -64,7 +64,7 @@ class ConceptRepresentationGenerator:
 
         content = self.generate_class_representation(structure_class, include_optional=include_optional)
 
-        return {"concept": concept_string, "content": content}
+        return {"concept": concept_ref, "content": content}
 
     def generate_class_representation(
         self,
@@ -345,35 +345,35 @@ class ConceptRepresentationGenerator:
 
 
 def generate_json_representation(
-    concept_string: str,
+    concept_ref: str,
     structure_class: type[StuffContent],
 ) -> dict[str, Any]:
     """Convenience function to generate a JSON format representation.
 
     Args:
-        concept_string: The concept string (e.g., "domain.ConceptCode")
+        concept_ref: The concept string (e.g., "domain.ConceptCode")
         structure_class: The StuffContent class
 
     Returns:
         Dict with concept and content
     """
     generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-    return generator.generate_representation(concept_string, structure_class)
+    return generator.generate_representation(concept_ref, structure_class)
 
 
 def generate_python_representation(
-    concept_string: str,
+    concept_ref: str,
     structure_class: type[StuffContent],
 ) -> tuple[dict[str, Any], set[str]]:
     """Convenience function to generate a Python format representation.
 
     Args:
-        concept_string: The concept string (e.g., "domain.ConceptCode")
+        concept_ref: The concept string (e.g., "domain.ConceptCode")
         structure_class: The StuffContent class
 
     Returns:
         Tuple of (representation dict, imports_needed set)
     """
     generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-    representation = generator.generate_representation(concept_string, structure_class)
+    representation = generator.generate_representation(concept_ref, structure_class)
     return representation, generator.imports_needed

@@ -76,7 +76,7 @@ class FlowFactory:
                     )
                     log.verbose(signature_from_blueprint, title="Signature from blueprint")
         return Flow(
-            domain=bundle_blueprint.domain,
+            domain_code=bundle_blueprint.domain,
             description=bundle_blueprint.description,
             flow_elements=flow_elements,
         )

@@ -16,7 +16,7 @@ class PipeFactoryErrorData(BaseModel):
     )
 
     # === Source Context ===
-    domain: str | None = Field(None, description="Domain where error occurred")
+    domain_code: str | None = Field(None, description="Domain where error occurred")
 
     # === Entity Context (what failed) ===
     pipe_code: str | None = Field(None, description="Pipe code that failed to be created")
@@ -39,7 +39,7 @@ class PipesAndConceptValidationErrorData(BaseModel):
     """
 
     # === Source Context ===
-    domain: str | None = Field(None, description="Domain where error occurred")
+    domain_code: str | None = Field(None, description="Domain where error occurred")
     source: str | None = Field(None, description="Source file path")
 
     # === Entity Context (what failed) ===

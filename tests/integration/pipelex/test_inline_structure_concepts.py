@@ -48,13 +48,13 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="TestFeatureAnalysis",
             blueprint_or_string_description=blueprint,
         )
 
         # Verify concept properties
-        assert concept.domain == "test_domain"
+        assert concept.domain_code == "test_domain"
         assert concept.code == "TestFeatureAnalysis"
         assert concept.description == "Analysis of a photo's visual content"
         assert concept.structure_class_name == "TestFeatureAnalysis"
@@ -88,14 +88,14 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="TestStringRef",
             blueprint_or_string_description=blueprint,
         )
 
         # Verify concept properties
         assert concept.code == "TestStringRef"
-        assert concept.domain == "test_domain"
+        assert concept.domain_code == "test_domain"
         assert concept.description == "Test with string reference"
         assert concept.structure_class_name == "TextContent"
 
@@ -106,7 +106,7 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="TestAutoDetect",
             blueprint_or_string_description=blueprint,
         )
@@ -144,14 +144,14 @@ class TestInlineStructureConcepts:
         blueprint = ConceptBlueprint(description="Complex document structure", structure=inline_structure)
 
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="ComplexDocument",
             blueprint_or_string_description=blueprint,
         )
 
         # Verify concept creation
         assert concept.code == "ComplexDocument"
-        assert concept.domain == "test_domain"
+        assert concept.domain_code == "test_domain"
         assert concept.structure_class_name == "ComplexDocument"
 
         # Verify the generated class works
@@ -182,7 +182,7 @@ class TestInlineStructureConcepts:
 not a registered subclass of StuffContent",
         ):
             _ = ConceptFactory.make_from_blueprint(
-                domain="test_domain",
+                domain_code="test_domain",
                 concept_code="TestInvalidRef",
                 blueprint_or_string_description=ConceptBlueprint(description="Test invalid reference", structure="NonExistentClass"),
             )
@@ -197,7 +197,7 @@ not a registered subclass of StuffContent",
 
         blueprint1 = ConceptBlueprint(description="Person information", structure=structure1)
         concept1 = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="Person",
             blueprint_or_string_description=blueprint1,
         )
@@ -210,7 +210,7 @@ not a registered subclass of StuffContent",
 
         blueprint2 = ConceptBlueprint(description="Product information", structure=structure2)
         concept2 = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="Product",
             blueprint_or_string_description=blueprint2,
         )
@@ -260,13 +260,13 @@ not a registered subclass of StuffContent",
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="AnimalInfo",
             blueprint_or_string_description=blueprint,
         )
 
         # Verify concept properties
-        assert concept.domain == "test_domain"
+        assert concept.domain_code == "test_domain"
         assert concept.code == "AnimalInfo"
         assert concept.structure_class_name == "AnimalInfo"
 

@@ -45,7 +45,7 @@ class TestPipeSequenceDryRun:
         discord_updates_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DiscordChannelUpdate",
-                domain="discord_newsletter",
+                domain_code="discord_newsletter",
                 description="Lorem Ipsum",
                 structure_class_name="DiscordChannelUpdate",
             ),
@@ -76,7 +76,7 @@ class TestPipeSequenceDryRun:
         # The pipeline only has one step (summarization), so the final output is ChannelSummary
         # This test is focused on verifying that batching works correctly in dry run mode
         assert pipe_output.main_stuff.concept.code == "HtmlNewsletter"
-        assert pipe_output.main_stuff.concept.domain == "discord_newsletter"
+        assert pipe_output.main_stuff.concept.domain_code == "discord_newsletter"
 
         # Verify working memory structure
         final_working_memory: WorkingMemory = pipe_output.working_memory
@@ -84,7 +84,7 @@ class TestPipeSequenceDryRun:
         # Check that discord_channel_updates was created as ListContent
         discord_updates_stuff_final = final_working_memory.get_stuff("discord_channel_updates")
         assert discord_updates_stuff_final.concept.code == "DiscordChannelUpdate"
-        assert discord_updates_stuff_final.concept.domain == "discord_newsletter"
+        assert discord_updates_stuff_final.concept.domain_code == "discord_newsletter"
 
         # The key assertion: verify it's a ListContent with multiple items
         discord_updates_list = discord_updates_stuff_final.as_list_of_fixed_content_type(item_type=DiscordChannelUpdate)
@@ -100,7 +100,7 @@ class TestPipeSequenceDryRun:
         channel_summaries_stuff: Stuff | None = final_working_memory.get_optional_stuff("channel_summaries")
         assert channel_summaries_stuff is not None, "channel_summaries should be in working memory"
         assert channel_summaries_stuff.concept.code == "ChannelSummary"
-        assert channel_summaries_stuff.concept.domain == "discord_newsletter"
+        assert channel_summaries_stuff.concept.domain_code == "discord_newsletter"
         assert isinstance(channel_summaries_stuff, Stuff), "ChannelSurrmary Stuff is not a Stuff"
 
         # Verify channel_summaries is also a ListContent with multiple ChannelSummary items

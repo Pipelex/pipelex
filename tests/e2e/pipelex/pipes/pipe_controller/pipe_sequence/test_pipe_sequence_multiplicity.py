@@ -22,7 +22,7 @@ class TestPipeSequenceMultiplicity:
             name="topic",
             concept=ConceptFactory.make(
                 concept_code="CreativeTopic",
-                domain="creative_ideation",
+                domain_code="creative_ideation",
                 description="creative_ideation.CreativeTopic",
                 structure_class_name="CreativeTopic",
             ),
@@ -44,4 +44,4 @@ class TestPipeSequenceMultiplicity:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
         assert pipe_output.main_stuff.concept.code == "BestIdea"
-        assert pipe_output.main_stuff.concept.domain == "creative_ideation"
+        assert pipe_output.main_stuff.concept.domain_code == "creative_ideation"

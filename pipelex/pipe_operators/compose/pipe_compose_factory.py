@@ -38,7 +38,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             raise PipeComposeFactoryError(msg) from exc
 
         return PipeCompose(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             inputs=inputs,

@@ -1,10 +1,10 @@
 import pytest
 
-from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_string_or_code
+from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_ref_or_code
 
 
 class TestStripMultiplicityFromConceptStringOrCode:
-    """Test the strip_multiplicity_from_concept_string_or_code function."""
+    """Test the strip_multiplicity_from_concept_ref_or_code function."""
 
     @pytest.mark.parametrize(
         ("input_string", "expected_output"),
@@ -55,5 +55,5 @@ class TestStripMultiplicityFromConceptStringOrCode:
         - Concepts with multi-digit multiplicity [10-999]
         - Concepts with large multiplicity [1000+]
         """
-        result = strip_multiplicity_from_concept_string_or_code(input_string)
+        result = strip_multiplicity_from_concept_ref_or_code(input_string)
         assert result == expected_output

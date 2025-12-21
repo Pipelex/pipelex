@@ -29,10 +29,10 @@ class TestPipeSequenceSimple:
     async def test_simple_sequence_processing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
-        domain = "test_integration"
+        domain_code = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",
-            domain=domain,
+            domain_code=domain_code,
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_library = get_concept_library()
@@ -42,8 +42,8 @@ class TestPipeSequenceSimple:
         # Create PipeSequence instance - pipes are loaded from PLX files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Simple sequence for text processing",
-            inputs={"input_text": concept_1.concept_string},
-            output=concept_2.concept_string,
+            inputs={"input_text": concept_1.concept_ref},
+            output=concept_2.concept_ref,
             steps=[
                 SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),
                 SubPipeBlueprint(pipe="add_prefix", result="final_text"),
@@ -51,7 +51,7 @@ class TestPipeSequenceSimple:
         )
 
         pipe_sequence = PipeFactory[PipeSequence].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="simple_sequence",
             blueprint=pipe_sequence_blueprint,
         )
@@ -67,7 +67,7 @@ class TestPipeSequenceSimple:
 
         # Verify the PipeSequence instance was created correctly
         assert pipe_sequence is not None
-        assert pipe_sequence.domain == "test_integration"
+        assert pipe_sequence.domain_code == "test_integration"
         assert pipe_sequence.code == "simple_sequence"
         assert len(pipe_sequence.sequential_sub_pipes) == 2
         assert pipe_sequence.sequential_sub_pipes[0].pipe_code == "capitalize_text"
