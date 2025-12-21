@@ -32,12 +32,12 @@ class SubPipe(BaseModel):
         """Run or dry run a single operation self."""
         if self.output_multiplicity:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
-        sub_pipe_run_params.batch_params = self.batch_params
 
         sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
 
         # Case 1: Batch processing
         if batch_params := self.batch_params:
+            sub_pipe_run_params.batch_params = batch_params
             try:
                 working_memory.get_typed_object_or_attribute(name=batch_params.input_list_stuff_name, wanted_type=ListContent)
             except WorkingMemoryStuffNotFoundError as exc:
@@ -80,9 +80,10 @@ class SubPipe(BaseModel):
                 },
             )
 
+            pipe_batch_adhoc_pipe_code = f"{self.pipe_code}_adhoc_batch"
             pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
                 domain_code=sub_pipe.domain_code,
-                pipe_code=self.pipe_code,
+                pipe_code=pipe_batch_adhoc_pipe_code,
                 blueprint=pipe_batch_blueprint,
                 concept_codes_from_the_same_domain=[concept.code for concept in sub_pipe.concept_dependencies],
             )
