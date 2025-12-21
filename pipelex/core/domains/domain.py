@@ -27,7 +27,7 @@ class Domain(BaseModel):
     description: str | None = None
     system_prompt: str | None = None
 
-    @field_validator("domain", mode="before")
+    @field_validator("code", mode="before")
     @classmethod
     def validate_domain_syntax(cls, domain_code: str) -> str:
         try:

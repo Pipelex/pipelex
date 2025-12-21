@@ -13,7 +13,7 @@ class DomainBlueprint(BaseModel):
     system_prompt: str | None = None
     main_pipe: str | None = None
 
-    @field_validator("domain", mode="before")
+    @field_validator("code", mode="before")
     @classmethod
     def validate_domain_syntax(cls, domain_code: str) -> str:
         try:
