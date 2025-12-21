@@ -216,7 +216,7 @@ from my_project.pipelines.finance_struct import Invoice, InvoiceData
 
 ### Step 6: Update Concept References (Optional)
 
-While domain-prefixed concept references still work, you can now use simpler references:
+While domain code prefixed concept references still work, you can now use simpler references:
 
 **Before:**
 ```plx
@@ -226,7 +226,7 @@ inputs = { wedding_photo = "images.Photo" }
 
 **After:**
 ```plx
-# Simpler references (domain prefix optional)
+# Simpler references (domain code prefix optional)
 inputs = { prompt = "ImgGenPrompt" }
 inputs = { wedding_photo = "Photo" }
 ```
