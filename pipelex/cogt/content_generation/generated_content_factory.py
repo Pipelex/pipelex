@@ -9,7 +9,7 @@ from pipelex.config import get_config
 from pipelex.tools.misc.base_64_utils import (
     extract_base_64_str_from_base64_url_if_possible,
 )
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 
@@ -46,10 +46,10 @@ class GeneratedContentFactory:
 
         return f"{hash_digest}.{extension}"
 
-    def _fetch_remote_content(self, url: str) -> bytes:
-        return fetch_file_from_url_httpx(url=url)
+    async def _fetch_remote_content(self, url: str) -> bytes:
+        return await fetch_file_from_url_httpx_async(url=url)
 
-    def make_generated_image(
+    async def make_generated_image(
         self,
         raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
@@ -108,7 +108,7 @@ class GeneratedContentFactory:
             mime_type = "image/jpeg"
 
         if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content:
-            actual_bytes = self._fetch_remote_content(url=url)
+            actual_bytes = await self._fetch_remote_content(url=url)
             storage_uri = self._build_filename_from_hash(data=actual_bytes, mime_type=mime_type, output_format=output_format)
             url = self.storage_provider.store(data=actual_bytes, uri=storage_uri)
 

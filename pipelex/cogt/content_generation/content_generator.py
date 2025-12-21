@@ -203,7 +203,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         self,
         generated_image_raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
-        return self._generated_content_factory.make_generated_image(raw_details=generated_image_raw_details)
+        return await self._generated_content_factory.make_generated_image(raw_details=generated_image_raw_details)
 
     @override
     @update_job_metadata
