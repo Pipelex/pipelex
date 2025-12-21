@@ -7,7 +7,6 @@ from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
 from typing_extensions import override
 
-from pipelex import pretty_print
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -80,8 +79,11 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
 
         response_dict: dict[str, Any] = response.model_dump()
         generated_images: list[GeneratedImageRawDetails] = []
-        response_output_format: str | None = response_dict.get("output_format")
         if images := response_dict.get("data"):
+            response_output_format: str | None = response_dict.get("output_format")
+            if not response_output_format:
+                msg = "No output format received from Gateway"
+                raise ImgGenGenerationError(msg)
             size = response_dict.get("size")
             if not isinstance(size, str):
                 msg = f"Size from img gen response is not a string: '{size}'"
@@ -113,7 +115,6 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             response_dict = await fal_poller.poll_queue_until_complete(response_dict=response_dict)
 
             for image in response_dict.get("images", []):
-                pretty_print(image, title="Image")
                 url = image.get("url")
                 if not isinstance(url, str):
                     msg = "Missing url field in image response"
@@ -135,7 +136,6 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     width=width,
                     height=height,
                     mime_type=content_type,
-                    output_format=response_output_format,
                 )
                 generated_images.append(generated_image)
         else:

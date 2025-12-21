@@ -99,6 +99,9 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             response_dict = response.json()
 
         response_output_format: str | None = response_dict.get("output_format")
+        if not response_output_format:
+            msg = "No output format received from Azure"
+            raise ImgGenGenerationError(msg)
         generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
             size = response_dict.get("size")

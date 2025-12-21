@@ -1,7 +1,6 @@
 import base64
 import hashlib
 
-from pipelex import pretty_print
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
 from pipelex.cogt.img_gen.img_gen_job_components import OutputFormat
@@ -109,8 +108,6 @@ class GeneratedContentFactory:
             else:
                 msg = "No URL or base64 string found"
                 raise NeitherUrlNorDataError(msg)
-
-        pretty_print(url, title="Generated image URL")
 
         mime_type: str | None = None
         if raw_details.mime_type:

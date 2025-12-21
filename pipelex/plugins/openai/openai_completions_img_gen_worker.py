@@ -4,7 +4,7 @@ import openai
 from openai import APIConnectionError, BadRequestError, NotFoundError
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -87,7 +87,6 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
             raise ImgGenGenerationError(msg) from bad_request_error
 
         openai_message: ChatCompletionMessage = response.choices[0].message
-        pretty_print(openai_message, title="OpenAI response message")
         actual_url: str | None = None
         base64_str: str | None = None
         base64_extracted_mime_type: str | None = None
@@ -115,7 +114,6 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                             base64_str, base64_extracted_mime_type = extracted
                             break
         if not base64_str and not actual_url:
-            pretty_print(openai_message, title="OpenAI response message")
             msg = f"ImgGenCompletions response has no image. Model: {self.inference_model.desc}"
             raise ImgGenGenerationError(msg)
         return GeneratedImageRawDetails(
