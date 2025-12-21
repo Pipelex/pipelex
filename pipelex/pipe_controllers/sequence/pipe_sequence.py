@@ -9,6 +9,7 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
 from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
@@ -55,15 +56,13 @@ class PipeSequence(PipeController):
         The output of the pipe sequence should match the output of the last step,
         both in terms of concept compatibility and multiplicity.
         """
-        last_step_pipe_code = self.sequential_sub_pipes[-1].pipe_code
-        last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
-        last_step_stuff_spec = last_step_pipe.output
+        last_step_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
 
         # Check concept compatibility
-        if not get_concept_library().is_compatible(tested_concept=last_step_stuff_spec.concept, wanted_concept=self.output.concept):
+        if not get_concept_library().is_compatible(tested_concept=last_step_pipe.output.concept, wanted_concept=self.output.concept):
             msg = (
-                f"PipeSequence concept mismatch: the output concept '{last_step_stuff_spec.concept.concept_ref}' "
-                f"of the last step '{last_step_pipe_code}' of sequence pipe '{self.code}' "
+                f"PipeSequence concept mismatch: the output concept '{last_step_pipe.output.concept.concept_ref}' "
+                f"of the last step '{last_step_pipe.code}' of sequence pipe '{self.code}' "
                 f"is not compatible with the output concept '{self.output.concept.concept_ref}' of the sequence."
             )
             raise PipeValidationError(
@@ -71,23 +70,31 @@ class PipeSequence(PipeController):
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=last_step_stuff_spec.concept.concept_ref,
+                provided_concept_code=last_step_pipe.output.concept.concept_ref,
                 required_concept_codes=[self.output.concept.concept_ref],
             )
 
-        # Check multiplicity match
-        if self.output.multiplicity != last_step_stuff_spec.multiplicity:
+        last_sub_pipe = self.sequential_sub_pipes[-1]
+        effective_last_step_output_multiplicity = last_sub_pipe.output_multiplicity
+        if not effective_last_step_output_multiplicity:
+            effective_last_step_output_multiplicity = get_required_pipe(pipe_code=last_sub_pipe.pipe_code).output.multiplicity
+
+        # Check multiplicity compatibility
+        if not is_multiplicity_compatible(
+            source_multiplicity=effective_last_step_output_multiplicity,
+            target_multiplicity=self.output.multiplicity,
+        ):
             msg = (
                 f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "
-                f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe_code}' "
-                f"has output multiplicity={last_step_stuff_spec.multiplicity}. They must be the same."
+                f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe.code}' "
+                f"has output multiplicity={effective_last_step_output_multiplicity}. They are not compatible."
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=last_step_stuff_spec.concept.concept_ref,
+                provided_concept_code=last_step_pipe.output.concept.concept_ref,
                 required_concept_codes=[self.output.concept.concept_ref],
             )
 
