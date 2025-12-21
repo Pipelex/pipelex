@@ -8,7 +8,7 @@ from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.validation import validate_concept_string
+from pipelex.core.concepts.validation import validate_concept_ref
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -24,14 +24,14 @@ class StuffFactoryError(PipelexError):
 
 class StuffBlueprint(BaseModel):
     stuff_name: str
-    concept_string: str
+    concept_ref: str
     content: dict[str, Any] | str
 
-    @field_validator("concept_string")
+    @field_validator("concept_ref")
     @classmethod
-    def validate_concept_string_field(cls, concept_string: str) -> str:
-        validate_concept_string(concept_string)
-        return concept_string
+    def validate_concept_ref_field(cls, concept_ref: str) -> str:
+        validate_concept_ref(concept_ref)
+        return concept_ref
 
 
 class StuffFactory:
@@ -48,9 +48,9 @@ class StuffFactory:
         )
 
     @classmethod
-    def make_from_concept_string(cls, concept_string: str, name: str, content: StuffContent) -> Stuff:
-        validate_concept_string(concept_string)
-        concept = get_required_concept(concept_string=concept_string)
+    def make_from_concept_ref(cls, concept_ref: str, name: str, content: StuffContent) -> Stuff:
+        validate_concept_ref(concept_ref)
+        concept = get_required_concept(concept_ref=concept_ref)
         return cls.make_stuff(
             concept=concept,
             content=content,
@@ -78,7 +78,7 @@ class StuffFactory:
     def make_from_blueprint(cls, blueprint: StuffBlueprint) -> "Stuff":
         concept_library = get_concept_library()
         if isinstance(blueprint.content, str) and concept_library.is_compatible(
-            tested_concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
+            tested_concept=concept_library.get_required_concept(concept_ref=blueprint.concept_ref),
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
         ):
             the_stuff = cls.make_stuff(
@@ -88,11 +88,11 @@ class StuffFactory:
             )
         else:
             the_stuff_content = StuffContentFactory.make_stuff_content_from_concept_required(
-                concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
+                concept=concept_library.get_required_concept(concept_ref=blueprint.concept_ref),
                 value=blueprint.content,
             )
             the_stuff = cls.make_stuff(
-                concept=concept_library.get_required_concept(concept_string=blueprint.concept_string),
+                concept=concept_library.get_required_concept(concept_ref=blueprint.concept_ref),
                 content=the_stuff_content,
                 name=blueprint.stuff_name,
             )
@@ -125,7 +125,7 @@ class StuffFactory:
         stuff_content_or_data: StuffContentOrData,
         name: str | None = None,
         code: str | None = None,
-        search_domains: list[str] | None = None,
+        search_domain_codes: list[str] | None = None,
     ) -> Stuff:
         """Create a Stuff from StuffContentOrData covering all pipeline inputs cases.
 
@@ -195,14 +195,14 @@ class StuffFactory:
                 content_class_name = type(first_item).__name__
 
                 # Check if it's a native concept
-                if "Content" in content_class_name and NativeConceptCode.is_native_concept_string_or_code(
-                    concept_string_or_code=content_class_name.split("Content")[0]
+                if "Content" in content_class_name and NativeConceptCode.is_native_concept_ref_or_code(
+                    concept_ref_or_code=content_class_name.split("Content")[0]
                 ):
                     concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
                     try:
-                        concept = concept_library.get_required_concept_from_concept_string_or_code(
-                            concept_string_or_code=content_class_name, search_domains=search_domains
+                        concept = concept_library.get_required_concept_from_concept_ref_or_code(
+                            concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
                         )
                     except ConceptLibraryConceptNotFoundError as exc:
                         msg = (
@@ -224,16 +224,16 @@ class StuffFactory:
                 content_class_name = stuff_content_or_data.__class__.__name__
 
                 # Check if it's a native concept
-                if "Content" in content_class_name and NativeConceptCode.is_native_concept_string_or_code(
-                    concept_string_or_code=content_class_name.split("Content")[0]
+                if "Content" in content_class_name and NativeConceptCode.is_native_concept_ref_or_code(
+                    concept_ref_or_code=content_class_name.split("Content")[0]
                 ):
                     # It's a native concept like TextContent, ImageContent, etc.
                     concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                 else:
                     # It's a StructuredContent, try to find the concept
                     try:
-                        concept = concept_library.get_required_concept_from_concept_string_or_code(
-                            concept_string_or_code=content_class_name, search_domains=search_domains
+                        concept = concept_library.get_required_concept_from_concept_ref_or_code(
+                            concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
                         )
                     except ConceptLibraryConceptNotFoundError as exc:
                         msg = (
@@ -291,14 +291,14 @@ class StuffFactory:
                             raise StuffFactoryError(msg)
 
                     # Check if it's a native concept
-                    if "Content" in content_class_name and NativeConceptCode.is_native_concept_string_or_code(
-                        concept_string_or_code=content_class_name.split("Content")[0]
+                    if "Content" in content_class_name and NativeConceptCode.is_native_concept_ref_or_code(
+                        concept_ref_or_code=content_class_name.split("Content")[0]
                     ):
                         concept = get_native_concept(native_concept=NativeConceptCode(content_class_name.split("Content")[0]))
                     else:
                         try:
-                            concept = concept_library.get_required_concept_from_concept_string_or_code(
-                                concept_string_or_code=content_class_name, search_domains=search_domains
+                            concept = concept_library.get_required_concept_from_concept_ref_or_code(
+                                concept_ref_or_code=content_class_name, search_domain_codes=search_domain_codes
                             )
                         except ConceptLibraryConceptNotFoundError as exc:
                             msg = (
@@ -343,18 +343,18 @@ class StuffFactory:
             )
             raise StuffFactoryError(msg)
 
-        concept_string = stuff_content_or_data["concept"]
+        concept_ref = stuff_content_or_data["concept"]
         content = stuff_content_or_data["content"]
 
         # Get the concept from the library
         try:
-            concept = concept_library.get_required_concept_from_concept_string_or_code(
-                concept_string_or_code=concept_string, search_domains=search_domains
+            concept = concept_library.get_required_concept_from_concept_ref_or_code(
+                concept_ref_or_code=concept_ref, search_domain_codes=search_domain_codes
             )
         except ConceptLibraryConceptNotFoundError as exc:
             msg = (
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
-                f"but the concept of name '{concept_string}' is not found in the library"
+                f"but the concept of name '{concept_ref}' is not found in the library"
             )
             raise StuffFactoryError(msg) from exc
 
@@ -371,7 +371,7 @@ class StuffFactory:
                 )
             msg = (
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
-                f"but the concept of name '{concept_string}' is not compatible with native concept 'native.Text'"
+                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Text'"
             )
             raise StuffFactoryError(msg)
 
@@ -380,7 +380,7 @@ class StuffFactory:
             if concept.structure_class_name != content.__class__.__name__:
                 msg = (
                     f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
-                    f"but the concept of name '{concept_string}' is not compatible with the content of type {content.__class__.__name__}"
+                    f"but the concept of name '{concept_ref}' is not compatible with the content of type {content.__class__.__name__}"
                 )
                 raise StuffFactoryError(msg)
 
@@ -397,7 +397,7 @@ class StuffFactory:
             if the_class is None:
                 msg = (
                     f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
-                    f"but the concept of name '{concept_string}' is not compatible with a dict content"
+                    f"but the concept of name '{concept_ref}' is not compatible with a dict content"
                 )
                 raise StuffFactoryError(msg)
 
@@ -437,7 +437,7 @@ class StuffFactory:
                         code=code,
                     )
 
-                msg = f"Concept '{concept_string}' is not compatible with list of text content"
+                msg = f"Concept '{concept_ref}' is not compatible with list of text content"
                 raise StuffFactoryError(msg)
 
             # Case 2.4: list[StuffContent] (includes both native and StructuredContent)

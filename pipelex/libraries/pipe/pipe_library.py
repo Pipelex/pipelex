@@ -93,15 +93,15 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         pipes = self.get_pipes()
 
         # Sort pipes by domain and code
-        ordered_items = sorted(pipes, key=lambda pipe: (pipe.domain or "", pipe.code or ""))
+        ordered_items = sorted(pipes, key=lambda pipe: (pipe.domain_code or "", pipe.code or ""))
 
         # Create dictionary for return value
         pipes_dict: dict[str, dict[str, dict[str, str]]] = {}
 
         # Group by domain and create separate tables
-        for domain, domain_pipes in groupby(ordered_items, key=lambda pipe: pipe.domain):
+        for domain_code, domain_pipes in groupby(ordered_items, key=lambda pipe: pipe.domain_code):
             table = Table(
-                title=f"[bold magenta]domain = {domain}[/]",
+                title=f"[bold magenta]domain = {domain_code}[/]",
                 show_header=True,
                 show_lines=True,
                 header_style="bold cyan",
@@ -114,13 +114,13 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             table.add_column("Input", style="yellow")
             table.add_column("Output", style="yellow")
 
-            pipes_dict[domain] = {}
+            pipes_dict[domain_code] = {}
 
             for pipe in domain_pipes:
                 inputs = pipe.inputs
-                formatted_inputs = [f"{name}: {_format_concept_code(stuff_spec.concept.code, domain)}" for name, stuff_spec in inputs.items]
+                formatted_inputs = [f"{name}: {_format_concept_code(stuff_spec.concept.code, domain_code)}" for name, stuff_spec in inputs.items]
                 formatted_inputs_str = ", ".join(formatted_inputs)
-                output_code = _format_concept_code(pipe.output.concept.code, domain)
+                output_code = _format_concept_code(pipe.output.concept.code, domain_code)
 
                 table.add_row(
                     pipe.code,
@@ -129,7 +129,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                     output_code,
                 )
 
-                pipes_dict[domain][pipe.code] = {
+                pipes_dict[domain_code][pipe.code] = {
                     "description": pipe.description or "",
                     "inputs": formatted_inputs_str,
                     "output": pipe.output.concept.code,

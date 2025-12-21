@@ -22,7 +22,7 @@ Every Pipelex bundle follows this structure:
 
 ```plx
 # 1. Domain Declaration (MANDATORY)
-domain = "domain_name"
+domain = "domain_code"
 description = "Description of what this domain handles"
 
 # 2. Optional: Main Pipe Declaration
@@ -119,13 +119,13 @@ LineItem = "An individual item or service listed in an invoice"
 
 **Concept Naming:**
 
-Within a bundle, you reference concepts by their simple name (`Invoice`). However, their **full identifier** includes the domain:
+Within a bundle, you reference concepts by their simple name (`Invoice`). However, their **full identifier** includes the domain code:
 
 ```
-domain_name.ConceptName
+domain_code.ConceptName
 ```
 
-For example, if your domain is `invoice_processing`, the concept `Invoice` has the full identifier:
+For example, if your domain_code is `invoice_processing`, the concept `Invoice` has the full identifier:
 
 ```
 invoice_processing.Invoice
@@ -146,13 +146,13 @@ output = "Page"
 ```
 See more about designing pipes in [Designing Pipelines](./pipes/index.md).
 
-## Referencing Concepts: When to Use Domain Prefixes
+## Referencing Concepts: When to Use Domain code prefixes
 
-Understanding when to use domain prefixes is crucial for writing clean, maintainable bundles.
+Understanding when to use domain code prefixes is crucial for writing clean, maintainable bundles.
 
 ### Same-Bundle References (No Prefix Needed)
 
-When a pipe in a bundle references a concept **defined in the same bundle**, you don't need the domain prefix:
+When a pipe in a bundle references a concept **defined in the same bundle**, you don't need the domain code prefix:
 
 ```plx
 domain = "invoice_processing"
@@ -173,7 +173,7 @@ This is the most common case and keeps your code clean.
 
 ### Cross-Bundle References (Prefix Required)
 
-When a pipe references a concept **from another bundle/domain**, you must use the full domain prefix:
+When a pipe references a concept **from another bundle/domain**, you must use the full domain code prefix:
 
 ```plx
 domain = "accounting"

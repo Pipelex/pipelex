@@ -156,7 +156,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             variable_name="mock_output",
             concept=ConceptFactory.make(
                 concept_code=self.output.concept.code,
-                domain="generic",
+                domain_code="generic",
                 description="Lorem Ipsum",
                 structure_class_name=self.output.concept.structure_class_name,
             ),

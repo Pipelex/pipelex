@@ -40,7 +40,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -50,7 +50,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -89,7 +89,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -99,7 +99,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -135,7 +135,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -145,7 +145,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -189,7 +189,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -199,7 +199,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -236,7 +236,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -246,7 +246,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -278,7 +278,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -350,7 +350,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -360,7 +360,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),

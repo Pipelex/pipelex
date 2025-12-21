@@ -49,6 +49,6 @@ class Flow(StructuredContent):
 
     model_config = ConfigDict(extra="forbid")
 
-    domain: str
+    domain_code: str
     description: str | None = None
     flow_elements: dict[str, FlowElement] = Field(default_factory=dict)

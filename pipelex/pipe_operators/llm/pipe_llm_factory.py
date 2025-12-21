@@ -36,7 +36,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         blueprint: PipeLLMBlueprint,
     ) -> PipeLLM:
         system_prompt = blueprint.system_prompt
-        if not system_prompt and (domain_obj := get_optional_domain(domain=domain_code)):
+        if not system_prompt and (domain_obj := get_optional_domain(domain_code=domain_code)):
             system_prompt = domain_obj.system_prompt
 
         system_prompt_jinja2_blueprint: TemplateBlueprint | None = None
@@ -73,13 +73,13 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 # Parse to strip multiplicity brackets
                 input_parse_result = parse_concept_with_multiplicity(requirement_str)
 
-                domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                    domain=domain_code,
-                    concept_string_or_code=input_parse_result.concept,
+                domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_ref_or_code(
+                    domain_code=domain_code,
+                    concept_ref_or_code=input_parse_result.concept,
                 )
                 concept = get_required_concept(
-                    concept_string=ConceptFactory.make_concept_string_with_domain(
-                        domain=domain_and_code.domain,
+                    concept_ref=ConceptFactory.make_concept_ref_with_domain(
+                        domain_code=domain_and_code.domain_code,
                         concept_code=domain_and_code.concept_code,
                     ),
                 )
@@ -114,7 +114,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         )
 
         return PipeLLM(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             inputs=inputs,

@@ -28,7 +28,7 @@ class TestPipeSequenceSimple:
             name="raw_text",
             concept=ConceptFactory.make(
                 concept_code="RawText",
-                domain="simple_text_processing",
+                domain_code="simple_text_processing",
                 description="simple_text_processing.RawText",
                 structure_class_name="TextContent",
             ),
@@ -50,4 +50,4 @@ class TestPipeSequenceSimple:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
         assert pipe_output.main_stuff.concept.code == "SummaryText"
-        assert pipe_output.main_stuff.concept.domain == "simple_text_processing"
+        assert pipe_output.main_stuff.concept.domain_code == "simple_text_processing"

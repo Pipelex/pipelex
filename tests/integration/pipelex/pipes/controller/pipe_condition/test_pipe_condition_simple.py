@@ -53,7 +53,7 @@ class TestPipeConditionSimple:
 
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_text_stuff)
 
-        assert pipe_condition.domain == "test_integration"
+        assert pipe_condition.domain_code == "test_integration"
         assert pipe_condition.code == "text_length_condition"
         assert pipe_condition.outcome_map == {"long": "capitalize_long_text", "short": "add_prefix_short_text"}
 
@@ -96,7 +96,10 @@ class TestPipeConditionSimple:
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode != PipeRunMode.DRY:
             assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
-        assert f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        assert (
+            f"{final_result_in_memory.concept.domain_code}.{final_result_in_memory.concept.code}"
+            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        )
 
     async def test_condition_short_text_processing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
@@ -167,7 +170,10 @@ class TestPipeConditionSimple:
         assert isinstance(final_result_in_memory.content, TextContent)
         if pipe_run_mode != PipeRunMode.DRY:
             assert final_result_in_memory.content.text == "SHORT: hi"
-        assert f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        assert (
+            f"{final_result_in_memory.concept.domain_code}.{final_result_in_memory.concept.code}"
+            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        )
 
     async def test_condition_dry_run_success(self, load_test_library: Callable[[list[Path]], None]):
         """Test PipeCondition dry run with valid inputs using real pipe - should succeed."""
@@ -177,7 +183,7 @@ class TestPipeConditionSimple:
         input_data_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="CategoryInput",
-                domain="test_pipe_condition_2",
+                domain_code="test_pipe_condition_2",
                 description="test_pipe_condition_2.CategoryInput",
                 structure_class_name="CategoryInput",
             ),
@@ -252,7 +258,7 @@ class TestPipeConditionSimple:
         input_data_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="CategoryInput",
-                domain="test_pipe_condition_2",
+                domain_code="test_pipe_condition_2",
                 description="test_pipe_condition_2.CategoryInput",
                 structure_class_name="CategoryInput",
             ),

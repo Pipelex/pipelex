@@ -130,22 +130,22 @@ class PipeCondition(PipeController):
         """
         for pipe_code in self.mapped_pipe_codes:
             pipe = get_required_pipe(pipe_code=pipe_code)
-            if self.output.concept.concept_string not in {
-                pipe.output.concept.concept_string,
-                NativeConceptCode.DYNAMIC.concept_string,
-                NativeConceptCode.ANYTHING.concept_string,
+            if self.output.concept.concept_ref not in {
+                pipe.output.concept.concept_ref,
+                NativeConceptCode.DYNAMIC.concept_ref,
+                NativeConceptCode.ANYTHING.concept_ref,
             }:
                 msg = (
-                    f"The output concept code '{self.output.concept.concept_string}' of the pipe '{self.code}' is not "
-                    f"matching the output concept code '{pipe.output.concept.concept_string}' of the pipe '{pipe_code}'"
+                    f"The output concept code '{self.output.concept.concept_ref}' of the pipe '{self.code}' is not "
+                    f"matching the output concept code '{pipe.output.concept.concept_ref}' of the pipe '{pipe_code}'"
                 )
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                    domain=self.domain,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
-                    provided_concept_code=pipe.output.concept.concept_string,
-                    required_concept_codes=[self.output.concept.concept_string],
+                    provided_concept_code=pipe.output.concept.concept_ref,
+                    required_concept_codes=[self.output.concept.concept_ref],
                 )
 
     # TODO: Restore this validation. The problem lies with needed_inputs that construct Anything concepts.

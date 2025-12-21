@@ -109,7 +109,7 @@ def assemble_pipelex_bundle_spec(working_memory: WorkingMemory) -> PipelexBundle
             raise PipeBuilderError(msg) from exc
 
     return PipelexBundleSpec(
-        domain=bundle_header_spec.domain,
+        domain=bundle_header_spec.domain_code,
         description=bundle_header_spec.description,
         system_prompt=bundle_header_spec.system_prompt,
         main_pipe=bundle_header_spec.main_pipe,

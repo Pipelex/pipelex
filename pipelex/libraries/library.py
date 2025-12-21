@@ -51,10 +51,10 @@ class Library(BaseModel):
             # TODO: Make this non mandatory in production, or a test
             for concept in pipe.concept_dependencies:
                 try:
-                    self.concept_library.is_concept_exists(concept_string=concept.concept_string)
+                    self.concept_library.is_concept_exists(concept_ref=concept.concept_ref)
                 except ConceptLibraryError as concept_error:
                     msg = (
-                        f"INTERNAL ERROR: Pipe '{pipe.code}' references concept '{concept.concept_string}' "
+                        f"INTERNAL ERROR: Pipe '{pipe.code}' references concept '{concept.concept_ref}' "
                         f"which doesn't exist in the concept library. This should be impossible as concepts are "
                         f"validated during pipe construction (via get_required_concept() in pipe factories). "
                         f"This indicates a bug in the system. Original error: {concept_error}"

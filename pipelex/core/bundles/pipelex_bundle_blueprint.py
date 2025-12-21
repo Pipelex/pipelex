@@ -47,13 +47,13 @@ class PipelexBundleBlueprint(BaseModel):
 
     @field_validator("domain", mode="before")
     @classmethod
-    def validate_domain_syntax(cls, domain: str) -> str:
+    def validate_domain_syntax(cls, domain_code: str) -> str:
         try:
-            validate_domain_code(code=domain)
+            validate_domain_code(code=domain_code)
         except DomainCodeError as exc:
-            msg = f"Error when trying to validate the pipelex bundle at domain '{domain}': {exc}"
+            msg = f"Error when trying to validate the pipelex bundle at domain '{domain_code}': {exc}"
             raise ValueError(msg) from exc
-        return domain
+        return domain_code
 
     @field_validator("concept", mode="before")
     @classmethod

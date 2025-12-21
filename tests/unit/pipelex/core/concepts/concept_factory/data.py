@@ -15,7 +15,7 @@ class TestCases:
     # Test cases for make_refines method - only native concepts can be refined
     MAKE_REFINES_TEST_CASES: ClassVar[list[tuple[str, ConceptBlueprint, str]]] = [
         (
-            "native_concept_string",
+            "native_concept_ref",
             ConceptBlueprint(description="A concept that refines a native text concept", refines=NativeConceptCode.TEXT),
             f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         ),
@@ -34,30 +34,30 @@ class TestCases:
         ),
     ]
 
-    # Test cases for make_domain_and_concept_code_from_concept_string_or_concept_code method
+    # Test cases for make_domain_and_concept_code_from_concept_ref_or_concept_code method
     MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES: ClassVar[list[tuple[str, str, DomainAndConceptCode]]] = [
         # Test case 1: Concept string with dot notation
-        ("my_domain", "other_domain.ConceptName", DomainAndConceptCode(domain="other_domain", concept_code="ConceptName")),
+        ("my_domain", "other_domain.ConceptName", DomainAndConceptCode(domain_code="other_domain", concept_code="ConceptName")),
         # Test case 2: Concept string with dot notation (ignores same domain codes)
-        ("my_domain", "other_domain.ConceptName", DomainAndConceptCode(domain="other_domain", concept_code="ConceptName")),
+        ("my_domain", "other_domain.ConceptName", DomainAndConceptCode(domain_code="other_domain", concept_code="ConceptName")),
         # Test case 3: Native concept code (Text)
-        ("my_domain", "Text", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Text")),
+        ("my_domain", "Text", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Text")),
         # Test case 4: Native concept code (Image)
-        ("my_domain", "Image", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Image")),
+        ("my_domain", "Image", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Image")),
         # Test case 5: Native concept code (PDF)
-        ("my_domain", "PDF", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="PDF")),
+        ("my_domain", "PDF", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="PDF")),
         # Test case 6: Native concept code with same domain codes provided (native takes precedence)
-        ("my_domain", "Text", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Text")),
+        ("my_domain", "Text", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Text")),
         # Test case 7: Concept code from same domain
-        ("my_domain", "MyConcept", DomainAndConceptCode(domain="my_domain", concept_code="MyConcept")),
+        ("my_domain", "MyConcept", DomainAndConceptCode(domain_code="my_domain", concept_code="MyConcept")),
         # Test case 8: Different domain in concept string
-        ("my_domain", "another_domain.SomeConcept", DomainAndConceptCode(domain="another_domain", concept_code="SomeConcept")),
+        ("my_domain", "another_domain.SomeConcept", DomainAndConceptCode(domain_code="another_domain", concept_code="SomeConcept")),
         # Test case 13: All native concept codes
-        ("my_domain", "Dynamic", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Dynamic")),
-        ("my_domain", "TextAndImages", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="TextAndImages")),
-        ("my_domain", "Number", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Number")),
-        ("my_domain", "Page", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Page")),
-        ("my_domain", "Anything", DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code="Anything")),
+        ("my_domain", "Dynamic", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Dynamic")),
+        ("my_domain", "TextAndImages", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="TextAndImages")),
+        ("my_domain", "Number", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Number")),
+        ("my_domain", "Page", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Page")),
+        ("my_domain", "Anything", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Anything")),
     ]
 
     # Test cases for make_from_blueprint method
@@ -69,11 +69,11 @@ class TestCases:
             "Text",
             ConceptBlueprint(description="Native text concept"),
             Concept(
-                domain=SpecialDomain.NATIVE,
+                domain_code=SpecialDomain.NATIVE,
                 code="Text",
                 description="Native text concept",
                 structure_class_name=NativeConceptCode.TEXT.structure_class_name,
-                refines=NativeConceptCode.TEXT.concept_string,
+                refines=NativeConceptCode.TEXT.concept_ref,
             ),
         ),
         # Test case 6: Concept code from same domain
@@ -83,7 +83,7 @@ class TestCases:
             "DomainConcept",
             ConceptBlueprint(description="A concept from same domain"),
             Concept(
-                domain="my_domain",
+                domain_code="my_domain",
                 code="DomainConcept",
                 description="A concept from same domain",
                 structure_class_name="DomainConcept",
@@ -109,7 +109,7 @@ class TestCases:
                 },
             ),
             Concept(
-                domain="my_domain",
+                domain_code="my_domain",
                 code="PersonConcept",
                 description="A person with structured data",
                 structure_class_name="PersonConcept",
@@ -123,7 +123,7 @@ class TestCases:
             "ConceptWithRefines",
             ConceptBlueprint(description="A concept with refines", refines="native.Image"),
             Concept(
-                domain="my_domain",
+                domain_code="my_domain",
                 code="ConceptWithRefines",
                 description="A concept with refines",
                 structure_class_name="ConceptWithRefines",
