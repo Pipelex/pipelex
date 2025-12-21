@@ -309,8 +309,8 @@ class ImgGenArgsFactory:
                         raise ImgGenParameterError(msg)
             case OutputFormatTaxonomy.FLUX_2:
                 key = "output_format"
-                value = output_format
+                value = output_format.value
             case OutputFormatTaxonomy.GPT:
                 key = "output_format"
-                value = output_format
+                value = output_format.value
         return {key: value}
