@@ -470,8 +470,8 @@ def get_concept_library() -> ConceptLibraryAbstract:
     return get_pipelex_hub().get_library().concept_library
 
 
-def get_required_concept(concept_string: str) -> Concept:
-    return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_string=concept_string)
+def get_required_concept(concept_ref: str) -> Concept:
+    return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
 def get_pipe_router() -> PipeRouterProtocol:

@@ -90,7 +90,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def concepts(self) -> list[Concept]:
         all_concepts: list[Concept] = []
         for stuff_spec in self.root.values():
-            if stuff_spec.concept.concept_string not in [c.concept_string for c in all_concepts]:
+            if stuff_spec.concept.concept_ref not in [c.concept_ref for c in all_concepts]:
                 all_concepts.append(stuff_spec.concept)
         return all_concepts
 

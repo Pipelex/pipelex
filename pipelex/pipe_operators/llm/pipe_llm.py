@@ -100,14 +100,14 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         ):
             msg = (
                 f"The output of the PipeLLM '{self.code}' cannot be compatible with the Image concept. "
-                f"The output concept is '{self.output.concept.concept_string}'. "
+                f"The output concept is '{self.output.concept.concept_ref}'. "
                 "Use a PipeImgGen if you want to generate images. You can use a PipeLLM to generate the prompt for a PipeImgGen."
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept.concept_string,
+                provided_concept_code=self.output.concept.concept_ref,
             )
 
     @override
@@ -146,7 +146,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT
             else:
                 output_stuff_spec.concept = get_required_concept(
-                    concept_string=ConceptFactory.make_concept_string_with_domain(domain_code=self.domain_code, concept_code=output_concept_code),
+                    concept_ref=ConceptFactory.make_concept_ref_with_domain(domain_code=self.domain_code, concept_code=output_concept_code),
                 )
 
         multiplicity_resolution = output_multiplicity_to_apply(
@@ -214,7 +214,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             and not is_multiple_output
         ):
             llm_prompt_1_for_text = await self.llm_prompt_spec.make_llm_prompt(
-                output_concept_string=output_stuff_spec.concept.concept_string,
+                output_concept_ref=output_stuff_spec.concept.concept_ref,
                 context_provider=working_memory,
                 output_structure_prompt=None,
                 extra_params=llm_prompt_run_params.params,
@@ -273,11 +273,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             output_structure_prompt: str | None = None
             if llm_config.is_structure_prompt_enabled:
                 output_structure_prompt = await PipeLLM.get_output_structure_prompt(
-                    concept_string=pipe_run_params.dynamic_output_concept_code or output_stuff_spec.concept.concept_string,
+                    concept_ref=pipe_run_params.dynamic_output_concept_code or output_stuff_spec.concept.concept_ref,
                     is_with_preliminary_text=is_with_preliminary_text,
                 )
             llm_prompt_1_for_object = await self.llm_prompt_spec.make_llm_prompt(
-                output_concept_string=output_stuff_spec.concept.concept_string,
+                output_concept_ref=output_stuff_spec.concept.concept_ref,
                 context_provider=working_memory,
                 output_structure_prompt=output_structure_prompt,
                 extra_params=llm_prompt_run_params.params,
@@ -450,8 +450,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         )
 
     @staticmethod
-    async def get_output_structure_prompt(concept_string: str, is_with_preliminary_text: bool) -> str | None:
-        concept = get_required_concept(concept_string=concept_string)
+    async def get_output_structure_prompt(concept_ref: str, is_with_preliminary_text: bool) -> str | None:
+        concept = get_required_concept(concept_ref=concept_ref)
         output_class = get_class_registry().get_class(concept.structure_class_name)
         if not output_class:
             return None

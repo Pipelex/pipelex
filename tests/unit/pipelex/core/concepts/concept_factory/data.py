@@ -15,7 +15,7 @@ class TestCases:
     # Test cases for make_refines method - only native concepts can be refined
     MAKE_REFINES_TEST_CASES: ClassVar[list[tuple[str, ConceptBlueprint, str]]] = [
         (
-            "native_concept_string",
+            "native_concept_ref",
             ConceptBlueprint(description="A concept that refines a native text concept", refines=NativeConceptCode.TEXT),
             f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         ),
@@ -34,7 +34,7 @@ class TestCases:
         ),
     ]
 
-    # Test cases for make_domain_and_concept_code_from_concept_string_or_concept_code method
+    # Test cases for make_domain_and_concept_code_from_concept_ref_or_concept_code method
     MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES: ClassVar[list[tuple[str, str, DomainAndConceptCode]]] = [
         # Test case 1: Concept string with dot notation
         ("my_domain", "other_domain.ConceptName", DomainAndConceptCode(domain_code="other_domain", concept_code="ConceptName")),
@@ -73,7 +73,7 @@ class TestCases:
                 code="Text",
                 description="Native text concept",
                 structure_class_name=NativeConceptCode.TEXT.structure_class_name,
-                refines=NativeConceptCode.TEXT.concept_string,
+                refines=NativeConceptCode.TEXT.concept_ref,
             ),
         ),
         # Test case 6: Concept code from same domain

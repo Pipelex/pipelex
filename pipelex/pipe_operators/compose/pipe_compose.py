@@ -89,7 +89,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         ):
             msg = (
                 f"The output of a PipeCompose must be strictly compatible with the Text concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept.concept_string}'. "
+                f"In the pipe '{self.code}' the output is '{self.output.concept.concept_ref}'. "
                 "Make sure this concept refines the native Text concept."
             )
             raise PipeValidationError(
@@ -97,8 +97,8 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept.concept_string,
-                required_concept_codes=[NativeConceptCode.TEXT.concept_string],
+                provided_concept_code=self.output.concept.concept_ref,
+                required_concept_codes=[NativeConceptCode.TEXT.concept_ref],
             )
 
     @override

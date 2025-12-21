@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptStringError
-from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, PipeInputsRoot
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.hub import get_required_concept
@@ -71,19 +71,19 @@ class InputStuffSpecsFactory:
             msg = f"Invalid input stuff spec string: {stuff_spec_str}"
             raise InputStuffSpecsFactoryError(msg)
 
-        concept_string_or_code = match.group(1)
+        concept_ref_or_code = match.group(1)
         multiplicity_str = match.group(2)
 
         # Validate and resolve concept string with domain
         try:
-            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
         except ConceptStringError as exc:
-            msg = f"Invalid concept string '{concept_string_or_code}' when trying to make an 'StuffSpec' from string: {exc}"
+            msg = f"Invalid concept string '{concept_ref_or_code}' when trying to make an 'StuffSpec' from string: {exc}"
             raise InputStuffSpecsFactoryError(msg) from exc
 
-        concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
+        concept_ref_with_domain = ConceptFactory.make_concept_ref_with_domain_from_concept_ref_or_code(
             domain_code=domain_code,
-            concept_sring_or_code=concept_string_or_code,
+            concept_sring_or_code=concept_ref_or_code,
         )
 
         # Determine multiplicity
@@ -96,5 +96,5 @@ class InputStuffSpecsFactory:
                 multiplicity = int(multiplicity_str)
         # else: No brackets, multiplicity stays None
 
-        concept = get_required_concept(concept_string=concept_string_with_domain)
+        concept = get_required_concept(concept_ref=concept_ref_with_domain)
         return StuffSpec(concept=concept, multiplicity=multiplicity)

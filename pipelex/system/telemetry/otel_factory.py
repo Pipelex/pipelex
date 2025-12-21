@@ -81,7 +81,7 @@ class OtelFactory:
         for input_name in needed_input_names:
             stuff = working_memory.get_stuff(name=input_name)
             inputs_dict[input_name] = {
-                "concept": stuff.concept.simple_concept_string,
+                "concept": stuff.concept.simple_concept_ref,
                 "content": stuff.content.smart_dump(),
             }
 
@@ -108,7 +108,7 @@ class OtelFactory:
             return "{}"
 
         output_dict: dict[str, Any] = {
-            "concept": main_stuff.concept.simple_concept_string,
+            "concept": main_stuff.concept.simple_concept_ref,
             "content": main_stuff.content.smart_dump(),
         }
 

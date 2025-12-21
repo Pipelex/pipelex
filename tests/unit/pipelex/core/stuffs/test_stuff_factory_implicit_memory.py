@@ -60,8 +60,8 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     yield concept
 
     # Cleanup after test
-    concept_library.remove_concepts_by_concept_strings(
-        concept_strings=["test_domain.MyConcept", "test_domain.MyConceptNotNativeText", "test_domain.AnotherConcept"]
+    concept_library.remove_concepts_by_concept_refs(
+        concept_refs=["test_domain.MyConcept", "test_domain.MyConceptNotNativeText", "test_domain.AnotherConcept"]
     )
 
 

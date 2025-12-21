@@ -62,17 +62,17 @@ class PipeSequence(PipeController):
         # Check concept compatibility
         if not get_concept_library().is_compatible(tested_concept=last_step_stuff_spec.concept, wanted_concept=self.output.concept):
             msg = (
-                f"PipeSequence concept mismatch: the output concept '{last_step_stuff_spec.concept.concept_string}' "
+                f"PipeSequence concept mismatch: the output concept '{last_step_stuff_spec.concept.concept_ref}' "
                 f"of the last step '{last_step_pipe_code}' of sequence pipe '{self.code}' "
-                f"is not compatible with the output concept '{self.output.concept.concept_string}' of the sequence."
+                f"is not compatible with the output concept '{self.output.concept.concept_ref}' of the sequence."
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=last_step_stuff_spec.concept.concept_string,
-                required_concept_codes=[self.output.concept.concept_string],
+                provided_concept_code=last_step_stuff_spec.concept.concept_ref,
+                required_concept_codes=[self.output.concept.concept_ref],
             )
 
         # Check multiplicity match
@@ -87,8 +87,8 @@ class PipeSequence(PipeController):
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=last_step_stuff_spec.concept.concept_string,
-                required_concept_codes=[self.output.concept.concept_string],
+                provided_concept_code=last_step_stuff_spec.concept.concept_ref,
+                required_concept_codes=[self.output.concept.concept_ref],
             )
 
     @override
@@ -197,14 +197,14 @@ class PipeSequence(PipeController):
         # Verify the output of this pipe is matching the output of the last step.
 
         concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output.concept
-        # if self.output.concept_string != concept_string_of_last_step:
+        # if self.output.concept_ref != concept_ref_of_last_step:
         if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output.concept):
             msg = f"""PipeSequence concept mismatch:
-the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
-of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept.concept_string}' of the sequence.
+the output concept '{concept_of_last_step.concept_ref}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
+of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept.concept_ref}' of the sequence.
 """
             raise PipeControllerOutputConceptMismatchError(
-                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept.concept_string
+                message=msg, tested_concept=concept_of_last_step.concept_ref, wanted_concept=self.output.concept.concept_ref
             )
         return await self._run_controller_pipe(
             job_metadata=job_metadata,

@@ -43,7 +43,7 @@ class LLMPromptBlueprint(BaseModel):
     # let's get back to it when we have a better solution for structuring_method
     async def make_llm_prompt(
         self,
-        output_concept_string: str,
+        output_concept_ref: str,
         context_provider: ContextProviderAbstract,
         output_structure_prompt: str | None = None,
         extra_params: dict[str, Any] | None = None,
@@ -125,7 +125,7 @@ class LLMPromptBlueprint(BaseModel):
             # Note that output_structure_prompt can be None
             # it's OK to have a null user_text
 
-        log.verbose(f"User text with {output_concept_string=}:\n {user_text}")
+        log.verbose(f"User text with {output_concept_ref=}:\n {user_text}")
 
         ############################################################
         # System text

@@ -48,12 +48,12 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
 
         # Handle combined_output if specified
         if blueprint.combined_output:
-            combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
+            combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_ref_or_code(
                 domain_code=domain_code,
-                concept_string_or_code=blueprint.combined_output,
+                concept_ref_or_code=blueprint.combined_output,
             )
             combined_output = get_required_concept(
-                concept_string=ConceptFactory.make_concept_string_with_domain(
+                concept_ref=ConceptFactory.make_concept_ref_with_domain(
                     domain_code=combined_output_domain_and_code.domain_code,
                     concept_code=combined_output_domain_and_code.concept_code,
                 ),
