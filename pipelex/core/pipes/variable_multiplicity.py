@@ -113,6 +113,57 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
     return MultiplicityParseResult(concept=concept, multiplicity=multiplicity)
 
 
+def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None, target_multiplicity: VariableMultiplicity | None) -> bool:
+    """Check if a source multiplicity is compatible with a target multiplicity.
+
+    This is used to validate that a pipe's output multiplicity can fulfill a required output multiplicity.
+    For example, when validating a PipeSequence, the last step's output multiplicity (source) must be
+    compatible with the sequence's declared output multiplicity (target).
+
+    Compatibility rules:
+    - If target is None (single item), source must also be None
+    - If target is True (variable list), source can be True OR any positive integer
+      (a fixed count is compatible with a variable-length expectation)
+    - If target is an integer N (fixed count), source must be exactly N
+
+    Args:
+        source_multiplicity: The actual multiplicity provided (e.g., from a sub-pipe's output)
+        target_multiplicity: The required/expected multiplicity (e.g., declared on a sequence)
+
+    Returns:
+        True if source_multiplicity can fulfill target_multiplicity, False otherwise
+
+    Examples:
+        >>> is_multiplicity_compatible(None, None)
+        True
+        >>> is_multiplicity_compatible(True, True)
+        True
+        >>> is_multiplicity_compatible(3, True)  # Fixed count fulfills variable expectation
+        True
+        >>> is_multiplicity_compatible(True, 3)  # Variable cannot fulfill fixed expectation
+        False
+        >>> is_multiplicity_compatible(3, 3)
+        True
+        >>> is_multiplicity_compatible(3, 5)  # Different fixed counts are incompatible
+        False
+        >>> is_multiplicity_compatible(None, True)  # Single cannot fulfill list expectation
+        False
+    """
+    # Case 1: Target expects single item (None)
+    if target_multiplicity is None:
+        return source_multiplicity is None
+
+    # Case 2: Target expects variable-length list (True)
+    if target_multiplicity is True:
+        # Accept True (variable) or any integer (fixed count)
+        # Both represent "multiple items", just with different specificity
+        return source_multiplicity is True or isinstance(source_multiplicity, int)
+
+    # Case 3: Target expects fixed count (integer)
+    # Source must match exactly
+    return source_multiplicity == target_multiplicity
+
+
 def format_concept_with_multiplicity(concept_code_or_string: str, multiplicity: VariableMultiplicity | None) -> str:
     """Format a concept code or string with multiplicity notation.
 

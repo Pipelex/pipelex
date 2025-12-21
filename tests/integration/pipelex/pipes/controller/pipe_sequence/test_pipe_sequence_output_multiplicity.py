@@ -221,16 +221,18 @@ class TestPipeSequenceOutputMultiplicity:
         error_message = str(exc_info.value).lower()
         assert "multiplicity" in error_message, f"Error should mention multiplicity mismatch, got: {exc_info.value}"
 
-    def test_fixed_vs_variable_multiplicity_mismatch(
+    def test_fixed_multiplicity_compatible_with_variable_multiplicity(
         self,
         load_empty_library: Callable[[], str],
     ):
-        """Test that validation fails when last step has [3] but sequence has [].
+        """Test that validation passes when last step has [3] and sequence has [].
 
         Creates:
         - A PipeLLM with output="Text[3]" (fixed multiplicity)
         - A PipeSequence with output="Text[]" (variable multiplicity)
-        The validation should fail because multiplicities don't match (3 vs True).
+
+        A fixed multiplicity is compatible with a variable multiplicity expectation
+        because a fixed count of items fulfills the "list of items" requirement.
         """
         load_empty_library()
 
@@ -251,23 +253,75 @@ class TestPipeSequenceOutputMultiplicity:
         )
         get_pipe_library().add_new_pipe(llm_pipe)
 
-        # Create a PipeSequence with variable multiplicity - MISMATCH
+        # Create a PipeSequence with variable multiplicity
+        # This is COMPATIBLE: fixed count fulfills variable expectation
         sequence_blueprint = PipeSequenceBlueprint(
             description="Sequence with variable output",
             inputs={"input_text": "Text"},
-            output="Text[]",  # Variable multiplicity - MISMATCH!
+            output="Text[]",  # Variable multiplicity - compatible with fixed
             steps=[
                 SubPipeBlueprint(pipe="llm_fixed_3", result="result"),
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
             domain_code=domain,
-            pipe_code="sequence_mismatch_fixed_var",
+            pipe_code="sequence_fixed_to_variable",
             blueprint=sequence_blueprint,
         )
         get_pipe_library().add_new_pipe(sequence_pipe)
 
-        # Validation should fail due to multiplicity mismatch
+        # Validation should pass - fixed multiplicity is compatible with variable
+        sequence_pipe.validate_with_libraries()
+
+    def test_variable_multiplicity_incompatible_with_fixed_multiplicity(
+        self,
+        load_empty_library: Callable[[], str],
+    ):
+        """Test that validation fails when last step has [] but sequence has [3].
+
+        Creates:
+        - A PipeLLM with output="Text[]" (variable multiplicity)
+        - A PipeSequence with output="Text[3]" (fixed multiplicity)
+
+        A variable multiplicity cannot fulfill a fixed count expectation because
+        we cannot guarantee the exact number of items will be produced.
+        """
+        load_empty_library()
+
+        domain = "test_variable_vs_fixed"
+
+        # Create a PipeLLM with variable multiplicity
+        llm_blueprint = PipeLLMBlueprint(
+            description="LLM with variable output count",
+            inputs={"input_text": "Text"},
+            output="Text[]",  # Variable multiplicity
+            model="llm_for_testing_gen_text",
+            prompt="@input_text",
+        )
+        llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code=domain,
+            pipe_code="llm_variable",
+            blueprint=llm_blueprint,
+        )
+        get_pipe_library().add_new_pipe(llm_pipe)
+
+        # Create a PipeSequence with fixed multiplicity - INCOMPATIBLE
+        sequence_blueprint = PipeSequenceBlueprint(
+            description="Sequence with fixed output count",
+            inputs={"input_text": "Text"},
+            output="Text[3]",  # Fixed multiplicity - cannot be fulfilled by variable
+            steps=[
+                SubPipeBlueprint(pipe="llm_variable", result="result"),
+            ],
+        )
+        sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
+            domain_code=domain,
+            pipe_code="sequence_variable_to_fixed",
+            blueprint=sequence_blueprint,
+        )
+        get_pipe_library().add_new_pipe(sequence_pipe)
+
+        # Validation should fail - variable cannot fulfill fixed expectation
         with pytest.raises(PipeValidationError) as exc_info:
             sequence_pipe.validate_with_libraries()
 

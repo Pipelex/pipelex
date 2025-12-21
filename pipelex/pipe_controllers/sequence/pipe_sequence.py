@@ -9,6 +9,7 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
 from pipelex.hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
@@ -78,12 +79,15 @@ class PipeSequence(PipeController):
         if not effective_last_step_output_multiplicity:
             effective_last_step_output_multiplicity = get_required_pipe(pipe_code=last_sub_pipe.pipe_code).output.multiplicity
 
-        # Check multiplicity match
-        if self.output.multiplicity != effective_last_step_output_multiplicity:
+        # Check multiplicity compatibility
+        if not is_multiplicity_compatible(
+            source_multiplicity=effective_last_step_output_multiplicity,
+            target_multiplicity=self.output.multiplicity,
+        ):
             msg = (
                 f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "
                 f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe.code}' "
-                f"would have an effective output multiplicity={effective_last_step_output_multiplicity}. They must be the same."
+                f"has output multiplicity={effective_last_step_output_multiplicity}. They are not compatible."
             )
             raise PipeValidationError(
                 message=msg,
