@@ -14,7 +14,7 @@ from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
-from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
@@ -156,45 +156,45 @@ class ConceptFactory:
                 )
 
     @classmethod
-    def make_domain_and_concept_code_from_concept_string_or_code(
+    def make_domain_and_concept_code_from_concept_ref_or_code(
         cls,
-        concept_string_or_code: str,
+        concept_ref_or_code: str,
         domain_code: str | None = None,
     ) -> DomainAndConceptCode:
-        if "." not in concept_string_or_code and not domain_code:
-            msg = f"Not enough information to make a domain and concept code from '{concept_string_or_code}'"
+        if "." not in concept_ref_or_code and not domain_code:
+            msg = f"Not enough information to make a domain and concept code from '{concept_ref_or_code}'"
             raise ConceptFactoryError(msg)
         try:
-            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
         except ConceptStringError as exc:
-            msg = f"Concept string or code '{concept_string_or_code}' is not a valid concept string or code"
+            msg = f"Concept string or code '{concept_ref_or_code}' is not a valid concept string or code"
             raise ConceptFactoryError(msg) from exc
 
-        if NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
-            natice_concept_string = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code)
-            return DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code=natice_concept_string.split(".")[1])
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
+            natice_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
+            return DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code=natice_concept_ref.split(".")[1])
 
-        if "." in concept_string_or_code:
-            domain_code, concept_code = concept_string_or_code.rsplit(".")
+        if "." in concept_ref_or_code:
+            domain_code, concept_code = concept_ref_or_code.rsplit(".")
             return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_code)
         elif domain_code:
-            return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_string_or_code)
+            return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_ref_or_code)
         else:
-            msg = f"Not enough information to make a domain and concept code from '{concept_string_or_code}'"
+            msg = f"Not enough information to make a domain and concept code from '{concept_ref_or_code}'"
             raise ConceptFactoryError(msg)
 
     @classmethod
-    def make_concept_string_with_domain(cls, domain_code: str, concept_code: str) -> str:
+    def make_concept_ref_with_domain(cls, domain_code: str, concept_code: str) -> str:
         return f"{domain_code}.{concept_code}"
 
     @classmethod
-    def make_concept_string_with_domain_from_concept_string_or_code(cls, domain_code: str, concept_sring_or_code: str) -> str:
-        input_domain_and_code = cls.make_domain_and_concept_code_from_concept_string_or_code(
-            concept_string_or_code=concept_sring_or_code,
+    def make_concept_ref_with_domain_from_concept_ref_or_code(cls, domain_code: str, concept_sring_or_code: str) -> str:
+        input_domain_and_code = cls.make_domain_and_concept_code_from_concept_ref_or_code(
+            concept_ref_or_code=concept_sring_or_code,
             domain_code=domain_code,
         )
 
-        return cls.make_concept_string_with_domain(
+        return cls.make_concept_ref_with_domain(
             domain_code=input_domain_and_code.domain_code,
             concept_code=input_domain_and_code.concept_code,
         )
@@ -216,7 +216,7 @@ class ConceptFactory:
             ConceptFactoryError: If the refine is invalid
 
         """
-        return NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
+        return NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refine)
 
     @classmethod
     def _handle_structure_with_classname(
@@ -298,7 +298,7 @@ class ConceptFactory:
 
         # Because native concepts have structure class names diffrent than other (with "Content")
         if concept_code in NativeConceptCode.values_list():
-            return NativeConceptCode.TEXT.structure_class_name, NativeConceptCode.TEXT.concept_string
+            return NativeConceptCode.TEXT.structure_class_name, NativeConceptCode.TEXT.concept_ref
 
         try:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
@@ -312,7 +312,7 @@ class ConceptFactory:
         # Register the generated class
         KajsonManager.get_class_registry().register_class(the_generated_class)
 
-        return concept_code, NativeConceptCode.TEXT.concept_string
+        return concept_code, NativeConceptCode.TEXT.concept_ref
 
     @classmethod
     def _handle_refines(
@@ -383,8 +383,8 @@ class ConceptFactory:
         else:
             declaration_type = ConceptDeclarationType.BASIC_BLUEPRINT
 
-        domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_string_or_code(
-            concept_string_or_code=concept_code,
+        domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_ref_or_code(
+            concept_ref_or_code=concept_code,
             domain_code=domain_code,
         )
 

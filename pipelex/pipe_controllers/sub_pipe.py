@@ -76,7 +76,7 @@ class SubPipe(BaseModel):
                 input_list_name=batch_params.input_list_stuff_name,
                 input_item_name=batch_params.input_item_stuff_name,
                 inputs={
-                    batch_params.input_list_stuff_name: item_stuff_spec.concept.concept_string,
+                    batch_params.input_list_stuff_name: item_stuff_spec.concept.concept_ref,
                 },
             )
 

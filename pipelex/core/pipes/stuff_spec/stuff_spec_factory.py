@@ -40,16 +40,16 @@ class StuffSpecFactory:
 
         # Resolve concept with domain
         try:
-            domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
+            domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_ref_or_code(
                 domain_code=domain_code,
-                concept_string_or_code=parse_result.concept,
+                concept_ref_or_code=parse_result.concept,
             )
         except ConceptFactoryError as exc:
             msg = f"Error resolving concept from output string '{output_string}': {exc}"
             raise StuffSpecFactoryError(msg) from exc
 
         concept = get_required_concept(
-            concept_string=ConceptFactory.make_concept_string_with_domain(
+            concept_ref=ConceptFactory.make_concept_ref_with_domain(
                 domain_code=domain_and_code.domain_code,
                 concept_code=domain_and_code.concept_code,
             ),

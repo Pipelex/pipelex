@@ -49,9 +49,9 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             pdf_stuff_name = input_name
         else:
             msg = (
-                f"The input concept {input_requirement.concept.concept_string} is not compatible "
-                f"with the required concept {get_native_concept(native_concept=NativeConceptCode.IMAGE).concept_string} or "
-                f"{get_native_concept(native_concept=NativeConceptCode.PDF).concept_string}"
+                f"The input concept {input_requirement.concept.concept_ref} is not compatible "
+                f"with the required concept {get_native_concept(native_concept=NativeConceptCode.IMAGE).concept_ref} or "
+                f"{get_native_concept(native_concept=NativeConceptCode.PDF).concept_ref}"
             )
             raise PipeExtractFactoryError(msg)
 

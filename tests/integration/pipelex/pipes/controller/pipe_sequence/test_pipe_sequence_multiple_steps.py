@@ -31,8 +31,8 @@ class TestPipeSequenceMultipleSteps:
 
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Test sequence with multiple steps",
-            inputs={"initial_input": concept_1.concept_string},
-            output=concept_2.concept_string,
+            inputs={"initial_input": concept_1.concept_ref},
+            output=concept_2.concept_ref,
             steps=[SubPipeBlueprint(pipe="step_1", result="intermediate"), SubPipeBlueprint(pipe="step_2", result="final_output")],
         )
 

@@ -107,7 +107,7 @@ class PipeTestCases:
     ]
     TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(
         stuff_name="question",
-        concept_string="answer.Question",
+        concept_ref="answer.Question",
         content=USER_TEXT_TRICKY_2,
     )
     NO_INPUT: ClassVar[list[tuple[str, str]]] = [  # topic, pipe

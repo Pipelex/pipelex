@@ -51,9 +51,9 @@ class TestPipeBatchSimple:
             description="Simple batch processing test",
             branch_pipe_code="uppercase_transformer",  # This exists in the PLX file
             inputs={
-                "text_list": concept_1.concept_string,
+                "text_list": concept_1.concept_ref,
             },
-            output=concept_2.concept_string,
+            output=concept_2.concept_ref,
             input_list_name="text_list",
             input_item_name="text_item",
         )

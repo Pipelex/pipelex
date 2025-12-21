@@ -52,18 +52,18 @@ class PipeAbstract(ABC, BaseModel):
     @property
     def concept_dependencies(self) -> list[Concept]:
         """Return all unique concept dependencies (output + inputs) without duplicates."""
-        seen_concept_strings: set[str] = set()
+        seen_concept_refs: set[str] = set()
         unique_concepts: list[Concept] = []
 
         # Add output concept first
         unique_concepts.append(self.output.concept)
-        seen_concept_strings.add(self.output.concept.concept_string)
+        seen_concept_refs.add(self.output.concept.concept_ref)
 
         # Add input concepts (avoiding duplicates)
         for concept in self.inputs.concepts:
-            if concept.concept_string not in seen_concept_strings:
+            if concept.concept_ref not in seen_concept_refs:
                 unique_concepts.append(concept)
-                seen_concept_strings.add(concept.concept_string)
+                seen_concept_refs.add(concept.concept_ref)
 
         return unique_concepts
 

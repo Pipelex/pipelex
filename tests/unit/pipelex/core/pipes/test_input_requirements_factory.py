@@ -21,14 +21,14 @@ class TestMakeInputRequirementsFromString:
     """Test the InputStuffSpecsFactory.make_from_str method."""
 
     @pytest.mark.parametrize(
-        ("domain_code", "stuff_spec_str", "expected_concept_string", "expected_multiplicity"),
+        ("domain_code", "stuff_spec_str", "expected_concept_ref", "expected_multiplicity"),
         SINGLE_ITEM_NO_BRACKETS_TEST_CASES,
     )
     def test_single_item_default_no_brackets(
         self,
         domain_code: str,
         stuff_spec_str: str,
-        expected_concept_string: str,
+        expected_concept_ref: str,
         expected_multiplicity: int | bool | None,
         load_empty_library: Callable[[], None],
     ):
@@ -37,63 +37,61 @@ class TestMakeInputRequirementsFromString:
         result = InputStuffSpecsFactory.make_from_string(domain_code=domain_code, stuff_spec_str=stuff_spec_str)
 
         assert isinstance(result, StuffSpec)
-        assert result.concept.concept_string == expected_concept_string
+        assert result.concept.concept_ref == expected_concept_ref
         assert result.multiplicity == expected_multiplicity
 
     @pytest.mark.parametrize(
-        ("domain_code", "stuff_spec_str", "expected_concept_string"),
+        ("domain_code", "stuff_spec_str", "expected_concept_ref"),
         MULTIPLE_ITEMS_EMPTY_BRACKETS_TEST_CASES,
     )
     def test_multiple_items_with_empty_brackets(
-        self, domain_code: str, stuff_spec_str: str, expected_concept_string: str, load_empty_library: Callable[[], None]
+        self, domain_code: str, stuff_spec_str: str, expected_concept_ref: str, load_empty_library: Callable[[], None]
     ):
         load_empty_library()
         """Test parsing a concept string with empty brackets (multiple items)."""
         result = InputStuffSpecsFactory.make_from_string(domain_code=domain_code, stuff_spec_str=stuff_spec_str)
 
         assert isinstance(result, StuffSpec)
-        assert result.concept.concept_string == expected_concept_string
+        assert result.concept.concept_ref == expected_concept_ref
         assert result.multiplicity is True
 
     @pytest.mark.parametrize(
-        ("domain_code", "stuff_spec_str", "expected_concept_string", "expected_multiplicity"),
+        ("domain_code", "stuff_spec_str", "expected_concept_ref", "expected_multiplicity"),
         FIXED_COUNT_TEST_CASES,
     )
     def test_fixed_count_with_number_in_brackets(
-        self, domain_code: str, stuff_spec_str: str, expected_concept_string: str, expected_multiplicity: int, load_empty_library: Callable[[], None]
+        self, domain_code: str, stuff_spec_str: str, expected_concept_ref: str, expected_multiplicity: int, load_empty_library: Callable[[], None]
     ):
         """Test parsing a concept string with a number in brackets (fixed count)."""
         load_empty_library()
         result = InputStuffSpecsFactory.make_from_string(domain_code=domain_code, stuff_spec_str=stuff_spec_str)
 
         assert isinstance(result, StuffSpec)
-        assert result.concept.concept_string == expected_concept_string
+        assert result.concept.concept_ref == expected_concept_ref
         assert result.multiplicity == expected_multiplicity
 
     @pytest.mark.parametrize(
-        ("domain_code", "stuff_spec_str", "expected_concept_string", "expected_multiplicity"),
+        ("domain_code", "stuff_spec_str", "expected_concept_ref", "expected_multiplicity"),
         VARIOUS_FIXED_COUNTS_TEST_CASES,
     )
     def test_various_fixed_counts(
-        self, domain_code: str, stuff_spec_str: str, expected_concept_string: str, expected_multiplicity: int, load_empty_library: Callable[[], None]
+        self, domain_code: str, stuff_spec_str: str, expected_concept_ref: str, expected_multiplicity: int, load_empty_library: Callable[[], None]
     ):
         load_empty_library()
         """Test parsing concept strings with various numbers in brackets."""
         result = InputStuffSpecsFactory.make_from_string(domain_code=domain_code, stuff_spec_str=stuff_spec_str)
         assert result.multiplicity == expected_multiplicity, f"Failed for {stuff_spec_str}"
-        assert result.concept.concept_string == expected_concept_string
+        assert result.concept.concept_ref == expected_concept_ref
 
     @pytest.mark.parametrize(
-        ("domain_code", "stuff_spec_str", "expected_concept_string"),
+        ("domain_code", "stuff_spec_str", "expected_concept_ref"),
         DIFFERENT_CONCEPT_CODES_TEST_CASES,
     )
-    def test_different_concept_codes(
-        self, domain_code: str, stuff_spec_str: str, expected_concept_string: str, load_empty_library: Callable[[], None]
-    ):
+    def test_different_concept_codes(self, domain_code: str, stuff_spec_str: str, expected_concept_ref: str, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test parsing various concept codes without multiplicity."""
         result = InputStuffSpecsFactory.make_from_string(domain_code=domain_code, stuff_spec_str=stuff_spec_str)
-        assert result.concept.concept_string == expected_concept_string
+        assert result.concept.concept_ref == expected_concept_ref
         assert result.multiplicity is None
 
     def test_custom_domain_concepts(self, load_empty_library: Callable[[], None]):
@@ -102,7 +100,7 @@ class TestMakeInputRequirementsFromString:
         # Note: This test will only work if these concepts exist in the system
         # For now, we'll test with native concepts, but the pattern should work for any domain
         result = InputStuffSpecsFactory.make_from_string(domain_code="native", stuff_spec_str="native.Text[3]")
-        assert result.concept.concept_string == "native.Text"
+        assert result.concept.concept_ref == "native.Text"
         assert result.multiplicity == 3
 
     def test_concept_not_found_raises_error(self, load_empty_library: Callable[[], None]):
@@ -141,7 +139,7 @@ class TestMakeInputRequirementsFromString:
         result = InputStuffSpecsFactory.make_from_string(domain_code="native", stuff_spec_str="native.Text[0]")
 
         assert isinstance(result, StuffSpec)
-        assert result.concept.concept_string == "native.Text"
+        assert result.concept.concept_ref == "native.Text"
         assert result.multiplicity == 0
 
     def test_return_type(self, load_empty_library: Callable[[], None]):
@@ -157,7 +155,7 @@ class TestMakeInputRequirementsFromString:
 
         assert hasattr(result, "concept")
         assert hasattr(result, "multiplicity")
-        assert result.concept.concept_string == "native.Text"
+        assert result.concept.concept_ref == "native.Text"
         assert result.concept.code == "Text"
 
     def test_edge_case_very_long_number(self, load_empty_library: Callable[[], None]):
@@ -166,7 +164,7 @@ class TestMakeInputRequirementsFromString:
         result = InputStuffSpecsFactory.make_from_string(domain_code="native", stuff_spec_str="native.Text[999999]")
 
         assert result.multiplicity == 999999
-        assert result.concept.concept_string == "native.Text"
+        assert result.concept.concept_ref == "native.Text"
 
     def test_whitespace_not_trimmed(self, load_empty_library: Callable[[], None]):
         load_empty_library()
@@ -203,14 +201,14 @@ class TestMakeInputRequirementsFromString:
         assert isinstance(exc_info.value.__cause__, ConceptStringError)
 
     @pytest.mark.parametrize(
-        ("domain_code", "stuff_spec_str", "expected_concept_string", "expected_multiplicity", "description"),
+        ("domain_code", "stuff_spec_str", "expected_concept_ref", "expected_multiplicity", "description"),
         CONCEPT_CODE_RESOLUTION_TEST_CASES,
     )
     def test_concept_code_resolution(
         self,
         domain_code: str,
         stuff_spec_str: str,
-        expected_concept_string: str,
+        expected_concept_ref: str,
         expected_multiplicity: int | bool | None,
         description: str,
         load_empty_library: Callable[[], None],
@@ -228,18 +226,18 @@ class TestMakeInputRequirementsFromString:
         )
 
         assert isinstance(result, StuffSpec)
-        assert result.concept.concept_string == expected_concept_string, f"Failed: {description}"
+        assert result.concept.concept_ref == expected_concept_ref, f"Failed: {description}"
         assert result.multiplicity == expected_multiplicity, f"Failed: {description}"
 
     @pytest.mark.parametrize(
-        ("domain_code", "stuff_spec_str", "expected_concept_string", "expected_multiplicity"),
+        ("domain_code", "stuff_spec_str", "expected_concept_ref", "expected_multiplicity"),
         EXPLICIT_DOMAIN_IN_STRING_TEST_CASES,
     )
     def test_explicit_domain_in_string(
         self,
         domain_code: str,
         stuff_spec_str: str,
-        expected_concept_string: str,
+        expected_concept_ref: str,
         expected_multiplicity: int | bool | None,
         load_empty_library: Callable[[], None],
     ):
@@ -251,5 +249,5 @@ class TestMakeInputRequirementsFromString:
         )
 
         assert isinstance(result, StuffSpec)
-        assert result.concept.concept_string == expected_concept_string
+        assert result.concept.concept_ref == expected_concept_ref
         assert result.multiplicity == expected_multiplicity

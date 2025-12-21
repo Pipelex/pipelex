@@ -87,15 +87,15 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         ):
             msg = (
                 f"The output of a PipeImgGen must be compatible with the Image concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept.concept_string}'"
+                f"In the pipe '{self.code}' the output is '{self.output.concept.concept_ref}'"
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept.concept_string,
-                required_concept_codes=[NativeConceptCode.IMAGE.concept_string],
+                provided_concept_code=self.output.concept.concept_ref,
+                required_concept_codes=[NativeConceptCode.IMAGE.concept_ref],
             )
 
     @override

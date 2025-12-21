@@ -42,8 +42,8 @@ class TestPipeSequenceSimple:
         # Create PipeSequence instance - pipes are loaded from PLX files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Simple sequence for text processing",
-            inputs={"input_text": concept_1.concept_string},
-            output=concept_2.concept_string,
+            inputs={"input_text": concept_1.concept_ref},
+            output=concept_2.concept_ref,
             steps=[
                 SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),
                 SubPipeBlueprint(pipe="add_prefix", result="final_text"),
