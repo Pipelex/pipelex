@@ -58,20 +58,29 @@ class PipeLLMBlueprint(PipeBlueprint):
             except Jinja2DetectVariablesError as exc:
                 msg = f"Could not detect required variables in system prompt for PipeLLM: {exc}"
                 raise ValueError(msg) from exc
+
         # Filter out internal variables that start with underscore and special variables
         # TODO: replace magic strings by StrEnum and also, make this check clearer and more readable
-        required_variables = {var for var in required_variables if not var.startswith("_") and var not in {"preliminary_text", "place_holder"}}
+        filtered_required_variables = {
+            var for var in required_variables if not var.startswith("_") and var not in {"preliminary_text", "place_holder"}
+        }
 
-        # Check that all required variables are in inputs
+        # Check that input_names and filtered_required_variables are equal
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
-        missing_variables: set[str] = required_variables - input_names
 
-        if missing_variables:
-            missing_vars_str = ", ".join(sorted(missing_variables))
-            msg = (
-                f"Missing input variable(s) in prompt template: {missing_vars_str}. "
-                "These variables are used in the prompt but not declared in inputs."
-            )
+        # Variables used in prompts but not declared in inputs
+        missing_inputs = filtered_required_variables - input_names
+        # Variables declared in inputs but not used in prompts
+        unused_inputs = input_names - filtered_required_variables
+
+        if missing_inputs:
+            missing_vars_str = ", ".join(sorted(missing_inputs))
+            msg = f"Missing input variable(s): {missing_vars_str}. These variables are used in the prompt/system_prompt but not declared in inputs."
+            raise ValueError(msg)
+
+        if unused_inputs:
+            unused_vars_str = ", ".join(sorted(unused_inputs))
+            msg = f"Unused input variable(s): {unused_vars_str}. These variables are declared in inputs but not referenced in prompt/system_prompt."
             raise ValueError(msg)
 
     @override

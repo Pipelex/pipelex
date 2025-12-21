@@ -76,6 +76,33 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             for llm_choice in self.llm_choices.list_choice_strings():
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
+        needed_inputs = self.needed_inputs()
+        required_variables = self.required_variables()
+
+        # Check for unused inputs: declared in inputs but not used in prompt/system_prompt
+        for input_name, _ in needed_inputs.items:
+            if input_name not in required_variables:
+                msg = f"PipeLLM '{self.code}' has input '{input_name}' declared but it is not used in the prompt or system_prompt."
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                    pipe_code=self.code,
+                    variable_names=[input_name],
+                    explanation=f"Input '{input_name}' is declared in inputs but not referenced in prompt/system_prompt.",
+                )
+
+        # Check for missing inputs: used in prompt/system_prompt but not declared in inputs
+        for required_variable_name in required_variables:
+            if required_variable_name not in needed_inputs.root:
+                msg = f"PipeLLM '{self.code}' uses variable '{required_variable_name}' in prompt/system_prompt but it is not declared in inputs."
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    pipe_code=self.code,
+                    variable_names=[required_variable_name],
+                    explanation=f"Variable '{required_variable_name}' is used in prompt/system_prompt but not declared in inputs.",
+                )
+
     @override
     def validate_inputs_with_library(self):
         pass
@@ -115,6 +142,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
         for input_name, stuff_spec in self.inputs.items:
             needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+
         return needed_inputs
 
     @override
