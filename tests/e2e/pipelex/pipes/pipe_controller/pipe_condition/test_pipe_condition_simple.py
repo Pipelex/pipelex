@@ -56,6 +56,7 @@ class TestPipeConditionSimple:
         # Verify it failed for the right reason
         error = exc_info.value
         assert error.pipe_code == "test_condition_fail"
+        assert error.missing_inputs is not None
         assert "user_category" in error.missing_inputs
         assert "missing required inputs" in str(error)
 
