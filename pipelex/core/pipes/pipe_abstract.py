@@ -10,7 +10,6 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -28,6 +27,7 @@ from pipelex.system.telemetry.otel_constants import (
     SpanCategory,
     SpanOutcome,
 )
+from pipelex.core.pipes.utils import monitor_pipe_stack
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
@@ -316,13 +316,6 @@ class PipeAbstract(ABC, BaseModel):
 
         """
 
-    def monitor_pipe_stack(self, pipe_run_params: PipeRunParams):
-        pipe_stack = pipe_run_params.pipe_stack
-        limit = pipe_run_params.pipe_stack_limit
-        if len(pipe_stack) > limit:
-            msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}"
-            raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=pipe_stack)
-
     def _format_pipe_run_info(self, pipe_run_params: PipeRunParams) -> str:
         indent_level = len(pipe_run_params.pipe_stack) - 1
         indent = "   " * indent_level
@@ -347,21 +340,27 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
+        pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
+        monitor_pipe_stack(pipe_run_params=pipe_run_params)
+
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
-                return await self.live_run_pipe(
+                pipe_output = await self.live_run_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
                     pipe_run_params=pipe_run_params,
                     output_name=output_name,
                 )
             case PipeRunMode.DRY:
-                return await self.dry_run_pipe(
+                pipe_output = await self.dry_run_pipe(
                     job_metadata=job_metadata,
                     working_memory=working_memory,
                     pipe_run_params=pipe_run_params,
                     output_name=output_name,
                 )
+
+        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
+        return pipe_output
 
     @final
     async def live_run_pipe(
@@ -371,28 +370,7 @@ class PipeAbstract(ABC, BaseModel):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
-        self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
-
-        # Check inputs ------------------------------------------------------------
-
-        # check we have the required inputs in the working memory
-        missing_inputs: dict[str, str] = {}
-        for required_stuff_name, stuff_spec in self.needed_inputs().items:
-            if not working_memory.is_stuff_exists(name=required_stuff_name):
-                missing_inputs[required_stuff_name] = stuff_spec.concept.code
-        if missing_inputs:
-            error = PipeRunInputsError(
-                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}",
-                run_mode=pipe_run_params.run_mode,
-                pipe_code=self.code,
-                missing_inputs=missing_inputs,
-            )
-            raise error
-
-        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
-        if pipe_run_params.run_mode == PipeRunMode.LIVE:
-            log.info(pipe_run_info)
+        log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
 
         # Handle telemetry ------------------------------------------------------------
 
@@ -438,13 +416,7 @@ class PipeAbstract(ABC, BaseModel):
         # Run pipe ------------------------------------------------------------
 
         try:
-            await self.validate_before_run(
-                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-            )
             pipe_output = await self._live_run_pipe(
-                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-            )
-            await self.validate_after_run(
                 job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
         except Exception as exc:
@@ -454,10 +426,6 @@ class PipeAbstract(ABC, BaseModel):
         # Handle telemetry ------------------------------------------------------------
 
         self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
-
-        # Cleanup ------------------------------------------------------------
-
-        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
 
         return pipe_output
 
