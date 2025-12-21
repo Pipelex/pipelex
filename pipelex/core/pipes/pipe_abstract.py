@@ -17,18 +17,8 @@ from pipelex.core.pipes.utils import monitor_pipe_stack
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_factory import PipelineFactory
-from pipelex.system.telemetry.otel_constants import (
-    LangfuseSpanAttr,
-    OTelConstants,
-    PipelexSpanAttr,
-    SpanCategory,
-    SpanOutcome,
-)
-from pipelex.system.telemetry.otel_factory import OtelFactory
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
-from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
