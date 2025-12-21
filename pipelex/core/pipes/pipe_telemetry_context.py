@@ -1,4 +1,5 @@
 from typing import Any
+from 
 
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
@@ -67,7 +68,7 @@ class PipeTelemetryContext:
             )
         return self
 
-    def __exit__(self, exc_type: type[Exception], exc_val: Any, exc_tb: Any):
+    def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None):
         if self._span is None:
             return False
 
