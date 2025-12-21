@@ -28,6 +28,7 @@ class PipeSequenceFactory(PipeFactoryProtocol[PipeSequenceBlueprint, PipeSequenc
         blueprint: PipeSequenceBlueprint,
     ) -> PipeSequence:
         sequential_sub_pipes: list[SubPipe] = []
+
         for step in blueprint.steps:
             sub_pipe = SubPipeFactory.make_from_blueprint(blueprint=step)
             sequential_sub_pipes.append(sub_pipe)

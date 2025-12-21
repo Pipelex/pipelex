@@ -89,6 +89,7 @@
 ### Fixed
 
 - Fixed the issue with the `find_files_in_dir` force including virtual environment directories: Now it force includes the `pipelex.builder` directory.
+- Fixed a bug with the comparison of Concept structures.
 
 ## [v0.17.2] - 2025-12-01
 

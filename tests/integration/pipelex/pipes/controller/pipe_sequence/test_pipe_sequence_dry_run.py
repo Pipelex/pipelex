@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeSequenceDryRun:
-    async def test_discord_newsletter_dry_run_working_memory(
+    async def test_discord_newsletter(
         self,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
@@ -86,44 +86,43 @@ class TestPipeSequenceDryRun:
         assert discord_updates_stuff_final.concept.code == "DiscordChannelUpdate"
         assert discord_updates_stuff_final.concept.domain == "discord_newsletter"
 
-        if pipe_run_mode == PipeRunMode.DRY:
-            # The key assertion: verify it's a ListContent with multiple items
-            discord_updates_list = discord_updates_stuff_final.as_list_of_fixed_content_type(item_type=DiscordChannelUpdate)
-            assert isinstance(discord_updates_list, ListContent)
-            assert len(discord_updates_list.items) > 1, "Should have multiple items for batching"
+        # The key assertion: verify it's a ListContent with multiple items
+        discord_updates_list = discord_updates_stuff_final.as_list_of_fixed_content_type(item_type=DiscordChannelUpdate)
+        assert isinstance(discord_updates_list, ListContent)
+        assert len(discord_updates_list.items) > 1, "Should have multiple items for batching"
 
-            # Verify each discord update item
-            for i, update in enumerate(discord_updates_list.items):
-                assert isinstance(update, DiscordChannelUpdate), f"Update {i} should be DiscordChannelUpdate"
-                assert len(update.name) > 0, f"Update {i} should have a non-empty channel name"
+        # Verify each discord update item
+        for i, update in enumerate(discord_updates_list.items):
+            assert isinstance(update, DiscordChannelUpdate), f"Update {i} should be DiscordChannelUpdate"
+            assert len(update.name) > 0, f"Update {i} should have a non-empty channel name"
 
-            # Check that channel_summaries was created as ListContent (result of batched operation)
-            channel_summaries_stuff: Stuff | None = final_working_memory.get_optional_stuff("channel_summaries")
-            assert channel_summaries_stuff is not None, "channel_summaries should be in working memory"
-            assert channel_summaries_stuff.concept.code == "ChannelSummary"
-            assert channel_summaries_stuff.concept.domain == "discord_newsletter"
-            assert isinstance(channel_summaries_stuff, Stuff), "ChannelSurrmary Stuff is not a Stuff"
+        # Check that channel_summaries was created as ListContent (result of batched operation)
+        channel_summaries_stuff: Stuff | None = final_working_memory.get_optional_stuff("channel_summaries")
+        assert channel_summaries_stuff is not None, "channel_summaries should be in working memory"
+        assert channel_summaries_stuff.concept.code == "ChannelSummary"
+        assert channel_summaries_stuff.concept.domain == "discord_newsletter"
+        assert isinstance(channel_summaries_stuff, Stuff), "ChannelSurrmary Stuff is not a Stuff"
 
-            # Verify channel_summaries is also a ListContent with multiple ChannelSummary items
-            channel_summaries_list: ListContent[ChannelSummary] = channel_summaries_stuff.as_list_of_fixed_content_type(item_type=ChannelSummary)
+        # Verify channel_summaries is also a ListContent with multiple ChannelSummary items
+        channel_summaries_list = channel_summaries_stuff.as_list_of_fixed_content_type(item_type=ChannelSummary)
 
-            pretty_print(channel_summaries_stuff, "jiodisjdqosj")
-            pretty_print(channel_summaries_list, title="Channel Summaries List")
-            assert isinstance(channel_summaries_list, ListContent)
-            assert len(channel_summaries_list.items) > 1, "Should have multiple ChannelSummary items from batch processing"
+        pretty_print(channel_summaries_stuff, title="Channel Summaries Stuff")
+        pretty_print(channel_summaries_list, title="Channel Summaries List")
+        assert isinstance(channel_summaries_list, ListContent)
+        assert len(channel_summaries_list.items) > 1, "Should have multiple ChannelSummary items from batch processing"
 
-            # Verify each summary item (these should be proper ChannelSummary objects from the LLM mock)
-            for i, summary in enumerate(channel_summaries_list.items):
-                assert isinstance(summary, ChannelSummary), f"Summary {i} should be ChannelSummary"
-                assert len(summary.channel_name) > 0, f"Summary {i} should have a non-empty channel name"
-                assert isinstance(summary.summary_items, list), f"Summary {i} should have a list of summary items"
+        # Verify each summary item (these should be proper ChannelSummary objects from the LLM mock)
+        for i, summary in enumerate(channel_summaries_list.items):
+            assert isinstance(summary, ChannelSummary), f"Summary {i} should be ChannelSummary"
+            assert len(summary.channel_name) > 0, f"Summary {i} should have a non-empty channel name"
+            assert isinstance(summary.summary_items, list), f"Summary {i} should have a list of summary items"
 
-            # Verify that the number of summaries matches the number of original channel updates
-            assert len(channel_summaries_list.items) == len(discord_updates_list.items), (
-                "Number of summaries should match number of original channel updates"
-            )
+        # Verify that the number of summaries matches the number of original channel updates
+        assert len(channel_summaries_list.items) == len(discord_updates_list.items), (
+            "Number of summaries should match number of original channel updates"
+        )
 
-            log.info("✅ Successfully verified dry run working memory:")
-            log.info(f"   - discord_channel_updates: ListContent with {len(discord_updates_list.items)} items")
-            log.info(f"   - channel_summaries: ListContent with {len(channel_summaries_list.items)} items")
-            log.info(f"   - Final output: ChannelSummary list with concept code {pipe_output.main_stuff.concept.code}")
+        log.info("✅ Successfully verified dry run working memory:")
+        log.info(f"   - discord_channel_updates: ListContent with {len(discord_updates_list.items)} items")
+        log.info(f"   - channel_summaries: ListContent with {len(channel_summaries_list.items)} items")
+        log.info(f"   - Final output: ChannelSummary list with concept code {pipe_output.main_stuff.concept.code}")

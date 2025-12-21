@@ -109,9 +109,13 @@ class Concept(BaseModel):
         if concept_1_class is None or concept_2_class is None:
             return False
 
+        # Check if classes are structurally equivalent (same fields, types)
+        if are_classes_equivalent(concept_1_class, concept_2_class):
+            return True
+
         if strict:
-            # Check if classes are equivalent (same fields, types, descriptions)
-            return are_classes_equivalent(concept_1_class, concept_2_class)
+            # In strict mode, only structural equivalence is accepted
+            return False
 
         # Check if concept_1 is a subclass of concept_2
         # This handles inheritance from refined concepts (e.g., RefusalEmail inherits from TextContent)
