@@ -8,6 +8,7 @@ class TestPipeLLMBlueprint:
     def test_validate_inputs_correct_with_prompt_variables(self):
         """Test that prompt variables matching inputs are valid."""
         blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
             inputs={"input_one": "native.Text", "input_two": "native.Text"},
             output="native.Text",
             prompt="Process @input_one and @input_two",
@@ -18,6 +19,7 @@ class TestPipeLLMBlueprint:
     def test_validate_inputs_correct_with_system_prompt_variables(self):
         """Test that system_prompt variables matching inputs are valid."""
         blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
             inputs={"context": "native.Text"},
             output="native.Text",
             system_prompt="Use this context: @context",
@@ -29,6 +31,7 @@ class TestPipeLLMBlueprint:
     def test_validate_inputs_correct_with_both_prompts(self):
         """Test that variables in both prompt and system_prompt are validated."""
         blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
             inputs={"context": "native.Text", "query": "native.Text"},
             output="native.Text",
             system_prompt="Context: @context",
@@ -40,6 +43,7 @@ class TestPipeLLMBlueprint:
     def test_validate_inputs_correct_no_variables(self):
         """Test that prompts without variables work fine."""
         blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
             inputs=None,
             output="native.Text",
             prompt="Generate a random story",
@@ -49,6 +53,7 @@ class TestPipeLLMBlueprint:
     def test_validate_inputs_correct_with_inline_variables(self):
         """Test that inline variables ($variable) are also validated."""
         blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
             inputs={"topic": "native.Text", "style": "native.Text"},
             output="native.Text",
             prompt="Write about $topic in $style style",
@@ -60,6 +65,7 @@ class TestPipeLLMBlueprint:
         """Test that missing input variable raises ValueError."""
         with pytest.raises(ValueError, match="Missing input variable") as exc_info:
             PipeLLMBlueprint(
+                description="lorem ipsum",
                 inputs={"input_one": "native.Text", "input_two": "native.Text"},
                 output="native.Text",
                 prompt="Process @input_one, @input_two, and @input_three",
@@ -73,6 +79,7 @@ class TestPipeLLMBlueprint:
         """Test that multiple missing variables are all reported."""
         with pytest.raises(ValueError, match="Missing input variable") as exc_info:
             PipeLLMBlueprint(
+                description="lorem ipsum",
                 inputs={"input_one": "native.Text"},
                 output="native.Text",
                 prompt="Process @input_one, @input_two, and @input_three",
@@ -86,6 +93,7 @@ class TestPipeLLMBlueprint:
         """Test that missing variables in system_prompt are caught."""
         with pytest.raises(ValueError, match="Missing input variable") as exc_info:
             PipeLLMBlueprint(
+                description="lorem ipsum",
                 inputs={"query": "native.Text"},
                 output="native.Text",
                 system_prompt="Use context: @context",
@@ -99,6 +107,7 @@ class TestPipeLLMBlueprint:
         """Test that variables in prompt require inputs to be declared."""
         with pytest.raises((ValidationError, ValueError)) as exc_info:
             PipeLLMBlueprint(
+                description="lorem ipsum",
                 inputs={},
                 output="native.Text",
                 prompt="Process @data",
@@ -109,6 +118,7 @@ class TestPipeLLMBlueprint:
     def test_validate_inputs_ignores_internal_variables(self):
         """Test that internal variables (starting with _) are ignored."""
         blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
             inputs=None,
             output="native.Text",
             prompt="Use internal variable @_internal_var",
@@ -119,6 +129,7 @@ class TestPipeLLMBlueprint:
     def test_validate_inputs_ignores_special_variables(self):
         """Test that special variables like preliminary_text are ignored."""
         blueprint = PipeLLMBlueprint(
+            description="lorem ipsum",
             inputs=None,
             output="native.Text",
             prompt="Use @preliminary_text and @place_holder",

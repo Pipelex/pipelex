@@ -19,7 +19,7 @@ class PipeBatchFactory(PipeFactoryProtocol[PipeBatchBlueprint, PipeBatch]):
         pipe_type: str,
         pipe_code: str,
         domain_code: str,
-        description: str | None,
+        description: str,
         inputs: InputStuffSpecs,
         output: StuffSpec,
         blueprint: PipeBatchBlueprint,
