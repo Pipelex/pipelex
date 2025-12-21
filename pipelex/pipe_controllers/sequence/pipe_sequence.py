@@ -85,7 +85,8 @@ class PipeSequence(PipeController):
             msg = (
                 f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "
                 f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe.code}' "
-                f"has output multiplicity={effective_last_step_output_multiplicity}. They are not compatible."
+                f"has output multiplicity={effective_last_step_output_multiplicity}. They are not compatible. "
+                "Update one of them to match the other."
             )
             raise PipeValidationError(
                 message=msg,
