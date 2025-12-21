@@ -13,6 +13,7 @@ from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import get_config
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -110,7 +111,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
-        return self.inputs
+        needed_inputs = InputStuffSpecsFactory.make_empty()
+
+        for input_name, stuff_spec in self.inputs.items:
+            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+        return needed_inputs
 
     @override
     def required_variables(self) -> set[str]:
