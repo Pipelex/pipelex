@@ -143,7 +143,7 @@ check-uv:
 	@uv self update >/dev/null 2>&1 || true
 
 
-env: check-uv
+env:
 	$(call PRINT_TITLE,"Creating virtual environment")
 	@if [ ! -d "$(VIRTUAL_ENV)" ]; then \
 		echo "Creating Python virtual env in \`${VIRTUAL_ENV}\`"; \
