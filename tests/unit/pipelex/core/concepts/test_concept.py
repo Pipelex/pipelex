@@ -20,7 +20,6 @@ class NestedImageInfo(StructuredContent):
     url: str
     source_prompt: str | None = None
     caption: str | None = None
-    base_64: str | None = None
 
 
 class DocumentWithNestedImage(StructuredContent):
