@@ -541,13 +541,9 @@ class PipeAbstract(ABC, BaseModel):
         # otel_context is passed separately because it must always be set explicitly
         # (even when None in dry mode) to avoid inheriting stale parent context
         child_metadata = job_metadata.copy_with_update(
-            updated_metadata=JobMetadata(
-                user_id=job_metadata.user_id,
-                pipeline_run_id=job_metadata.pipeline_run_id,
-                pipe_code=self.code,
-                pipe_run_id=this_pipe_run_id,
-            ),
             otel_context=this_otel_context,
+            pipe_code=self.code,
+            pipe_run_id=this_pipe_run_id,
         )
 
         # Run pipe ------------------------------------------------------------
