@@ -2,6 +2,7 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
+import shortuuid
 from pytest_mock import MockerFixture
 
 from pipelex import log
@@ -112,9 +113,15 @@ def load_empty_library() -> Generator[Callable[[], str], None, None]:
 
 
 @pytest.fixture
-def dummy_job_metadata() -> JobMetadata:
-    """Provide a JobMetadata instance with dummy values for tests."""
+def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
+    """Provide a JobMetadata instance with test-specific values.
+
+    Uses the test node ID as pipeline_run_id for better traceability in logs.
+    """
+    test_id: str = request.node.nodeid  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    random_code: str = shortuuid.uuid()[:5]
+    pipeline_run_id: str = f"{test_id}-{random_code}"
     return JobMetadata(
-        user_id="pytest_dummy_user",
-        pipeline_run_id="pytest_dummy_pipeline_run_id",
+        user_id="pytest",
+        pipeline_run_id=pipeline_run_id,
     )

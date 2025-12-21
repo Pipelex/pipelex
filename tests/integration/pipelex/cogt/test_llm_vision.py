@@ -20,7 +20,7 @@ from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 class TestLLMVision:
     @pytest.mark.parametrize(("topic", "image_uri"), LLMVisionTestCases.IMAGE_URLS)
     async def test_gen_text_from_vision_by_url(
-        self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_uri: str, dummy_job_metadata: JobMetadata
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_uri: str
     ):
         prompt_image = PromptImageFactory.make_prompt_image(url=image_uri)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
@@ -30,7 +30,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
 
@@ -45,7 +45,7 @@ class TestLLMVision:
 
     @pytest.mark.parametrize(("topic", "image_path"), LLMVisionTestCases.IMAGE_PATHS)
     async def test_gen_text_from_vision_by_bytes(
-        self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str, dummy_job_metadata: JobMetadata
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str
     ):
         image_bytes = load_binary_as_base64(path=image_path)
         prompt_image = PromptImageBase64(base_64=image_bytes)
@@ -55,7 +55,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         try:
@@ -69,7 +69,7 @@ class TestLLMVision:
 
     @pytest.mark.parametrize(("topic", "image_path"), LLMVisionTestCases.IMAGE_PATHS)
     async def test_gen_text_from_vision_by_path(
-        self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str, dummy_job_metadata: JobMetadata
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str
     ):
         prompt_image = PromptImagePath(file_path=image_path)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
@@ -78,7 +78,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         try:
@@ -92,7 +92,7 @@ class TestLLMVision:
 
     @pytest.mark.parametrize(("topic", "image_pair"), LLMVisionTestCases.IMAGE_PATH_PAIRS)
     async def test_gen_text_from_vision_2_images(
-        self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_pair: tuple[str, str], dummy_job_metadata: JobMetadata
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_pair: tuple[str, str]
     ):
         prompt_image1 = PromptImagePath(file_path=image_pair[0])
         prompt_image2 = PromptImagePath(file_path=image_pair[1])
@@ -102,7 +102,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_IMAGES_COMPARE_PROMPT,
                 user_images=[prompt_image1, prompt_image2],
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         try:

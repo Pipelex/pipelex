@@ -23,7 +23,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeParallelSimple:
     async def test_parallel_text_analysis(
-        self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None], dummy_job_metadata: JobMetadata
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
     ):
         """Test PipeParallel running three text analysis pipes in parallel."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
@@ -79,7 +79,7 @@ class TestPipeParallelSimple:
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             working_memory=working_memory,
             output_name="parallel_results",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -142,7 +142,7 @@ class TestPipeParallelSimple:
         assert final_result.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
 
     async def test_parallel_short_text_analysis(
-        self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None], dummy_job_metadata: JobMetadata
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
     ):
         """Test PipeParallel with shorter text to verify consistent behavior."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
@@ -176,7 +176,7 @@ class TestPipeParallelSimple:
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             working_memory=working_memory,
             output_name="parallel_results",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

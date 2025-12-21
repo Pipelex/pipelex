@@ -17,7 +17,7 @@ from tests.integration.pipelex.cogt.test_data import ImageDescription, LLMTestCo
 @pytest.mark.usefixtures("routing_profile_override")
 class TestLLMInference:
     @pytest.mark.parametrize("user_text", [LLMTestConstants.USER_TEXT_SUPER_SHORT])
-    async def test_simple_gen_text_from_text(self, llm_job_params: LLMJobParams, llm_handle: str, user_text: str, dummy_job_metadata: JobMetadata):
+    async def test_simple_gen_text_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, user_text: str):
         log.info(f"test_simple_gen_text_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
@@ -26,7 +26,7 @@ class TestLLMInference:
                 system_text=None,
                 user_text=user_text,
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
@@ -34,7 +34,7 @@ class TestLLMInference:
         pretty_print(generated_text)
         # get_report_delegate().generate_report()
 
-    async def test_simple_gen_object_from_text(self, llm_job_params: LLMJobParams, llm_handle: str, dummy_job_metadata: JobMetadata):
+    async def test_simple_gen_object_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str):
         log.info(f"test_simple_gen_object_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         if not llm_worker.is_gen_object_supported:
@@ -46,7 +46,7 @@ class TestLLMInference:
                 system_text=None,
                 user_text=LLMTestConstants.USER_TEXT_TO_EXTRACT_PERSON,
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         generated_object = await llm_worker.gen_object(llm_job=llm_job, schema=Person)
@@ -55,7 +55,7 @@ class TestLLMInference:
         # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
-    async def test_gen_text_from_image(self, llm_job_params: LLMJobParams, llm_handle: str, image_path: str, dummy_job_metadata: JobMetadata):
+    async def test_gen_text_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
         log.info(f"test_gen_text_from_image: Testing llm_handle '{llm_handle}'")
         prompt_image = PromptImagePath(file_path=image_path)
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
@@ -69,7 +69,7 @@ class TestLLMInference:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         try:
@@ -81,7 +81,7 @@ class TestLLMInference:
         # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
-    async def test_gen_object_from_image(self, llm_job_params: LLMJobParams, llm_handle: str, image_path: str, dummy_job_metadata: JobMetadata):
+    async def test_gen_object_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
         log.info(f"test_gen_object_from_image: Testing llm_handle '{llm_handle}'")
         prompt_image = PromptImagePath(file_path=image_path)
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
@@ -101,7 +101,7 @@ class TestLLMInference:
                 user_text="Analyze this image and provide a title, detailed description, and estimated date or time period.",
                 user_images=[prompt_image],
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         try:

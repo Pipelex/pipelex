@@ -36,9 +36,9 @@ class TestPipeFunc:
 
     async def test_wrap_lines_pipe_func(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_empty_library: Callable[[], None],
-        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         # Sample source code to test with
@@ -73,7 +73,7 @@ if __name__ == "__main__":
                 blueprint=pipe_func_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             working_memory=working_memory,
         )
 

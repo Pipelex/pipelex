@@ -27,9 +27,9 @@ from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, Pi
 class TestPipeLLMBasic:
     async def test_pipe_llm_simple(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
-        dummy_job_metadata: JobMetadata,
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         pipe_llm_blueprint = PipeLLMBlueprint(
@@ -49,7 +49,7 @@ class TestPipeLLMBasic:
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
         )
         pipe_llm_output = await get_pipe_router().run(
             pipe_job=pipe_job,
@@ -81,6 +81,7 @@ class TestPipeLLMBasic:
     )
     async def test_pipe_llm_structured(
         self,
+        job_metadata: JobMetadata,
         topic: str,
         data: str,
         concept: str,
@@ -89,7 +90,6 @@ class TestPipeLLMBasic:
         llm: str,
         llm_to_structure: str,
         load_test_library: Callable[[list[Path]], None],
-        dummy_job_metadata: JobMetadata,
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         # TODO: Add assertion on generated objects vs expected results
@@ -127,7 +127,7 @@ class TestPipeLLMBasic:
             pipe=pipe,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
         )
 
         pipe_llm_output = await get_pipe_router().run(pipe_job=pipe_job)
@@ -157,11 +157,11 @@ class TestPipeLLMBasic:
     @pytest.mark.parametrize(("stuff", "attribute_paths"), PipeTestCases.STUFFS_IMAGE_ATTRIBUTES)
     async def test_pipe_llm_attribute_image(
         self,
+        job_metadata: JobMetadata,
         stuff: Stuff,
         attribute_paths: list[str],
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
-        dummy_job_metadata: JobMetadata,
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         for attribute_path in attribute_paths:
@@ -185,7 +185,7 @@ class TestPipeLLMBasic:
                     blueprint=pipe_llm_blueprint,
                 ),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-                job_metadata=dummy_job_metadata,
+                job_metadata=job_metadata,
             )
 
             pipe_llm_output = await get_pipe_router().run(

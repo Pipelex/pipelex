@@ -15,15 +15,13 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestImageOutIn:
-    async def test_image_out_in(
-        self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None], dummy_job_metadata: JobMetadata
-    ) -> None:
+    async def test_image_out_in(self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="image_out_in"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-                job_metadata=dummy_job_metadata,
+                job_metadata=job_metadata,
             ),
         )
 

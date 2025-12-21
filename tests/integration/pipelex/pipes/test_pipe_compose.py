@@ -27,10 +27,10 @@ class TestPipeCompose:
     @pytest.mark.parametrize("template_source", JINJA2TestCases.JINJA2_FOR_ANY)
     async def test_pipe_compose_for_any(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         template_source: str,
         load_empty_library: Callable[[], None],
-        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         pipe_compose_blueprint = PipeComposeBlueprint(
@@ -51,7 +51,7 @@ class TestPipeCompose:
                 blueprint=pipe_compose_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
         )
         pipe_compose_output = cast("PipeComposeOutput", await get_pipe_router().run(pipe_job=pipe_job))
         rendered_text = pipe_compose_output.main_stuff_as_str
@@ -60,10 +60,10 @@ class TestPipeCompose:
     @pytest.mark.parametrize("template_source", JINJA2TestCases.JINJA2_FOR_STUFF)
     async def test_pipe_compose_for_stuff(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         template_source: str,
         load_empty_library: Callable[[], None],
-        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
@@ -92,7 +92,7 @@ class TestPipeCompose:
                 blueprint=pipe_compose_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             working_memory=working_memory,
         )
         pipe_compose_output = cast("PipeComposeOutput", await get_pipe_router().run(pipe_job=pipe_job))

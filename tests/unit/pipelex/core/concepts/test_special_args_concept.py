@@ -26,9 +26,9 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestSpecialArgsConcept:
     async def test_create_concept_with_content_field(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_empty_library: Callable[[], None],
-        dummy_job_metadata: JobMetadata,
     ):
         """Test creating a concept with a 'content' field and running a pipe that uses it."""
         load_empty_library()
@@ -99,7 +99,7 @@ class TestSpecialArgsConcept:
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe_llm,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             working_memory=working_memory,
         )
 

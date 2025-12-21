@@ -49,10 +49,10 @@ class TestPipeExtract:
     @pytest.mark.parametrize("image_url", PipeExtractTestCases.PIPE_OCR_IMAGE_TEST_CASES)
     async def test_pipe_extract_image(
         self,
+        job_metadata: JobMetadata,
         extract_choice_for_image: str,
         pipe_run_mode: PipeRunMode,
         image_url: str,
-        dummy_job_metadata: JobMetadata,
     ):
         pipe_extract_blueprint = PipeExtractBlueprint(
             description="OCR test for image processing",
@@ -72,7 +72,7 @@ class TestPipeExtract:
                 blueprint=pipe_extract_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             working_memory=WorkingMemoryFactory.make_from_single_stuff(
                 stuff=StuffFactory.make_stuff(
                     concept=ConceptFactory.make(
@@ -97,11 +97,11 @@ class TestPipeExtract:
     @pytest.mark.parametrize("page_image_captions", [False])  # TODO: add True when captioning is implemented
     async def test_pipe_extract_from_pdf(
         self,
+        job_metadata: JobMetadata,
         extract_choice_for_pdf: str,
         pipe_run_mode: PipeRunMode,
         pdf_url: str,
         page_image_captions: bool,
-        dummy_job_metadata: JobMetadata,
     ):
         input_name = "arbitrary_name"
         blueprint = PipeExtractBlueprint(
@@ -122,7 +122,7 @@ class TestPipeExtract:
                 blueprint=blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             working_memory=WorkingMemoryFactory.make_from_single_stuff(
                 stuff=StuffFactory.make_stuff(
                     concept=ConceptFactory.make_native_concept(

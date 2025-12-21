@@ -41,7 +41,7 @@ def get_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMeta
 class TestLLMGenText:
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_using_handle(
-        self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str, dummy_job_metadata: JobMetadata
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str
     ):
         pretty_print(prompt_text, title=f"Generating text about '{topic}' using '{llm_handle}'")
         llm_worker = get_llm_worker(llm_handle=llm_handle)
@@ -49,7 +49,7 @@ class TestLLMGenText:
             llm_prompt=LLMPrompt(
                 user_text=prompt_text,
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
             llm_job_config=LLMJobConfig(
                 max_retries=3,
@@ -60,15 +60,15 @@ class TestLLMGenText:
         pretty_print(generated_text)
 
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str, dummy_job_metadata: JobMetadata):  # noqa: ARG002
-        llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text, job_metadata=dummy_job_metadata)
+    async def test_gen_text_using_llm_preset(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
+        llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text, job_metadata=job_metadata)
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
 
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_multiple_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str, dummy_job_metadata: JobMetadata):  # noqa: ARG002
-        llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text, job_metadata=dummy_job_metadata)
+    async def test_gen_text_multiple_using_llm_preset(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
+        llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text, job_metadata=job_metadata)
         job_params_base = llm_job.job_params
         max_tokens = 30
         temperature = 0.1

@@ -23,11 +23,11 @@ class TestConceptSpecGeneration:
     @pytest.mark.parametrize(("topic", "user_prompt"), ConceptSpecGenerationTestCases.TEST_CASES)
     async def test_generate_concept_spec(
         self,
+        job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
         llm_handle: str,
         topic: str,
         user_prompt: str,
-        dummy_job_metadata: JobMetadata,
     ):
         log.info(f"Testing {topic} with llm_handle '{llm_handle}'")
 
@@ -46,7 +46,7 @@ class TestConceptSpecGeneration:
                 system_text="You are an expert at generating concept specifications for a data modeling system.",
                 user_text=user_prompt,
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_config=LLMJobConfig(
                 max_retries=3,
             ),

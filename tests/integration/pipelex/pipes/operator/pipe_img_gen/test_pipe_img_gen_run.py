@@ -24,12 +24,12 @@ class TestPipeImgGenRun:
     @pytest.mark.parametrize(("topic", "image_desc"), ImageGenTestCases.IMAGE_DESC)
     async def test_pipe_img_gen_run_no_inputs(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         img_gen_handle: str,
         topic: str,  # noqa: ARG002
         image_desc: str,
         load_empty_library: Callable[[], None],
-        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
@@ -46,7 +46,7 @@ class TestPipeImgGenRun:
                 blueprint=pipe_img_gen_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
         )
         await get_pipe_router().run(
             pipe_job=pipe_job,
@@ -55,12 +55,12 @@ class TestPipeImgGenRun:
     @pytest.mark.parametrize(("topic", "image_desc"), ImageGenTestCases.IMAGE_DESC)
     async def test_pipe_img_gen_run_input_to_template(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         img_gen_handle: str,
         topic: str,  # noqa: ARG002
         image_desc: str,
         load_empty_library: Callable[[], None],
-        dummy_job_metadata: JobMetadata,
     ):
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
@@ -81,7 +81,7 @@ class TestPipeImgGenRun:
                 stuff=StuffFactory.make_from_str(str_value=image_desc, name="image_desc"),
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
         )
         await get_pipe_router().run(
             pipe_job=pipe_job,

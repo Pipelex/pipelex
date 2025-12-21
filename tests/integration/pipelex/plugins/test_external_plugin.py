@@ -69,7 +69,7 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestExternalPlugin:
-    async def test_external_llm_worker(self, load_empty_library: Callable[[], None], dummy_job_metadata: JobMetadata):
+    async def test_external_llm_worker(self, job_metadata: JobMetadata, load_empty_library: Callable[[], None]):
         load_empty_library()
         llm_worker = MockExternalLLMWorker(reporting_delegate=get_report_delegate())
         llm_job = LLMJobFactory.make_llm_job(
@@ -77,7 +77,7 @@ class TestExternalPlugin:
                 system_text=None,
                 user_text=LLMTestConstants.USER_TEXT_SHORT,
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             llm_job_params=LLMJobParams(
                 temperature=0.5,
                 max_tokens=None,
@@ -92,7 +92,7 @@ class TestExternalPlugin:
         assert generated_object
         pretty_print(generated_object)
 
-    async def test_pipe_llm_with_external_llm_handle(self, load_empty_library: Callable[[], None], dummy_job_metadata: JobMetadata):
+    async def test_pipe_llm_with_external_llm_handle(self, job_metadata: JobMetadata, load_empty_library: Callable[[], None]):
         load_empty_library()
         llm_handle = EXTERNAL_PLUGIN_NAME
         get_inference_manager().set_llm_worker_from_external_plugin(
@@ -118,7 +118,7 @@ class TestExternalPlugin:
                 pipe_code="adhoc_for_test_pipe_llm_with_external_llm_handle",
                 blueprint=pipe_llm_blueprint,
             ),
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
         )
         pipe_llm_output = await get_pipe_router().run(
             pipe_job=pipe_job,

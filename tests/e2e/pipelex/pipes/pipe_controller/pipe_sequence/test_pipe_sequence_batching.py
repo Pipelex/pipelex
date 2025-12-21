@@ -22,7 +22,7 @@ from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence impo
 @pytest.mark.inference
 @pytest.mark.asyncio
 async def test_review_analysis_sequence_with_batching(
-    pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None], dummy_job_metadata: JobMetadata
+    job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
 ):
     load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
     """Test customer review analysis sequence with batching."""
@@ -44,7 +44,7 @@ async def test_review_analysis_sequence_with_batching(
         )
         pipe = get_required_pipe(pipe_code="analyze_reviews_sequence")
         pipe_output = await pipe.run_pipe(
-            job_metadata=dummy_job_metadata,
+            job_metadata=job_metadata,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             working_memory=working_memory,
         )
