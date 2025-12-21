@@ -157,7 +157,9 @@ def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None,
     if target_multiplicity is True:
         # Accept True (variable) or any integer (fixed count)
         # Both represent "multiple items", just with different specificity
-        return source_multiplicity is True or isinstance(source_multiplicity, int)
+        # Note: We must explicitly check for bool first because bool is a subclass of int in Python
+        # isinstance(False, int) returns True, which would incorrectly match False as a valid multiplicity
+        return source_multiplicity is True or (isinstance(source_multiplicity, int) and not isinstance(source_multiplicity, bool))
 
     # Case 3: Target expects fixed count (integer)
     # Source must match exactly
