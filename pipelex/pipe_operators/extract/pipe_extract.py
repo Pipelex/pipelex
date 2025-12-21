@@ -162,6 +162,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
                 if needs_to_generate_page_views:
                     page_views = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.page_views_dpi)
+                    page_view_contents = []
                     for page_view in page_views:
                         page_view_binary = BytesIO()
                         page_view.save(page_view_binary, format="PNG")
