@@ -1,5 +1,6 @@
-from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipeline.exceptions import PipeStackOverflowError
+
 
 def monitor_pipe_stack(pipe_run_params: PipeRunParams):
     pipe_stack = pipe_run_params.pipe_stack

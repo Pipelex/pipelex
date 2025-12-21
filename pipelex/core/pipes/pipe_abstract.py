@@ -14,10 +14,10 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.utils import monitor_pipe_stack
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.telemetry.otel_constants import (
@@ -27,7 +27,6 @@ from pipelex.system.telemetry.otel_constants import (
     SpanCategory,
     SpanOutcome,
 )
-from pipelex.core.pipes.utils import monitor_pipe_stack
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
