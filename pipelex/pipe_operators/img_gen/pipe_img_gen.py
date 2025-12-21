@@ -238,7 +238,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 source_prompt=img_gen_prompt_text,
                 base_64=base_64_str,
             )
-            log.verbose(the_content, title="Single image content")
+            log.verbose(the_content, title=f"output stuff content of PipeImg {self.code}")
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,

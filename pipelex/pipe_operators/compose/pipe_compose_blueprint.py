@@ -7,6 +7,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -70,4 +71,10 @@ class PipeComposeBlueprint(PipeBlueprint):
 
     @override
     def validate_output(self):
-        pass
+        parsed_output = parse_concept_with_multiplicity(concept_ref=self.output)
+        if parsed_output.multiplicity:
+            msg = (
+                "PipeCompose does not support multiple output generation. The output of PipeCompose must be a single stuff, "
+                f"from a concept that refines the native Text concept. Current output: {self.output}"
+            )
+            raise ValueError(msg)

@@ -189,7 +189,7 @@ class PipeRunParams(BaseModel):
 
     @property
     def is_multiple_output_required(self) -> bool:
-        return isinstance(self.output_multiplicity, int) and self.output_multiplicity > 1  # pyright: ignore[reportUnnecessaryIsInstance]
+        return isinstance(self.output_multiplicity, int) and self.output_multiplicity > 1
 
     def push_pipe_to_stack(self, pipe_code: str) -> None:
         self.pipe_stack.append(pipe_code)
