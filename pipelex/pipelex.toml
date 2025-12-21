@@ -1,6 +1,12 @@
 
 
 [pipelex]
+
+[pipelex.storage_config]
+is_fetch_remote_content = true
+method = "local"
+local_storage_path = ".pipelex/storage"
+
 [pipelex.observer_config]
 observer_dir = "results/observer"
 

@@ -26,6 +26,12 @@
 #
 ####################################################################################################
 
+
+[pipelex.storage_config]
+# Uncomment to change the storage method: "local" (default) or "in_memory"
+# method = "local"
+# local_storage_path = ".pipelex/storage"
+
 [pipelex.scan_config]
 # Uncomment to customize the excluded directories for scanning
 # excluded_dirs = [

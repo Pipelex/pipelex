@@ -30,6 +30,7 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
             msg = f"File not found: '{uri}'"
             raise StorageFileNotFoundError(msg)
 
+        log.dev(f"Loaded data from URI: '{uri}'")
         return self.root[uri]
 
     @override
@@ -44,5 +45,5 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
             The URI of the stored data.
         """
         self.root[uri] = data
-        log.debug(f"Stored data at URI: '{uri}'")
+        log.dev(f"Stored data at URI: '{uri}'")
         return uri

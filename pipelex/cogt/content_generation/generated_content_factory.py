@@ -5,9 +5,11 @@ from pipelex import pretty_print
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
 from pipelex.cogt.img_gen.img_gen_job_components import OutputFormat
+from pipelex.config import get_config
 from pipelex.tools.misc.base_64_utils import (
     extract_base_64_str_from_base64_url_if_possible,
 )
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 
@@ -44,17 +46,22 @@ class GeneratedContentFactory:
 
         return f"{hash_digest}.{extension}"
 
+    def _fetch_remote_content(self, url: str) -> bytes:
+        return fetch_file_from_url_httpx(url=url)
+
     def make_generated_image(
         self,
         raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
         output_format: OutputFormat | None = None
         base64_extracted_mime_type: str | None = None
+        is_remote_url: bool
         if raw_details.output_format:
             output_format = OutputFormat(raw_details.output_format)
 
         if raw_details.actual_url:
             url = raw_details.actual_url
+            is_remote_url = True
         else:
             actual_url: str | None = None
             actual_bytes: bytes | None = None
@@ -77,11 +84,13 @@ class GeneratedContentFactory:
 
             if actual_url:
                 url = actual_url
+                is_remote_url = True
             elif actual_bytes:
-                filename = self._build_filename_from_hash(
+                storage_uri = self._build_filename_from_hash(
                     data=actual_bytes, mime_type=raw_details.mime_type or base64_extracted_mime_type, output_format=output_format
                 )
-                url = self.storage_provider.store(data=actual_bytes, uri=filename)
+                url = self.storage_provider.store(data=actual_bytes, uri=storage_uri)
+                is_remote_url = False
             else:
                 msg = "No URL or base64 string found"
                 raise NeitherUrlNorDataError(msg)
@@ -97,6 +106,11 @@ class GeneratedContentFactory:
             mime_type = output_format.as_mime_type
         else:
             mime_type = "image/jpeg"
+
+        if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content:
+            actual_bytes = self._fetch_remote_content(url=url)
+            storage_uri = self._build_filename_from_hash(data=actual_bytes, mime_type=mime_type, output_format=output_format)
+            url = self.storage_provider.store(data=actual_bytes, uri=storage_uri)
 
         return GeneratedImageResolved(
             url=url,
