@@ -7,6 +7,7 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlue
 class TestPipeImgGenBlueprint:
     def test_validate_inputs_correct(self):
         blueprint = PipeImgGenBlueprint(
+            description="lorem ipsum",
             inputs=None,
             output="Image",
             prompt="A beautiful sunset",
@@ -15,6 +16,7 @@ class TestPipeImgGenBlueprint:
         assert blueprint.prompt == "A beautiful sunset"
 
         blueprint = PipeImgGenBlueprint(
+            description="lorem ipsum",
             inputs={"topic": "Text"},
             output="Image",
             prompt="Sketch black and white illustration of: $topic",
@@ -25,6 +27,7 @@ class TestPipeImgGenBlueprint:
     def test_validate_inputs_incorrect(self):
         with pytest.raises(ValidationError) as exc_info:
             PipeImgGenBlueprint(
+                description="lorem ipsum",
                 inputs={"topic": "Text"},
                 output="Image",
                 prompt="Sketch black and white illustration of: $bingo",

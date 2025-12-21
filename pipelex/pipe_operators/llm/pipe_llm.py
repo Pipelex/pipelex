@@ -20,7 +20,6 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -111,16 +110,10 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
-        """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
-        needed_inputs = InputStuffSpecsFactory.make_empty()
-
-        for input_name, stuff_spec in self.inputs.items:
-            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
-        return needed_inputs
+        return self.inputs
 
     @override
     def required_variables(self) -> set[str]:
-        """Required variables are the variables that are used in the current prompt template or system prompt"""
         return {variable_name for variable_name in self.llm_prompt_spec.required_variables() if not variable_name.startswith("_")}
 
     @override

@@ -82,7 +82,7 @@ class PipeBlueprint(ABC, BaseModel):
     source: str | None = None
     pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
     type: Any  # TODO: Find a better way to handle this.
-    description: str | None = None
+    description: str
     inputs: dict[str, str] | None = None
     output: str
 
