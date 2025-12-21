@@ -3,7 +3,8 @@
 [pipelex]
 
 [pipelex.storage_config]
-is_fetch_remote_content = true
+is_fetch_remote_content_enabled = true
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 method = "local"
 local_storage_path = ".pipelex/storage"
 

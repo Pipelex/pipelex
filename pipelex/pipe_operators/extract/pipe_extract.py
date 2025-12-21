@@ -171,7 +171,10 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
                             height=page_view.height,
                             output_format="png",
                         )
-                        generated_image = await content_generator.make_generated_image(generated_image_raw_details=raw_details)
+                        generated_image = await content_generator.make_generated_image(
+                            job_metadata=job_metadata,
+                            generated_image_raw_details=raw_details,
+                        )
                         image_content = ImageContent(url=generated_image.url)
                         page_view_contents.append(image_content)
             elif image_uri:

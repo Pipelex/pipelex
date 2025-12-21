@@ -201,9 +201,14 @@ class ContentGenerator(ContentGeneratorProtocol):
     @override
     async def make_generated_image(
         self,
+        job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
-        return await self._generated_content_factory.make_generated_image(raw_details=generated_image_raw_details)
+        return await self._generated_content_factory.make_generated_image(
+            primary_id=job_metadata.user_id,
+            secondary_id=job_metadata.pipeline_run_id,
+            raw_details=generated_image_raw_details,
+        )
 
     @override
     @update_job_metadata
@@ -226,7 +231,10 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         generated_image_raw_details = await img_gen_single_image(img_gen_assignment=img_gen_assignment)
         log.verbose(f"{self.__class__.__name__} generated image raw details: {generated_image_raw_details}")
-        return await self.make_generated_image(generated_image_raw_details=generated_image_raw_details)
+        return await self.make_generated_image(
+            job_metadata=job_metadata,
+            generated_image_raw_details=generated_image_raw_details,
+        )
 
     @override
     @update_job_metadata
@@ -250,7 +258,13 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         generated_images_as_raw_details = await img_gen_image_list(img_gen_assignment=img_gen_assignment)
         log.verbose(f"{self.__class__.__name__} generated image list: {generated_images_as_raw_details}")
-        return [await self.make_generated_image(generated_image_raw_details=raw_details) for raw_details in generated_images_as_raw_details]
+        return [
+            await self.make_generated_image(
+                job_metadata=job_metadata,
+                generated_image_raw_details=raw_details,
+            )
+            for raw_details in generated_images_as_raw_details
+        ]
 
     @override
     async def make_templated_text(

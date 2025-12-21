@@ -64,7 +64,8 @@ class ValidationErrorConfig(ConfigModel):
 
 
 class StorageConfig(ConfigModel):
-    is_fetch_remote_content: bool
+    is_fetch_remote_content_enabled: bool
+    uri_format: str
     method: StorageMethod = Field(strict=False)
     local_storage_path: str | None = None
 

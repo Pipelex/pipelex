@@ -17,15 +17,24 @@ class GeneratedContentFactory:
     def __init__(self, storage_provider: StorageProviderAbstract) -> None:
         self.storage_provider = storage_provider
 
-    def _build_filename_from_hash(self, data: bytes, mime_type: str | None, output_format: OutputFormat | None) -> str:
-        """Build a filename using a SHA-256 hash of the data.
+    def _build_storage_uri(
+        self,
+        primary_id: str,
+        secondary_id: str,
+        data: bytes,
+        mime_type: str | None,
+        output_format: OutputFormat | None,
+    ) -> str:
+        """Build a storage URI using a SHA-256 hash of the data.
 
         Args:
+            primary_id: The principal ID
+            secondary_id: The secondary ID
             data: The binary data to hash
             mime_type: Optional MIME type to determine file extension
             output_format: Optional output format to determine file extension
         Returns:
-            A filename in the format "{hash}.{extension}"
+            A storage URI in the format "{hash}.{extension}"
         """
         hash_digest = hashlib.sha256(data).hexdigest()[:16]
 
@@ -43,14 +52,16 @@ class GeneratedContentFactory:
                     extension = "jpg"
         else:
             extension = "jpg"
-
-        return f"{hash_digest}.{extension}"
+        uri_format = get_config().pipelex.storage_config.uri_format
+        return uri_format.format(primary_id=primary_id, secondary_id=secondary_id, hash=hash_digest, extension=extension)
 
     async def _fetch_remote_content(self, url: str) -> bytes:
         return await fetch_file_from_url_httpx_async(url=url)
 
     async def make_generated_image(
         self,
+        primary_id: str,
+        secondary_id: str,
         raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
         output_format: OutputFormat | None = None
@@ -86,8 +97,12 @@ class GeneratedContentFactory:
                 url = actual_url
                 is_remote_url = True
             elif actual_bytes:
-                storage_uri = self._build_filename_from_hash(
-                    data=actual_bytes, mime_type=raw_details.mime_type or base64_extracted_mime_type, output_format=output_format
+                storage_uri = self._build_storage_uri(
+                    primary_id=primary_id,
+                    secondary_id=secondary_id,
+                    data=actual_bytes,
+                    mime_type=raw_details.mime_type or base64_extracted_mime_type,
+                    output_format=output_format,
                 )
                 url = self.storage_provider.store(data=actual_bytes, uri=storage_uri)
                 is_remote_url = False
@@ -107,9 +122,15 @@ class GeneratedContentFactory:
         else:
             mime_type = "image/jpeg"
 
-        if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content:
+        if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content_enabled:
             actual_bytes = await self._fetch_remote_content(url=url)
-            storage_uri = self._build_filename_from_hash(data=actual_bytes, mime_type=mime_type, output_format=output_format)
+            storage_uri = self._build_storage_uri(
+                primary_id=primary_id,
+                secondary_id=secondary_id,
+                data=actual_bytes,
+                mime_type=mime_type,
+                output_format=output_format,
+            )
             url = self.storage_provider.store(data=actual_bytes, uri=storage_uri)
 
         return GeneratedImageResolved(

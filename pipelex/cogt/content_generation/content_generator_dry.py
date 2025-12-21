@@ -147,6 +147,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     @override
     async def make_generated_image(
         self,
+        job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
         return self._make_generated_image_fake(raw_details=generated_image_raw_details)
