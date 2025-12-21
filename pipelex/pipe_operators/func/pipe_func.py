@@ -79,8 +79,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        log.verbose(f"Applying function '{self.function_name}'")
-
+        log.verbose(f"Running PipeFunc with function '{self.function_name}'")
         function = func_registry.get_required_function(self.function_name)
 
         if asyncio.iscoroutinefunction(function):

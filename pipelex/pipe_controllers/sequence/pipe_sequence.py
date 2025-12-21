@@ -15,7 +15,6 @@ from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -164,11 +163,6 @@ class PipeSequence(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        pipe_run_params.push_pipe_layer(pipe_code=self.code)
-        if pipe_run_params.is_multiple_output_required:
-            msg = f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-            raise PipeRunParamsError(msg)
-
         evolving_memory = working_memory
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
