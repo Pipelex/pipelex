@@ -60,13 +60,13 @@ class PipelexBundleSpec(StructuredContent):
 
     @field_validator("domain", mode="before")
     @classmethod
-    def validate_domain_syntax(cls, domain: str) -> str:
+    def validate_domain_syntax(cls, domain_code: str) -> str:
         try:
-            validate_domain_code(code=domain)
+            validate_domain_code(code=domain_code)
         except DomainCodeError as exc:
-            msg = f"Error when trying to validate pipelex bundle spec: domain '{domain}' is not a valid domain code: {exc}"
+            msg = f"Error when trying to validate pipelex bundle spec: domain '{domain_code}' is not a valid domain code: {exc}"
             raise ValueError(msg) from exc
-        return domain
+        return domain_code
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleSpec":

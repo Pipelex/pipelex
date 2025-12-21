@@ -30,7 +30,7 @@ class TestPipeSequenceOutputMultiplicity:
         """
         load_empty_library()
 
-        domain = "test_multiplicity"
+        domain_code = "test_multiplicity"
 
         # Create a PipeLLM with multiple output (output_multiplicity=3)
         llm_blueprint = PipeLLMBlueprint(
@@ -41,7 +41,7 @@ class TestPipeSequenceOutputMultiplicity:
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="llm_multiple_output",
             blueprint=llm_blueprint,
         )
@@ -57,7 +57,7 @@ class TestPipeSequenceOutputMultiplicity:
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="sequence_mismatch",
             blueprint=sequence_blueprint,
         )
@@ -83,7 +83,7 @@ class TestPipeSequenceOutputMultiplicity:
         """
         load_empty_library()
 
-        domain = "test_no_multiplicity"
+        domain_code = "test_no_multiplicity"
 
         # Create a PipeLLM with single output (no multiplicity)
         llm_blueprint = PipeLLMBlueprint(
@@ -94,7 +94,7 @@ class TestPipeSequenceOutputMultiplicity:
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="llm_single_output",
             blueprint=llm_blueprint,
         )
@@ -110,7 +110,7 @@ class TestPipeSequenceOutputMultiplicity:
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="sequence_matching",
             blueprint=sequence_blueprint,
         )
@@ -132,7 +132,7 @@ class TestPipeSequenceOutputMultiplicity:
         """
         load_empty_library()
 
-        domain = "test_variable_multiplicity"
+        domain_code = "test_variable_multiplicity"
 
         # Create a PipeLLM with variable multiplicity output
         llm_blueprint = PipeLLMBlueprint(
@@ -143,7 +143,7 @@ class TestPipeSequenceOutputMultiplicity:
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="llm_variable_output",
             blueprint=llm_blueprint,
         )
@@ -159,7 +159,7 @@ class TestPipeSequenceOutputMultiplicity:
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="sequence_variable_matching",
             blueprint=sequence_blueprint,
         )
@@ -181,7 +181,7 @@ class TestPipeSequenceOutputMultiplicity:
         """
         load_empty_library()
 
-        domain = "test_variable_vs_none"
+        domain_code = "test_variable_vs_none"
 
         # Create a PipeLLM with variable multiplicity
         llm_blueprint = PipeLLMBlueprint(
@@ -192,7 +192,7 @@ class TestPipeSequenceOutputMultiplicity:
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="llm_variable",
             blueprint=llm_blueprint,
         )
@@ -208,7 +208,7 @@ class TestPipeSequenceOutputMultiplicity:
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="sequence_mismatch_var_none",
             blueprint=sequence_blueprint,
         )
@@ -234,7 +234,7 @@ class TestPipeSequenceOutputMultiplicity:
         """
         load_empty_library()
 
-        domain = "test_fixed_vs_variable"
+        domain_code = "test_fixed_vs_variable"
 
         # Create a PipeLLM with fixed multiplicity
         llm_blueprint = PipeLLMBlueprint(
@@ -245,7 +245,7 @@ class TestPipeSequenceOutputMultiplicity:
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="llm_fixed_3",
             blueprint=llm_blueprint,
         )
@@ -261,7 +261,7 @@ class TestPipeSequenceOutputMultiplicity:
             ],
         )
         sequence_pipe = PipeFactory[PipeSequence].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="sequence_mismatch_fixed_var",
             blueprint=sequence_blueprint,
         )

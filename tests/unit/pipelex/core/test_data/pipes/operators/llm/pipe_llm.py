@@ -32,7 +32,7 @@ prompt = "Generate a story about a programmer"
 # PipeLLM with inputs and template variables
 PIPE_LLM_WITH_INPUTS = (
     "pipe_llm_with_inputs",
-    '''domain = "test_pipes"
+    '''domain_code = "test_pipes"
 description = "Domain with pipe definitions"
 
 [pipe.extract_info]
@@ -92,7 +92,7 @@ prompt = "Analyze the following data and provide insights"
 # PipeLLM with long prompt
 PIPE_LLM_WITH_LONG_PROMPT = (
     "pipe_llm_with_long_prompt",
-    '''domain = "test_pipes"
+    '''domain_code = "test_pipes"
 description = "Domain with pipe definitions"
 
 [pipe.expert_analysis]
@@ -296,7 +296,7 @@ prompt = "Extract person information from this text: @text"
 # PipeLLM with boolean multiplicity values
 PIPE_LLM_BOOLEAN_MULTIPLICITY = (
     "pipe_llm_boolean_multiplicity",
-    '''domain = "test_pipes"
+    '''domain_code = "test_pipes"
 description = "Domain with pipe definitions"
 
 [concept]

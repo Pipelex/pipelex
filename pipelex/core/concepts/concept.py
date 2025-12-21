@@ -25,7 +25,7 @@ class Concept(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     code: str
-    domain: str
+    domain_code: str
     description: str
     structure_class_name: str
     # TODO: rethink this refines field here.
@@ -41,15 +41,15 @@ class Concept(BaseModel):
             raise ConceptValueError(msg) from exc
         return code
 
-    @field_validator("domain")
+    @field_validator("domain_code")
     @classmethod
-    def validate_domain(cls, domain: str) -> str:
+    def validate_domain(cls, domain_code: str) -> str:
         try:
-            validate_domain_code(code=domain)
+            validate_domain_code(code=domain_code)
         except DomainCodeError as exc:
-            msg = f"Domain code '{domain}' is not a valid domain code for concept '{cls.concept_string}'"
+            msg = f"Domain code '{domain_code}' is not a valid domain code for concept '{cls.concept_string}'"
             raise ConceptValueError(msg) from exc
-        return domain
+        return domain_code
 
     @field_validator("refines", mode="before")
     @classmethod
@@ -64,11 +64,11 @@ class Concept(BaseModel):
 
     @property
     def concept_string(self) -> str:
-        return f"{self.domain}.{self.code}"
+        return f"{self.domain_code}.{self.code}"
 
     @property
     def simple_concept_string(self) -> str:
-        if SpecialDomain.is_native(domain=self.domain):
+        if SpecialDomain.is_native(domain_code=self.domain_code):
             return self.code
         else:
             return self.concept_string

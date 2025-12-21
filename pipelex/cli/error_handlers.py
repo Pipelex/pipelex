@@ -144,8 +144,8 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: str | No
                 console.print(f"   [cyan]Pipe:[/cyan] [yellow]{pipe_error.pipe_code}[/yellow]")
             if pipe_error.concept_code:
                 console.print(f"   [cyan]Concept:[/cyan] [yellow]{pipe_error.concept_code}[/yellow]")
-            if pipe_error.domain:
-                console.print(f"   [cyan]Domain:[/cyan] [green]{pipe_error.domain}[/green]")
+            if pipe_error.domain_code:
+                console.print(f"   [cyan]Domain:[/cyan] [green]{pipe_error.domain_code}[/green]")
 
             # Field name if present
             if pipe_error.field_name:

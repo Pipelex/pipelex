@@ -41,7 +41,7 @@ class TestPipeParallelDocumentAnalysis:
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentInput",
-                domain="test_pipe_parallel",
+                domain_code="test_pipe_parallel",
                 description="test_pipe_parallel.DocumentInput",
                 structure_class_name="DocumentInput",
             ),

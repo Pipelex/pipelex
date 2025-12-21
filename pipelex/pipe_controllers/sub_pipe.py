@@ -81,7 +81,7 @@ class SubPipe(BaseModel):
             )
 
             pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
-                domain_code=sub_pipe.domain,
+                domain_code=sub_pipe.domain_code,
                 pipe_code=self.pipe_code,
                 blueprint=pipe_batch_blueprint,
                 concept_codes_from_the_same_domain=[concept.code for concept in sub_pipe.concept_dependencies],

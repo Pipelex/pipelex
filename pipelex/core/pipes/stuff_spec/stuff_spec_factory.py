@@ -15,13 +15,13 @@ class StuffSpecFactory:
     @classmethod
     def make_from_blueprint(
         cls,
-        domain: str,
+        domain_code: str,
         output_string: str,
     ) -> StuffSpec:
         """Parse an output string and return a StuffSpec with concept and multiplicity.
 
         Args:
-            domain: The domain to use for resolving concept codes without domain prefix
+            domain_code: The domain code to use for resolving concept codes without domain prefix
             output_string: String in the format "ConceptCode" or "domain.ConceptCode"
                           with optional "[multiplicity]" (e.g., "Text", "Text[]", "Text[3]")
 
@@ -41,7 +41,7 @@ class StuffSpecFactory:
         # Resolve concept with domain
         try:
             domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                domain=domain,
+                domain_code=domain_code,
                 concept_string_or_code=parse_result.concept,
             )
         except ConceptFactoryError as exc:
@@ -50,7 +50,7 @@ class StuffSpecFactory:
 
         concept = get_required_concept(
             concept_string=ConceptFactory.make_concept_string_with_domain(
-                domain=domain_and_code.domain,
+                domain_code=domain_and_code.domain_code,
                 concept_code=domain_and_code.concept_code,
             ),
         )

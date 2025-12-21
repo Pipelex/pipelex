@@ -83,36 +83,36 @@ class TestConceptFactory:
         assert normalize_structure_blueprint(mixed_structure_blueprint2) == expected_structure2
 
     @pytest.mark.parametrize(
-        ("domain", "concept_string_or_code", "expected_result"),
+        ("domain_code", "concept_string_or_code", "expected_result"),
         TestCases.MAKE_DOMAIN_AND_CONCEPT_CODE_TEST_CASES,
     )
     def test_make_domain_and_concept_code_from_concept_string_or_code(
         self,
-        domain: str,
+        domain_code: str,
         concept_string_or_code: str,
         expected_result: list[str],
     ):
         result = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-            domain=domain,
+            domain_code=domain_code,
             concept_string_or_code=concept_string_or_code,
         )
         assert result == expected_result
 
     @pytest.mark.parametrize(
-        ("test_name", "domain", "concept_code", "blueprint", "expected_concept"),
+        ("test_name", "domain_code", "concept_code", "blueprint", "expected_concept"),
         TestCases.MAKE_FROM_BLUEPRINT_TEST_CASES,
     )
     def test_make_from_blueprint(
         self,
         test_name: str,
-        domain: str,
+        domain_code: str,
         concept_code: str,
         blueprint: ConceptBlueprint,
         expected_concept: Concept,
     ):
         """Test make_from_blueprint method with various blueprint configurations."""
         result = ConceptFactory.make_from_blueprint(
-            domain=domain,
+            domain_code=domain_code,
             concept_code=concept_code,
             blueprint_or_string_description=blueprint,
         )
@@ -127,7 +127,7 @@ class TestConceptFactory:
 
         with pytest.raises(ConceptFactoryError, match="is not a registered subclass of StuffContent"):
             ConceptFactory.make_from_blueprint(
-                domain="my_domain",
+                domain_code="my_domain",
                 concept_code="TestConcept",
                 blueprint_or_string_description=blueprint,
             )

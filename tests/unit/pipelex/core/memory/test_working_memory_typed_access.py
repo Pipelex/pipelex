@@ -34,7 +34,7 @@ def nested_content_memory() -> WorkingMemory:
     stuff = StuffFactory.make_stuff(
         concept=ConceptFactory.make(
             concept_code="Page",
-            domain=SpecialDomain.NATIVE,
+            domain_code=SpecialDomain.NATIVE,
             description="A page with text and images",
             structure_class_name="PageContent",
         ),
@@ -59,7 +59,7 @@ def nested_content_with_none_memory() -> WorkingMemory:
     stuff = StuffFactory.make_stuff(
         concept=ConceptFactory.make(
             concept_code="Page",
-            domain=SpecialDomain.NATIVE,
+            domain_code=SpecialDomain.NATIVE,
             description="A page with minimal content",
             structure_class_name="PageContent",
         ),

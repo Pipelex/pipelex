@@ -85,7 +85,7 @@ class TestPipeConditionSimple:
                     variable_name="user_status",
                     concept=ConceptFactory.make(
                         concept_code="CategoryInput",
-                        domain="test_pipe_condition",
+                        domain_code="test_pipe_condition",
                         description="CategoryInput",
                         structure_class_name="CategoryInput",
                     ),

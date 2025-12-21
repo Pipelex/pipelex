@@ -55,7 +55,7 @@ class TestPipeParallelSimple:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_text_stuff)
 
         # Verify the PipeParallel instance was created correctly
-        assert pipe_parallel.domain == "test_integration"
+        assert pipe_parallel.domain_code == "test_integration"
         assert pipe_parallel.code == "parallel_text_analyzer"
         assert len(pipe_parallel.parallel_sub_pipes) == 3
         assert pipe_parallel.add_each_output is True
@@ -105,7 +105,7 @@ class TestPipeParallelSimple:
         # Should return one of: positive, negative, neutral
         if pipe_run_mode != PipeRunMode.DRY:
             assert sentiment_result.content.text.lower() in {"positive", "negative", "neutral"}
-        assert f"{sentiment_result.concept.domain}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        assert f"{sentiment_result.concept.domain_code}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
 
         # Verify word count result
         word_count_result = final_working_memory.get_stuff("word_count_result")
@@ -116,7 +116,7 @@ class TestPipeParallelSimple:
         if pipe_run_mode != PipeRunMode.DRY:
             assert word_count_text.isdigit() or word_count_text in {"12", "thirteen", "twelve"}  # Allow for some variation
         assert word_count_result.concept.code == "Text"
-        assert word_count_result.concept.domain == "native"
+        assert word_count_result.concept.domain_code == "native"
 
         # Verify keywords extraction result
         keywords_result = final_working_memory.get_stuff("keywords_result")
@@ -127,7 +127,7 @@ class TestPipeParallelSimple:
         if pipe_run_mode != PipeRunMode.DRY:
             assert "," in keywords_text or len(keywords_text.split()) >= 2  # Should have multiple keywords
         assert keywords_result.concept.code == "Text"
-        assert keywords_result.concept.domain == "native"
+        assert keywords_result.concept.domain_code == "native"
 
         # Verify that all results are different (pipes ran independently)
         assert sentiment_result.content.text != word_count_result.content.text

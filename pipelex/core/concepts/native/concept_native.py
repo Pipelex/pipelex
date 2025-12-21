@@ -155,7 +155,7 @@ class NativeConceptCode(StrEnum):
 
         if "." in concept_string_or_code:
             domain_code, concept_code = concept_string_or_code.split(".", 1)
-            return SpecialDomain.is_native(domain=domain_code) and concept_code in cls.values_list()
+            return SpecialDomain.is_native(domain_code=domain_code) and concept_code in cls.values_list()
         return concept_string_or_code in cls.values_list()
 
     @classmethod
@@ -174,7 +174,7 @@ class NativeConceptCode(StrEnum):
         if "." not in concept_string:
             return False
         domain_code, concept_code = concept_string.split(".", 1)
-        return SpecialDomain.is_native(domain=domain_code) and concept_code in cls.values_list()
+        return SpecialDomain.is_native(domain_code=domain_code) and concept_code in cls.values_list()
 
     @classmethod
     def validate_native_concept_string_or_code(cls, concept_string_or_code: str) -> None:

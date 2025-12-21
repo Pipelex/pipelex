@@ -125,7 +125,7 @@ class StuffFactory:
         stuff_content_or_data: StuffContentOrData,
         name: str | None = None,
         code: str | None = None,
-        search_domains: list[str] | None = None,
+        search_domain_codes: list[str] | None = None,
     ) -> Stuff:
         """Create a Stuff from StuffContentOrData covering all pipeline inputs cases.
 
@@ -202,7 +202,7 @@ class StuffFactory:
                 else:
                     try:
                         concept = concept_library.get_required_concept_from_concept_string_or_code(
-                            concept_string_or_code=content_class_name, search_domains=search_domains
+                            concept_string_or_code=content_class_name, search_domain_codes=search_domain_codes
                         )
                     except ConceptLibraryConceptNotFoundError as exc:
                         msg = (
@@ -233,7 +233,7 @@ class StuffFactory:
                     # It's a StructuredContent, try to find the concept
                     try:
                         concept = concept_library.get_required_concept_from_concept_string_or_code(
-                            concept_string_or_code=content_class_name, search_domains=search_domains
+                            concept_string_or_code=content_class_name, search_domain_codes=search_domain_codes
                         )
                     except ConceptLibraryConceptNotFoundError as exc:
                         msg = (
@@ -298,7 +298,7 @@ class StuffFactory:
                     else:
                         try:
                             concept = concept_library.get_required_concept_from_concept_string_or_code(
-                                concept_string_or_code=content_class_name, search_domains=search_domains
+                                concept_string_or_code=content_class_name, search_domain_codes=search_domain_codes
                             )
                         except ConceptLibraryConceptNotFoundError as exc:
                             msg = (
@@ -349,7 +349,7 @@ class StuffFactory:
         # Get the concept from the library
         try:
             concept = concept_library.get_required_concept_from_concept_string_or_code(
-                concept_string_or_code=concept_string, search_domains=search_domains
+                concept_string_or_code=concept_string, search_domain_codes=search_domain_codes
             )
         except ConceptLibraryConceptNotFoundError as exc:
             msg = (

@@ -101,7 +101,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -111,7 +111,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -121,7 +121,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.IMAGE,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -131,7 +131,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.PDF,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -141,7 +141,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.TEXT_AND_IMAGES,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -151,7 +151,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.NUMBER,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -161,7 +161,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code=NativeConceptCode.ANYTHING,
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -171,7 +171,7 @@ class TestConcept:
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
                     concept_code="RandomConcept",
-                    domain=valid_domain,
+                    domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
             )
@@ -182,7 +182,7 @@ class TestConcept:
         """Test construct_concept_string_with_domain method."""
         valid_domain = "valid_domain"
         assert (
-            ConceptFactory.make_concept_string_with_domain(domain=valid_domain, concept_code=NativeConceptCode.TEXT)
+            ConceptFactory.make_concept_string_with_domain(domain_code=valid_domain, concept_code=NativeConceptCode.TEXT)
             == f"{valid_domain}.{NativeConceptCode.TEXT}"
         )
 
@@ -237,22 +237,22 @@ class TestConcept:
     def test_are_concept_compatible(self):
         concept1 = ConceptFactory.make_from_blueprint(
             concept_code="Code1",
-            domain="domain1",
+            domain_code="domain1",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
         )
         concept2 = ConceptFactory.make_from_blueprint(
             concept_code="Code2",
-            domain="domain1",
+            domain_code="domain1",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", refines=NativeConceptCode.TEXT),
         )
         concept3 = ConceptFactory.make_from_blueprint(
             concept_code="Code3",
-            domain="domain2",
+            domain_code="domain2",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", structure="TextContent"),
         )
         concept4 = ConceptFactory.make_from_blueprint(
             concept_code="Code4",
-            domain="domain1",
+            domain_code="domain1",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum", structure="ImageContent"),
         )
 
@@ -266,7 +266,7 @@ class TestConcept:
 
         concept_7 = ConceptFactory.make_from_blueprint(
             concept_code="VisualDescription",
-            domain="images",
+            domain_code="images",
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
 
@@ -290,7 +290,7 @@ class TestConcept:
         """Test that a concept created with .make() that refines native.Text is strictly compatible with Text."""
         # Create a concept that refines native.Text using ConceptFactory.make()
         concept_not_native_text = ConceptFactory.make(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="MyConceptNotNativeText",
             description="Test concept for unit tests",
             structure_class_name="TextContent",
@@ -309,7 +309,7 @@ class TestConcept:
         # Create a concept with a structure blueprint that has exactly the same field as TextContent: text: str
         custom_text_like_concept = ConceptFactory.make_from_blueprint(
             concept_code="MyTextLikeConcept",
-            domain="test_structure_equiv",
+            domain_code="test_structure_equiv",
             blueprint_or_string_description=ConceptBlueprint(
                 description="A concept with the exact same structure as TextContent",
                 structure={
@@ -339,7 +339,7 @@ class TestConcept:
 
         # Create a concept using our custom DocumentWithNestedImage class
         concept_with_nested_image = ConceptFactory.make(
-            domain="test_nested",
+            domain_code="test_nested",
             concept_code="DocumentWithImage",
             description="A document containing nested image info",
             structure_class_name="DocumentWithNestedImage",
@@ -347,7 +347,7 @@ class TestConcept:
 
         # Create a concept using the NestedImageInfo class (same structure as ImageContent)
         concept_image_like = ConceptFactory.make(
-            domain="test_nested",
+            domain_code="test_nested",
             concept_code="ImageInfo",
             description="Image-like info",
             structure_class_name="NestedImageInfo",

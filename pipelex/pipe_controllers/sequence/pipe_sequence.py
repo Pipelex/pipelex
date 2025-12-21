@@ -69,7 +69,7 @@ class PipeSequence(PipeController):
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                domain=self.domain,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=last_step_stuff_spec.concept.concept_string,
                 required_concept_codes=[self.output.concept.concept_string],
@@ -85,7 +85,7 @@ class PipeSequence(PipeController):
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
-                domain=self.domain,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=last_step_stuff_spec.concept.concept_string,
                 required_concept_codes=[self.output.concept.concept_string],

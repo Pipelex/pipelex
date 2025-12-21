@@ -27,13 +27,13 @@ class CustomClassInfo:
     """Information about a custom structure class for import generation."""
 
     class_name: str
-    domain: str
+    domain_code: str
     concept_code: str
 
     @property
     def module_name(self) -> str:
         """Get the module name (filename without .py) for this class."""
-        return f"{self.domain}_{self.concept_code}"
+        return f"{self.domain_code}_{self.concept_code}"
 
     @property
     def import_statement(self) -> str:
@@ -106,14 +106,14 @@ def _collect_concept_info(concept: Concept) -> CustomClassInfo | None:
     Returns:
         CustomClassInfo if it's a custom concept, None if native
     """
-    if SpecialDomain.is_native(concept.domain):
+    if SpecialDomain.is_native(concept.domain_code):
         return None
 
     # For custom concepts, use the concept code as the class name
     # The structure class name should match the concept code
     return CustomClassInfo(
         class_name=concept.structure_class_name,
-        domain=concept.domain,
+        domain_code=concept.domain_code,
         concept_code=concept.code,
     )
 

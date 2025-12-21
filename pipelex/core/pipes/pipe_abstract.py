@@ -40,7 +40,7 @@ class PipeAbstract(ABC, BaseModel):
     pipe_category: Any  # Any so that subclasses can put a Literal
     type: Any  # Any so that subclasses can put a Literal
     code: str
-    domain: str
+    domain_code: str
     description: str | None = None
     inputs: InputStuffSpecs = Field(default_factory=InputStuffSpecs)
     output: StuffSpec
@@ -137,7 +137,7 @@ class PipeAbstract(ABC, BaseModel):
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[required_variable_name],
                 )
@@ -154,7 +154,7 @@ class PipeAbstract(ABC, BaseModel):
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-                    domain=self.domain,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[var_name],
                 )
@@ -190,7 +190,7 @@ class PipeAbstract(ABC, BaseModel):
                     raise PipeValidationError(
                         message=msg,
                         error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
-                        domain=self.domain,
+                        domain_code=self.domain_code,
                         pipe_code=self.code,
                         variable_names=[var_name],
                     )
@@ -202,7 +202,7 @@ class PipeAbstract(ABC, BaseModel):
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    domain=self.domain,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[input_name],
                 )

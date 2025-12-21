@@ -15,15 +15,15 @@ class TestPipeSequenceMultipleSteps:
     def test_pipe_sequence_multiple_sub_pipes(self, load_test_library: Callable[[list[Path]], None]):
         """Test PipeSequence with multiple sequential sub-pipes"""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
-        domain = "test_domain"
+        domain_code = "test_domain"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept",
-            domain=domain,
+            domain_code=domain_code,
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             concept_code="ProcessedText",
-            domain=domain,
+            domain_code=domain_code,
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_library = get_concept_library()
@@ -37,7 +37,7 @@ class TestPipeSequenceMultipleSteps:
         )
 
         pipe_sequence = PipeFactory[PipeSequence].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="test_sequence",
             blueprint=pipe_sequence_blueprint,
         )

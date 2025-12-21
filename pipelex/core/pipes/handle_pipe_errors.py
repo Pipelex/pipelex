@@ -68,7 +68,7 @@ def categorize_pipe_validation_error(
             unknown_field_name = str(loc[0]) if len(loc) >= 1 else None
 
             categorized_error = PipesAndConceptValidationErrorData(
-                domain=None,
+                domain_code=None,
                 source=None,
                 pipe_code=None,
                 concept_code=None,  # We don't have the code at this point
@@ -123,7 +123,7 @@ def _handle_pipe_errors(
         error_type = PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
 
     return PipesAndConceptValidationErrorData(
-        domain=None,
+        domain_code=None,
         source=None,
         pipe_code=pipe_code,
         concept_code=None,
@@ -153,7 +153,7 @@ def categorize_pipe_validation_with_libraries_error(
     error_type = pipe_error.error_type or PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
     return PipesAndConceptValidationErrorData(
         error_type=error_type,
-        domain=pipe_error.domain,
+        domain_code=pipe_error.domain_code,
         source=pipe_error.file_path or None,
         pipe_code=pipe_error.pipe_code,
         concept_code=None,  # This is a pipe error, not a concept error
@@ -179,7 +179,7 @@ def categorize_pipe_factory_error(
     """
     return PipeFactoryErrorData(
         error_type=factory_error.error_type,
-        domain=factory_error.domain,
+        domain_code=factory_error.domain_code,
         pipe_code=factory_error.pipe_code,
         missing_concept_code=factory_error.missing_concept_code,
         declared_concepts=factory_error.declared_concepts,

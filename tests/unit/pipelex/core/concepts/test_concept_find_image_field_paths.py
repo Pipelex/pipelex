@@ -60,7 +60,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
     # Create and register concepts
     concepts_to_register: list[Concept] = [
         ConceptFactory.make(
-            domain=TestData.DOMAIN,
+            domain_code=TestData.DOMAIN,
             concept_code=code,
             description=description,
             structure_class_name=structure_class_name,

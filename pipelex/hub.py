@@ -442,12 +442,12 @@ def teardown_current_library() -> None:
     _library_id.set(None)
 
 
-def get_required_domain(domain: str) -> Domain:
-    return get_pipelex_hub().get_required_domain_library().get_required_domain(domain=domain)
+def get_required_domain(domain_code: str) -> Domain:
+    return get_pipelex_hub().get_required_domain_library().get_required_domain(domain_code=domain_code)
 
 
-def get_optional_domain(domain: str) -> Domain | None:
-    return get_pipelex_hub().get_required_domain_library().get_domain(domain=domain)
+def get_optional_domain(domain_code: str) -> Domain | None:
+    return get_pipelex_hub().get_required_domain_library().get_domain(domain_code=domain_code)
 
 
 def get_pipe_library() -> PipeLibraryAbstract:

@@ -58,7 +58,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
         page_views_dpi = blueprint.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
 
         return PipeExtract(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             output=output,

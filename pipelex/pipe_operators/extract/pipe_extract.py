@@ -89,7 +89,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                domain=self.domain,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_string,
                 required_concept_codes=[NativeConceptCode.PAGE.concept_string],

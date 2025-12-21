@@ -146,7 +146,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 output_concept_code = SpecialDomain.NATIVE + "." + NativeConceptCode.TEXT
             else:
                 output_stuff_spec.concept = get_required_concept(
-                    concept_string=ConceptFactory.make_concept_string_with_domain(domain=self.domain, concept_code=output_concept_code),
+                    concept_string=ConceptFactory.make_concept_string_with_domain(domain_code=self.domain_code, concept_code=output_concept_code),
                 )
 
         multiplicity_resolution = output_multiplicity_to_apply(

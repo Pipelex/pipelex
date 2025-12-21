@@ -204,7 +204,7 @@ class LibraryManager(LibraryManagerAbstract):
                 concepts: list[Concept] = []
                 for concept_code, concept_blueprint in blueprint.concept.items():
                     concept = ConceptFactory.make_from_blueprint(
-                        domain=blueprint.domain,
+                        domain_code=blueprint.domain,
                         concept_code=concept_code,
                         blueprint_or_string_description=concept_blueprint,
                     )
@@ -275,7 +275,7 @@ class LibraryManager(LibraryManagerAbstract):
         library = self.get_current_library()
         if blueprint.concept is not None:
             concept_codes_to_remove = [
-                ConceptFactory.make_concept_string_with_domain(domain=blueprint.domain, concept_code=concept_code)
+                ConceptFactory.make_concept_string_with_domain(domain_code=blueprint.domain, concept_code=concept_code)
                 for concept_code in blueprint.concept
             ]
             library.concept_library.remove_concepts_by_concept_strings(concept_strings=concept_codes_to_remove)

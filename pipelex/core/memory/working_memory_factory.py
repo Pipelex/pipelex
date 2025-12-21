@@ -55,13 +55,13 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_pipeline_inputs(
         cls,
         pipeline_inputs: PipelineInputs,
-        search_domains: list[str] | None = None,
+        search_domain_codes: list[str] | None = None,
     ) -> WorkingMemory:
         """Create a WorkingMemory from a pipeline inputs dictionary.
 
         Args:
             pipeline_inputs: Dictionary in the format from API serialization
-            search_domains: List of domains to search for concepts
+            search_domain_codes: List of domain codes to search for concepts
 
         Returns:
             WorkingMemory object reconstructed from the implicit format
@@ -73,7 +73,7 @@ class WorkingMemoryFactory(BaseModel):
             stuff = StuffFactory.make_stuff_from_stuff_content_or_data(
                 name=stuff_key,
                 stuff_content_or_data=stuff_content_or_data,
-                search_domains=search_domains,
+                search_domain_codes=search_domain_codes,
             )
             working_memory.add_new_stuff(name=stuff_key, stuff=stuff)
         return working_memory

@@ -62,11 +62,11 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
 
         return transformed_dict
 
-    def set_default_domain(self, domain: str):
+    def set_default_domain(self, domain_code: str):
         for input_name, stuff_spec in self.root.items():
             input_concept_code = stuff_spec.concept.code
             if "." not in input_concept_code:
-                stuff_spec.concept.code = f"{domain}.{input_concept_code}"
+                stuff_spec.concept.code = f"{domain_code}.{input_concept_code}"
                 self.root[input_name] = stuff_spec
 
     def get_required_stuff_spec(self, variable_name: str) -> StuffSpec:

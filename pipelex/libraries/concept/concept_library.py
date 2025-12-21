@@ -59,8 +59,8 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         return list(self.root.values())
 
     @override
-    def list_concepts_by_domain(self, domain: str) -> list[Concept]:
-        return [concept for key, concept in self.root.items() if key.startswith(f"{domain}.")]
+    def list_concepts_by_domain(self, domain_code: str) -> list[Concept]:
+        return [concept for key, concept in self.root.items() if key.startswith(f"{domain_code}.")]
 
     @override
     def add_new_concept(self, concept: Concept):
@@ -115,7 +115,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptCode.values_list()]
 
     @override
-    def get_required_concept_from_concept_string_or_code(self, concept_string_or_code: str, search_domains: list[str] | None = None) -> Concept:
+    def get_required_concept_from_concept_string_or_code(self, concept_string_or_code: str, search_domain_codes: list[str] | None = None) -> Concept:
         try:
             validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
         except ConceptStringError as exc:
@@ -129,7 +129,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
             return self.get_required_concept(concept_string=concept_string_or_code)
         else:
             found_concepts: list[Concept] = []
-            if search_domains is None:
+            if search_domain_codes is None:
                 for concept in self.root.values():
                     if concept_string_or_code == concept.code:
                         found_concepts.append(concept)
@@ -141,9 +141,9 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                     raise ConceptLibraryConceptNotFoundError(msg)
                 return found_concepts[0]
             else:
-                for domain in search_domains:
+                for domain_code in search_domain_codes:
                     if found_concept := self.get_required_concept(
-                        concept_string=ConceptFactory.make_concept_string_with_domain(domain=domain, concept_code=concept_string_or_code),
+                        concept_string=ConceptFactory.make_concept_string_with_domain(domain_code=domain_code, concept_code=concept_string_or_code),
                     ):
                         found_concepts.append(found_concept)
                 if len(found_concepts) == 0:

@@ -25,13 +25,13 @@ class InputStuffSpecsFactory:
     @classmethod
     def make_from_blueprint(
         cls,
-        domain: str,
+        domain_code: str,
         blueprint: dict[str, str],
     ) -> InputStuffSpecs:
         stuff_specs: PipeInputsRoot = {}
         for var_name, stuff_spec_str in blueprint.items():
             stuff_spec = InputStuffSpecsFactory.make_from_string(
-                domain=domain,
+                domain_code=domain_code,
                 stuff_spec_str=stuff_spec_str,
             )
             stuff_specs[var_name] = stuff_spec
@@ -40,7 +40,7 @@ class InputStuffSpecsFactory:
     @classmethod
     def make_from_string(
         cls,
-        domain: str,
+        domain_code: str,
         stuff_spec_str: str,
     ) -> StuffSpec:
         """Parse an input requirement string and return an StuffSpec.
@@ -52,7 +52,7 @@ class InputStuffSpecsFactory:
         - "ConceptCode[5]" -> multiplicity = 5 (resolved with domain)
 
         Args:
-            domain: The domain to use for resolving concept codes without domain prefix
+            domain_code: The domain code to use for resolving concept codes without domain prefix
             stuff_spec_str: String in the format "domain.ConceptCode" or "ConceptCode" with optional "[multiplicity]"
 
         Returns:
@@ -82,7 +82,7 @@ class InputStuffSpecsFactory:
             raise InputStuffSpecsFactoryError(msg) from exc
 
         concept_string_with_domain = ConceptFactory.make_concept_string_with_domain_from_concept_string_or_code(
-            domain=domain,
+            domain_code=domain_code,
             concept_sring_or_code=concept_string_or_code,
         )
 

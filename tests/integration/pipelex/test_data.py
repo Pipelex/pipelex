@@ -63,7 +63,7 @@ class PipeTestCases:
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
         name="complex",
-        concept=ConceptFactory.make(concept_code="Complex", domain="tests", description="tests.Complex", structure_class_name="Complex"),
+        concept=ConceptFactory.make(concept_code="Complex", domain_code="tests", description="tests.Complex", structure_class_name="Complex"),
         content=ListContent(
             items=[
                 TextContent(text="The quick brown fox jumps over the lazy dog"),

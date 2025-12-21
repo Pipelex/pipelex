@@ -83,19 +83,19 @@ class PipeFactory(Generic[PipeAbstractType]):
                     message=msg,
                     error_type=PipeFactoryErrorType.UNKNOWN_CONCEPT,
                     pipe_code=pipe_code,
-                    domain=domain_code,
+                    domain_code=domain_code,
                     missing_concept_code=stripped_output_concept_string_or_code,
                     declared_concepts=concept_codes_from_the_same_domain,
                 )
 
         # Parse common attributes
         try:
-            parsed_output = StuffSpecFactory.make_from_blueprint(domain=domain_code, output_string=blueprint.output)
+            parsed_output = StuffSpecFactory.make_from_blueprint(domain_code=domain_code, output_string=blueprint.output)
         except StuffSpecFactoryError as exc:
             msg = f"Error parsing output string '{blueprint.output}': {exc}"
             raise PipeFactoryError(msg) from exc
         parsed_inputs = InputStuffSpecsFactory.make_from_blueprint(
-            domain=domain_code,
+            domain_code=domain_code,
             blueprint=blueprint.inputs or {},
         )
 
