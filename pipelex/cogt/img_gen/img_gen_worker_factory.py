@@ -65,6 +65,24 @@ class ImgGenWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case "huggingface_img_gen":
+                from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
+
+                from pipelex.plugins.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=AsyncInferenceClient(
+                        provider="auto",
+                        token=backend.api_key,
+                    ),
+                )
+
+                img_gen_worker = HuggingFaceImgGenWorker(
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
             case "openai_img_gen":
                 from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415

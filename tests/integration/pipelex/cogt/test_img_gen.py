@@ -36,8 +36,8 @@ class TestImageGeneration:
         )
         pretty_print(generated_image_raw_details, title=f"Generated image raw details for topic '{topic}'")
         generated_image_resolved = await generated_content_factory.make_generated_image(
-            primary_id="primary_id",
-            secondary_id="secondary_id",
+            primary_id="id_1",
+            secondary_id="id_2",
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
@@ -68,8 +68,8 @@ class TestImageGeneration:
         )
         pretty_print(generated_image_raw_details, title=f"Generated image raw details for topic '{topic}'")
         generated_image_resolved = await generated_content_factory.make_generated_image(
-            primary_id="primary_id",
-            secondary_id="secondary_id",
+            primary_id="id_1",
+            secondary_id="id_2",
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
@@ -98,8 +98,8 @@ class TestImageGeneration:
         generated_image_resolved_list = [
             (
                 await generated_content_factory.make_generated_image(
-                    primary_id="primary_id",
-                    secondary_id="secondary_id",
+                    primary_id="id_1",
+                    secondary_id="id_2",
                     raw_details=generated_image_raw_details,
                 )
             )

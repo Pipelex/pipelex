@@ -53,12 +53,18 @@ GOOGLE_IMG_GEN_MODELS = [
     "nano-banana-pro",
 ]
 
+# --- Qwen Models --------------------------------------------------------------------------
+QWEN_IMG_GEN_MODELS = [
+    "qwen-image",
+]
+
 # --- All Image Generation Handles ---------------------------------------------------------------
 ALL_IMG_GEN_HANDLES = [
     *STABLE_DIFFUSION_IMG_GEN_MODELS,
     *FAL_IMG_GEN_MODELS,
     *OPENAI_IMG_GEN_MODELS,
     *GOOGLE_IMG_GEN_MODELS,
+    *QWEN_IMG_GEN_MODELS,
 ]
 
 

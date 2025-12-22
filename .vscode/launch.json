@@ -28,7 +28,7 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug test inference",
+            "name": "Debug test inference LLM structured",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
@@ -37,6 +37,19 @@
                 "-vv",
                 "-m inference",
                 "-k test_pipe_llm_structured"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug test inference img gen",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_img_gen_single_opaque"
             ],
             "console": "integratedTerminal"
         },
