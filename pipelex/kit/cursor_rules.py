@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from importlib.abc import Traversable
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +8,7 @@ import yaml
 from pipelex.kit.exceptions import KitError
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.paths import get_kit_agents_dir
+from pipelex.types import Traversable
 
 
 def _iter_agent_files(agents_dir: Traversable) -> Iterable[tuple[str, str]]:
