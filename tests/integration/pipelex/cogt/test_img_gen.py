@@ -1,12 +1,15 @@
 import pytest
 
-from pipelex import pretty_print
+from pipelex import pretty_print, pretty_print_url
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.hub import get_img_gen_worker
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import ImageGenTestCases
+
+PRIMARY_ID = "id_1"
+SECONDARY_ID = "id_2"
 
 
 @pytest.mark.img_gen
@@ -36,11 +39,12 @@ class TestImageGeneration:
         )
         pretty_print(generated_image_raw_details, title=f"Generated image raw details for topic '{topic}'")
         generated_image_resolved = await generated_content_factory.make_generated_image(
-            primary_id="id_1",
-            secondary_id="id_2",
+            primary_id=PRIMARY_ID,
+            secondary_id=SECONDARY_ID,
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
+        pretty_print_url(generated_image_resolved.url, title=f"Generated image URL for topic '{topic}'")
 
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_single_transparent(
@@ -68,8 +72,8 @@ class TestImageGeneration:
         )
         pretty_print(generated_image_raw_details, title=f"Generated image raw details for topic '{topic}'")
         generated_image_resolved = await generated_content_factory.make_generated_image(
-            primary_id="id_1",
-            secondary_id="id_2",
+            primary_id=PRIMARY_ID,
+            secondary_id=SECONDARY_ID,
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
@@ -98,8 +102,8 @@ class TestImageGeneration:
         generated_image_resolved_list = [
             (
                 await generated_content_factory.make_generated_image(
-                    primary_id="id_1",
-                    secondary_id="id_2",
+                    primary_id=PRIMARY_ID,
+                    secondary_id=SECONDARY_ID,
                     raw_details=generated_image_raw_details,
                 )
             )

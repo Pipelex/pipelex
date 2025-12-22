@@ -111,6 +111,28 @@ def pretty_print_md(
     )
 
 
+def pretty_print_url(
+    url: str,
+    title: TextType | None = None,
+    subtitle: TextType | None = None,
+    inner_title: str | None = None,
+    border_style: StyleType | None = None,
+    width: int | None = None,
+    console_width: int | None = None,
+):
+    if url.startswith("/"):
+        url = "file://" + url
+    pretty_print(
+        Text(url, style="link " + url, no_wrap=False),
+        title=title,
+        subtitle=subtitle,
+        inner_title=inner_title,
+        border_style=border_style,
+        width=width,
+        console_width=console_width,
+    )
+
+
 class PrettyPrinter:
     mode: ClassVar[PrettyPrintMode] = PrettyPrintMode.RICH
 
