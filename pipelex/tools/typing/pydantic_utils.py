@@ -331,8 +331,8 @@ class CustomBaseModel(BaseModel):
     def __repr_args__(self) -> Sequence[tuple[str | None, Any]]:
         processed_args: list[tuple[str | None, Any]] = []
         for name, value in super().__repr_args__():
-            if name and AttributePolisher.should_truncate(name=name, value=value):
-                truncated_value = AttributePolisher.get_truncated_value(name, value)
+            if AttributePolisher.should_truncate(value=value):
+                truncated_value = AttributePolisher.get_truncated_value(value)
                 processed_args.append((name, truncated_value))
             else:
                 processed_args.append((name, value))

@@ -79,6 +79,14 @@ class Background(StrEnum):
     OPAQUE = "opaque"
     AUTO = "auto"
 
+    @property
+    def is_certainly_transparent(self) -> bool:
+        match self:
+            case Background.TRANSPARENT:
+                return True
+            case Background.OPAQUE | Background.AUTO:
+                return False
+
 
 class ImgGenJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
@@ -125,6 +133,9 @@ class ImgGenJobParamsDefaults(ConfigModel):
             seed = None
         else:
             seed = self.seed
+        output_format: OutputFormat | None = None
+        if self.background.is_certainly_transparent:
+            output_format = OutputFormat.PNG
         return ImgGenJobParams(
             aspect_ratio=self.aspect_ratio,
             background=self.background,
@@ -134,7 +145,7 @@ class ImgGenJobParamsDefaults(ConfigModel):
             is_moderated=self.is_moderated,
             safety_tolerance=self.safety_tolerance,
             is_raw=self.is_raw,
-            output_format=None,
+            output_format=output_format,
             seed=seed,
         )
 

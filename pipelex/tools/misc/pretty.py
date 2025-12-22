@@ -298,9 +298,9 @@ class PrettyPrinter:
             # Handle URLs specially, otherwise use Text for simple strings
             if value.startswith(("http://", "https://")):
                 pretty = Text(value, style="link " + value, no_wrap=True)
-            elif AttributePolisher.should_truncate_any_long_string(value):
+            elif AttributePolisher.should_truncate(value=value):
                 # Truncate long base64-like strings
-                pretty = Text(AttributePolisher.get_truncated_long_string(value))
+                pretty = Text(AttributePolisher.get_truncated_value(value))
             else:
                 # Use Text instead of Markdown to allow proper auto-sizing
                 pretty = Text(value)
