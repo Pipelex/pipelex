@@ -29,6 +29,7 @@ class TestPipeBatchSimple:
 
     async def test_simple_batch_processing(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ):
@@ -105,7 +106,7 @@ class TestPipeBatchSimple:
 
         # Actually run the PipeBatch pipe
         pipe_output = await pipe_batch.run_pipe(  # pyright: ignore[reportPrivateUsage]
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             output_name="batch_result",

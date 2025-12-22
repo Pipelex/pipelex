@@ -55,11 +55,11 @@ Write a haiku about the meaning of life
 class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_llm_text_only(self):
+    async def test_make_llm_text_only(self, job_metadata: JobMetadata):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_text")
 
         text: str = await get_content_generator().make_llm_text(
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
             llm_setting_main=llm_setting_main,
         )
@@ -69,11 +69,11 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_object_direct(self):
+    async def test_make_object_direct(self, job_metadata: JobMetadata):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
         person_direct: Employee = await get_content_generator().make_object_direct(
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             object_class=Employee,
             llm_prompt_for_object=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON),
             llm_setting_for_object=llm_setting_for_object,
@@ -84,11 +84,11 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_object_list_direct(self):
+    async def test_make_object_list_direct(self, job_metadata: JobMetadata):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
 
         person_list_direct: list[Employee] = await get_content_generator().make_object_list_direct(
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             object_class=Employee,
             llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),
             llm_setting_for_object_list=llm_setting_for_object,
@@ -100,11 +100,11 @@ class TestContentGenerator:
 
     @pytest.mark.img_gen
     @pytest.mark.inference
-    async def test_make_image(self):
+    async def test_make_image(self, job_metadata: JobMetadata):
         img_gen_handle = "fast-lightning-sdxl"
         positive_text = "A dog with sunglasses coding on a laptop"
         image: GeneratedImageResolved = await get_content_generator().make_single_image(
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             img_gen_handle=img_gen_handle,
             img_gen_prompt=ImgGenPrompt(
                 positive_text=positive_text,
@@ -128,9 +128,9 @@ class TestContentGenerator:
 
     @pytest.mark.extract
     @pytest.mark.inference
-    async def test_make_extract_pages_from_image(self, extract_handle_from_image: str):
+    async def test_make_extract_pages_from_image(self, job_metadata: JobMetadata, extract_handle_from_image: str):
         extract_output = await get_content_generator().make_extract_pages(
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             extract_handle=extract_handle_from_image,
             extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_JPG_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
@@ -141,9 +141,9 @@ class TestContentGenerator:
 
     @pytest.mark.extract
     @pytest.mark.inference
-    async def test_make_extract_pages_from_pdf(self, extract_handle_from_pdf: str):
+    async def test_make_extract_pages_from_pdf(self, job_metadata: JobMetadata, extract_handle_from_pdf: str):
         extract_output = await get_content_generator().make_extract_pages(
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             extract_handle=extract_handle_from_pdf,
             extract_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
@@ -154,11 +154,11 @@ class TestContentGenerator:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_make_llm_text_with_error(self):
+    async def test_make_llm_text_with_error(self, job_metadata: JobMetadata):
         llm_setting_main = LLMSetting(model="bad_handle_to_test_failure", temperature=0.5, max_tokens=100)
         with pytest.raises(ModelNotFoundError) as excinfo:
             await get_content_generator().make_llm_text(
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
                 llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
                 llm_setting_main=llm_setting_main,
             )

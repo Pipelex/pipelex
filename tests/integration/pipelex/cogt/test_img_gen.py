@@ -5,6 +5,7 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.hub import get_img_gen_worker
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
 
@@ -16,6 +17,7 @@ class TestImageGeneration:
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_single_opaque(
         self,
+        job_metadata: JobMetadata,
         img_gen_handle: str,
         img_gen_job_params: ImgGenJobParams,
         topic: str,
@@ -26,6 +28,7 @@ class TestImageGeneration:
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,
+            job_metadata=job_metadata,
             img_gen_job_params=img_gen_job_params,
         )
         generated_image_raw_details = await img_gen_worker_async.gen_image(
@@ -42,6 +45,7 @@ class TestImageGeneration:
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_single_transparent(
         self,
+        job_metadata: JobMetadata,
         img_gen_handle: str,
         topic: str,
         img_gen_prompt_text: str,
@@ -56,6 +60,7 @@ class TestImageGeneration:
         )
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,
+            job_metadata=job_metadata,
             img_gen_job_params=img_gen_job_params,
         )
         generated_image_raw_details = await img_gen_worker_async.gen_image(
@@ -72,6 +77,7 @@ class TestImageGeneration:
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_multiple(
         self,
+        job_metadata: JobMetadata,
         img_gen_handle: str,
         img_gen_job_params: ImgGenJobParams,
         topic: str,
@@ -81,6 +87,7 @@ class TestImageGeneration:
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,
+            job_metadata=job_metadata,
             img_gen_job_params=img_gen_job_params,
         )
         generated_image_raw_details_list = await img_gen_worker_async.gen_image_list(

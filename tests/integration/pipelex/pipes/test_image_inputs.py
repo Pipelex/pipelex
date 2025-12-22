@@ -33,6 +33,7 @@ class TestImageInputs:
 
     async def test_extract_article_from_image(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ) -> None:
@@ -50,7 +51,7 @@ class TestImageInputs:
                 pipe=get_required_pipe(pipe_code="extract_article_from_image"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
         if pipe_run_mode != PipeRunMode.DRY:
@@ -66,7 +67,9 @@ class TestImageInputs:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-    async def test_describe_page(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]) -> None:
+    async def test_describe_page(
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ) -> None:
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         # Create the page content
         # image_content = ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG)
@@ -90,7 +93,7 @@ class TestImageInputs:
                 pipe=get_required_pipe(pipe_code="describe_page"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
@@ -129,6 +132,7 @@ class TestImageInputs:
 
     async def test_analyze_image_collection(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ) -> None:
@@ -161,7 +165,7 @@ class TestImageInputs:
                 pipe=get_required_pipe(pipe_code="analyze_image_collection"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
@@ -178,6 +182,7 @@ class TestImageInputs:
 
     async def test_compare_two_image_collections(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ) -> None:
@@ -219,7 +224,7 @@ class TestImageInputs:
                 pipe=get_required_pipe(pipe_code="compare_two_image_collections"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 

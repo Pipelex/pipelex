@@ -12,12 +12,11 @@ class PipeJobFactory:
     def make_pipe_job(
         cls,
         pipe: PipeAbstract,
+        job_metadata: JobMetadata,
         pipe_run_params: PipeRunParams | None = None,
         working_memory: WorkingMemory | None = None,
-        job_metadata: JobMetadata | None = None,
         output_name: str | None = None,
     ) -> PipeJob:
-        job_metadata = job_metadata or JobMetadata()
         working_memory = working_memory or WorkingMemoryFactory.make_empty()
         if not pipe_run_params:
             pipe_run_params = PipeRunParamsFactory.make_run_params()

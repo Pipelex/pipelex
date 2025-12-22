@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 class TestPipeSequenceDryRun:
     async def test_discord_newsletter(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ) -> None:
@@ -61,7 +62,7 @@ class TestPipeSequenceDryRun:
                 pipe=get_required_pipe(pipe_code="write_discord_newsletter"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
