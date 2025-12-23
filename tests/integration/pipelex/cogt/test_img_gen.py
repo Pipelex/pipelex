@@ -2,10 +2,11 @@ import pytest
 
 from pipelex import pretty_print, pretty_print_url
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.hub import get_img_gen_worker
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.image_utils import ImageFormat
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
 PRIMARY_ID = "id_1"
@@ -60,7 +61,7 @@ class TestImageGeneration:
             aspect_ratio=AspectRatio.SQUARE,
             is_raw=None,
             background=Background.TRANSPARENT,
-            output_format=OutputFormat.PNG,
+            output_format=ImageFormat.PNG,
         )
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,

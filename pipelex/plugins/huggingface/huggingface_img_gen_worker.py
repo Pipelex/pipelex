@@ -35,13 +35,14 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
     ) -> Image.Image:
         """Generate a single image using HuggingFace's text_to_image."""
         prompt = img_gen_job.img_gen_prompt.positive_text
+        negative_prompt = img_gen_job.img_gen_prompt.negative_text or " "
         model_id = self.inference_model.model_id
-
         log.verbose(f"HuggingFace text_to_image: model={model_id}, prompt={prompt[:50]}...")
 
         return await self.hf_async_client.text_to_image(
             prompt=prompt,
             model=model_id,
+            negative_prompt=negative_prompt,
         )
 
     @override
@@ -50,8 +51,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         pil_image = await self._generate_single_image(img_gen_job=img_gen_job)
-        output_format = img_gen_job.job_params.output_format
-        generated_image = HuggingFaceFactory.make_generated_image(pil_image=pil_image, output_format=output_format)
+        generated_image = HuggingFaceFactory.make_generated_image(pil_image=pil_image, output_format=img_gen_job.job_params.output_format)
         log.verbose(generated_image, title="generated_image")
         return generated_image
 
@@ -69,7 +69,6 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             pil_image = await self._generate_single_image(img_gen_job=img_gen_job)
             pil_images.append(pil_image)
 
-        output_format = img_gen_job.job_params.output_format
-        generated_image_list = HuggingFaceFactory.make_generated_image_list(pil_images=pil_images, output_format=output_format)
+        generated_image_list = HuggingFaceFactory.make_generated_image_list(pil_images=pil_images, output_format=img_gen_job.job_params.output_format)
         log.verbose(generated_image_list, title="generated_image_list")
         return generated_image_list

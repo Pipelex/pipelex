@@ -12,7 +12,7 @@ from typing import Any
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, Quality
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
     BackgroundTaxonomy,
@@ -26,6 +26,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
 )
 from pipelex.config import get_config
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
+from pipelex.tools.misc.image_utils import ImageFormat
 
 
 class ImgGenArgsFactory:
@@ -114,7 +115,7 @@ class ImgGenArgsFactory:
                     args_dict.update(
                         cls.make_args_from_output_format(
                             output_format_taxonomy=output_format_taxonomy,
-                            output_format=job_params.output_format or OutputFormat.PNG,
+                            output_format=job_params.output_format or ImageFormat.PNG,
                         )
                     )
                 case ImgGenArgTopic.SPECIFIC:
@@ -277,7 +278,7 @@ class ImgGenArgsFactory:
     def make_args_from_output_format(
         cls,
         output_format_taxonomy: OutputFormatTaxonomy,
-        output_format: OutputFormat,
+        output_format: ImageFormat,
     ) -> dict[str, Any]:
         """Map output format to provider-specific parameter name and validate support.
 
@@ -290,21 +291,21 @@ class ImgGenArgsFactory:
             case OutputFormatTaxonomy.SDXL:
                 key = "format"
                 match output_format:
-                    case OutputFormat.PNG:
+                    case ImageFormat.PNG:
                         value = "png"
-                    case OutputFormat.JPEG:
+                    case ImageFormat.JPEG:
                         value = "jpeg"
-                    case OutputFormat.WEBP:
+                    case ImageFormat.WEBP:
                         msg = "Output format WebP is not supported by SDXL image generation models"
                         raise ImgGenParameterError(msg)
             case OutputFormatTaxonomy.FLUX_1:
                 key = "output_format"
                 match output_format:
-                    case OutputFormat.PNG:
+                    case ImageFormat.PNG:
                         value = "png"
-                    case OutputFormat.JPEG:
+                    case ImageFormat.JPEG:
                         value = "jpeg"
-                    case OutputFormat.WEBP:
+                    case ImageFormat.WEBP:
                         msg = "Output format WebP is not supported by Flux 1 image generation models"
                         raise ImgGenParameterError(msg)
             case OutputFormatTaxonomy.FLUX_2:
