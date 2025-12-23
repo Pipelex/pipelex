@@ -1,4 +1,4 @@
-from jinja2 import meta
+from jinja2 import meta, nodes
 from jinja2.exceptions import (
     TemplateSyntaxError,
     UndefinedError,
@@ -46,3 +46,109 @@ def detect_jinja2_required_variables(
         raise Jinja2DetectVariablesError(msg) from undef_error
 
     return undeclared_variables
+
+
+def _build_full_path(node: nodes.Node) -> str | None:
+    """Recursively build the full dotted path from a Getattr or Name node.
+
+    Args:
+        node: A Jinja2 AST node (Name or Getattr)
+
+    Returns:
+        The full dotted path as a string, or None if the node structure is not supported.
+    """
+    if isinstance(node, nodes.Name):
+        return node.name
+    if isinstance(node, nodes.Getattr):
+        parent_path = _build_full_path(node.node)
+        if parent_path is not None:
+            return f"{parent_path}.{node.attr}"
+    return None
+
+
+def _collect_full_variable_paths(node: nodes.Node, paths: set[str], declared_names: set[str]) -> None:
+    """Recursively walk the AST and collect full variable paths.
+
+    Args:
+        node: The current AST node
+        paths: Set to collect discovered paths
+        declared_names: Set of locally declared names (loop variables, macro params, etc.)
+    """
+    # Track locally declared variables (loop vars, set targets, macro params)
+    local_declared: set[str] = set()
+
+    if isinstance(node, nodes.For):
+        # Loop variable is locally declared
+        if isinstance(node.target, nodes.Name):
+            local_declared.add(node.target.name)
+        elif isinstance(node.target, nodes.Tuple):
+            for item in node.target.items:
+                if isinstance(item, nodes.Name):
+                    local_declared.add(item.name)
+
+    if isinstance(node, nodes.Assign):
+        # Assigned variable is locally declared
+        if isinstance(node.target, nodes.Name):
+            local_declared.add(node.target.name)
+
+    if isinstance(node, nodes.Macro):
+        # Macro parameters are locally declared
+        local_declared.update(arg.name for arg in node.args)
+
+    # Merge local declarations
+    new_declared = declared_names | local_declared
+
+    # Check if this is a Name or Getattr node that represents a variable access
+    if isinstance(node, (nodes.Name, nodes.Getattr)):
+        full_path = _build_full_path(node)
+        if full_path:
+            root_name = full_path.split(".")[0]
+            # Only add if the root is not a declared local variable
+            if root_name not in new_declared:
+                paths.add(full_path)
+
+    # Recurse into child nodes
+    for child in node.iter_child_nodes():
+        _collect_full_variable_paths(child, paths, new_declared)
+
+
+def detect_jinja2_full_variable_paths(
+    template_category: TemplateCategory,
+    template_source: str,
+) -> set[str]:
+    """Returns a set of full dotted variable paths required by the Jinja2 template.
+
+    Unlike detect_jinja2_required_variables which only returns root variable names,
+    this function returns full paths like 'user.profile.name' instead of just 'user'.
+
+    Args:
+        template_category: Category of the template (HTML, MARKDOWN, etc.)
+        template_source: Jinja2 template string
+
+    Returns:
+        Set of full dotted variable paths required by the template
+
+    Raises:
+        Jinja2DetectVariablesError: If there is an error parsing the template
+    """
+    jinja2_env = make_jinja2_env_without_loader(
+        template_category=template_category,
+    )
+
+    try:
+        parsed_ast = jinja2_env.parse(template_source)
+    except Jinja2StuffError as stuff_error:
+        msg = f"Jinja2 detect variables — stuff error: '{stuff_error}', template_category: {template_category}, template_source:\n{template_source}"
+        raise Jinja2DetectVariablesError(msg) from stuff_error
+    except TemplateSyntaxError as syntax_error:
+        msg = f"Jinja2 detect variables — syntax error: '{syntax_error}', template_category: {template_category}, template_source:\n{template_source}"
+        raise Jinja2DetectVariablesError(msg) from syntax_error
+    except UndefinedError as undef_error:
+        msg = (
+            f"Jinja2 detect variables — undefined error: '{undef_error}', template_category: {template_category}, template_source:\n{template_source}"
+        )
+        raise Jinja2DetectVariablesError(msg) from undef_error
+
+    paths: set[str] = set()
+    _collect_full_variable_paths(parsed_ast, paths, set())
+    return paths

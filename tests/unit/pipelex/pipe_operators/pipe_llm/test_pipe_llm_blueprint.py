@@ -71,7 +71,7 @@ class TestPipeLLMBlueprint:
                 prompt="Process @input_one, @input_two, and @input_three",
             )
         error_msg = str(exc_info.value)
-        assert "Missing input variable(s) in prompt template" in error_msg
+        assert "Missing input variable(s):" in error_msg
         assert "input_three" in error_msg
         assert "not declared in inputs" in error_msg
 
@@ -85,7 +85,7 @@ class TestPipeLLMBlueprint:
                 prompt="Process @input_one, @input_two, and @input_three",
             )
         error_msg = str(exc_info.value)
-        assert "Missing input variable(s) in prompt template" in error_msg
+        assert "Missing input variable(s):" in error_msg
         assert "input_two" in error_msg
         assert "input_three" in error_msg
 
@@ -100,7 +100,7 @@ class TestPipeLLMBlueprint:
                 prompt="Answer: @query",
             )
         error_msg = str(exc_info.value)
-        assert "Missing input variable(s) in prompt template" in error_msg
+        assert "Missing input variable(s):" in error_msg
         assert "context" in error_msg
 
     def test_validate_inputs_incorrect_empty_inputs_with_variables(self):
@@ -113,7 +113,7 @@ class TestPipeLLMBlueprint:
                 prompt="Process @data",
             )
         error_msg = str(exc_info.value)
-        assert "Missing input variable(s) in prompt template" in error_msg or "data" in error_msg
+        assert "Missing input variable(s):" in error_msg or "data" in error_msg
 
     def test_validate_inputs_ignores_internal_variables(self):
         """Test that internal variables (starting with _) are ignored."""

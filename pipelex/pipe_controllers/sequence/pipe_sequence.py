@@ -150,6 +150,7 @@ class PipeSequence(PipeController):
             # Add this step's output to generated outputs
             if sequential_sub_pipe.output_name:
                 generated_outputs.add(sequential_sub_pipe.output_name)
+
         return needed_inputs
 
     @override
