@@ -18,6 +18,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -99,7 +100,8 @@ def generate_structures_from_blueprints(
                     msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
                     raise PipelexError(msg) from exc
 
-                output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
+                concept_snake_case = pascal_case_to_snake_case(concept_code)
+                output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
                 output_file.write_text(generated_code)
                 generated_files.append((blueprint.domain, concept_code))
                 typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
@@ -120,7 +122,8 @@ def generate_structures_from_blueprints(
                     msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
                     raise PipelexError(msg) from exc
 
-                output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
+                concept_snake_case = pascal_case_to_snake_case(concept_code)
+                output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
                 output_file.write_text(generated_code)
                 generated_files.append((blueprint.domain, concept_code))
                 typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
@@ -150,7 +153,8 @@ def generate_structures_from_blueprints(
                     )
                     raise PipelexError(msg) from exc
 
-                output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
+                concept_snake_case = pascal_case_to_snake_case(concept_code)
+                output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
                 output_file.write_text(generated_code)
                 generated_files.append((blueprint.domain, concept_code))
                 typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
@@ -167,7 +171,8 @@ def generate_structures_from_blueprints(
                     msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
                     raise PipelexError(msg) from exc
 
-                output_file = output_directory / f"{blueprint.domain}_{concept_code}.py"
+                concept_snake_case = pascal_case_to_snake_case(concept_code)
+                output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
                 output_file.write_text(generated_code)
                 generated_files.append((blueprint.domain, concept_code))
                 typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
