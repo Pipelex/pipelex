@@ -51,7 +51,8 @@
                 "-m inference",
                 "-k test_img_gen_single_opaque"
             ],
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "justMyCode": false
         },
         {
             "name": "Debug validate bundle",

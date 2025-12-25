@@ -5,8 +5,9 @@ from pathlib import Path
 import pytest
 
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, Quality
 from pipelex.hub import get_model_deck
+from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
 
@@ -84,14 +85,14 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(
     params=[
         ImgGenJobParams(
-            aspect_ratio=AspectRatio.SQUARE,
+            aspect_ratio=AspectRatio.PORTRAIT_9_16,
             background=Background.OPAQUE,
-            quality=Quality.LOW,
-            guidance_scale=3.5,
+            quality=Quality.MEDIUM,
+            guidance_scale=2.5,
             is_moderated=None,
             safety_tolerance=1,
             is_raw=None,
-            output_format=OutputFormat.PNG,
+            output_format=ImageFormat.PNG,
         ),
         ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
@@ -101,7 +102,17 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
             is_moderated=None,
             safety_tolerance=1,
             is_raw=None,
-            output_format=OutputFormat.JPEG,
+            output_format=ImageFormat.PNG,
+        ),
+        ImgGenJobParams(
+            aspect_ratio=AspectRatio.LANDSCAPE_3_2,
+            background=Background.OPAQUE,
+            quality=Quality.LOW,
+            guidance_scale=3.5,
+            is_moderated=None,
+            safety_tolerance=1,
+            is_raw=None,
+            output_format=ImageFormat.JPEG,
         ),
     ],
 )

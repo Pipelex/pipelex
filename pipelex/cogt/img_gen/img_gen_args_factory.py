@@ -204,6 +204,36 @@ class ImgGenArgsFactory:
             case AspectRatioTaxonomy.GPT:
                 key = "size"
                 value = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio)[0]
+            case AspectRatioTaxonomy.QWEN_IMAGE:
+                width: int
+                height: int
+                aspect_ratio_string: str
+                match aspect_ratio:
+                    case AspectRatio.SQUARE:
+                        width, height = 1328, 1328
+                        aspect_ratio_string = "1:1"
+                    case AspectRatio.LANDSCAPE_16_9:
+                        width, height = 1664, 928
+                        aspect_ratio_string = "16:9"
+                    case AspectRatio.PORTRAIT_9_16:
+                        width, height = 928, 1664
+                        aspect_ratio_string = "9:16"
+                    case AspectRatio.LANDSCAPE_4_3:
+                        width, height = 1472, 1140
+                        aspect_ratio_string = "4:3"
+                    case AspectRatio.PORTRAIT_3_4:
+                        width, height = 1140, 1472
+                        aspect_ratio_string = "3:4"
+                    case AspectRatio.LANDSCAPE_3_2:
+                        width, height = 1584, 1056
+                        aspect_ratio_string = "3:2"
+                    case AspectRatio.PORTRAIT_2_3:
+                        width, height = 1056, 1584
+                        aspect_ratio_string = "2:3"
+                    case AspectRatio.LANDSCAPE_21_9 | AspectRatio.PORTRAIT_9_21:
+                        msg = f"Aspect ratio '{aspect_ratio}' is not supported by HuggingFace image generation model"
+                        raise ImgGenParameterError(msg)
+                return {"width": width, "height": height, "aspect_ratio": aspect_ratio_string}
         return {key: value}
 
     @classmethod
@@ -249,6 +279,15 @@ class ImgGenArgsFactory:
             case InferenceTaxonomy.GPT:
                 if quality:
                     args_dict["quality"] = quality.value
+            case InferenceTaxonomy.QWEN_IMAGE:
+                if num_inference_steps:
+                    args_dict["num_inference_steps"] = num_inference_steps
+                else:
+                    qwen_image_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.qwen_image_map_quality_to_steps
+                    num_inference_steps = qwen_image_map_quality_to_steps[quality or Quality.MEDIUM]
+                    args_dict["num_inference_steps"] = num_inference_steps
+                if guidance_scale:
+                    args_dict["guidance_scale"] = guidance_scale
         return args_dict
 
     @classmethod

@@ -8,6 +8,7 @@ from pipelex.system.exceptions import ConfigValidationError
 class FalConfig(ConfigModel):
     flux_map_quality_to_steps: dict[str, int]
     sdxl_lightning_map_quality_to_steps: dict[str, int]
+    qwen_image_map_quality_to_steps: dict[str, int]
 
     @field_validator("flux_map_quality_to_steps", "sdxl_lightning_map_quality_to_steps")
     @classmethod

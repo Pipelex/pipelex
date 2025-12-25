@@ -111,3 +111,5 @@ class TestImageGeneration:
             for generated_image_raw_details in generated_image_raw_details_list
         ]
         pretty_print(generated_image_resolved_list, title=f"Generated images resolved for topic '{topic}'")
+        for image_index, image in enumerate(generated_image_resolved_list):
+            pretty_print_url(url=image.url, title=f"Image #{image_index}")

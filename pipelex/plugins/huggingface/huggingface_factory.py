@@ -1,9 +1,10 @@
 from PIL import Image
+from typing_extensions import Literal
 
 from pipelex.cogt.exceptions import ImgGenGenerationError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
-
+from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T
 
 class HuggingFaceFactory:
     @classmethod
@@ -31,18 +32,50 @@ class HuggingFaceFactory:
             raise ImgGenGenerationError(msg) from exc
 
     @classmethod
-    def make_generated_image_list(
-        cls,
-        pil_images: list[Image.Image],
-        output_format: ImageFormat | None,
-    ) -> list[GeneratedImageRawDetails]:
-        """Convert a list of PIL Images to GeneratedImageRawDetails list.
-
-        Args:
-            pil_images: List of PIL Images returned by HuggingFace
-            output_format: The desired output format (PNG, JPEG, or WEBP)
-
-        Returns:
-            List of GeneratedImageRawDetails
-        """
-        return [cls.make_generated_image(pil_image=img, output_format=output_format) for img in pil_images]
+    def make_huggingface_inference_provider(cls, provider_str: str) -> PROVIDER_OR_POLICY_T:
+        match provider_str:
+            case "black-forest-labs":
+                return "black-forest-labs"
+            case "cerebras":
+                return "cerebras"
+            case "clarifai":
+                return "clarifai"
+            case "cohere":
+                return "cohere"
+            case "fal-ai":
+                return "fal-ai"
+            case "featherless-ai":
+                return "featherless-ai"
+            case "fireworks-ai":
+                return "fireworks-ai"
+            case "groq":
+                return "groq"
+            case "hf-inference":
+                return "hf-inference"
+            case "hyperbolic":
+                return "hyperbolic"
+            case "nebius":
+                return "nebius"
+            case "novita":
+                return "novita"
+            case "nscale":
+                return "nscale"
+            case "openai":
+                return "openai"
+            case "publicai":
+                return "publicai"
+            case "replicate":
+                return "replicate"
+            case "sambanova":
+                return "sambanova"
+            case "scaleway":
+                return "scaleway"
+            case "together":
+                return "together"
+            case "zai-org":
+                return "zai-org"
+            case "auto":
+                return "auto"
+            case _:
+                msg = f"Unknown HuggingFace inference provider: {provider_str}"
+                raise ValueError(msg)

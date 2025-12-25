@@ -5,8 +5,9 @@ from PIL import Image
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import SdkTypeError
+from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -33,16 +34,26 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
     ) -> Image.Image:
-        """Generate a single image using HuggingFace's text_to_image."""
+        if self.inference_model.rules is None:
+            msg = f"Model '{self.inference_model.name}' does not have rules configured"
+            raise ImgGenParameterError(msg)
+        args_dict = ImgGenArgsFactory.make_args_for_model(
+            model_rules=self.inference_model.rules,
+            img_gen_job=img_gen_job,
+            nb_images=1,
+        )
+        log.dev(args_dict, title="args_dict")
         prompt = img_gen_job.img_gen_prompt.positive_text
-        negative_prompt = img_gen_job.img_gen_prompt.negative_text or " "
+        negative_prompt = img_gen_job.img_gen_prompt.negative_text
         model_id = self.inference_model.model_id
         log.verbose(f"HuggingFace text_to_image: model={model_id}, prompt={prompt[:50]}...")
-
+        if (extra_headers := self.inference_model.extra_headers) and (provider := extra_headers.get("provider")):
+            self.hf_async_client.provider = HuggingFaceFactory.make_huggingface_inference_provider(provider_str=provider)
         return await self.hf_async_client.text_to_image(
             prompt=prompt,
             model=model_id,
             negative_prompt=negative_prompt,
+            extra_body=args_dict,
         )
 
     @override
@@ -63,12 +74,11 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
     ) -> list[GeneratedImageRawDetails]:
         # HuggingFace's text_to_image doesn't support batch generation directly,
         # so we generate images one at a time
-        pil_images: list[Image.Image] = []
+        generated_image_list: list[GeneratedImageRawDetails] = []
         for idx in range(nb_images):
             log.verbose(f"Generating image {idx + 1}/{nb_images}")
-            pil_image = await self._generate_single_image(img_gen_job=img_gen_job)
-            pil_images.append(pil_image)
+            generated_image = await self._gen_image(img_gen_job=img_gen_job)
+            generated_image_list.append(generated_image)
 
-        generated_image_list = HuggingFaceFactory.make_generated_image_list(pil_images=pil_images, output_format=img_gen_job.job_params.output_format)
         log.verbose(generated_image_list, title="generated_image_list")
         return generated_image_list
