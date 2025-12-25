@@ -261,14 +261,14 @@ class ImgGenArgsFactory:
                         num_inference_steps = 4
                     args_dict["num_inference_steps"] = num_inference_steps
                 else:
-                    sdxl_lightning_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.sdxl_lightning_map_quality_to_steps
+                    sdxl_lightning_map_quality_to_steps = get_config().cogt.img_gen_config.quality_to_steps_map.sdxl_lightning_map_quality_to_steps
                     num_inference_steps = sdxl_lightning_map_quality_to_steps[quality or Quality.MEDIUM]
                     args_dict["num_inference_steps"] = num_inference_steps
             case InferenceTaxonomy.FLUX:
                 if num_inference_steps:
                     args_dict["num_inference_steps"] = num_inference_steps
                 else:
-                    flux_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.flux_map_quality_to_steps
+                    flux_map_quality_to_steps = get_config().cogt.img_gen_config.quality_to_steps_map.flux_map_quality_to_steps
                     num_inference_steps = flux_map_quality_to_steps[quality or Quality.MEDIUM]
                     args_dict["num_inference_steps"] = num_inference_steps
                 if guidance_scale:
@@ -283,7 +283,7 @@ class ImgGenArgsFactory:
                 if num_inference_steps:
                     args_dict["num_inference_steps"] = num_inference_steps
                 else:
-                    qwen_image_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.qwen_image_map_quality_to_steps
+                    qwen_image_map_quality_to_steps = get_config().cogt.img_gen_config.quality_to_steps_map.qwen_image_map_quality_to_steps
                     num_inference_steps = qwen_image_map_quality_to_steps[quality or Quality.MEDIUM]
                     args_dict["num_inference_steps"] = num_inference_steps
                 if guidance_scale:

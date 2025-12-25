@@ -187,7 +187,7 @@ safety_tolerance = 5
 is_raw = false
 seed = "auto"
 
-[cogt.img_gen_config.fal_config]
+[cogt.img_gen_config.quality_to_steps_map]
 flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
 sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
 qwen_image_map_quality_to_steps = { "low" = 15, "medium" = 25, "high" = 50 }

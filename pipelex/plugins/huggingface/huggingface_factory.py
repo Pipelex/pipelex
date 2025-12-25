@@ -1,10 +1,10 @@
+from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T
 from PIL import Image
-from typing_extensions import Literal
 
 from pipelex.cogt.exceptions import ImgGenGenerationError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
-from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T
+
 
 class HuggingFaceFactory:
     @classmethod
