@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from huggingface_hub import AsyncInferenceClient
 from PIL import Image
@@ -13,6 +13,9 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.huggingface.huggingface_factory import HuggingFaceFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+
+if TYPE_CHECKING:
+    from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T
 
 
 class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
@@ -42,13 +45,16 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=1,
         )
-        log.dev(args_dict, title="args_dict")
         prompt = img_gen_job.img_gen_prompt.positive_text
         negative_prompt = img_gen_job.img_gen_prompt.negative_text
         model_id = self.inference_model.model_id
-        log.verbose(f"HuggingFace text_to_image: model={model_id}, prompt={prompt[:50]}...")
-        if (extra_headers := self.inference_model.extra_headers) and (provider := extra_headers.get("provider")):
-            self.hf_async_client.provider = HuggingFaceFactory.make_huggingface_inference_provider(provider_str=provider)
+        provider_literal: PROVIDER_OR_POLICY_T
+        if (extra_headers := self.inference_model.extra_headers) and (provider_str := extra_headers.get("provider")):
+            provider_literal = HuggingFaceFactory.make_huggingface_inference_provider(provider_str=provider_str)
+        else:
+            provider_literal = "auto"
+        self.hf_async_client.provider = provider_literal
+
         return await self.hf_async_client.text_to_image(
             prompt=prompt,
             model=model_id,
@@ -80,5 +86,4 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             generated_image = await self._gen_image(img_gen_job=img_gen_job)
             generated_image_list.append(generated_image)
 
-        log.verbose(generated_image_list, title="generated_image_list")
         return generated_image_list

@@ -259,18 +259,25 @@ class ImgGenArgsFactory:
                         # TODO: prevent this when building presets and params
                         log.warning(f"Number of inference steps {num_inference_steps} for SDXL Lightning must be one of {acceptable_steps}")
                         num_inference_steps = 4
-                    args_dict["num_inference_steps"] = num_inference_steps
                 else:
-                    sdxl_lightning_map_quality_to_steps = get_config().cogt.img_gen_config.quality_to_steps_map.sdxl_lightning_map_quality_to_steps
-                    num_inference_steps = sdxl_lightning_map_quality_to_steps[quality or Quality.MEDIUM]
-                    args_dict["num_inference_steps"] = num_inference_steps
+                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
+                        model_name="sdxl_lightning", quality=quality or Quality.MEDIUM
+                    )
+                args_dict["num_inference_steps"] = num_inference_steps
             case InferenceTaxonomy.FLUX:
-                if num_inference_steps:
-                    args_dict["num_inference_steps"] = num_inference_steps
-                else:
-                    flux_map_quality_to_steps = get_config().cogt.img_gen_config.quality_to_steps_map.flux_map_quality_to_steps
-                    num_inference_steps = flux_map_quality_to_steps[quality or Quality.MEDIUM]
-                    args_dict["num_inference_steps"] = num_inference_steps
+                if not num_inference_steps:
+                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
+                        model_name="flux", quality=quality or Quality.MEDIUM
+                    )
+                args_dict["num_inference_steps"] = num_inference_steps
+                if guidance_scale:
+                    args_dict["guidance_scale"] = guidance_scale
+            case InferenceTaxonomy.QWEN_IMAGE:
+                if not num_inference_steps:
+                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
+                        model_name="qwen_image", quality=quality or Quality.MEDIUM
+                    )
+                args_dict["num_inference_steps"] = num_inference_steps
                 if guidance_scale:
                     args_dict["guidance_scale"] = guidance_scale
             case InferenceTaxonomy.FLUX_11_ULTRA:
@@ -279,15 +286,6 @@ class ImgGenArgsFactory:
             case InferenceTaxonomy.GPT:
                 if quality:
                     args_dict["quality"] = quality.value
-            case InferenceTaxonomy.QWEN_IMAGE:
-                if num_inference_steps:
-                    args_dict["num_inference_steps"] = num_inference_steps
-                else:
-                    qwen_image_map_quality_to_steps = get_config().cogt.img_gen_config.quality_to_steps_map.qwen_image_map_quality_to_steps
-                    num_inference_steps = qwen_image_map_quality_to_steps[quality or Quality.MEDIUM]
-                    args_dict["num_inference_steps"] = num_inference_steps
-                if guidance_scale:
-                    args_dict["guidance_scale"] = guidance_scale
         return args_dict
 
     @classmethod

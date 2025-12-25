@@ -12,37 +12,48 @@ class ExtractConfig(ConfigModel):
     default_page_views_dpi: int
 
 
-class QualityToStepsMap(ConfigModel):
-    flux_map_quality_to_steps: dict[str, int]
-    sdxl_lightning_map_quality_to_steps: dict[str, int]
-    qwen_image_map_quality_to_steps: dict[str, int]
-
-    @field_validator("flux_map_quality_to_steps", "sdxl_lightning_map_quality_to_steps", "qwen_image_map_quality_to_steps")
-    @classmethod
-    def validate_quality_mapping(cls, value: dict[str, int]) -> dict[str, int]:
-        valid_qualities = {quality.value for quality in Quality}
-        missing_qualities = valid_qualities - set(value.keys())
-        invalid_qualities = set(value.keys()) - valid_qualities
-
-        if missing_qualities and invalid_qualities:
-            msg = f"Missing ({missing_qualities}) and invalid ({invalid_qualities}) quality levels in mapping"
-            raise ConfigValidationError(msg)
-        if missing_qualities:
-            msg = f"Missing quality levels in mapping: {missing_qualities}"
-            raise ConfigValidationError(msg)
-        if invalid_qualities:
-            msg = f"Invalid quality levels in mapping: {invalid_qualities}"
-            raise ConfigValidationError(msg)
-        return value
+QualityToStepsMap = dict[str, int]
 
 
 class ImgGenConfig(ConfigModel):
     img_gen_job_config: ImgGenJobConfig
     img_gen_param_defaults: ImgGenJobParamsDefaults
-    quality_to_steps_map: QualityToStepsMap
+    quality_to_steps_maps: dict[str, QualityToStepsMap]
 
     def make_default_img_gen_job_params(self) -> ImgGenJobParams:
         return self.img_gen_param_defaults.make_img_gen_job_params()
+
+    def get_num_inference_steps(self, model_name: str, quality: Quality) -> int:
+        quality_to_steps_map = self.quality_to_steps_maps.get(model_name)
+        if not quality_to_steps_map:
+            msg = f"No quality-to-steps map found for model '{model_name}'"
+            raise ConfigValidationError(msg)
+        num_inference_steps = quality_to_steps_map.get(quality.value)
+        if not num_inference_steps:
+            msg = f"No number of inference steps found for quality '{quality.value}' and model '{model_name}'"
+            raise ConfigValidationError(msg)
+        return num_inference_steps
+
+    @field_validator("quality_to_steps_maps")
+    @classmethod
+    def validate_quality_mapping(cls, value: dict[str, QualityToStepsMap]) -> dict[str, QualityToStepsMap]:
+        valid_qualities = {quality.value for quality in Quality}
+        missing_qualities: set[str]
+        invalid_qualities: set[str]
+        for model_name, quality_to_steps_map in value.items():
+            missing_qualities = valid_qualities - set(quality_to_steps_map.keys())
+            invalid_qualities = set(quality_to_steps_map.keys()) - valid_qualities
+
+            if missing_qualities and invalid_qualities:
+                msg = f"Missing ({missing_qualities}) and invalid ({invalid_qualities}) quality levels in mapping for model '{model_name}'"
+                raise ConfigValidationError(msg)
+            if missing_qualities:
+                msg = f"Missing quality levels in mapping: {missing_qualities} for model '{model_name}'"
+                raise ConfigValidationError(msg)
+            if invalid_qualities:
+                msg = f"Invalid quality levels in mapping: {invalid_qualities} for model '{model_name}'"
+                raise ConfigValidationError(msg)
+        return value
 
 
 class InstructorConfig(ConfigModel):
