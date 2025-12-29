@@ -8,7 +8,7 @@ from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 
 class HuggingFaceFactory:
     @classmethod
-    def make_generated_image(cls, pil_image: Image.Image, output_format: ImageFormat | None) -> GeneratedImageRawDetails:
+    def make_generated_image(cls, pil_image: Image.Image, output_format: ImageFormat) -> GeneratedImageRawDetails:
         """Convert a PIL Image to GeneratedImageRawDetails.
 
         Args:
