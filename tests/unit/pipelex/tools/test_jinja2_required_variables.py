@@ -482,7 +482,11 @@ class TestDetectJinja2RequiredVariables:
 
 
 class TestDataFullPaths:
-    """Test data for detect_jinja2_full_variable_paths tests."""
+    """Test data for detect_jinja2_full_variable_paths tests.
+
+    Note: This function returns ONLY the leaf (full) paths, not intermediate paths.
+    For example, `{{ foo.bar.baz }}` returns `{"foo.bar.baz"}`, NOT `{"foo", "foo.bar", "foo.bar.baz"}`.
+    """
 
     SIMPLE_VARIABLES: ClassVar[list[tuple[str, str, set[str]]]] = [
         ("single_variable", "Hello {{ name }}", {"name"}),
@@ -491,17 +495,18 @@ class TestDataFullPaths:
     ]
 
     NESTED_VARIABLES: ClassVar[list[tuple[str, str, set[str]]]] = [
-        ("simple_dot_notation", "{{ user.name }}", {"user.name", "user"}),
-        ("deep_nesting", "{{ user.profile.bio.short }}", {"user.profile.bio.short", "user.profile.bio", "user.profile", "user"}),
+        # Only the full path is returned, not intermediate paths
+        ("simple_dot_notation", "{{ user.name }}", {"user.name"}),
+        ("deep_nesting", "{{ user.profile.bio.short }}", {"user.profile.bio.short"}),
         (
             "multiple_nested",
             "{{ user.name }} and {{ config.setting }}",
-            {"user.name", "user", "config.setting", "config"},
+            {"user.name", "config.setting"},
         ),
         (
             "mix_nested_and_simple",
             "Hello {{ name }}, your email is {{ user.email }}",
-            {"name", "user.email", "user"},
+            {"name", "user.email"},
         ),
     ]
 
@@ -509,17 +514,17 @@ class TestDataFullPaths:
         (
             "plx_at_variable_preprocessed",
             '{{ page.page_view|tag("page.page_view") }}',
-            {"page.page_view", "page"},
+            {"page.page_view"},
         ),
         (
             "plx_dollar_variable_preprocessed",
             "{{ page.text_and_images.text.text|format() }}",
-            {"page.text_and_images.text.text", "page.text_and_images.text", "page.text_and_images", "page"},
+            {"page.text_and_images.text.text"},
         ),
         (
             "plx_mixed_preprocessed",
             '{{ page.page_view|tag("page.page_view") }}\n{{ page.text_and_images.text.text|format() }}',
-            {"page.page_view", "page", "page.text_and_images.text.text", "page.text_and_images.text", "page.text_and_images"},
+            {"page.page_view", "page.text_and_images.text.text"},
         ),
     ]
 
@@ -532,7 +537,7 @@ class TestDataFullPaths:
         (
             "for_loop_with_external_var",
             "{% for item in items %}{{ item.name }} ({{ prefix.value }}){% endfor %}",
-            {"items", "prefix.value", "prefix"},
+            {"items", "prefix.value"},
         ),
     ]
 
@@ -620,18 +625,16 @@ class TestDetectJinja2FullVariablePaths:
         """Test that full path detection differs from root-only detection."""
         template_source = "{{ user.profile.name }}"
 
-        # Root-only detection
+        # Root-only detection returns just the root variable name
         root_result = detect_jinja2_required_variables(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,
         )
         assert root_result == {"user"}, "Root-only should return just 'user'"
 
-        # Full path detection
+        # Full path detection returns ONLY the complete path (not intermediate paths)
         full_result = detect_jinja2_full_variable_paths(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,
         )
-        assert "user.profile.name" in full_result, "Full paths should include 'user.profile.name'"
-        assert "user.profile" in full_result, "Full paths should include intermediate 'user.profile'"
-        assert "user" in full_result, "Full paths should include root 'user'"
+        assert full_result == {"user.profile.name"}, "Full paths should return only the complete path"

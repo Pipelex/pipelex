@@ -69,6 +69,10 @@ def _build_full_path(node: nodes.Node) -> str | None:
 def _collect_full_variable_paths(node: nodes.Node, paths: set[str], declared_names: set[str]) -> None:
     """Recursively walk the AST and collect full variable paths.
 
+    This function collects only the FULL (leaf) paths for each variable access chain.
+    For example, `{{ foo.bar.baz }}` will only return `foo.bar.baz`, not intermediate
+    paths like `foo.bar` or `foo`.
+
     Args:
         node: The current AST node
         paths: Set to collect discovered paths
@@ -99,6 +103,8 @@ def _collect_full_variable_paths(node: nodes.Node, paths: set[str], declared_nam
     new_declared = declared_names | local_declared
 
     # Check if this is a Name or Getattr node that represents a variable access
+    # We only add the path and DON'T recurse into Name/Getattr children to avoid
+    # adding intermediate paths (e.g., for `foo.bar`, we only want `foo.bar`, not also `foo`)
     if isinstance(node, (nodes.Name, nodes.Getattr)):
         full_path = _build_full_path(node)
         if full_path:
@@ -106,8 +112,10 @@ def _collect_full_variable_paths(node: nodes.Node, paths: set[str], declared_nam
             # Only add if the root is not a declared local variable
             if root_name not in new_declared:
                 paths.add(full_path)
+        # Don't recurse into Name/Getattr children - we've captured the full path
+        return
 
-    # Recurse into child nodes
+    # Recurse into child nodes (only for non-Name/Getattr nodes)
     for child in node.iter_child_nodes():
         _collect_full_variable_paths(child, paths, new_declared)
 
