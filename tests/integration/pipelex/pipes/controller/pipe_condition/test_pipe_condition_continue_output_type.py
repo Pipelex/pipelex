@@ -23,6 +23,7 @@ from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition_co
     VerifiedLink,
 )
 
+
 @pytest.mark.xfail(reason="This test identifies a bug. it should be fixed")
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
