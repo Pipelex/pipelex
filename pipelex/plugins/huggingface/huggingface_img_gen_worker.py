@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from huggingface_hub import AsyncInferenceClient
 from PIL import Image
@@ -14,9 +14,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.huggingface.huggingface_factory import HuggingFaceFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.image_utils import ImageFormat
-
-if TYPE_CHECKING:
-    from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T
 
 
 class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
@@ -49,12 +46,6 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         prompt = img_gen_job.img_gen_prompt.positive_text
         negative_prompt = img_gen_job.img_gen_prompt.negative_text
         model_id = self.inference_model.model_id
-        provider_literal: PROVIDER_OR_POLICY_T
-        if (extra_headers := self.inference_model.extra_headers) and (provider_str := extra_headers.get("provider")):
-            provider_literal = HuggingFaceFactory.make_huggingface_inference_provider(provider_str=provider_str)
-        else:
-            provider_literal = "auto"
-        self.hf_async_client.provider = provider_literal
 
         return await self.hf_async_client.text_to_image(
             prompt=prompt,

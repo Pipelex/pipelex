@@ -34,7 +34,8 @@ model_id = "Qwen/Qwen-Image"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0, output = 0.0 }
-provider = "fal-ai"
+variant = "fal-ai"
+# variant = "replicate"
 
 [qwen-image.rules]
 aspect_ratio = "qwen_image"
