@@ -8,6 +8,7 @@ from pipelex import log
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.types import Self, StrEnum
 
 
@@ -193,6 +194,10 @@ class PipeRunParams(BaseModel):
 
     def push_pipe_to_stack(self, pipe_code: str) -> None:
         self.pipe_stack.append(pipe_code)
+        limit = self.pipe_stack_limit
+        if len(self.pipe_stack) > limit:
+            msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{self.pipe_stack}"
+            raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=self.pipe_stack)
 
     def pop_pipe_from_stack(self, pipe_code: str) -> None:
         popped_pipe_code = self.pipe_stack.pop()

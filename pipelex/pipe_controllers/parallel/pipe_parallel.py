@@ -13,7 +13,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_required_pipe
+from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -188,6 +188,15 @@ class PipeParallel(PipeController):
                 stuff=combined_output_stuff,
                 name=output_name,
             )
+
+            for stuff in output_stuffs.values():
+                get_pipeline_tracker().add_aggregate_step(
+                    from_stuff=stuff,
+                    to_stuff=combined_output_stuff,
+                    pipe_layer=pipe_run_params.pipe_layers,
+                    comment="PipeParallel on output_stuffs",
+                )
+
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
