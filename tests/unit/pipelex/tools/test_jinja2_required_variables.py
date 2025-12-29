@@ -4,14 +4,15 @@ import pytest
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
-from pipelex.tools.jinja2.jinja2_required_variables import (
-    detect_jinja2_full_variable_paths,
-    detect_jinja2_required_variables,
-)
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 
 
 class TestData:
-    """Test data for detect_jinja2_required_variables tests."""
+    """Test data for detect_jinja2_required_variables tests.
+
+    Note: The function returns ONLY the leaf (full) paths, not intermediate paths.
+    For example, `{{ foo.bar.baz }}` returns `{"foo.bar.baz"}`, NOT `{"foo", "foo.bar", "foo.bar.baz"}`.
+    """
 
     # (topic, template_source, expected_variables)
     SIMPLE_VARIABLES: ClassVar[list[tuple[str, str, set[str]]]] = [
@@ -48,13 +49,18 @@ class TestData:
     ]
 
     NESTED_VARIABLES: ClassVar[list[tuple[str, str, set[str]]]] = [
-        ("simple_dot_notation", "{{ user.name }}", {"user"}),
-        ("deep_nesting", "{{ user.profile.bio.short }}", {"user"}),
-        ("multiple_nested", "{{ user.name }} and {{ config.setting }}", {"user", "config"}),
+        # Full paths are returned
+        ("simple_dot_notation", "{{ user.name }}", {"user.name"}),
+        ("deep_nesting", "{{ user.profile.bio.short }}", {"user.profile.bio.short"}),
+        (
+            "multiple_nested",
+            "{{ user.name }} and {{ config.setting }}",
+            {"user.name", "config.setting"},
+        ),
         (
             "mix_nested_and_simple",
             "Hello {{ name }}, your email is {{ user.email }}",
-            {"name", "user"},
+            {"name", "user.email"},
         ),
     ]
 
@@ -71,6 +77,11 @@ class TestData:
             "multiple_vars_with_filters",
             '{{ first|tag("first") }} and {{ second|format() }}',
             {"first", "second"},
+        ),
+        (
+            "nested_with_filter",
+            '{{ user.name|tag("user.name") }}',
+            {"user.name"},
         ),
     ]
 
@@ -99,6 +110,11 @@ class TestData:
             "nested_for_loops",
             "{% for row in rows %}{% for cell in row.cells %}{{ cell }}{% endfor %}{% endfor %}",
             {"rows"},
+        ),
+        (
+            "for_loop_with_nested_external",
+            "{% for item in items %}{{ item.name }} ({{ prefix.value }}){% endfor %}",
+            {"items", "prefix.value"},
         ),
     ]
 
@@ -145,7 +161,7 @@ We are writing to inform you about {{ topic }}.
 Best regards,
 {{ sender.name }}
 {{ sender.title }}""",
-            {"recipient", "greeting", "topic", "action_items", "sender"},
+            {"recipient.name", "greeting", "topic", "action_items", "sender.name", "sender.title"},
         ),
     ]
 
@@ -158,7 +174,25 @@ Best regards,
         (
             "optional_nested",
             '{% if user.bio %}{{ user.bio|tag("user.bio") }}{% endif %}',
-            {"user"},
+            {"user.bio"},
+        ),
+    ]
+
+    PLX_STYLE_TEMPLATES: ClassVar[list[tuple[str, str, set[str]]]] = [
+        (
+            "plx_at_variable_preprocessed",
+            '{{ page.page_view|tag("page.page_view") }}',
+            {"page.page_view"},
+        ),
+        (
+            "plx_dollar_variable_preprocessed",
+            "{{ page.text_and_images.text.text|format() }}",
+            {"page.text_and_images.text.text"},
+        ),
+        (
+            "plx_mixed_preprocessed",
+            '{{ page.page_view|tag("page.page_view") }}\n{{ page.text_and_images.text.text|format() }}',
+            {"page.page_view", "page.text_and_images.text.text"},
         ),
     ]
 
@@ -182,7 +216,7 @@ Best regards,
     ]
 
 
-class TestDetectJinja2RequiredVariables:
+class TestDetectJinja2Variables:
     """Tests for detect_jinja2_required_variables function."""
 
     @pytest.mark.parametrize(
@@ -229,7 +263,7 @@ class TestDetectJinja2RequiredVariables:
         template_source: str,
         expected_variables: set[str],
     ):
-        """Test detection of nested/dotted variables (only root is detected)."""
+        """Test detection of nested/dotted variables returns full paths."""
         result = detect_jinja2_required_variables(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,
@@ -303,6 +337,23 @@ class TestDetectJinja2RequiredVariables:
             template_source=template_source,
         )
         assert result == expected_variables, f"Failed for topic: {topic}"
+
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "expected_paths"),
+        TestData.PLX_STYLE_TEMPLATES,
+    )
+    def test_plx_style_templates(
+        self,
+        topic: str,
+        template_source: str,
+        expected_paths: set[str],
+    ):
+        """Test detection in PLX-style preprocessed templates with tag/format filters."""
+        result = detect_jinja2_required_variables(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source=template_source,
+        )
+        assert result == expected_paths, f"Failed for topic: {topic}"
 
     @pytest.mark.parametrize("template_category", TestData.TEMPLATE_CATEGORIES)
     def test_different_template_categories(
@@ -480,161 +531,23 @@ class TestDetectJinja2RequiredVariables:
         )
         assert result == {"_private", "__dunder__", "normal_var"}
 
-
-class TestDataFullPaths:
-    """Test data for detect_jinja2_full_variable_paths tests.
-
-    Note: This function returns ONLY the leaf (full) paths, not intermediate paths.
-    For example, `{{ foo.bar.baz }}` returns `{"foo.bar.baz"}`, NOT `{"foo", "foo.bar", "foo.bar.baz"}`.
-    """
-
-    SIMPLE_VARIABLES: ClassVar[list[tuple[str, str, set[str]]]] = [
-        ("single_variable", "Hello {{ name }}", {"name"}),
-        ("two_variables", "{{ first }} and {{ second }}", {"first", "second"}),
-        ("empty_template", "No variables here", set()),
-    ]
-
-    NESTED_VARIABLES: ClassVar[list[tuple[str, str, set[str]]]] = [
-        # Only the full path is returned, not intermediate paths
-        ("simple_dot_notation", "{{ user.name }}", {"user.name"}),
-        ("deep_nesting", "{{ user.profile.bio.short }}", {"user.profile.bio.short"}),
-        (
-            "multiple_nested",
-            "{{ user.name }} and {{ config.setting }}",
-            {"user.name", "config.setting"},
-        ),
-        (
-            "mix_nested_and_simple",
-            "Hello {{ name }}, your email is {{ user.email }}",
-            {"name", "user.email"},
-        ),
-    ]
-
-    PLX_STYLE_TEMPLATES: ClassVar[list[tuple[str, str, set[str]]]] = [
-        (
-            "plx_at_variable_preprocessed",
-            '{{ page.page_view|tag("page.page_view") }}',
-            {"page.page_view"},
-        ),
-        (
-            "plx_dollar_variable_preprocessed",
-            "{{ page.text_and_images.text.text|format() }}",
-            {"page.text_and_images.text.text"},
-        ),
-        (
-            "plx_mixed_preprocessed",
-            '{{ page.page_view|tag("page.page_view") }}\n{{ page.text_and_images.text.text|format() }}',
-            {"page.page_view", "page.text_and_images.text.text"},
-        ),
-    ]
-
-    CONTROL_STRUCTURES: ClassVar[list[tuple[str, str, set[str]]]] = [
-        (
-            "for_loop_item_excluded",
-            "{% for item in items %}{{ item.name }}{% endfor %}",
-            {"items"},  # 'item' is loop variable, 'item.name' should not be detected
-        ),
-        (
-            "for_loop_with_external_var",
-            "{% for item in items %}{{ item.name }} ({{ prefix.value }}){% endfor %}",
-            {"items", "prefix.value"},
-        ),
-    ]
-
-
-class TestDetectJinja2FullVariablePaths:
-    """Tests for detect_jinja2_full_variable_paths function."""
-
-    @pytest.mark.parametrize(
-        ("topic", "template_source", "expected_paths"),
-        TestDataFullPaths.SIMPLE_VARIABLES,
-    )
-    def test_simple_variables(
-        self,
-        topic: str,
-        template_source: str,
-        expected_paths: set[str],
-    ):
-        """Test detection of simple variables returns full paths."""
-        result = detect_jinja2_full_variable_paths(
-            template_category=TemplateCategory.LLM_PROMPT,
-            template_source=template_source,
-        )
-        assert result == expected_paths, f"Failed for topic: {topic}"
-
-    @pytest.mark.parametrize(
-        ("topic", "template_source", "expected_paths"),
-        TestDataFullPaths.NESTED_VARIABLES,
-    )
-    def test_nested_variables(
-        self,
-        topic: str,
-        template_source: str,
-        expected_paths: set[str],
-    ):
-        """Test detection of nested variables returns all full dotted paths."""
-        result = detect_jinja2_full_variable_paths(
-            template_category=TemplateCategory.LLM_PROMPT,
-            template_source=template_source,
-        )
-        assert result == expected_paths, f"Failed for topic: {topic}"
-
-    @pytest.mark.parametrize(
-        ("topic", "template_source", "expected_paths"),
-        TestDataFullPaths.PLX_STYLE_TEMPLATES,
-    )
-    def test_plx_style_templates(
-        self,
-        topic: str,
-        template_source: str,
-        expected_paths: set[str],
-    ):
-        """Test detection in PLX-style preprocessed templates with tag/format filters."""
-        result = detect_jinja2_full_variable_paths(
-            template_category=TemplateCategory.LLM_PROMPT,
-            template_source=template_source,
-        )
-        assert result == expected_paths, f"Failed for topic: {topic}"
-
-    @pytest.mark.parametrize(
-        ("topic", "template_source", "expected_paths"),
-        TestDataFullPaths.CONTROL_STRUCTURES,
-    )
-    def test_control_structures(
-        self,
-        topic: str,
-        template_source: str,
-        expected_paths: set[str],
-    ):
-        """Test that loop variables and set variables are properly excluded."""
-        result = detect_jinja2_full_variable_paths(
-            template_category=TemplateCategory.LLM_PROMPT,
-            template_source=template_source,
-        )
-        assert result == expected_paths, f"Failed for topic: {topic}"
-
-    def test_empty_template(self):
-        """Test that empty template returns empty set."""
-        result = detect_jinja2_full_variable_paths(
-            template_category=TemplateCategory.LLM_PROMPT,
-            template_source="",
-        )
-        assert result == set()
-
-    def test_comparison_with_root_only_detection(self):
-        """Test that full path detection differs from root-only detection."""
+    def test_full_path_is_returned(self):
+        """Test that full paths are returned, not just root names."""
         template_source = "{{ user.profile.name }}"
 
-        # Root-only detection returns just the root variable name
-        root_result = detect_jinja2_required_variables(
+        result = detect_jinja2_required_variables(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,
         )
-        assert root_result == {"user"}, "Root-only should return just 'user'"
+        assert result == {"user.profile.name"}, "Full path should be returned"
 
-        # Full path detection returns ONLY the complete path (not intermediate paths)
-        full_result = detect_jinja2_full_variable_paths(
+    def test_can_extract_roots_from_full_paths(self):
+        """Test that roots can be extracted from full paths if needed."""
+        template_source = "{{ user.profile.name }} and {{ config.value }}"
+
+        full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,
         )
-        assert full_result == {"user.profile.name"}, "Full paths should return only the complete path"
+        roots = {path.split(".")[0] for path in full_paths}
+        assert roots == {"user", "config"}, "Roots should be extractable from full paths"

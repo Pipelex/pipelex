@@ -40,7 +40,7 @@ class TestData:
             "nested_at_variable",
             "User: @user.profile.name",
             'User: {{ user.profile.name|tag("user.profile.name") }}',
-            {"user"},
+            {"user.profile.name"},
         ),
     ]
 
@@ -67,7 +67,7 @@ class TestData:
             "nested_dollar_variable",
             "Config: $config.setting.value",
             "Config: {{ config.setting.value|format() }}",
-            {"config"},
+            {"config.setting.value"},
         ),
     ]
 
@@ -88,7 +88,7 @@ class TestData:
             "nested_optional_variable",
             "@?user.profile.bio",
             '{% if user.profile.bio %}{{ user.profile.bio|tag("user.profile.bio") }}{% endif %}',
-            {"user"},
+            {"user.profile.bio"},
         ),
     ]
 
@@ -565,5 +565,9 @@ Optional: @?system.logs.archive.old.entries
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=processed,
         )
-        # Only root variables are detected
-        assert variables == {"user", "app", "system"}
+        # Full variable paths are detected
+        assert variables == {
+            "user.profile.settings.preferences.theme",
+            "app.config.database.connection.host",
+            "system.logs.archive.old.entries",
+        }

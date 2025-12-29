@@ -58,11 +58,11 @@ class PipeCondition(PipeController):
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
         # Variables from the expression/expression_template
-        expression_required_variables = detect_jinja2_required_variables(
+        full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
-        required_variables.update(expression_required_variables)
+        required_variables.update(path.split(".")[0] for path in full_paths)
 
         # Variables from the outcomes map and default_outcome
         for pipe_code in self.pipe_dependencies():
@@ -84,10 +84,11 @@ class PipeCondition(PipeController):
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
         # Add the variables from the expression/expression_template
-        required_variables = detect_jinja2_required_variables(
+        full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
+        required_variables = {path.split(".")[0] for path in full_paths}
 
         for var_name in required_variables:
             if not var_name.startswith("_"):  # exclude internal variables starting with `_`
@@ -272,10 +273,11 @@ class PipeCondition(PipeController):
     ) -> PipeOutput:
         # Validate that the expression template is valid
         try:
-            required_variables = detect_jinja2_required_variables(
+            full_paths = detect_jinja2_required_variables(
                 template_category=TemplateCategory.EXPRESSION,
                 template_source=self.expression,
             )
+            required_variables = {path.split(".")[0] for path in full_paths}
             log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")

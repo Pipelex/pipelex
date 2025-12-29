@@ -7,7 +7,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
-from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_full_variable_paths
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.types import StrEnum
 
 
@@ -89,7 +89,7 @@ class PipeLLMBlueprint(PipeBlueprint):
             preprocessed_template = preprocess_template(self.prompt)
             try:
                 required_variable_paths.update(
-                    detect_jinja2_full_variable_paths(
+                    detect_jinja2_required_variables(
                         template_category=TemplateCategory.LLM_PROMPT,
                         template_source=preprocessed_template,
                     )
@@ -102,7 +102,7 @@ class PipeLLMBlueprint(PipeBlueprint):
             preprocessed_system_template = preprocess_template(self.system_prompt)
             try:
                 required_variable_paths.update(
-                    detect_jinja2_full_variable_paths(
+                    detect_jinja2_required_variables(
                         template_category=TemplateCategory.LLM_PROMPT,
                         template_source=preprocessed_system_template,
                     )
