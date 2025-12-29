@@ -19,7 +19,6 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -102,7 +101,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             )
 
     @override
-    async def _run_operator_pipe(
+    async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -111,9 +110,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeComposeOutput:
         content_generator = content_generator or get_content_generator()
-        if pipe_run_params.is_multiple_output_required:
-            msg = f"PipeCompose does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-            raise PipeRunParamsError(msg)
 
         context: dict[str, Any] = working_memory.generate_context()
         if pipe_run_params:
@@ -165,10 +161,22 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             log.verbose(f"PipeCompose: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
             content_generator_used = get_content_generator()
 
-        return await self._run_operator_pipe(
+        return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             output_name=output_name,
             content_generator=content_generator_used,
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

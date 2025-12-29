@@ -28,8 +28,6 @@ from pipelex.hub import (
     get_native_concept,
 )
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.exceptions import PipeRunError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
@@ -96,7 +94,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             )
 
     @override
-    async def _run_operator_pipe(
+    async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -205,16 +203,22 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeExtractOutput:
-        log.verbose(f"PipeExtract: dry run operator pipe: {self.code}")
-        if pipe_run_params.run_mode != PipeRunMode.DRY:
-            msg = f"Running pipe '{self.code}' (PipeExtract) _dry_run_operator_pipe() in non-dry mode is not allowed."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-
-        content_generator_dry = ContentGeneratorDry()
-        return await self._run_operator_pipe(
+        return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
-            content_generator=content_generator_dry,
+            content_generator=ContentGeneratorDry(),
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

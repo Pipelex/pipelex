@@ -35,7 +35,7 @@ class PipeRunInputsError(PipeRunError):
         message: str,
         run_mode: PipeRunMode,
         pipe_code: str,
-        missing_inputs: dict[str, str],
+        missing_inputs: list[str] | None = None,
         variable_name: str | None = None,
         concept_code: str | None = None,
     ):
