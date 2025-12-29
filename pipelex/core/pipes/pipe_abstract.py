@@ -15,8 +15,6 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.utils import monitor_pipe_stack
-from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
@@ -342,7 +340,6 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
     ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
-        monitor_pipe_stack(pipe_run_params=pipe_run_params)
 
         match pipe_run_params.run_mode:
             case PipeRunMode.LIVE:
@@ -439,10 +436,7 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
     ) -> PipeOutput:
         log.verbose(f"Dry run of {self.type}: '{self.code}'")
-        if not pipe_run_params.run_mode.is_dry:
-            msg = f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-
+        assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
         await self.validate_before_run(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )

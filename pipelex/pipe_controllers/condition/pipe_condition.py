@@ -7,12 +7,12 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import WorkingMemory, WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_required_pipe
+from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -83,7 +83,7 @@ class PipeCondition(PipeController):
 
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
-        # 1. Add the variables from the expression/expression_template
+        # Add the variables from the expression/expression_template
         required_variables = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
@@ -100,7 +100,7 @@ class PipeCondition(PipeController):
                     ),
                 )
 
-        # 2. Add the inputs needed by all possible target pipes
+        # Add the inputs needed by all possible target pipes
         for pipe_code in self.mapped_pipe_codes:
             pipe = get_required_pipe(pipe_code=pipe_code)
             # Use the centralized recursion detection
@@ -216,7 +216,35 @@ class PipeCondition(PipeController):
             msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
-        return await get_pipe_router().run(
+        chosen_pipe = get_required_pipe(pipe_code=outcome)
+
+        condition_details = self._make_pipe_condition_details(
+            evaluated_expression=self.expression,
+            chosen_pipe_code=chosen_pipe.code,
+        )
+
+        # Get required variables and validate they exist in working memory
+        required_variables = chosen_pipe.required_variables()
+        required_stuff_names = {required_variable for required_variable in required_variables if not required_variable.startswith("_")}
+        try:
+            required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
+        except WorkingMemoryStuffNotFoundError as exc:
+            pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
+            pipe_condition_path_str = ".".join(pipe_condition_path)
+            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
+            msg = f"Some required stuff(s) not found: {error_details}"
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+
+        for required_stuff in required_stuffs:
+            get_pipeline_tracker().add_condition_step(
+                from_stuff=required_stuff,
+                to_condition=condition_details,
+                condition_expression=self.expression,
+                pipe_layer=pipe_run_params.pipe_layers,
+                comment="PipeCondition required for condition",
+            )
+
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=outcome),
                 job_metadata=job_metadata,
@@ -225,6 +253,13 @@ class PipeCondition(PipeController):
                 output_name=output_name,
             ),
         )
+        get_pipeline_tracker().add_choice_step(
+            from_condition=condition_details,
+            to_stuff=pipe_output.main_stuff,
+            pipe_layer=pipe_run_params.pipe_layers,
+            comment="PipeCondition chosen pipe",
+        )
+        return pipe_output
 
     @override
     async def _dry_run_controller_pipe(
@@ -234,7 +269,7 @@ class PipeCondition(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        # 1. Validate that the expression template is valid
+        # Validate that the expression template is valid
         try:
             required_variables = detect_jinja2_required_variables(
                 template_category=TemplateCategory.EXPRESSION,
@@ -249,7 +284,7 @@ class PipeCondition(PipeController):
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # 2. Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
+        # Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
         all_pipe_codes = set(self.outcome_map.values())
         if self.default_outcome:
             all_pipe_codes.add(self.default_outcome)
