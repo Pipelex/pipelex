@@ -29,8 +29,7 @@ class TemplateBlueprint(BaseModel):
 
     def required_variables(self) -> set[str]:
         template_source = preprocess_template(self.template)
-        full_paths = detect_jinja2_required_variables(
+        return detect_jinja2_required_variables(
             template_category=self.category,
             template_source=template_source,
         )
-        return {path.split(".")[0] for path in full_paths}
