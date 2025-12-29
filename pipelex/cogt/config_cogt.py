@@ -29,7 +29,7 @@ class ImgGenConfig(ConfigModel):
             msg = f"No quality-to-steps map found for model '{model_name}'"
             raise ConfigValidationError(msg)
         num_inference_steps = quality_to_steps_map.get(quality.value)
-        if not num_inference_steps:
+        if num_inference_steps is None:
             msg = f"No number of inference steps found for quality '{quality.value}' and model '{model_name}'"
             raise ConfigValidationError(msg)
         return num_inference_steps

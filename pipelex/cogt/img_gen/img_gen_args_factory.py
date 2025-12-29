@@ -265,7 +265,7 @@ class ImgGenArgsFactory:
                     )
                 args_dict["num_inference_steps"] = num_inference_steps
             case InferenceTaxonomy.FLUX:
-                if not num_inference_steps:
+                if num_inference_steps is None:
                     num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
                         model_name="flux", quality=quality or Quality.MEDIUM
                     )
@@ -273,7 +273,7 @@ class ImgGenArgsFactory:
                 if guidance_scale:
                     args_dict["guidance_scale"] = guidance_scale
             case InferenceTaxonomy.QWEN_IMAGE:
-                if not num_inference_steps:
+                if num_inference_steps is None:
                     num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
                         model_name="qwen_image", quality=quality or Quality.MEDIUM
                     )
