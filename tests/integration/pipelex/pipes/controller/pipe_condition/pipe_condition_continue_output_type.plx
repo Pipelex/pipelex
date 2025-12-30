@@ -1,37 +1,25 @@
 domain = "test_pipe_condition_continue_output_type"
-description = "Test PipeCondition with continue outcome and different input/output types"
+description = "Test PipeCondition with continue outcome and batching over verified links"
 
 [concept]
-VerifiedLink = "A verified link with a verdict"
+VerifiedLink = "A verified link with a verdict (approved or rejected)"
 Constraint = "A mathematical price constraint"
 
 [pipe]
-[pipe.main_sequence]
-type = "PipeSequence"
-description = "Sequence that verifies a link and then routes it based on verdict."
-inputs = { input_text = "Text" }
+[pipe.process_verified_links]
+type = "PipeBatch"
+description = "Batches over verified links and routes each based on verdict."
+inputs = { verified_links = "VerifiedLink[]" }
 output = "Constraint[]"
-steps = [
-    { pipe = "verify_link", result = "verified_link" },
-    { pipe = "build_or_skip", result = "constraints" }
-]
-
-[pipe.verify_link]
-type = "PipeLLM"
-description = "Analyzes input text and outputs a verified link with a verdict."
-inputs = { input_text = "Text" }
-output = "VerifiedLink"
-prompt = """
-@input_text
-
-Analyze the input and output a verified link with a verdict (approved or rejected).
-"""
+input_list_name = "verified_links"
+input_item_name = "verified_link"
+branch_pipe_code = "build_or_skip"
 
 [pipe.build_or_skip]
 type = "PipeCondition"
 description = "Routes approved links to builder, rejected links to skip (continue)."
 inputs = { verified_link = "VerifiedLink" }
-output = "Constraint[]"
+output = "Constraint"
 expression_template = "{{ verified_link.verdict }}"
 default_outcome = "continue"
 
@@ -43,7 +31,7 @@ rejected = "continue"
 type = "PipeLLM"
 description = "Converts an approved verified link into a mathematical price constraint."
 inputs = { verified_link = "VerifiedLink" }
-output = "Constraint[]"
+output = "Constraint"
 prompt = """
 @verified_link
 
