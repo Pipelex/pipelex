@@ -138,7 +138,9 @@ class PipeBatch(PipeController):
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             required_variables = sub_pipe.required_variables()
-            required_stuffs = branch_memory.get_existing_stuffs(names=required_variables)
+            # Extract root names from full paths for looking up stuffs in working memory
+            required_stuff_names = {req_var.split(".")[0] for req_var in required_variables}
+            required_stuffs = branch_memory.get_existing_stuffs(names=required_stuff_names)
             required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff.stuff_code]
             required_stuff_lists.append(required_stuffs)
             # We create a deep copy of the run params to avoid modifying the original run params,

@@ -36,7 +36,11 @@ from pipelex.hub import (
 )
 from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import (
+    StructuringMethod,
+    is_input_used_by_variables,
+    is_variable_satisfied_by_inputs,
+)
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import (
@@ -77,11 +81,12 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
         needed_inputs = self.needed_inputs()
-        required_variables = self.required_variables()
+        required_variable_paths = self.required_variables()
+        input_names = {input_name for input_name, _ in needed_inputs.items}
 
-        # Check for unused inputs: declared in inputs but not used in prompt/system_prompt
-        for input_name, _ in needed_inputs.items:
-            if input_name not in required_variables:
+        # Check for unused inputs: declared in inputs but not used by any variable path
+        for input_name in input_names:
+            if not is_input_used_by_variables(input_name, required_variable_paths):
                 msg = f"PipeLLM '{self.code}' has input '{input_name}' declared but it is not used in the prompt or system_prompt."
                 raise PipeValidationError(
                     message=msg,
@@ -91,16 +96,16 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     explanation=f"Input '{input_name}' is declared in inputs but not referenced in prompt/system_prompt.",
                 )
 
-        # Check for missing inputs: used in prompt/system_prompt but not declared in inputs
-        for required_variable_name in required_variables:
-            if required_variable_name not in needed_inputs.root:
-                msg = f"PipeLLM '{self.code}' uses variable '{required_variable_name}' in prompt/system_prompt but it is not declared in inputs."
+        # Check for missing inputs: variable paths in prompt/system_prompt not satisfied by any input
+        for variable_path in required_variable_paths:
+            if not is_variable_satisfied_by_inputs(variable_path, input_names):
+                msg = f"PipeLLM '{self.code}' uses variable '{variable_path}' in prompt/system_prompt but it is not declared in inputs."
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
                     pipe_code=self.code,
-                    variable_names=[required_variable_name],
-                    explanation=f"Variable '{required_variable_name}' is used in prompt/system_prompt but not declared in inputs.",
+                    variable_names=[variable_path],
+                    explanation=f"Variable '{variable_path}' is used in prompt/system_prompt but not declared in inputs.",
                 )
 
     @override

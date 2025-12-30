@@ -16,7 +16,7 @@ class StructuringMethod(StrEnum):
     PRELIMINARY_TEXT = "preliminary_text"
 
 
-def _is_variable_satisfied_by_inputs(variable_path: str, input_names: set[str]) -> bool:
+def is_variable_satisfied_by_inputs(variable_path: str, input_names: set[str]) -> bool:
     """Check if a variable path is satisfied by the declared inputs.
 
     A variable path is satisfied if:
@@ -44,7 +44,7 @@ def _is_variable_satisfied_by_inputs(variable_path: str, input_names: set[str]) 
     return False
 
 
-def _is_input_used_by_variables(input_name: str, variable_paths: set[str]) -> bool:
+def is_input_used_by_variables(input_name: str, variable_paths: set[str]) -> bool:
     """Check if an input is used by any of the variable paths.
 
     An input is considered used if:
@@ -120,10 +120,10 @@ class PipeLLMBlueprint(PipeBlueprint):
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
 
         # Find variables used in prompts but not satisfied by any input
-        missing_inputs = {var_path for var_path in filtered_variable_paths if not _is_variable_satisfied_by_inputs(var_path, input_names)}
+        missing_inputs = {var_path for var_path in filtered_variable_paths if not is_variable_satisfied_by_inputs(var_path, input_names)}
 
         # Find inputs declared but not used by any variable path
-        unused_inputs = {input_name for input_name in input_names if not _is_input_used_by_variables(input_name, filtered_variable_paths)}
+        unused_inputs = {input_name for input_name in input_names if not is_input_used_by_variables(input_name, filtered_variable_paths)}
 
         if missing_inputs:
             missing_vars_str = ", ".join(sorted(missing_inputs))

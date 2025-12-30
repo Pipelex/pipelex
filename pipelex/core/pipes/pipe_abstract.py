@@ -131,16 +131,26 @@ class PipeAbstract(ABC, BaseModel):
 
     @final
     def generic_validate_inputs_with_library(self):
-        # First validate required variables are in the inputs
-        for required_variable_name in self.required_variables():
-            if required_variable_name not in self.inputs.variables:
-                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+        # First validate required variables are in the inputs (using prefix-based matching)
+        input_names = set(self.inputs.variables)
+        for required_variable_path in self.required_variables():
+            # Check if the variable path is satisfied by any input (exact match or prefix match)
+            is_satisfied = required_variable_path in input_names
+            if not is_satisfied:
+                parts = required_variable_path.split(".")
+                for idx in range(1, len(parts)):
+                    prefix = ".".join(parts[:idx])
+                    if prefix in input_names:
+                        is_satisfied = True
+                        break
+            if not is_satisfied:
+                msg = f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain_code=self.domain_code,
                     pipe_code=self.code,
-                    variable_names=[required_variable_name],
+                    variable_names=[required_variable_path],
                 )
 
         # Then validate that all inputs are actually needed and match requirements exactly
