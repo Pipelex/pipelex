@@ -228,6 +228,7 @@ class PipeCondition(PipeController):
         # Get required variables and validate they exist in working memory
         # Extract root names from full paths for looking up stuffs in working memory
         required_variables = chosen_pipe.required_variables()
+        # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
         required_stuff_names = {req_var.split(".")[0] for req_var in required_variables if not req_var.startswith("_")}
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
