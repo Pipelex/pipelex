@@ -401,7 +401,7 @@ class PipeAbstract(ABC, BaseModel):
         output_name: str | None = None,
     ) -> PipeOutput:
         log.verbose(f"Dry run of {self.type}: '{self.code}', pipe_run_id={pipe_run_id}")
-        
+
         assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
         await self.validate_before_run(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
