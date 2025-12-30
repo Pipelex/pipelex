@@ -531,23 +531,12 @@ class TestDetectJinja2Variables:
         )
         assert result == {"_private", "__dunder__", "normal_var"}
 
-    def test_full_path_is_returned(self):
-        """Test that full paths are returned, not just root names."""
-        template_source = "{{ user.profile.name }}"
+    def test_full_paths_are_returned(self):
+        """Test that full dotted paths are returned."""
+        template_source = "{{ user.profile.name }} and {{ config.value }}"
 
         result = detect_jinja2_required_variables(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,
         )
-        assert result == {"user.profile.name"}, "Full path should be returned"
-
-    def test_can_extract_roots_from_full_paths(self):
-        """Test that roots can be extracted from full paths if needed."""
-        template_source = "{{ user.profile.name }} and {{ config.value }}"
-
-        full_paths = detect_jinja2_required_variables(
-            template_category=TemplateCategory.LLM_PROMPT,
-            template_source=template_source,
-        )
-        roots = {path.split(".")[0] for path in full_paths}
-        assert roots == {"user", "config"}, "Roots should be extractable from full paths"
+        assert result == {"user.profile.name", "config.value"}
