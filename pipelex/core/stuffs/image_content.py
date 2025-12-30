@@ -1,6 +1,5 @@
 import json
 
-from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import ImageContentError
@@ -54,9 +53,7 @@ class ImageContent(StuffContent):
             if base_64.startswith("data:"):
                 prefixed_base64_str = base_64
             else:
-                prefixed_base64_str = prefixed_base64_str_from_base64_str(
-                    b64_str=base_64
-                )
+                prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
             return cls(
                 url=prefixed_base64_str,
                 caption=extracted_image.caption,
