@@ -1,5 +1,6 @@
 import json
 
+from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import ImageContentError
@@ -16,6 +17,13 @@ class ImageContent(StuffContent):
     url: str
     source_prompt: str | None = None
     caption: str | None = None
+
+    @field_validator("url")
+    def validate_url(cls, v: str) -> str:
+        if not v.startswith("http"):
+            msg = f"Image URL must start with 'http' or 'https': {v}"
+            raise ImageContentError(msg)
+        return v
 
     @property
     @override
@@ -53,7 +61,9 @@ class ImageContent(StuffContent):
             if base_64.startswith("data:"):
                 prefixed_base64_str = base_64
             else:
-                prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
+                prefixed_base64_str = prefixed_base64_str_from_base64_str(
+                    b64_str=base_64
+                )
             return cls(
                 url=prefixed_base64_str,
                 caption=extracted_image.caption,

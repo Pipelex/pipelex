@@ -1,17 +1,20 @@
 import base64
 from abc import ABC, abstractmethod
+from dataclasses import field
 from typing import Literal, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
+from pipelex.tools.misc.file_utils import MAX_FILE_PATH_LENGTH
 from pipelex.tools.misc.filetype_utils import (
     FileType,
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
     detect_file_type_from_path,
 )
+from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 from pipelex.types import StrEnum
 
@@ -43,6 +46,14 @@ class PromptImage(BaseModel, ABC):
 class PromptImagePath(PromptImage):
     file_path: str
 
+    @field_validator("file_path", mode="before")
+    @classmethod
+    def validate_file_path(cls, file_path: str) -> str:
+        if len(file_path) > MAX_FILE_PATH_LENGTH:
+            msg = f"File path is too long: {file_path}"
+            raise ValueError(msg)
+        return file_path
+
     def get_file_type(self) -> FileType:
         return detect_file_type_from_path(self.file_path)
 
@@ -60,6 +71,14 @@ class PromptImagePath(PromptImage):
 
 class PromptImageUrl(PromptImage):
     url: str
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def validate_url(cls, url: str) -> str:
+        if len(url) > URL_MAX_LENGTH:
+            msg = f"URL is too long: {url}"
+            raise ValueError(msg)
+        return url
 
     @override
     def __str__(self) -> str:

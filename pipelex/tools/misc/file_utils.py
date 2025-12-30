@@ -5,6 +5,8 @@ from pathlib import Path
 
 import aiofiles
 
+MAX_FILE_PATH_LENGTH = 4096
+
 ########################################################
 # Save & Load
 ########################################################
