@@ -98,7 +98,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
 
     @override
-    async def _run_operator_pipe(
+    async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -228,7 +228,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 url=generated_image.url,
                 source_prompt=img_gen_prompt_text,
             )
-            log.verbose(the_content, title="Single image content")
+            log.verbose(the_content, title=f"output stuff content of PipeImg {self.code}")
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
@@ -254,11 +254,22 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeImgGenOutput:
-        content_generator_dry = ContentGeneratorDry()
-        return await self._run_operator_pipe(
+        return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             output_name=output_name,
-            content_generator=content_generator_dry,
+            content_generator=ContentGeneratorDry(),
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

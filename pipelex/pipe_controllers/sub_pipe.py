@@ -29,7 +29,6 @@ class SubPipe(BaseModel):
         job_metadata: JobMetadata,
         sub_pipe_run_params: PipeRunParams,
     ) -> PipeOutput:
-        """Run or dry run a single operation self."""
         if self.output_multiplicity:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
 
@@ -49,7 +48,6 @@ class SubPipe(BaseModel):
                     message=msg,
                     run_mode=sub_pipe_run_params.run_mode,
                     pipe_code=self.pipe_code,
-                    missing_inputs={},
                     variable_name=batch_params.input_list_stuff_name,
                     concept_code=None,
                 ) from exc
@@ -65,7 +63,6 @@ class SubPipe(BaseModel):
                     message=msg,
                     run_mode=sub_pipe_run_params.run_mode,
                     pipe_code=self.pipe_code,
-                    missing_inputs={},
                     variable_name=batch_params.input_item_stuff_name,
                     concept_code=None,
                 ) from exc
@@ -116,7 +113,6 @@ class SubPipe(BaseModel):
                     message=msg,
                     run_mode=sub_pipe_run_params.run_mode,
                     pipe_code=self.pipe_code,
-                    missing_inputs={},
                     variable_name=exc.variable_name,
                     concept_code=None,
                 ) from exc
@@ -127,6 +123,7 @@ class SubPipe(BaseModel):
                 pipe_run_params=sub_pipe_run_params,
                 output_name=self.output_name,
             )
+
             if new_output_stuff := pipe_output.working_memory.get_optional_main_stuff():
                 for stuff in required_stuffs:
                     get_pipeline_tracker().add_pipe_step(
@@ -136,4 +133,5 @@ class SubPipe(BaseModel):
                         pipe_layer=sub_pipe_run_params.pipe_layers,
                         comment="SubPipe on required_stuff",
                     )
+
         return pipe_output

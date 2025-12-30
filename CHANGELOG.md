@@ -40,6 +40,7 @@
 - Validation for `PipeCompose` output concepts: must be strictly compatible with the Text concept
 - Validation for Pipelex Bundle concept keys: cannot create a native concept
 - Validation for `PipeSequence`: The multiplicity of the output of the sequence must be the same as the multiplicity of the output of the last step.
+- Validation for `PipeFunc`: The multiplicity of the output of the pipe must be the same as the multiplicity of the output of the function: If the multiplicity is true, the return type of the function must be a subclass of `ListContent`. If the multiplicity is false, the return type of the function must not be a subclass of `ListContent`.
 
 ### Changed
 
@@ -84,6 +85,7 @@
 - `ConceptFactory.make_from_blueprint` method now correctly handles native concepts
 - The output (and inputs) of a pipe is now a `StuffSpec` object instead, that holds the concept and the multiplicity.
 - Renamed `domain` into `domain_code` when relevant.
+- Refactored the dry run methods of the `PipeAbstract` class.
 
 ## [v0.17.3] - 2025-12-01
 

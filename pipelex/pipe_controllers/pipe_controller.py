@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.pipe_run.pipe_run_params import PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -27,33 +27,28 @@ class PipeController(PipeAbstract):
 
     @final
     @override
-    async def _run_pipe(
+    async def _live_run_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        print_intermediate_outputs: bool | None = False,
     ) -> PipeOutput:
-        match pipe_run_params.run_mode:
-            case PipeRunMode.LIVE:
-                pipe_output = await self._run_controller_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                    output_name=output_name,
-                )
-            case PipeRunMode.DRY:
-                pipe_output = await self._dry_run_controller_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                    output_name=output_name,
-                )
-        return pipe_output
+        return await self._live_run_controller_pipe(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
+
+    @final
+    @override
+    async def _dry_run_pipe(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ) -> PipeOutput:
+        return await self._dry_run_controller_pipe(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
 
     @abstractmethod
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,

@@ -18,7 +18,6 @@ from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
@@ -128,7 +127,7 @@ class PipeParallel(PipeController):
         return {sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes}
 
     @override
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -189,6 +188,7 @@ class PipeParallel(PipeController):
                 stuff=combined_output_stuff,
                 name=output_name,
             )
+
             for stuff in output_stuffs.values():
                 get_pipeline_tracker().add_aggregate_step(
                     from_stuff=stuff,
@@ -196,6 +196,7 @@ class PipeParallel(PipeController):
                     pipe_layer=pipe_run_params.pipe_layers,
                     comment="PipeParallel on output_stuffs",
                 )
+
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -209,26 +210,7 @@ class PipeParallel(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        """Dry run implementation for PipeParallel.
-        Validates that all required inputs are present and that all parallel sub-pipes can be dry run.
-        """
-        log.verbose(f"PipeParallel: dry run controller pipe: {self.code}")
-        if pipe_run_params.run_mode != PipeRunMode.DRY:
-            msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-
-        # 1. Validate that all required inputs are present in the working memory
-        needed_inputs = self.needed_inputs()
-        missing_input_names: list[str] = []
-        for named_stuff_spec in needed_inputs.named_stuff_specs:
-            if not working_memory.get_optional_stuff(named_stuff_spec.variable_name):
-                missing_input_names.append(named_stuff_spec.variable_name)
-
-        if missing_input_names:
-            msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): missing required inputs: {missing_input_names}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-
-        # 2. Validate that all sub-pipes exist
+        # 1. Validate that all sub-pipes exist
         for sub_pipe in self.parallel_sub_pipes:
             try:
                 get_required_pipe(pipe_code=sub_pipe.pipe_code)
@@ -236,7 +218,7 @@ class PipeParallel(PipeController):
                 msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe.pipe_code}' not found"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # 3. Run all sub-pipes in dry mode
+        # 2. Run all sub-pipes in dry mode
         tasks: list[Coroutine[Any, Any, PipeOutput]] = []
 
         for sub_pipe in self.parallel_sub_pipes:
@@ -251,7 +233,7 @@ class PipeParallel(PipeController):
 
         pipe_outputs = await asyncio.gather(*tasks)
 
-        # 4. Process outputs as in the regular run
+        # 3. Process outputs as in the regular run
         output_stuffs: dict[str, Stuff] = {}
         output_stuff_contents: dict[str, StuffContent] = {}
 
@@ -276,7 +258,7 @@ class PipeParallel(PipeController):
             output_stuffs[sub_pipe_output_name] = output_stuff
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
 
-        # 5. Handle combined output if specified
+        # 4. Handle combined output if specified
         if self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
                 concept=self.combined_output,
@@ -291,3 +273,15 @@ class PipeParallel(PipeController):
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

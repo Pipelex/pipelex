@@ -33,6 +33,10 @@ class StuffBlueprint(BaseModel):
 
 class StuffFactory:
     @classmethod
+    def make_stuff_code(cls) -> str:
+        return shortuuid.uuid()[:5]
+
+    @classmethod
     def make_stuff_name(cls, concept: Concept) -> str:
         return Stuff.make_stuff_name(concept=concept)
 
@@ -62,13 +66,17 @@ class StuffFactory:
         name: str | None = None,
         code: str | None = None,
     ) -> Stuff:
+        if not code:
+            code = cls.make_stuff_code()
+
         if not name:
             name = cls.make_stuff_name(concept=concept)
+
         return Stuff(
             concept=concept,
             content=content,
             stuff_name=name,
-            stuff_code=code or shortuuid.uuid()[:5],
+            stuff_code=code,
         )
 
     @classmethod

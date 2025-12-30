@@ -7,8 +7,7 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import WorkingMemory, WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
@@ -84,7 +83,7 @@ class PipeCondition(PipeController):
 
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
-        # 1. Add the variables from the expression/expression_template
+        # Add the variables from the expression/expression_template
         required_variables = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
@@ -101,7 +100,7 @@ class PipeCondition(PipeController):
                     ),
                 )
 
-        # 2. Add the inputs needed by all possible target pipes
+        # Add the inputs needed by all possible target pipes
         for pipe_code in self.mapped_pipe_codes:
             pipe = get_required_pipe(pipe_code=pipe_code)
             # Use the centralized recursion detection
@@ -150,7 +149,7 @@ class PipeCondition(PipeController):
 
     # TODO: Restore this validation. The problem lies with needed_inputs that construct Anything concepts.
     # @override
-    # async def validate_before_run(
+    # async def _validate_before_run(
     #     self,
     #     job_metadata: JobMetadata,
     #     working_memory: WorkingMemory,
@@ -197,20 +196,14 @@ class PipeCondition(PipeController):
         return evaluated_expression
 
     @override
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        log.verbose(f"{self.class_name} generating a '{self.output.concept.code}'")
-
-        # TODO: restore pipe_layer feature
-        # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
-
         evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
-
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 
@@ -225,7 +218,6 @@ class PipeCondition(PipeController):
 
         chosen_pipe = get_required_pipe(pipe_code=outcome)
 
-        # Create condition details for tracking
         condition_details = self._make_pipe_condition_details(
             evaluated_expression=self.expression,
             chosen_pipe_code=chosen_pipe.code,
@@ -243,7 +235,6 @@ class PipeCondition(PipeController):
             msg = f"Some required stuff(s) not found: {error_details}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # Track condition steps
         for required_stuff in required_stuffs:
             get_pipeline_tracker().add_condition_step(
                 from_stuff=required_stuff,
@@ -253,19 +244,15 @@ class PipeCondition(PipeController):
                 comment="PipeCondition required for condition",
             )
 
-        # Execute the chosen pipe
-        log.verbose(f"Chosen pipe: {chosen_pipe.code}")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=chosen_pipe,
+                pipe=get_required_pipe(pipe_code=outcome),
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
             ),
         )
-
-        # Track choice step
         get_pipeline_tracker().add_choice_step(
             from_condition=condition_details,
             to_stuff=pipe_output.main_stuff,
@@ -282,27 +269,7 @@ class PipeCondition(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        """Dry run implementation for PipeCondition.
-        Validates that all required inputs are present, expression is valid, and target pipes exist.
-        """
-        log.verbose(f"PipeCondition: dry run controller pipe: {self.code}")
-        # 1. Validate that all required inputs are present in the working memory
-        needed_inputs = self.needed_inputs()
-        missing_input_names: list[str] = []
-
-        for named_stuff_spec in needed_inputs.named_stuff_specs:
-            if not working_memory.get_optional_stuff(named_stuff_spec.variable_name):
-                missing_input_names.append(named_stuff_spec.variable_name)
-
-        if missing_input_names:
-            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
-            raise PipeRunError(
-                message=f"Dry run failed for pipe '{self.code}' (PipeCondition): missing required inputs: {', '.join(missing_input_names)}",
-                run_mode=pipe_run_params.run_mode,
-                pipe_code=self.code,
-            )
-
-        # 2. Validate that the expression template is valid
+        # Validate that the expression template is valid
         try:
             required_variables = detect_jinja2_required_variables(
                 template_category=TemplateCategory.EXPRESSION,
@@ -317,7 +284,7 @@ class PipeCondition(PipeController):
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # 3. Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
+        # Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
         all_pipe_codes = set(self.outcome_map.values())
         if self.default_outcome:
             all_pipe_codes.add(self.default_outcome)
@@ -341,3 +308,15 @@ class PipeCondition(PipeController):
                 pipe_run_params=pipe_run_params,
             )
         return PipeOutput(working_memory=working_memory)
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

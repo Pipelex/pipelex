@@ -17,7 +17,6 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.telemetry.otel_constants import (
@@ -32,6 +31,8 @@ from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManager
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
+
+PipeAbstractType = type["PipeAbstract"]
 
 
 class PipeAbstract(ABC, BaseModel):
@@ -229,21 +230,66 @@ class PipeAbstract(ABC, BaseModel):
     def validate_output_static(self):
         pass
 
+    @final
     async def validate_before_run(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-    ): ...
+    ):
+        # Check that all the needed inputs are actually in the working memory
+        missing_input_names: list[str] = []
 
+        for named_stuff_spec in self.needed_inputs().named_stuff_specs:
+            if not working_memory.get_optional_stuff(named_stuff_spec.variable_name):
+                missing_input_names.append(named_stuff_spec.variable_name)
+
+        if missing_input_names:
+            msg = f"Dry run of {self.type} '{self.code}': missing required inputs: {', '.join(missing_input_names)}"
+            raise PipeRunInputsError(
+                message=msg,
+                run_mode=pipe_run_params.run_mode,
+                pipe_code=self.code,
+                missing_inputs=missing_input_names,
+            )
+
+        # Specific pipe validation function
+        await self._validate_before_run(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
+
+    @abstractmethod
+    async def _validate_before_run(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ):
+        pass
+
+    @final
     async def validate_after_run(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-    ): ...
+    ):
+        await self._validate_after_run(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
+
+    @abstractmethod
+    async def _validate_after_run(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ):
+        pass
 
     @abstractmethod
     def required_variables(self) -> set[str]:
@@ -269,13 +315,6 @@ class PipeAbstract(ABC, BaseModel):
 
         """
 
-    def monitor_pipe_stack(self, pipe_run_params: PipeRunParams):
-        pipe_stack = pipe_run_params.pipe_stack
-        limit = pipe_run_params.pipe_stack_limit
-        if len(pipe_stack) > limit:
-            msg = f"Exceeded pipe stack limit of {limit}. You can raise that limit in the config. Stack:\n{pipe_stack}"
-            raise PipeStackOverflowError(message=msg, limit=limit, pipe_stack=pipe_stack)
-
     def _format_pipe_run_info(self, pipe_run_params: PipeRunParams) -> str:
         indent_level = len(pipe_run_params.pipe_stack) - 1
         indent = "   " * indent_level
@@ -292,8 +331,133 @@ class PipeAbstract(ABC, BaseModel):
         arrow = "[yellow]→[/yellow]"
         return f"{indent}{pipe_type_label} {pipe_code_label} {arrow} {concept_code_label}"
 
+    @final
+    async def run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
+
+        match pipe_run_params.run_mode:
+            case PipeRunMode.LIVE:
+                pipe_output = await self.live_run_pipe(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                )
+            case PipeRunMode.DRY:
+                pipe_output = await self.dry_run_pipe(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                )
+
+        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
+        return pipe_output
+
+    @final
+    async def live_run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
+
+        # Handle telemetry ------------------------------------------------------------
+
+        # Generate pipe_run_id (business ID, always set)
+        this_pipe_run_id = PipelineFactory.make_pipe_run_id()
+
+        # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
+        # The trace_id comes from parent's otel_context (already computed at pipeline start)
+        this_otel_context: OtelContext | None = None
+        span: Span | None = None
+        is_root_span: bool = False
+
+        parent_otel_context = job_metadata.otel_context
+        if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
+            # Start OTel span first
+            span, is_root_span = self._start_pipe_span(
+                parent_otel_context=parent_otel_context,
+                pipeline_run_id=job_metadata.pipeline_run_id,
+                working_memory=working_memory,
+            )
+            # Get the actual span_id from OTel (OTel generates its own span_id)
+            if span:
+                span_context = span.get_span_context()
+                this_otel_context = OtelContext(
+                    trace_id=parent_otel_context.trace_id,
+                    trace_name=parent_otel_context.trace_name,
+                    trace_name_redacted=parent_otel_context.trace_name_redacted,
+                    span_id=span_context.span_id,
+                )
+
+        # Create child metadata with updated pipe_code and pipe_run_id
+        # This passes down a modified copy rather than mutating the original
+        # otel_context is passed separately because it must always be set explicitly
+        # (even when None in dry mode) to avoid inheriting stale parent context
+        child_metadata = job_metadata.copy_with_update(
+            otel_context=this_otel_context,
+            pipe_code=self.code,
+            pipe_run_id=this_pipe_run_id,
+        )
+
+        # Run pipe ------------------------------------------------------------
+
+        try:
+            pipe_output = await self._live_run_pipe(
+                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
+        except Exception as exc:
+            self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
+            raise
+
+        # Handle telemetry ------------------------------------------------------------
+
+        self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
+
+        return pipe_output
+
+    @final
+    async def dry_run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        log.verbose(f"Dry run of {self.type}: '{self.code}'")
+        assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
+        await self.validate_before_run(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
+        pipe_output = await self._dry_run_pipe(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
+        await self.validate_after_run(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+        )
+        return pipe_output
+
     @abstractmethod
-    async def _run_pipe(
+    async def _live_run_pipe(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        pass
+
+    @abstractmethod
+    async def _dry_run_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -475,102 +639,3 @@ class PipeAbstract(ABC, BaseModel):
             if is_root_span:
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.FAILURE)
         span.end()
-
-    @final
-    async def run_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeOutput:
-        pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
-        self.monitor_pipe_stack(pipe_run_params=pipe_run_params)
-
-        # Check inputs ------------------------------------------------------------
-
-        # check we have the required inputs in the working memory
-        missing_inputs: dict[str, str] = {}
-        for required_stuff_name, stuff_spec in self.needed_inputs().items:
-            if not working_memory.is_stuff_exists(name=required_stuff_name):
-                missing_inputs[required_stuff_name] = stuff_spec.concept.code
-        if missing_inputs:
-            error = PipeRunInputsError(
-                message=f"Missing required inputs for pipe '{self.code}': {missing_inputs}",
-                run_mode=pipe_run_params.run_mode,
-                pipe_code=self.code,
-                missing_inputs=missing_inputs,
-            )
-            raise error
-
-        pipe_run_info = self._format_pipe_run_info(pipe_run_params=pipe_run_params)
-        if pipe_run_params.run_mode == PipeRunMode.LIVE:
-            log.info(pipe_run_info)
-
-        # Handle telemetry ------------------------------------------------------------
-
-        # Generate pipe_run_id (business ID, always set)
-        this_pipe_run_id = PipelineFactory.make_pipe_run_id()
-
-        # Derive OtelContext if telemetry is enabled (not dry mode and tracer available)
-        # The trace_id comes from parent's otel_context (already computed at pipeline start)
-        this_otel_context: OtelContext | None = None
-        span: Span | None = None
-        is_root_span: bool = False
-
-        parent_otel_context = job_metadata.otel_context
-        if not pipe_run_params.run_mode.is_dry and parent_otel_context is not None:
-            # Start OTel span first
-            span, is_root_span = self._start_pipe_span(
-                parent_otel_context=parent_otel_context,
-                pipeline_run_id=job_metadata.pipeline_run_id,
-                working_memory=working_memory,
-            )
-            # Get the actual span_id from OTel (OTel generates its own span_id)
-            if span:
-                span_context = span.get_span_context()
-                this_otel_context = OtelContext(
-                    trace_id=parent_otel_context.trace_id,
-                    trace_name=parent_otel_context.trace_name,
-                    trace_name_redacted=parent_otel_context.trace_name_redacted,
-                    span_id=span_context.span_id,
-                )
-
-        # Create child metadata with updated pipe_code and pipe_run_id
-        # This passes down a modified copy rather than mutating the original
-        # otel_context is passed separately because it must always be set explicitly
-        # (even when None in dry mode) to avoid inheriting stale parent context
-        child_metadata = job_metadata.copy_with_update(
-            otel_context=this_otel_context,
-            pipe_code=self.code,
-            pipe_run_id=this_pipe_run_id,
-        )
-
-        # Run pipe ------------------------------------------------------------
-
-        try:
-            await self.validate_before_run(
-                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-            )
-            pipe_output = await self._run_pipe(
-                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-            )
-            await self.validate_after_run(
-                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-            )
-        except Exception as exc:
-            self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
-            raise
-
-        # Handle telemetry ------------------------------------------------------------
-
-        self._end_pipe_span_success(span=span, pipe_output=pipe_output, is_root_span=is_root_span)
-
-        # Cleanup ------------------------------------------------------------
-
-        pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
-
-        return pipe_output
-
-
-PipeAbstractType = type[PipeAbstract]
