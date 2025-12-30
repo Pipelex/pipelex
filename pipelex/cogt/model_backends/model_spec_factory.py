@@ -18,6 +18,7 @@ BackendModelSpecs = dict[str, Any]
 class InferenceModelSpecBlueprint(ConfigModel):
     enabled: bool = True
     sdk: str
+    variant: str | None = None
     model_type: ModelType = Field(default=ModelType.LLM, strict=False)
     model_id: str | None = None
     inputs: list[str] = Field(default_factory=list)
@@ -87,6 +88,7 @@ class InferenceModelSpecFactory(BaseModel):
             backend_name=backend_name,
             name=name,
             sdk=blueprint.sdk,
+            variant=blueprint.variant,
             model_type=blueprint.model_type,
             model_id=blueprint.model_id or name,
             inputs=blueprint.inputs,

@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.types import Self, StrEnum
 
 
@@ -18,56 +19,6 @@ class AspectRatio(StrEnum):
     PORTRAIT_9_21 = "portrait_9_21"
 
 
-class OutputFormat(StrEnum):
-    PNG = "png"
-    JPEG = "jpeg"
-    WEBP = "webp"
-
-    @property
-    def is_transparent_compatible(self) -> bool:
-        match self:
-            case OutputFormat.PNG:
-                return True
-            case OutputFormat.JPEG | OutputFormat.WEBP:
-                return False
-
-    @property
-    def is_png(self) -> bool:
-        match self:
-            case OutputFormat.PNG:
-                return True
-            case OutputFormat.JPEG | OutputFormat.WEBP:
-                return False
-
-    @property
-    def is_jpeg(self) -> bool:
-        match self:
-            case OutputFormat.JPEG:
-                return True
-            case OutputFormat.PNG | OutputFormat.WEBP:
-                return False
-
-    @property
-    def as_file_extension(self) -> str:
-        match self:
-            case OutputFormat.PNG:
-                return "png"
-            case OutputFormat.JPEG:
-                return "jpg"
-            case OutputFormat.WEBP:
-                return "webp"
-
-    @property
-    def as_mime_type(self) -> str:
-        match self:
-            case OutputFormat.PNG:
-                return "image/png"
-            case OutputFormat.JPEG:
-                return "image/jpeg"
-            case OutputFormat.WEBP:
-                return "image/webp"
-
-
 class Quality(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
@@ -79,6 +30,14 @@ class Background(StrEnum):
     OPAQUE = "opaque"
     AUTO = "auto"
 
+    @property
+    def is_certainly_transparent(self) -> bool:
+        match self:
+            case Background.TRANSPARENT:
+                return True
+            case Background.OPAQUE | Background.AUTO:
+                return False
+
 
 class ImgGenJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
@@ -89,7 +48,7 @@ class ImgGenJobParams(BaseModel):
     is_moderated: bool | None = None
     safety_tolerance: int | None = Field(default=None, ge=1, le=6)
     is_raw: bool | None = None
-    output_format: OutputFormat | None = Field(default=None, strict=False)
+    output_format: ImageFormat | None = Field(default=None, strict=False)
     seed: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
@@ -125,6 +84,9 @@ class ImgGenJobParamsDefaults(ConfigModel):
             seed = None
         else:
             seed = self.seed
+        output_format: ImageFormat | None = None
+        if self.background.is_certainly_transparent:
+            output_format = ImageFormat.PNG
         return ImgGenJobParams(
             aspect_ratio=self.aspect_ratio,
             background=self.background,
@@ -134,7 +96,7 @@ class ImgGenJobParamsDefaults(ConfigModel):
             is_moderated=self.is_moderated,
             safety_tolerance=self.safety_tolerance,
             is_raw=self.is_raw,
-            output_format=None,
+            output_format=output_format,
             seed=seed,
         )
 

@@ -180,16 +180,17 @@ is_sync_mode = false
 nb_steps = 28           # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
 aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
-guidance_scale = 3.5
+guidance_scale = 2.5
 background = "auto"
 is_moderated = true
 safety_tolerance = 5
 is_raw = false
 seed = "auto"
 
-[cogt.img_gen_config.fal_config]
-flux_map_quality_to_steps = { "low" = 14, "medium" = 28, "high" = 56 }
-sdxl_lightning_map_quality_to_steps = { "low" = 2, "medium" = 4, "high" = 8 }
+[cogt.img_gen_config.quality_to_steps_maps]
+flux = { "low" = 14, "medium" = 28, "high" = 56 }
+sdxl_lightning = { "low" = 2, "medium" = 4, "high" = 8 }
+qwen_image = { "low" = 10, "medium" = 20, "high" = 28 }
 
 ####################################################################################################
 # OCR config

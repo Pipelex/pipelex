@@ -3,7 +3,8 @@ from typing import Literal
 from openai import Omit, omit
 
 from pipelex.cogt.exceptions import ImgGenParameterError
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, Quality
+from pipelex.tools.misc.image_utils import ImageFormat
 
 GptImage1SizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
 GptImage1OutputFormatType = Literal["png", "jpeg", "webp"]
@@ -34,16 +35,16 @@ class OpenAIImgGenFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def output_format_for_gpt_image_1(cls, output_format: OutputFormat | None) -> GptImage1OutputFormatType | None:
+    def output_format_for_gpt_image_1(cls, output_format: ImageFormat | None) -> GptImage1OutputFormatType | None:
         """This method only converts the OutputFormat StrEnum value to a Literal, as expected by the OpenAI API"""
         if output_format is None:
             return None
         match output_format:
-            case OutputFormat.PNG:
+            case ImageFormat.PNG:
                 return "png"
-            case OutputFormat.JPEG:
+            case ImageFormat.JPEG:
                 return "jpeg"
-            case OutputFormat.WEBP:
+            case ImageFormat.WEBP:
                 return "webp"
 
     @classmethod

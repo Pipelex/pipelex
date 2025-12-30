@@ -1,12 +1,16 @@
 import pytest
 
-from pipelex import pretty_print
+from pipelex import pretty_print, pretty_print_url
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.hub import get_img_gen_worker
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.image_utils import ImageFormat
 from tests.integration.pipelex.test_data import ImageGenTestCases
+
+PRIMARY_ID = "id_1"
+SECONDARY_ID = "id_2"
 
 
 @pytest.mark.img_gen
@@ -36,11 +40,12 @@ class TestImageGeneration:
         )
         pretty_print(generated_image_raw_details, title=f"Generated image raw details for topic '{topic}'")
         generated_image_resolved = await generated_content_factory.make_generated_image(
-            primary_id="primary_id",
-            secondary_id="secondary_id",
+            primary_id=PRIMARY_ID,
+            secondary_id=SECONDARY_ID,
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
+        pretty_print_url(generated_image_resolved.url, title=f"Generated image URL for topic '{topic}'")
 
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_single_transparent(
@@ -56,7 +61,7 @@ class TestImageGeneration:
             aspect_ratio=AspectRatio.SQUARE,
             is_raw=None,
             background=Background.TRANSPARENT,
-            output_format=OutputFormat.PNG,
+            output_format=ImageFormat.PNG,
         )
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=img_gen_prompt_text,
@@ -68,8 +73,8 @@ class TestImageGeneration:
         )
         pretty_print(generated_image_raw_details, title=f"Generated image raw details for topic '{topic}'")
         generated_image_resolved = await generated_content_factory.make_generated_image(
-            primary_id="primary_id",
-            secondary_id="secondary_id",
+            primary_id=PRIMARY_ID,
+            secondary_id=SECONDARY_ID,
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
@@ -98,11 +103,13 @@ class TestImageGeneration:
         generated_image_resolved_list = [
             (
                 await generated_content_factory.make_generated_image(
-                    primary_id="primary_id",
-                    secondary_id="secondary_id",
+                    primary_id=PRIMARY_ID,
+                    secondary_id=SECONDARY_ID,
                     raw_details=generated_image_raw_details,
                 )
             )
             for generated_image_raw_details in generated_image_raw_details_list
         ]
         pretty_print(generated_image_resolved_list, title=f"Generated images resolved for topic '{topic}'")
+        for image_index, image in enumerate(generated_image_resolved_list):
+            pretty_print_url(url=image.url, title=f"Image #{image_index}")

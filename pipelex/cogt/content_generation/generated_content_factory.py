@@ -3,12 +3,12 @@ import hashlib
 
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
-from pipelex.cogt.img_gen.img_gen_job_components import OutputFormat
 from pipelex.config import get_config
 from pipelex.tools.misc.base_64_utils import (
     extract_base_64_str_from_base64_url_if_possible,
 )
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
+from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 
@@ -22,7 +22,7 @@ class GeneratedContentFactory:
         secondary_id: str,
         data: bytes,
         mime_type: str | None,
-        output_format: OutputFormat | None,
+        output_format: ImageFormat | None,
     ) -> str:
         """Build a storage URI using a SHA-256 hash of the data.
 
@@ -63,11 +63,11 @@ class GeneratedContentFactory:
         secondary_id: str,
         raw_details: GeneratedImageRawDetails,
     ) -> GeneratedImageResolved:
-        output_format: OutputFormat | None = None
+        output_format: ImageFormat | None = None
         base64_extracted_mime_type: str | None = None
         is_remote_url: bool
         if raw_details.output_format:
-            output_format = OutputFormat(raw_details.output_format)
+            output_format = ImageFormat(raw_details.output_format)
 
         if raw_details.actual_url:
             url = raw_details.actual_url
@@ -84,12 +84,12 @@ class GeneratedContentFactory:
                     base64_str, base64_extracted_mime_type = result
                     actual_bytes = base64.b64decode(base64_str)
                 else:
-                    msg = "No URL or base64 string found"
+                    msg = "No URL or base64 string could be extracted"
                     raise NeitherUrlNorDataError(msg)
             elif raw_details.actual_bytes:
                 actual_bytes = raw_details.actual_bytes
             else:
-                msg = "No URL or base64 string found"
+                msg = "No URL or bytes or image found"
                 raise NeitherUrlNorDataError(msg)
 
             if actual_url:
@@ -106,7 +106,7 @@ class GeneratedContentFactory:
                 url = self.storage_provider.store(data=actual_bytes, uri=storage_uri)
                 is_remote_url = False
             else:
-                msg = "No URL or base64 string found"
+                msg = "No URL or bytes found"
                 raise NeitherUrlNorDataError(msg)
 
         mime_type: str | None = None

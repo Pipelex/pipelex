@@ -59,11 +59,15 @@ class AspectRatioTaxonomy(StrEnum):
     - FLUX: uses `image_size` with values like "square_hd", "landscape_4_3"
     - FLUX_11_ULTRA: uses `aspect_ratio` with values like "1:1", "4:3"
     - GPT: uses `size` with pixel dimensions like "1024x1024"
+    - QWEN_IMAGE: uses `width` and `height` with pixel dimensions mapped from aspect ratios
+      (e.g., "1:1" -> 1328x1328, "16:9" -> 1664x928, "9:16" -> 928x1664,
+       "4:3" -> 1472x1140, "3:4" -> 1140x1472, "3:2" -> 1584x1056, "2:3" -> 1056x1584)
     """
 
     FLUX = "flux"
     FLUX_11_ULTRA = "flux_11_ultra"
     GPT = "gpt"
+    QWEN_IMAGE = "qwen_image"
 
 
 class InferenceTaxonomy(StrEnum):
@@ -74,12 +78,14 @@ class InferenceTaxonomy(StrEnum):
     - FLUX: uses `num_inference_steps` and `guidance_scale`
     - FLUX_11_ULTRA: uses `raw` mode
     - GPT: uses `quality` ("low", "medium", "high")
+    - QWEN_IMAGE: uses `num_inference_steps` and `guidance_scale`
     """
 
     SDXL_LIGHTNING = "sdxl_lightning"
     FLUX = "flux"
     FLUX_11_ULTRA = "flux_11_ultra"
     GPT = "gpt"
+    QWEN_IMAGE = "qwen_image"
 
 
 class SafetyCheckerTaxonomy(StrEnum):

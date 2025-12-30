@@ -8,13 +8,14 @@ from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, OutputFormat
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import extract_base_64_str_from_base64_url_if_possible
+from pipelex.tools.misc.image_utils import ImageFormat
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
@@ -44,7 +45,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
-        output_format: OutputFormat | None = None
+        output_format: ImageFormat | None = None
         if self.inference_model.backend_name == "pipelex_gateway":
             if img_gen_job.job_params.output_format and not img_gen_job.job_params.output_format.is_png:
                 msg = (
@@ -52,7 +53,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                     f"Requested output format: {img_gen_job.job_params.output_format}"
                 )
                 raise ImgGenParameterError(msg)
-            output_format = OutputFormat.PNG
+            output_format = ImageFormat.PNG
         if self.inference_model.backend_name == "blackboxai":
             if img_gen_job.job_params.output_format and not img_gen_job.job_params.output_format.is_jpeg:
                 msg = (
@@ -60,7 +61,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                     f"Requested output format: {img_gen_job.job_params.output_format}"
                 )
                 raise ImgGenParameterError(msg)
-            output_format = OutputFormat.JPEG
+            output_format = ImageFormat.JPEG
         if img_gen_job.job_params.aspect_ratio != AspectRatio.SQUARE:
             msg = f"OpenAI Completions ImgGen worker only supports square images. Aspect ratio: {img_gen_job.job_params.aspect_ratio}"
             raise ImgGenParameterError(msg)

@@ -272,16 +272,16 @@ class TestPrettyPrint:
         """Test the base64 detection logic for long strings."""
         # Pure base64 string should be detected
         base64_str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" * 20
-        assert AttributePolisher.should_truncate_any_long_string(base64_str)
+        assert AttributePolisher.should_truncate(value=base64_str)
 
         # Normal text should not be detected even if long
         normal_text = "This is a normal text with spaces and punctuation! " * 20
-        assert not AttributePolisher.should_truncate_any_long_string(normal_text)
+        assert not AttributePolisher.should_truncate(value=normal_text)
 
         # Data URL should be detected
         data_url = "data:image/png;base64," + base64_str
-        assert AttributePolisher.should_truncate_any_long_string(data_url)
+        assert AttributePolisher.should_truncate(value=data_url)
 
         # Short strings should not be truncated
         short_base64 = "iVBORw0KGgoAAAANSUhEUg=="
-        assert not AttributePolisher.should_truncate_any_long_string(short_base64)
+        assert not AttributePolisher.should_truncate(value=short_base64)

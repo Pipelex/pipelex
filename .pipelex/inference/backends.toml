@@ -54,6 +54,11 @@ enabled = true
 endpoint = "https://api.groq.com/openai/v1"
 api_key = "${GROQ_API_KEY}"
 
+[huggingface]
+display_name = "Hugging Face"
+enabled = true
+api_key = "${HF_TOKEN}"
+
 [mistral]
 display_name = "Mistral AI"
 enabled = true

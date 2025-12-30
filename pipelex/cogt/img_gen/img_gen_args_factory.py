@@ -12,7 +12,7 @@ from typing import Any
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, Quality
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
     BackgroundTaxonomy,
@@ -26,6 +26,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
 )
 from pipelex.config import get_config
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
+from pipelex.tools.misc.image_utils import ImageFormat
 
 
 class ImgGenArgsFactory:
@@ -114,7 +115,7 @@ class ImgGenArgsFactory:
                     args_dict.update(
                         cls.make_args_from_output_format(
                             output_format_taxonomy=output_format_taxonomy,
-                            output_format=job_params.output_format or OutputFormat.PNG,
+                            output_format=job_params.output_format or ImageFormat.PNG,
                         )
                     )
                 case ImgGenArgTopic.SPECIFIC:
@@ -203,6 +204,36 @@ class ImgGenArgsFactory:
             case AspectRatioTaxonomy.GPT:
                 key = "size"
                 value = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio)[0]
+            case AspectRatioTaxonomy.QWEN_IMAGE:
+                width: int
+                height: int
+                aspect_ratio_string: str
+                match aspect_ratio:
+                    case AspectRatio.SQUARE:
+                        width, height = 1328, 1328
+                        aspect_ratio_string = "1:1"
+                    case AspectRatio.LANDSCAPE_16_9:
+                        width, height = 1664, 928
+                        aspect_ratio_string = "16:9"
+                    case AspectRatio.PORTRAIT_9_16:
+                        width, height = 928, 1664
+                        aspect_ratio_string = "9:16"
+                    case AspectRatio.LANDSCAPE_4_3:
+                        width, height = 1472, 1140
+                        aspect_ratio_string = "4:3"
+                    case AspectRatio.PORTRAIT_3_4:
+                        width, height = 1140, 1472
+                        aspect_ratio_string = "3:4"
+                    case AspectRatio.LANDSCAPE_3_2:
+                        width, height = 1584, 1056
+                        aspect_ratio_string = "3:2"
+                    case AspectRatio.PORTRAIT_2_3:
+                        width, height = 1056, 1584
+                        aspect_ratio_string = "2:3"
+                    case AspectRatio.LANDSCAPE_21_9 | AspectRatio.PORTRAIT_9_21:
+                        msg = f"Aspect ratio '{aspect_ratio}' is not supported by HuggingFace image generation model"
+                        raise ImgGenParameterError(msg)
+                return {"width": width, "height": height, "aspect_ratio": aspect_ratio_string}
         return {key: value}
 
     @classmethod
@@ -228,18 +259,25 @@ class ImgGenArgsFactory:
                         # TODO: prevent this when building presets and params
                         log.warning(f"Number of inference steps {num_inference_steps} for SDXL Lightning must be one of {acceptable_steps}")
                         num_inference_steps = 4
-                    args_dict["num_inference_steps"] = num_inference_steps
                 else:
-                    sdxl_lightning_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.sdxl_lightning_map_quality_to_steps
-                    num_inference_steps = sdxl_lightning_map_quality_to_steps[quality or Quality.MEDIUM]
-                    args_dict["num_inference_steps"] = num_inference_steps
+                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
+                        model_name="sdxl_lightning", quality=quality or Quality.MEDIUM
+                    )
+                args_dict["num_inference_steps"] = num_inference_steps
             case InferenceTaxonomy.FLUX:
-                if num_inference_steps:
-                    args_dict["num_inference_steps"] = num_inference_steps
-                else:
-                    flux_map_quality_to_steps = get_config().cogt.img_gen_config.fal_config.flux_map_quality_to_steps
-                    num_inference_steps = flux_map_quality_to_steps[quality or Quality.MEDIUM]
-                    args_dict["num_inference_steps"] = num_inference_steps
+                if num_inference_steps is None:
+                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
+                        model_name="flux", quality=quality or Quality.MEDIUM
+                    )
+                args_dict["num_inference_steps"] = num_inference_steps
+                if guidance_scale:
+                    args_dict["guidance_scale"] = guidance_scale
+            case InferenceTaxonomy.QWEN_IMAGE:
+                if num_inference_steps is None:
+                    num_inference_steps = get_config().cogt.img_gen_config.get_num_inference_steps(
+                        model_name="qwen_image", quality=quality or Quality.MEDIUM
+                    )
+                args_dict["num_inference_steps"] = num_inference_steps
                 if guidance_scale:
                     args_dict["guidance_scale"] = guidance_scale
             case InferenceTaxonomy.FLUX_11_ULTRA:
@@ -277,7 +315,7 @@ class ImgGenArgsFactory:
     def make_args_from_output_format(
         cls,
         output_format_taxonomy: OutputFormatTaxonomy,
-        output_format: OutputFormat,
+        output_format: ImageFormat,
     ) -> dict[str, Any]:
         """Map output format to provider-specific parameter name and validate support.
 
@@ -290,21 +328,21 @@ class ImgGenArgsFactory:
             case OutputFormatTaxonomy.SDXL:
                 key = "format"
                 match output_format:
-                    case OutputFormat.PNG:
+                    case ImageFormat.PNG:
                         value = "png"
-                    case OutputFormat.JPEG:
+                    case ImageFormat.JPEG:
                         value = "jpeg"
-                    case OutputFormat.WEBP:
+                    case ImageFormat.WEBP:
                         msg = "Output format WebP is not supported by SDXL image generation models"
                         raise ImgGenParameterError(msg)
             case OutputFormatTaxonomy.FLUX_1:
                 key = "output_format"
                 match output_format:
-                    case OutputFormat.PNG:
+                    case ImageFormat.PNG:
                         value = "png"
-                    case OutputFormat.JPEG:
+                    case ImageFormat.JPEG:
                         value = "jpeg"
-                    case OutputFormat.WEBP:
+                    case ImageFormat.WEBP:
                         msg = "Output format WebP is not supported by Flux 1 image generation models"
                         raise ImgGenParameterError(msg)
             case OutputFormatTaxonomy.FLUX_2:

@@ -82,7 +82,7 @@ class PromptImageUrl(PromptImage):
 
     @override
     def __str__(self) -> str:
-        truncated_url = AttributePolisher.get_truncated_value(name="url", value=self.url)
+        truncated_url = AttributePolisher.get_truncated_value(value=self.url)
         return f"PromptImageUrl(url='{truncated_url!r}')"
 
     @override
@@ -109,7 +109,7 @@ class PromptImageBase64(PromptImage):
     @override
     def __str__(self) -> str:
         base_64_str = str(self.base_64)
-        truncated_base_64 = AttributePolisher.get_truncated_value(name="base_64", value=base_64_str)
+        truncated_base_64 = AttributePolisher.get_truncated_value(value=base_64_str)
         return f"PromptImageBase64(base_64={truncated_base_64!r})"
 
     @override

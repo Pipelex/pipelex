@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
@@ -32,6 +32,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
+from pipelex.tools.misc.image_utils import ImageFormat
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
@@ -51,7 +52,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
-    output_format: OutputFormat | None = Field(default=None, strict=False)
+    output_format: ImageFormat | None = Field(default=None, strict=False)
     output_multiplicity: VariableMultiplicity
 
     @override
