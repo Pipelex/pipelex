@@ -35,12 +35,12 @@ from pipelex.hub import (
     get_required_concept,
 )
 from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
-from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
-from pipelex.pipe_operators.llm.pipe_llm_blueprint import (
-    StructuringMethod,
+from pipelex.pipe_operators.llm.input_validation_helpers import (
     is_input_used_by_variables,
     is_variable_satisfied_by_inputs,
 )
+from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
+from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import (

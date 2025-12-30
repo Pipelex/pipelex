@@ -41,7 +41,6 @@
 - Validation for Pipelex Bundle concept keys: cannot create a native concept
 - Validation for `PipeSequence`: The multiplicity of the output of the sequence must be the same as the multiplicity of the output of the last step.
 - Validation for `PipeFunc`: The multiplicity of the output of the pipe must be the same as the multiplicity of the output of the function: If the multiplicity is true, the return type of the function must be a subclass of `ListContent`. If the multiplicity is false, the return type of the function must not be a subclass of `ListContent`.
-- `description` field is not Optional anymore in the `PipeAbstract`, `PipeBlueprint` and `PipeSpec` classes.
 
 ### Fixed
 - Fixed a bug with the validation of the multiplicity of the output of the `PipeCondition`.
@@ -72,6 +71,7 @@
 - `pipelex doctor` command enhanced to detect outdated `telemetry.toml` formats and suggest fixes
 - The `runner`, `structures`, and `inputs` CLI commands now accept `--output-dir` option (defaults to `target_dir`)
 - Cost report now displays a note clarifying that it only includes LLM costs
+- `description` field is not Optional anymore in the `PipeAbstract`, `PipeBlueprint` and `PipeSpec` classes.
 
 ### Deprecated
 
