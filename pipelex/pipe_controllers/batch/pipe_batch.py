@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_required_pipe
+from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
@@ -138,7 +138,9 @@ class PipeBatch(PipeController):
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             required_variables = sub_pipe.required_variables()
-            required_stuffs = branch_memory.get_existing_stuffs(names=required_variables)
+            # Extract root names from full paths for looking up stuffs in working memory
+            required_stuff_names = {req_var.split(".")[0] for req_var in required_variables}
+            required_stuffs = branch_memory.get_existing_stuffs(names=required_stuff_names)
             required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff.stuff_code]
             required_stuff_lists.append(required_stuffs)
             # We create a deep copy of the run params to avoid modifying the original run params,
@@ -152,28 +154,20 @@ class PipeBatch(PipeController):
                     "output_multiplicity": False,
                 },
             )
-
-            task: Coroutine[Any, Any, PipeOutput]
-            if pipe_run_params.run_mode == PipeRunMode.DRY:
-                branch_pipe_run_params.run_mode = PipeRunMode.DRY
-                task = sub_pipe.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=branch_memory,
-                    output_name=f"Batch result {branch_index + 1} of {output_name}",
-                    pipe_run_params=branch_pipe_run_params,
-                )
-            else:
-                task = sub_pipe.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=branch_memory,
-                    output_name=f"Batch result {branch_index + 1} of {output_name}",
-                    pipe_run_params=branch_pipe_run_params,
-                )
+            branch_pipe_run_params.run_mode = PipeRunMode.DRY if pipe_run_params.run_mode.is_dry else PipeRunMode.LIVE
+            task = sub_pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=branch_memory,
+                output_name=f"Batch result {branch_index + 1} of {output_name}",
+                pipe_run_params=branch_pipe_run_params,
+            )
             tasks.append(task)
 
         pipe_outputs = await asyncio.gather(*tasks)
 
         output_items: list[StuffContent] = []
+
+        output_stuffs: list[Stuff] = []
 
         for pipe_output in pipe_outputs:
             branch_output_stuff = pipe_output.main_stuff
@@ -185,6 +179,38 @@ class PipeBatch(PipeController):
             content=list_content,
             name=output_name,
         )
+        method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "run_pipe"
+        for branch_index, (
+            required_stuff_list,
+            item_input_stuff,
+            item_output_stuff,
+        ) in enumerate(zip(required_stuff_lists, item_stuffs, output_stuffs, strict=False)):
+            get_pipeline_tracker().add_batch_step(
+                from_stuff=input_stuff,
+                to_stuff=item_input_stuff,
+                to_branch_index=branch_index,
+                pipe_layer=pipe_run_params.pipe_layers,
+                comment=f"PipeBatch.{method_name}() in zip",
+            )
+            for required_stuff in required_stuff_list:
+                get_pipeline_tracker().add_pipe_step(
+                    from_stuff=required_stuff,
+                    to_stuff=item_output_stuff,
+                    pipe_code=self.branch_pipe_code,
+                    pipe_layer=pipe_run_params.pipe_layers,
+                    comment=f"PipeBatch.{method_name}() on required_stuff_list",
+                    as_item_index=branch_index,
+                    is_with_edge=(required_stuff.stuff_name != MAIN_STUFF_NAME),
+                )
+
+        for branch_index, branch_output_stuff in enumerate(output_stuffs):
+            branch_output_item_code = branch_output_item_codes[branch_index]
+            get_pipeline_tracker().add_aggregate_step(
+                from_stuff=branch_output_stuff,
+                to_stuff=output_stuff,
+                pipe_layer=pipe_run_params.pipe_layers,
+                comment=f"PipeBatch.{method_name}() on branch_index of batch",
+            )
 
         working_memory.set_new_main_stuff(
             stuff=output_stuff,

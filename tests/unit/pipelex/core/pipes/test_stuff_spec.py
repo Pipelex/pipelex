@@ -1,5 +1,3 @@
-"""Unit tests for StuffSpec.to_bundle_representation method."""
-
 import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory

@@ -76,14 +76,14 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 f"PipeFunc '{self.code}' failed to validate output with library: The return type of the function is None. "
                 "It should be a subclass of StuffContent."
             )
-            raise ValueError(msg)
+            raise TypeError(msg)
         if self.output.multiplicity and not issubclass(return_type, ListContent):
             msg = (
                 f"PipeFunc '{self.code}' output multiplicity is '{self.output.multiplicity}', but the function '{self.function_name}' "
                 f"return type {return_type} is not a subclass of ListContent. The output of your PipeFunc is "
                 f"'{self.output.to_bundle_representation()}'. The return type of your function should be a subclass of ListContent."
             )
-            raise ValueError(msg)
+            raise TypeError(msg)
         if not self.output.multiplicity and issubclass(return_type, ListContent):
             msg = (
                 f"PipeFunc '{self.code}' output multiplicity is '{self.output.multiplicity}', but the function '{self.function_name}' "
@@ -91,7 +91,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 f"'{self.output.concept.concept_ref}{self.output.to_bundle_representation()}' "
                 f"when it should be '{self.output.concept.concept_ref}' (no multiplicity)."
             )
-            raise ValueError(msg)
+            raise TypeError(msg)
 
     @override
     async def _live_run_operator_pipe(
