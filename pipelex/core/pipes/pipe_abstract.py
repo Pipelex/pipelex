@@ -15,6 +15,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
@@ -134,16 +135,7 @@ class PipeAbstract(ABC, BaseModel):
         # First validate required variables are in the inputs (using prefix-based matching)
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
-            # Check if the variable path is satisfied by any input (exact match or prefix match)
-            is_satisfied = required_variable_path in input_names
-            if not is_satisfied:
-                parts = required_variable_path.split(".")
-                for idx in range(1, len(parts)):
-                    prefix = ".".join(parts[:idx])
-                    if prefix in input_names:
-                        is_satisfied = True
-                        break
-            if not is_satisfied:
+            if not is_variable_satisfied_by_inputs(required_variable_path, input_names):
                 msg = f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
                 raise PipeValidationError(
                     message=msg,

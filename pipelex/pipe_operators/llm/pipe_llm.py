@@ -22,6 +22,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -35,10 +36,6 @@ from pipelex.hub import (
     get_required_concept,
 )
 from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
-from pipelex.pipe_operators.llm.input_validation_helpers import (
-    is_input_used_by_variables,
-    is_variable_satisfied_by_inputs,
-)
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import StructuringMethod
 from pipelex.pipe_operators.pipe_operator import PipeOperator
