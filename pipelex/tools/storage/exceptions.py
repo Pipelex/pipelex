@@ -11,3 +11,7 @@ class StorageFileNotFoundError(StorageError):
 
 class StorageInvalidUriError(StorageError):
     """Raised when a URI is invalid (e.g., path traversal attempt or absolute path)."""
+
+
+class StorageInvalidKeyError(StorageError):
+    """Raised when a storage key is invalid (e.g., contains scheme prefix)."""

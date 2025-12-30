@@ -85,7 +85,6 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
             pages[page_index] = Page(
                 text=extracted_page_text,
                 extracted_images=page_images,
-                page_view=None,
             )
         return ExtractOutput(
             pages=pages,

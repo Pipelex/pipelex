@@ -1,4 +1,3 @@
-from io import BytesIO
 from typing import Literal
 
 from pydantic import model_validator
@@ -7,11 +6,10 @@ from typing_extensions import Self, override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.exceptions import ModelChoiceNotFoundError
+from pipelex.cogt.exceptions import ExtractOutputError, ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
-from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -32,7 +30,6 @@ from pipelex.hub import (
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 
 
 class PipeExtractOutput(PipeOutput):
@@ -141,49 +138,30 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         # Build the output stuff, which is a list of page contents
         page_view_contents: list[ImageContent] = []
         if self.should_include_page_views:
-            log.verbose(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
+            log.debug(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
             if pdf_uri:
-                page_view_contents.extend(
-                    ImageContent.make_from_extracted_image(extracted_image=page.page_view) for page in extract_output.pages.values() if page.page_view
+                page_views = await content_generator.make_render_page_views(
+                    extract_input=extract_input,
+                    extract_handle=extract_setting.model,
+                    job_metadata=job_metadata,
+                    extract_job_params=extract_job_params,
+                    extract_job_config=ExtractJobConfig(),
                 )
-                log.verbose(f"page_view_contents: {page_view_contents}")
-                needs_to_generate_page_views: bool
-                if len(page_view_contents) == 0:
-                    log.verbose("No page views found in the OCR output")
-                    needs_to_generate_page_views = True
-                elif len(page_view_contents) < len(extract_output.pages):
-                    log.warning(f"Only {len(page_view_contents)} page found in the OCR output, but {len(extract_output.pages)} pages")
-                    needs_to_generate_page_views = True
-                else:
-                    log.verbose("All page views found in the OCR output")
-                    needs_to_generate_page_views = False
-
-                if needs_to_generate_page_views:
-                    page_views = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.page_views_dpi)
-                    page_view_contents = []
-                    for page_view in page_views:
-                        page_view_binary = BytesIO()
-                        page_view.save(page_view_binary, format="PNG")
-                        raw_details = GeneratedImageRawDetails(
-                            actual_bytes=page_view_binary.getvalue(),
-                            width=page_view.width,
-                            height=page_view.height,
-                            output_format="png",
-                        )
-                        generated_image = await content_generator.make_generated_image(
-                            job_metadata=job_metadata,
-                            generated_image_raw_details=raw_details,
-                        )
-                        image_content = ImageContent(url=generated_image.url)
-                        page_view_contents.append(image_content)
+                page_view_contents = [ImageContent(url=page_view.url) for page_view in page_views]
             elif image_uri:
                 page_view_contents = [ImageContent(url=image_uri)]
 
+        log.debug(extract_output.pages, title="extract_output.pages")
+        log.debug(page_view_contents, title="page_view_contents")
         page_contents: list[PageContent] = []
         for page_index, page in extract_output.pages.items():
             images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
             log.verbose(f"images: {images}, page_view_contents: {page_view_contents}, index: {page_index}")
-            page_view_content = page_view_contents[page_index - 1] if self.should_include_page_views else None
+            try:
+                page_view_content = page_view_contents[page_index - 1] if self.should_include_page_views else None
+            except IndexError as exc:
+                msg = f"Page view content not found for page index {page_index}"
+                raise ExtractOutputError(msg) from exc
             page_contents.append(
                 PageContent(
                     text_and_images=TextAndImagesContent(

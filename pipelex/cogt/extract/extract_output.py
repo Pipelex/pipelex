@@ -19,7 +19,6 @@ class ExtractedImageFromPage(ExtractedImage):
 class Page(CustomBaseModel):
     text: str | None = None
     extracted_images: list[ExtractedImageFromPage] = Field(default_factory=empty_list_factory_of(ExtractedImageFromPage))
-    page_view: ExtractedImageFromPage | None = None
 
 
 class ExtractOutput(CustomBaseModel):

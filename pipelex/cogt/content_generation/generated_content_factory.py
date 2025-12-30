@@ -16,7 +16,7 @@ class GeneratedContentFactory:
     def __init__(self, storage_provider: StorageProviderAbstract) -> None:
         self.storage_provider = storage_provider
 
-    def _build_storage_uri(
+    def _build_storage_key(
         self,
         primary_id: str,
         secondary_id: str,
@@ -24,7 +24,7 @@ class GeneratedContentFactory:
         mime_type: str | None,
         output_format: ImageFormat | None,
     ) -> str:
-        """Build a storage URI using a SHA-256 hash of the data.
+        """Build a storage key using a SHA-256 hash of the data.
 
         Args:
             primary_id: The principal ID
@@ -32,8 +32,9 @@ class GeneratedContentFactory:
             data: The binary data to hash
             mime_type: Optional MIME type to determine file extension
             output_format: Optional output format to determine file extension
+
         Returns:
-            A storage URI in the format "{hash}.{extension}"
+            A storage key in the format "{primary_id}/{secondary_id}/{hash}.{extension}"
         """
         hash_digest = hashlib.sha256(data).hexdigest()[:16]
 
@@ -96,14 +97,14 @@ class GeneratedContentFactory:
                 url = actual_url
                 is_remote_url = True
             elif actual_bytes:
-                storage_uri = self._build_storage_uri(
+                storage_key = self._build_storage_key(
                     primary_id=primary_id,
                     secondary_id=secondary_id,
                     data=actual_bytes,
                     mime_type=raw_details.mime_type or base64_extracted_mime_type,
                     output_format=output_format,
                 )
-                url = self.storage_provider.store(data=actual_bytes, uri=storage_uri)
+                url = self.storage_provider.store(data=actual_bytes, key=storage_key)
                 is_remote_url = False
             else:
                 msg = "No URL or bytes found"
@@ -121,14 +122,14 @@ class GeneratedContentFactory:
 
         if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content_enabled:
             actual_bytes = await self._fetch_remote_content(url=url)
-            storage_uri = self._build_storage_uri(
+            storage_key = self._build_storage_key(
                 primary_id=primary_id,
                 secondary_id=secondary_id,
                 data=actual_bytes,
                 mime_type=mime_type,
                 output_format=output_format,
             )
-            url = self.storage_provider.store(data=actual_bytes, uri=storage_uri)
+            url = self.storage_provider.store(data=actual_bytes, key=storage_key)
 
         return GeneratedImageResolved(
             url=url,

@@ -32,6 +32,8 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -281,6 +283,34 @@ class ContentGenerator(ContentGeneratorProtocol):
             category=template_category or TemplateCategory.BASIC,
         )
         return await templating_gen_text(templating_assignment=templating_assignment)
+
+    @override
+    async def make_render_page_views(
+        self,
+        job_metadata: JobMetadata,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
+        extract_job_config: ExtractJobConfig | None = None,
+    ) -> list[GeneratedImageResolved]:
+        if not extract_input.pdf_uri:
+            msg = "PDF URI is required to render page views"
+            raise ValueError(msg)
+        job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
+        page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
+        page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.pdf_uri, dpi=page_views_dpi)
+        page_view_images_resolved: list[GeneratedImageResolved] = []
+        for page_view_image in page_view_images:
+            image_resolved = await self.make_generated_image(
+                job_metadata=job_metadata,
+                generated_image_raw_details=GeneratedImageRawDetails.make_from_pil_image(
+                    pil_image=page_view_image,
+                    output_format=ImageFormat.PNG,
+                ),
+            )
+            page_view_images_resolved.append(image_resolved)
+
+        return page_view_images_resolved
 
     @override
     async def make_extract_pages(

@@ -100,6 +100,14 @@ class ExtractHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
+class ExtractOutputError(CogtError):
+    pass
+
+
+class GeneratedImageError(CogtError):
+    pass
+
+
 class LLMModelNotFoundError(ModelNotFoundError):
     pass
 

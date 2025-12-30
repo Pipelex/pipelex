@@ -11,7 +11,6 @@ from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.plugins.huggingface.huggingface_factory import HuggingFaceFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.image_utils import ImageFormat
 
@@ -60,10 +59,8 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         pil_image = await self._generate_single_image(img_gen_job=img_gen_job)
-        generated_image = HuggingFaceFactory.make_generated_image(
-            pil_image=pil_image,
-            output_format=img_gen_job.job_params.output_format or ImageFormat.PNG,
-        )
+        output_format = img_gen_job.job_params.output_format or ImageFormat.PNG
+        generated_image = GeneratedImageRawDetails.make_from_pil_image(pil_image=pil_image, output_format=output_format)
         log.verbose(generated_image, title="generated_image")
         return generated_image
 

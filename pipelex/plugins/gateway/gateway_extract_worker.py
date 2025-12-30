@@ -94,11 +94,6 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             if extract_job.job_params.should_caption_images:
                 msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
                 raise ExtractCapabilityError(msg)
-            if extract_job.job_params.should_include_page_views:
-                log.verbose(f"Page views are not implemented by '{self.inference_model.tag}'.")
-                # TODO: use a model capability flag to check possibility before asking for it
-                # it it's asked and not available, raise
-                # the caller will be responsible to get the page views using other solution if needed
             base64_url = await make_base_64_url_from_location_async(location=pdf_uri)
             extract_output = await self.extract_base64_url(
                 base64_url=base64_url,

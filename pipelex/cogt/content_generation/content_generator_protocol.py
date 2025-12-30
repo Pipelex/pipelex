@@ -120,6 +120,15 @@ class ContentGeneratorProtocol(Protocol):
         template_category: TemplateCategory | None = None,
     ) -> Coroutine[Any, Any, str]: ...
 
+    async def make_render_page_views(
+        self,
+        job_metadata: JobMetadata,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
+        extract_job_config: ExtractJobConfig | None = None,
+    ) -> list[GeneratedImageResolved]: ...
+
     def make_extract_pages(
         self,
         job_metadata: JobMetadata,
