@@ -18,13 +18,6 @@ class ImageContent(StuffContent):
     source_prompt: str | None = None
     caption: str | None = None
 
-    @field_validator("url")
-    def validate_url(cls, v: str) -> str:
-        if not v.startswith("http"):
-            msg = f"Image URL must start with 'http' or 'https': {v}"
-            raise ImageContentError(msg)
-        return v
-
     @property
     @override
     def short_desc(self) -> str:
