@@ -4,7 +4,7 @@ from pipelex.tools.typing.pydantic_utils import CustomBaseModel, empty_list_fact
 
 
 class ExtractedImage(CustomBaseModel):
-    image_id: str
+    # image_id: str
     base_64: str | None = None
     caption: str | None = None
 

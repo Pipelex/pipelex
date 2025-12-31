@@ -45,7 +45,7 @@ class TestImageGeneration:
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
-        pretty_print_url(generated_image_resolved.url, title=f"Generated image URL for topic '{topic}'")
+        pretty_print_url(generated_image_resolved.display_link, title=f"Generated image for topic '{topic}'")
 
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_single_transparent(
@@ -78,6 +78,7 @@ class TestImageGeneration:
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
+        pretty_print_url(generated_image_resolved.display_link, title=f"Generated image for topic '{topic}'")
 
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
     async def test_img_gen_multiple(
@@ -112,4 +113,4 @@ class TestImageGeneration:
         ]
         pretty_print(generated_image_resolved_list, title=f"Generated images resolved for topic '{topic}'")
         for image_index, image in enumerate(generated_image_resolved_list):
-            pretty_print_url(url=image.url, title=f"Image #{image_index}")
+            pretty_print_url(image.display_link, title=f"Image #{image_index}")

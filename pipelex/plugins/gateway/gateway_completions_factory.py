@@ -8,6 +8,7 @@ from portkey_ai import (
 )
 from typing_extensions import override
 
+from pipelex import pretty_print
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
 from pipelex.plugins.gateway.gateway_exceptions import GatewayFactoryError
@@ -74,12 +75,23 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
             if extracted_page_images is None:
                 msg = "Page images are not set"
                 raise GatewayFactoryError(msg)
+            pretty_print(extracted_page_images, title="Extracted page images")
             page_images: list[ExtractedImageFromPage] = []
             for extracted_page_image in extracted_page_images:
+                if not isinstance(extracted_page_image, dict):
+                    msg = "Extracted page image is not a dictionary"
+                    raise GatewayFactoryError(msg)
+                extracted_page_image_dict = cast("dict[str, Any]", extracted_page_image)
+                base_64 = extracted_page_image_dict.get("image_base64")
+                if base_64 is None:
+                    msg = "Got no base 64 for extracted page image"
+                    raise GatewayFactoryError(msg)
+                # image_id = extracted_page_image_dict.get("id")
+                caption = extracted_page_image_dict.get("image_annotation")
                 extracted_image = ExtractedImageFromPage(
-                    image_id=extracted_page_image["id"],
-                    base_64=extracted_page_image["image_base64"],
-                    caption=extracted_page_image["image_annotation"],
+                    # image_id=image_id,
+                    base_64=base_64,
+                    caption=caption,
                 )
                 page_images.append(extracted_image)
             pages[page_index] = Page(

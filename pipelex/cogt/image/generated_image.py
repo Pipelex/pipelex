@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 
 from pipelex.cogt.exceptions import GeneratedImageError
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
@@ -26,9 +26,25 @@ class GeneratedImageRawDetails(CustomBaseModel):
     mime_type: str | None = None
     output_format: str | None = None
 
+    @field_validator("output_format", mode="before")
+    @classmethod
+    def validate_output_format(cls, output_format_str: str | None) -> str | None:
+        if output_format_str:
+            return ImageFormat(output_format_str)
+        else:
+            return None
+
     @model_validator(mode="after")
     def validate_mime_type_or_output_format(self) -> Self:
-        if self.mime_type is None and self.output_format is None:
+        if self.mime_type:
+            if not ImageFormat.is_supported_mime_type(self.mime_type):
+                supported = ", ".join(sorted(ImageFormat.get_supported_mime_types()))
+                if self.mime_type.startswith("image/"):
+                    msg = f"Unsupported image MIME type: {self.mime_type}. Supported types are: {supported}"
+                else:
+                    msg = f"Invalid image MIME type: {self.mime_type}. Expected format 'image/<subtype>'. Supported types are: {supported}"
+                raise ValueError(msg)
+        elif self.output_format is None:
             msg = "Either mime_type or output_format must be provided"
             raise ValueError(msg)
         return self
@@ -51,6 +67,7 @@ class GeneratedImageRawDetails(CustomBaseModel):
 
 class GeneratedImageResolved(CustomBaseModel):
     url: str
+    display_link: str
     mime_type: str
     width: int
     height: int

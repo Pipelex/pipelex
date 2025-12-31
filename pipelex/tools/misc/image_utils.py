@@ -54,6 +54,16 @@ class ImageFormat(StrEnum):
             case ImageFormat.WEBP:
                 return "image/webp"
 
+    @classmethod
+    def get_supported_mime_types(cls) -> frozenset[str]:
+        """Return the set of supported image MIME types."""
+        return frozenset(fmt.as_mime_type for fmt in cls)
+
+    @classmethod
+    def is_supported_mime_type(cls, mime_type: str) -> bool:
+        """Check if a string is a supported image MIME type."""
+        return mime_type in cls.get_supported_mime_types()
+
 
 def pil_image_to_bytes(pil_image: Image.Image, image_format: ImageFormat | None) -> bytes:
     """Convert a PIL Image to bytes in the specified format.

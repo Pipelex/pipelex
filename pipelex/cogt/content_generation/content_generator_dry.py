@@ -37,6 +37,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> GeneratedImageResolved:
         return GeneratedImageResolved(
             url=raw_details.actual_url or "https://example.com/image.jpg",
+            display_link=raw_details.actual_url or "https://example.com/image.jpg",
             mime_type=raw_details.mime_type or "image/jpeg",
             width=raw_details.width,
             height=raw_details.height,
