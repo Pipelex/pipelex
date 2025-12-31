@@ -26,6 +26,8 @@ class GeneratedImageRawDetails(CustomBaseModel):
     mime_type: str | None = None
     output_format: str | None = None
 
+    caption: str | None = None
+
     @field_validator("output_format", mode="before")
     @classmethod
     def validate_output_format(cls, output_format_str: str | None) -> str | None:

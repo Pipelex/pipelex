@@ -19,6 +19,9 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -145,12 +148,37 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         )
 
     @override
-    async def make_generated_image(
+    async def make_image_content(
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
     ) -> ImageContent:
         return self._make_generated_image_fake(raw_details=generated_image_raw_details)
+
+    @override
+    async def make_page_contents(
+        self,
+        job_metadata: JobMetadata,
+        extract_output: ExtractOutput,
+    ) -> list[PageContent]:
+        page_contents: list[PageContent] = []
+        for page in extract_output.pages.values():
+            page_images: list[ImageContent] = []
+            for extracted_image in page.extracted_images:
+                image_content = await self.make_image_content(
+                    job_metadata=job_metadata,
+                    generated_image_raw_details=extracted_image,
+                )
+                page_images.append(image_content)
+            page_contents.append(
+                PageContent(
+                    text_and_images=TextAndImagesContent(
+                        text=TextContent(text=page.text) if page.text else None,
+                        images=page_images,
+                    ),
+                )
+            )
+        return page_contents
 
     @override
     @update_job_metadata
@@ -246,25 +274,27 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-    ) -> ExtractOutput:
+    ) -> list[PageContent]:
         func_name = "make_extract_pages"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        nb_pages: int
         if extract_input.image_uri:
-            image_as_page = Page(
+            nb_pages = 1
+        else:
+            nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
+        page_contents: list[PageContent] = []
+        for _ in range(1, nb_pages + 1):
+            page = Page(
                 text="DRY RUN: OCR text",
                 extracted_images=[],
             )
-            extract_output = ExtractOutput(
-                pages={1: image_as_page},
-            )
-        else:
-            nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
-            pages = {
-                page_index: Page(
-                    text="DRY RUN: OCR text",
-                    extracted_images=[],
+            page_contents.append(
+                PageContent(
+                    text_and_images=TextAndImagesContent(
+                        text=TextContent(text=page.text) if page.text else None,
+                        images=[],
+                    ),
+                    page_view=None,
                 )
-                for page_index in range(1, nb_pages + 1)
-            }
-            extract_output = ExtractOutput(pages=pages)
-        return extract_output
+            )
+        return page_contents

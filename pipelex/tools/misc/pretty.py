@@ -266,6 +266,8 @@ class PrettyPrinter:
         # Format the value
         if isinstance(value, PrettyPrintable):
             pretty = value
+        elif isinstance(value, PrettyRenderable):
+            pretty = value.rendered_pretty(depth=depth)
         elif isinstance(value, BaseModel):
             # Wrap regular BaseModel to get truncated __rich_repr__ with proper class name
             pretty = Pretty(make_truncated_wrapper(value))
@@ -307,10 +309,8 @@ class PrettyPrinter:
         elif isinstance(value, (int, float, bool)):
             # For primitive types, convert to string
             pretty = Text(str(value))
-        elif isinstance(value, PrettyRenderable):
-            pretty = value.rendered_pretty(depth=depth)
         else:
-            # For other types, use Pretty
+            # For other types, use Rich's native Pretty rendering
             pretty = Pretty(value)
 
         if inner_title:

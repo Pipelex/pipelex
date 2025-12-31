@@ -82,15 +82,15 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
                     msg = "Extracted page image is not a dictionary"
                     raise GatewayFactoryError(msg)
                 extracted_page_image_dict = cast("dict[str, Any]", extracted_page_image)
-                base_64 = extracted_page_image_dict.get("image_base64")
-                if base_64 is None:
+                base64_str = extracted_page_image_dict.get("image_base64")
+                if base64_str is None:
                     msg = "Got no base 64 for extracted page image"
                     raise GatewayFactoryError(msg)
-                # image_id = extracted_page_image_dict.get("id")
                 caption = extracted_page_image_dict.get("image_annotation")
                 extracted_image = ExtractedImageFromPage(
-                    # image_id=image_id,
-                    base_64=base_64,
+                    size=None,
+                    base64_str=base64_str,
+                    mime_type="image/jpeg",  # Gateway returns JPEG images
                     caption=caption,
                 )
                 page_images.append(extracted_image)

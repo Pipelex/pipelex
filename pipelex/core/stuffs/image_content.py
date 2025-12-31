@@ -2,15 +2,11 @@ import json
 
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ImageContentError
-from pipelex.cogt.extract.extract_output import ExtractedImage
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
-from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 from pipelex.tools.misc.path_utils import interpret_path_or_url
-from pipelex.types import Self
 
 
 class ImageContent(StuffContent):
@@ -49,19 +45,3 @@ class ImageContent(StuffContent):
     @override
     def rendered_json(self) -> str:
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
-
-    @classmethod
-    def make_from_extracted_image(cls, extracted_image: ExtractedImage) -> Self:
-        if base_64 := extracted_image.base_64:
-            # Check if it's already a prefixed base64 string
-            if base_64.startswith("data:"):
-                prefixed_base64_str = base_64
-            else:
-                prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
-            return cls(
-                url=prefixed_base64_str,
-                caption=extracted_image.caption,
-            )
-        else:
-            msg = f"Base 64 is required for image content: {extracted_image}"
-            raise ImageContentError(msg)

@@ -19,7 +19,7 @@ class TestPdfRender:
         pytestconfig: pytest.Config,
         file_path: str,
     ):
-        texts = await pypdfium2_renderer.get_text_from_pdf_pages(pdf_input=file_path)
+        texts = await pypdfium2_renderer.extract_text_from_pdf_pages(pdf_input=file_path)
         assert len(texts) > 0
         assert all(isinstance(text, str) for text in texts)
         if pytestconfig.get_verbosity() >= 2:

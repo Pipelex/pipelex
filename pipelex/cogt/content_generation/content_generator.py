@@ -32,6 +32,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
@@ -202,15 +203,27 @@ class ContentGenerator(ContentGeneratorProtocol):
         return cast("list[BaseModelTypeVar]", obj_list)
 
     @override
-    async def make_generated_image(
+    async def make_image_content(
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
     ) -> ImageContent:
-        return await self._generated_content_factory.make_generated_image(
+        return await self._generated_content_factory.make_image_content(
             primary_id=job_metadata.user_id,
             secondary_id=job_metadata.pipeline_run_id,
             raw_details=generated_image_raw_details,
+        )
+
+    @override
+    async def make_page_contents(
+        self,
+        job_metadata: JobMetadata,
+        extract_output: ExtractOutput,
+    ) -> list[PageContent]:
+        return await self._generated_content_factory.make_page_contents(
+            primary_id=job_metadata.user_id,
+            secondary_id=job_metadata.pipeline_run_id,
+            extract_output=extract_output,
         )
 
     @override
@@ -234,7 +247,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         generated_image_raw_details = await img_gen_single_image(img_gen_assignment=img_gen_assignment)
         log.verbose(f"{self.__class__.__name__} generated image raw details: {generated_image_raw_details}")
-        return await self.make_generated_image(
+        return await self.make_image_content(
             job_metadata=job_metadata,
             generated_image_raw_details=generated_image_raw_details,
         )
@@ -262,7 +275,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         generated_images_as_raw_details = await img_gen_image_list(img_gen_assignment=img_gen_assignment)
         log.verbose(f"{self.__class__.__name__} generated image list: {generated_images_as_raw_details}")
         return [
-            await self.make_generated_image(
+            await self.make_image_content(
                 job_metadata=job_metadata,
                 generated_image_raw_details=raw_details,
             )
@@ -302,7 +315,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.pdf_uri, dpi=page_views_dpi)
         page_view_images_resolved: list[ImageContent] = []
         for page_view_image in page_view_images:
-            image_content = await self.make_generated_image(
+            image_content = await self.make_image_content(
                 job_metadata=job_metadata,
                 generated_image_raw_details=GeneratedImageRawDetails.make_from_pil_image(
                     pil_image=page_view_image,
@@ -321,7 +334,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-    ) -> ExtractOutput:
+    ) -> list[PageContent]:
         extract_assignment = ExtractAssignment(
             job_metadata=job_metadata,
             extract_input=extract_input,
@@ -329,4 +342,8 @@ class ContentGenerator(ContentGeneratorProtocol):
             extract_job_params=extract_job_params or ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=extract_job_config or ExtractJobConfig(),
         )
-        return await extract_gen_pages(extract_assignment=extract_assignment)
+        extract_output = await extract_gen_pages(extract_assignment=extract_assignment)
+        return await self.make_page_contents(
+            job_metadata=job_metadata,
+            extract_output=extract_output,
+        )

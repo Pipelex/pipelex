@@ -2,9 +2,13 @@ import base64
 import hashlib
 
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
+from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.misc.base_64_utils import (
     extract_base_64_str_from_base64_url_if_possible,
 )
@@ -59,7 +63,7 @@ class GeneratedContentFactory:
     async def _fetch_remote_content(self, url: str) -> bytes:
         return await fetch_file_from_url_httpx_async(url=url)
 
-    async def make_generated_image(
+    async def make_image_content(
         self,
         primary_id: str,
         secondary_id: str,
@@ -143,4 +147,31 @@ class GeneratedContentFactory:
             display_link=display_link,
             size=raw_details.size,
             mime_type=mime_type,
+            caption=raw_details.caption,
         )
+
+    async def make_page_contents(
+        self,
+        primary_id: str,
+        secondary_id: str,
+        extract_output: ExtractOutput,
+    ) -> list[PageContent]:
+        page_contents: list[PageContent] = []
+        for page in extract_output.pages.values():
+            page_images: list[ImageContent] = []
+            for extracted_image in page.extracted_images:
+                image_content = await self.make_image_content(
+                    primary_id=primary_id,
+                    secondary_id=secondary_id,
+                    raw_details=extracted_image,
+                )
+                page_images.append(image_content)
+            page_contents.append(
+                PageContent(
+                    text_and_images=TextAndImagesContent(
+                        text=TextContent(text=page.text) if page.text else None,
+                        images=page_images,
+                    ),
+                )
+            )
+        return page_contents

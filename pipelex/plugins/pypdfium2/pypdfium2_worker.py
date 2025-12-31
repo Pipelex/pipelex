@@ -26,7 +26,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
         extract_job: ExtractJob,
     ) -> ExtractOutput:
         if extract_job.extract_input.image_uri:
-            msg = "Pypdfium2 only extracts text from PDFs, not images"
+            msg = "Pypdfium2 only extracts text from PDFs, not from images"
             raise NotImplementedError(msg)
 
         pdf_uri = extract_job.extract_input.pdf_uri
@@ -34,8 +34,10 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
             msg = "No PDF URI provided in ExtractJob"
             raise ExtractInputError(msg)
 
-        page_texts = await pypdfium2_renderer.get_text_from_pdf_pages_from_uri(pdf_uri=pdf_uri)
+        all_page_images = await pypdfium2_renderer.extract_embedded_images_from_pdf_uri(pdf_uri=pdf_uri)
+
+        all_page_texts = await pypdfium2_renderer.extract_text_from_pdf_pages_from_uri(pdf_uri=pdf_uri)
         pages: dict[int, Page] = {}
-        for page_index, page_text in enumerate(page_texts):
-            pages[page_index + 1] = Page(text=page_text)
+        for page_index, page_text in enumerate(all_page_texts):
+            pages[page_index + 1] = Page(text=page_text, extracted_images=all_page_images[page_index + 1])
         return ExtractOutput(pages=pages)

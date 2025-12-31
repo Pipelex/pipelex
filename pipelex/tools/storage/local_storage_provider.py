@@ -113,14 +113,14 @@ class LocalStorageProvider(StorageProviderAbstract):
 
     @override
     def display_link(self, uri: str) -> str:
-        """Return the absolute file path for this URI.
+        """Return a file:// URI for this storage URI.
 
         Args:
             uri: Full URI including pipelex-storage:// scheme.
 
         Returns:
-            Absolute file path for debugging/display.
+            file:// URI that can be clicked in terminals like Cursor.
         """
         key = self._strip_scheme(uri)
         file_path = self._validate_key(key)
-        return str(file_path)
+        return file_path.as_uri()

@@ -71,6 +71,7 @@ class TextAndImagesContent(StuffContent):
             )
             table.add_column("Index")
             table.add_column("URL", width=36)
+            table.add_column("")
             if has_captions:
                 table.add_column("Caption", style="yellow italic")
 
@@ -78,10 +79,12 @@ class TextAndImagesContent(StuffContent):
                 index_text = Text.from_markup(f"[dim]img-[/dim][yellow]{idx}[/yellow]")
                 display_url = f"{image.url[:35]}…" if len(image.url) > 36 else image.url
                 url_markdown = Markdown(f"[{display_url}]({image.url})")
+                # Use Rich hyperlink style - terminal will make it clickable
+                link_text = Text("Display", style=f"cyan underline link {image.display_link}")
                 if has_captions:
-                    table.add_row(index_text, url_markdown, image.caption or "/")
+                    table.add_row(index_text, url_markdown, link_text, image.caption or "/")
                 else:
-                    table.add_row(index_text, url_markdown)
+                    table.add_row(index_text, url_markdown, link_text)
 
             group.renderables.append(table)
 

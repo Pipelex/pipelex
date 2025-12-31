@@ -138,12 +138,13 @@ class MistralFactory:
         mistral_ocr_image_obj: mistralai.OCRImageObject,
     ) -> ExtractedImageFromPage:
         return ExtractedImageFromPage(
-            # image_id=mistral_ocr_image_obj.id,
+            size=None,
             top_left_x=mistral_ocr_image_obj.top_left_x,
             top_left_y=mistral_ocr_image_obj.top_left_y,
             bottom_right_x=mistral_ocr_image_obj.bottom_right_x,
             bottom_right_y=mistral_ocr_image_obj.bottom_right_y,
-            base_64=mistral_ocr_image_obj.image_base64 or None,
+            base64_str=mistral_ocr_image_obj.image_base64 or None,
+            mime_type="image/jpeg",  # Mistral OCR returns JPEG images
         )
 
     #########################################################

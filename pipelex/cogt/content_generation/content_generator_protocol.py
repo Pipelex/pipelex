@@ -14,6 +14,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -88,11 +89,17 @@ class ContentGeneratorProtocol(Protocol):
         nb_items: int | None = None,
     ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
 
-    async def make_generated_image(
+    async def make_image_content(
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
     ) -> ImageContent: ...
+
+    async def make_page_contents(
+        self,
+        job_metadata: JobMetadata,
+        extract_output: ExtractOutput,
+    ) -> list[PageContent]: ...
 
     def make_single_image(
         self,
@@ -137,4 +144,4 @@ class ContentGeneratorProtocol(Protocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams,
         extract_job_config: ExtractJobConfig,
-    ) -> Coroutine[Any, Any, ExtractOutput]: ...
+    ) -> Coroutine[Any, Any, list[PageContent]]: ...

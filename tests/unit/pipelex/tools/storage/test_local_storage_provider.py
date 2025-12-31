@@ -52,8 +52,8 @@ class TestLocalStorageProvider:
 
         assert "should not include scheme prefix" in str(exc_info.value).lower()
 
-    def test_display_link_returns_absolute_path(self, tmp_path: Path) -> None:
-        """Test that display_link() returns the absolute file path for debugging."""
+    def test_display_link_returns_file_uri(self, tmp_path: Path) -> None:
+        """Test that display_link() returns a file:// URI for clickable terminal links."""
         provider = LocalStorageProvider(root_path=tmp_path)
         test_data = b"display test"
         key = "subdir/display_test.bin"
@@ -61,9 +61,9 @@ class TestLocalStorageProvider:
         returned_uri = provider.store(data=test_data, key=key)
         display = provider.display_link(uri=returned_uri)
 
-        expected_path = str(tmp_path / key)
-        assert display == expected_path
-        assert Path(display).is_absolute()
+        expected_uri = (tmp_path / key).as_uri()
+        assert display == expected_uri
+        assert display.startswith("file://")
 
     def test_store_creates_parent_directories(self, tmp_path: Path) -> None:
         """Test that storing to a nested path creates intermediate directories."""
