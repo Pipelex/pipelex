@@ -140,14 +140,13 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         if self.should_include_page_views:
             log.debug(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
             if pdf_uri:
-                page_views = await content_generator.make_render_page_views(
+                page_view_contents = await content_generator.make_render_page_views(
                     extract_input=extract_input,
                     extract_handle=extract_setting.model,
                     job_metadata=job_metadata,
                     extract_job_params=extract_job_params,
                     extract_job_config=ExtractJobConfig(),
                 )
-                page_view_contents = [ImageContent(url=page_view.url) for page_view in page_views]
             elif image_uri:
                 page_view_contents = [ImageContent(url=image_uri)]
 

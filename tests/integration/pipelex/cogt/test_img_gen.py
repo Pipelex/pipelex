@@ -45,6 +45,7 @@ class TestImageGeneration:
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
+        assert generated_image_resolved.display_link is not None
         pretty_print_url(generated_image_resolved.display_link, title=f"Generated image for topic '{topic}'")
 
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
@@ -78,6 +79,7 @@ class TestImageGeneration:
             raw_details=generated_image_raw_details,
         )
         pretty_print(generated_image_resolved, title=f"Generated image resolved for topic '{topic}'")
+        assert generated_image_resolved.display_link is not None
         pretty_print_url(generated_image_resolved.display_link, title=f"Generated image for topic '{topic}'")
 
     @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
@@ -113,4 +115,5 @@ class TestImageGeneration:
         ]
         pretty_print(generated_image_resolved_list, title=f"Generated images resolved for topic '{topic}'")
         for image_index, image in enumerate(generated_image_resolved_list):
+            assert image.display_link is not None
             pretty_print_url(image.display_link, title=f"Image #{image_index}")

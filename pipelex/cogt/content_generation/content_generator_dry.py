@@ -8,7 +8,8 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
-from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -17,6 +18,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -34,13 +36,12 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     def _make_generated_image_fake(
         self,
         raw_details: GeneratedImageRawDetails,
-    ) -> GeneratedImageResolved:
-        return GeneratedImageResolved(
+    ) -> ImageContent:
+        return ImageContent(
             url=raw_details.actual_url or "https://example.com/image.jpg",
             display_link=raw_details.actual_url or "https://example.com/image.jpg",
             mime_type=raw_details.mime_type or "image/jpeg",
-            width=raw_details.width,
-            height=raw_details.height,
+            size=raw_details.size,
         )
 
     @override
@@ -148,7 +149,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
-    ) -> GeneratedImageResolved:
+    ) -> ImageContent:
         return self._make_generated_image_fake(raw_details=generated_image_raw_details)
 
     @override
@@ -160,7 +161,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> GeneratedImageResolved:
+    ) -> ImageContent:
         func_name = "make_single_image"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
@@ -168,8 +169,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         return self._make_generated_image_fake(
             raw_details=GeneratedImageRawDetails(
                 actual_url=image_url,
-                width=1024,
-                height=1024,
+                size=ImageSize(width=1024, height=1024),
                 mime_type="image/jpeg",
             ),
         )
@@ -184,7 +184,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> list[GeneratedImageResolved]:
+    ) -> list[ImageContent]:
         func_name = "make_image_list"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
@@ -192,8 +192,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             self._make_generated_image_fake(
                 raw_details=GeneratedImageRawDetails(
                     actual_url=image_urls[image_index % len(image_urls)],
-                    width=1024,
-                    height=1024,
+                    size=ImageSize(width=1024, height=1024),
                     mime_type="image/jpeg",
                 ),
             )
@@ -225,15 +224,14 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-    ) -> list[GeneratedImageResolved]:
+    ) -> list[ImageContent]:
         nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
-        page_view_images_resolved: list[GeneratedImageResolved] = []
+        page_view_images_resolved: list[ImageContent] = []
         for page_index in range(1, nb_pages + 1):
             page_view_image = self._make_generated_image_fake(
                 raw_details=GeneratedImageRawDetails(
                     actual_url=f"https://example.com/page_{page_index}.png",
-                    width=1024,
-                    height=1024,
+                    size=ImageSize(width=1024, height=1024),
                     mime_type="image/jpeg",
                 ),
             )

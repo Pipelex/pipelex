@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from pydantic import field_validator, model_validator
 
 from pipelex.cogt.exceptions import GeneratedImageError
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
@@ -15,8 +16,7 @@ if TYPE_CHECKING:
 
 
 class GeneratedImageRawDetails(CustomBaseModel):
-    width: int
-    height: int
+    size: ImageSize | None
 
     actual_url: str | None = None
     base64_str: str | None = None
@@ -55,19 +55,10 @@ class GeneratedImageRawDetails(CustomBaseModel):
             width, height = pil_image.size
             actual_bytes = pil_image_to_bytes(pil_image=pil_image, image_format=output_format)
             return GeneratedImageRawDetails(
-                width=width,
-                height=height,
+                size=ImageSize(width=width, height=height),
                 actual_bytes=actual_bytes,
                 output_format=output_format,
             )
         except (ValueError, OSError, AttributeError) as exc:
             msg = f"Failed to convert PIL image to GeneratedImageRawDetails: {exc}"
             raise GeneratedImageError(msg) from exc
-
-
-class GeneratedImageResolved(CustomBaseModel):
-    url: str
-    display_link: str
-    mime_type: str
-    width: int
-    height: int

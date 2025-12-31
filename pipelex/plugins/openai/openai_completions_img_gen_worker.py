@@ -7,6 +7,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -120,8 +121,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         return GeneratedImageRawDetails(
             actual_url=actual_url,
             base64_str=base64_str,
-            width=1024,
-            height=1024,
+            size=ImageSize(width=1024, height=1024),
             mime_type=base64_extracted_mime_type,
             output_format=output_format,
         )

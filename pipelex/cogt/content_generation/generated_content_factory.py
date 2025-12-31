@@ -2,8 +2,9 @@ import base64
 import hashlib
 
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
-from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.config import get_config
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.tools.misc.base_64_utils import (
     extract_base_64_str_from_base64_url_if_possible,
 )
@@ -63,7 +64,7 @@ class GeneratedContentFactory:
         primary_id: str,
         secondary_id: str,
         raw_details: GeneratedImageRawDetails,
-    ) -> GeneratedImageResolved:
+    ) -> ImageContent:
         output_format: ImageFormat | None = None
         base64_extracted_mime_type: str | None = None
         is_remote_url: bool
@@ -137,10 +138,9 @@ class GeneratedContentFactory:
         else:
             display_link = url
 
-        return GeneratedImageResolved(
+        return ImageContent(
             url=url,
             display_link=display_link,
-            width=raw_details.width,
-            height=raw_details.height,
+            size=raw_details.size,
             mime_type=mime_type,
         )

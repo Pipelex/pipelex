@@ -4,6 +4,7 @@ from typing_extensions import override
 
 from pipelex.cogt.exceptions import ImageContentError
 from pipelex.cogt.extract.extract_output import ExtractedImage
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
@@ -14,8 +15,11 @@ from pipelex.types import Self
 
 class ImageContent(StuffContent):
     url: str
+    display_link: str | None = None
     source_prompt: str | None = None
     caption: str | None = None
+    mime_type: str | None = None
+    size: ImageSize | None = None
 
     @property
     @override

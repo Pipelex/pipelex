@@ -4,6 +4,7 @@ from pydantic import ValidationError
 
 from pipelex.cogt.exceptions import ImgGenGenerationError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.image.image_size import ImageSize
 
 
 class FalFactory:
@@ -27,8 +28,7 @@ class FalFactory:
             for image_dict in image_dicts:
                 generated_image = GeneratedImageRawDetails(
                     actual_url_or_prefixed_base64=image_dict["url"],
-                    width=image_dict["width"],
-                    height=image_dict["height"],
+                    size=ImageSize(width=image_dict["width"], height=image_dict["height"]),
                     mime_type=image_dict["content_type"],
                 )
                 generated_image_list.append(generated_image)
