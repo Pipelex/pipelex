@@ -139,7 +139,7 @@ class PipeBatch(PipeController):
 
             required_variables = sub_pipe.required_variables()
             # Extract root names from full paths for looking up stuffs in working memory
-            required_stuff_names = {req_var.split(".")[0] for req_var in required_variables}
+            required_stuff_names = {req_var.split(".", 1)[0] for req_var in required_variables}
             required_stuffs = branch_memory.get_existing_stuffs(names=required_stuff_names)
             required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff.stuff_code]
             required_stuff_lists.append(required_stuffs)
@@ -154,7 +154,7 @@ class PipeBatch(PipeController):
                     "output_multiplicity": False,
                 },
             )
-            branch_pipe_run_params.run_mode = PipeRunMode.DRY if pipe_run_params.run_mode.is_dry else PipeRunMode.LIVE
+            branch_pipe_run_params.run_mode = pipe_run_params.run_mode
             task = sub_pipe.run_pipe(
                 job_metadata=job_metadata,
                 working_memory=branch_memory,

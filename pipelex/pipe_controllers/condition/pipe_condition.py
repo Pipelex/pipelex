@@ -88,7 +88,7 @@ class PipeCondition(PipeController):
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
-        required_variables = {path.split(".")[0] for path in full_paths}
+        required_variables = {path.split(".", 1)[0] for path in full_paths}
 
         for var_name in required_variables:
             if not var_name.startswith("_"):  # exclude internal variables starting with `_`
@@ -279,7 +279,7 @@ class PipeCondition(PipeController):
                 template_category=TemplateCategory.EXPRESSION,
                 template_source=self.expression,
             )
-            required_variables = {path.split(".")[0] for path in full_paths}
+            required_variables = {path.split(".", 1)[0] for path in full_paths}
             log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")
