@@ -22,6 +22,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 ConditionOutcomeMap = dict[str, str | SpecialOutcome]
 
@@ -88,7 +89,7 @@ class PipeCondition(PipeController):
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
-        required_variables = {path.split(".", 1)[0] for path in full_paths}
+        required_variables = {get_root_from_dotted_path(path) for path in full_paths}
 
         for var_name in required_variables:
             if not var_name.startswith("_"):  # exclude internal variables starting with `_`
@@ -229,7 +230,7 @@ class PipeCondition(PipeController):
         # Extract root names from full paths for looking up stuffs in working memory
         required_variables = chosen_pipe.required_variables()
         # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
-        required_stuff_names = {req_var.split(".")[0] for req_var in required_variables if not req_var.startswith("_")}
+        required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables if not req_var.startswith("_")}
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
         except WorkingMemoryStuffNotFoundError as exc:
@@ -279,7 +280,7 @@ class PipeCondition(PipeController):
                 template_category=TemplateCategory.EXPRESSION,
                 template_source=self.expression,
             )
-            required_variables = {path.split(".", 1)[0] for path in full_paths}
+            required_variables = {get_root_from_dotted_path(path) for path in full_paths}
             log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")

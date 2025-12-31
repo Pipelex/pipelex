@@ -3,6 +3,7 @@ import pytest
 from pipelex.tools.misc.string_utils import (
     camel_to_snake_case,
     can_inject_text,
+    get_root_from_dotted_path,
     is_none_or_has_text,
     is_not_none_and_has_text,
     is_pascal_case,
@@ -197,6 +198,32 @@ def test_is_snake_case(word: str, expected: bool) -> None:
 )
 def test_is_pascal_case(word: str, expected: bool) -> None:
     assert is_pascal_case(word) is expected
+
+
+@pytest.mark.parametrize(
+    ("dotted_path", "expected"),
+    [
+        # Paths with multiple dots
+        ("foo.bar.baz", "foo"),
+        ("object.attribute.sub", "object"),
+        ("a.b.c.d.e", "a"),
+        # Paths with single dot
+        ("foo.bar", "foo"),
+        ("domain.ConceptCode", "domain"),
+        # Paths without dots (returns unchanged)
+        ("foo", "foo"),
+        ("single", "single"),
+        # Edge cases
+        ("", ""),
+        (".leading", ""),
+        ("trailing.", "trailing"),
+        ("..", ""),
+        ("a.", "a"),
+        (".b", ""),
+    ],
+)
+def test_get_root_from_dotted_path(dotted_path: str, expected: str) -> None:
+    assert get_root_from_dotted_path(dotted_path) == expected
 
 
 @pytest.mark.parametrize(

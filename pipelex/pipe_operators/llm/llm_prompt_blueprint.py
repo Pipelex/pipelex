@@ -12,6 +12,7 @@ from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderError
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
@@ -26,7 +27,7 @@ class LLMPromptBlueprint(BaseModel):
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
         if self.user_images:
-            user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
+            user_images_top_object_name = [get_root_from_dotted_path(user_image) for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
 
         if self.prompt_blueprint:

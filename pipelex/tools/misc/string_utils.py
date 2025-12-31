@@ -246,6 +246,32 @@ def normalize_to_ascii(text: str) -> str:
     return "".join(c for c in normalized if ord(c) < 128 and (c.isalnum() or c == "_"))
 
 
+def get_root_from_dotted_path(dotted_path: str) -> str:
+    """Extract the root segment from a dot-separated path.
+
+    This function returns the first segment of a dotted path (everything before
+    the first dot). If there is no dot, returns the entire string unchanged.
+
+    Args:
+        dotted_path: A string that may contain dots as separators (e.g., "object.attribute.sub").
+
+    Returns:
+        The first segment before the first dot, or the whole string if no dot exists.
+
+    Examples:
+        >>> get_root_from_dotted_path("foo.bar.baz")
+        'foo'
+        >>> get_root_from_dotted_path("foo.bar")
+        'foo'
+        >>> get_root_from_dotted_path("foo")
+        'foo'
+        >>> get_root_from_dotted_path("")
+        ''
+
+    """
+    return dotted_path.split(".", 1)[0]
+
+
 def matches_wildcard_pattern(text: str, pattern: str) -> bool:
     """Check if a text matches a wildcard pattern.
 
