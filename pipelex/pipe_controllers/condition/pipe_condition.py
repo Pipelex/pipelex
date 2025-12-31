@@ -22,6 +22,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 ConditionOutcomeMap = dict[str, str | SpecialOutcome]
 
@@ -58,11 +59,11 @@ class PipeCondition(PipeController):
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
         # Variables from the expression/expression_template
-        expression_required_variables = detect_jinja2_required_variables(
+        full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
-        required_variables.update(expression_required_variables)
+        required_variables.update(path.split(".")[0] for path in full_paths)
 
         # Variables from the outcomes map and default_outcome
         for pipe_code in self.pipe_dependencies():
@@ -84,10 +85,11 @@ class PipeCondition(PipeController):
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
         # Add the variables from the expression/expression_template
-        required_variables = detect_jinja2_required_variables(
+        full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
+        required_variables = {get_root_from_dotted_path(path) for path in full_paths}
 
         for var_name in required_variables:
             if not var_name.startswith("_"):  # exclude internal variables starting with `_`
@@ -107,7 +109,8 @@ class PipeCondition(PipeController):
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
 
             for input_name, stuff_spec in pipe_needed_inputs.items:
-                needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept)
+                needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+
         return needed_inputs
 
     @override
@@ -224,8 +227,10 @@ class PipeCondition(PipeController):
         )
 
         # Get required variables and validate they exist in working memory
+        # Extract root names from full paths for looking up stuffs in working memory
         required_variables = chosen_pipe.required_variables()
-        required_stuff_names = {required_variable for required_variable in required_variables if not required_variable.startswith("_")}
+        # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
+        required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables if not req_var.startswith("_")}
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
         except WorkingMemoryStuffNotFoundError as exc:
@@ -271,10 +276,11 @@ class PipeCondition(PipeController):
     ) -> PipeOutput:
         # Validate that the expression template is valid
         try:
-            required_variables = detect_jinja2_required_variables(
+            full_paths = detect_jinja2_required_variables(
                 template_category=TemplateCategory.EXPRESSION,
                 template_source=self.expression,
             )
+            required_variables = {get_root_from_dotted_path(path) for path in full_paths}
             log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")

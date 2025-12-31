@@ -44,7 +44,7 @@ class PipeSpec(StructuredContent):
     pipe_category: Any = Field(
         description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'.")
     )
-    description: str | None = Field(description="Natural language description of the pipe's purpose and functionality.")
+    description: str = Field(description="Natural language description of the pipe's purpose and functionality.")
     inputs: dict[str, str] = Field(
         description=(
             "Input specifications mapping variable names to concept codes with optional multiplicity. "

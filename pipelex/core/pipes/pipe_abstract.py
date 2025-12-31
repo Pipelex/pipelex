@@ -15,6 +15,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
@@ -42,7 +43,7 @@ class PipeAbstract(ABC, BaseModel):
     type: Any  # Any so that subclasses can put a Literal
     code: str
     domain_code: str
-    description: str | None = None
+    description: str
     inputs: InputStuffSpecs = Field(default_factory=InputStuffSpecs)
     output: StuffSpec
 
@@ -131,16 +132,17 @@ class PipeAbstract(ABC, BaseModel):
 
     @final
     def generic_validate_inputs_with_library(self):
-        # First validate required variables are in the inputs
-        for required_variable_name in self.required_variables():
-            if required_variable_name not in self.inputs.variables:
-                msg = f"Required variable '{required_variable_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+        # First validate required variables are in the inputs (using prefix-based matching)
+        input_names = set(self.inputs.variables)
+        for required_variable_path in self.required_variables():
+            if not is_variable_satisfied_by_inputs(required_variable_path, input_names):
+                msg = f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
                     domain_code=self.domain_code,
                     pipe_code=self.code,
-                    variable_names=[required_variable_name],
+                    variable_names=[required_variable_path],
                 )
 
         # Then validate that all inputs are actually needed and match requirements exactly
