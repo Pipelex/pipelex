@@ -35,7 +35,6 @@ if TYPE_CHECKING:
 
 
 async def pipeline_run_setup(
-    user_id: str | None = None,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
@@ -46,6 +45,7 @@ async def pipeline_run_setup(
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
+    user_id: str | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -55,8 +55,6 @@ async def pipeline_run_setup(
 
     Parameters
     ----------
-    user_id:
-        Unique identifier for the user.
     library_id:
         Unique identifier for the library instance. If not provided, defaults to the
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
@@ -91,6 +89,8 @@ async def pipeline_run_setup(
     search_domain_codes:
         List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.
+    user_id:
+        Unique identifier for the user (optional).
 
     Returns:
     -------

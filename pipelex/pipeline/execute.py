@@ -38,8 +38,6 @@ async def execute_pipeline(
 
     Parameters
     ----------
-    user_id:
-        Unique identifier for the user.
     library_id:
         Unique identifier for the library instance. If not provided, defaults to the
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
@@ -74,6 +72,8 @@ async def execute_pipeline(
     search_domain_codes:
         List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.
+    user_id:
+        Unique identifier for the user.
 
     Returns:
     -------
@@ -82,7 +82,6 @@ async def execute_pipeline(
 
     """
     pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
-        user_id=user_id,
         library_id=library_id,
         library_dirs=library_dirs,
         pipe_code=pipe_code,
@@ -93,6 +92,7 @@ async def execute_pipeline(
         dynamic_output_concept_code=dynamic_output_concept_code,
         pipe_run_mode=pipe_run_mode,
         search_domain_codes=search_domain_codes,
+        user_id=user_id,
     )
 
     properties: dict[EventProperty, Any]
