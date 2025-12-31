@@ -98,10 +98,9 @@ class PyPdfium2Renderer:
         if pdf_url:
             pdf_bytes = await fetch_file_from_url_httpx_async(url=pdf_url)
             return await self.get_text_from_pdf_pages(pdf_input=pdf_bytes)
-        if pdf_path:
+        else:
+            assert pdf_path is not None
             return await self.get_text_from_pdf_pages(pdf_input=pdf_path)
-        msg = f"Invalid PDF URI: {pdf_uri}"
-        raise PyPdfium2RendererError(msg)
 
 
 pypdfium2_renderer = PyPdfium2Renderer()
