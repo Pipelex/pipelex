@@ -104,7 +104,7 @@ def detect_jinja2_required_variables(
 ) -> set[str]:
     """Returns the set of full variable paths required by the Jinja2 template.
 
-    For example, `{{ user.profile.name }}` returns `{'user.profile.name'}`.
+    For example, `{{ user.profile.name }}` returns a set containing `user.profile.name`.
 
     Args:
         template_category: Category of the template (HTML, MARKDOWN, etc.)
