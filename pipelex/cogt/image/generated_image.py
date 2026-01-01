@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING
 
 from pydantic import field_validator, model_validator
 
+from pipelex import log
 from pipelex.cogt.exceptions import GeneratedImageError
 from pipelex.cogt.image.image_size import ImageSize
+from pipelex.tools.misc.base_64_utils import extract_base_64_str_from_base64_url_if_possible
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
@@ -46,6 +48,12 @@ class GeneratedImageRawDetails(CustomBaseModel):
                 else:
                     msg = f"Invalid image MIME type: {self.mime_type}. Expected format 'image/<subtype>'. Supported types are: {supported}"
                 raise ValueError(msg)
+        elif self.actual_url_or_prefixed_base64 and (
+            result := extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=self.actual_url_or_prefixed_base64)
+        ):
+            base64_str, base64_extracted_mime_type = result
+            self.mime_type = base64_extracted_mime_type
+            self.base64_str = base64_str
         elif self.output_format is None:
             msg = "Either mime_type or output_format must be provided"
             raise ValueError(msg)

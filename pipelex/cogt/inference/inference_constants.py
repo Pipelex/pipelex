@@ -5,6 +5,7 @@ class InferenceOutputType(StrEnum):
     TEXT = "Text"
     OBJECT = "Object"
     IMAGE = "Image"
+    PAGES = "Pages"
 
     @classmethod
     def is_text(cls, output_desc: str) -> bool:
@@ -18,4 +19,6 @@ class InferenceOutputType(StrEnum):
             case cls.OBJECT:
                 return False
             case cls.IMAGE:
+                return False
+            case cls.PAGES:
                 return False

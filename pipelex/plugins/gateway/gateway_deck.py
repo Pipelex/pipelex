@@ -12,7 +12,7 @@ class GatewayDeck:
             msg = f"Could not get '{PortkeyHeaderKey.CONFIG}' field from headers"
             raise GatewayDeckError(msg)
         config_id_substitutions = get_config().cogt.gateway_test_config.config_id_substitutions
-        if config_id_substitutions:
-            log.dev(f"Substituting config ID '{config_id}' with '{config_id_substitutions.get(config_id, config_id)}'")
-            return config_id_substitutions.get(config_id, config_id)
+        if config_id_substitutions and (substitute := config_id_substitutions.get(config_id)) and substitute != config_id:
+            log.warning(f"Substituting config ID '{config_id}' with '{substitute}'")
+            return substitute
         return config_id
