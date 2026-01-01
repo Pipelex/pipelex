@@ -34,10 +34,16 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
             msg = "No PDF URI provided in ExtractJob"
             raise ExtractInputError(msg)
 
-        all_page_images = await pypdfium2_renderer.extract_embedded_images_from_pdf_uri(pdf_uri=pdf_uri)
+        if extract_job.job_params.should_include_images:
+            all_page_images = await pypdfium2_renderer.extract_embedded_images_from_pdf_uri(pdf_uri=pdf_uri)
+        else:
+            all_page_images = {}
 
         all_page_texts = await pypdfium2_renderer.extract_text_from_pdf_pages_from_uri(pdf_uri=pdf_uri)
         pages: dict[int, Page] = {}
         for page_index, page_text in enumerate(all_page_texts):
-            pages[page_index + 1] = Page(text=page_text, extracted_images=all_page_images[page_index + 1])
+            if extract_job.job_params.should_include_images:
+                pages[page_index + 1] = Page(text=page_text, extracted_images=all_page_images[page_index + 1])
+            else:
+                pages[page_index + 1] = Page(text=page_text)
         return ExtractOutput(pages=pages)

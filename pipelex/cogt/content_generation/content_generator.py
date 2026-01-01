@@ -343,7 +343,29 @@ class ContentGenerator(ContentGeneratorProtocol):
             extract_job_config=extract_job_config or ExtractJobConfig(),
         )
         extract_output = await extract_gen_pages(extract_assignment=extract_assignment)
-        return await self.make_page_contents(
+        page_contents = await self.make_page_contents(
             job_metadata=job_metadata,
             extract_output=extract_output,
         )
+        if extract_job_params and extract_job_params.should_include_page_views:
+            log.dev("Making page views")
+            page_view_contents: list[ImageContent] = []
+            if extract_input.pdf_uri:
+                page_view_contents = await self.make_render_page_views(
+                    extract_input=extract_input,
+                    extract_handle=extract_handle,
+                    job_metadata=job_metadata,
+                    extract_job_params=extract_job_params,
+                    extract_job_config=ExtractJobConfig(),
+                )
+            elif extract_input.image_uri:
+                page_view_contents = [ImageContent(url=extract_input.image_uri)]
+            if len(page_view_contents) != len(page_contents):
+                msg = f"Number of page view contents ({len(page_view_contents)}) does not match number of page contents ({len(page_contents)})"
+                raise ValueError(msg)
+            for page_content in page_contents:
+                page_content.page_view = page_view_contents.pop(0)
+        else:
+            log.dev(f"No page views to make because: {extract_job_params} and {extract_input}")
+
+        return page_contents

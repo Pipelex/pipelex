@@ -79,8 +79,7 @@ class TextAndImagesContent(StuffContent):
                 index_text = Text.from_markup(f"[dim]img-[/dim][yellow]{idx}[/yellow]")
                 display_url = f"{image.url[:35]}…" if len(image.url) > 36 else image.url
                 url_markdown = Markdown(f"[{display_url}]({image.url})")
-                # Use Rich hyperlink style - terminal will make it clickable
-                link_text = Text("Display", style=f"cyan underline link {image.display_link}")
+                link_text = Text("Display", style=f"cyan link {image.display_link}")
                 if has_captions:
                     table.add_row(index_text, url_markdown, link_text, image.caption or "/")
                 else:

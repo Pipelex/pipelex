@@ -29,7 +29,7 @@ class PageContent(StructuredContent):
         group.renderables.append(Text("\nPage View:", style="bold cyan"))
         url_markdown = Markdown(f"[{self.page_view.url}…]({self.page_view.url})")
         group.renderables.append(url_markdown)
-        display_link_markdown = Markdown(f"[{self.page_view.display_link}…]({self.page_view.display_link})")
-        group.renderables.append(display_link_markdown)
+        link_text = Text("Display", style=f"cyan link {self.page_view.display_link}")
+        group.renderables.append(link_text)
 
         return group

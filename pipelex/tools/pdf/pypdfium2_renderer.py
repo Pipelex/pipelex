@@ -102,7 +102,6 @@ def _extract_image_from_pdf_object(
     bitmap = image_obj.get_bitmap()
     pil_image: Image.Image = bitmap.to_pil()
     actual_bytes = pil_image_to_bytes(pil_image=pil_image, image_format=effective_format)
-    log.dev(f"Bitmap extraction: ({width}, {height}) at ({top_left_x}, {top_left_y})-({bottom_right_x}, {bottom_right_y}) → {effective_format}")
 
     return ExtractedImageFromPage(
         size=ImageSize(width=width, height=height),
