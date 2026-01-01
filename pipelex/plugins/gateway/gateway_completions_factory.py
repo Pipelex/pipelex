@@ -8,11 +8,11 @@ from portkey_ai import (
 )
 from typing_extensions import override
 
-from pipelex import pretty_print
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
 from pipelex.plugins.gateway.gateway_exceptions import GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
+from pipelex.plugins.gateway.gateway_schemas import GatewayExtractPageResult
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 
 if TYPE_CHECKING:
@@ -57,41 +57,21 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         if not hasattr(response, "pages"):
             msg = "Portkey extract response does not have pages"
             raise GatewayFactoryError(msg)
+
+        response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
         pages: dict[int, Page] = {}
-        for extracted_page in response.pages:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
-            if not isinstance(extracted_page, dict):
-                msg = "Extracted page is not a dictionary"
-                raise GatewayFactoryError(msg)
-            extracted_page_dict = cast("dict[str, Any]", extracted_page)
-            page_index = extracted_page_dict.get("index")
-            if page_index is None:
-                msg = "Page index is not set"
-                raise GatewayFactoryError(msg)
-            extracted_page_text = extracted_page_dict.get("markdown")
-            if extracted_page_text is None:
-                msg = "Page text is not set"
-                raise GatewayFactoryError(msg)
-            extracted_page_images = extracted_page_dict.get("images")
-            if extracted_page_images is None:
-                msg = "Page images are not set"
-                raise GatewayFactoryError(msg)
-            pretty_print(extracted_page_images, title="Extracted page images")
+        for response_page_dict in response_page_dicts:
+            response_page = GatewayExtractPageResult.model_validate(response_page_dict)
+            page_index = response_page.index
+            extracted_page_text = response_page.markdown
+            extracted_page_images_base64_strs = response_page.images
             page_images: list[ExtractedImageFromPage] = []
-            for extracted_page_image in extracted_page_images:
-                if not isinstance(extracted_page_image, dict):
-                    msg = "Extracted page image is not a dictionary"
-                    raise GatewayFactoryError(msg)
-                extracted_page_image_dict = cast("dict[str, Any]", extracted_page_image)
-                base64_str = extracted_page_image_dict.get("image_base64")
-                if base64_str is None:
-                    msg = "Got no base 64 for extracted page image"
-                    raise GatewayFactoryError(msg)
-                caption = extracted_page_image_dict.get("image_annotation")
+            for extracted_page_image_base64_str in extracted_page_images_base64_strs:
                 extracted_image = ExtractedImageFromPage(
                     size=None,
-                    base64_str=base64_str,
-                    mime_type="image/jpeg",  # Gateway returns JPEG images
-                    caption=caption,
+                    base64_str=extracted_page_image_base64_str,
+                    mime_type="image/png",  # Gateway returns PNG images
+                    caption=None,
                 )
                 page_images.append(extracted_image)
             pages[page_index] = Page(

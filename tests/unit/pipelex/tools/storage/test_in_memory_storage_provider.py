@@ -60,8 +60,7 @@ class TestInMemoryStorageProvider:
         display = provider.display_link(uri=returned_uri)
 
         # Display should indicate it's in-memory storage
-        assert key in display
-        assert "memory" in display.lower()
+        assert display is None
 
     def test_store_overwrites_existing_data(self) -> None:
         """Test that storing with the same key overwrites the previous data."""

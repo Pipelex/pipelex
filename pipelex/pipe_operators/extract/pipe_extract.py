@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
@@ -16,7 +15,6 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import (

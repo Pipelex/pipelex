@@ -17,6 +17,7 @@ from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
+from pipelex.plugins.gateway.gateway_schemas import GatewayExtractRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_async
 from pipelex.types import StrEnum
@@ -113,8 +114,11 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
     ) -> ExtractOutput:
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
-        doc_tag = document_type.document_tag
 
+        request_params = GatewayExtractRequestParams(should_include_images=should_include_images)
+        messages: list[dict[str, str]] = [{"role": "user", "content": request_params.model_dump_json()}]
+
+        doc_tag = document_type.document_tag
         attempt_number = 0
         response: GenericResponse | None = None
         retryer = self._make_retryer()
@@ -125,6 +129,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                         "/",
                         model=self.inference_model.model_id,
+                        messages=messages,
                         document={"type": doc_tag, doc_tag: base64_url},
                         include_image_base64=True,
                     )
@@ -141,9 +146,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
 
-        return GatewayCompletionsFactory.make_extract_output_from_portkey_response(
-            response=response,
-        )
+        return GatewayCompletionsFactory.make_extract_output_from_portkey_response(response=response)
 
     def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
         if isinstance(exc, portkey_exceptions.NotFoundError):
