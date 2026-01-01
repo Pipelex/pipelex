@@ -4,12 +4,9 @@ from typing import TYPE_CHECKING, Any
 
 from portkey_ai import PORTKEY_GATEWAY_URL
 
-from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_telemetry_manager
-from pipelex.plugins.gateway.gateway_schemas import GatewayExtractRequestParams
 from pipelex.plugins.openai.openai_constants import OpenAIBodyKey
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError

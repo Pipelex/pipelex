@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from pydantic import field_validator, model_validator
 
-from pipelex import log
 from pipelex.cogt.exceptions import GeneratedImageError
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.tools.misc.base_64_utils import extract_base_64_str_from_base64_url_if_possible

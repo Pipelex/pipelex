@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pipelex.types import Self, StrEnum
+from pipelex.types import StrEnum
 
 
 class GatewayExtractProtocol(StrEnum):

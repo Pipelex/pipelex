@@ -9,7 +9,6 @@ from portkey_ai import (
 from pydantic import ValidationError
 from typing_extensions import override
 
-from pipelex import pretty_print
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
