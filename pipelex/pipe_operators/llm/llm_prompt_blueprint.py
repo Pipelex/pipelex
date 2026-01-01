@@ -12,6 +12,7 @@ from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderError
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
@@ -26,7 +27,7 @@ class LLMPromptBlueprint(BaseModel):
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
         if self.user_images:
-            user_images_top_object_name = [user_image.split(".", 1)[0] for user_image in self.user_images]
+            user_images_top_object_name = [get_root_from_dotted_path(user_image) for user_image in self.user_images]
             required_variables.update(user_images_top_object_name)
 
         if self.prompt_blueprint:
@@ -43,7 +44,7 @@ class LLMPromptBlueprint(BaseModel):
     # let's get back to it when we have a better solution for structuring_method
     async def make_llm_prompt(
         self,
-        output_concept_string: str,
+        output_concept_ref: str,
         context_provider: ContextProviderAbstract,
         output_structure_prompt: str | None = None,
         extra_params: dict[str, Any] | None = None,
@@ -63,7 +64,7 @@ class LLMPromptBlueprint(BaseModel):
                         accept_list=True,
                     )
                     if isinstance(prompt_image_content, ImageContent):
-                        user_image = PromptImageFactory.make_prompt_image(url=prompt_image_content.url, base_64_str=prompt_image_content.base_64)
+                        user_image = PromptImageFactory.make_prompt_image(url=prompt_image_content.url)
                         prompt_user_images[user_image_name] = user_image
                     elif isinstance(prompt_image_content, list):
                         prompt_image_content = cast("list[ImageContent]", prompt_image_content)
@@ -71,7 +72,7 @@ class LLMPromptBlueprint(BaseModel):
                             if not isinstance(image_item, ImageContent):  # pyright: ignore[reportUnnecessaryIsInstance]
                                 msg = f"Item of '{user_image_name}' is of type '{type(image_item).__name__}', it should be ImageContent"
                                 raise LLMPromptBlueprintValueError(msg)
-                            user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
+                            user_image = PromptImageFactory.make_prompt_image(url=image_item.url)
                             user_image_item_name = f"{user_image_name}[{image_index}]"
                             prompt_user_images[user_image_item_name] = user_image
                     else:
@@ -88,7 +89,7 @@ class LLMPromptBlueprint(BaseModel):
                         if isinstance(image_collection, (list, tuple)):
                             image_collection = cast("list[ImageContent] | tuple[ImageContent]", image_collection)
                             for image_index, image_item in enumerate(image_collection, start=1):
-                                user_image = PromptImageFactory.make_prompt_image(url=image_item.url, base_64_str=image_item.base_64)
+                                user_image = PromptImageFactory.make_prompt_image(url=image_item.url)
                                 user_image_item_name = f"{user_image_name}[{image_index}]"
                                 prompt_user_images[user_image_item_name] = user_image
                         else:
@@ -125,7 +126,7 @@ class LLMPromptBlueprint(BaseModel):
             # Note that output_structure_prompt can be None
             # it's OK to have a null user_text
 
-        log.verbose(f"User text with {output_concept_string=}:\n {user_text}")
+        log.verbose(f"User text with {output_concept_ref=}:\n {user_text}")
 
         ############################################################
         # System text

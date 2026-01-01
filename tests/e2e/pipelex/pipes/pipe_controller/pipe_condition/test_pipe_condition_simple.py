@@ -9,7 +9,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
-from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
@@ -24,7 +24,7 @@ from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition im
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeConditionSimple:
-    async def test_direct_pipe_condition_should_fail(self, load_test_library: Callable[[list[Path]], None]):
+    async def test_direct_pipe_condition_should_fail(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """Test a PipeCondition created directly in code that should FAIL dry run."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create a PipeCondition directly in Python that requires an input
@@ -48,7 +48,7 @@ class TestPipeConditionSimple:
 
         with pytest.raises(PipeRunInputsError) as exc_info:
             await pipe_condition.run_pipe(
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
                 working_memory=empty_working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )
@@ -56,10 +56,11 @@ class TestPipeConditionSimple:
         # Verify it failed for the right reason
         error = exc_info.value
         assert error.pipe_code == "test_condition_fail"
+        assert error.missing_inputs is not None
         assert "user_category" in error.missing_inputs
-        assert "Missing required inputs" in str(error)
+        assert "missing required inputs" in str(error)
 
-    async def test_direct_pipe_condition_should_succeed(self, load_test_library: Callable[[list[Path]], None]):
+    async def test_direct_pipe_condition_should_succeed(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """Test a PipeCondition created directly in code that should SUCCEED dry run."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create a PipeCondition directly in Python
@@ -81,11 +82,11 @@ class TestPipeConditionSimple:
         # Test with proper working memory - should SUCCEED or fail at expression evaluation (not missing inputs)
         working_memory = WorkingMemoryFactory.make_for_dry_run(
             needed_inputs=[
-                TypedNamedInputRequirement(
+                TypedNamedStuffSpec(
                     variable_name="user_status",
                     concept=ConceptFactory.make(
                         concept_code="CategoryInput",
-                        domain="test_pipe_condition",
+                        domain_code="test_pipe_condition",
                         description="CategoryInput",
                         structure_class_name="CategoryInput",
                     ),
@@ -96,7 +97,7 @@ class TestPipeConditionSimple:
 
         try:
             pipe_output = await pipe_condition.run_pipe(
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )

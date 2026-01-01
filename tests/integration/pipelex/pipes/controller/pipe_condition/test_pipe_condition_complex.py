@@ -13,6 +13,7 @@ from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -28,7 +29,9 @@ from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition_co
 @pytest.mark.llm
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeConditionComplex:
-    async def test_technical_urgent_routing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_technical_urgent_routing(
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test technical document with urgent priority routing."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create complex input data
@@ -39,7 +42,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -49,7 +52,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -64,7 +67,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
@@ -79,7 +82,9 @@ class TestPipeConditionComplex:
         if pipe_run_mode != PipeRunMode.DRY:
             assert "URGENT_TECHNICAL_PROCESSED" in final_result.content.text
 
-    async def test_business_finance_routing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_business_finance_routing(
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test business document for finance department routing."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="business", priority="normal", language="english", complexity="medium")
@@ -88,7 +93,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -98,7 +103,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -113,7 +118,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
@@ -125,7 +130,9 @@ class TestPipeConditionComplex:
             assert isinstance(final_result.content, TextContent)
             assert "FINANCE_BUSINESS_PROCESSED" in final_result.content.text
 
-    async def test_legal_complex_routing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_legal_complex_routing(
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test complex legal document routing."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="legal", priority="normal", language="spanish", complexity="high")
@@ -134,7 +141,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -144,7 +151,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -159,7 +166,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
@@ -171,7 +178,9 @@ class TestPipeConditionComplex:
             assert isinstance(final_result.content, TextContent)
             assert "COMPLEX_LEGAL_PROCESSED" in final_result.content.text
 
-    async def test_technical_expert_high_complexity_routing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_technical_expert_high_complexity_routing(
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test technical document with expert user and high complexity."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(
@@ -188,7 +197,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -198,7 +207,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -213,7 +222,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
@@ -226,7 +235,7 @@ class TestPipeConditionComplex:
             assert "EXPERT_TECHNICAL_PROCESSED" in final_result.content.text
 
     # DRY RUN TESTS
-    async def test_complex_pipeline_dry_run_success(self, load_test_library: Callable[[list[Path]], None]):
+    async def test_complex_pipeline_dry_run_success(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """Test complex pipeline dry run with valid inputs - should succeed."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="business", priority="urgent", language="english", complexity="low")
@@ -235,7 +244,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -245,7 +254,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -260,7 +269,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
@@ -269,7 +278,7 @@ class TestPipeConditionComplex:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
 
-    async def test_complex_pipeline_dry_run_missing_inputs(self, load_test_library: Callable[[list[Path]], None]):
+    async def test_complex_pipeline_dry_run_missing_inputs(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """Test complex pipeline dry run with missing inputs - should fail with PipeRouterError."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="technical", priority="urgent", language="english", complexity="high")
@@ -277,7 +286,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -287,21 +296,25 @@ class TestPipeConditionComplex:
 
         working_memory = WorkingMemoryFactory.make_from_single_stuff(doc_stuff)
 
-        with pytest.raises(PipeRunInputsError) as exc_info:
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="complex_document_processor"),
                     pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
                     working_memory=working_memory,
-                    job_metadata=JobMetadata(),
+                    job_metadata=job_metadata,
                 ),
             )
 
         error = exc_info.value
         assert error.pipe_code == "complex_document_processor"
-        assert error.missing_inputs is not None
-        assert "user_profile" in error.missing_inputs
-        assert "Missing required inputs" in str(error)
+        assert "missing required inputs" in str(error)
+
+        # Check the underlying cause is PipeRunInputsError with missing_inputs details
+        cause = error.__cause__
+        assert isinstance(cause, PipeRunInputsError)
+        assert cause.missing_inputs is not None
+        assert "user_profile" in cause.missing_inputs
 
     @pytest.mark.parametrize(
         ("doc_type", "priority", "user_level", "department", "complexity", "language", "expected_output_contains"),
@@ -320,6 +333,7 @@ class TestPipeConditionComplex:
     )
     async def test_complex_routing_scenarios_dry_run(
         self,
+        job_metadata: JobMetadata,
         doc_type: Literal["technical", "business", "legal"],
         priority: Literal["urgent", "normal", "low"],
         user_level: Literal["beginner", "intermediate", "expert"],
@@ -345,7 +359,7 @@ class TestPipeConditionComplex:
         doc_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="DocumentRequest",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.DocumentRequest",
                 structure_class_name="DocumentRequest",
             ),
@@ -355,7 +369,7 @@ class TestPipeConditionComplex:
         user_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="UserProfile",
-                domain="test_pipe_condition_complex",
+                domain_code="test_pipe_condition_complex",
                 description="test_pipe_condition_complex.UserProfile",
                 structure_class_name="UserProfile",
             ),
@@ -370,7 +384,7 @@ class TestPipeConditionComplex:
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 

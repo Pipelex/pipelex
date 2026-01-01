@@ -20,10 +20,10 @@ A pipeline file has three main sections:
 
 ### Domain Statement
 ```plx
-domain = "domain_name"
+domain = "domain_code"
 description = "Description of the domain" # Optional
 ```
-Note: The domain name usually matches the plx filename for single-file domains. For multi-file domains, use the subdirectory name.
+Note: The domain code usually matches the plx filename for single-file domains. For multi-file domains, use the subdirectory name.
 
 ### Concept Definitions
 

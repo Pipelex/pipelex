@@ -8,6 +8,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 
@@ -18,7 +19,9 @@ from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 @pytest.mark.usefixtures("routing_profile_override")
 class TestLLMVision:
     @pytest.mark.parametrize(("topic", "image_uri"), LLMVisionTestCases.IMAGE_URLS)
-    async def test_gen_text_from_vision_by_url(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_uri: str):
+    async def test_gen_text_from_vision_by_url(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_uri: str
+    ):
         prompt_image = PromptImageFactory.make_prompt_image(url=image_uri)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
@@ -27,6 +30,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
 
@@ -40,7 +44,9 @@ class TestLLMVision:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
 
     @pytest.mark.parametrize(("topic", "image_path"), LLMVisionTestCases.IMAGE_PATHS)
-    async def test_gen_text_from_vision_by_bytes(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str):
+    async def test_gen_text_from_vision_by_bytes(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str
+    ):
         image_bytes = load_binary_as_base64(path=image_path)
         prompt_image = PromptImageBase64(base_64=image_bytes)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
@@ -49,6 +55,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         try:
@@ -61,7 +68,9 @@ class TestLLMVision:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
 
     @pytest.mark.parametrize(("topic", "image_path"), LLMVisionTestCases.IMAGE_PATHS)
-    async def test_gen_text_from_vision_by_path(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str):
+    async def test_gen_text_from_vision_by_path(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str
+    ):
         prompt_image = PromptImagePath(file_path=image_path)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
@@ -69,6 +78,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_USER_TEXT,
                 user_images=[prompt_image],
             ),
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         try:
@@ -81,7 +91,9 @@ class TestLLMVision:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
 
     @pytest.mark.parametrize(("topic", "image_pair"), LLMVisionTestCases.IMAGE_PATH_PAIRS)
-    async def test_gen_text_from_vision_2_images(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_pair: tuple[str, str]):
+    async def test_gen_text_from_vision_2_images(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_pair: tuple[str, str]
+    ):
         prompt_image1 = PromptImagePath(file_path=image_pair[0])
         prompt_image2 = PromptImagePath(file_path=image_pair[1])
         llm_worker = get_llm_worker(llm_handle=llm_handle)
@@ -90,6 +102,7 @@ class TestLLMVision:
                 user_text=LLMVisionTestCases.VISION_IMAGES_COMPARE_PROMPT,
                 user_images=[prompt_image1, prompt_image2],
             ),
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
         )
         try:

@@ -17,6 +17,7 @@ class InferenceModelSpec(ConfigModel):
     backend_name: str
     name: str
     sdk: str
+    variant: str | None = None
     model_type: ModelType = Field(strict=False)
     model_id: str
     inputs: list[str] = Field(default_factory=list)

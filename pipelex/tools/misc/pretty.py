@@ -19,7 +19,7 @@ from rich.text import Text, TextType
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor, print_to_stderr
-from pipelex.tools.typing.pydantic_utils import CustomBaseModel, make_truncated_wrapper
+from pipelex.tools.typing.pydantic_utils import make_truncated_wrapper
 from pipelex.types import StrEnum
 
 TEXT_COLOR = TerminalColor.WHITE
@@ -102,6 +102,28 @@ def pretty_print_md(
     md_content = Markdown(content)
     PrettyPrinter.pretty_print(
         content=md_content,
+        title=title,
+        subtitle=subtitle,
+        inner_title=inner_title,
+        border_style=border_style,
+        width=width,
+        console_width=console_width,
+    )
+
+
+def pretty_print_url(
+    url: str,
+    title: TextType | None = None,
+    subtitle: TextType | None = None,
+    inner_title: str | None = None,
+    border_style: StyleType | None = None,
+    width: int | None = None,
+    console_width: int | None = None,
+):
+    if url.startswith("/"):
+        url = "file://" + url
+    pretty_print(
+        Text(url, style="link " + url, no_wrap=False),
         title=title,
         subtitle=subtitle,
         inner_title=inner_title,
@@ -244,7 +266,9 @@ class PrettyPrinter:
         # Format the value
         if isinstance(value, PrettyPrintable):
             pretty = value
-        elif isinstance(value, BaseModel) and not isinstance(value, CustomBaseModel):
+        elif isinstance(value, PrettyRenderable):
+            pretty = value.rendered_pretty(depth=depth)
+        elif isinstance(value, BaseModel):
             # Wrap regular BaseModel to get truncated __rich_repr__ with proper class name
             pretty = Pretty(make_truncated_wrapper(value))
         elif isinstance(value, dict):
@@ -276,19 +300,17 @@ class PrettyPrinter:
             # Handle URLs specially, otherwise use Text for simple strings
             if value.startswith(("http://", "https://")):
                 pretty = Text(value, style="link " + value, no_wrap=True)
-            elif AttributePolisher.should_truncate_any_long_string(value):
+            elif AttributePolisher.should_truncate(value=value):
                 # Truncate long base64-like strings
-                pretty = Text(AttributePolisher.get_truncated_long_string(value))
+                pretty = Text(AttributePolisher.get_truncated_value(value))
             else:
                 # Use Text instead of Markdown to allow proper auto-sizing
                 pretty = Text(value)
         elif isinstance(value, (int, float, bool)):
             # For primitive types, convert to string
             pretty = Text(str(value))
-        elif isinstance(value, PrettyRenderable):
-            pretty = value.rendered_pretty(depth=depth)
         else:
-            # For other types, use Pretty
+            # For other types, use Rich's native Pretty rendering
             pretty = Pretty(value)
 
         if inner_title:

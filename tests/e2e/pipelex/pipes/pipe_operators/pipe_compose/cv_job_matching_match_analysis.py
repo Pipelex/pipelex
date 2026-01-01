@@ -9,7 +9,6 @@ If you want to customize this structure:
 To regenerate: pipelex build structures <target_directory>
 """
 
-
 from pydantic import Field
 
 from pipelex.core.stuffs.structured_content import StructuredContent

@@ -143,8 +143,8 @@ Always use the full identifier when referencing concepts in code:
 ```python
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 
-invoice_stuff = StuffFactory.make_from_concept_string(
-    concept_string="finance.Invoice",  # domain_code.ConceptName
+invoice_stuff = StuffFactory.make_from_concept_ref(
+    concept_ref="finance.Invoice",  # domain_code.ConceptName
     name="invoice_123",
     content=invoice_data
 )

@@ -7,7 +7,6 @@ from typing_extensions import override
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.tools.misc.file_utils import ensure_directory_exists
 from pipelex.tools.misc.pretty import PrettyPrintable
 
 
@@ -61,6 +60,7 @@ class TextAndImagesContent(StuffContent):
         if self.images:
             # Check if any image has a caption (for table column headers)
             has_captions = any(image.caption for image in self.images)
+            has_display_links = any(image.display_link for image in self.images)
 
             table = Table(
                 title=f"Images ({len(self.images)}):",
@@ -72,6 +72,8 @@ class TextAndImagesContent(StuffContent):
             )
             table.add_column("Index")
             table.add_column("URL", width=36)
+            if has_display_links:
+                table.add_column("")
             if has_captions:
                 table.add_column("Caption", style="yellow italic")
 
@@ -79,19 +81,20 @@ class TextAndImagesContent(StuffContent):
                 index_text = Text.from_markup(f"[dim]img-[/dim][yellow]{idx}[/yellow]")
                 display_url = f"{image.url[:35]}…" if len(image.url) > 36 else image.url
                 url_markdown = Markdown(f"[{display_url}]({image.url})")
-                if has_captions:
+                link = image.display_link
+                if link is not None:
+                    link_text = Text("Display", style=f"cyan link {link}")
+                else:
+                    link_text = Text()
+                if has_captions and has_display_links:
+                    table.add_row(index_text, url_markdown, link_text, image.caption or "/")
+                elif has_captions:
                     table.add_row(index_text, url_markdown, image.caption or "/")
+                elif has_display_links:
+                    table.add_row(index_text, url_markdown, link_text)
                 else:
                     table.add_row(index_text, url_markdown)
 
             group.renderables.append(table)
 
         return group
-
-    def save_to_directory(self, directory: str):
-        ensure_directory_exists(directory)
-        if text_content := self.text:
-            text_content.save_to_directory(directory=directory)
-        if images := self.images:
-            for image_content in images:
-                image_content.save_to_directory(directory=directory)

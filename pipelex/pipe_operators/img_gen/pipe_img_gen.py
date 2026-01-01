@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
@@ -16,7 +16,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
@@ -31,8 +31,8 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.misc.base_64_utils import extract_base_64_str_from_base64_url_if_possible
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
+from pipelex.tools.misc.image_utils import ImageFormat
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
@@ -52,11 +52,11 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
-    output_format: OutputFormat | None = Field(default=None, strict=False)
+    output_format: ImageFormat | None = Field(default=None, strict=False)
     output_multiplicity: VariableMultiplicity
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
         return self.inputs
 
@@ -81,25 +81,25 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     @override
     def validate_output_with_library(self):
         if not get_concept_library().is_compatible(
-            tested_concept=self.output,
+            tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.IMAGE),
             strict=True,
         ):
             msg = (
                 f"The output of a PipeImgGen must be compatible with the Image concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'"
+                f"In the pipe '{self.code}' the output is '{self.output.concept.concept_ref}'"
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                domain=self.domain,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept_string,
-                required_concept_codes=[NativeConceptCode.IMAGE.concept_string],
+                provided_concept_code=self.output.concept.concept_ref,
+                required_concept_codes=[NativeConceptCode.IMAGE.concept_ref],
             )
 
     @override
-    async def _run_operator_pipe(
+    async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -165,7 +165,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             is_moderated=img_gen_setting.is_moderated,
             safety_tolerance=img_gen_setting.safety_tolerance,
             is_raw=self.is_raw if self.is_raw is not None else img_gen_param_defaults.is_raw,
-            output_format=self.output_format or img_gen_param_defaults.output_format,
+            output_format=self.output_format,
             seed=seed,
         )
         # Get the image generation handle
@@ -187,12 +187,11 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             nb_images = 1
 
-        # Get the structure class from the registry (might be a subclass of ImageContent)
-        structure_class = get_class_registry().get_required_subclass(
-            name=self.output.structure_class_name,
+        # Get the structure class from the registry (must be a subclass of ImageContent)
+        image_content_subclass = get_class_registry().get_required_subclass(
+            name=self.output.concept.structure_class_name,
             base_class=ImageContent,
         )
-        base_64_str: str | None
         if nb_images > 1:
             generated_image_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
@@ -206,15 +205,11 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
             image_content_items: list[StuffContent] = []
             for generated_image in generated_image_list:
-                generated_image_url = generated_image.url
-                base_64_str = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
-                image_content_items.append(
-                    structure_class(
-                        url=generated_image_url,
-                        source_prompt=img_gen_prompt_text,
-                        base_64=base_64_str,
-                    ),
+                image_content = image_content_subclass(
+                    url=generated_image.url,
+                    source_prompt=img_gen_prompt_text,
                 )
+                image_content_items.append(image_content)
             the_content = ListContent(
                 items=image_content_items,
             )
@@ -230,19 +225,15 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 img_gen_job_config=img_gen_config.img_gen_job_config,
             )
 
-            generated_image_url = generated_image.url
-            base_64_str = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=generated_image_url)
-
-            the_content = structure_class(
-                url=generated_image_url,
+            the_content = image_content_subclass(
+                url=generated_image.url,
                 source_prompt=img_gen_prompt_text,
-                base_64=base_64_str,
             )
-            log.verbose(the_content, title="Single image content")
+            log.verbose(the_content, title=f"output stuff content of PipeImg {self.code}")
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
-            concept=self.output,
+            concept=self.output.concept,
             content=the_content,
         )
 
@@ -264,11 +255,22 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeImgGenOutput:
-        content_generator_dry = ContentGeneratorDry()
-        return await self._run_operator_pipe(
+        return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             output_name=output_name,
-            content_generator=content_generator_dry,
+            content_generator=ContentGeneratorDry(),
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

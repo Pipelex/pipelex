@@ -22,7 +22,7 @@ from pipelex.core.pipes.exceptions import (
     PipeOperatorModelChoiceError,
     PipeValidationError,
 )
-from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.stuffs.exceptions import (
     StuffArtefactError,
     StuffArtefactReservedFieldError,
@@ -91,7 +91,7 @@ __all__ = [
     "PipeRouterError",
     "PipeRunError",
     # from pipelex.core.pipes.exceptions
-    "PipeInputNotFoundError",
+    "InputStuffSpecNotFoundError",
     "PipeFactoryError",
     "PipeOperatorModelChoiceError",
     # from pipelex.core.stuffs.exceptions

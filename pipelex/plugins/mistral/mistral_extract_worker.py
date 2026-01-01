@@ -3,7 +3,6 @@ from typing import Any
 from mistralai import Mistral
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
@@ -54,7 +53,6 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                 pdf_uri=pdf_uri,
                 should_include_images=extract_job.job_params.should_include_images,
                 should_caption_images=extract_job.job_params.should_caption_images,
-                should_include_page_views=extract_job.job_params.should_include_page_views,
             )
         else:
             msg = "No image nor PDF URI provided in ExtractJob"
@@ -84,17 +82,10 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         pdf_uri: str,
         should_include_images: bool,
         should_caption_images: bool,
-        should_include_page_views: bool,
     ) -> ExtractOutput:
         if should_caption_images:
             msg = "Captioning is not implemented for Mistral OCR."
             raise ExtractCapabilityError(msg)
-        if should_include_page_views:
-            log.verbose("Page views are not implemented for Mistral OCR.")
-            # TODO: use a model capability flag to check possibility before asking for it
-            # it it's asked and not available, raise
-            # the caller will be responsible to get the page views using other solution if needed
-            # raise OcrCapabilityError("Page views are not implemented for Mistral OCR.")
         pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
         extract_output: ExtractOutput
         if pdf_url:

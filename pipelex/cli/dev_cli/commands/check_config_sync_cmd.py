@@ -8,14 +8,9 @@ from pathlib import Path
 from rich.panel import Panel
 
 from pipelex.hub import get_console
+from pipelex.kit.paths import GIT_IGNORED_CONFIG_DIRS, GIT_IGNORED_CONFIG_FILES
 from pipelex.tools.misc.diff import has_diff_dirs, make_diff_dirs_pretty
 from pipelex.types import StrEnum
-
-# Files excluded from config sync check because they have intentionally different values
-# between the template (for new users) and the dev config (for developers/tests).
-# - pipelex_service.toml: Contains terms_accepted which is False in template
-#   (for new users) but True in dev config (for developers/tests)
-CONFIG_SYNC_EXCLUDE_FILES = {"pipelex_service.toml"}
 
 
 class LeadingConfig(StrEnum):
@@ -77,8 +72,8 @@ def check_config_sync_cmd(
             left_label = "pipelex/kit/configs"
             right_label = ".pipelex"
 
-    # Check for differences (excluding files that intentionally differ)
-    has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=CONFIG_SYNC_EXCLUDE_FILES)
+    # Check for differences (excluding files and directories that intentionally differ)
+    has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=GIT_IGNORED_CONFIG_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
 
     if not has_diff:
         # No differences found
@@ -113,7 +108,7 @@ def check_config_sync_cmd(
 
         if show_diff:
             console.print()
-            pretty_diff = make_diff_dirs_pretty(left_dir, right_dir, exclude_files=CONFIG_SYNC_EXCLUDE_FILES)
+            pretty_diff = make_diff_dirs_pretty(left_dir, right_dir, exclude_files=GIT_IGNORED_CONFIG_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
             console.print(pretty_diff)
             console.print()
 

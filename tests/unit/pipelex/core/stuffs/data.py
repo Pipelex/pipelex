@@ -114,7 +114,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_name="stuff_name",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -135,7 +135,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -162,7 +162,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -210,7 +210,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_code="stuff_code",
             stuff_name="stuff_name",
             concept=ConceptFactory.make(
-                domain="test_domain",
+                domain_code="test_domain",
                 concept_code="MyConceptNotNativeText",
                 description="Test concept for unit tests",
                 structure_class_name="MyConceptNotNativeText",
@@ -248,7 +248,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_code="stuff_code",
             stuff_name="stuff_name",
             concept=ConceptFactory.make(
-                domain="test_domain",
+                domain_code="test_domain",
                 concept_code="MyConceptNotNativeText",
                 description="Test concept for unit tests",
                 structure_class_name="MyConceptNotNativeText",
@@ -277,7 +277,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_name="stuff_name",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -301,7 +301,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -331,7 +331,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_name="stuff_name",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -363,7 +363,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -393,7 +393,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -441,7 +441,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="MyConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for unit tests",
                 structure_class_name="MyConcept",
             ),
@@ -492,7 +492,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, l
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="AnotherConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for search domains",
                 structure_class_name="AnotherConcept",
             ),
@@ -514,7 +514,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, l
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="AnotherConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for search domains",
                 structure_class_name="AnotherConcept",
             ),
@@ -543,7 +543,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, l
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="AnotherConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for search domains",
                 structure_class_name="AnotherConcept",
             ),
@@ -570,7 +570,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, l
             stuff_code="stuff_code",
             concept=ConceptFactory.make(
                 concept_code="AnotherConcept",
-                domain="test_domain",
+                domain_code="test_domain",
                 description="Test concept for search domains",
                 structure_class_name="AnotherConcept",
             ),

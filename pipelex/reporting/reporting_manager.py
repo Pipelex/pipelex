@@ -5,7 +5,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import ReportingManagerError
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
+from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
@@ -61,15 +61,11 @@ class ReportingManager(ReportingProtocol):
             log.warning("LLM job has no llm_tokens_usage")
             return
 
-        llm_token_cost_report: LLMTokenCostReport | None = None
-
-        if self._reporting_config.is_log_costs_to_console:
-            llm_token_cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
-
         pipeline_run_id = llm_job.job_metadata.pipeline_run_id
         self._get_registry(pipeline_run_id).add_tokens_usage(llm_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
+            llm_token_cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
             log.verbose(llm_token_cost_report, title="Token Cost report")
 
     ############################################################

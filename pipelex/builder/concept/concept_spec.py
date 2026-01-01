@@ -180,7 +180,7 @@ class ConceptSpec(StructuredContent):
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
         if refines is not None:
-            if not NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refines):
+            if not NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refines):
                 msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
                 raise ValueError(msg)
         return refines

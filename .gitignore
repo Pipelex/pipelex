@@ -42,8 +42,10 @@ Thumbs.db
 reports/
 results/
 
-# personnal pipelex config file that overrides the default one
+# personnal pipelex config files that overrides the default one
 pipelex_super.toml
+pipelex_override.toml
+telemetry_override.toml
 
 # local pipelex service configuration
 .pipelex/pipelex_service.toml
@@ -56,3 +58,4 @@ gcp_credentials.json
 /pipelex.toml
 settings.local.json
 structures/
+.pipelex/storage

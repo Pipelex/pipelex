@@ -133,6 +133,34 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: str | No
 
     if bundle_path:
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{bundle_path}[/yellow]\n")
+
+    # Display blueprint validation errors (e.g., MISSING_INPUT_VARIABLE, EXTRANEOUS_INPUT_VARIABLE from blueprint validation)
+    if exc.pipelex_bundle_blueprint_validation_errors:
+        console.print("[bold cyan]Blueprint Validation Errors:[/bold cyan]\n")
+        for error_index, blueprint_error in enumerate(exc.pipelex_bundle_blueprint_validation_errors, 1):
+            error_type_display = blueprint_error.error_type.replace("_", " ").title() if blueprint_error.error_type else "Validation Error"
+            console.print(f"[bold yellow]{error_index}. {error_type_display}[/bold yellow]")
+
+            # Display key identification info
+            if blueprint_error.pipe_code:
+                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{blueprint_error.pipe_code}[/yellow]")
+            if blueprint_error.domain_code:
+                console.print(f"   [cyan]Domain:[/cyan] [green]{blueprint_error.domain_code}[/green]")
+
+            # Variables
+            if blueprint_error.variable_names:
+                variables_str = ", ".join([f"[yellow]{v}[/yellow]" for v in blueprint_error.variable_names])
+                console.print(f"   [cyan]Variables:[/cyan] {variables_str}")
+
+            # Error message
+            console.print(f"   [cyan]→[/cyan] {blueprint_error.message}")
+
+            # Source file
+            if blueprint_error.source:
+                console.print(f"   [dim]└─ Source: {blueprint_error.source}[/dim]")
+
+            console.print()
+
     # Display pipe validation errors
     if exc.pipe_validation_error_data:
         console.print("[bold cyan]Pipe Validation Errors:[/bold cyan]\n")
@@ -144,8 +172,8 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: str | No
                 console.print(f"   [cyan]Pipe:[/cyan] [yellow]{pipe_error.pipe_code}[/yellow]")
             if pipe_error.concept_code:
                 console.print(f"   [cyan]Concept:[/cyan] [yellow]{pipe_error.concept_code}[/yellow]")
-            if pipe_error.domain:
-                console.print(f"   [cyan]Domain:[/cyan] [green]{pipe_error.domain}[/green]")
+            if pipe_error.domain_code:
+                console.print(f"   [cyan]Domain:[/cyan] [green]{pipe_error.domain_code}[/green]")
 
             # Field name if present
             if pipe_error.field_name:

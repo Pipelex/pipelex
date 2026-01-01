@@ -45,6 +45,8 @@ def do_validate_all_libraries_and_dry_run() -> None:
             library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
 
             pipes = library.get_pipe_library().get_pipes()
+            for pipe in pipes:
+                pipe.validate_with_libraries()
 
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(pipes)})
 

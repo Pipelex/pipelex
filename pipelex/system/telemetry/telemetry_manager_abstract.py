@@ -100,11 +100,19 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         """Safe context manager for telemetry that works whether telemetry is enabled or not."""
 
     @abstractmethod
-    def is_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
         pass
 
     @abstractmethod
-    def is_portkey_tracing_enabled(self) -> bool:
+    def is_custom_portkey_tracing_enabled(self) -> bool:
+        pass
+
+    @abstractmethod
+    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+        pass
+
+    @abstractmethod
+    def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
         pass
 
     @abstractmethod
@@ -173,11 +181,19 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         yield
 
     @override
-    def is_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
         return False
 
     @override
-    def is_portkey_tracing_enabled(self) -> bool:
+    def is_custom_portkey_tracing_enabled(self) -> bool:
+        return False
+
+    @override
+    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+        return False
+
+    @override
+    def is_pipelex_gateway_portkey_tracing_enabled(self) -> bool:
         return False
 
     @override

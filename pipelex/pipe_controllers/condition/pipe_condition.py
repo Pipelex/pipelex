@@ -7,11 +7,10 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import WorkingMemory, WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
@@ -23,6 +22,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 ConditionOutcomeMap = dict[str, str | SpecialOutcome]
 
@@ -59,11 +59,11 @@ class PipeCondition(PipeController):
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
         # Variables from the expression/expression_template
-        expression_required_variables = detect_jinja2_required_variables(
+        full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
-        required_variables.update(expression_required_variables)
+        required_variables.update(path.split(".")[0] for path in full_paths)
 
         # Variables from the outcomes map and default_outcome
         for pipe_code in self.pipe_dependencies():
@@ -71,44 +71,46 @@ class PipeCondition(PipeController):
         return required_variables
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
         # If we've already visited this pipe, stop recursion
         if self.code in visited_pipes:
-            return InputRequirementsFactory.make_empty()
+            return InputStuffSpecsFactory.make_empty()
 
         # Add this pipe to visited set for recursive calls
         visited_pipes_with_current = visited_pipes | {self.code}
 
-        needed_inputs = InputRequirementsFactory.make_empty()
+        needed_inputs = InputStuffSpecsFactory.make_empty()
 
-        # 1. Add the variables from the expression/expression_template
-        required_variables = detect_jinja2_required_variables(
+        # Add the variables from the expression/expression_template
+        full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
+        required_variables = {get_root_from_dotted_path(path) for path in full_paths}
 
         for var_name in required_variables:
             if not var_name.startswith("_"):  # exclude internal variables starting with `_`
                 # We don't know the concept code from just the variable name,
                 # so we'll use a generic placeholder that will be validated later
-                needed_inputs.add_requirement(
+                needed_inputs.add_stuff_spec(
                     variable_name=var_name,
                     concept=ConceptFactory.make_native_concept(
                         native_concept_code=NativeConceptCode.ANYTHING,
                     ),
                 )
 
-        # 2. Add the inputs needed by all possible target pipes
+        # Add the inputs needed by all possible target pipes
         for pipe_code in self.mapped_pipe_codes:
             pipe = get_required_pipe(pipe_code=pipe_code)
             # Use the centralized recursion detection
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
 
-            for input_name, requirement in pipe_needed_inputs.items:
-                needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept)
+            for input_name, stuff_spec in pipe_needed_inputs.items:
+                needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+
         return needed_inputs
 
     @override
@@ -130,27 +132,27 @@ class PipeCondition(PipeController):
         """
         for pipe_code in self.mapped_pipe_codes:
             pipe = get_required_pipe(pipe_code=pipe_code)
-            if self.output.concept_string not in {
-                pipe.output.concept_string,
-                NativeConceptCode.DYNAMIC.concept_string,
-                NativeConceptCode.ANYTHING.concept_string,
+            if self.output.concept.concept_ref not in {
+                pipe.output.concept.concept_ref,
+                NativeConceptCode.DYNAMIC.concept_ref,
+                NativeConceptCode.ANYTHING.concept_ref,
             }:
                 msg = (
-                    f"The output concept code '{self.output.concept_string}' of the pipe '{self.code}' is not "
-                    f"matching the output concept code '{pipe.output.concept_string}' of the pipe '{pipe_code}'"
+                    f"The output concept code '{self.output.concept.concept_ref}' of the pipe '{self.code}' is not "
+                    f"matching the output concept code '{pipe.output.concept.concept_ref}' of the pipe '{pipe_code}'"
                 )
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                    domain=self.domain,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
-                    provided_concept_code=pipe.output.concept_string,
-                    required_concept_codes=[self.output.concept_string],
+                    provided_concept_code=pipe.output.concept.concept_ref,
+                    required_concept_codes=[self.output.concept.concept_ref],
                 )
 
     # TODO: Restore this validation. The problem lies with needed_inputs that construct Anything concepts.
     # @override
-    # async def validate_before_run(
+    # async def _validate_before_run(
     #     self,
     #     job_metadata: JobMetadata,
     #     working_memory: WorkingMemory,
@@ -197,20 +199,14 @@ class PipeCondition(PipeController):
         return evaluated_expression
 
     @override
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        log.verbose(f"{self.class_name} generating a '{self.output.code}'")
-
-        # TODO: restore pipe_layer feature
-        # pipe_run_params.push_pipe_code(pipe_code=pipe_code)
-
         evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
-
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 
@@ -221,19 +217,20 @@ class PipeCondition(PipeController):
 
         if SpecialOutcome.is_fail(outcome):
             msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         chosen_pipe = get_required_pipe(pipe_code=outcome)
 
-        # Create condition details for tracking
         condition_details = self._make_pipe_condition_details(
             evaluated_expression=self.expression,
             chosen_pipe_code=chosen_pipe.code,
         )
 
         # Get required variables and validate they exist in working memory
+        # Extract root names from full paths for looking up stuffs in working memory
         required_variables = chosen_pipe.required_variables()
-        required_stuff_names = {required_variable for required_variable in required_variables if not required_variable.startswith("_")}
+        # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
+        required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables if not req_var.startswith("_")}
         try:
             required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
         except WorkingMemoryStuffNotFoundError as exc:
@@ -241,9 +238,8 @@ class PipeCondition(PipeController):
             pipe_condition_path_str = ".".join(pipe_condition_path)
             error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
             msg = f"Some required stuff(s) not found: {error_details}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # Track condition steps
         for required_stuff in required_stuffs:
             get_pipeline_tracker().add_condition_step(
                 from_stuff=required_stuff,
@@ -253,19 +249,15 @@ class PipeCondition(PipeController):
                 comment="PipeCondition required for condition",
             )
 
-        # Execute the chosen pipe
-        log.verbose(f"Chosen pipe: {chosen_pipe.code}")
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=chosen_pipe,
+                pipe=get_required_pipe(pipe_code=outcome),
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
             ),
         )
-
-        # Track choice step
         get_pipeline_tracker().add_choice_step(
             from_condition=condition_details,
             to_stuff=pipe_output.main_stuff,
@@ -282,31 +274,13 @@ class PipeCondition(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        """Dry run implementation for PipeCondition.
-        Validates that all required inputs are present, expression is valid, and target pipes exist.
-        """
-        log.verbose(f"PipeCondition: dry run controller pipe: {self.code}")
-        # 1. Validate that all required inputs are present in the working memory
-        needed_inputs = self.needed_inputs()
-        missing_input_names: list[str] = []
-
-        for named_input_requirement in needed_inputs.named_input_requirements:
-            if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
-                missing_input_names.append(named_input_requirement.variable_name)
-
-        if missing_input_names:
-            log.error(f"Dry run failed: missing required inputs: {missing_input_names}")
-            raise PipeRunError(
-                message=f"Dry run failed for pipe '{self.code}' (PipeCondition): missing required inputs: {', '.join(missing_input_names)}",
-                run_mode=pipe_run_params.run_mode,
-            )
-
-        # 2. Validate that the expression template is valid
+        # Validate that the expression template is valid
         try:
-            required_variables = detect_jinja2_required_variables(
+            full_paths = detect_jinja2_required_variables(
                 template_category=TemplateCategory.EXPRESSION,
                 template_source=self.expression,
             )
+            required_variables = {get_root_from_dotted_path(path) for path in full_paths}
             log.verbose(f"Expression template is valid, requires variables: {required_variables}")
         except Jinja2DetectVariablesError as exc:
             log.error(f"Dry run failed: could not detect required variables from expression template: {exc}")
@@ -314,9 +288,9 @@ class PipeCondition(PipeController):
                 f"Dry run failed for pipe '{self.code}' (PipeCondition): could not detect required variables "
                 f"from expression template: {exc}\nTemplate:\n'{self.expression}'"
             )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # 3. Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
+        # Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
         all_pipe_codes = set(self.outcome_map.values())
         if self.default_outcome:
             all_pipe_codes.add(self.default_outcome)
@@ -329,7 +303,7 @@ class PipeCondition(PipeController):
                 f"Dry run failed for PipeCondition '{self.code}': missing pipes: {', '.join(missing_pipes)}. "
                 f"Pipe map: {self.outcome_map}, default: {self.default_outcome}"
             )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         # Here, it should launch the dry run of all the pipes in the outcomes map
         for pipe_code in self.mapped_pipe_codes:
@@ -340,3 +314,15 @@ class PipeCondition(PipeController):
                 pipe_run_params=pipe_run_params,
             )
         return PipeOutput(working_memory=working_memory)
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

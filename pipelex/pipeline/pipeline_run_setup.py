@@ -44,7 +44,8 @@ async def pipeline_run_setup(
     output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
-    search_domains: list[str] | None = None,
+    search_domain_codes: list[str] | None = None,
+    user_id: str | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -85,9 +86,11 @@ async def pipeline_run_setup(
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
         inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
         to ``PipeRunMode.LIVE`` if the environment variable is not set.
-    search_domains:
-        List of domains to search for pipes. The executed pipe's domain is automatically
+    search_domain_codes:
+        List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.
+    user_id:
+        Unique identifier for the user (optional).
 
     Returns:
     -------
@@ -96,6 +99,7 @@ async def pipeline_run_setup(
         and the library ID.
 
     """
+    user_id = user_id or OTelConstants.DEFAULT_USER_ID
     if not plx_content and not pipe_code:
         msg = "Either pipe_code or plx_content must be provided to the pipeline API."
         raise ValueError(msg)
@@ -140,9 +144,9 @@ async def pipeline_run_setup(
 
     pipe_code = pipe.code
 
-    search_domains = search_domains or []
-    if pipe.domain not in search_domains:
-        search_domains.insert(0, pipe.domain)
+    search_domain_codes = search_domain_codes or []
+    if pipe.domain_code not in search_domain_codes:
+        search_domain_codes.insert(0, pipe.domain_code)
 
     working_memory: WorkingMemory | None = None
 
@@ -152,7 +156,7 @@ async def pipeline_run_setup(
         else:
             working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
                 pipeline_inputs=inputs,
-                search_domains=search_domains,
+                search_domain_codes=search_domain_codes,
             )
 
     if pipe_run_mode is None:
@@ -180,6 +184,7 @@ async def pipeline_run_setup(
         get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
     job_metadata = JobMetadata(
+        user_id=user_id,
         pipeline_run_id=pipeline.pipeline_run_id,
         otel_context=otel_context,
     )

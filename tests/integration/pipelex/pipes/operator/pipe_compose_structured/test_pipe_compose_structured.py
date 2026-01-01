@@ -22,6 +22,7 @@ from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlu
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_structured_models import (
     Address,
     Deal,
@@ -69,6 +70,7 @@ class TestPipeComposeStructured:
 
     async def test_compose_fixed_values_only(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
         test_library_path: list[Path],
@@ -90,6 +92,7 @@ class TestPipeComposeStructured:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
+            job_metadata=job_metadata,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
         pipe_output = await get_pipe_router().run(pipe_job=pipe_job)
@@ -121,6 +124,7 @@ class TestPipeComposeStructured:
 
     async def test_compose_with_variable_refs_and_templates(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
         test_library_path: list[Path],
@@ -153,6 +157,7 @@ class TestPipeComposeStructured:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
+            job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -174,6 +179,7 @@ class TestPipeComposeStructured:
 
     async def test_compose_with_nested_structure(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
         test_library_path: list[Path],
@@ -213,6 +219,7 @@ class TestPipeComposeStructured:
 
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
+            job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )

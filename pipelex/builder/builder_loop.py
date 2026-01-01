@@ -6,10 +6,11 @@ from pipelex.builder.builder import (
     PipeSpecUnion,
     reconstruct_bundle_with_pipe_fixes,
 )
+from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity
 from pipelex.hub import get_required_pipe
@@ -90,7 +91,36 @@ class BuilderLoop:
         is_save_second_iteration_enabled: bool,
     ) -> PipelexBundleSpec:
         fixed_pipes: list[PipeSpecUnion] = []
+        added_concepts: list[str] = []
 
+        # Handle pipe factory errors (e.g., missing output concepts)
+        for factory_error in bundle_error.pipe_factory_errors:
+            match factory_error.error_type:
+                case PipeFactoryErrorType.UNKNOWN_CONCEPT:
+                    # Fix unknown concept by adding a new concept that refines Text to the bundle
+                    unknown_concept_code = factory_error.missing_concept_code
+                    if not unknown_concept_code:
+                        continue
+
+                    # Create a simple concept that refines Text
+                    new_concept = ConceptSpec(
+                        the_concept_code=unknown_concept_code,
+                        description=unknown_concept_code,
+                        refines="Text",
+                    )
+
+                    # Add the concept to the bundle
+                    if pipelex_bundle_spec.concept is None:
+                        pipelex_bundle_spec.concept = {}
+
+                    pipelex_bundle_spec.concept[unknown_concept_code] = new_concept
+                    added_concepts.append(unknown_concept_code)
+                    log.info(f"🔧 Added unknown concept '{unknown_concept_code}' (refines Text) to bundle for pipe '{factory_error.pipe_code}'")
+
+                case PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR:
+                    continue
+
+        # Handle pipe validation errors
         for val_error in bundle_error.pipe_validation_error_data:
             if not val_error.pipe_code or not pipelex_bundle_spec.pipe:
                 continue
@@ -100,8 +130,8 @@ class BuilderLoop:
                 continue
 
             match val_error.error_type:
-                case PipeValidationErrorType.INPUT_REQUIREMENT_MISMATCH:
-                    # Fix input requirement mismatch by updating the specific mismatched input(s)
+                case PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH:
+                    # Fix input stuff spec mismatch by updating the specific mismatched input(s)
                     # This applies to ALL pipe categories (operators and controllers)
                     if not PipeCategory.is_controller_by_str(category_str=pipe_spec.pipe_category):
                         continue
@@ -117,12 +147,12 @@ class BuilderLoop:
 
                     # Update only the mismatched inputs with the correct concept from needed_inputs
                     for variable_name in mismatched_variables:
-                        for named_requirement in needed_inputs.named_input_requirements:
-                            if named_requirement.variable_name == variable_name:
+                        for named_stuff_spec in needed_inputs.named_stuff_specs:
+                            if named_stuff_spec.variable_name == variable_name:
                                 old_value = new_inputs.get(variable_name, "NOT SET")
                                 concept_code_with_multiplicity = format_concept_with_multiplicity(
-                                    concept_code_or_string=named_requirement.concept.code,
-                                    multiplicity=named_requirement.multiplicity,
+                                    concept_code_or_string=named_stuff_spec.concept.code,
+                                    multiplicity=named_stuff_spec.multiplicity,
                                 )
                                 new_inputs[variable_name] = concept_code_with_multiplicity
                                 # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
@@ -144,12 +174,12 @@ class BuilderLoop:
                     needed_inputs = pipe.needed_inputs()
                     old_inputs = dict(pipe_spec.inputs) if pipe_spec.inputs else {}
                     fixed_inputs: dict[str, str] = {}
-                    for named_requirement in needed_inputs.named_input_requirements:
+                    for named_stuff_spec in needed_inputs.named_stuff_specs:
                         concept_code_with_multiplicity = format_concept_with_multiplicity(
-                            concept_code_or_string=named_requirement.concept.code,
-                            multiplicity=named_requirement.multiplicity,
+                            concept_code_or_string=named_stuff_spec.concept.code,
+                            multiplicity=named_stuff_spec.multiplicity,
                         )
-                        fixed_inputs[named_requirement.variable_name] = concept_code_with_multiplicity
+                        fixed_inputs[named_stuff_spec.variable_name] = concept_code_with_multiplicity
 
                     # Only apply fix if it actually changes something (avoid infinite loops)
                     if fixed_inputs != old_inputs:
@@ -163,8 +193,8 @@ class BuilderLoop:
                                     This might be an intermediate variable that shouldn't be in inputs."
                         )
 
-                case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT:
-                    # Fix output concept mismatch for PipeSequence by updating to match last step's output
+                case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
+                    # Fix output concept/multiplicity mismatch for PipeSequence by updating to match last step's output
                     if not isinstance(pipe_spec, PipeSequenceSpec):
                         continue
 
@@ -183,8 +213,9 @@ class BuilderLoop:
                     pipe_spec.output = new_output
                     fixed_pipes.append(pipe_spec)
                     # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
+                    error_kind = "concept" if val_error.error_type == PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT else "multiplicity"
                     log.info(
-                        f"🔧 Fixed output concept for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
+                        f"🔧 Fixed output {error_kind} for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
                             '{new_output}' (matching last step '{last_step_pipe_code}')"
                     )
 
@@ -196,16 +227,18 @@ class BuilderLoop:
                 ):
                     continue
 
-        # Reconstruct bundle if we made changes
+        # Reconstruct bundle if we made pipe changes
         if fixed_pipes:
             pipelex_bundle_spec = reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes)
-            if is_save_second_iteration_enabled:
-                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-                second_iteration_path = get_incremental_file_path(
-                    base_path="results",
-                    base_name="generated_pipeline_2nd_iteration",
-                    extension="plx",
-                )
-                save_text_to_path(text=plx_content, path=second_iteration_path)
+
+        # Save second iteration if we made any changes (pipes or concepts)
+        if (fixed_pipes or added_concepts) and is_save_second_iteration_enabled:
+            plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+            second_iteration_path = get_incremental_file_path(
+                base_path="results",
+                base_name="generated_pipeline_2nd_iteration",
+                extension="plx",
+            )
+            save_text_to_path(text=plx_content, path=second_iteration_path)
 
         return pipelex_bundle_spec

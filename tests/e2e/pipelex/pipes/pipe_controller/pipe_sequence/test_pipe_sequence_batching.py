@@ -8,7 +8,7 @@ import pytest
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.inputs.input_requirements import TypedNamedInputRequirement
+from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -21,18 +21,20 @@ from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence impo
 @pytest.mark.dry_runnable
 @pytest.mark.inference
 @pytest.mark.asyncio
-async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+async def test_review_analysis_sequence_with_batching(
+    job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+):
     load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
     """Test customer review analysis sequence with batching."""
     # Create test input - a document with reviews
     if pipe_run_mode == PipeRunMode.DRY:
         working_memory = WorkingMemoryFactory.make_for_dry_run(
             needed_inputs=[
-                TypedNamedInputRequirement(
+                TypedNamedStuffSpec(
                     variable_name="document",
                     concept=ConceptFactory.make(
                         concept_code="Document",
-                        domain="customer_feedback",
+                        domain_code="customer_feedback",
                         description="Lorem ipsum",
                         structure_class_name="Document",
                     ),
@@ -42,7 +44,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
         )
         pipe = get_required_pipe(pipe_code="analyze_reviews_sequence")
         pipe_output = await pipe.run_pipe(
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             working_memory=working_memory,
         )
@@ -51,7 +53,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
             name="document",
             concept=ConceptFactory.make(
                 concept_code="Document",
-                domain="customer_feedback",
+                domain_code="customer_feedback",
                 description="customer_feedback.Document",
                 structure_class_name="Document",
             ),
@@ -75,7 +77,7 @@ async def test_review_analysis_sequence_with_batching(pipe_run_mode: PipeRunMode
     assert pipe_output.working_memory is not None
     assert pipe_output.main_stuff is not None
     assert pipe_output.main_stuff.concept.code == "ProductRating"
-    assert pipe_output.main_stuff.concept.domain == "customer_feedback"
+    assert pipe_output.main_stuff.concept.domain_code == "customer_feedback"
 
     # Log the working memory for debugging
     log.verbose("Final working memory after pipeline execution:")

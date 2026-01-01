@@ -9,14 +9,11 @@ If you want to customize this structure:
 To regenerate: pipelex build structures <target_directory>
 """
 
-from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
-
 from pydantic import Field
 
 from pipelex.core.stuffs.structured_content import StructuredContent
 
-from .cv_job_matching_InterviewQuestion import InterviewQuestion
+from .cv_job_matching_itvw_question import InterviewQuestion
 
 
 class InterviewSheet(StructuredContent):

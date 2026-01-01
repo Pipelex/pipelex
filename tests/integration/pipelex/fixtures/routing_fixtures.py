@@ -28,6 +28,7 @@ ALL_BACKENDS = [
     "fal",
     "google",
     "groq",
+    "huggingface",
     "mistral",
     "ollama",
     "openai",

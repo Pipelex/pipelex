@@ -2,10 +2,15 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
+import shortuuid
+from pytest_mock import MockerFixture
 
 from pipelex import log
 from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 
 pytest_plugins = [
@@ -13,6 +18,23 @@ pytest_plugins = [
 ]
 
 TEST_OUTPUTS_DIR = "temp/test_outputs"
+
+# Session-level cache for remote config (using dict to avoid global statement)
+_remote_config_cache: dict[str, RemoteConfig] = {}
+_original_fetch_remote_config = RemoteConfigFetcher.fetch_remote_config
+
+
+def _cached_fetch_remote_config() -> RemoteConfig:
+    """Wrapper that caches the remote config for the entire test session."""
+    if "config" not in _remote_config_cache:
+        _remote_config_cache["config"] = _original_fetch_remote_config()
+    return _remote_config_cache["config"]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def cache_remote_config_for_session(session_mocker: MockerFixture):
+    """Cache remote configuration for the entire test session to avoid repeated fetches."""
+    session_mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _cached_fetch_remote_config)
 
 
 def _get_test_integration_mode() -> IntegrationMode:
@@ -88,3 +110,18 @@ def load_empty_library() -> Generator[Callable[[], str], None, None]:
         library_manager = get_library_manager()
         library_manager.teardown(library_id=library_id)
         log.verbose(f"Torn down library: {library_id}")
+
+
+@pytest.fixture
+def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
+    """Provide a JobMetadata instance with test-specific values.
+
+    Uses the test node ID as pipeline_run_id for better traceability in logs.
+    """
+    test_id: str = request.node.nodeid  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    random_code: str = shortuuid.uuid()[:5]
+    pipeline_run_id: str = f"{test_id}-{random_code}"
+    return JobMetadata(
+        user_id="pytest",
+        pipeline_run_id=pipeline_run_id,
+    )

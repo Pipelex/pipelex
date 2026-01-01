@@ -22,11 +22,14 @@ from openai.types.chat import (
 )
 
 from pipelex.cogt.exceptions import PromptImageFormatError
+from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImagePath, PromptImageUrl
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.plugins.mistral.mistral_exceptions import MistralExtractResponseError
 from pipelex.plugins.openai.openai_utils import make_image_url_obj
 from pipelex.tools.misc.base_64_utils import load_binary_as_base64
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_path
@@ -137,13 +140,39 @@ class MistralFactory:
         cls,
         mistral_ocr_image_obj: mistralai.OCRImageObject,
     ) -> ExtractedImageFromPage:
+        if not mistral_ocr_image_obj.image_base64:
+            msg = "Mistral OCR image object does not have an image base64"
+            raise MistralExtractResponseError(msg)
+        width: int | None = None
+        height: int | None = None
+        if mistral_ocr_image_obj.top_left_x is not None and mistral_ocr_image_obj.bottom_right_x is not None:
+            width = mistral_ocr_image_obj.bottom_right_x - mistral_ocr_image_obj.top_left_x
+        if mistral_ocr_image_obj.top_left_y is not None and mistral_ocr_image_obj.bottom_right_y is not None:
+            height = mistral_ocr_image_obj.bottom_right_y - mistral_ocr_image_obj.top_left_y
+        size: ImageSize | None = None
+        if width is not None and height is not None:
+            size = ImageSize(width=width, height=height)
+        bounding_box: BoundingBox | None
+        if (
+            mistral_ocr_image_obj.top_left_x is not None
+            and mistral_ocr_image_obj.top_left_y is not None
+            and mistral_ocr_image_obj.bottom_right_x is not None
+            and mistral_ocr_image_obj.bottom_right_y is not None
+        ):
+            bounding_box = BoundingBox.make_from_two_corners(
+                top_left_x=mistral_ocr_image_obj.top_left_x,
+                top_left_y=mistral_ocr_image_obj.top_left_y,
+                bottom_right_x=mistral_ocr_image_obj.bottom_right_x,
+                bottom_right_y=mistral_ocr_image_obj.bottom_right_y,
+            )
+        else:
+            bounding_box = None
+
         return ExtractedImageFromPage(
-            image_id=mistral_ocr_image_obj.id,
-            top_left_x=mistral_ocr_image_obj.top_left_x,
-            top_left_y=mistral_ocr_image_obj.top_left_y,
-            bottom_right_x=mistral_ocr_image_obj.bottom_right_x,
-            bottom_right_y=mistral_ocr_image_obj.bottom_right_y,
-            base_64=mistral_ocr_image_obj.image_base64 or None,
+            size=size,
+            base64_str=mistral_ocr_image_obj.image_base64,
+            mime_type="image/jpeg",  # Mistral OCR returns JPEG images
+            bounding_box=bounding_box,
         )
 
     #########################################################

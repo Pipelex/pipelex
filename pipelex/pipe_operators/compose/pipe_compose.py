@@ -9,21 +9,20 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -40,9 +39,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     type: Literal["PipeCompose"] = "PipeCompose"
     model_config = ConfigDict(extra="forbid", strict=False)
 
-    output: Concept = ConceptFactory.make_native_concept(
-        native_concept_code=NativeConceptCode.TEXT,
-    )
+    output: StuffSpec = StuffSpec(concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT))
 
     # Template mode fields (used when template is provided)
     template: str | None = None
@@ -76,7 +73,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             return set()
 
         try:
-            required_variables = detect_jinja2_required_variables(
+            full_paths = detect_jinja2_required_variables(
                 template_category=self.category,
                 template_source=self.template,
             )
@@ -84,9 +81,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             msg = f"Error detecting required variables for PipeCompose: {exc}"
             raise ValueError(msg) from exc
         return {
-            variable_name
-            for variable_name in required_variables
-            if not variable_name.startswith("_") and variable_name not in {"preliminary_text", "place_holder"}
+            path.split(".")[0]
+            for path in full_paths
+            if not path.split(".")[0].startswith("_") and path.split(".")[0] not in {"preliminary_text", "place_holder"}
         }
 
     def _required_variables_for_construct(self) -> set[str]:
@@ -97,10 +94,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     # TODO: this needs testing!!!
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
-        needed_inputs = InputRequirementsFactory.make_empty()
-        for input_name, requirement in self.inputs.root.items():
-            needed_inputs.add_requirement(variable_name=input_name, concept=requirement.concept, multiplicity=requirement.multiplicity)
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+        needed_inputs = InputStuffSpecsFactory.make_empty()
+        for input_name, stuff_spec in self.inputs.root.items():
+            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
         return needed_inputs
 
     @override
@@ -125,26 +122,26 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         # In template mode, output must be Text-compatible
         if not get_concept_library().is_compatible(
-            tested_concept=self.output,
+            tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
             strict=True,
         ):
             msg = (
                 f"The output of a PipeCompose in template mode must be strictly compatible with the Text concept. "
-                f"In the pipe '{self.code}' the output is '{self.output.concept_string}'. "
+                f"In the pipe '{self.code}' the output is '{self.output.concept.concept_ref}'. "
                 "Make sure this concept refines the native Text concept, or use construct mode for StructuredContent."
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                domain=self.domain,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=self.output.concept_string,
-                required_concept_codes=[NativeConceptCode.TEXT.concept_string],
+                provided_concept_code=self.output.concept.concept_ref,
+                required_concept_codes=[NativeConceptCode.TEXT.concept_ref],
             )
 
     @override
-    async def _run_operator_pipe(
+    async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -153,9 +150,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeComposeOutput:
         content_generator = content_generator or get_content_generator()
-        if pipe_run_params.is_multiple_output_required:
-            msg = f"PipeCompose does not suppport multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-            raise PipeRunParamsError(msg)
 
         if self.is_construct_mode:
             return await self._run_construct_mode(
@@ -201,12 +195,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         # Get the structure class from the registry (might be a subclass of TextContent)
         structure_class = get_class_registry().get_required_subclass(
-            name=self.output.structure_class_name,
+            name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
         the_content = structure_class(text=jinja2_text)
 
-        output_stuff = StuffFactory.make_stuff(concept=self.output, content=the_content, name=output_name)
+        output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
 
         working_memory.set_new_main_stuff(
             stuff=output_stuff,
@@ -231,7 +225,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
         # Get the output class from the registry
         output_class = get_class_registry().get_required_subclass(
-            name=self.output.structure_class_name,
+            name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
 
@@ -244,7 +238,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         the_content = await composer.compose_async()
         log.verbose(f"Composed structured content: {the_content}")
 
-        output_stuff = StuffFactory.make_stuff(concept=self.output, content=the_content, name=output_name)
+        output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
 
         working_memory.set_new_main_stuff(
             stuff=output_stuff,
@@ -272,10 +266,22 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             log.verbose(f"PipeCompose: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
             content_generator_used = get_content_generator()
 
-        return await self._run_operator_pipe(
+        return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             output_name=output_name,
             content_generator=content_generator_used,
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

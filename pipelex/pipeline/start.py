@@ -19,7 +19,8 @@ async def start_pipeline(
     output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
-    search_domains: list[str] | None = None,
+    search_domain_codes: list[str] | None = None,
+    user_id: str | None = None,
 ) -> tuple[str, asyncio.Task[PipeOutput]]:
     """Start a pipeline in the background.
 
@@ -61,9 +62,11 @@ async def start_pipeline(
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
         inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
         to ``PipeRunMode.LIVE`` if the environment variable is not set.
-    search_domains:
-        List of domains to search for pipes. The executed pipe's domain is automatically
+    search_domain_codes:
+        List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.
+    user_id:
+        Unique identifier for the user.
 
     Returns:
     -------
@@ -82,7 +85,8 @@ async def start_pipeline(
         output_multiplicity=output_multiplicity,
         dynamic_output_concept_code=dynamic_output_concept_code,
         pipe_run_mode=pipe_run_mode,
-        search_domains=search_domains,
+        search_domain_codes=search_domain_codes,
+        user_id=user_id,
     )
 
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))

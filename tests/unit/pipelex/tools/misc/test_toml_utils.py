@@ -46,7 +46,7 @@ description = "Test"
 
     def test_validate_toml_file_trailing_space_after_triple_quotes(self, tmp_path: Path) -> None:
         """Test detection of trailing whitespace after triple quotes."""
-        toml_content = '''domain = "test"
+        toml_content = '''domain_code = "test"
 
 [pipe.test_pipe]
 type = "PipeLLM"
@@ -64,7 +64,7 @@ Output this only: "test"
         # Create content with explicit mixed line endings - use binary mode to ensure exact control
         toml_file = tmp_path / "mixed_endings.toml"
         # Write content with mixed line endings directly in binary mode
-        mixed_content = b'domain = "test"\r\\description = "Test"\nextra = "value"\n'
+        mixed_content = b'domain_code = "test"\r\\description = "Test"\nextra = "value"\n'
         toml_file.write_bytes(mixed_content)
 
     def test_load_toml_from_path_no_validation_by_default(self, tmp_path: Path) -> None:
@@ -144,7 +144,7 @@ Output: "test"
 
     def test_validate_toml_file_pipe_condition_real_case(self, tmp_path: Path) -> None:
         """Test the exact scenario from pipe_condition_2.toml with trailing space after triple quotes."""
-        toml_content = '''domain = "test_pipe_condition_2"
+        toml_content = '''domain_code = "test_pipe_condition_2"
 description = "Simple test for PipeCondition functionality using expression"
 
 [concept]

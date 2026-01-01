@@ -172,7 +172,7 @@ for_object = "cheap_llm_for_structured"
 choice_default = "extract_text_from_visuals"
 
 [extract.presets]
-extract_text_from_visuals = { model = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+extract_text_from_visuals = { model = "azure-document-intelligence", max_nb_images = 100, image_min_size = 50 }
 extract_text_from_pdf = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
 
 ####################################################################################################

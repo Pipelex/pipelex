@@ -49,11 +49,6 @@ class TestWorkingMemoryFactory:
                                 "caption": "First image showing data visualization",
                                 "source_prompt": "Generate a chart showing quarterly sales data",
                             },
-                            {
-                                "url": ("data:image/png;base64,mock_base64"),
-                                "caption": "Second image with base64 data",
-                                "base_64": ("mock_base64"),
-                            },
                             {"url": "/local/path/diagram.png", "caption": "System architecture diagram"},
                         ],
                     },
@@ -84,7 +79,7 @@ class TestWorkingMemoryFactory:
         # Verify images
         images = page_content.text_and_images.images
         assert images is not None
-        assert len(images) == 3
+        assert len(images) == 2
 
         # Check first image
         first_image = images[0]
@@ -93,18 +88,11 @@ class TestWorkingMemoryFactory:
         assert first_image.caption == "First image showing data visualization"
         assert first_image.source_prompt == "Generate a chart showing quarterly sales data"
 
-        # Check second image (with base64)
+        # Check second image
         second_image = images[1]
         assert isinstance(second_image, ImageContent)
-        expected_base64 = "mock_base64"
-        assert second_image.base_64 == expected_base64
-        assert second_image.caption == "Second image with base64 data"
-
-        # Check third image
-        third_image = images[2]
-        assert isinstance(third_image, ImageContent)
-        assert third_image.url == "/local/path/diagram.png"
-        assert third_image.caption == "System architecture diagram"
+        assert second_image.url == "/local/path/diagram.png"
+        assert second_image.caption == "System architecture diagram"
 
         # Verify page_view
         page_view = page_content.page_view

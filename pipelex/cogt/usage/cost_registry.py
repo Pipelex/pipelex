@@ -156,6 +156,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         )
 
         console.print(table)
+        console.print(" [dim]Note: the report only includes LLMs and some costs might be missing or not up-to-date.[/dim]")
 
         if cost_report_file_path:
             cls.save_to_csv(records, cost_report_file_path)

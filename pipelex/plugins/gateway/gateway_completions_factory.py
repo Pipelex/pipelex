@@ -6,12 +6,16 @@ import openai
 from portkey_ai import (
     createHeaders,  # type: ignore[reportUnknownVariableType]
 )
+from pydantic import ValidationError
 from typing_extensions import override
 
+from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
-from pipelex.plugins.gateway.gateway_exceptions import GatewayFactoryError
+from pipelex.plugins.gateway.gateway_exceptions import GatewayExtractResponseError, GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
+from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
+from pipelex.plugins.gateway.gateway_schemas import GatewayExtractPageAzure, GatewayExtractPageMistral
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 
 if TYPE_CHECKING:
@@ -49,47 +53,102 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         )
 
     @classmethod
-    def make_extract_output_from_portkey_response(
+    def make_extract_output_from_response(
+        cls,
+        inference_model: InferenceModelSpec,
+        response: GenericResponse,
+    ) -> ExtractOutput:
+        extract_protocol = GatewayExtractProtocol.make_from_model_handle(model_handle=inference_model.name)
+        match extract_protocol:
+            case GatewayExtractProtocol.MISTRAL_DOC_AI:
+                return cls._make_extract_output_from_response_mistral(response=response)
+            case GatewayExtractProtocol.AZURE_DOC_INTEL:
+                return cls._make_extract_output_from_response_azure(response=response)
+
+    @classmethod
+    def _make_extract_output_from_response_azure(
         cls,
         response: GenericResponse,
     ) -> ExtractOutput:
         if not hasattr(response, "pages"):
-            msg = "Portkey extract response does not have pages"
-            raise GatewayFactoryError(msg)
-        pages: dict[int, Page] = {}
-        for extracted_page in response.pages:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue, reportUnknownVariableType]
-            if not isinstance(extracted_page, dict):
-                msg = "Extracted page is not a dictionary"
-                raise GatewayFactoryError(msg)
-            extracted_page_dict = cast("dict[str, Any]", extracted_page)
-            page_index = extracted_page_dict.get("index")
-            if page_index is None:
-                msg = "Page index is not set"
-                raise GatewayFactoryError(msg)
-            extracted_page_text = extracted_page_dict.get("markdown")
-            if extracted_page_text is None:
-                msg = "Page text is not set"
-                raise GatewayFactoryError(msg)
-            extracted_page_images = extracted_page_dict.get("images")
-            if extracted_page_images is None:
-                msg = "Page images are not set"
-                raise GatewayFactoryError(msg)
-            page_images: list[ExtractedImageFromPage] = []
-            for extracted_page_image in extracted_page_images:
-                extracted_image = ExtractedImageFromPage(
-                    image_id=extracted_page_image["id"],
-                    base_64=extracted_page_image["image_base64"],
-                    caption=extracted_page_image["image_annotation"],
+            msg = "Gateway extract response does not have pages"
+            raise GatewayExtractResponseError(msg)
+        try:
+            response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+            pages: dict[int, Page] = {}
+            for response_page_dict in response_page_dicts:
+                response_page = GatewayExtractPageAzure.model_validate(response_page_dict)
+                page_index = response_page.index
+                extracted_page_text = response_page.markdown
+                extracted_page_images = response_page.images
+                page_images: list[ExtractedImageFromPage] = []
+                for extracted_page_image in extracted_page_images:
+                    extracted_image = ExtractedImageFromPage(
+                        size=None,
+                        base64_str=extracted_page_image.base64_str,
+                        mime_type=extracted_page_image.mime_type,
+                        caption=extracted_page_image.caption,
+                        bounding_box=extracted_page_image.bounding_box,
+                    )
+                    page_images.append(extracted_image)
+                pages[page_index] = Page(
+                    text=extracted_page_text,
+                    extracted_images=page_images,
                 )
-                page_images.append(extracted_image)
-            pages[page_index] = Page(
-                text=extracted_page_text,
-                extracted_images=page_images,
-                page_view=None,
-            )
-        return ExtractOutput(
-            pages=pages,
-        )
+            return ExtractOutput(pages=pages)
+        except (TypeError, ValidationError) as exc:
+            msg = f"Error parsing Gateway extract response from pages using Azure schema: {exc}"
+            raise GatewayExtractResponseError(msg) from exc
+
+    @classmethod
+    def _make_extract_output_from_response_mistral(
+        cls,
+        response: GenericResponse,
+    ) -> ExtractOutput:
+        if not hasattr(response, "pages"):
+            msg = "Gateway extract response does not have pages"
+            raise GatewayExtractResponseError(msg)
+        try:
+            response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+            pages: dict[int, Page] = {}
+            for response_page_dict in response_page_dicts:
+                response_page = GatewayExtractPageMistral.model_validate(response_page_dict)
+                page_index = response_page.index
+                extracted_page_text = response_page.markdown
+                extracted_page_images = response_page.images
+                page_images: list[ExtractedImageFromPage] = []
+                for extracted_page_image in extracted_page_images:
+                    prefixed_base64 = extracted_page_image.image_base64
+                    if not prefixed_base64:
+                        continue
+                    bounding_box: BoundingBox | None = None
+                    if (
+                        extracted_page_image.top_left_x is not None
+                        and extracted_page_image.top_left_y is not None
+                        and extracted_page_image.bottom_right_x is not None
+                        and extracted_page_image.bottom_right_y is not None
+                    ):
+                        bounding_box = BoundingBox.make_from_two_corners(
+                            top_left_x=cast("float", extracted_page_image.top_left_x),
+                            top_left_y=cast("float", extracted_page_image.top_left_y),
+                            bottom_right_x=cast("float", extracted_page_image.bottom_right_x),
+                            bottom_right_y=cast("float", extracted_page_image.bottom_right_y),
+                        )
+                    extracted_image = ExtractedImageFromPage(
+                        size=None,
+                        actual_url_or_prefixed_base64=prefixed_base64,
+                        caption=extracted_page_image.image_annotation,
+                        bounding_box=bounding_box,
+                    )
+                    page_images.append(extracted_image)
+                pages[page_index] = Page(
+                    text=extracted_page_text,
+                    extracted_images=page_images,
+                )
+            return ExtractOutput(pages=pages)
+        except (TypeError, ValidationError) as exc:
+            msg = f"Error parsing Gateway extract response from pages using Mistral schema: {exc}"
+            raise GatewayExtractResponseError(msg) from exc
 
     @override
     def make_extras(

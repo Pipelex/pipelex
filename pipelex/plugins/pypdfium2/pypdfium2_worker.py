@@ -8,7 +8,6 @@ from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.path_utils import clarify_path_or_url
 from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 
 
@@ -27,50 +26,24 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
         extract_job: ExtractJob,
     ) -> ExtractOutput:
         if extract_job.extract_input.image_uri:
-            msg = "Pypdfium2 only extracts text from PDFs, not images"
+            msg = "Pypdfium2 only extracts text from PDFs, not from images"
             raise NotImplementedError(msg)
 
-        if pdf_uri := extract_job.extract_input.pdf_uri:
-            pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
-            extract_output: ExtractOutput
-            if pdf_url:
-                extract_output = await self.extract_from_pdf_url(
-                    pdf_url=pdf_url,
-                )
-            else:  # pdf_path must be provided based on validation
-                assert pdf_path is not None  # Type narrowing for mypy
-                extract_output = await self.extract_from_pdf_file(
-                    pdf_path=pdf_path,
-                )
-        else:
+        pdf_uri = extract_job.extract_input.pdf_uri
+        if not pdf_uri:
             msg = "No PDF URI provided in ExtractJob"
             raise ExtractInputError(msg)
-        return extract_output
 
-    async def extract_from_pdf_url(
-        self,
-        pdf_url: str,
-    ) -> ExtractOutput:
-        page_texts = await pypdfium2_renderer.get_text_from_pdf_pages_from_uri(pdf_uri=pdf_url)
-        pages: dict[int, Page] = {}
-        for page_index, page_text in enumerate(page_texts):
-            pages[page_index + 1] = Page(
-                text=page_text,
-            )
-        return ExtractOutput(
-            pages=pages,
-        )
+        if extract_job.job_params.should_include_images:
+            all_page_images = await pypdfium2_renderer.extract_embedded_images_from_pdf_uri(pdf_uri=pdf_uri)
+        else:
+            all_page_images = {}
 
-    async def extract_from_pdf_file(
-        self,
-        pdf_path: str,
-    ) -> ExtractOutput:
-        page_texts = await pypdfium2_renderer.get_text_from_pdf_pages(pdf_input=pdf_path)
+        all_page_texts = await pypdfium2_renderer.extract_text_from_pdf_pages_from_uri(pdf_uri=pdf_uri)
         pages: dict[int, Page] = {}
-        for page_index, page_text in enumerate(page_texts):
-            pages[page_index + 1] = Page(
-                text=page_text,
-            )
-        return ExtractOutput(
-            pages=pages,
-        )
+        for page_index, page_text in enumerate(all_page_texts):
+            if extract_job.job_params.should_include_images:
+                pages[page_index + 1] = Page(text=page_text, extracted_images=all_page_images[page_index + 1])
+            else:
+                pages[page_index + 1] = Page(text=page_text)
+        return ExtractOutput(pages=pages)

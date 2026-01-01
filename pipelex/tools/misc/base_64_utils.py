@@ -75,12 +75,18 @@ def strip_base_64_str_if_needed(base64_str: str) -> str:
     return base64_str
 
 
-def extract_base_64_str_from_base64_url_if_possible(possibly_base64_url: str) -> str | None:
+def is_prefixed_base64_url(possibly_base64_url: str) -> bool:
+    return possibly_base64_url.startswith("data:") and ";base64," in possibly_base64_url
+
+
+def extract_base_64_str_from_base64_url_if_possible(possibly_base64_url: str) -> tuple[str, str] | None:
     if not possibly_base64_url.startswith("data:"):
         return None
     if ";base64," not in possibly_base64_url:
         return None
-    return possibly_base64_url.split(";base64,", 1)[1]
+    mime_type = possibly_base64_url[5:].split(";base64,", 1)[0]
+    base64_str = possibly_base64_url.split(";base64,", 1)[1]
+    return base64_str, mime_type
 
 
 def prefixed_base64_str_from_base64_bytes(b64_bytes: bytes) -> str:

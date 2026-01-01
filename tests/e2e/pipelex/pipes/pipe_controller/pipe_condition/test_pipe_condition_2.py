@@ -26,6 +26,7 @@ class TestPipeConditionExpression:
     )
     async def test_pipe_condition_routing_expression(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         category: str,
         load_test_library: Callable[[list[Path]], None],
@@ -37,7 +38,7 @@ class TestPipeConditionExpression:
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="CategoryInput",
-                domain="test_pipe_condition",
+                domain_code="test_pipe_condition",
                 description="test_pipe_condition.CategoryInput",
                 structure_class_name="CategoryInput",
             ),
@@ -54,7 +55,7 @@ class TestPipeConditionExpression:
                 pipe=get_required_pipe(pipe_code="basic_condition_by_category"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 

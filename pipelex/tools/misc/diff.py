@@ -13,16 +13,24 @@ from rich.text import Text
 from pipelex.tools.misc.pretty import PrettyPrinter
 
 if TYPE_CHECKING:
+    from collections.abc import Set as AbstractSet
+
     from pipelex.tools.misc.pretty import PrettyPrintable
 
 
-def has_diff_dirs(dir1: str | Path, dir2: str | Path, exclude_files: set[str] | None = None) -> bool:
+def has_diff_dirs(
+    dir1: str | Path,
+    dir2: str | Path,
+    exclude_files: AbstractSet[str] | None = None,
+    exclude_dirs: AbstractSet[str] | None = None,
+) -> bool:
     """Check if there are any differences between two directories.
 
     Args:
         dir1: First directory path.
         dir2: Second directory path.
         exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_service.toml"}).
+        exclude_dirs: Set of directory names to exclude from comparison (e.g., {"storage"}).
 
     Returns:
         True if there are any files only in left, only in right, or different files.
@@ -30,25 +38,26 @@ def has_diff_dirs(dir1: str | Path, dir2: str | Path, exclude_files: set[str] | 
     dir1 = Path(dir1)
     dir2 = Path(dir2)
     exclude_files = exclude_files or set()
+    exclude_dirs = exclude_dirs or set()
 
-    def _filter_excluded(file_list: list[str]) -> list[str]:
+    def _filter_excluded_files(file_list: list[str]) -> list[str]:
         return [file for file in file_list if file not in exclude_files]
 
     def _has_diff(dir_comparison: filecmp.dircmp[str]) -> bool:
-        # Check for files only in left or right (excluding excluded files)
-        left_only_filtered = _filter_excluded(dir_comparison.left_only)
-        right_only_filtered = _filter_excluded(dir_comparison.right_only)
+        # Filter out excluded directories from left_only and right_only
+        left_only_filtered = _filter_excluded_files([item for item in dir_comparison.left_only if item not in exclude_dirs])
+        right_only_filtered = _filter_excluded_files([item for item in dir_comparison.right_only if item not in exclude_dirs])
         if left_only_filtered or right_only_filtered:
             return True
 
         # Check for different files using shallow comparison (excluding excluded files)
-        diff_files_filtered = _filter_excluded(dir_comparison.diff_files)
+        diff_files_filtered = _filter_excluded_files(dir_comparison.diff_files)
         if diff_files_filtered:
             return True
 
         # Force deep comparison for common files that passed shallow comparison
         # This is needed because shallow comparison only checks metadata (size, mtime)
-        common_files_filtered = _filter_excluded(dir_comparison.common_files)
+        common_files_filtered = _filter_excluded_files(dir_comparison.common_files)
         if common_files_filtered:
             _, mismatch, errors = filecmp.cmpfiles(
                 dir_comparison.left,
@@ -59,8 +68,9 @@ def has_diff_dirs(dir1: str | Path, dir2: str | Path, exclude_files: set[str] | 
             if mismatch or errors:
                 return True
 
-        # Check subdirectories recursively
-        return any(_has_diff(sub) for sub in dir_comparison.subdirs.values())
+        # Check subdirectories recursively (excluding excluded directories)
+        filtered_subdirs = {name: sub for name, sub in dir_comparison.subdirs.items() if name not in exclude_dirs}
+        return any(_has_diff(sub) for sub in filtered_subdirs.values())
 
     return _has_diff(filecmp.dircmp(str(dir1), str(dir2)))
 
@@ -197,13 +207,19 @@ def _generate_diff_summary(diff_content: str, left_is_newer: bool) -> str | None
         return f"  Sync would {' and '.join(summary_parts)} in {obsolete_location}"
 
 
-def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: set[str] | None = None) -> PrettyPrintable:
+def make_diff_dirs_pretty(
+    dir1: str | Path,
+    dir2: str | Path,
+    exclude_files: AbstractSet[str] | None = None,
+    exclude_dirs: AbstractSet[str] | None = None,
+) -> PrettyPrintable:
     """Generate a PrettyPrintable representation of directory differences.
 
     Args:
         dir1: First directory path.
         dir2: Second directory path.
         exclude_files: Set of file names to exclude from comparison (e.g., {"pipelex_service.toml"}).
+        exclude_dirs: Set of directory names to exclude from comparison (e.g., {"storage"}).
 
     Returns:
         A Rich renderable showing files only in left, only in right,
@@ -213,15 +229,16 @@ def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: set
     dir1 = Path(dir1)
     dir2 = Path(dir2)
     exclude_files = exclude_files or set()
+    exclude_dirs = exclude_dirs or set()
 
     sections: list[PrettyPrintable] = []
 
-    def _filter_excluded(file_list: list[str]) -> list[str]:
+    def _filter_excluded_files(file_list: list[str]) -> list[str]:
         return [file for file in file_list if file not in exclude_files]
 
     def _collect_diffs(dir_comparison: filecmp.dircmp[str], relative_path: str = "") -> None:
-        # Files only in left directory (excluding excluded files)
-        left_only_filtered = _filter_excluded(dir_comparison.left_only)
+        # Files only in left directory (excluding excluded files and directories)
+        left_only_filtered = _filter_excluded_files([item for item in dir_comparison.left_only if item not in exclude_dirs])
         if left_only_filtered:
             table = Table(
                 title=f"[yellow]Only in {dir_comparison.left}[/yellow]",
@@ -236,8 +253,8 @@ def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: set
                 table.add_row(str(full_path))
             sections.append(table)
 
-        # Files only in right directory (excluding excluded files)
-        right_only_filtered = _filter_excluded(dir_comparison.right_only)
+        # Files only in right directory (excluding excluded files and directories)
+        right_only_filtered = _filter_excluded_files([item for item in dir_comparison.right_only if item not in exclude_dirs])
         if right_only_filtered:
             table = Table(
                 title=f"[cyan]Only in {dir_comparison.right}[/cyan]",
@@ -255,10 +272,10 @@ def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: set
         # Different files - combine shallow diff_files with deep comparison of common_files
         # This is needed because diff_files only contains files that failed shallow comparison
         # Apply exclusion filter to diff_files
-        different_files = set(_filter_excluded(dir_comparison.diff_files))
+        different_files = set(_filter_excluded_files(dir_comparison.diff_files))
 
         # Force deep comparison for common files (excluding excluded files)
-        common_files_filtered = _filter_excluded(dir_comparison.common_files)
+        common_files_filtered = _filter_excluded_files(dir_comparison.common_files)
         if common_files_filtered:
             _, mismatch, errors = filecmp.cmpfiles(
                 dir_comparison.left,
@@ -319,8 +336,10 @@ def make_diff_dirs_pretty(dir1: str | Path, dir2: str | Path, exclude_files: set
                 binary_note = Text("(binary or non-text file; cannot show diff)", style="dim red")
                 sections.append(binary_note)
 
-        # Recurse into subdirectories
+        # Recurse into subdirectories (excluding excluded directories)
         for subdir_name, sub in sorted(dir_comparison.subdirs.items()):
+            if subdir_name in exclude_dirs:
+                continue
             new_relative_path = str(Path(relative_path, subdir_name)) if relative_path else subdir_name
             _collect_diffs(sub, new_relative_path)
 

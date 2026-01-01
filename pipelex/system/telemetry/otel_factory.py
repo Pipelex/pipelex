@@ -81,7 +81,7 @@ class OtelFactory:
         for input_name in needed_input_names:
             stuff = working_memory.get_stuff(name=input_name)
             inputs_dict[input_name] = {
-                "concept": stuff.concept.simple_concept_string,
+                "concept": stuff.concept.simple_concept_ref,
                 "content": stuff.content.smart_dump(),
             }
 
@@ -108,7 +108,7 @@ class OtelFactory:
             return "{}"
 
         output_dict: dict[str, Any] = {
-            "concept": main_stuff.concept.simple_concept_string,
+            "concept": main_stuff.concept.simple_concept_ref,
             "content": main_stuff.content.smart_dump(),
         }
 
@@ -198,10 +198,11 @@ class OtelFactory:
         user_id: str | None,
         custom_posthog_client: Posthog | None,
         custom_redaction_config: TelemetryRedactionConfig,
-        pipelex_posthog_client: Posthog | None = None,
-        pipelex_distinct_id: str | None = None,
-        otlp_exporters: list[OtlpExporterConfig] | None = None,
-        langfuse_config: LangfuseConfig | None = None,
+        pipelex_posthog_client: Posthog | None,
+        pipelex_gateway_redaction_config: TelemetryRedactionConfig,
+        pipelex_distinct_id: str | None,
+        otlp_exporters: list[OtlpExporterConfig] | None,
+        langfuse_config: LangfuseConfig | None,
     ) -> tuple[OTelTracer, OTelTracerProvider]:
         """Create an isolated OpenTelemetry Tracer for GenAI instrumentation.
 
@@ -219,6 +220,7 @@ class OtelFactory:
             custom_posthog_client: Optional user's PostHog client for sending events
             custom_redaction_config: Redaction config for custom PostHog exporter
             pipelex_posthog_client: Optional Pipelex internal PostHog client (for gateway)
+            pipelex_gateway_redaction_config: Redaction config for Pipelex Gateway PostHog exporter
             pipelex_distinct_id: Distinct ID for Pipelex telemetry
             otlp_exporters: List of OTLP exporter configurations
             langfuse_config: Optional Langfuse configuration (enables Langfuse if provided and enabled)
@@ -240,7 +242,7 @@ class OtelFactory:
         # Create Provider
         provider = OTelTracerProvider(resource=resource)
 
-        # Add Custom PostHog Exporter if client provided (custom telemetry)
+        # Add Custom PostHog Exporter if client is provided (custom telemetry)
         # Uses user's redaction config (may capture content/pipe codes based on user settings)
         if custom_posthog_client:
             custom_posthog_exporter = PostHogSpanExporter(
@@ -251,14 +253,12 @@ class OtelFactory:
             provider.add_span_processor(OTelBatchSpanProcessor(custom_posthog_exporter))
             log.verbose("Custom PostHog exporter enabled for custom telemetry")
 
-        # Add Pipelex PostHog Exporter if client provided (mandatory for gateway)
-        # Always uses full redaction config (never captures sensitive content/pipe codes)
+        # Add Pipelex PostHog Exporter if client is provided (mandatory for gateway)
         if pipelex_posthog_client:
-            pipelex_redaction_config = TelemetryRedactionConfig.pipelex_config()
             pipelex_posthog_exporter = PostHogSpanExporter(
                 posthog_client=pipelex_posthog_client,
                 distinct_id=pipelex_distinct_id,
-                redaction_config=pipelex_redaction_config,
+                redaction_config=pipelex_gateway_redaction_config,
             )
             provider.add_span_processor(OTelBatchSpanProcessor(pipelex_posthog_exporter))
             log.verbose("Pipelex PostHog exporter enabled for gateway telemetry (with full redaction)")

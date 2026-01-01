@@ -442,12 +442,12 @@ def teardown_current_library() -> None:
     _library_id.set(None)
 
 
-def get_required_domain(domain: str) -> Domain:
-    return get_pipelex_hub().get_required_domain_library().get_required_domain(domain=domain)
+def get_required_domain(domain_code: str) -> Domain:
+    return get_pipelex_hub().get_required_domain_library().get_required_domain(domain_code=domain_code)
 
 
-def get_optional_domain(domain: str) -> Domain | None:
-    return get_pipelex_hub().get_required_domain_library().get_domain(domain=domain)
+def get_optional_domain(domain_code: str) -> Domain | None:
+    return get_pipelex_hub().get_required_domain_library().get_domain(domain_code=domain_code)
 
 
 def get_pipe_library() -> PipeLibraryAbstract:
@@ -470,8 +470,8 @@ def get_concept_library() -> ConceptLibraryAbstract:
     return get_pipelex_hub().get_library().concept_library
 
 
-def get_required_concept(concept_string: str) -> Concept:
-    return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_string=concept_string)
+def get_required_concept(concept_ref: str) -> Concept:
+    return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
 def get_pipe_router() -> PipeRouterProtocol:

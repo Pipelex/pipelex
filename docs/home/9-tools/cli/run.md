@@ -53,7 +53,7 @@ The input JSON file should contain a dictionary where keys are input variable na
 {
   "input_variable": "simple string value",
   "another_input": {
-    "concept": "domain.ConceptName",
+    "concept": "domain_code.ConceptName",
     "content": { "field": "value" }
   }
 }

@@ -1,12 +1,17 @@
-from collections.abc import Callable, Sequence
-from typing import Any, TypeVar, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
-from rich.repr import Result as RichReprResult
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.types import StrEnum
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
+    from rich.repr import Result as RichReprResult
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
 
@@ -326,8 +331,8 @@ class CustomBaseModel(BaseModel):
     def __repr_args__(self) -> Sequence[tuple[str | None, Any]]:
         processed_args: list[tuple[str | None, Any]] = []
         for name, value in super().__repr_args__():
-            if name and AttributePolisher.should_truncate(name=name, value=value):
-                truncated_value = AttributePolisher.get_truncated_value(name, value)
+            if AttributePolisher.should_truncate(value=value):
+                truncated_value = AttributePolisher.get_truncated_value(value)
                 processed_args.append((name, truncated_value))
             else:
                 processed_args.append((name, value))

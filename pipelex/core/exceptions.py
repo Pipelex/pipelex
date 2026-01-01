@@ -1,6 +1,30 @@
 from pydantic import BaseModel, Field
 
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
+
+
+class PipeFactoryErrorData(BaseModel):
+    """Structured error data for Pipe factory errors.
+
+    This model captures errors raised during pipe creation from blueprints,
+    particularly missing concept errors that can be auto-fixed by the builder loop.
+    """
+
+    # === Error Classification ===
+    error_type: PipeFactoryErrorType = Field(
+        description="Type of pipe factory error",
+    )
+
+    # === Source Context ===
+    domain_code: str | None = Field(None, description="Domain where error occurred")
+
+    # === Entity Context (what failed) ===
+    pipe_code: str | None = Field(None, description="Pipe code that failed to be created")
+    missing_concept_code: str | None = Field(None, description="The concept code that is missing")
+    declared_concepts: list[str] = Field(default_factory=list, description="List of concepts declared in the domain")
+
+    # === Error Details ===
+    message: str = Field(description="Human-readable error message")
 
 
 class PipesAndConceptValidationErrorData(BaseModel):
@@ -15,7 +39,7 @@ class PipesAndConceptValidationErrorData(BaseModel):
     """
 
     # === Source Context ===
-    domain: str | None = Field(None, description="Domain where error occurred")
+    domain_code: str | None = Field(None, description="Domain where error occurred")
     source: str | None = Field(None, description="Source file path")
 
     # === Entity Context (what failed) ===

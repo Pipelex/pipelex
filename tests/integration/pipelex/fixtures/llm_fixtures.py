@@ -81,6 +81,7 @@ GOOGLE_MODELS = [
     "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
     "gemini-3.0-pro",
+    "gemini-3.0-flash-preview",
 ]
 
 # --- Groq Models --------------------------------------------------------------------------------
@@ -142,9 +143,13 @@ OPENAI_MODELS = [
     "gpt-5-mini",
     "gpt-5-chat",
     "gpt-5",
+    "gpt-5-codex",
+    "gpt-5.1-codex",
+    "gpt-5.1-codex-max",
     "gpt-5.1-chat",
     "gpt-5.1",
-    "gpt-5.1-codex",
+    "gpt-5.2",
+    "gpt-5.2-chat",
 ]
 
 # --- OpenAI OSS Models --------------------------------------------------------------------------
@@ -232,8 +237,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     llm_preset_id_param = request.param
     if not is_llm_preset_supported(llm_preset_id=llm_preset_id_param):
         pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported by any enabled backend")
-    # if not is_llm_preset_supported_by_enabled_backends(llm_preset_id=llm_preset_id_param):
-    #     pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported by any enabled backend")
     return llm_preset_id_param
 
 

@@ -63,7 +63,7 @@ class PipeTestCases:
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
         name="complex",
-        concept=ConceptFactory.make(concept_code="Complex", domain="tests", description="tests.Complex", structure_class_name="Complex"),
+        concept=ConceptFactory.make(concept_code="Complex", domain_code="tests", description="tests.Complex", structure_class_name="Complex"),
         content=ListContent(
             items=[
                 TextContent(text="The quick brown fox jumps over the lazy dog"),
@@ -107,7 +107,7 @@ class PipeTestCases:
     ]
     TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(
         stuff_name="question",
-        concept_string="answer.Question",
+        concept_ref="answer.Question",
         content=USER_TEXT_TRICKY_2,
     )
     NO_INPUT: ClassVar[list[tuple[str, str]]] = [  # topic, pipe
@@ -164,8 +164,8 @@ class PipeExtractTestCases:
 
 class ImageGenTestCases:
     IMAGE_DESC: ClassVar[list[tuple[str, str]]] = [  # topic, img_gen_prompt_text
-        ("dog wearing sunglasses", "a dog wearing sunglasses"),
-        # ("otter playing poker", "an otter playing poker"),
+        # ("dog wearing sunglasses", "a dog wearing sunglasses"),
+        ("otter playing poker", "an otter playing poker"),
         # ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python"),
     ]
 

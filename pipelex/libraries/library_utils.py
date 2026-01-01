@@ -1,4 +1,3 @@
-from importlib.abc import Traversable
 from importlib.resources import files
 from pathlib import Path
 
@@ -7,6 +6,7 @@ from pipelex.builder import builder
 from pipelex.config import get_config
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.tools.misc.file_utils import find_files_in_dir
+from pipelex.types import Traversable
 
 
 def get_pipelex_plx_files_from_package() -> list[Path]:

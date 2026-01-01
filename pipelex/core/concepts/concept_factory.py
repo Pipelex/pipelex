@@ -14,7 +14,7 @@ from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
-from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
@@ -65,16 +65,16 @@ class ConceptDeclarationType(StrEnum):
 class DomainAndConceptCode(BaseModel):
     """Small model to represent domain and concept code pair."""
 
-    domain: str
+    domain_code: str
     concept_code: str
 
 
 class ConceptFactory:
     @classmethod
-    def make(cls, concept_code: str, domain: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
+    def make(cls, concept_code: str, domain_code: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
         return Concept(
             code=concept_code,
-            domain=domain,
+            domain_code=domain_code,
             description=description,
             structure_class_name=structure_class_name,
             refines=refines,
@@ -87,115 +87,115 @@ class ConceptFactory:
             case NativeConceptCode.DYNAMIC:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="A dynamic concept",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.TEXT:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="A text",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.IMAGE:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="An image",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.PDF:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="A PDF",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.TEXT_AND_IMAGES:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="A text and an image",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.NUMBER:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="A number",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.IMG_GEN_PROMPT:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="A prompt for an image generator",
                     structure_class_name=NativeConceptCode.TEXT.structure_class_name,
                 )
             case NativeConceptCode.PAGE:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="The content of a page of a document, comprising text and linked images and an optional page view image",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.ANYTHING:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="Anything",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.JSON:
                 return Concept(
                     code=native_concept_code,
-                    domain=SpecialDomain.NATIVE,
+                    domain_code=SpecialDomain.NATIVE,
                     description="A JSON object",
                     structure_class_name=structure_class_name,
                 )
 
     @classmethod
-    def make_domain_and_concept_code_from_concept_string_or_code(
+    def make_domain_and_concept_code_from_concept_ref_or_code(
         cls,
-        concept_string_or_code: str,
-        domain: str | None = None,
+        concept_ref_or_code: str,
+        domain_code: str | None = None,
     ) -> DomainAndConceptCode:
-        if "." not in concept_string_or_code and not domain:
-            msg = f"Not enough information to make a domain and concept code from '{concept_string_or_code}'"
+        if "." not in concept_ref_or_code and not domain_code:
+            msg = f"Not enough information to make a domain and concept code from '{concept_ref_or_code}'"
             raise ConceptFactoryError(msg)
         try:
-            validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+            validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
         except ConceptStringError as exc:
-            msg = f"Concept string or code '{concept_string_or_code}' is not a valid concept string or code"
+            msg = f"Concept string or code '{concept_ref_or_code}' is not a valid concept string or code"
             raise ConceptFactoryError(msg) from exc
 
-        if NativeConceptCode.is_native_concept_string_or_code(concept_string_or_code=concept_string_or_code):
-            natice_concept_string = NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=concept_string_or_code)
-            return DomainAndConceptCode(domain=SpecialDomain.NATIVE, concept_code=natice_concept_string.split(".")[1])
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
+            natice_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
+            return DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code=natice_concept_ref.split(".")[1])
 
-        if "." in concept_string_or_code:
-            domain_code, concept_code = concept_string_or_code.rsplit(".")
-            return DomainAndConceptCode(domain=domain_code, concept_code=concept_code)
-        elif domain:
-            return DomainAndConceptCode(domain=domain, concept_code=concept_string_or_code)
+        if "." in concept_ref_or_code:
+            domain_code, concept_code = concept_ref_or_code.rsplit(".")
+            return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_code)
+        elif domain_code:
+            return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_ref_or_code)
         else:
-            msg = f"Not enough information to make a domain and concept code from '{concept_string_or_code}'"
+            msg = f"Not enough information to make a domain and concept code from '{concept_ref_or_code}'"
             raise ConceptFactoryError(msg)
 
     @classmethod
-    def make_concept_string_with_domain(cls, domain: str, concept_code: str) -> str:
-        return f"{domain}.{concept_code}"
+    def make_concept_ref_with_domain(cls, domain_code: str, concept_code: str) -> str:
+        return f"{domain_code}.{concept_code}"
 
     @classmethod
-    def make_concept_string_with_domain_from_concept_string_or_code(cls, domain: str, concept_sring_or_code: str) -> str:
-        input_domain_and_code = cls.make_domain_and_concept_code_from_concept_string_or_code(
-            concept_string_or_code=concept_sring_or_code,
-            domain=domain,
+    def make_concept_ref_with_domain_from_concept_ref_or_code(cls, domain_code: str, concept_sring_or_code: str) -> str:
+        input_domain_and_code = cls.make_domain_and_concept_code_from_concept_ref_or_code(
+            concept_ref_or_code=concept_sring_or_code,
+            domain_code=domain_code,
         )
 
-        return cls.make_concept_string_with_domain(
-            domain=input_domain_and_code.domain,
+        return cls.make_concept_ref_with_domain(
+            domain_code=input_domain_and_code.domain_code,
             concept_code=input_domain_and_code.concept_code,
         )
 
@@ -216,14 +216,14 @@ class ConceptFactory:
             ConceptFactoryError: If the refine is invalid
 
         """
-        return NativeConceptCode.get_validated_native_concept_string(concept_string_or_code=refine)
+        return NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refine)
 
     @classmethod
     def _handle_structure_with_classname(
         cls,
         blueprint: ConceptBlueprint,
         concept_code: str,
-        domain: str,
+        domain_code: str,
     ) -> str:
         """Handle STRUCTURE_WITH_CLASSNAME declaration type.
 
@@ -238,7 +238,7 @@ class ConceptFactory:
             raise ConceptFactoryError(msg)
         if not Concept.is_valid_structure_class(structure_class_name=structure_class_name):
             msg = (
-                f"Structure class '{structure_class_name}' set for concept '{concept_code}' in domain '{domain}' "
+                f"Structure class '{structure_class_name}' set for concept '{concept_code}' in domain '{domain_code}' "
                 "is not a registered subclass of StuffContent, or was not found in the library."
             )
             raise ConceptFactoryError(msg)
@@ -249,7 +249,7 @@ class ConceptFactory:
         cls,
         blueprint: ConceptBlueprint,
         concept_code: str,
-        domain: str,
+        domain_code: str,
     ) -> str:
         """Handle BLUEPRINT_WITH_STRUCTURE declaration type.
 
@@ -272,7 +272,7 @@ class ConceptFactory:
                 structure_blueprint=normalized_structure,
             )
         except ConceptStructureGeneratorError as exc:
-            msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain}': {exc}"
+            msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
@@ -284,7 +284,7 @@ class ConceptFactory:
     def _handle_basic_blueprint(
         cls,
         concept_code: str,
-        domain: str,
+        domain_code: str,
     ) -> tuple[str, str | None]:
         """Handle BASIC_BLUEPRINT declaration type.
 
@@ -298,7 +298,7 @@ class ConceptFactory:
 
         # Because native concepts have structure class names diffrent than other (with "Content")
         if concept_code in NativeConceptCode.values_list():
-            return NativeConceptCode.TEXT.structure_class_name, NativeConceptCode.TEXT.concept_string
+            return NativeConceptCode.TEXT.structure_class_name, NativeConceptCode.TEXT.concept_ref
 
         try:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
@@ -307,19 +307,19 @@ class ConceptFactory:
                 base_class_name=TextContent.__name__,
             )
         except ConceptStructureGeneratorError as exc:
-            msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain}': {exc}"
+            msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
         # Register the generated class
         KajsonManager.get_class_registry().register_class(the_generated_class)
 
-        return concept_code, NativeConceptCode.TEXT.concept_string
+        return concept_code, NativeConceptCode.TEXT.concept_ref
 
     @classmethod
     def _handle_refines(
         cls,
         blueprint: ConceptBlueprint,
         concept_code: str,
-        domain: str,
+        domain_code: str,
     ) -> tuple[str, str]:
         """Handle REFINES declaration type.
 
@@ -336,7 +336,7 @@ class ConceptFactory:
         try:
             current_refine = cls.make_refine(refine=blueprint.refines)
         except ConceptRefineError as exc:
-            msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain}': {exc}"
+            msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
 
         # Get the refined concept's structure class name
@@ -352,7 +352,8 @@ class ConceptFactory:
             )
         except ConceptStructureGeneratorError as exc:
             msg = (
-                f"Error generating structure class for concept '{concept_code}' refining '{refined_structure_class_name}' in domain '{domain}': {exc}"
+                f"Error generating structure class for concept '{concept_code}' refining '{refined_structure_class_name}' "
+                f"in domain '{domain_code}': {exc}"
             )
             raise ConceptFactoryError(msg) from exc
 
@@ -364,7 +365,7 @@ class ConceptFactory:
     @classmethod
     def make_from_blueprint(
         cls,
-        domain: str,
+        domain_code: str,
         concept_code: str,
         blueprint_or_string_description: ConceptBlueprint | str,
     ) -> Concept:
@@ -382,32 +383,31 @@ class ConceptFactory:
         else:
             declaration_type = ConceptDeclarationType.BASIC_BLUEPRINT
 
-        domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_string_or_code(
-            concept_string_or_code=concept_code,
-            domain=domain,
+        domain_and_concept_code = cls.make_domain_and_concept_code_from_concept_ref_or_code(
+            concept_ref_or_code=concept_code,
+            domain_code=domain_code,
         )
 
         match declaration_type:
             case ConceptDeclarationType.STRING:
-                structure_class_name, refines = cls._handle_basic_blueprint(
+                structure_class_name, _ = cls._handle_basic_blueprint(
                     concept_code=concept_code,
-                    domain=domain,
+                    domain_code=domain_code,
                 )
                 return Concept(
-                    domain=domain_and_concept_code.domain,
+                    domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
                     description=cast("str", blueprint_or_string_description),
                     structure_class_name=structure_class_name,
-                    refines=refines,
                 )
 
             case ConceptDeclarationType.BASIC_BLUEPRINT:
                 structure_class_name, refines = cls._handle_basic_blueprint(
                     concept_code=concept_code,
-                    domain=domain,
+                    domain_code=domain_code,
                 )
                 return Concept(
-                    domain=domain_and_concept_code.domain,
+                    domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
                     description=cast("ConceptBlueprint", blueprint_or_string_description).description,
                     structure_class_name=structure_class_name,
@@ -417,13 +417,13 @@ class ConceptFactory:
             case ConceptDeclarationType.STRUCTURE_WITH_CLASSNAME:
                 blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
                 return Concept(
-                    domain=domain_and_concept_code.domain,
+                    domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
                     description=blueprint.description,
                     structure_class_name=cls._handle_structure_with_classname(
                         blueprint=blueprint,
                         concept_code=concept_code,
-                        domain=domain,
+                        domain_code=domain_code,
                     ),
                     refines=None,
                 )
@@ -431,13 +431,13 @@ class ConceptFactory:
             case ConceptDeclarationType.BLUEPRINT_WITH_STRUCTURE:
                 blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
                 return Concept(
-                    domain=domain_and_concept_code.domain,
+                    domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
                     description=blueprint.description,
                     structure_class_name=cls._handle_blueprint_with_structure(
                         blueprint=blueprint,
                         concept_code=concept_code,
-                        domain=domain,
+                        domain_code=domain_code,
                     ),
                     refines=None,
                 )
@@ -447,10 +447,10 @@ class ConceptFactory:
                 structure_class_name, current_refine = cls._handle_refines(
                     blueprint=blueprint,
                     concept_code=concept_code,
-                    domain=domain,
+                    domain_code=domain_code,
                 )
                 return Concept(
-                    domain=domain_and_concept_code.domain,
+                    domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
                     description=blueprint.description,
                     structure_class_name=structure_class_name,

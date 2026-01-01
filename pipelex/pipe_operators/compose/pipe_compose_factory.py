@@ -3,9 +3,9 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.pipe_operators.compose.exceptions import PipeComposeFactoryError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
@@ -22,9 +22,9 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         pipe_type: str,
         pipe_code: str,
         domain_code: str,
-        description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        description: str,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeComposeBlueprint,
     ) -> PipeCompose:
         if blueprint.is_construct_mode:
@@ -50,9 +50,9 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         cls,
         pipe_code: str,
         domain_code: str,
-        description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        description: str,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeComposeBlueprint,
     ) -> PipeCompose:
         """Create PipeCompose in template mode (produces Text output)."""
@@ -72,7 +72,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             raise PipeComposeFactoryError(msg) from exc
 
         return PipeCompose(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             inputs=inputs,
@@ -88,9 +88,9 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         cls,
         pipe_code: str,
         domain_code: str,
-        description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        description: str,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeComposeBlueprint,
     ) -> PipeCompose:
         """Create PipeCompose in construct mode (produces StructuredContent output)."""
@@ -100,7 +100,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             raise PipeComposeFactoryError(msg)
 
         return PipeCompose(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             inputs=inputs,

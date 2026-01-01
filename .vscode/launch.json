@@ -28,7 +28,7 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug test inference",
+            "name": "Debug test inference LLM structured",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
@@ -39,6 +39,34 @@
                 "-k test_pipe_llm_structured"
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Debug test inference img gen",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_img_gen_single_opaque"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug test inference PipeExtract",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_pipe_extract_from_pdf"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
         },
         {
             "name": "Debug validate bundle",
@@ -65,7 +93,7 @@
             "justMyCode": false
         },
         {
-            "name": "Debug run pipe",
+            "name": "Debug run pipe bundle",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
@@ -74,6 +102,20 @@
                 "results/pipeline_01/bundle.plx",
                 "--inputs",
                 "results/pipeline_01/inputs.json",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug run pipe code",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "run",
+                "write_discord_newsletter",
+                "--inputs",
+                "tests/data/discord_newsletter/discord_sample_input.json",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

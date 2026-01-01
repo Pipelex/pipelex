@@ -6,6 +6,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.builder.concept.integration_test_data import ConceptSpecGenerationTestCases
 
 
@@ -22,6 +23,7 @@ class TestConceptSpecGeneration:
     @pytest.mark.parametrize(("topic", "user_prompt"), ConceptSpecGenerationTestCases.TEST_CASES)
     async def test_generate_concept_spec(
         self,
+        job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
         llm_handle: str,
         topic: str,
@@ -44,6 +46,7 @@ class TestConceptSpecGeneration:
                 system_text="You are an expert at generating concept specifications for a data modeling system.",
                 user_text=user_prompt,
             ),
+            job_metadata=job_metadata,
             llm_job_config=LLMJobConfig(
                 max_retries=3,
             ),

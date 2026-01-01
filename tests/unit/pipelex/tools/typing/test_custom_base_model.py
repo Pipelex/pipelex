@@ -13,7 +13,7 @@ class TestCustomBaseModel:
             url: str
             other: str
 
-        AttributePolisher.base_64_truncate_length = 10
+        AttributePolisher.bytes_truncate_length = 10
         AttributePolisher.url_truncate_length = 10
         model = TestModel(
             base_64="b" * 20,
@@ -21,5 +21,5 @@ class TestCustomBaseModel:
             other="val",
         )
         repr_str = repr(model)
-        assert "bbbbbbbbbb…" in repr_str
-        assert "data:image…" in repr_str
+        assert "bbbbbbbbbb" in repr_str
+        assert "data:image/png;base64,xxxxxxxxxxxxxxxxxxxx" in repr_str

@@ -325,7 +325,7 @@ def init_cmd(
     # Show info message if config already exists
     if not is_first_time_backends_setup and not skip_confirmation:
         console.print()
-        console.print("[dim]ℹ Config updates are not yet supported. Running a full reset.[/dim]")
+        console.print("[dim]ℹ Config update requires running a full reset.[/dim]")
 
     try:
         # Show unified initialization prompt (skip if skip_confirmation is True)

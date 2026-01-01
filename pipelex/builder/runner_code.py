@@ -17,7 +17,7 @@ from pipelex.core.concepts.concept_representation_generator import (
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
@@ -27,13 +27,13 @@ class CustomClassInfo:
     """Information about a custom structure class for import generation."""
 
     class_name: str
-    domain: str
+    domain_code: str
     concept_code: str
 
     @property
     def module_name(self) -> str:
         """Get the module name (filename without .py) for this class."""
-        return f"{self.domain}_{self.concept_code}"
+        return f"{self.domain_code}_{self.concept_code}"
 
     @property
     def import_statement(self) -> str:
@@ -106,19 +106,19 @@ def _collect_concept_info(concept: Concept) -> CustomClassInfo | None:
     Returns:
         CustomClassInfo if it's a custom concept, None if native
     """
-    if SpecialDomain.is_native(concept.domain):
+    if SpecialDomain.is_native(concept.domain_code):
         return None
 
     # For custom concepts, use the concept code as the class name
     # The structure class name should match the concept code
     return CustomClassInfo(
         class_name=concept.structure_class_name,
-        domain=concept.domain,
+        domain_code=concept.domain_code,
         concept_code=concept.code,
     )
 
 
-def _collect_imports_for_inputs(inputs: InputRequirements) -> tuple[set[str], dict[str, CustomClassInfo]]:
+def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict[str, CustomClassInfo]]:
     """Collect all imports needed for a pipe's inputs.
 
     Args:
@@ -136,7 +136,7 @@ def _collect_imports_for_inputs(inputs: InputRequirements) -> tuple[set[str], di
 
         # Get imports from the representation generator
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        generator.generate_representation(concept.concept_string, structure_class)
+        generator.generate_representation(concept.concept_ref, structure_class)
 
         for class_name in generator.imports_needed:
             if NativeConceptCode.is_native_structure_class(class_name):
@@ -165,9 +165,9 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
         output_multiplicity: Whether the output is a list (e.g., Text[])
     """
     # Get output information
-    structure_class_name = pipe.output.structure_class_name
+    structure_class_name = pipe.output.concept.structure_class_name
     is_native = NativeConceptCode.is_native_structure_class(structure_class_name)
-    custom_info = None if is_native else _collect_concept_info(pipe.output)
+    custom_info = None if is_native else _collect_concept_info(pipe.output.concept)
 
     # Collect all imports needed for inputs
     native_classes, custom_classes = _collect_imports_for_inputs(pipe.inputs)

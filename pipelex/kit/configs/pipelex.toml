@@ -2,11 +2,11 @@
 # Pipelex Configuration File
 ####################################################################################################
 #
-# This configuration file is copied to your project's .pipelex/ directory when you run:
-#   pipelex init config
+# This configuration file is copied to client projects' .pipelex/ directory when running:
+#   `pipelex init config`
 #
 # Purpose:
-# - This file allows you to override Pipelex's default settings for your specific project
+# - This file allows to override Pipelex's default settings for specific projects
 # - Feel free to modify any settings below to suit your needs
 # - You can add any configuration sections that exist in the main pipelex.toml
 #
@@ -14,7 +14,7 @@
 # - See the full default configuration in: pipelex/pipelex.toml (in the Pipelex package)
 # - See the configuration structure classes in: pipelex/config.py and pipelex/cogt/config_cogt.py
 #
-# Common Customizations:
+# Common customizations are proposed below, such as:
 # - Logging levels and behavior
 # - Excluded directories for scanning
 # - LLM prompt dumping for debugging
@@ -26,77 +26,89 @@
 #
 ####################################################################################################
 
+
+[pipelex.storage_config]
+# Uncomment to change the storage method: "local" (default) or "in_memory"
+# is_fetch_remote_content_enabled = true
+# uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+# method = "local"
+# local_storage_path = ".pipelex/storage"
+
 [pipelex.scan_config]
-excluded_dirs = [
-    ".venv",
-    "venv",
-    "env",
-    ".env",
-    "virtualenv",
-    ".virtualenv",
-    ".git",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "node_modules",
-    "results",
-]
+# Uncomment to customize the excluded directories for scanning
+# excluded_dirs = [
+#     ".venv",
+#     "venv",
+#     "env",
+#     ".env",
+#     "virtualenv",
+#     ".virtualenv",
+#     ".git",
+#     "__pycache__",
+#     ".pytest_cache",
+#     ".mypy_cache",
+#     ".ruff_cache",
+#     "node_modules",
+#     "results",
+# ]
 
 [pipelex.builder_config]
-fix_loop_max_attempts = 10
-# Uncomment to change where the generated pipelines are saved
+# Uncomment to change where the generated pipelines are saved:
 # default_output_dir = "."
 # default_bundle_file_name = "bundle"
 # default_directory_base_name = "pipeline"
 
 [pipelex.log_config]
-default_log_level = "INFO"
+# Uncomment to change the default log level:
+# default_log_level = "INFO"
 
 # Uncomment to log to stderr instead of stdout
 # console_log_target = "stderr"
 # console_print_target = "stderr"
 
 [pipelex.log_config.package_log_levels]
-pipelex = "INFO"
+# Uncomment to change the log level for specific packages:
+# pipelex = "INFO"
 
 [cogt]
 [cogt.model_deck_config]
-# Uncomment to disable model fallback: it will raise errors instead of using secondary model options
+# Uncomment to disable model fallback: it will raise errors instead of using secondary model options:
 # is_model_fallback_enabled = false
 # Uncomment to change the reaction to missing presets: "raise" (default), "log" or "none"
 # missing_presets_reaction = "raise"
 
 [cogt.tenacity_config]
-# Uncomment to change those values as needed
+# Uncomment to change those values as needed:
 # max_retries = 50      # Maximum number of retry attempts before giving up
 # wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
 # wait_max = 20         # Maximum wait time between retries (in seconds)
 # wait_exp_base = 1.3   # Base for exponential backoff calculation
 
 [cogt.llm_config]
-# Uncomment any of these to enable dumping the inputs or outputs of text-genration with an LLM
+# Uncomment any of these to enable dumping the inputs or outputs of text-generation with an LLM:
 # is_dump_text_prompts_enabled = true
 # is_dump_response_text_enabled = true
 
 [cogt.llm_config.instructor_config]
-# Uncomment any of these to enable dumping the kwargs, response or errors of the instructor
+# Uncomment any of these to enable dumping the kwargs, response or errors when generating structured content:
 # is_dump_kwargs_enabled = true
 # is_dump_response_enabled = true
 # is_dump_error_enabled = true
 
 [pipelex.observer_config]
-observer_dir = "results/observer"
+# Uncomment to change the directory where the observer will save its results:
+# observer_dir = "results/observer"
 
 [pipelex.feature_config]
-# WIP/Experimental feature flags
-is_pipeline_tracking_enabled = false
-is_reporting_enabled = true
+# WIP/Experimental feature flags:
+# is_pipeline_tracking_enabled = false
+# is_reporting_enabled = true
 
 [pipelex.reporting_config]
-is_log_costs_to_console = false
-is_generate_cost_report_file_enabled = true
-cost_report_dir_path = "reports"
-cost_report_base_name = "cost_report"
-cost_report_extension = "csv"
-cost_report_unit_scale = 1.0
+# Uncomment to customize the reporting configuration:
+# is_log_costs_to_console = false
+# is_generate_cost_report_file_enabled = false
+# cost_report_dir_path = "reports"
+# cost_report_base_name = "cost_report"
+# cost_report_extension = "csv"
+# cost_report_unit_scale = 1.0
