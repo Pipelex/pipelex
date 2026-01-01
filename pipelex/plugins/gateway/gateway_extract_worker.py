@@ -119,9 +119,6 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
 
-        # request_params = GatewayExtractRequestParams(should_include_images=should_include_images)
-        # messages: list[dict[str, str]] = [{"role": "user", "content": request_params.model_dump_json()}]
-
         doc_tag = document_type.document_tag
         attempt_number = 0
         response: GenericResponse | None = None
