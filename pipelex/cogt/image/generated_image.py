@@ -40,17 +40,12 @@ class GeneratedImageRawDetails(CustomBaseModel):
     @model_validator(mode="after")
     def validate_mime_type_or_output_format(self) -> Self:
         if self.mime_type:
-            if not ImageFormat.is_supported_mime_type(self.mime_type):
-                supported = ", ".join(sorted(ImageFormat.get_supported_mime_types()))
-                if self.mime_type.startswith("image/"):
-                    msg = f"Unsupported image MIME type: {self.mime_type}. Supported types are: {supported}"
-                else:
-                    msg = f"Invalid image MIME type: {self.mime_type}. Expected format 'image/<subtype>'. Supported types are: {supported}"
-                raise ValueError(msg)
+            ImageFormat.raise_if_unsupported_mime_type(self.mime_type)
         elif self.actual_url_or_prefixed_base64 and (
             result := extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=self.actual_url_or_prefixed_base64)
         ):
             base64_str, base64_extracted_mime_type = result
+            ImageFormat.raise_if_unsupported_mime_type(base64_extracted_mime_type)
             self.mime_type = base64_extracted_mime_type
             self.base64_str = base64_str
         elif self.output_format is None:
