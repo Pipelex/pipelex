@@ -188,7 +188,7 @@ type = "PipeLLM"
 description = "Analyze image content"
 inputs = { image = "Image" }
 output = "Text"
-prompt = "Describe what you see in this image in detail"
+prompt = "Describe what you see in this image in detail: $image"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -199,7 +199,7 @@ prompt = "Describe what you see in this image in detail"
                 description="Analyze image content",
                 inputs={"image": "Image"},
                 output=NativeConceptCode.TEXT,
-                prompt="Describe what you see in this image in detail",
+                prompt="Describe what you see in this image in detail: $image",
             ),
         },
     ),

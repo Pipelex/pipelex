@@ -20,7 +20,9 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -75,6 +77,34 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             for llm_choice in self.llm_choices.list_choice_strings():
                 check_llm_choice_with_deck(llm_choice=llm_choice)
 
+        needed_inputs = self.needed_inputs()
+        required_variable_paths = self.required_variables()
+        input_names = {input_name for input_name, _ in needed_inputs.items}
+
+        # Check for unused inputs: declared in inputs but not used by any variable path
+        for input_name in input_names:
+            if not is_input_used_by_variables(input_name, required_variable_paths):
+                msg = f"PipeLLM '{self.code}' has input '{input_name}' declared but it is not used in the prompt or system_prompt."
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                    pipe_code=self.code,
+                    variable_names=[input_name],
+                    explanation=f"Input '{input_name}' is declared in inputs but not referenced in prompt/system_prompt.",
+                )
+
+        # Check for missing inputs: variable paths in prompt/system_prompt not satisfied by any input
+        for variable_path in required_variable_paths:
+            if not is_variable_satisfied_by_inputs(variable_path, input_names):
+                msg = f"PipeLLM '{self.code}' uses variable '{variable_path}' in prompt/system_prompt but it is not declared in inputs."
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    pipe_code=self.code,
+                    variable_names=[variable_path],
+                    explanation=f"Variable '{variable_path}' is used in prompt/system_prompt but not declared in inputs.",
+                )
+
     @override
     def validate_inputs_with_library(self):
         pass
@@ -110,7 +140,12 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
-        return self.inputs
+        needed_inputs = InputStuffSpecsFactory.make_empty()
+
+        for input_name, stuff_spec in self.inputs.items:
+            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+
+        return needed_inputs
 
     @override
     def required_variables(self) -> set[str]:

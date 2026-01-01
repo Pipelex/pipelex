@@ -42,14 +42,11 @@ class PipeImgGenBlueprint(PipeBlueprint):
             msg = f"Could not parse template for PipeImgGen: {exc}"
             raise ValueError(msg) from exc
         # Filter out internal variables that start with underscore
-        required_variables = {
-            variable_name
-            for variable_name in detect_jinja2_required_variables(
-                template_category=template_category,
-                template_source=preprocessed_template,
-            )
-            if not variable_name.startswith("_")
-        }
+        full_paths = detect_jinja2_required_variables(
+            template_category=template_category,
+            template_source=preprocessed_template,
+        )
+        required_variables = {path.split(".")[0] for path in full_paths if not path.split(".")[0].startswith("_")}
 
         # Check that all required variables are in inputs
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
