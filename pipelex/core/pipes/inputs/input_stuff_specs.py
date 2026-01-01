@@ -11,6 +11,7 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class NamedStuffSpec(StuffSpec):
@@ -50,7 +51,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         transformed_dict: PipeInputsRoot = {}
         for input_name, stuff_spec in stuff_specs.items():
             # in case of sub-attribute, the variable name is the object name, before the 1st dot
-            transformed_key: str = input_name.split(".", 1)[0]
+            transformed_key: str = get_root_from_dotted_path(input_name)
             if transformed_key != input_name:
                 log.verbose(f"Sub-attribute {input_name} detected, using {transformed_key} as variable name")
 
@@ -102,7 +103,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def required_names(self) -> list[str]:
         the_required_names: list[str] = []
         for requirement_expression in self.root:
-            required_variable_name = requirement_expression.split(".", 1)[0]
+            required_variable_name = get_root_from_dotted_path(requirement_expression)
             the_required_names.append(required_variable_name)
         return the_required_names
 
@@ -110,7 +111,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def named_stuff_specs(self) -> list[NamedStuffSpec]:
         the_named_stuff_spec: list[NamedStuffSpec] = []
         for requirement_expression, stuff_spec in self.root.items():
-            required_variable_name = requirement_expression.split(".", 1)[0]
+            required_variable_name = get_root_from_dotted_path(requirement_expression)
             the_named_stuff_spec.append(
                 NamedStuffSpec(
                     variable_name=required_variable_name,

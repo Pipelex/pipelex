@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
@@ -14,13 +16,42 @@ class ModelScope(StrEnum):
     CONCEPT = "concept"
 
 
+def _extract_wrapped_pipe_validation_error(error: ErrorDetails) -> PipeValidationError | None:
+    """Extract a wrapped PipeValidationError from a pydantic error if present.
+
+    When a PipeValidationError is raised inside a model validator, pydantic wraps it.
+    This function attempts to extract the original PipeValidationError from the error context.
+
+    Args:
+        error: Pydantic error details that may contain a wrapped PipeValidationError
+
+    Returns:
+        The original PipeValidationError if found, None otherwise
+    """
+    # Check if the error type indicates a value_error (which wraps exceptions from validators)
+    error_type = error.get(ErrorCatKey.TYPE.value, "")
+    if error_type != "value_error":
+        return None
+
+    # Check if there's a context with the original error
+    ctx: dict[str, Any] | None = error.get("ctx")
+    if ctx:
+        # Pydantic may store the original exception in ctx["error"]
+        original_error = ctx.get("error")
+        if isinstance(original_error, PipeValidationError):
+            return original_error
+
+    return None
+
+
 def categorize_pipe_validation_error(
     validation_error: ValidationError,
 ) -> list[PipesAndConceptValidationErrorData]:
     """Categorize all errors from a ValidationError for Pipe instantiation.
 
     This function determines the model scope (PIPE or CONCEPT) from the ValidationError
-    and processes all errors accordingly.
+    and processes all errors accordingly. It also detects wrapped PipeValidationError
+    exceptions that were raised inside model validators.
 
     Args:
         validation_error: Pydantic ValidationError from Pipe model validation
@@ -56,7 +87,11 @@ def categorize_pipe_validation_error(
     # Process all errors
     categorized_errors: list[PipesAndConceptValidationErrorData] = []
     for error in errors:
-        if model_scope == ModelScope.PIPE:
+        # First, check if this is a wrapped PipeValidationError
+        wrapped_pipe_error = _extract_wrapped_pipe_validation_error(error)
+        if wrapped_pipe_error:
+            categorized_error = categorize_pipe_validation_with_libraries_error(pipe_error=wrapped_pipe_error)
+        elif model_scope == ModelScope.PIPE:
             categorized_error = _handle_pipe_errors(
                 error=error,
                 pipe_code=None,  # We don't have the code at this point

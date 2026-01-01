@@ -169,14 +169,15 @@ class TestPipeLLMBasic:
             if not stuff_name:
                 pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
             working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+            # Build prompt dynamically to include the input variable reference
+            prompt_with_input = f"Here is the input: ${stuff_name}\n{PipeTestCases.MULTI_IMG_DESC_PROMPT}"
             pipe_llm_blueprint = PipeLLMBlueprint(
                 description="LLM test for image processing with attributes",
-                inputs={stuff_name: stuff.concept.concept_ref},
+                inputs={stuff_name: "native.Image"},
                 output=NativeConceptCode.TEXT,
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
+                prompt=prompt_with_input,
             )
-
             pipe_job = PipeJobFactory.make_pipe_job(
                 working_memory=working_memory,
                 pipe=PipeFactory[PipeLLM].make_from_blueprint(

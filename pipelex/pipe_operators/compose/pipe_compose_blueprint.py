@@ -56,13 +56,14 @@ class PipeComposeBlueprint(PipeBlueprint):
         except Jinja2TemplateSyntaxError as exc:
             msg = f"Could not parse template for PipeCompose: {exc}"
             raise ValueError(msg) from exc
+        full_paths = detect_jinja2_required_variables(
+            template_category=self.template_category,
+            template_source=preprocessed_template,
+        )
         required_variables = {
-            variable_name
-            for variable_name in detect_jinja2_required_variables(
-                template_category=self.template_category,
-                template_source=preprocessed_template,
-            )
-            if not variable_name.startswith("_") and variable_name not in {"preliminary_text", "place_holder"}
+            path.split(".")[0]
+            for path in full_paths
+            if not path.split(".")[0].startswith("_") and path.split(".")[0] not in {"preliminary_text", "place_holder"}
         }
         for required_variable_name in required_variables:
             if required_variable_name not in self.input_names:

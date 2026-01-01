@@ -14,6 +14,7 @@ from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -138,7 +139,9 @@ class PipeBatch(PipeController):
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             required_variables = sub_pipe.required_variables()
-            required_stuffs = branch_memory.get_existing_stuffs(names=required_variables)
+            # Extract root names from full paths for looking up stuffs in working memory
+            required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables}
+            required_stuffs = branch_memory.get_existing_stuffs(names=required_stuff_names)
             required_stuffs = [required_stuff for required_stuff in required_stuffs if required_stuff.stuff_code != input_stuff.stuff_code]
             required_stuff_lists.append(required_stuffs)
             # We create a deep copy of the run params to avoid modifying the original run params,
@@ -152,23 +155,13 @@ class PipeBatch(PipeController):
                     "output_multiplicity": False,
                 },
             )
-
-            task: Coroutine[Any, Any, PipeOutput]
-            if pipe_run_params.run_mode == PipeRunMode.DRY:
-                branch_pipe_run_params.run_mode = PipeRunMode.DRY
-                task = sub_pipe.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=branch_memory,
-                    output_name=f"Batch result {branch_index + 1} of {output_name}",
-                    pipe_run_params=branch_pipe_run_params,
-                )
-            else:
-                task = sub_pipe.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=branch_memory,
-                    output_name=f"Batch result {branch_index + 1} of {output_name}",
-                    pipe_run_params=branch_pipe_run_params,
-                )
+            branch_pipe_run_params.run_mode = pipe_run_params.run_mode
+            task = sub_pipe.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=branch_memory,
+                output_name=f"Batch result {branch_index + 1} of {output_name}",
+                pipe_run_params=branch_pipe_run_params,
+            )
             tasks.append(task)
 
         pipe_outputs = await asyncio.gather(*tasks)
