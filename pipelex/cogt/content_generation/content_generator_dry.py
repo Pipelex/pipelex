@@ -253,6 +253,9 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
     ) -> list[ImageContent]:
+        if not extract_input.pdf_uri:
+            msg = "PDF URI is required to render page views"
+            raise ValueError(msg)
         nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
         page_view_images_resolved: list[ImageContent] = []
         for page_index in range(1, nb_pages + 1):

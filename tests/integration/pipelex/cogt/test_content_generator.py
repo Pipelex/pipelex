@@ -5,7 +5,6 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.exceptions import ModelNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -136,15 +135,16 @@ class TestContentGenerator:
         extract_handle_from_image: str,
         content_generator: ContentGeneratorProtocol,
     ):
-        extract_output = await content_generator.make_extract_pages(
+        page_contents = await content_generator.make_extract_pages(
             job_metadata=job_metadata,
             extract_handle=extract_handle_from_image,
             extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_JPG_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
         )
-        pretty_print(extract_output, title="extract_pages")
-        assert isinstance(extract_output, ExtractOutput)
+        pretty_print(page_contents, title="extract_pages")
+        assert isinstance(page_contents, list)
+        assert all(isinstance(page_content, PageContent) for page_content in page_contents)
 
     @pytest.mark.extract
     @pytest.mark.inference
@@ -155,16 +155,16 @@ class TestContentGenerator:
         extract_job_params: ExtractJobParams,
         content_generator: ContentGeneratorProtocol,
     ):
-        extract_output = await content_generator.make_extract_pages(
+        page_contents = await content_generator.make_extract_pages(
             job_metadata=job_metadata,
             extract_handle=extract_handle_from_pdf,
             extract_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),
         )
-        pretty_print(extract_output, title="Extract pages from PDF")
-        assert isinstance(extract_output, list)
-        assert all(isinstance(page_content, PageContent) for page_content in extract_output)
+        pretty_print(page_contents, title="Extract pages from PDF")
+        assert isinstance(page_contents, list)
+        assert all(isinstance(page_content, PageContent) for page_content in page_contents)
 
     @pytest.mark.llm
     @pytest.mark.inference
