@@ -36,6 +36,7 @@ class TestPipeConditionContinueOutputType:
 
     async def test_batch_with_mixed_verdicts(
         self,
+        job_metadata: JobMetadata,
         load_test_library: Callable[[list[Path]], None],
         pipe_run_mode: PipeRunMode,
     ):
@@ -83,7 +84,7 @@ class TestPipeConditionContinueOutputType:
                 pipe=get_required_pipe(pipe_code="process_verified_links"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
