@@ -6,11 +6,12 @@ import openai
 from portkey_ai import (
     createHeaders,  # type: ignore[reportUnknownVariableType]
 )
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
-from pipelex.plugins.gateway.gateway_exceptions import GatewayFactoryError
+from pipelex.plugins.gateway.gateway_exceptions import GatewayExtractResponseError, GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_schemas import GatewayExtractPageResult
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
@@ -55,32 +56,37 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         response: GenericResponse,
     ) -> ExtractOutput:
         if not hasattr(response, "pages"):
-            msg = "Portkey extract response does not have pages"
-            raise GatewayFactoryError(msg)
+            msg = "Gateway extract response does not have pages"
+            raise GatewayExtractResponseError(msg)
 
-        response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-        pages: dict[int, Page] = {}
-        for response_page_dict in response_page_dicts:
-            response_page = GatewayExtractPageResult.model_validate(response_page_dict)
-            page_index = response_page.index
-            extracted_page_text = response_page.markdown
-            extracted_page_images_base64_strs = response_page.images
-            page_images: list[ExtractedImageFromPage] = []
-            for extracted_page_image_base64_str in extracted_page_images_base64_strs:
-                extracted_image = ExtractedImageFromPage(
-                    size=None,
-                    base64_str=extracted_page_image_base64_str,
-                    mime_type="image/png",  # Gateway returns PNG images
-                    caption=None,
+        try:
+            response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+            pages: dict[int, Page] = {}
+            for response_page_dict in response_page_dicts:
+                response_page = GatewayExtractPageResult.model_validate(response_page_dict)
+                page_index = response_page.index
+                extracted_page_text = response_page.markdown
+                extracted_page_images = response_page.images
+                page_images: list[ExtractedImageFromPage] = []
+                for extracted_page_image in extracted_page_images:
+                    extracted_image = ExtractedImageFromPage(
+                        size=None,
+                        base64_str=extracted_page_image.base64_str,
+                        mime_type=extracted_page_image.mime_type,
+                        caption=extracted_page_image.caption,
+                        bounding_box=extracted_page_image.bounding_box,
+                    )
+                    page_images.append(extracted_image)
+                pages[page_index] = Page(
+                    text=extracted_page_text,
+                    extracted_images=page_images,
                 )
-                page_images.append(extracted_image)
-            pages[page_index] = Page(
-                text=extracted_page_text,
-                extracted_images=page_images,
+            return ExtractOutput(
+                pages=pages,
             )
-        return ExtractOutput(
-            pages=pages,
-        )
+        except (TypeError, ValidationError) as exc:
+            msg = f"Error parsing Gateway extract response pages: {exc}"
+            raise GatewayExtractResponseError(msg) from exc
 
     @override
     def make_extras(

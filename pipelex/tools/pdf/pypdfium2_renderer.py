@@ -8,7 +8,7 @@ import pypdfium2 as pdfium
 from pypdfium2 import PdfImage
 from pypdfium2.raw import FPDF_PAGEOBJ_IMAGE, FPDFBitmap_BGRA
 
-from pipelex import log
+from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.system.exceptions import ToolError
@@ -64,10 +64,12 @@ def _extract_image_from_pdf_object(
     # - right → bottom_right_x
     # - bottom → bottom_right_y
     left, bottom, right, top = image_obj.get_pos()
-    top_left_x = round(left)
-    top_left_y = round(top)
-    bottom_right_x = round(right)
-    bottom_right_y = round(bottom)
+    bounding_box = BoundingBox.make_from_two_corners(
+        top_left_x=left,
+        top_left_y=top,
+        bottom_right_x=right,
+        bottom_right_y=bottom,
+    )
 
     # Get the filters applied to this image to determine compression type
     filters = cast("list[str]", image_obj.get_filters())
@@ -82,16 +84,12 @@ def _extract_image_from_pdf_object(
         # Direct extraction: get the compressed JPEG bytes without decompressing
         # get_data returns a ctypes array (c_ubyte) that can be converted to bytes
         actual_bytes = bytes(image_obj.get_data(decode_simple=True))  # pyright: ignore[reportUnknownArgumentType]
-        log.dev(f"Direct JPEG extraction: ({width}, {height}) at ({top_left_x}, {top_left_y})-({bottom_right_x}, {bottom_right_y})")
 
         return ExtractedImageFromPage(
             size=ImageSize(width=width, height=height),
             actual_bytes=actual_bytes,
             output_format=ImageFormat.JPEG,
-            top_left_x=top_left_x,
-            top_left_y=top_left_y,
-            bottom_right_x=bottom_right_x,
-            bottom_right_y=bottom_right_y,
+            bounding_box=bounding_box,
         )
 
     # Fallback: use bitmap extraction with PIL encoding
@@ -107,10 +105,7 @@ def _extract_image_from_pdf_object(
         size=ImageSize(width=width, height=height),
         actual_bytes=actual_bytes,
         output_format=effective_format,
-        top_left_x=top_left_x,
-        top_left_y=top_left_y,
-        bottom_right_x=bottom_right_x,
-        bottom_right_y=bottom_right_y,
+        bounding_box=bounding_box,
     )
 
 
