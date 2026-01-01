@@ -123,10 +123,10 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
                         continue
                     bounding_box: BoundingBox | None = None
                     if (
-                        extracted_page_image.top_left_x
-                        and extracted_page_image.top_left_y
-                        and extracted_page_image.bottom_right_x
-                        and extracted_page_image.bottom_right_y
+                        extracted_page_image.top_left_x is not None
+                        and extracted_page_image.top_left_y is not None
+                        and extracted_page_image.bottom_right_x is not None
+                        and extracted_page_image.bottom_right_y is not None
                     ):
                         bounding_box = BoundingBox.make_from_two_corners(
                             top_left_x=cast("float", extracted_page_image.top_left_x),

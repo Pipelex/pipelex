@@ -145,19 +145,19 @@ class MistralFactory:
             raise MistralExtractResponseError(msg)
         width: int | None = None
         height: int | None = None
-        if mistral_ocr_image_obj.top_left_x and mistral_ocr_image_obj.bottom_right_x:
+        if mistral_ocr_image_obj.top_left_x is not None and mistral_ocr_image_obj.bottom_right_x is not None:
             width = mistral_ocr_image_obj.bottom_right_x - mistral_ocr_image_obj.top_left_x
-        if mistral_ocr_image_obj.top_left_y and mistral_ocr_image_obj.bottom_right_y:
+        if mistral_ocr_image_obj.top_left_y is not None and mistral_ocr_image_obj.bottom_right_y is not None:
             height = mistral_ocr_image_obj.bottom_right_y - mistral_ocr_image_obj.top_left_y
         size: ImageSize | None = None
-        if width and height:
+        if width is not None and height is not None:
             size = ImageSize(width=width, height=height)
         bounding_box: BoundingBox | None
         if (
-            mistral_ocr_image_obj.top_left_x
-            and mistral_ocr_image_obj.top_left_y
-            and mistral_ocr_image_obj.bottom_right_x
-            and mistral_ocr_image_obj.bottom_right_y
+            mistral_ocr_image_obj.top_left_x is not None
+            and mistral_ocr_image_obj.top_left_y is not None
+            and mistral_ocr_image_obj.bottom_right_x is not None
+            and mistral_ocr_image_obj.bottom_right_y is not None
         ):
             bounding_box = BoundingBox.make_from_two_corners(
                 top_left_x=mistral_ocr_image_obj.top_left_x,
