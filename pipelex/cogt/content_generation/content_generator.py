@@ -348,7 +348,6 @@ class ContentGenerator(ContentGeneratorProtocol):
             extract_output=extract_output,
         )
         if extract_job_params and extract_job_params.should_include_page_views:
-            log.dev("Making page views")
             page_view_contents: list[ImageContent] = []
             if extract_input.pdf_uri:
                 page_view_contents = await self.make_render_page_views(

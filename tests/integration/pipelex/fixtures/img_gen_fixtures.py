@@ -1,6 +1,5 @@
 """Image generation test fixtures."""
 
-
 import pytest
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, Quality

@@ -135,50 +135,6 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             extract_job_config=ExtractJobConfig(),
         )
 
-        # Build the output stuff, which is a list of page contents
-        if self.should_include_page_views:
-            page_view_contents: list[ImageContent] = []
-            log.debug(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
-            if pdf_uri:
-                page_view_contents = await content_generator.make_render_page_views(
-                    extract_input=extract_input,
-                    extract_handle=extract_setting.model,
-                    job_metadata=job_metadata,
-                    extract_job_params=extract_job_params,
-                    extract_job_config=ExtractJobConfig(),
-                )
-            elif image_uri:
-                page_view_contents = [ImageContent(url=image_uri)]
-            if len(page_view_contents) != len(page_contents):
-                msg = f"Number of page view contents ({len(page_view_contents)}) does not match number of page contents ({len(page_contents)})"
-                raise ValueError(msg)
-            for page_content in page_contents:
-                page_content.page_view = page_view_contents.pop(0)
-
-        # log.debug(extract_output.pages, title="extract_output.pages")
-        # log.debug(page_view_contents, title="page_view_contents")
-        # page_contents: list[PageContent] = []
-        # for page_index, page in extract_output.pages.items():
-        #     images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
-        #     log.verbose(f"images: {images}, page_view_contents: {page_view_contents}, index: {page_index}")
-        #     try:
-        #         page_view_content = page_view_contents[page_index - 1] if self.should_include_page_views else None
-        #     except IndexError as exc:
-        #         msg = f"Page view content not found for page index {page_index}"
-        #         raise ExtractOutputError(msg) from exc
-        #     page_contents.append(
-        #         PageContent(
-        #             text_and_images=TextAndImagesContent(
-        #                 text=TextContent(text=page.text) if page.text else None,
-        #                 images=images,
-        #             ),
-        #             page_view=page_view_content,
-        #         ),
-        #     )
-        # if self.should_include_page_views:
-        #     for page_content in page_contents:
-        #         page_content.page_view = page_view_contents.pop(0)
-
         content: ListContent[PageContent] = ListContent(items=page_contents)
 
         output_stuff = StuffFactory.make_stuff(

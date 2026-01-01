@@ -61,18 +61,16 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         """
         uri = self._add_scheme(key)
         self.root[key] = data
-        log.dev(f"Stored data at URI:\n'{uri}'")
         return uri
 
     @override
-    def display_link(self, uri: str) -> str:
-        """Return human-readable link for this URI.
+    def display_link(self, uri: str) -> str | None:
+        """In-memory storage cannot generate a display link.
 
         Args:
             uri: Full URI including pipelex-storage:// scheme.
 
         Returns:
-            Human-readable memory reference for debugging.
+            None
         """
-        key = self._strip_scheme(uri)
-        return f"<memory: {key}>"
+        return None

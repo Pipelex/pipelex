@@ -27,10 +27,7 @@ from tests.integration.pipelex.test_data import PipeExtractTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeExtract:
-    @pytest.fixture(
-        scope="class",
-        autouse=True,
-    )
+    @pytest.fixture(scope="class", autouse=True)
     def setup(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         concept_library = get_concept_library()
@@ -136,5 +133,5 @@ class TestPipeExtract:
         pipe_extract_output = await get_pipe_router().run(
             pipe_job=pipe_job,
         )
-        extracted_text = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
-        pretty_print(extracted_text, title="extracted_text")
+        extracted_pages = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
+        pretty_print(extracted_pages, title="Extracted pages")

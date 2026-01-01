@@ -162,7 +162,7 @@ class TestContentGenerator:
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),
         )
-        pretty_print(extract_output, title="extract_pages")
+        pretty_print(extract_output, title="Extract pages from PDF")
         assert isinstance(extract_output, list)
         assert all(isinstance(page_content, PageContent) for page_content in extract_output)
 

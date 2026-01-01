@@ -28,7 +28,7 @@ class StorageProviderAbstract(ABC):
         """
 
     @abstractmethod
-    def display_link(self, uri: str) -> str:
+    def display_link(self, uri: str) -> str | None:
         """Return human-readable link for this URI.
 
         Args:

@@ -55,6 +55,20 @@
             "justMyCode": false
         },
         {
+            "name": "Debug test inference PipeExtract",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_pipe_extract_from_pdf"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Debug validate bundle",
             "type": "debugpy",
             "request": "launch",

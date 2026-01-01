@@ -125,7 +125,7 @@ class GeneratedContentFactory:
         else:
             mime_type = "image/jpeg"
 
-        display_link: str
+        display_link: str | None
         if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content_enabled:
             actual_bytes = await self._fetch_remote_content(url=url)
             storage_key = self._build_storage_key(
