@@ -1,4 +1,5 @@
-from typing import Any, cast, get_args, get_origin
+import types
+from typing import Any, Union, cast, get_args, get_origin
 
 from pydantic import ValidationError
 
@@ -583,13 +584,18 @@ class StructuredContentComposer:
         if field_info and field_info.annotation:
             annotation = field_info.annotation
             # Handle Optional types (both `Optional[X]` and Python 3.10+ `X | None` syntax)
-            # Note: get_origin() handles both typing.Union and types.UnionType correctly,
-            # while hasattr(annotation, "__origin__") only works for typing.Union
-            if get_origin(annotation) is not None:
-                # It's a generic type like Optional[Address] or Address | None
+            # We need to specifically detect Optional types, not all generic types.
+            # - Optional[X] has origin Union and type(None) in args
+            # - X | None (Python 3.10+) has origin types.UnionType and type(None) in args
+            # Other generic types like list[X] should NOT be unwrapped.
+            origin = get_origin(annotation)
+            if origin is Union or origin is types.UnionType:
                 args = get_args(annotation)
-                if args:
-                    annotation = args[0]
+                if type(None) in args:
+                    # It's an Optional type, get the non-None type
+                    non_none_args = [arg for arg in args if arg is not type(None)]
+                    if non_none_args:
+                        annotation = non_none_args[0]
             return annotation  # type: ignore[return-value]
         else:
             msg = f"Cannot determine class for nested field '{field_name}' in {self.output_class.__name__}"

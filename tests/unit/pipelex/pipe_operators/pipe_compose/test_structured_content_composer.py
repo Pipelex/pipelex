@@ -4,7 +4,7 @@ The composer takes a ConstructBlueprint and WorkingMemory, resolves all fields
 according to their composition methods, and produces a StructuredContent instance.
 """
 
-from typing import Any, Callable, ClassVar
+from typing import Any, Callable, ClassVar, get_origin
 
 import pytest
 from pydantic import Field, ValidationError
@@ -19,6 +19,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
 # Test StructuredContent classes for testing
@@ -597,6 +598,93 @@ class TestGetNestedFieldClassOptionalSyntaxes:
         assert result_typing is Address
         assert result_union is Address
         assert result_typing is result_union, "Both syntaxes should return the same class"
+
+
+# Test models for generic type tests (list, dict)
+class CompanyWithAddressList(StructuredContent):
+    """Company with a list of addresses - should NOT be unwrapped by _get_nested_field_class."""
+
+    name: str = Field(description="Company name")
+    branches: list[Address] = Field(
+        default_factory=empty_list_factory_of(Address),
+        description="List of branch addresses",
+    )
+
+
+class CompanyWithAddressDict(StructuredContent):
+    """Company with a dict of addresses - should NOT be unwrapped by _get_nested_field_class."""
+
+    name: str = Field(description="Company name")
+    offices: dict[str, Address] = Field(default_factory=dict, description="Dict of office addresses by name")
+
+
+class TestGetNestedFieldClassGenericTypes:
+    """Tests for _get_nested_field_class with generic types that should NOT be unwrapped.
+
+    This tests the fix for the bug where `get_origin(annotation) is not None` matched
+    ALL generic types including list[X], dict[K, V], etc. The condition was too broad
+    and would incorrectly unwrap list[Address] to Address.
+
+    The fix checks specifically for Union/UnionType with None in args to detect Optional types.
+    """
+
+    def test_get_nested_field_class_does_not_unwrap_list(self):
+        """Test _get_nested_field_class does NOT unwrap list[Address] to Address.
+
+        Before the fix: list[Address] would be unwrapped to Address because
+        get_origin(list[Address]) returns list (not None), triggering the unwrap.
+
+        After the fix: list[Address] is returned as-is because we only unwrap
+        Optional types (Union/UnionType with None in args).
+        """
+        # Use a simple blueprint - we just need to test the _get_nested_field_class method
+        # The blueprint doesn't need to match the field we're testing
+        simple_construct = {"name": "Test Company"}
+        blueprint = ConstructBlueprint.make_from_raw(simple_construct)
+        working_memory = WorkingMemory()
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=CompanyWithAddressList,
+        )
+
+        # Directly test the private method (noqa needed for testing internal behavior)
+        result = composer._get_nested_field_class("branches")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+
+        # The bug would have returned Address here instead of list[Address]
+        assert result is not Address, "list[Address] should NOT be unwrapped to Address"
+        # The correct result should be list[Address]
+        assert get_origin(result) is list, f"Expected list[Address], got {result}"
+
+    def test_get_nested_field_class_does_not_unwrap_dict(self):
+        """Test _get_nested_field_class does NOT unwrap dict[str, Address] to str.
+
+        Before the fix: dict[str, Address] would be unwrapped to str because
+        get_origin(dict[str, Address]) returns dict (not None), triggering the unwrap.
+
+        After the fix: dict[str, Address] is returned as-is.
+        """
+        # Use a simple blueprint - we just need to test the _get_nested_field_class method
+        # The blueprint doesn't need to match the field we're testing
+        simple_construct = {"name": "Test Company"}
+        blueprint = ConstructBlueprint.make_from_raw(simple_construct)
+        working_memory = WorkingMemory()
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=CompanyWithAddressDict,
+        )
+
+        # Directly test the private method (noqa needed for testing internal behavior)
+        result = composer._get_nested_field_class("offices")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+
+        # The bug would have returned str here instead of dict[str, Address]
+        assert result is not str, "dict[str, Address] should NOT be unwrapped to str"
+        assert result is not Address, "dict[str, Address] should NOT be unwrapped to Address"
+        # The correct result should be dict[str, Address]
+        assert get_origin(result) is dict, f"Expected dict[str, Address], got {result}"
 
 
 # Test model for runtime params testing
