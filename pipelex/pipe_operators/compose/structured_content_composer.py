@@ -22,13 +22,15 @@ class StructuredContentComposer:
     The composer resolves each field in the blueprint according to its method:
     - FIXED: Use the literal value directly
     - FROM_VAR: Get value from working memory via path
-    - TEMPLATE: Render Jinja2 template with working memory context
+    - TEMPLATE: Render Jinja2 template with working memory context and runtime params
     - NESTED: Recursively compose a nested StructuredContent
 
     Attributes:
         construct_blueprint: The blueprint defining how to compose each field
         working_memory: The working memory containing input variables
         output_class: The StructuredContent subclass to instantiate
+        runtime_params: Additional runtime parameters for template context (from PipeRunParams.params)
+        extra_context: Extra context values for template rendering (from PipeCompose.extra_context)
     """
 
     def __init__(
@@ -36,10 +38,14 @@ class StructuredContentComposer:
         construct_blueprint: ConstructBlueprint,
         working_memory: WorkingMemory,
         output_class: type[StuffContent],
+        runtime_params: dict[str, Any] | None = None,
+        extra_context: dict[str, Any] | None = None,
     ):
         self.construct_blueprint = construct_blueprint
         self.working_memory = working_memory
         self.output_class = output_class
+        self.runtime_params = runtime_params or {}
+        self.extra_context = extra_context or {}
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -492,6 +498,14 @@ class StructuredContentComposer:
     async def _resolve_template(self, field_blueprint: ConstructFieldBlueprint) -> str:
         """Resolve a TEMPLATE field by rendering the Jinja2 template.
 
+        The context is built consistently with _run_template_mode in PipeCompose:
+        1. Working memory context (stuffs as variables)
+        2. Runtime params from PipeRunParams.params (keys prefixed with _)
+        3. Extra context from PipeCompose.extra_context
+
+        This ensures templates in construct fields can access the same variables
+        as templates in template mode.
+
         Args:
             field_blueprint: The field blueprint with template
 
@@ -502,8 +516,15 @@ class StructuredContentComposer:
             msg = "template is required for TEMPLATE method"
             raise StructuredContentComposerValueError(msg)
 
-        # Get context from working memory
-        context = self.working_memory.generate_context()
+        # Build context consistently with _run_template_mode in PipeCompose:
+        # 1. Working memory context (stuffs as variables)
+        context: dict[str, Any] = self.working_memory.generate_context()
+        # 2. Runtime params (from PipeRunParams.params)
+        if self.runtime_params:
+            context.update(**self.runtime_params)
+        # 3. Extra context (from PipeCompose.extra_context)
+        if self.extra_context:
+            context.update(**self.extra_context)
 
         # Preprocess the template (handles $ -> {{ }} conversion)
         preprocessed = preprocess_template(field_blueprint.template)
@@ -533,11 +554,13 @@ class StructuredContentComposer:
         # Get the field type from the output class to determine nested class
         nested_class: type[StuffContent] = self._get_nested_field_class(field_name=field_name)
 
-        # Create a new composer for the nested structure
+        # Create a new composer for the nested structure, passing through runtime params and extra context
         nested_composer = StructuredContentComposer(
             construct_blueprint=field_blueprint.nested,
             working_memory=self.working_memory,
             output_class=nested_class,
+            runtime_params=self.runtime_params,
+            extra_context=self.extra_context,
         )
 
         return await nested_composer.compose()

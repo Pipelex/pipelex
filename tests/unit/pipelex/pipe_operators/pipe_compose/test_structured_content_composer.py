@@ -597,3 +597,167 @@ class TestGetNestedFieldClassOptionalSyntaxes:
         assert result_typing is Address
         assert result_union is Address
         assert result_typing is result_union, "Both syntaxes should return the same class"
+
+
+# Test model for runtime params testing
+class ReportWithRuntimeParams(StructuredContent):
+    """Report that uses runtime params in templates."""
+
+    title: str = Field(description="Report title")
+    generated_summary: str = Field(description="Summary generated from template with runtime params")
+
+
+# Test model for nested structure with runtime params
+class NestedReportWithRuntimeParams(StructuredContent):
+    """Nested structure with runtime params in templates."""
+
+    header: str = Field(description="Header text")
+    details: ReportWithRuntimeParams = Field(description="Nested report details")
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestStructuredContentComposerRuntimeParams:
+    """Tests for template fields accessing runtime_params and extra_context.
+
+    This tests the fix for the inconsistency where _resolve_template only used
+    working_memory.generate_context(), but _run_template_mode in PipeCompose also
+    included pipe_run_params.params and extra_context. Templates in construct fields
+    should have access to the same context as templates in template mode.
+    """
+
+    @pytest.fixture
+    def working_memory_with_deal(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
+        """Create working memory with a Deal object."""
+        load_empty_library()
+        deal = Deal(customer_name="Acme Corp", amount=50000.0)
+        return WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=deal,
+                name="deal",
+            ),
+        )
+
+    async def test_template_field_accesses_runtime_params(self, working_memory_with_deal: WorkingMemory):
+        """Test that template fields can access runtime_params (from PipeRunParams.params).
+
+        Before fix: templates in construct fields could not access runtime params,
+        causing template rendering to fail or produce incorrect output.
+
+        After fix: runtime_params are merged into the template context, making them
+        accessible just like in _run_template_mode.
+        """
+        blueprint = ConstructBlueprint.make_from_raw(
+            {
+                "title": {"from": "deal.customer_name"},
+                "generated_summary": {"template": "Report for $_report_type generated on $_report_date"},
+            }
+        )
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_deal,
+            output_class=ReportWithRuntimeParams,
+            runtime_params={"_report_type": "Quarterly", "_report_date": "2025-01-02"},
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, ReportWithRuntimeParams)
+        assert result.title == "Acme Corp"
+        assert "Quarterly" in result.generated_summary
+        assert "2025-01-02" in result.generated_summary
+
+    async def test_template_field_accesses_extra_context(self, working_memory_with_deal: WorkingMemory):
+        """Test that template fields can access extra_context (from PipeCompose.extra_context).
+
+        Before fix: templates in construct fields could not access extra_context,
+        causing template rendering to fail or produce incorrect output.
+
+        After fix: extra_context is merged into the template context, making it
+        accessible just like in _run_template_mode.
+        """
+        blueprint = ConstructBlueprint.make_from_raw(
+            {
+                "title": "Financial Report",
+                "generated_summary": {"template": "Summary for $fiscal_year Q$quarter"},
+            }
+        )
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_deal,
+            output_class=ReportWithRuntimeParams,
+            extra_context={"fiscal_year": "2025", "quarter": "1"},
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, ReportWithRuntimeParams)
+        assert result.title == "Financial Report"
+        assert "2025" in result.generated_summary
+        assert "Q1" in result.generated_summary
+
+    async def test_template_field_combines_all_context_sources(self, working_memory_with_deal: WorkingMemory):
+        """Test that template fields can access all context sources together.
+
+        Context is built in order (later sources override earlier):
+        1. Working memory context (stuffs as variables)
+        2. Runtime params (from PipeRunParams.params)
+        3. Extra context (from PipeCompose.extra_context)
+
+        This ensures templates can use variables from all sources in a single template.
+        """
+        blueprint = ConstructBlueprint.make_from_raw(
+            {
+                "title": {"from": "deal.customer_name"},
+                "generated_summary": {"template": "Customer: $deal.customer_name, Type: $_report_type, Year: $fiscal_year"},
+            }
+        )
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_deal,
+            output_class=ReportWithRuntimeParams,
+            runtime_params={"_report_type": "Annual"},
+            extra_context={"fiscal_year": "2025"},
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, ReportWithRuntimeParams)
+        assert result.title == "Acme Corp"
+        # Template should include values from all three sources
+        assert "Acme Corp" in result.generated_summary  # From working memory
+        assert "Annual" in result.generated_summary  # From runtime_params
+        assert "2025" in result.generated_summary  # From extra_context
+
+    async def test_nested_template_fields_access_runtime_params(self, working_memory_with_deal: WorkingMemory):
+        """Test that nested structures also have access to runtime_params and extra_context.
+
+        The fix passes runtime_params and extra_context to nested composers,
+        ensuring templates in nested structures work correctly.
+        """
+        nested_construct = {
+            "header": {"template": "Report for $_report_type"},
+            "details": {
+                "title": {"from": "deal.customer_name"},
+                "generated_summary": {"template": "Generated on $_report_date for $fiscal_year"},
+            },
+        }
+        blueprint = ConstructBlueprint.make_from_raw(nested_construct)
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_deal,
+            output_class=NestedReportWithRuntimeParams,
+            runtime_params={"_report_type": "Monthly", "_report_date": "2025-01-15"},
+            extra_context={"fiscal_year": "2025"},
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, NestedReportWithRuntimeParams)
+        # Top-level template should access runtime_params
+        assert "Monthly" in result.header
+        # Nested template should access both runtime_params and extra_context
+        assert isinstance(result.details, ReportWithRuntimeParams)
+        assert result.details.title == "Acme Corp"
+        assert "2025-01-15" in result.details.generated_summary  # From runtime_params
+        assert "2025" in result.details.generated_summary  # From extra_context
