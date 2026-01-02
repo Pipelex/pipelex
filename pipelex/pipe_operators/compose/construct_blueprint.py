@@ -250,5 +250,5 @@ class ConstructBlueprint(BaseModel):
         return cls(fields=fields)
 
 
-# Rebuild the model to resolve forward references
+# The two models reference each other, so we need to rebuild the model to resolve forward references
 ConstructFieldBlueprint.model_rebuild()
