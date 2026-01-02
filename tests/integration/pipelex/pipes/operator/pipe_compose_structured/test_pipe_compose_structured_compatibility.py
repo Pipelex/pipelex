@@ -9,7 +9,7 @@ objects directly (not TextContent, not ListContent):
 """
 
 from pathlib import Path
-from typing import Any, Callable, ClassVar
+from typing import Callable
 
 import pytest
 
@@ -32,41 +32,7 @@ from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for
     Manager,
     Person,
 )
-
-
-class StructuredCompatibilityTestData:
-    """Test data for direct StructuredContent class compatibility tests."""
-
-    # Exact type match: Person -> PersonHolder.person field
-    EXACT_TYPE_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "holder_name": "Exact Type Holder",
-        "person": {"from": "input_person"},
-    }
-
-    # Class equivalence: Employee -> PersonHolder.person field
-    # Employee and Person have the same fields (name, role)
-    EQUIVALENT_CLASS_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "holder_name": "Equivalent Class Holder",
-        "person": {"from": "input_employee"},
-    }
-
-    # Reverse equivalence: Person -> EmployeeHolder.employee field
-    REVERSE_EQUIVALENT_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "holder_name": "Reverse Equivalent Holder",
-        "employee": {"from": "input_person"},
-    }
-
-    # Subclass to base: Manager -> PersonHolder.person field
-    SUBCLASS_TO_BASE_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "holder_name": "Subclass to Base Holder",
-        "person": {"from": "input_manager"},
-    }
-
-    # Incompatible classes: Location -> PersonHolder.person field (should fail)
-    INCOMPATIBLE_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "holder_name": "Incompatible Holder",
-        "person": {"from": "input_location"},
-    }
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import StructuredCompatibilityTestData
 
 
 @pytest.mark.dry_runnable
@@ -100,11 +66,13 @@ class TestPipeComposeStructuredCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="input_person", stuff=person_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose PersonHolder with exact Person type",
-            inputs={"input_person": "Text"},
-            construct_spec=StructuredCompatibilityTestData.EXACT_TYPE_CONSTRUCT,
-            output="compose_structured_test.PersonHolder",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose PersonHolder with exact Person type",
+                "inputs": {"input_person": "Text"},
+                "construct": StructuredCompatibilityTestData.EXACT_TYPE_CONSTRUCT,
+                "output": "compose_structured_test.PersonHolder",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -154,11 +122,13 @@ class TestPipeComposeStructuredCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="input_employee", stuff=employee_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose PersonHolder with structurally equivalent Employee",
-            inputs={"input_employee": "Text"},
-            construct_spec=StructuredCompatibilityTestData.EQUIVALENT_CLASS_CONSTRUCT,
-            output="compose_structured_test.PersonHolder",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose PersonHolder with structurally equivalent Employee",
+                "inputs": {"input_employee": "Text"},
+                "construct": StructuredCompatibilityTestData.EQUIVALENT_CLASS_CONSTRUCT,
+                "output": "compose_structured_test.PersonHolder",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -209,11 +179,13 @@ class TestPipeComposeStructuredCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="input_person", stuff=person_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose EmployeeHolder with structurally equivalent Person",
-            inputs={"input_person": "Text"},
-            construct_spec=StructuredCompatibilityTestData.REVERSE_EQUIVALENT_CONSTRUCT,
-            output="compose_structured_test.EmployeeHolder",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose EmployeeHolder with structurally equivalent Person",
+                "inputs": {"input_person": "Text"},
+                "construct": StructuredCompatibilityTestData.REVERSE_EQUIVALENT_CONSTRUCT,
+                "output": "compose_structured_test.EmployeeHolder",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -264,11 +236,13 @@ class TestPipeComposeStructuredCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="input_manager", stuff=manager_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose PersonHolder with Manager subclass",
-            inputs={"input_manager": "Text"},
-            construct_spec=StructuredCompatibilityTestData.SUBCLASS_TO_BASE_CONSTRUCT,
-            output="compose_structured_test.PersonHolder",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose PersonHolder with Manager subclass",
+                "inputs": {"input_manager": "Text"},
+                "construct": StructuredCompatibilityTestData.SUBCLASS_TO_BASE_CONSTRUCT,
+                "output": "compose_structured_test.PersonHolder",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -322,11 +296,13 @@ class TestPipeComposeStructuredCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="input_location", stuff=location_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose PersonHolder with incompatible Location",
-            inputs={"input_location": "Text"},
-            construct_spec=StructuredCompatibilityTestData.INCOMPATIBLE_CONSTRUCT,
-            output="compose_structured_test.PersonHolder",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose PersonHolder with incompatible Location",
+                "inputs": {"input_location": "Text"},
+                "construct": StructuredCompatibilityTestData.INCOMPATIBLE_CONSTRUCT,
+                "output": "compose_structured_test.PersonHolder",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(

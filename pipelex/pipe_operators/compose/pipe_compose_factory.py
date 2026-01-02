@@ -27,8 +27,17 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         output: StuffSpec,
         blueprint: PipeComposeBlueprint,
     ) -> PipeCompose:
-        if blueprint.is_construct_mode:
-            return cls._make_construct_mode(
+        if blueprint.construct_blueprint is not None:
+            return PipeCompose(
+                domain_code=domain_code,
+                code=pipe_code,
+                description=description,
+                inputs=inputs,
+                output=output,
+                construct_blueprint=blueprint.construct_blueprint,
+            )
+        else:
+            return cls._make_template_mode(
                 pipe_code=pipe_code,
                 domain_code=domain_code,
                 description=description,
@@ -36,14 +45,6 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
                 output=output,
                 blueprint=blueprint,
             )
-        return cls._make_template_mode(
-            pipe_code=pipe_code,
-            domain_code=domain_code,
-            description=description,
-            inputs=inputs,
-            output=output,
-            blueprint=blueprint,
-        )
 
     @classmethod
     def _make_template_mode(
@@ -81,29 +82,4 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             templating_style=blueprint.templating_style,
             category=blueprint.template_category,
             extra_context=blueprint.extra_context,
-        )
-
-    @classmethod
-    def _make_construct_mode(
-        cls,
-        pipe_code: str,
-        domain_code: str,
-        description: str,
-        inputs: InputStuffSpecs,
-        output: StuffSpec,
-        blueprint: PipeComposeBlueprint,
-    ) -> PipeCompose:
-        """Create PipeCompose in construct mode (produces StructuredContent output)."""
-        construct_blueprint = blueprint.construct_blueprint
-        if construct_blueprint is None:
-            msg = "Construct blueprint is required for construct mode"
-            raise PipeComposeFactoryError(msg)
-
-        return PipeCompose(
-            domain_code=domain_code,
-            code=pipe_code,
-            description=description,
-            inputs=inputs,
-            output=output,
-            construct_blueprint=construct_blueprint,
         )

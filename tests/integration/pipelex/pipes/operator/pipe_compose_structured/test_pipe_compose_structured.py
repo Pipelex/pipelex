@@ -5,7 +5,7 @@ using the construct blueprint syntax in PLX files.
 """
 
 from pathlib import Path
-from typing import Any, Callable, ClassVar
+from typing import Callable
 
 import pytest
 
@@ -27,35 +27,7 @@ from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for
     Address,
     Deal,
 )
-
-
-class ComposeStructuredTestData:
-    """Test data for PipeCompose construct integration tests."""
-
-    # Test case: all fixed values
-    FIXED_ONLY_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "title": "Annual Report",
-        "author": "John Doe",
-        "score": 95.5,
-    }
-
-    # Test case: mix of fixed values and variable references
-    MIXED_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "report_title": "Monthly Sales Report",
-        "customer_name": {"from": "deal.customer_name"},
-        "deal_value": {"from": "deal.amount"},
-        "summary_text": {"template": "Deal worth $deal.amount with $deal.customer_name"},
-    }
-
-    # Test case: nested construct
-    NESTED_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "name": {"from": "company_name"},
-        "headquarters": {
-            "street": {"from": "addr.street"},
-            "city": {"from": "addr.city"},
-            "country": "France",
-        },
-    }
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import ComposeStructuredTestData
 
 
 @pytest.mark.dry_runnable
@@ -78,10 +50,12 @@ class TestPipeComposeStructured:
         """Test PipeCompose with construct containing only fixed values."""
         load_test_library(test_library_path)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose a simple report with fixed values",
-            construct_spec=ComposeStructuredTestData.FIXED_ONLY_CONSTRUCT,
-            output="compose_structured_test.SimpleReport",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose a simple report with fixed values",
+                "construct": ComposeStructuredTestData.FIXED_ONLY_CONSTRUCT,
+                "output": "compose_structured_test.SimpleReport",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -142,11 +116,13 @@ class TestPipeComposeStructured:
             ),
         )
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose a sales summary from deal data",
-            inputs={"deal": "Text"},
-            construct_spec=ComposeStructuredTestData.MIXED_CONSTRUCT,
-            output="compose_structured_test.SalesSummary",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose a sales summary from deal data",
+                "inputs": {"deal": "Text"},
+                "construct": ComposeStructuredTestData.MIXED_CONSTRUCT,
+                "output": "compose_structured_test.SalesSummary",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -204,11 +180,13 @@ class TestPipeComposeStructured:
         working_memory.add_new_stuff(name="company_name", stuff=company_name_stuff)
         working_memory.add_new_stuff(name="addr", stuff=addr_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose a company with nested address",
-            inputs={"company_name": "Text", "addr": "Text"},
-            construct_spec=ComposeStructuredTestData.NESTED_CONSTRUCT,
-            output="compose_structured_test.Company",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose a company with nested address",
+                "inputs": {"company_name": "Text", "addr": "Text"},
+                "construct": ComposeStructuredTestData.NESTED_CONSTRUCT,
+                "output": "compose_structured_test.Company",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(

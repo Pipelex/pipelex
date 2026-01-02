@@ -7,7 +7,7 @@ These tests verify tricky cases involving:
 """
 
 from pathlib import Path
-from typing import Any, Callable, ClassVar
+from typing import Callable
 
 import pytest
 
@@ -32,42 +32,7 @@ from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for
     Product,
     RichTextContent,
 )
-
-
-class ClassCompatibilityTestData:
-    """Test data for class compatibility tests."""
-
-    # Subclass to base class: RichTextContent -> TextContent field
-    SUBCLASS_TO_BASE_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "content": {"from": "rich_text"},
-        "note": "Testing subclass to base conversion",
-    }
-
-    # Class equivalence: list[Employee] items -> list[Person] field
-    # (Employee and Person have same structure)
-    EQUIVALENT_LIST_ITEMS_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "team_name": "Equivalent Team",
-        "members": {"from": "employees"},
-    }
-
-    # Subclass list items: list[Manager] -> list[Person] field
-    # (Manager is a subclass of Person)
-    SUBCLASS_LIST_ITEMS_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "team_name": "Manager Team",
-        "members": {"from": "managers"},
-    }
-
-    # Subclass list items in ListContent: ListContent[Manager] -> ListContent[Person]
-    SUBCLASS_LIST_CONTENT_ITEMS_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "team_name": "ListContent Manager Team",
-        "members": {"from": "managers_list"},
-    }
-
-    # Mixed subclass items: list[Product | DiscountedProduct] -> list[Product]
-    MIXED_SUBCLASS_ITEMS_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "catalog_name": "Mixed Products Catalog",
-        "products": {"from": "mixed_products"},
-    }
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import ClassCompatibilityTestData
 
 
 @pytest.mark.dry_runnable
@@ -101,11 +66,13 @@ class TestPipeComposeClassCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="rich_text", stuff=rich_text_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose report with base TextContent field from subclass",
-            inputs={"rich_text": "Text"},
-            construct_spec=ClassCompatibilityTestData.SUBCLASS_TO_BASE_CONSTRUCT,
-            output="compose_structured_test.ReportWithBaseTextContent",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose report with base TextContent field from subclass",
+                "inputs": {"rich_text": "Text"},
+                "construct": ClassCompatibilityTestData.SUBCLASS_TO_BASE_CONSTRUCT,
+                "output": "compose_structured_test.ReportWithBaseTextContent",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -164,11 +131,13 @@ class TestPipeComposeClassCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="employees", stuff=employees_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose team with list[Person] from structurally equivalent Employee items",
-            inputs={"employees": "Text"},
-            construct_spec=ClassCompatibilityTestData.EQUIVALENT_LIST_ITEMS_CONSTRUCT,
-            output="compose_structured_test.TeamWithPersons",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose team with list[Person] from structurally equivalent Employee items",
+                "inputs": {"employees": "Text"},
+                "construct": ClassCompatibilityTestData.EQUIVALENT_LIST_ITEMS_CONSTRUCT,
+                "output": "compose_structured_test.TeamWithPersons",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -228,11 +197,13 @@ class TestPipeComposeClassCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="managers", stuff=managers_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose team with list[Person] from Manager subclass items",
-            inputs={"managers": "Text"},
-            construct_spec=ClassCompatibilityTestData.SUBCLASS_LIST_ITEMS_CONSTRUCT,
-            output="compose_structured_test.TeamWithPersons",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose team with list[Person] from Manager subclass items",
+                "inputs": {"managers": "Text"},
+                "construct": ClassCompatibilityTestData.SUBCLASS_LIST_ITEMS_CONSTRUCT,
+                "output": "compose_structured_test.TeamWithPersons",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -290,11 +261,13 @@ class TestPipeComposeClassCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="managers_list", stuff=managers_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose team with ListContent[Person] from Manager subclass items",
-            inputs={"managers_list": "Text"},
-            construct_spec=ClassCompatibilityTestData.SUBCLASS_LIST_CONTENT_ITEMS_CONSTRUCT,
-            output="compose_structured_test.TeamWithListContentPersons",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose team with ListContent[Person] from Manager subclass items",
+                "inputs": {"managers_list": "Text"},
+                "construct": ClassCompatibilityTestData.SUBCLASS_LIST_CONTENT_ITEMS_CONSTRUCT,
+                "output": "compose_structured_test.TeamWithListContentPersons",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -353,11 +326,13 @@ class TestPipeComposeClassCompatibility:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="mixed_products", stuff=products_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose catalog with list[Product] from mixed Product and DiscountedProduct items",
-            inputs={"mixed_products": "Text"},
-            construct_spec=ClassCompatibilityTestData.MIXED_SUBCLASS_ITEMS_CONSTRUCT,
-            output="compose_structured_test.Catalog",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose catalog with list[Product] from mixed Product and DiscountedProduct items",
+                "inputs": {"mixed_products": "Text"},
+                "construct": ClassCompatibilityTestData.MIXED_SUBCLASS_ITEMS_CONSTRUCT,
+                "output": "compose_structured_test.Catalog",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(

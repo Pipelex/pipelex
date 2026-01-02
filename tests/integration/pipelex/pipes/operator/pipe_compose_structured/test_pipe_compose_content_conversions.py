@@ -9,7 +9,7 @@ These tests verify that PipeCompose correctly handles different content type con
 """
 
 from pathlib import Path
-from typing import Any, Callable, ClassVar
+from typing import Callable
 
 import pytest
 
@@ -31,40 +31,7 @@ from tests.integration.pipelex.pipes.operator.pipe_compose_structured.models_for
     MarkdownText,
     TeamMember,
 )
-
-
-class ContentConversionTestData:
-    """Test data for content type conversion tests."""
-
-    # Test case: TextContent to str field
-    TEXT_TO_STR_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "title": {"from": "title_text"},
-        "author": "Test Author",
-    }
-
-    # Test case: TextContent to TextContent field
-    TEXT_TO_TEXT_CONTENT_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "title_content": {"from": "title_text"},
-        "description": "A description",
-    }
-
-    # Test case: MarkdownText (TextContent subclass) to MarkdownText field
-    MARKDOWN_TO_MARKDOWN_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "markdown_content": {"from": "markdown_input"},
-        "summary": "Plain text summary",
-    }
-
-    # Test case: ListContent to list[TeamMember] field
-    LIST_TO_LIST_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "team_name": "Engineering Team",
-        "members": {"from": "team_members"},
-    }
-
-    # Test case: ListContent to ListContent field
-    LIST_TO_LIST_CONTENT_CONSTRUCT: ClassVar[dict[str, Any]] = {
-        "team_name": "Engineering Team",
-        "members_list": {"from": "team_members"},
-    }
+from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import ContentConversionTestData
 
 
 @pytest.mark.dry_runnable
@@ -97,11 +64,13 @@ class TestPipeComposeContentConversions:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="title_text", stuff=title_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose report with str field from TextContent",
-            inputs={"title_text": "Text"},
-            construct_spec=ContentConversionTestData.TEXT_TO_STR_CONSTRUCT,
-            output="compose_structured_test.ReportWithStrField",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose report with str field from TextContent",
+                "inputs": {"title_text": "Text"},
+                "construct": ContentConversionTestData.TEXT_TO_STR_CONSTRUCT,
+                "output": "compose_structured_test.ReportWithStrField",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -150,11 +119,13 @@ class TestPipeComposeContentConversions:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="title_text", stuff=title_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose report with TextContent field from TextContent",
-            inputs={"title_text": "Text"},
-            construct_spec=ContentConversionTestData.TEXT_TO_TEXT_CONTENT_CONSTRUCT,
-            output="compose_structured_test.ReportWithTextContent",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose report with TextContent field from TextContent",
+                "inputs": {"title_text": "Text"},
+                "construct": ContentConversionTestData.TEXT_TO_TEXT_CONTENT_CONSTRUCT,
+                "output": "compose_structured_test.ReportWithTextContent",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -203,11 +174,13 @@ class TestPipeComposeContentConversions:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="markdown_input", stuff=markdown_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose report with MarkdownText field from MarkdownText",
-            inputs={"markdown_input": "Text"},
-            construct_spec=ContentConversionTestData.MARKDOWN_TO_MARKDOWN_CONSTRUCT,
-            output="compose_structured_test.ReportWithMarkdown",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose report with MarkdownText field from MarkdownText",
+                "inputs": {"markdown_input": "Text"},
+                "construct": ContentConversionTestData.MARKDOWN_TO_MARKDOWN_CONSTRUCT,
+                "output": "compose_structured_test.ReportWithMarkdown",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -264,11 +237,13 @@ class TestPipeComposeContentConversions:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="team_members", stuff=members_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose team report with list[TeamMember] field from ListContent",
-            inputs={"team_members": "Text"},
-            construct_spec=ContentConversionTestData.LIST_TO_LIST_CONSTRUCT,
-            output="compose_structured_test.TeamReport",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose team report with list[TeamMember] field from ListContent",
+                "inputs": {"team_members": "Text"},
+                "construct": ContentConversionTestData.LIST_TO_LIST_CONSTRUCT,
+                "output": "compose_structured_test.TeamReport",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(
@@ -326,11 +301,13 @@ class TestPipeComposeContentConversions:
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(name="team_members", stuff=members_stuff)
 
-        pipe_compose_blueprint = PipeComposeBlueprint(
-            description="Compose team report with ListContent field from ListContent",
-            inputs={"team_members": "Text"},
-            construct_spec=ContentConversionTestData.LIST_TO_LIST_CONTENT_CONSTRUCT,
-            output="compose_structured_test.TeamReportWithListContent",
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose team report with ListContent field from ListContent",
+                "inputs": {"team_members": "Text"},
+                "construct": ContentConversionTestData.LIST_TO_LIST_CONTENT_CONSTRUCT,
+                "output": "compose_structured_test.TeamReportWithListContent",
+            }
         )
 
         pipe = PipeFactory[PipeCompose].make_from_blueprint(

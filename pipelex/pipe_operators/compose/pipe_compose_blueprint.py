@@ -13,7 +13,6 @@ from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprin
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
-from pipelex.types import Self
 
 
 class PipeComposeBlueprint(PipeBlueprint):
@@ -26,33 +25,28 @@ class PipeComposeBlueprint(PipeBlueprint):
     # Note: The field is named 'construct_spec' internally to avoid conflict with Pydantic's
     # BaseModel.construct() method. In PLX/TOML files, use 'construct' (via validation_alias).
     template: str | TemplateBlueprint | None = None
-    construct_spec: dict[str, Any] | None = Field(default=None, validation_alias="construct")
+    construct_blueprint: ConstructBlueprint | None = Field(default=None, validation_alias="construct")
 
-    @model_validator(mode="after")
-    def validate_template_or_construct(self) -> Self:
+    @model_validator(mode="before")
+    @classmethod
+    def validate_template_or_construct(cls, values: dict[str, Any]) -> dict[str, Any]:
         """Validate that exactly one of template or construct is provided."""
-        has_template = self.template is not None
-        has_construct = self.construct_spec is not None
+        has_template = values.get("template") is not None
+        construct_raw = values.get("construct")
 
-        if not has_template and not has_construct:
+        if not has_template and construct_raw is None:
             msg = "PipeComposeBlueprint requires either 'template' or 'construct' to be provided"
             raise ValueError(msg)
-        if has_template and has_construct:
+        if has_template and construct_raw is not None:
             msg = "PipeComposeBlueprint cannot have both 'template' and 'construct' - use one or the other"
             raise ValueError(msg)
-        return self
 
-    @property
-    def construct_blueprint(self) -> ConstructBlueprint | None:
-        """Get the construct blueprint if construct mode is used."""
-        if self.construct_spec is None:
-            return None
-        return ConstructBlueprint.make_from_raw(self.construct_spec)
-
-    @property
-    def is_construct_mode(self) -> bool:
-        """Return True if this blueprint uses construct mode instead of template mode."""
-        return self.construct_spec is not None
+        if construct_raw is not None:
+            construct_blueprint = ConstructBlueprint.make_from_raw(raw=construct_raw)
+            values["construct_blueprint"] = construct_blueprint
+            # Remove the raw 'construct' key to avoid conflict with the validation_alias
+            values.pop("construct")
+        return values
 
     @property
     def template_source(self) -> str | None:
@@ -87,7 +81,7 @@ class PipeComposeBlueprint(PipeBlueprint):
     @override
     def validate_inputs(self):
         """Validate inputs based on mode (template or construct)."""
-        if self.is_construct_mode:
+        if self.construct_blueprint is not None:
             self._validate_construct_inputs()
         else:
             self._validate_template_inputs()
