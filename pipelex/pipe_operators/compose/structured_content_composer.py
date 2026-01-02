@@ -205,75 +205,140 @@ class StructuredContentComposer:
         expected_type = self._get_field_expected_type(field_name)
         log.dev(f"_resolve_from_var: resolving path '{path}' for field '{field_name}' (expected: {expected_type})")
 
-        # Handle dotted paths (e.g., "deal.customer_name")
         if "." in path:
-            parts = path.split(".", 1)
-            base_name = parts[0]
-            attr_path = parts[1]
+            return self._resolve_dotted_path(path)
 
-            stuff = self.working_memory.get_stuff(base_name)
-            content: StuffContent = stuff.content
-            log.dev(f"  Stuff '{base_name}' content type: {type(content).__name__}")
+        return self._resolve_simple_path(path, expected_type)
 
-            # Navigate the attribute path - this is dynamic attribute access at runtime
-            current: StuffContent = content
-            for attr in attr_path.split("."):
-                if hasattr(current, attr):  # pyright: ignore[reportUnknownArgumentType]
-                    current = getattr(current, attr)  # pyright: ignore[reportUnknownArgumentType]
-                elif isinstance(current, dict) and attr in current:  # pyright: ignore[reportUnknownVariableType]
-                    current = current[attr]  # pyright: ignore[reportUnknownVariableType]
-                else:
-                    msg = f"Cannot resolve path '{path}': attribute '{attr}' not found"
-                    raise ValueError(msg)
-            log.dev(f"  Resolved value type: {type(current).__name__}")  # pyright: ignore[reportUnknownArgumentType]
-            return current  # pyright: ignore[reportUnknownVariableType]
-        else:
-            # Simple case: just get the stuff's content or text value
-            stuff = self.working_memory.get_stuff(path)
-            simple_content: StuffContent = stuff.content
-            log.dev(f"  Stuff '{path}' content type: {type(simple_content).__name__}")
+    def _resolve_dotted_path(self, path: str) -> Any:
+        """Resolve a dotted path by navigating through object attributes.
 
-            # Type-aware conversion for TextContent
-            if isinstance(simple_content, TextContent):
-                if self._expects_str_type(expected_type):
-                    # Target field expects str, extract the text
-                    log.dev("  -> Target expects str, returning TextContent.text")
-                    return simple_content.text
-                elif self._expects_text_content_type(expected_type):
-                    # Target field expects TextContent or subclass
-                    return self._convert_content_for_field(simple_content, expected_type)
-                else:
-                    # Default: return the object as-is
-                    log.dev(f"  -> Unknown target type, returning {type(simple_content).__name__} object")
-                    return simple_content
+        Handles paths like "deal.customer_name" by getting the base object
+        from working memory and then navigating through its attributes.
 
-            # Type-aware conversion for ListContent
-            elif isinstance(simple_content, ListContent):
-                typed_list_content = cast("ListContent[StuffContent]", simple_content)
-                if self._expects_list_content_type(expected_type):
-                    # Target field expects ListContent[X], check item compatibility and return as ListContent
-                    expected_item_type = self._get_list_item_type(expected_type)
-                    log.dev(f"  -> Target expects ListContent[{expected_item_type}]")
-                    converted_items = self._convert_list_items_as_objects(typed_list_content.items, expected_item_type, path)
-                    return ListContent(items=converted_items)
-                elif self._expects_list_type(expected_type):
-                    # Target expects list[X], extract items as dicts for Pydantic reconstruction
-                    expected_item_type = self._get_list_item_type(expected_type)
-                    log.dev(f"  -> Target expects list[{expected_item_type}], extracting items from ListContent")
-                    return self._convert_list_items_as_dicts(typed_list_content.items, expected_item_type, path)
-                else:
-                    # Default: return the object as-is
-                    log.dev(f"  -> Unknown target type, returning ListContent object with {simple_content.nb_items} items")
-                    return typed_list_content
-            # Other content types (StructuredContent, ImageContent, etc.)
-            # Check if expected type is a StuffContent subclass and handle compatibility
-            elif self._expects_stuff_content_type(expected_type):
-                log.dev(f"  -> Target expects {expected_type.__name__}, converting content")
-                return self._convert_content_for_field(simple_content, expected_type)
+        Args:
+            path: The dotted path (e.g., "deal.customer_name")
+
+        Returns:
+            The value at the end of the attribute path
+        """
+        parts = path.split(".", 1)
+        base_name = parts[0]
+        attr_path = parts[1]
+
+        stuff = self.working_memory.get_stuff(base_name)
+        content: StuffContent = stuff.content
+        log.dev(f"  Stuff '{base_name}' content type: {type(content).__name__}")
+
+        # Navigate the attribute path - this is dynamic attribute access at runtime
+        current: StuffContent = content
+        for attr in attr_path.split("."):
+            if hasattr(current, attr):  # pyright: ignore[reportUnknownArgumentType]
+                current = getattr(current, attr)  # pyright: ignore[reportUnknownArgumentType]
+            elif isinstance(current, dict) and attr in current:  # pyright: ignore[reportUnknownVariableType]
+                current = current[attr]  # pyright: ignore[reportUnknownVariableType]
             else:
-                # Unknown expected type, return as-is
-                log.dev(f"  -> Unknown target type, returning {type(simple_content).__name__} object")
-                return simple_content
+                msg = f"Cannot resolve path '{path}': attribute '{attr}' not found"
+                raise ValueError(msg)
+        log.dev(f"  Resolved value type: {type(current).__name__}")  # pyright: ignore[reportUnknownArgumentType]
+        return current  # pyright: ignore[reportUnknownVariableType]
+
+    def _resolve_simple_path(self, path: str, expected_type: Any) -> Any:
+        """Resolve a simple (non-dotted) path and convert content based on expected type.
+
+        Args:
+            path: The simple path (stuff name in working memory)
+            expected_type: The expected type annotation for the target field
+
+        Returns:
+            The content, converted as appropriate for the target field type
+        """
+        stuff = self.working_memory.get_stuff(path)
+        content: StuffContent = stuff.content
+        log.dev(f"  Stuff '{path}' content type: {type(content).__name__}")
+        return self._convert_for_target_type(content, expected_type, path)
+
+    def _convert_for_target_type(self, content: StuffContent, expected_type: Any, path: str) -> Any:
+        """Convert content based on the expected target field type.
+
+        Central dispatcher for type-aware conversion. Routes to specific
+        conversion methods based on content type.
+
+        Args:
+            content: The content to convert
+            expected_type: The expected type annotation for the target field
+            path: The path (for logging purposes)
+
+        Returns:
+            The content, converted as appropriate for the target field type
+        """
+        # TextContent handling
+        if isinstance(content, TextContent):
+            return self._convert_text_content(content, expected_type)
+
+        # ListContent handling
+        if isinstance(content, ListContent):
+            typed_content = cast("ListContent[StuffContent]", content)
+            return self._convert_list_content(typed_content, expected_type, path)
+
+        # Generic StuffContent handling
+        if self._expects_type(expected_type, StuffContent):
+            log.dev(f"  -> Target expects {expected_type.__name__}, converting content")
+            return self._convert_content_for_field(content, expected_type)
+
+        # Fallback: return as-is
+        log.dev(f"  -> Unknown target type, returning {type(content).__name__} object")
+        return content
+
+    def _convert_text_content(self, content: TextContent, expected_type: Any) -> Any:
+        """Convert TextContent based on expected type (str, TextContent, or subclass).
+
+        Args:
+            content: The TextContent to convert
+            expected_type: The expected type annotation for the target field
+
+        Returns:
+            Either the text string, or the TextContent object (potentially converted)
+        """
+        if self._expects_type(expected_type, str):
+            # Target field expects str, extract the text
+            log.dev("  -> Target expects str, returning TextContent.text")
+            return content.text
+        elif self._expects_type(expected_type, TextContent):
+            # Target field expects TextContent or subclass
+            return self._convert_content_for_field(content, expected_type)
+        else:
+            # Default: return the object as-is
+            log.dev(f"  -> Unknown target type, returning {type(content).__name__} object")
+            return content
+
+    def _convert_list_content(self, content: ListContent[StuffContent], expected_type: Any, path: str) -> Any:
+        """Convert ListContent based on expected type (list[X] or ListContent[X]).
+
+        Args:
+            content: The ListContent to convert
+            expected_type: The expected type annotation for the target field
+            path: The path (for logging purposes)
+
+        Returns:
+            Either a list of dicts, or a ListContent object with converted items
+        """
+        if self._expects_list_content_type(expected_type):
+            # Target field expects ListContent[X], check item compatibility and return as ListContent
+            expected_item_type = self._get_list_item_type(expected_type)
+            log.dev(f"  -> Target expects ListContent[{expected_item_type}]")
+            converted_items = self._convert_list_items_as_objects(content.items, expected_item_type, path)
+            return ListContent(items=converted_items)
+
+        if self._expects_list_type(expected_type):
+            # Target expects list[X], extract items as dicts for Pydantic reconstruction
+            expected_item_type = self._get_list_item_type(expected_type)
+            log.dev(f"  -> Target expects list[{expected_item_type}], extracting items from ListContent")
+            return self._convert_list_items_as_dicts(content.items, expected_item_type, path)
+
+        # Default: return the object as-is
+        log.dev(f"  -> Unknown target type, returning ListContent object with {content.nb_items} items")
+        return content
 
     def _get_field_expected_type(self, field_name: str) -> Any:
         """Get the expected type annotation for a field from the output class.
@@ -290,49 +355,22 @@ class StructuredContentComposer:
                 return field_info.annotation
         return None
 
-    def _expects_str_type(self, expected_type: Any) -> bool:
-        """Check if the expected type is str.
+    def _expects_type(self, expected_type: Any, target_type: type) -> bool:
+        """Check if the expected type matches or is a subclass of target_type.
 
         Args:
             expected_type: The type annotation to check
+            target_type: The type to match against (e.g., str, TextContent, StuffContent)
 
         Returns:
-            True if the expected type is str
+            True if expected_type is target_type or a subclass of it
         """
         if expected_type is None:
             return False
-        return expected_type is str
-
-    def _expects_text_content_type(self, expected_type: Any) -> bool:
-        """Check if the expected type is TextContent or a subclass.
-
-        Args:
-            expected_type: The type annotation to check
-
-        Returns:
-            True if the expected type is TextContent or a subclass
-        """
-        if expected_type is None:
-            return False
+        if expected_type is target_type:
+            return True
         try:
-            return isinstance(expected_type, type) and issubclass(expected_type, TextContent)
-        except TypeError:
-            # expected_type is not a class (e.g., it's a generic like list[X])
-            return False
-
-    def _expects_stuff_content_type(self, expected_type: Any) -> bool:
-        """Check if the expected type is StuffContent or a subclass.
-
-        Args:
-            expected_type: The type annotation to check
-
-        Returns:
-            True if the expected type is StuffContent or a subclass
-        """
-        if expected_type is None:
-            return False
-        try:
-            return isinstance(expected_type, type) and issubclass(expected_type, StuffContent)
+            return isinstance(expected_type, type) and issubclass(expected_type, target_type)
         except TypeError:
             # expected_type is not a class (e.g., it's a generic like list[X])
             return False
