@@ -119,21 +119,23 @@ class StructuredContentComposer:
         log.dev(f"_resolve_from_var: resolving path '{path}' for field '{field_name}' (expected: {expected_type})")
 
         if "." in path:
-            return self._resolve_dotted_path(path=path)
+            return self._resolve_dotted_path(path=path, expected_type=expected_type)
         else:
             return self._resolve_from_stuff_name(name=path, expected_type=expected_type)
 
-    def _resolve_dotted_path(self, path: str) -> Any:
+    def _resolve_dotted_path(self, path: str, expected_type: type[Any] | None) -> Any:
         """Resolve a dotted path by navigating through object attributes.
 
         Handles paths like "deal.customer_name" by getting the base object
         from working memory and then navigating through its attributes.
+        Applies type conversion based on expected_type (same as non-dotted paths).
 
         Args:
             path: The dotted path (e.g., "deal.customer_name")
+            expected_type: The expected type annotation for the target field
 
         Returns:
-            The value at the end of the attribute path
+            The value at the end of the attribute path, converted as appropriate
         """
         parts = path.split(".", 1)
         base_name = parts[0]
@@ -144,17 +146,22 @@ class StructuredContentComposer:
         log.dev(f"  Stuff '{base_name}' content type: {type(stuff_content).__name__}")
 
         # Navigate the attribute path - this is dynamic attribute access at runtime
-        current_content: StuffContent = stuff_content
+        current_value: Any = stuff_content
         for attr in attr_path.split("."):
-            if hasattr(current_content, attr):  # pyright: ignore[reportUnknownArgumentType]
-                current_content = getattr(current_content, attr)  # pyright: ignore[reportUnknownArgumentType]
-            elif isinstance(current_content, dict) and attr in current_content:  # pyright: ignore[reportUnknownVariableType]
-                current_content = current_content[attr]  # pyright: ignore[reportUnknownVariableType]
+            if hasattr(current_value, attr):  # pyright: ignore[reportUnknownArgumentType]
+                current_value = getattr(current_value, attr)  # pyright: ignore[reportUnknownArgumentType]
+            elif isinstance(current_value, dict) and attr in current_value:  # pyright: ignore[reportUnknownVariableType]
+                current_value = current_value[attr]  # pyright: ignore[reportUnknownVariableType]
             else:
                 msg = f"Cannot resolve path '{path}': attribute '{attr}' not found"
                 raise StructuredContentComposerValueError(msg)
-        log.dev(f"  Resolved value type: {type(current_content).__name__}")  # pyright: ignore[reportUnknownArgumentType]
-        return current_content  # pyright: ignore[reportUnknownVariableType]
+        log.dev(f"  Resolved value type: {type(current_value).__name__}")  # pyright: ignore[reportUnknownArgumentType]
+
+        # Apply type conversion if the resolved value is a StuffContent
+        if isinstance(current_value, StuffContent):
+            return self._convert_for_target_type(stuff_content=current_value, expected_type=expected_type)
+        else:
+            return current_value  # pyright: ignore[reportUnknownVariableType]
 
     def _resolve_from_stuff_name(self, name: str, expected_type: type[Any] | None) -> StuffContent | list[dict[str, Any]] | str:
         """Resolve a simple (non-dotted) path and convert content based on expected type.

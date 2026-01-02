@@ -15,6 +15,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
@@ -200,8 +201,6 @@ class TestStructuredContentComposerNested:
     def working_memory_with_address(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
         """Create working memory with address components."""
         load_empty_library()
-        from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
-
         addr = Address(street="123 Main St", city="Paris", country="France")
         company_name_stuff = StuffFactory.make_stuff(
             concept=get_native_concept(NativeConceptCode.TEXT),
@@ -317,3 +316,97 @@ class TestStructuredContentComposerWithTemplates:
         assert isinstance(result, SalesSummary)
         assert "50000.0" in result.summary_text or "50000" in result.summary_text
         assert "Acme Corp" in result.summary_text
+
+
+# Additional test models for dotted path type conversion
+class ContainerWithTextContent(StructuredContent):
+    """Container that holds a TextContent for testing dotted path type conversion."""
+
+    content: TextContent = Field(description="Text content")
+    label: str = Field(description="Label")
+
+
+class OutputWithStringField(StructuredContent):
+    """Output that expects a string field from a dotted path to TextContent."""
+
+    extracted_text: str = Field(description="Text extracted from dotted path")
+    description: str = Field(description="Description")
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestStructuredContentComposerDottedPathTypeConversion:
+    """Tests for type conversion when using dotted paths.
+
+    This tests the fix for the bug where dotted paths did not apply type conversion:
+    - Non-dotted path `{ from = "content" }` correctly converted TextContent -> str
+    - Dotted path `{ from = "obj.content" }` returned raw TextContent, causing Pydantic error
+
+    After the fix, both paths should consistently apply type conversion.
+    """
+
+    @pytest.fixture
+    def working_memory_with_container(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
+        """Create working memory with a container holding TextContent."""
+        load_empty_library()
+        container = ContainerWithTextContent(
+            content=TextContent(text="Hello from TextContent"),
+            label="test-container",
+        )
+        return WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=container,
+                name="container",
+            ),
+        )
+
+    async def test_dotted_path_converts_text_content_to_str(self, working_memory_with_container: WorkingMemory):
+        """Test that dotted path to TextContent is converted to str when target field expects str.
+
+        This tests the fix: before the fix, `{ from = "container.content" }` would return
+        the raw TextContent object, causing a Pydantic validation error.
+        After the fix, it should correctly extract TextContent.text as str.
+        """
+        blueprint = ConstructBlueprint.make_from_raw(
+            {
+                "extracted_text": {"from": "container.content"},  # TextContent -> str conversion needed
+                "description": "Test description",
+            }
+        )
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_container,
+            output_class=OutputWithStringField,
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, OutputWithStringField)
+        assert result.extracted_text == "Hello from TextContent"
+        assert result.description == "Test description"
+
+    async def test_dotted_path_preserves_text_content_when_expected(self, working_memory_with_container: WorkingMemory):
+        """Test that dotted path to TextContent is preserved when target field expects TextContent."""
+
+        class OutputWithTextContentField(StructuredContent):
+            content: TextContent = Field(description="Text content object")
+            label: str = Field(description="Label")
+
+        blueprint = ConstructBlueprint.make_from_raw(
+            {
+                "content": {"from": "container.content"},  # TextContent -> TextContent, no conversion
+                "label": {"from": "container.label"},
+            }
+        )
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_container,
+            output_class=OutputWithTextContentField,
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, OutputWithTextContentField)
+        assert isinstance(result.content, TextContent)
+        assert result.content.text == "Hello from TextContent"
+        assert result.label == "test-container"
