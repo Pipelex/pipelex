@@ -39,6 +39,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     type: Literal["PipeCompose"] = "PipeCompose"
     model_config = ConfigDict(extra="forbid", strict=False)
 
+    # default output is Text
     output: StuffSpec = StuffSpec(concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT))
 
     # Template mode fields (used when template is provided)
