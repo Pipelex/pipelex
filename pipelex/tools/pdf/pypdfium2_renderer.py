@@ -183,8 +183,8 @@ class PyPdfium2Renderer:
             max_depth=max_depth,
         ):
             # obj is a PdfImage when filter is FPDF_PAGEOBJ_IMAGE
-            image_obj = cast("PdfImage", obj)
-            raw_details = _extract_image_from_pdf_object(image_obj=image_obj, output_format=output_format)
+            assert isinstance(obj, PdfImage)
+            raw_details = _extract_image_from_pdf_object(image_obj=obj, output_format=output_format)
             images.append(raw_details)
 
         page.close()
@@ -219,8 +219,8 @@ class PyPdfium2Renderer:
                 max_depth=max_depth,
             ):
                 # obj is a PdfImage when filter is FPDF_PAGEOBJ_IMAGE
-                image_obj = cast("PdfImage", obj)
-                raw_details = _extract_image_from_pdf_object(image_obj=image_obj, output_format=output_format)
+                assert isinstance(obj, PdfImage)
+                raw_details = _extract_image_from_pdf_object(image_obj=obj, output_format=output_format)
                 page_images.append(raw_details)
 
             # Use 1-based page index for consistency with other page-related APIs
