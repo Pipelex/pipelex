@@ -17,8 +17,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_content_generator
-from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
-from pipelex.pipe_operators.compose.construct_field_blueprint import ConstructFieldBlueprint, ConstructFieldMethod
+from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldBlueprint, ConstructFieldMethod
 from pipelex.tools.typing.class_utils import are_classes_equivalent
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 

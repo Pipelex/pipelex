@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from pipelex.pipe_operators.compose.construct_field_blueprint import (
+from pipelex.pipe_operators.compose.construct_blueprint import (
     ConstructFieldBlueprint,
     ConstructFieldMethod,
 )

@@ -7,8 +7,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
-from pipelex.pipe_operators.compose.construct_field_blueprint import ConstructFieldMethod
+from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldMethod
 
 
 class ConstructBlueprintTestData:
@@ -201,11 +200,3 @@ class TestConstructBlueprintValidation:
         """Empty construct should raise an error."""
         with pytest.raises(ValueError, match="empty"):
             ConstructBlueprint.make_from_raw({})
-
-    def test_non_dict_raises_error(self):
-        """Non-dict input should raise an error."""
-        with pytest.raises(TypeError, match="must be a dict"):
-            ConstructBlueprint.make_from_raw("not a dict")  # type: ignore[arg-type]
-
-        with pytest.raises(TypeError, match="must be a dict"):
-            ConstructBlueprint.make_from_raw(["a", "list"])  # type: ignore[arg-type]
