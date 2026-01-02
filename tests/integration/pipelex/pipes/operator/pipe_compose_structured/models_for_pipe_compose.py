@@ -2,7 +2,14 @@
 
 from pydantic import Field
 
+from pipelex.core.stuffs.html_content import HtmlContent
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.mermaid_content import MermaidContent
+from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 
@@ -242,3 +249,83 @@ class LocationHolder(StructuredContent):
 
     holder_name: str = Field(description="Name of the holder")
     location: Location = Field(description="The held location")
+
+
+# ============================================================================
+# Models for StuffContent subclass testing (ImageContent, PDFContent, etc.)
+# ============================================================================
+
+
+class ImageGallery(StructuredContent):
+    """Gallery with ImageContent fields."""
+
+    gallery_name: str = Field(description="Name of the gallery")
+    cover_image: ImageContent = Field(description="Cover image for the gallery")
+    featured_image: ImageContent | None = Field(default=None, description="Optional featured image")
+
+
+class DocumentArchive(StructuredContent):
+    """Archive with PDFContent fields."""
+
+    archive_name: str = Field(description="Name of the archive")
+    main_document: PDFContent = Field(description="Main PDF document")
+    supplementary_doc: PDFContent | None = Field(default=None, description="Optional supplementary document")
+
+
+class Metrics(StructuredContent):
+    """Metrics container with NumberContent fields."""
+
+    metric_name: str = Field(description="Name of the metric set")
+    primary_value: NumberContent = Field(description="Primary metric value")
+    secondary_value: NumberContent | None = Field(default=None, description="Optional secondary value")
+
+
+class PageReport(StructuredContent):
+    """Report containing PageContent."""
+
+    report_title: str = Field(description="Title of the report")
+    main_page: PageContent = Field(description="Main page content")
+
+
+class CodeSnippet(StructuredContent):
+    """Container for MermaidContent."""
+
+    snippet_name: str = Field(description="Name of the snippet")
+    diagram: MermaidContent = Field(description="Mermaid diagram content")
+
+
+class WebContent(StructuredContent):
+    """Container for HtmlContent."""
+
+    content_title: str = Field(description="Title of the web content")
+    html_block: HtmlContent = Field(description="HTML content block")
+
+
+class DataPayload(StructuredContent):
+    """Container for JSONContent."""
+
+    payload_name: str = Field(description="Name of the data payload")
+    data: JSONContent = Field(description="JSON data content")
+
+
+class MixedMediaReport(StructuredContent):
+    """Report with multiple StuffContent types."""
+
+    report_title: str = Field(description="Report title")
+    cover_image: ImageContent = Field(description="Cover image")
+    document: PDFContent = Field(description="Associated PDF document")
+    view_count: NumberContent = Field(description="View count metric")
+
+
+class ImageListGallery(StructuredContent):
+    """Gallery with a list of ImageContent."""
+
+    gallery_name: str = Field(description="Gallery name")
+    images: list[ImageContent] = Field(description="List of images")
+
+
+class DocumentBundle(StructuredContent):
+    """Bundle with a list of PDFContent."""
+
+    bundle_name: str = Field(description="Bundle name")
+    documents: list[PDFContent] = Field(description="List of PDF documents")

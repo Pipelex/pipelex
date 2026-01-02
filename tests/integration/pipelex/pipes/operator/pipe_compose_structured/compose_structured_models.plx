@@ -40,3 +40,15 @@ ManagerHolder = "Container with Manager field for subclass testing"
 Location = "Location model with different fields than Person/Employee"
 LocationHolder = "Container with Location field for incompatible class testing"
 
+# StuffContent subclass testing concepts (ImageContent, PDFContent, etc.)
+ImageGallery = "Gallery with ImageContent fields"
+DocumentArchive = "Archive with PDFContent fields"
+Metrics = "Metrics container with NumberContent fields"
+PageReport = "Report containing PageContent"
+CodeSnippet = "Container for MermaidContent"
+WebContent = "Container for HtmlContent"
+DataPayload = "Container for JSONContent"
+MixedMediaReport = "Report with multiple StuffContent types"
+ImageListGallery = "Gallery with a list of ImageContent"
+DocumentBundle = "Bundle with a list of PDFContent"
+

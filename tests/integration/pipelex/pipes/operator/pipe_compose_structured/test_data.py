@@ -138,3 +138,81 @@ class StructuredCompatibilityTestData:
         "holder_name": "Incompatible Holder",
         "person": {"from": "input_location"},
     }
+
+
+class StuffContentSubclassTestData:
+    """Test data for StuffContent subclass composition tests (ImageContent, PDFContent, etc.)."""
+
+    # ImageContent composition
+    IMAGE_GALLERY_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "gallery_name": "Nature Gallery",
+        "cover_image": {"from": "cover"},
+        "featured_image": {"from": "featured"},
+    }
+
+    IMAGE_GALLERY_SINGLE_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "gallery_name": "Simple Gallery",
+        "cover_image": {"from": "cover"},
+    }
+
+    # PDFContent composition
+    DOCUMENT_ARCHIVE_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "archive_name": "Legal Documents Archive",
+        "main_document": {"from": "main_pdf"},
+        "supplementary_doc": {"from": "supplement_pdf"},
+    }
+
+    DOCUMENT_ARCHIVE_SINGLE_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "archive_name": "Contract Archive",
+        "main_document": {"from": "main_pdf"},
+    }
+
+    # NumberContent composition
+    METRICS_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "metric_name": "Performance Metrics",
+        "primary_value": {"from": "primary_metric"},
+        "secondary_value": {"from": "secondary_metric"},
+    }
+
+    METRICS_SINGLE_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "metric_name": "Simple Metric",
+        "primary_value": {"from": "primary_metric"},
+    }
+
+    # MermaidContent composition
+    CODE_SNIPPET_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "snippet_name": "Architecture Diagram",
+        "diagram": {"from": "mermaid_diagram"},
+    }
+
+    # HtmlContent composition
+    WEB_CONTENT_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "content_title": "Homepage Section",
+        "html_block": {"from": "html_content"},
+    }
+
+    # JSONContent composition
+    DATA_PAYLOAD_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "payload_name": "API Response",
+        "data": {"from": "json_data"},
+    }
+
+    # Mixed media composition (multiple StuffContent types)
+    MIXED_MEDIA_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "report_title": "Annual Report",
+        "cover_image": {"from": "cover"},
+        "document": {"from": "main_pdf"},
+        "view_count": {"from": "primary_metric"},
+    }
+
+    # List of ImageContent
+    IMAGE_LIST_GALLERY_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "gallery_name": "Photo Collection",
+        "images": {"from": "image_list"},
+    }
+
+    # List of PDFContent
+    DOCUMENT_BUNDLE_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "bundle_name": "Contract Bundle",
+        "documents": {"from": "pdf_list"},
+    }
