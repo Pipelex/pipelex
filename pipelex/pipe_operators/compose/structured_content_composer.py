@@ -3,6 +3,7 @@ from typing import Any, cast, get_args, get_origin
 from pydantic import ValidationError
 
 from pipelex import log
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -31,6 +32,7 @@ class StructuredContentComposer:
         output_class: The StructuredContent subclass to instantiate
         runtime_params: Additional runtime parameters for template context (from PipeRunParams.params)
         extra_context: Extra context values for template rendering (from PipeCompose.extra_context)
+        content_generator: The content generator to use for template rendering (supports dry run mode)
     """
 
     def __init__(
@@ -40,12 +42,14 @@ class StructuredContentComposer:
         output_class: type[StuffContent],
         runtime_params: dict[str, Any] | None = None,
         extra_context: dict[str, Any] | None = None,
+        content_generator: ContentGeneratorProtocol | None = None,
     ):
         self.construct_blueprint = construct_blueprint
         self.working_memory = working_memory
         self.output_class = output_class
         self.runtime_params = runtime_params or {}
         self.extra_context = extra_context or {}
+        self.content_generator = content_generator or get_content_generator()
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -529,9 +533,8 @@ class StructuredContentComposer:
         # Preprocess the template (handles $ -> {{ }} conversion)
         preprocessed = preprocess_template(field_blueprint.template)
 
-        # Render the template
-        content_generator = get_content_generator()
-        return await content_generator.make_templated_text(
+        # Render the template using the provided content generator (supports dry run mode)
+        return await self.content_generator.make_templated_text(
             context=context,
             template=preprocessed,
             template_category=TemplateCategory.BASIC,
@@ -554,13 +557,14 @@ class StructuredContentComposer:
         # Get the field type from the output class to determine nested class
         nested_class: type[StuffContent] = self._get_nested_field_class(field_name=field_name)
 
-        # Create a new composer for the nested structure, passing through runtime params and extra context
+        # Create a new composer for the nested structure, passing through runtime params, extra context, and content generator
         nested_composer = StructuredContentComposer(
             construct_blueprint=field_blueprint.nested,
             working_memory=self.working_memory,
             output_class=nested_class,
             runtime_params=self.runtime_params,
             extra_context=self.extra_context,
+            content_generator=self.content_generator,
         )
 
         return await nested_composer.compose()

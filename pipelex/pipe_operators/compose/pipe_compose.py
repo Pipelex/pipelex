@@ -145,6 +145,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
+                content_generator=content_generator,
             )
         else:
             return await self._run_template_mode(
@@ -208,6 +209,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
+        content_generator: ContentGeneratorProtocol,
     ) -> PipeComposeOutput:
         """Run PipeCompose in construct mode (produces StructuredContent output)."""
         if self.construct_blueprint is None:
@@ -221,13 +223,14 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         )
 
         # Create composer and compose the structured content
-        # Pass runtime params and extra context for template fields (consistent with _run_template_mode)
+        # Pass runtime params, extra context, and content generator for template fields (consistent with _run_template_mode)
         composer = StructuredContentComposer(
             construct_blueprint=self.construct_blueprint,
             working_memory=working_memory,
             output_class=output_class,
             runtime_params=pipe_run_params.params if pipe_run_params else None,
             extra_context=self.extra_context,
+            content_generator=content_generator,
         )
         the_content = await composer.compose()
         log.verbose(f"Composed structured content: {the_content}")
