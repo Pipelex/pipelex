@@ -15,3 +15,11 @@ class ConstructFieldBlueprintTypeError(PipeComposeError, TypeError):
 
 class ConstructFieldBlueprintValueError(PipeComposeError, ValueError):
     pass
+
+
+class StructuredContentComposerTypeError(PipeComposeError, TypeError):
+    pass
+
+
+class StructuredContentComposerValueError(PipeComposeError, ValueError):
+    pass
