@@ -155,7 +155,8 @@ class GeneratedContentFactory:
         extract_output: ExtractOutput,
     ) -> list[PageContent]:
         page_contents: list[PageContent] = []
-        for page in extract_output.pages.values():
+        for page_index in sorted(extract_output.pages.keys()):
+            page = extract_output.pages[page_index]
             page_images: list[ImageContent] = []
             for extracted_image in page.extracted_images:
                 image_content = await self.make_image_content(
