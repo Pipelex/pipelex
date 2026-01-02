@@ -9,7 +9,7 @@ from typing import Any, cast, get_args, get_origin
 
 from pydantic import ValidationError
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -65,7 +65,7 @@ class StructuredContentComposer:
         field_values: dict[str, Any] = {}
 
         for field_name, field_blueprint in self.construct_blueprint.fields.items():
-            field_values[field_name] = await self._resolve_field(field_blueprint, field_name)
+            field_values[field_name] = await self._resolve_field(field_blueprint=field_blueprint, field_name=field_name)
 
         return field_values
 
@@ -84,13 +84,13 @@ class StructuredContentComposer:
                 return field_blueprint.fixed_value
 
             case ConstructFieldMethod.FROM_VAR:
-                return self._resolve_from_var(field_blueprint, field_name)
+                return self._resolve_from_var(field_blueprint=field_blueprint, field_name=field_name)
 
             case ConstructFieldMethod.TEMPLATE:
-                return await self._resolve_template(field_blueprint)
+                return await self._resolve_template(field_blueprint=field_blueprint)
 
             case ConstructFieldMethod.NESTED:
-                return await self._resolve_nested(field_blueprint, field_name)
+                return await self._resolve_nested(field_blueprint=field_blueprint, field_name=field_name)
 
     def _resolve_from_var(self, field_blueprint: ConstructFieldBlueprint, field_name: str) -> Any:
         """Resolve a FROM_VAR field by getting value from working memory.
@@ -114,13 +114,13 @@ class StructuredContentComposer:
             raise ValueError(msg)
 
         path = field_blueprint.from_path
-        expected_type = self._get_field_expected_type(field_name)
+        expected_type = self._get_field_expected_type(field_name=field_name)
         log.dev(f"_resolve_from_var: resolving path '{path}' for field '{field_name}' (expected: {expected_type})")
 
         if "." in path:
-            return self._resolve_dotted_path(path)
-
-        return self._resolve_simple_path(path, expected_type)
+            return self._resolve_dotted_path(path=path)
+        else:
+            return self._resolve_stuff_name(name=path, expected_type=expected_type)
 
     def _resolve_dotted_path(self, path: str) -> Any:
         """Resolve a dotted path by navigating through object attributes.
@@ -139,74 +139,68 @@ class StructuredContentComposer:
         attr_path = parts[1]
 
         stuff = self.working_memory.get_stuff(base_name)
-        content: StuffContent = stuff.content
-        log.dev(f"  Stuff '{base_name}' content type: {type(content).__name__}")
+        stuff_content: StuffContent = stuff.content
+        log.dev(f"  Stuff '{base_name}' content type: {type(stuff_content).__name__}")
 
         # Navigate the attribute path - this is dynamic attribute access at runtime
-        current: StuffContent = content
+        current_content: StuffContent = stuff_content
         for attr in attr_path.split("."):
-            if hasattr(current, attr):  # pyright: ignore[reportUnknownArgumentType]
-                current = getattr(current, attr)  # pyright: ignore[reportUnknownArgumentType]
-            elif isinstance(current, dict) and attr in current:  # pyright: ignore[reportUnknownVariableType]
-                current = current[attr]  # pyright: ignore[reportUnknownVariableType]
+            if hasattr(current_content, attr):  # pyright: ignore[reportUnknownArgumentType]
+                current_content = getattr(current_content, attr)  # pyright: ignore[reportUnknownArgumentType]
+            elif isinstance(current_content, dict) and attr in current_content:  # pyright: ignore[reportUnknownVariableType]
+                current_content = current_content[attr]  # pyright: ignore[reportUnknownVariableType]
             else:
                 msg = f"Cannot resolve path '{path}': attribute '{attr}' not found"
                 raise ValueError(msg)
-        log.dev(f"  Resolved value type: {type(current).__name__}")  # pyright: ignore[reportUnknownArgumentType]
-        return current  # pyright: ignore[reportUnknownVariableType]
+        log.dev(f"  Resolved value type: {type(current_content).__name__}")  # pyright: ignore[reportUnknownArgumentType]
+        return current_content  # pyright: ignore[reportUnknownVariableType]
 
-    def _resolve_simple_path(self, path: str, expected_type: Any) -> Any:
+    def _resolve_stuff_name(self, name: str, expected_type: Any) -> Any:
         """Resolve a simple (non-dotted) path and convert content based on expected type.
 
         Args:
-            path: The simple path (stuff name in working memory)
+            name: A non-dotted path, hence it's the stuff name in working memory
             expected_type: The expected type annotation for the target field
 
         Returns:
             The content, converted as appropriate for the target field type
         """
-        stuff = self.working_memory.get_stuff(path)
-        content: StuffContent = stuff.content
-        log.dev(f"  Stuff '{path}' content type: {type(content).__name__}")
-        return self._convert_for_target_type(content, expected_type, path)
+        stuff = self.working_memory.get_stuff(name=name)
+        stuff_content: StuffContent = stuff.content
+        log.dev(f"  Stuff '{name}' content type: {type(stuff_content).__name__}")
+        return self._convert_for_target_type(stuff_content=stuff_content, expected_type=expected_type)
 
-    def _convert_for_target_type(self, content: StuffContent, expected_type: Any, path: str) -> Any:
+    def _convert_for_target_type(self, stuff_content: StuffContent, expected_type: Any) -> Any:
         """Convert content based on the expected target field type.
 
         Central dispatcher for type-aware conversion. Routes to specific
         conversion methods based on content type.
 
         Args:
-            content: The content to convert
+            stuff_content: The content to convert
             expected_type: The expected type annotation for the target field
-            path: The path (for logging purposes)
 
         Returns:
             The content, converted as appropriate for the target field type
         """
-        # TextContent handling
-        if isinstance(content, TextContent):
-            return self._convert_text_content(content, expected_type)
-
-        # ListContent handling
-        if isinstance(content, ListContent):
-            typed_content = cast("ListContent[StuffContent]", content)
-            return self._convert_list_content(typed_content, expected_type, path)
-
-        # Generic StuffContent handling
-        if self._expects_type(expected_type, StuffContent):
+        if isinstance(stuff_content, TextContent):
+            return self._convert_text_content(text_content=stuff_content, expected_type=expected_type)
+        elif isinstance(stuff_content, ListContent):
+            list_content = cast("ListContent[StuffContent]", stuff_content)
+            return self._convert_list_content(list_content=list_content, expected_type=expected_type)
+        elif self._expects_type(expected_type, StuffContent):
             log.dev(f"  -> Target expects {expected_type.__name__}, converting content")
-            return self._convert_content_for_field(content, expected_type)
+            return self._convert_content_for_field(stuff_content=stuff_content, expected_type=expected_type)
+        else:
+            # Fallback: return as-is
+            log.dev(f"  -> Unknown target type, returning {type(stuff_content).__name__} object")
+            return stuff_content
 
-        # Fallback: return as-is
-        log.dev(f"  -> Unknown target type, returning {type(content).__name__} object")
-        return content
-
-    def _convert_text_content(self, content: TextContent, expected_type: Any) -> Any:
+    def _convert_text_content(self, text_content: TextContent, expected_type: Any) -> Any:
         """Convert TextContent based on expected type (str, TextContent, or subclass).
 
         Args:
-            content: The TextContent to convert
+            text_content: The TextContent to convert
             expected_type: The expected type annotation for the target field
 
         Returns:
@@ -215,22 +209,21 @@ class StructuredContentComposer:
         if self._expects_type(expected_type, str):
             # Target field expects str, extract the text
             log.dev("  -> Target expects str, returning TextContent.text")
-            return content.text
+            return text_content.text
         elif self._expects_type(expected_type, TextContent):
             # Target field expects TextContent or subclass
-            return self._convert_content_for_field(content, expected_type)
+            return self._convert_content_for_field(stuff_content=text_content, expected_type=expected_type)
         else:
             # Default: return the object as-is
-            log.dev(f"  -> Unknown target type, returning {type(content).__name__} object")
-            return content
+            log.dev(f"  -> Unknown target type, returning {type(text_content).__name__} object")
+            return text_content
 
-    def _convert_list_content(self, content: ListContent[StuffContent], expected_type: Any, path: str) -> Any:
+    def _convert_list_content(self, list_content: ListContent[StuffContent], expected_type: Any) -> Any:
         """Convert ListContent based on expected type (list[X] or ListContent[X]).
 
         Args:
-            content: The ListContent to convert
+            list_content: The ListContent to convert
             expected_type: The expected type annotation for the target field
-            path: The path (for logging purposes)
 
         Returns:
             Either a list of dicts, or a ListContent object with converted items
@@ -239,18 +232,17 @@ class StructuredContentComposer:
             # Target field expects ListContent[X], check item compatibility and return as ListContent
             expected_item_type = self._get_list_item_type(expected_type)
             log.dev(f"  -> Target expects ListContent[{expected_item_type}]")
-            converted_items = self._convert_list_items_as_objects(content.items, expected_item_type, path)
+            converted_items = self._convert_list_items_as_objects(items=list_content.items, expected_item_type=expected_item_type)
             return ListContent(items=converted_items)
-
-        if self._expects_list_type(expected_type):
+        elif self._expects_list_type(expected_type):
             # Target expects list[X], extract items as dicts for Pydantic reconstruction
             expected_item_type = self._get_list_item_type(expected_type)
             log.dev(f"  -> Target expects list[{expected_item_type}], extracting items from ListContent")
-            return self._convert_list_items_as_dicts(content.items, expected_item_type, path)
-
-        # Default: return the object as-is
-        log.dev(f"  -> Unknown target type, returning ListContent object with {content.nb_items} items")
-        return content
+            return self._convert_list_items_as_dicts(items=list_content.items, expected_item_type=expected_item_type)
+        else:
+            # Default: return the object as-is
+            log.dev(f"  -> Unknown target type, returning ListContent object with {list_content.nb_items} items")
+            return list_content
 
     def _get_field_expected_type(self, field_name: str) -> Any:
         """Get the expected type annotation for a field from the output class.
@@ -287,7 +279,7 @@ class StructuredContentComposer:
             # expected_type is not a class (e.g., it's a generic like list[X])
             return False
 
-    def _convert_content_for_field(self, content: StuffContent, expected_type: type[StuffContent]) -> StuffContent:
+    def _convert_content_for_field(self, stuff_content: StuffContent, expected_type: type[StuffContent]) -> StuffContent:
         """Convert any StuffContent to the expected type if needed.
 
         This is a generic conversion method that handles class compatibility for
@@ -297,7 +289,7 @@ class StructuredContentComposer:
         3. Otherwise -> attempt rebuild, error on failure
 
         Args:
-            content: The StuffContent object to convert
+            stuff_content: The StuffContent object to convert
             expected_type: The expected StuffContent class/subclass
 
         Returns:
@@ -306,23 +298,23 @@ class StructuredContentComposer:
         Raises:
             ValueError: If the content cannot be converted to the expected type
         """
-        actual_type = type(content)
+        actual_type = type(stuff_content)
 
         # Case 1: Exact match or subclass - return as-is
         if actual_type is expected_type or issubclass(actual_type, expected_type):
             log.dev(f"  -> {actual_type.__name__} is compatible with {expected_type.__name__}, returning as-is")
-            return content
+            return stuff_content
 
         # Case 2: Check structural equivalence and rebuild if compatible
         if are_classes_equivalent(actual_type, expected_type):
             log.dev(f"  -> {actual_type.__name__} is structurally equivalent to {expected_type.__name__}, rebuilding")
-            content_dict = content.model_dump(exclude_none=False, serialize_as_any=True)
+            content_dict = stuff_content.model_dump(exclude_none=False, serialize_as_any=True)
             return expected_type.model_validate(content_dict)
 
         # Case 3: Try to rebuild anyway if expected_type accepts the content's fields
         try:
             log.dev(f"  -> Attempting to rebuild {actual_type.__name__} as {expected_type.__name__}")
-            content_dict = content.model_dump(exclude_none=False, serialize_as_any=True)
+            content_dict = stuff_content.model_dump(exclude_none=False, serialize_as_any=True)
             return expected_type.model_validate(content_dict)
         except ValidationError as exc:
             formatted_error = format_pydantic_validation_error(exc)
@@ -384,7 +376,7 @@ class StructuredContentComposer:
             return args[0]  # type: ignore[return-value, no-any-return]
         return None
 
-    def _convert_list_items_as_dicts(self, items: list[StuffContent], expected_item_type: type[Any] | None, path: str) -> list[Any]:
+    def _convert_list_items_as_dicts(self, items: list[StuffContent], expected_item_type: type[Any] | None) -> list[Any]:
         """Convert list items to dicts for Pydantic model_validate reconstruction.
 
         Used when target is list[X] - items are returned as dicts so Pydantic
@@ -393,15 +385,11 @@ class StructuredContentComposer:
         Args:
             items: The list of items to convert
             expected_item_type: The expected type for each item
-            path: The path for logging purposes
 
         Returns:
             List of item dicts
         """
         log.dev(f"     Converting {len(items)} items to dicts, expected item type: {expected_item_type}")
-        if items:
-            log.dev(f"     Actual item types: {[type(item).__name__ for item in items[:3]]}")
-        pretty_print(items, title=f"ListContent items for '{path}'")
 
         if expected_item_type is None:
             log.dev("     No expected item type, converting all items to dicts")
@@ -415,7 +403,7 @@ class StructuredContentComposer:
         log.dev(f"     Returning {len(converted_items)} items as dicts")
         return converted_items
 
-    def _convert_list_items_as_objects(self, items: list[StuffContent], expected_item_type: type[Any] | None, path: str) -> list[StuffContent]:
+    def _convert_list_items_as_objects(self, items: list[StuffContent], expected_item_type: type[Any] | None) -> list[StuffContent]:
         """Convert list items while keeping them as objects (for ListContent target).
 
         Used when target is ListContent[X] - items are validated and potentially
@@ -424,15 +412,11 @@ class StructuredContentComposer:
         Args:
             items: The list of items to convert
             expected_item_type: The expected type for each item
-            path: The path for logging purposes
 
         Returns:
             List of StuffContent objects
         """
         log.dev(f"     Converting {len(items)} items as objects, expected item type: {expected_item_type}")
-        if items:
-            log.dev(f"     Actual item types: {[type(item).__name__ for item in items[:3]]}")
-        pretty_print(items, title=f"ListContent items for '{path}'")
 
         if expected_item_type is None:
             log.dev("     No expected item type, returning items as-is")
