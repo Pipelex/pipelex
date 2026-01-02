@@ -211,8 +211,7 @@ class PyPdfium2Renderer:
         pdf_doc = pdfium.PdfDocument(pdf_input)
         all_images: dict[int, list[ExtractedImageFromPage]] = {}
 
-        for page_index in range(len(pdf_doc)):
-            page = pdf_doc[page_index]
+        for page_index, page in enumerate(pdf_doc):
             page_images: list[ExtractedImageFromPage] = []
 
             for obj in page.get_objects(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
