@@ -6,24 +6,24 @@ from pipelex.types import StrEnum
 
 
 class InterpretedPathOrUrl(StrEnum):
-    FILE_URI = "file_uri"
-    FILE_PATH = "file_path"
-    URL = "uri"
+    HTTP_URL = "http_url"
+    LOCAL_FILE_PATH_URL = "local_file_path_url"
     FILE_NAME = "file_name"
+    FILE_PATH = "file_path"
     BASE_64 = "base_64"
     PIPELEX_STORAGE = "pipelex_storage"
 
     @property
     def desc(self) -> str:
         match self:
-            case InterpretedPathOrUrl.FILE_URI:
-                return "File URI"
-            case InterpretedPathOrUrl.FILE_PATH:
-                return "File Path"
-            case InterpretedPathOrUrl.URL:
-                return "URL"
+            case InterpretedPathOrUrl.HTTP_URL:
+                return "HTTP URL"
+            case InterpretedPathOrUrl.LOCAL_FILE_PATH_URL:
+                return "Local file path URL"
             case InterpretedPathOrUrl.FILE_NAME:
                 return "File Name"
+            case InterpretedPathOrUrl.FILE_PATH:
+                return "File path"
             case InterpretedPathOrUrl.BASE_64:
                 return "Base 64"
             case InterpretedPathOrUrl.PIPELEX_STORAGE:
@@ -68,9 +68,9 @@ def interpret_path_or_url(path_or_uri: str) -> InterpretedPathOrUrl:
     if path_or_uri.startswith(PIPELEX_STORAGE_SCHEME):
         return InterpretedPathOrUrl.PIPELEX_STORAGE
     elif path_or_uri.startswith("file://"):
-        return InterpretedPathOrUrl.FILE_URI
+        return InterpretedPathOrUrl.LOCAL_FILE_PATH_URL
     elif path_or_uri.startswith("http"):
-        return InterpretedPathOrUrl.URL
+        return InterpretedPathOrUrl.HTTP_URL
     elif os.sep in path_or_uri:
         return InterpretedPathOrUrl.FILE_PATH
     else:
@@ -111,11 +111,11 @@ def clarify_path_or_url(path_or_uri: str) -> tuple[str | None, str | None]:
     file_path: str | None
     url: str | None
     match interpret_path_or_url(path_or_uri):
-        case InterpretedPathOrUrl.FILE_URI:
+        case InterpretedPathOrUrl.LOCAL_FILE_PATH_URL:
             parsed_uri = urllib.parse.urlparse(path_or_uri)
             file_path = urllib.parse.unquote(parsed_uri.path)
             url = None
-        case InterpretedPathOrUrl.URL:
+        case InterpretedPathOrUrl.HTTP_URL:
             file_path = None
             url = path_or_uri
         case InterpretedPathOrUrl.FILE_PATH:

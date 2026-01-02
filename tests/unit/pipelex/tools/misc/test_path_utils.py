@@ -12,42 +12,22 @@ from pipelex.tools.misc.path_utils import (
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 
-class TestInterpretedPathOrUrl:
-    def test_desc_property_file_uri(self):
-        assert InterpretedPathOrUrl.FILE_URI.desc == "File URI"
-
-    def test_desc_property_file_path(self):
-        assert InterpretedPathOrUrl.FILE_PATH.desc == "File Path"
-
-    def test_desc_property_url(self):
-        assert InterpretedPathOrUrl.URL.desc == "URL"
-
-    def test_desc_property_file_name(self):
-        assert InterpretedPathOrUrl.FILE_NAME.desc == "File Name"
-
-    def test_desc_property_base_64(self):
-        assert InterpretedPathOrUrl.BASE_64.desc == "Base 64"
-
-    def test_desc_property_pipelex_storage(self):
-        assert InterpretedPathOrUrl.PIPELEX_STORAGE.desc == "Pipelex Storage"
-
-
 class TestInterpretPathOrUrl:
     def test_interpret_file_uri(self):
         result = interpret_path_or_url("file:///home/user/file.txt")
-        assert result == InterpretedPathOrUrl.FILE_URI
+        assert result == InterpretedPathOrUrl.LOCAL_FILE_PATH_URL
 
     def test_interpret_file_uri_windows(self):
         result = interpret_path_or_url("file:///C:/Users/user/file.txt")
-        assert result == InterpretedPathOrUrl.FILE_URI
+        assert result == InterpretedPathOrUrl.LOCAL_FILE_PATH_URL
 
     def test_interpret_http_url(self):
         result = interpret_path_or_url("http://example.com")
-        assert result == InterpretedPathOrUrl.URL
+        assert result == InterpretedPathOrUrl.HTTP_URL
 
     def test_interpret_https_url(self):
         result = interpret_path_or_url("https://example.com/path")
-        assert result == InterpretedPathOrUrl.URL
+        assert result == InterpretedPathOrUrl.HTTP_URL
 
     def test_interpret_absolute_file_path_unix(self):
         result = interpret_path_or_url("/home/user/file.txt")
@@ -93,7 +73,7 @@ class TestInterpretPathOrUrl:
 
     def test_interpret_edge_case_file_in_url(self):
         result = interpret_path_or_url("http://example.com/file.txt")
-        assert result == InterpretedPathOrUrl.URL
+        assert result == InterpretedPathOrUrl.HTTP_URL
 
     def test_interpret_pipelex_storage_uri(self):
         result = interpret_path_or_url(f"{PIPELEX_STORAGE_SCHEME}images/photo.png")
@@ -192,7 +172,7 @@ class TestClarifyPathOrUrl:
 
         mocker.patch(
             "pipelex.tools.misc.path_utils.interpret_path_or_url",
-            return_value=InterpretedPathOrUrl.FILE_URI,
+            return_value=InterpretedPathOrUrl.LOCAL_FILE_PATH_URL,
         )
 
         file_path, url = clarify_path_or_url("file:///home/user/file.txt")

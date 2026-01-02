@@ -23,7 +23,7 @@
             "args": [
                 "-s",
                 "-vv",
-                "-k test_discord_newsletter_dry_run_working_memory"
+                "-k test_compose_image_content_multiple"
             ],
             "console": "integratedTerminal"
         },

@@ -1,5 +1,8 @@
 import json
 
+from rich.console import Group
+from rich.markdown import Markdown
+from rich.text import Text
 from typing_extensions import override
 
 from pipelex.cogt.image.image_size import ImageSize
@@ -7,6 +10,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.path_utils import interpret_path_or_url
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class ImageContent(StuffContent):
@@ -45,3 +49,47 @@ class ImageContent(StuffContent):
     @override
     def rendered_json(self) -> str:
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
+
+    @override
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        group = Group()
+
+        # title indicating it's an image:
+        title_text = Text("Image:", style="bold cyan")
+        group.renderables.append(title_text)
+
+        # URL with clickable markdown link
+        display_url = f"{self.url[:35]}…" if len(self.url) > 36 else self.url
+        url_markdown = Markdown(f"**URL:** [{display_url}]({self.url})")
+        group.renderables.append(url_markdown)
+
+        # Display link if present
+        if self.display_link is not None:
+            link_text = Text()
+            link_text.append("Display: ", style="bold")
+            link_text.append("Open Image", style=f"cyan link {self.display_link}")
+            group.renderables.append(link_text)
+
+        # Caption if present
+        if self.caption:
+            caption_text = Text()
+            caption_text.append("Caption: ", style="bold")
+            caption_text.append(self.caption, style="yellow italic")
+            group.renderables.append(caption_text)
+
+        # Size if present
+        if self.size:
+            size_text = Text()
+            size_text.append("Size: ", style="bold")
+            size_text.append(f"{self.size.width}x{self.size.height}", style="dim")
+            group.renderables.append(size_text)
+
+        # Source prompt if present
+        if self.source_prompt:
+            group.renderables.append(Text())  # Add spacing
+            prompt_text = Text()
+            prompt_text.append("Source Prompt: ", style="bold")
+            prompt_text.append(self.source_prompt, style="dim italic")
+            group.renderables.append(prompt_text)
+
+        return group

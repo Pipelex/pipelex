@@ -108,7 +108,11 @@ cheap_llm_for_creativity = [
 ]
 
 # --- Waterfalls for Extracts ---------------------------------------------------------------------
-pdf_text_extractor = ["mistral-ocr", "pypdfium2-extract-text"]
+pdf_text_extractor = [
+    "azure-document-intelligence",
+    "mistral-ocr",
+    "pypdfium2-extract-text",
+]
 image_text_extractor = ["mistral-ocr"]
 
 ####################################################################################################
