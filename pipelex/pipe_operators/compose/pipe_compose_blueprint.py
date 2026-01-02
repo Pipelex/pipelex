@@ -13,6 +13,7 @@ from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprin
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class PipeComposeBlueprint(PipeBlueprint):
@@ -88,11 +89,10 @@ class PipeComposeBlueprint(PipeBlueprint):
 
     def _validate_template_inputs(self):
         """Validate inputs for template mode."""
-        template_source = self.template_source
-        if template_source is None:
+        if self.template_source is None:
             return
 
-        preprocessed_template = preprocess_template(template_source)
+        preprocessed_template = preprocess_template(self.template_source)
         try:
             check_jinja2_parsing(
                 template_source=preprocessed_template,
@@ -127,12 +127,11 @@ class PipeComposeBlueprint(PipeBlueprint):
             return
 
         required_variables = construct_bp.get_required_variables()
-        # Extract root variable names (the part before any dot)
-        root_variable_names = {var.split(".")[0] for var in required_variables}
 
-        for root_name in root_variable_names:
-            if root_name not in self.input_names:
-                msg = f"Required variable '{root_name}' from construct is not in the inputs of PipeCompose."
+        for required_variable in required_variables:
+            root_variable_name = get_root_from_dotted_path(required_variable)
+            if root_variable_name not in self.input_names:
+                msg = f"Required variable '{root_variable_name}' from construct is not in the inputs of PipeCompose for field '{required_variable}'."
                 raise ValueError(msg)
 
     @override

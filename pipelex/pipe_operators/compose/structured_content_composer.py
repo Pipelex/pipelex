@@ -1,10 +1,3 @@
-"""Composer for creating StructuredContent from ConstructBlueprint.
-
-The StructuredContentComposer takes a ConstructBlueprint and WorkingMemory,
-resolves all fields according to their composition methods, and produces
-a populated StructuredContent instance.
-"""
-
 from typing import Any, cast, get_args, get_origin
 
 from pydantic import ValidationError
