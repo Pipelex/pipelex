@@ -26,6 +26,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class PipeComposeOutput(PipeOutput):
@@ -76,11 +77,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         except Jinja2DetectVariablesError as exc:
             msg = f"Error detecting required variables for PipeCompose: {exc}"
             raise ValueError(msg) from exc
-        return {
-            path.split(".")[0]
-            for path in full_paths
-            if not path.split(".")[0].startswith("_") and path.split(".")[0] not in {"preliminary_text", "place_holder"}
-        }
+        roots: set[str] = set()
+        for path in full_paths:
+            root = get_root_from_dotted_path(path)
+            if not root.startswith("_") and root not in {"preliminary_text", "place_holder"}:
+                roots.add(root)
+        return roots
 
     @override
     # TODO: this needs testing!!!

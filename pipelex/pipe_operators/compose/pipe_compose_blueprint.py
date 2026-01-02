@@ -105,11 +105,11 @@ class PipeComposeBlueprint(PipeBlueprint):
             template_category=self.template_category,
             template_source=preprocessed_template,
         )
-        required_variables = {
-            path.split(".")[0]
-            for path in full_paths
-            if not path.split(".")[0].startswith("_") and path.split(".")[0] not in {"preliminary_text", "place_holder"}
-        }
+        required_variables: set[str] = set()
+        for path in full_paths:
+            root = get_root_from_dotted_path(path)
+            if not root.startswith("_") and root not in {"preliminary_text", "place_holder"}:
+                required_variables.add(root)
         for required_variable_name in required_variables:
             if required_variable_name not in self.input_names:
                 msg = f"Required variable '{required_variable_name}' is not in the inputs of PipeCompose."

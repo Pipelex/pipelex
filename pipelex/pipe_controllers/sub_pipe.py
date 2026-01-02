@@ -14,6 +14,7 @@ from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBluepri
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class SubPipe(BaseModel):
@@ -103,7 +104,10 @@ class SubPipe(BaseModel):
             required_variables = sub_pipe.required_variables()
             # Extract root names from full paths for looking up stuffs in working memory
             # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
-            required_stuff_names = {req_var.split(".")[0] for req_var in required_variables if not req_var.startswith("_")}
+            required_stuff_names: set[str] = set()
+            for req_var in required_variables:
+                if not req_var.startswith("_"):
+                    required_stuff_names.add(get_root_from_dotted_path(req_var))
             try:
                 required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
             except WorkingMemoryStuffNotFoundError as exc:
