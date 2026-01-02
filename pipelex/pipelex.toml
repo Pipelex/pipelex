@@ -204,6 +204,8 @@ default_page_views_dpi = 72
 ####################################################################################################
 
 [cogt.gateway_test_config.config_id_substitutions]
+# this is an empty dict, it's only used by Pipelex staff to override the ¨Pipelex Gateway¨ config
+# in order to test new model integrations or debug issues with the Gateway
 
 ####################################################################################################
 # Pipelex prompting config
