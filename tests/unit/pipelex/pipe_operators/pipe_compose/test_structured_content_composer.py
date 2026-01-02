@@ -237,6 +237,82 @@ class TestStructuredContentComposerNested:
         assert result.headquarters.country == "France"
 
 
+class CompanyWithOptionalAddress(StructuredContent):
+    """Company with optional address using Python 3.10+ union syntax (X | None).
+
+    This tests the fix for _get_nested_field_class which used hasattr(annotation, "__origin__")
+    to detect Optional types. The Python 3.10+ union syntax creates types.UnionType which
+    doesn't have __origin__, so get_origin() must be used instead.
+    """
+
+    name: str = Field(description="Company name")
+    headquarters: Address | None = Field(default=None, description="Optional company headquarters")
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class TestStructuredContentComposerNestedOptional:
+    """Tests for composing nested structures with Python 3.10+ union syntax (X | None).
+
+    This tests the fix for the bug where _get_nested_field_class used
+    hasattr(annotation, "__origin__") to detect Optional types, which doesn't work
+    with Python 3.10+ union syntax (Address | None creates types.UnionType).
+    """
+
+    @pytest.fixture
+    def working_memory_with_address(self, load_empty_library: Callable[[], None]) -> WorkingMemory:
+        """Create working memory with address components."""
+        load_empty_library()
+        addr = Address(street="456 Elm St", city="Lyon", country="France")
+        company_name_stuff = StuffFactory.make_stuff(
+            concept=get_native_concept(NativeConceptCode.TEXT),
+            content=TextContent(text="OptionalCorp"),
+            name="company_name",
+        )
+        addr_stuff = StuffFactory.make_stuff(
+            concept=get_native_concept(NativeConceptCode.TEXT),
+            content=addr,
+            name="addr",
+        )
+
+        working_memory = WorkingMemory()
+        working_memory.add_new_stuff(name="company_name", stuff=company_name_stuff)
+        working_memory.add_new_stuff(name="addr", stuff=addr_stuff)
+        return working_memory
+
+    async def test_compose_nested_optional_with_python_310_union_syntax(self, working_memory_with_address: WorkingMemory):
+        """Test composing nested structure when field uses Python 3.10+ union syntax.
+
+        Before fix: hasattr(annotation, "__origin__") would return False for types.UnionType,
+        causing the Address | None type to not have None stripped, and instantiation would fail.
+
+        After fix: get_origin() correctly handles both typing.Union and types.UnionType,
+        so the nested Address is correctly identified and composed.
+        """
+        nested_construct = {
+            "name": {"from": "company_name"},
+            "headquarters": {
+                "street": {"from": "addr.street"},
+                "city": {"from": "addr.city"},
+                "country": "France",
+            },
+        }
+        blueprint = ConstructBlueprint.make_from_raw(nested_construct)
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory_with_address,
+            output_class=CompanyWithOptionalAddress,
+        )
+        result = await composer.compose()
+
+        assert isinstance(result, CompanyWithOptionalAddress)
+        assert result.name == "OptionalCorp"
+        assert isinstance(result.headquarters, Address)
+        assert result.headquarters.street == "456 Elm St"
+        assert result.headquarters.city == "Lyon"
+        assert result.headquarters.country == "France"
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestStructuredContentComposerErrors:
     """Tests for error handling in the composer."""
@@ -410,3 +486,114 @@ class TestStructuredContentComposerDottedPathTypeConversion:
         assert isinstance(result.content, TextContent)
         assert result.content.text == "Hello from TextContent"
         assert result.label == "test-container"
+
+
+# Test models using typing.Optional syntax (works on all Python versions)
+
+
+class CompanyWithTypingOptionalAddress(StructuredContent):
+    """Company with optional address using typing.Optional syntax."""
+
+    name: str = Field(description="Company name")
+    headquarters: Address | None = Field(default=None, description="Optional headquarters")
+
+
+class TestGetNestedFieldClassOptionalSyntaxes:
+    """Tests for _get_nested_field_class with different Optional syntaxes.
+
+    This tests the fix where hasattr(annotation, "__origin__") was used to detect
+    Optional types, which doesn't work for Python 3.10+ union syntax (X | None).
+    The fix uses get_origin() which handles both syntaxes correctly.
+
+    These tests directly verify that _get_nested_field_class returns the correct
+    class for both Optional[Address] and Address | None syntaxes.
+    """
+
+    def test_get_nested_field_class_with_typing_optional(self):
+        """Test _get_nested_field_class correctly handles typing.Optional[Address].
+
+        typing.Optional[Address] has __origin__ = typing.Union, so the old
+        hasattr(annotation, "__origin__") check worked. This test ensures we
+        didn't break backward compatibility.
+        """
+        # Need valid nested construct data for the blueprint
+        nested_construct = {
+            "name": "Test",
+            "headquarters": {"street": "123 Main", "city": "Paris", "country": "France"},
+        }
+        blueprint = ConstructBlueprint.make_from_raw(nested_construct)
+        working_memory = WorkingMemory()
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=CompanyWithTypingOptionalAddress,
+        )
+
+        # Directly test the private method (noqa needed for testing internal behavior)
+        result = composer._get_nested_field_class("headquarters")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+
+        assert result is Address, f"Expected Address, got {result}"
+
+    def test_get_nested_field_class_with_python_310_union_syntax(self):
+        """Test _get_nested_field_class correctly handles Python 3.10+ Address | None.
+
+        Before the fix: types.UnionType (from X | None) doesn't have __origin__,
+        so hasattr(annotation, "__origin__") returned False, and the None wasn't
+        stripped. This would cause Address | None to be returned instead of Address.
+
+        After the fix: get_origin() correctly returns types.UnionType for this case,
+        and we strip the None to get Address.
+        """
+        # Need valid nested construct data for the blueprint
+        nested_construct = {
+            "name": "Test",
+            "headquarters": {"street": "123 Main", "city": "Paris", "country": "France"},
+        }
+        blueprint = ConstructBlueprint.make_from_raw(nested_construct)
+        working_memory = WorkingMemory()
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=CompanyWithOptionalAddress,
+        )
+
+        # Directly test the private method (noqa needed for testing internal behavior)
+        result = composer._get_nested_field_class("headquarters")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+
+        assert result is Address, f"Expected Address, got {result}"
+
+    def test_both_optional_syntaxes_return_same_class(self):
+        """Test that both Optional syntaxes return the same nested class.
+
+        This is the key test: regardless of whether Optional[Address] or Address | None
+        is used, _get_nested_field_class should return Address in both cases.
+        """
+        # Need valid nested construct data for the blueprint
+        nested_construct = {
+            "name": "Test",
+            "headquarters": {"street": "123 Main", "city": "Paris", "country": "France"},
+        }
+        blueprint = ConstructBlueprint.make_from_raw(nested_construct)
+        working_memory = WorkingMemory()
+
+        composer_typing_optional = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=CompanyWithTypingOptionalAddress,
+        )
+
+        composer_union_syntax = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=CompanyWithOptionalAddress,
+        )
+
+        # Ignore lint/type errors: testing internal behavior directly
+        result_typing = composer_typing_optional._get_nested_field_class("headquarters")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+        result_union = composer_union_syntax._get_nested_field_class("headquarters")  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+
+        assert result_typing is Address
+        assert result_union is Address
+        assert result_typing is result_union, "Both syntaxes should return the same class"

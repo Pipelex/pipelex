@@ -555,10 +555,12 @@ class StructuredContentComposer:
         field_info = self.output_class.model_fields.get(field_name)
         if field_info and field_info.annotation:
             annotation = field_info.annotation
-            # Handle Optional types
-            if hasattr(annotation, "__origin__"):
-                # It's a generic type like Optional[Address]
-                args = getattr(annotation, "__args__", ())
+            # Handle Optional types (both `Optional[X]` and Python 3.10+ `X | None` syntax)
+            # Note: get_origin() handles both typing.Union and types.UnionType correctly,
+            # while hasattr(annotation, "__origin__") only works for typing.Union
+            if get_origin(annotation) is not None:
+                # It's a generic type like Optional[Address] or Address | None
+                args = get_args(annotation)
                 if args:
                     annotation = args[0]
             return annotation  # type: ignore[return-value]
