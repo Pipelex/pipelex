@@ -5,20 +5,18 @@ resolves all fields according to their composition methods, and produces
 a populated StructuredContent instance.
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Any, get_args, get_origin
+from typing import Any, cast, get_args, get_origin
 
 from pipelex import log, pretty_print
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_content_generator
+from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.construct_field_blueprint import ConstructFieldBlueprint, ConstructFieldMethod
-
-if TYPE_CHECKING:
-    from pipelex.core.memory.working_memory import WorkingMemory
-    from pipelex.core.stuffs.stuff_content import StuffContent
-    from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 
 
 class StructuredContentComposer:
@@ -227,11 +225,11 @@ class StructuredContentComposer:
             attr_path = parts[1]
 
             stuff = self.working_memory.get_stuff(base_name)
-            content: Any = stuff.content
+            content: StuffContent = stuff.content
             log.dev(f"  Stuff '{base_name}' content type: {type(content).__name__}")
 
             # Navigate the attribute path - this is dynamic attribute access at runtime
-            current: Any = content
+            current: StuffContent = content
             for attr in attr_path.split("."):
                 if hasattr(current, attr):  # pyright: ignore[reportUnknownArgumentType]
                     current = getattr(current, attr)  # pyright: ignore[reportUnknownArgumentType]
@@ -245,49 +243,42 @@ class StructuredContentComposer:
         else:
             # Simple case: just get the stuff's content or text value
             stuff = self.working_memory.get_stuff(path)
-            simple_content: Any = stuff.content
+            simple_content: StuffContent = stuff.content
             log.dev(f"  Stuff '{path}' content type: {type(simple_content).__name__}")
 
             # If it's a TextContent, return the text
-            from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
-
             if isinstance(simple_content, TextContent):
                 log.dev("  -> Returning TextContent.text (str)")
                 return simple_content.text
 
-            # Check if it's a ListContent - extract items for list fields
-            from pipelex.core.stuffs.list_content import ListContent  # noqa: PLC0415
-
-            if isinstance(simple_content, ListContent):  # type: ignore[misc]
-                log.dev(f"  -> Content is ListContent with {simple_content.nb_items} items")  # type: ignore[misc]
-                items_list = simple_content.items  # type: ignore[misc]
-                log.dev(f"     Items types: {[type(list_item).__name__ for list_item in items_list[:3]]}")  # type: ignore[misc]
-                pretty_print(simple_content, title=f"ListContent for '{path}'")  # type: ignore[misc]
+            elif isinstance(simple_content, ListContent):
+                # it's a ListContent - extract items for list fields
+                log.dev(f"  -> Content is ListContent with {simple_content.nb_items} items")
+                items_list = cast("list[StuffContent]", simple_content.items)  # pyright: ignore[reportUnknownMemberType]
+                log.dev(f"     Items types: {[type(list_item).__name__ for list_item in items_list[:3]]}")
+                pretty_print(items_list, title=f"ListContent for '{path}'")
 
                 # WORKAROUND: Convert items to dicts to avoid class identity issues
                 # During dry run, polyfactory creates mock objects with __module__="builtins"
                 # which causes Pydantic validation to fail when the target field expects
                 # a specific class. By converting to dicts, Pydantic can reconstruct
                 # the objects using the correct class during model_validate().
-                from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
 
                 items_as_dicts: list[Any] = []
                 for list_item in items_list:  # type: ignore[misc]
-                    if isinstance(list_item, StuffContent):
-                        # Convert to dict, excluding internal fields like __class__ and __module__
-                        item_dict = list_item.model_dump(exclude_none=False)
-                        # Remove kajson metadata that would interfere with Pydantic validation
-                        item_dict.pop("__class__", None)
-                        item_dict.pop("__module__", None)
-                        items_as_dicts.append(item_dict)
-                        log.dev(f"     Converted item to dict: {list(item_dict.keys())}")
-                    else:
-                        items_as_dicts.append(list_item)  # type: ignore[misc]
+                    # Convert to dict, excluding internal fields like __class__ and __module__
+                    item_dict = list_item.model_dump(exclude_none=False, serialize_as_any=True)
+                    # Remove kajson metadata that would interfere with Pydantic validation
+                    # item_dict.pop("__class__", None)
+                    # item_dict.pop("__module__", None)
+                    items_as_dicts.append(item_dict)
+                    log.dev(f"     Converted item to dict: {list(item_dict.keys())}")
 
                 log.dev(f"     Returning {len(items_as_dicts)} items as dicts for Pydantic reconstruction")
                 return items_as_dicts
-
-            return simple_content  # type: ignore[misc]
+            else:
+                log.dev(f"  -> Content is {type(simple_content).__name__}")
+                return simple_content
 
     async def _resolve_template(self, field_blueprint: ConstructFieldBlueprint) -> str:
         """Resolve a TEMPLATE field by rendering the Jinja2 template.
