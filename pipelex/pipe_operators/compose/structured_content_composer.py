@@ -7,9 +7,9 @@ a populated StructuredContent instance.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args, get_origin
 
-from pipelex import pretty_print
+from pipelex import log, pretty_print
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.hub import get_content_generator
@@ -79,9 +79,94 @@ class StructuredContentComposer:
             Populated StructuredContent instance
         """
         field_values = await self._resolve_all_fields()
+
+        # DEBUG: Show comprehensive comparison of expected vs actual
+        self._debug_log_field_comparison(field_values)
+
         pretty_print(self.output_class, title="Output class")
         pretty_print(field_values, title="Field values")
         return self.output_class.model_validate(field_values)
+
+    def _debug_log_field_comparison(self, field_values: dict[str, Any]) -> None:
+        """Log detailed comparison between expected model fields and resolved values."""
+        log.dev("=" * 80)
+        log.dev(f"StructuredContentComposer DEBUG for {self.output_class.__name__}")
+        log.dev("=" * 80)
+
+        # Get expected fields from the output class
+        expected_fields: dict[str, Any] = {}
+        if hasattr(self.output_class, "model_fields"):
+            for field_name, field_info in self.output_class.model_fields.items():
+                expected_fields[field_name] = {
+                    "annotation": field_info.annotation,
+                    "required": field_info.is_required(),
+                }
+
+        log.dev(f"Expected fields from {self.output_class.__name__}:")
+        for field_name, field_meta in expected_fields.items():
+            log.dev(f"  - {field_name}: {field_meta['annotation']} (required={field_meta['required']})")
+
+        # Blueprint fields
+        blueprint_field_names = list(self.construct_blueprint.fields.keys())
+        log.dev(f"Blueprint fields: {blueprint_field_names}")
+
+        # Check for missing fields (in expected but not in blueprint)
+        expected_names = set(expected_fields.keys())
+        blueprint_names = set(blueprint_field_names)
+        missing_in_blueprint = expected_names - blueprint_names
+        extra_in_blueprint = blueprint_names - expected_names
+
+        if missing_in_blueprint:
+            log.warning(f"Fields MISSING in blueprint (expected by {self.output_class.__name__}): {missing_in_blueprint}")
+        if extra_in_blueprint:
+            log.warning(f"Fields EXTRA in blueprint (not in {self.output_class.__name__}): {extra_in_blueprint}")
+
+        # Resolved values with types
+        log.dev("Resolved field values:")
+        for field_name, value in field_values.items():
+            value_type = type(value).__name__
+            expected_type = expected_fields.get(field_name, {}).get("annotation", "UNKNOWN")
+
+            # Check if it's a list type and show item types
+            if isinstance(value, list):
+                if value:
+                    item_types = [type(list_item).__name__ for list_item in value[:3]]  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+                    log.dev(f"  - {field_name}: list[{item_types}...] (expected: {expected_type})")
+                else:
+                    log.dev(f"  - {field_name}: empty list (expected: {expected_type})")
+            elif isinstance(value, dict):
+                dict_keys = list(value.keys())[:5]  # type: ignore[misc]
+                log.dev(f"  - {field_name}: dict with keys {dict_keys} (expected: {expected_type})")
+                if "__class__" in value:
+                    log.dev(f"    ^ This looks like a serialized object! __class__={value.get('__class__')}")  # pyright: ignore[reportUnknownMemberType]
+            else:
+                log.dev(f"  - {field_name}: {value_type} (expected: {expected_type})")
+
+            # Type mismatch detection
+            if expected_type != "UNKNOWN":
+                self._debug_check_type_mismatch(field_name, value, expected_type)
+
+        log.dev("=" * 80)
+
+    def _debug_check_type_mismatch(self, field_name: str, value: Any, expected_type: Any) -> None:
+        """Check and log type mismatches."""
+        actual_type = type(value)  # type: ignore[misc]
+
+        # Handle generic types like list[X]
+        origin = get_origin(expected_type)
+        if origin is list:
+            args = get_args(expected_type)
+            if not isinstance(value, list):
+                log.warning(f"    TYPE MISMATCH for '{field_name}': expected list, got {actual_type.__name__}")
+                if isinstance(value, dict) and "items" in value:
+                    log.warning("    ^ Value is a dict with 'items' key - likely a serialized ListContent!")
+            elif args and value:
+                expected_item_type = args[0]
+                for idx, list_item in enumerate(value[:3]):  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+                    if not isinstance(list_item, expected_item_type):
+                        log.warning(
+                            f"    TYPE MISMATCH for '{field_name}[{idx}]': expected {expected_item_type.__name__}, got {type(list_item).__name__}"  # pyright: ignore[reportUnknownArgumentType]
+                        )
 
     async def _resolve_all_fields(self) -> dict[str, Any]:
         """Resolve all fields in the blueprint to their values.
@@ -133,6 +218,7 @@ class StructuredContentComposer:
             raise ValueError(msg)
 
         path = field_blueprint.from_path
+        log.dev(f"_resolve_from_var: resolving path '{path}'")
 
         # Handle dotted paths (e.g., "deal.customer_name")
         if "." in path:
@@ -142,6 +228,7 @@ class StructuredContentComposer:
 
             stuff = self.working_memory.get_stuff(base_name)
             content: Any = stuff.content
+            log.dev(f"  Stuff '{base_name}' content type: {type(content).__name__}")
 
             # Navigate the attribute path - this is dynamic attribute access at runtime
             current: Any = content
@@ -153,18 +240,54 @@ class StructuredContentComposer:
                 else:
                     msg = f"Cannot resolve path '{path}': attribute '{attr}' not found"
                     raise ValueError(msg)
+            log.dev(f"  Resolved value type: {type(current).__name__}")  # pyright: ignore[reportUnknownArgumentType]
             return current  # pyright: ignore[reportUnknownVariableType]
         else:
             # Simple case: just get the stuff's content or text value
             stuff = self.working_memory.get_stuff(path)
             simple_content: Any = stuff.content
+            log.dev(f"  Stuff '{path}' content type: {type(simple_content).__name__}")
 
             # If it's a TextContent, return the text
             from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
 
             if isinstance(simple_content, TextContent):
+                log.dev("  -> Returning TextContent.text (str)")
                 return simple_content.text
-            return simple_content
+
+            # Check if it's a ListContent - extract items for list fields
+            from pipelex.core.stuffs.list_content import ListContent  # noqa: PLC0415
+
+            if isinstance(simple_content, ListContent):  # type: ignore[misc]
+                log.dev(f"  -> Content is ListContent with {simple_content.nb_items} items")  # type: ignore[misc]
+                items_list = simple_content.items  # type: ignore[misc]
+                log.dev(f"     Items types: {[type(list_item).__name__ for list_item in items_list[:3]]}")  # type: ignore[misc]
+                pretty_print(simple_content, title=f"ListContent for '{path}'")  # type: ignore[misc]
+
+                # WORKAROUND: Convert items to dicts to avoid class identity issues
+                # During dry run, polyfactory creates mock objects with __module__="builtins"
+                # which causes Pydantic validation to fail when the target field expects
+                # a specific class. By converting to dicts, Pydantic can reconstruct
+                # the objects using the correct class during model_validate().
+                from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+                items_as_dicts: list[Any] = []
+                for list_item in items_list:  # type: ignore[misc]
+                    if isinstance(list_item, StuffContent):
+                        # Convert to dict, excluding internal fields like __class__ and __module__
+                        item_dict = list_item.model_dump(exclude_none=False)
+                        # Remove kajson metadata that would interfere with Pydantic validation
+                        item_dict.pop("__class__", None)
+                        item_dict.pop("__module__", None)
+                        items_as_dicts.append(item_dict)
+                        log.dev(f"     Converted item to dict: {list(item_dict.keys())}")
+                    else:
+                        items_as_dicts.append(list_item)  # type: ignore[misc]
+
+                log.dev(f"     Returning {len(items_as_dicts)} items as dicts for Pydantic reconstruction")
+                return items_as_dicts
+
+            return simple_content  # type: ignore[misc]
 
     async def _resolve_template(self, field_blueprint: ConstructFieldBlueprint) -> str:
         """Resolve a TEMPLATE field by rendering the Jinja2 template.

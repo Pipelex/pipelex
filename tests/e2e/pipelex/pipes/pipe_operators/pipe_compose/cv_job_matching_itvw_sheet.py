@@ -12,8 +12,7 @@ To regenerate: pipelex build structures <target_directory>
 from pydantic import Field
 
 from pipelex.core.stuffs.structured_content import StructuredContent
-
-from .cv_job_matching_itvw_question import InterviewQuestion
+from tests.e2e.pipelex.pipes.pipe_operators.pipe_compose.cv_job_matching_itvw_question import InterviewQuestion
 
 
 class InterviewSheet(StructuredContent):
