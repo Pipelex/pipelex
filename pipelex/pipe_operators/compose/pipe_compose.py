@@ -1,6 +1,5 @@
 from typing import Any, Literal
 
-from pydantic import ConfigDict
 from typing_extensions import override
 
 from pipelex import log
@@ -9,14 +8,12 @@ from pipelex.cogt.content_generation.content_generator_protocol import ContentGe
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
@@ -37,10 +34,6 @@ class PipeComposeOutput(PipeOutput):
 
 class PipeCompose(PipeOperator[PipeComposeOutput]):
     type: Literal["PipeCompose"] = "PipeCompose"
-    model_config = ConfigDict(extra="forbid", strict=False)
-
-    # default output is Text
-    output: StuffSpec = StuffSpec(concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT))
 
     # Template mode fields (used when template is provided)
     template: str | None = None
@@ -59,14 +52,16 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     @property
     def desc(self) -> str:
         if self.is_construct_mode:
-            return "PipeCompose in construct mode for StructuredContent output"
-        return f"Jinja2 included template, prompting style {self.templating_style}"
+            return f"PipeCompose in construct mode for StructuredContent output of type '{self.output.concept.structure_class_name}'"
+        else:
+            return f"PipeCompose in template mode with Jinja2 template, prompting style {self.templating_style}, category {self.category}"
 
     @override
     def required_variables(self) -> set[str]:
-        if self.is_construct_mode:
-            return self._required_variables_for_construct()
-        return self._required_variables_for_template()
+        if self.construct_blueprint is not None:
+            return self.construct_blueprint.get_required_variables()
+        else:
+            return self._required_variables_for_template()
 
     def _required_variables_for_template(self) -> set[str]:
         """Get required variables for template mode."""
@@ -86,12 +81,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             for path in full_paths
             if not path.split(".")[0].startswith("_") and path.split(".")[0] not in {"preliminary_text", "place_holder"}
         }
-
-    def _required_variables_for_construct(self) -> set[str]:
-        """Get required variables for construct mode."""
-        if self.construct_blueprint is None:
-            return set()
-        return self.construct_blueprint.get_required_variables()
 
     @override
     # TODO: this needs testing!!!
@@ -117,8 +106,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     def validate_output_with_library(self):
         # In construct mode, output can be any StructuredContent (not just Text)
         if self.is_construct_mode:
-            # For construct mode, we just need to verify the output concept exists
-            # The actual structure validation happens at runtime
             return
 
         # In template mode, output must be Text-compatible
@@ -158,13 +145,14 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 working_memory=working_memory,
                 output_name=output_name,
             )
-        return await self._run_template_mode(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=content_generator,
-        )
+        else:
+            return await self._run_template_mode(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+                output_name=output_name,
+                content_generator=content_generator,
+            )
 
     async def _run_template_mode(
         self,
