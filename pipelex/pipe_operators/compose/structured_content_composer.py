@@ -7,6 +7,8 @@ a populated StructuredContent instance.
 
 from typing import Any, cast, get_args, get_origin
 
+from pydantic import ValidationError
+
 from pipelex import log, pretty_print
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
@@ -17,6 +19,8 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.construct_field_blueprint import ConstructFieldBlueprint, ConstructFieldMethod
+from pipelex.tools.typing.class_utils import are_classes_equivalent
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
 class StructuredContentComposer:
@@ -194,7 +198,7 @@ class StructuredContentComposer:
                 return field_blueprint.fixed_value
 
             case ConstructFieldMethod.FROM_VAR:
-                return self._resolve_from_var(field_blueprint)
+                return self._resolve_from_var(field_blueprint, field_name)
 
             case ConstructFieldMethod.TEMPLATE:
                 return await self._resolve_template(field_blueprint)
@@ -202,21 +206,30 @@ class StructuredContentComposer:
             case ConstructFieldMethod.NESTED:
                 return await self._resolve_nested(field_blueprint, field_name)
 
-    def _resolve_from_var(self, field_blueprint: ConstructFieldBlueprint) -> Any:
+    def _resolve_from_var(self, field_blueprint: ConstructFieldBlueprint, field_name: str) -> Any:
         """Resolve a FROM_VAR field by getting value from working memory.
+
+        The resolution is type-aware: it checks what the target field expects
+        and converts content accordingly:
+        - TextContent -> str: extract .text
+        - TextContent -> TextContent/subclass: keep object
+        - ListContent -> list[X]: extract items as dicts
+        - ListContent -> ListContent: keep object
 
         Args:
             field_blueprint: The field blueprint with from_path
+            field_name: The name of the target field (for type lookup)
 
         Returns:
-            The value from working memory
+            The value from working memory, converted as appropriate for the target field
         """
         if not field_blueprint.from_path:
             msg = "from_path is required for FROM_VAR method"
             raise ValueError(msg)
 
         path = field_blueprint.from_path
-        log.dev(f"_resolve_from_var: resolving path '{path}'")
+        expected_type = self._get_field_expected_type(field_name)
+        log.dev(f"_resolve_from_var: resolving path '{path}' for field '{field_name}' (expected: {expected_type})")
 
         # Handle dotted paths (e.g., "deal.customer_name")
         if "." in path:
@@ -246,39 +259,324 @@ class StructuredContentComposer:
             simple_content: StuffContent = stuff.content
             log.dev(f"  Stuff '{path}' content type: {type(simple_content).__name__}")
 
-            # If it's a TextContent, return the text
+            # Type-aware conversion for TextContent
             if isinstance(simple_content, TextContent):
-                log.dev("  -> Returning TextContent.text (str)")
-                return simple_content.text
+                if self._expects_str_type(expected_type):
+                    # Target field expects str, extract the text
+                    log.dev("  -> Target expects str, returning TextContent.text")
+                    return simple_content.text
+                elif self._expects_text_content_type(expected_type):
+                    # Target field expects TextContent or subclass
+                    return self._convert_text_content_for_field(simple_content, expected_type)
+                else:
+                    # Default: return the object as-is
+                    log.dev(f"  -> Unknown target type, returning {type(simple_content).__name__} object")
+                    return simple_content
 
+            # Type-aware conversion for ListContent
             elif isinstance(simple_content, ListContent):
-                # it's a ListContent - extract items for list fields
-                log.dev(f"  -> Content is ListContent with {simple_content.nb_items} items")
-                items_list = cast("list[StuffContent]", simple_content.items)  # pyright: ignore[reportUnknownMemberType]
-                log.dev(f"     Items types: {[type(list_item).__name__ for list_item in items_list[:3]]}")
-                pretty_print(items_list, title=f"ListContent for '{path}'")
-
-                # WORKAROUND: Convert items to dicts to avoid class identity issues
-                # During dry run, polyfactory creates mock objects with __module__="builtins"
-                # which causes Pydantic validation to fail when the target field expects
-                # a specific class. By converting to dicts, Pydantic can reconstruct
-                # the objects using the correct class during model_validate().
-
-                items_as_dicts: list[Any] = []
-                for list_item in items_list:  # type: ignore[misc]
-                    # Convert to dict, excluding internal fields like __class__ and __module__
-                    item_dict = list_item.model_dump(exclude_none=False, serialize_as_any=True)
-                    # Remove kajson metadata that would interfere with Pydantic validation
-                    # item_dict.pop("__class__", None)
-                    # item_dict.pop("__module__", None)
-                    items_as_dicts.append(item_dict)
-                    log.dev(f"     Converted item to dict: {list(item_dict.keys())}")
-
-                log.dev(f"     Returning {len(items_as_dicts)} items as dicts for Pydantic reconstruction")
-                return items_as_dicts
+                typed_list_content = cast("ListContent[StuffContent]", simple_content)
+                if self._expects_list_content_type(expected_type):
+                    # Target field expects ListContent[X], check item compatibility and return as ListContent
+                    expected_item_type = self._get_list_item_type(expected_type)
+                    log.dev(f"  -> Target expects ListContent[{expected_item_type}]")
+                    converted_items = self._convert_list_items_as_objects(typed_list_content.items, expected_item_type, path)
+                    return ListContent(items=converted_items)
+                elif self._expects_list_type(expected_type):
+                    # Target expects list[X], extract items as dicts for Pydantic reconstruction
+                    expected_item_type = self._get_list_item_type(expected_type)
+                    log.dev(f"  -> Target expects list[{expected_item_type}], extracting items from ListContent")
+                    return self._convert_list_items_as_dicts(typed_list_content.items, expected_item_type, path)
+                else:
+                    # Default: return the object as-is
+                    log.dev(f"  -> Unknown target type, returning ListContent object with {simple_content.nb_items} items")
+                    return typed_list_content
             else:
                 log.dev(f"  -> Content is {type(simple_content).__name__}")
                 return simple_content
+
+    def _get_field_expected_type(self, field_name: str) -> Any:
+        """Get the expected type annotation for a field from the output class.
+
+        Args:
+            field_name: The name of the field
+
+        Returns:
+            The type annotation for the field, or None if not found
+        """
+        if hasattr(self.output_class, "model_fields"):
+            field_info = self.output_class.model_fields.get(field_name)
+            if field_info and field_info.annotation:
+                return field_info.annotation
+        return None
+
+    def _expects_str_type(self, expected_type: Any) -> bool:
+        """Check if the expected type is str.
+
+        Args:
+            expected_type: The type annotation to check
+
+        Returns:
+            True if the expected type is str
+        """
+        if expected_type is None:
+            return False
+        return expected_type is str
+
+    def _expects_text_content_type(self, expected_type: Any) -> bool:
+        """Check if the expected type is TextContent or a subclass.
+
+        Args:
+            expected_type: The type annotation to check
+
+        Returns:
+            True if the expected type is TextContent or a subclass
+        """
+        if expected_type is None:
+            return False
+        try:
+            return isinstance(expected_type, type) and issubclass(expected_type, TextContent)
+        except TypeError:
+            # expected_type is not a class (e.g., it's a generic like list[X])
+            return False
+
+    def _convert_text_content_for_field(self, content: TextContent, expected_type: type[TextContent]) -> TextContent:
+        """Convert a TextContent to the expected type if needed.
+
+        Handles class compatibility by:
+        1. If actual class is the expected class or a subclass -> return as-is
+        2. If classes are structurally equivalent -> rebuild using expected class
+        3. Otherwise -> raise an error
+
+        Args:
+            content: The TextContent object to convert
+            expected_type: The expected TextContent class/subclass
+
+        Returns:
+            The content object, potentially rebuilt as the expected class
+
+        Raises:
+            ValueError: If the content cannot be converted to the expected type
+        """
+        actual_type = type(content)
+
+        # Case 1: Exact match or subclass - return as-is
+        if actual_type is expected_type or issubclass(actual_type, expected_type):
+            log.dev(f"  -> {actual_type.__name__} is compatible with {expected_type.__name__}, returning as-is")
+            return content
+
+        # Case 2: Check structural equivalence and rebuild if compatible
+        if are_classes_equivalent(actual_type, expected_type):
+            log.dev(f"  -> {actual_type.__name__} is structurally equivalent to {expected_type.__name__}, rebuilding")
+            content_dict = content.model_dump(exclude_none=False, serialize_as_any=True)
+            return expected_type.model_validate(content_dict)
+
+        # Case 3: Try to rebuild anyway if expected_type accepts the content's fields
+        # This handles cases where expected_type is a superset (has more optional fields)
+        try:
+            log.dev(f"  -> Attempting to rebuild {actual_type.__name__} as {expected_type.__name__}")
+            content_dict = content.model_dump(exclude_none=False, serialize_as_any=True)
+            return expected_type.model_validate(content_dict)
+        except ValidationError as exc:
+            formatted_error = format_pydantic_validation_error(exc)
+            msg = f"Cannot convert {actual_type.__name__} to {expected_type.__name__}: classes are not compatible. {formatted_error}"
+            raise ValueError(msg) from exc
+
+    def _expects_list_content_type(self, expected_type: Any) -> bool:
+        """Check if the expected type is ListContent (not list[X]).
+
+        Args:
+            expected_type: The type annotation to check
+
+        Returns:
+            True if the expected type is ListContent or a subclass
+        """
+        if expected_type is None:
+            return False
+
+        # Check if it's a generic ListContent[X]
+        origin = get_origin(expected_type)
+        if origin is not None:
+            try:
+                return isinstance(origin, type) and issubclass(origin, ListContent)
+            except TypeError:
+                return False
+
+        # Check if it's the ListContent class itself
+        try:
+            return isinstance(expected_type, type) and issubclass(expected_type, ListContent)
+        except TypeError:
+            return False
+
+    def _expects_list_type(self, expected_type: Any) -> bool:
+        """Check if the expected type is list[X] (not ListContent).
+
+        Args:
+            expected_type: The type annotation to check
+
+        Returns:
+            True if the expected type is list[X]
+        """
+        if expected_type is None:
+            return False
+
+        origin = get_origin(expected_type)
+        return origin is list
+
+    def _get_list_item_type(self, expected_type: Any) -> type[Any] | None:
+        """Extract the item type from list[X] or ListContent[X].
+
+        Args:
+            expected_type: The type annotation (e.g., list[Address] or ListContent[TeamMember])
+
+        Returns:
+            The item type X, or None if not determinable
+        """
+        args = get_args(expected_type)
+        if args:
+            return args[0]  # type: ignore[return-value, no-any-return]
+        return None
+
+    def _convert_list_items_as_dicts(self, items: list[StuffContent], expected_item_type: type[Any] | None, path: str) -> list[Any]:
+        """Convert list items to dicts for Pydantic model_validate reconstruction.
+
+        Used when target is list[X] - items are returned as dicts so Pydantic
+        can reconstruct them during model_validate().
+
+        Args:
+            items: The list of items to convert
+            expected_item_type: The expected type for each item
+            path: The path for logging purposes
+
+        Returns:
+            List of item dicts
+        """
+        log.dev(f"     Converting {len(items)} items to dicts, expected item type: {expected_item_type}")
+        if items:
+            log.dev(f"     Actual item types: {[type(item).__name__ for item in items[:3]]}")
+        pretty_print(items, title=f"ListContent items for '{path}'")
+
+        if expected_item_type is None:
+            log.dev("     No expected item type, converting all items to dicts")
+            return [item.model_dump(exclude_none=False, serialize_as_any=True) for item in items]
+
+        converted_items: list[Any] = []
+        for idx, item in enumerate(items):
+            self._validate_item_compatibility(item, expected_item_type, idx)
+            converted_items.append(item.model_dump(exclude_none=False, serialize_as_any=True))
+
+        log.dev(f"     Returning {len(converted_items)} items as dicts")
+        return converted_items
+
+    def _convert_list_items_as_objects(self, items: list[StuffContent], expected_item_type: type[Any] | None, path: str) -> list[StuffContent]:
+        """Convert list items while keeping them as objects (for ListContent target).
+
+        Used when target is ListContent[X] - items are validated and potentially
+        rebuilt as the expected type, but returned as actual objects.
+
+        Args:
+            items: The list of items to convert
+            expected_item_type: The expected type for each item
+            path: The path for logging purposes
+
+        Returns:
+            List of StuffContent objects
+        """
+        log.dev(f"     Converting {len(items)} items as objects, expected item type: {expected_item_type}")
+        if items:
+            log.dev(f"     Actual item types: {[type(item).__name__ for item in items[:3]]}")
+        pretty_print(items, title=f"ListContent items for '{path}'")
+
+        if expected_item_type is None:
+            log.dev("     No expected item type, returning items as-is")
+            return items
+
+        converted_items: list[StuffContent] = []
+        for idx, item in enumerate(items):
+            converted_item = self._convert_single_item_as_object(item, expected_item_type, idx)
+            converted_items.append(converted_item)
+
+        log.dev(f"     Returning {len(converted_items)} items as objects")
+        return converted_items
+
+    def _validate_item_compatibility(self, item: StuffContent, expected_type: type[Any], idx: int) -> None:
+        """Validate that an item can be converted to the expected type.
+
+        Args:
+            item: The item to validate
+            expected_type: The expected type for the item
+            idx: The item index (for error messages)
+
+        Raises:
+            ValueError: If the item cannot be converted to the expected type
+        """
+        actual_type = type(item)
+
+        # Case 1: Exact match or subclass - OK
+        if actual_type is expected_type or issubclass(actual_type, expected_type):
+            log.dev(f"     Item[{idx}]: {actual_type.__name__} is compatible with {expected_type.__name__}")
+            return
+
+        # Case 2: Check structural equivalence - OK
+        if hasattr(actual_type, "model_fields") and hasattr(expected_type, "model_fields"):
+            if are_classes_equivalent(actual_type, expected_type):
+                log.dev(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent to {expected_type.__name__}")
+                return
+
+        # Case 3: Try to validate via dict
+        log.dev(f"     Item[{idx}]: Validating conversion {actual_type.__name__} -> {expected_type.__name__}")
+        item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
+
+        if hasattr(expected_type, "model_validate"):
+            try:
+                expected_type.model_validate(item_dict)
+            except ValidationError as exc:
+                formatted_error = format_pydantic_validation_error(exc)
+                msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type.__name__}: {formatted_error}"
+                raise ValueError(msg) from exc
+
+    def _convert_single_item_as_object(self, item: StuffContent, expected_type: type[Any], idx: int) -> StuffContent:
+        """Convert a single list item while keeping it as an object.
+
+        Args:
+            item: The item to convert
+            expected_type: The expected type for the item
+            idx: The item index (for error messages)
+
+        Returns:
+            The item, potentially rebuilt as the expected type
+
+        Raises:
+            ValueError: If the item cannot be converted to the expected type
+        """
+        actual_type = type(item)
+
+        # Case 1: Exact match or subclass - return as-is
+        if actual_type is expected_type or issubclass(actual_type, expected_type):
+            log.dev(f"     Item[{idx}]: {actual_type.__name__} is compatible with {expected_type.__name__}, keeping as-is")
+            return item
+
+        # Case 2: Check structural equivalence - rebuild as expected type
+        if hasattr(actual_type, "model_fields") and hasattr(expected_type, "model_fields"):
+            if are_classes_equivalent(actual_type, expected_type):
+                log.dev(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent, rebuilding as {expected_type.__name__}")
+                item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
+                return expected_type.model_validate(item_dict)  # type: ignore[return-value, no-any-return]
+
+        # Case 3: Try to rebuild anyway
+        log.dev(f"     Item[{idx}]: Attempting to rebuild {actual_type.__name__} as {expected_type.__name__}")
+        item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
+
+        if hasattr(expected_type, "model_validate"):
+            try:
+                return expected_type.model_validate(item_dict)  # type: ignore[return-value, no-any-return]
+            except ValidationError as exc:
+                formatted_error = format_pydantic_validation_error(exc)
+                msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type.__name__}: {formatted_error}"
+                raise ValueError(msg) from exc
+
+        # Fallback: return as-is
+        return item
 
     async def _resolve_template(self, field_blueprint: ConstructFieldBlueprint) -> str:
         """Resolve a TEMPLATE field by rendering the Jinja2 template.
