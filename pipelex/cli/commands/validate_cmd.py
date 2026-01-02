@@ -7,7 +7,6 @@ from typing import Annotated
 import click
 import typer
 from posthog import tag
-from pydantic import ValidationError
 from rich.traceback import Traceback
 
 from pipelex import log
@@ -27,7 +26,6 @@ from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundl
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 COMMAND = "validate"
 
@@ -154,16 +152,10 @@ def validate_cmd(
 
             pipe = get_required_pipe(pipe_code=pipe_code)
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
-            try:
-                await dry_run_pipe(
-                    pipe,
-                    raise_on_failure=True,
-                )
-            except ValidationError as validation_error:
-                get_console().print(Traceback())
-                msg = f"Failed to dry run pipe {pipe_code}: {format_pydantic_validation_error(validation_error)}"
-                typer.secho(msg, fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from validation_error
+            await dry_run_pipe(
+                pipe,
+                raise_on_failure=True,
+            )
             typer.secho(f"✅ Successfully validated pipe '{pipe_code}'", fg=typer.colors.GREEN)
         else:
             typer.secho("Failed to validate: no pipe code or bundle specified", fg=typer.colors.RED, err=True)

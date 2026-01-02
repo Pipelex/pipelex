@@ -55,18 +55,17 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
-    except PipeStackOverflowError as exc:
+    except (PipeStackOverflowError, ValidationError) as exc:
+        formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
         if pipe.code in get_config().pipelex.dry_run_config.allowed_to_fail_pipes:
-            error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {exc}"
+            error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {formatted_error}"
             return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
         elif raise_on_failure:
-            raise
-
-        error_message = f"Dry run failed for pipe '{pipe.code}': {exc}"
-        return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
-    except ValidationError as validation_error:
-        msg = f"Dry run failed for pipe '{pipe.code}': {format_pydantic_validation_error(validation_error)}"
-        raise PipeRunError(message=msg, run_mode=PipeRunMode.DRY, pipe_code=pipe.code) from validation_error
+            msg = f"Dry run failed for pipe '{pipe.code}': {formatted_error}"
+            raise PipeRunError(message=msg, run_mode=PipeRunMode.DRY, pipe_code=pipe.code) from exc
+        else:
+            error_message = f"Dry run failed for pipe '{pipe.code}': {formatted_error}"
+            return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
     log.dev(f"✅ Pipe '{pipe.code}' dry run completed successfully")
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
