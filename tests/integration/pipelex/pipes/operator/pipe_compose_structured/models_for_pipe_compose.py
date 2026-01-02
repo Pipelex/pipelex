@@ -199,3 +199,46 @@ class Catalog(StructuredContent):
 
     catalog_name: str = Field(description="Catalog name")
     products: list[Product] = Field(description="List of products")
+
+
+# ============================================================================
+# Models for direct StructuredContent object composition testing
+# These test cases where FROM_VAR returns a StructuredContent object directly
+# (not TextContent, not ListContent) and the target field expects a different type.
+# ============================================================================
+
+
+class PersonHolder(StructuredContent):
+    """Container with a Person field, tests direct StructuredContent object composition."""
+
+    holder_name: str = Field(description="Name of the holder")
+    person: Person = Field(description="The held person")
+
+
+class EmployeeHolder(StructuredContent):
+    """Container with an Employee field, tests class equivalence for direct objects."""
+
+    holder_name: str = Field(description="Name of the holder")
+    employee: Employee = Field(description="The held employee")
+
+
+class ManagerHolder(StructuredContent):
+    """Container with a Manager field, tests subclass for direct objects."""
+
+    holder_name: str = Field(description="Name of the holder")
+    manager: Manager = Field(description="The held manager")
+
+
+class Location(StructuredContent):
+    """Location model with different fields than Person/Employee."""
+
+    latitude: float = Field(description="Latitude coordinate")
+    longitude: float = Field(description="Longitude coordinate")
+    name: str = Field(description="Location name")
+
+
+class LocationHolder(StructuredContent):
+    """Container with a Location field, tests incompatible class conversion."""
+
+    holder_name: str = Field(description="Name of the holder")
+    location: Location = Field(description="The held location")

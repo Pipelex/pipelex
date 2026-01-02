@@ -235,7 +235,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             working_memory=working_memory,
             output_class=output_class,
         )
-        the_content = await composer.compose_async()
+        the_content = await composer.compose()
         log.verbose(f"Composed structured content: {the_content}")
 
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)

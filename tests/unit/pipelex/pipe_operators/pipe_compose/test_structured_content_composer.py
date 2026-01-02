@@ -99,10 +99,11 @@ class ComposerTestData:
     }
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestStructuredContentComposerFixedValues:
     """Tests for composing with fixed values only."""
 
-    def test_compose_all_fixed_values(self):
+    async def test_compose_all_fixed_values(self):
         """Test composing a StructuredContent with all fixed values."""
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.FIXED_ONLY_CONSTRUCT)
         working_memory = WorkingMemory()
@@ -112,7 +113,7 @@ class TestStructuredContentComposerFixedValues:
             working_memory=working_memory,
             output_class=SimpleReport,
         )
-        result = composer.compose()
+        result = await composer.compose()
 
         assert isinstance(result, SimpleReport)
         assert result.title == "Annual Report"
@@ -121,6 +122,7 @@ class TestStructuredContentComposerFixedValues:
         assert result.is_draft is False
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestStructuredContentComposerVariableRefs:
     """Tests for composing with variable references."""
 
@@ -137,7 +139,7 @@ class TestStructuredContentComposerVariableRefs:
             ),
         )
 
-    def test_compose_with_variable_refs(self, working_memory_with_deal: WorkingMemory):
+    async def test_compose_with_variable_refs(self, working_memory_with_deal: WorkingMemory):
         """Test composing with variable references from working memory."""
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.VAR_REF_CONSTRUCT)
 
@@ -146,13 +148,14 @@ class TestStructuredContentComposerVariableRefs:
             working_memory=working_memory_with_deal,
             output_class=SalesSummary,
         )
-        result = composer.compose()
+        result = await composer.compose()
 
         assert isinstance(result, SalesSummary)
         assert result.customer_name == "Acme Corp"
         assert result.deal_value == 50000.0
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestStructuredContentComposerTemplates:
     """Tests for composing with templates."""
 
@@ -169,7 +172,7 @@ class TestStructuredContentComposerTemplates:
             ),
         )
 
-    def test_compose_with_template(self, working_memory_with_deal: WorkingMemory):
+    async def test_compose_with_template(self, working_memory_with_deal: WorkingMemory):
         """Test composing with a template field."""
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.MIXED_CONSTRUCT)
 
@@ -178,7 +181,7 @@ class TestStructuredContentComposerTemplates:
             working_memory=working_memory_with_deal,
             output_class=SalesSummary,
         )
-        result = composer.compose()
+        result = await composer.compose()
 
         assert isinstance(result, SalesSummary)
         assert result.report_title == "Monthly Sales Report"
@@ -189,6 +192,7 @@ class TestStructuredContentComposerTemplates:
         assert "Acme Corp" in result.summary_text
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestStructuredContentComposerNested:
     """Tests for composing nested structures."""
 
@@ -215,7 +219,7 @@ class TestStructuredContentComposerNested:
         working_memory.add_new_stuff(name="addr", stuff=addr_stuff)
         return working_memory
 
-    def test_compose_nested_structure(self, working_memory_with_address: WorkingMemory):
+    async def test_compose_nested_structure(self, working_memory_with_address: WorkingMemory):
         """Test composing a StructuredContent with nested structure."""
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.NESTED_CONSTRUCT)
 
@@ -224,7 +228,7 @@ class TestStructuredContentComposerNested:
             working_memory=working_memory_with_address,
             output_class=Company,
         )
-        result = composer.compose()
+        result = await composer.compose()
 
         assert isinstance(result, Company)
         assert result.name == "TechCorp"
@@ -234,10 +238,11 @@ class TestStructuredContentComposerNested:
         assert result.headquarters.country == "France"
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestStructuredContentComposerErrors:
     """Tests for error handling in the composer."""
 
-    def test_missing_variable_raises_error(self, load_empty_library: Callable[[], None]):
+    async def test_missing_variable_raises_error(self, load_empty_library: Callable[[], None]):
         """Test that referencing a missing variable raises an appropriate error."""
         load_empty_library()
         blueprint = ConstructBlueprint.make_from_raw(
@@ -256,9 +261,9 @@ class TestStructuredContentComposerErrors:
         )
 
         with pytest.raises(WorkingMemoryStuffNotFoundError):
-            composer.compose()
+            await composer.compose()
 
-    def test_type_mismatch_raises_error(self, load_empty_library: Callable[[], None]):
+    async def test_type_mismatch_raises_error(self, load_empty_library: Callable[[], None]):
         """Test that type mismatch between blueprint and class raises error."""
         load_empty_library()
         # score should be float but we provide a string that can't be converted
@@ -278,10 +283,11 @@ class TestStructuredContentComposerErrors:
         )
 
         with pytest.raises(ValidationError):
-            composer.compose()
+            await composer.compose()
 
 
-class TestStructuredContentComposerAsync:
+@pytest.mark.asyncio(loop_scope="class")
+class TestStructuredContentComposerWithTemplates:
     """Tests for async composition (templates may require async rendering)."""
 
     @pytest.fixture
@@ -297,8 +303,7 @@ class TestStructuredContentComposerAsync:
             ),
         )
 
-    @pytest.mark.asyncio
-    async def test_compose_async_with_templates(self, working_memory_with_deal: WorkingMemory):
+    async def test_compose_with_templates(self, working_memory_with_deal: WorkingMemory):
         """Test async composition when templates are involved."""
         blueprint = ConstructBlueprint.make_from_raw(ComposerTestData.MIXED_CONSTRUCT)
 
@@ -307,7 +312,7 @@ class TestStructuredContentComposerAsync:
             working_memory=working_memory_with_deal,
             output_class=SalesSummary,
         )
-        result = await composer.compose_async()
+        result = await composer.compose()
 
         assert isinstance(result, SalesSummary)
         assert "50000.0" in result.summary_text or "50000" in result.summary_text

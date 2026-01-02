@@ -33,3 +33,10 @@ Product = "Product model for mixed list testing"
 DiscountedProduct = "Product subclass with discount field"
 Catalog = "Catalog expecting list[Product] tests subclass items"
 
+# Direct StructuredContent object composition testing concepts
+PersonHolder = "Container with Person field for direct object composition"
+EmployeeHolder = "Container with Employee field for class equivalence"
+ManagerHolder = "Container with Manager field for subclass testing"
+Location = "Location model with different fields than Person/Employee"
+LocationHolder = "Container with Location field for incompatible class testing"
+

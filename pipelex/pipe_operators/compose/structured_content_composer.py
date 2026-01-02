@@ -48,33 +48,7 @@ class StructuredContentComposer:
         self.working_memory = working_memory
         self.output_class = output_class
 
-    def compose(self) -> StuffContent:
-        """Compose the StructuredContent synchronously.
-
-        Note: If templates are used, this method will run async code synchronously
-        which may not work in all contexts. Prefer compose_async() when templates
-        are involved.
-
-        Returns:
-            Populated StructuredContent instance
-        """
-        import asyncio  # noqa: PLC0415
-
-        # Check if we're already in an async context
-        try:
-            asyncio.get_running_loop()
-            # We're in an async context, need to use a different approach
-            # Create a new thread to run the async code
-            import concurrent.futures  # noqa: PLC0415
-
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(asyncio.run, self.compose_async())
-                return future.result()
-        except RuntimeError:
-            # No running loop, safe to use asyncio.run
-            return asyncio.run(self.compose_async())
-
-    async def compose_async(self) -> StuffContent:
+    async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
 
         Returns:
@@ -267,7 +241,7 @@ class StructuredContentComposer:
                     return simple_content.text
                 elif self._expects_text_content_type(expected_type):
                     # Target field expects TextContent or subclass
-                    return self._convert_text_content_for_field(simple_content, expected_type)
+                    return self._convert_content_for_field(simple_content, expected_type)
                 else:
                     # Default: return the object as-is
                     log.dev(f"  -> Unknown target type, returning {type(simple_content).__name__} object")
@@ -291,8 +265,14 @@ class StructuredContentComposer:
                     # Default: return the object as-is
                     log.dev(f"  -> Unknown target type, returning ListContent object with {simple_content.nb_items} items")
                     return typed_list_content
+            # Other content types (StructuredContent, ImageContent, etc.)
+            # Check if expected type is a StuffContent subclass and handle compatibility
+            elif self._expects_stuff_content_type(expected_type):
+                log.dev(f"  -> Target expects {expected_type.__name__}, converting content")
+                return self._convert_content_for_field(simple_content, expected_type)
             else:
-                log.dev(f"  -> Content is {type(simple_content).__name__}")
+                # Unknown expected type, return as-is
+                log.dev(f"  -> Unknown target type, returning {type(simple_content).__name__} object")
                 return simple_content
 
     def _get_field_expected_type(self, field_name: str) -> Any:
@@ -340,17 +320,35 @@ class StructuredContentComposer:
             # expected_type is not a class (e.g., it's a generic like list[X])
             return False
 
-    def _convert_text_content_for_field(self, content: TextContent, expected_type: type[TextContent]) -> TextContent:
-        """Convert a TextContent to the expected type if needed.
-
-        Handles class compatibility by:
-        1. If actual class is the expected class or a subclass -> return as-is
-        2. If classes are structurally equivalent -> rebuild using expected class
-        3. Otherwise -> raise an error
+    def _expects_stuff_content_type(self, expected_type: Any) -> bool:
+        """Check if the expected type is StuffContent or a subclass.
 
         Args:
-            content: The TextContent object to convert
-            expected_type: The expected TextContent class/subclass
+            expected_type: The type annotation to check
+
+        Returns:
+            True if the expected type is StuffContent or a subclass
+        """
+        if expected_type is None:
+            return False
+        try:
+            return isinstance(expected_type, type) and issubclass(expected_type, StuffContent)
+        except TypeError:
+            # expected_type is not a class (e.g., it's a generic like list[X])
+            return False
+
+    def _convert_content_for_field(self, content: StuffContent, expected_type: type[StuffContent]) -> StuffContent:
+        """Convert any StuffContent to the expected type if needed.
+
+        This is a generic conversion method that handles class compatibility for
+        any StuffContent subclass (TextContent, StructuredContent, etc.):
+        1. If actual class is the expected class or a subclass -> return as-is
+        2. If classes are structurally equivalent -> rebuild using expected class
+        3. Otherwise -> attempt rebuild, error on failure
+
+        Args:
+            content: The StuffContent object to convert
+            expected_type: The expected StuffContent class/subclass
 
         Returns:
             The content object, potentially rebuilt as the expected class
@@ -372,7 +370,6 @@ class StructuredContentComposer:
             return expected_type.model_validate(content_dict)
 
         # Case 3: Try to rebuild anyway if expected_type accepts the content's fields
-        # This handles cases where expected_type is a superset (has more optional fields)
         try:
             log.dev(f"  -> Attempting to rebuild {actual_type.__name__} as {expected_type.__name__}")
             content_dict = content.model_dump(exclude_none=False, serialize_as_any=True)
@@ -538,6 +535,9 @@ class StructuredContentComposer:
     def _convert_single_item_as_object(self, item: StuffContent, expected_type: type[Any], idx: int) -> StuffContent:
         """Convert a single list item while keeping it as an object.
 
+        Delegates to the generic _convert_content_for_field method,
+        adding item index information to error messages.
+
         Args:
             item: The item to convert
             expected_type: The expected type for the item
@@ -549,34 +549,13 @@ class StructuredContentComposer:
         Raises:
             ValueError: If the item cannot be converted to the expected type
         """
-        actual_type = type(item)
-
-        # Case 1: Exact match or subclass - return as-is
-        if actual_type is expected_type or issubclass(actual_type, expected_type):
-            log.dev(f"     Item[{idx}]: {actual_type.__name__} is compatible with {expected_type.__name__}, keeping as-is")
-            return item
-
-        # Case 2: Check structural equivalence - rebuild as expected type
-        if hasattr(actual_type, "model_fields") and hasattr(expected_type, "model_fields"):
-            if are_classes_equivalent(actual_type, expected_type):
-                log.dev(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent, rebuilding as {expected_type.__name__}")
-                item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
-                return expected_type.model_validate(item_dict)  # type: ignore[return-value, no-any-return]
-
-        # Case 3: Try to rebuild anyway
-        log.dev(f"     Item[{idx}]: Attempting to rebuild {actual_type.__name__} as {expected_type.__name__}")
-        item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
-
-        if hasattr(expected_type, "model_validate"):
-            try:
-                return expected_type.model_validate(item_dict)  # type: ignore[return-value, no-any-return]
-            except ValidationError as exc:
-                formatted_error = format_pydantic_validation_error(exc)
-                msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type.__name__}: {formatted_error}"
-                raise ValueError(msg) from exc
-
-        # Fallback: return as-is
-        return item
+        try:
+            log.dev(f"     Item[{idx}]: Converting {type(item).__name__} to {expected_type.__name__}")
+            return self._convert_content_for_field(item, expected_type)
+        except ValueError as exc:
+            # Re-raise with item index in message
+            msg = f"Item[{idx}]: {exc}"
+            raise ValueError(msg) from exc
 
     async def _resolve_template(self, field_blueprint: ConstructFieldBlueprint) -> str:
         """Resolve a TEMPLATE field by rendering the Jinja2 template.
@@ -629,7 +608,7 @@ class StructuredContentComposer:
             output_class=nested_class,
         )
 
-        return await nested_composer.compose_async()
+        return await nested_composer.compose()
 
     def _get_nested_field_class(self, field_name: str) -> type[StuffContent]:
         """Get the class for a nested field from the output class's field annotations.
