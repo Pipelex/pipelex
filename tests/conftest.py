@@ -9,7 +9,6 @@ from pipelex import log
 from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.system.pipelex_service.exceptions import RemoteConfigSSLError
 from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, RunMode, runtime_manager
@@ -41,14 +40,11 @@ def _make_default_remote_config() -> RemoteConfig:
 def _cached_fetch_remote_config() -> RemoteConfig:
     """Wrapper that caches the remote config for the entire test session."""
     if "config" not in _remote_config_cache:
-        try:
+        # In Codex Cloud, use default config to avoid SSL issues with MITM proxy
+        if runtime_manager.run_mode in {RunMode.CODEX_CLOUD, RunMode.CODEX_CLOUD_TEST}:
+            _remote_config_cache["config"] = _make_default_remote_config()
+        else:
             _remote_config_cache["config"] = _original_fetch_remote_config()
-        except RemoteConfigSSLError:
-            # In Codex Cloud, SSL fetch fails due to MITM proxy cert issues (after 5 retries)
-            if runtime_manager.run_mode in {RunMode.CODEX_CLOUD, RunMode.CODEX_CLOUD_TEST}:
-                _remote_config_cache["config"] = _make_default_remote_config()
-            else:
-                raise
     return _remote_config_cache["config"]
 
 

@@ -1,12 +1,9 @@
-import ssl
-
 import httpx
 from pydantic import ValidationError
 from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigFetchError,
-    RemoteConfigSSLError,
     RemoteConfigValidationError,
 )
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
@@ -84,39 +81,22 @@ class RemoteConfigFetcher:
             msg = f"HTTP error {exc.response.status_code} while fetching remote configuration from {url}"
             raise RemoteConfigFetchError(msg) from exc
         except httpx.RequestError as exc:
-            # Check if this is an SSL error by looking at the exception chain
-            if cls._is_ssl_error(exc):
-                msg = f"SSL certificate verification failed while fetching remote configuration from {url}: {exc}"
-                raise RemoteConfigSSLError(msg) from exc
             msg = f"Failed to fetch remote configuration from {url} after {cls.FETCH_MAX_RETRIES} attempts: {exc}"
             raise RemoteConfigFetchError(msg) from exc
 
         # Parse JSON content
         try:
             config_dict = response.json()
-        except Exception as json_exc:
-            msg = f"Failed to parse remote configuration JSON: {json_exc}"
-            raise RemoteConfigValidationError(msg) from json_exc
+        except Exception as exc:
+            msg = f"Failed to parse remote configuration JSON: {exc}"
+            raise RemoteConfigValidationError(msg) from exc
 
         # Validate the structure
         try:
             config = RemoteConfig.model_validate(config_dict)
-        except ValidationError as validation_exc:
-            validation_error_msg = format_pydantic_validation_error(validation_exc)
+        except ValidationError as exc:
+            validation_error_msg = format_pydantic_validation_error(exc)
             msg = f"Remote configuration validation failed: {validation_error_msg}"
-            raise RemoteConfigValidationError(msg) from validation_exc
+            raise RemoteConfigValidationError(msg) from exc
 
         return config
-
-    @classmethod
-    def _is_ssl_error(cls, exc: BaseException) -> bool:
-        """Check if an exception is caused by an SSL error.
-
-        Traverses the exception chain to detect ssl.SSLError.
-        """
-        current: BaseException | None = exc
-        while current is not None:
-            if isinstance(current, ssl.SSLError):
-                return True
-            current = current.__cause__
-        return False

@@ -21,16 +21,6 @@ class RemoteConfigFetchError(PipelexServiceError):
     """
 
 
-class RemoteConfigSSLError(RemoteConfigFetchError):
-    """Raised when SSL certificate verification fails during remote config fetch.
-
-    This error occurs when:
-    - MITM proxy presents invalid certificates (e.g., Codex Cloud)
-    - Certificate chain is incomplete or malformed
-    - CA bundle is missing or outdated
-    """
-
-
 class RemoteConfigValidationError(PipelexServiceError):
     """Raised when remote configuration payload validation fails.
 
