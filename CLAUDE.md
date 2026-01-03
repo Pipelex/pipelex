@@ -5,16 +5,17 @@
 
 ### Linting
 
-   After making code changes, you must always lint using `make check`.
+   After making code changes, you must always lint using `make agent-check`.
 
    ```bash
-   make check
-   # If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
+   make agent-check
+   # If the current system doesn't have the `make` command,
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
    ```
 
    This runs multiple code quality tools:
    - Pyright: Static type checking
-   - Ruff: Fast Python linter  
+   - Ruff: Fix unised imports, lint, format  
    - Mypy: Static type checker
 
    Always fix any issues reported by these tools before proceeding.
@@ -92,6 +93,19 @@
    ```
 
    If the installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
+
+### Pipelex CLI Commands
+
+   To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.
+
+   ```bash
+   pipelex --help
+   pipelex build --help --no-logo
+   pipelex run --help --no-logo
+   pipelex validate --help --no-logo
+   pipelex doctor --help --no-logo
+   pipelex init --help --no-logo
+   ```
 
 ## Coding Standards & Best Practices for Python Code
 
