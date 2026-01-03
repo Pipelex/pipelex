@@ -12,6 +12,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, runtime_manager
+from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 pytest_plugins = [
     "pipelex.test_extras.shared_pytest_plugins",
@@ -42,10 +43,10 @@ def _cached_fetch_remote_config() -> RemoteConfig:
     if "config" not in _remote_config_cache:
         # In Codex Cloud, use default config to avoid SSL issues with MITM proxy
         if runtime_manager.is_in_codex_cloud:
-            print("Using default remote config for Codex Cloud")
+            print_to_stderr("Using default remote config for Codex Cloud")
             _remote_config_cache["config"] = _make_default_remote_config()
         else:
-            print("Fetching remote config to cache it for the entire test session")
+            print_to_stderr("Fetching remote config to cache it for the entire test session")
             _remote_config_cache["config"] = _original_fetch_remote_config()
     return _remote_config_cache["config"]
 

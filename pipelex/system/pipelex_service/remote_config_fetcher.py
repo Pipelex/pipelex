@@ -18,7 +18,7 @@ class RemoteConfigFetcher:
 
     # Retry configuration for remote config fetch
     # Using hardcoded values since this runs before config is fully loaded
-    FETCH_MAX_RETRIES = 5
+    FETCH_MAX_RETRIES = 1
     FETCH_WAIT_MULTIPLIER = 1
     FETCH_WAIT_MIN = 1
     FETCH_WAIT_MAX = 10
@@ -74,7 +74,7 @@ class RemoteConfigFetcher:
         url = PipelexDetails.REMOTE_CONFIG_URL
 
         try:
-            print(f"Fetching remote config with run mode = '{runtime_manager.run_mode}' from {url}")
+            print_to_stderr(f"Fetching remote config with run mode = '{runtime_manager.run_mode}' from {url}")
             response = cls._fetch_remote_config_with_retry(url)
         except httpx.TimeoutException as exc:
             msg = f"Timeout while fetching remote configuration from {url}: {exc}"
