@@ -22,7 +22,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.observability.graphspec import GraphSpec, graphspec_to_json, save_graphspec
 from pipelex.observability.graphspec.html_renderer import render_mermaid_html
-from pipelex.observability.graphspec.mermaid import VALID_DIRECTIONS, graphspec_to_mermaid
+from pipelex.observability.graphspec.mermaid import VALID_DIRECTIONS, graphspec_to_dataflow_mermaid, graphspec_to_mermaid
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
 from pipelex.pipelex import Pipelex
@@ -126,6 +126,10 @@ def graph_cmd(
         bool,
         typer.Option("--no-contains-edges", help="Exclude parent-child (contains) edges from Mermaid output"),
     ] = False,
+    data_flow: Annotated[
+        bool,
+        typer.Option("--data-flow", help="Generate data flow diagram instead of orchestration diagram"),
+    ] = False,
 ) -> None:
     """Dry run a pipe and output its execution graph.
 
@@ -136,6 +140,7 @@ def graph_cmd(
         pipelex graph my_pipe --out graph.json
         pipelex graph my_pipe --mermaid --html --out ./output/
         pipelex graph my_bundle.plx --mermaid --direction LR
+        pipelex graph my_pipe --mermaid --data-flow  # Data lineage view
     """
     # Handle deprecated --output flag
     if output and not out:
@@ -264,12 +269,21 @@ def graph_cmd(
 
             # Generate and save Mermaid
             if generate_mermaid:
-                mermaid_code = graphspec_to_mermaid(
-                    graph_spec,
-                    direction=direction,
-                    include_data_edges=not no_data_edges,
-                    include_contains_edges=not no_contains_edges,
-                )
+                if data_flow:
+                    # Data flow diagram: default to LR if user didn't specify direction
+                    effective_direction = direction if direction != "TD" else "LR"
+                    mermaid_code = graphspec_to_dataflow_mermaid(
+                        graph_spec,
+                        direction=effective_direction,
+                    )
+                else:
+                    # Orchestration diagram (default)
+                    mermaid_code = graphspec_to_mermaid(
+                        graph_spec,
+                        direction=direction,
+                        include_data_edges=not no_data_edges,
+                        include_contains_edges=not no_contains_edges,
+                    )
                 if mermaid_path:
                     mermaid_path.write_text(mermaid_code, encoding="utf-8")
                     typer.secho(f"✅ Mermaid saved to: {mermaid_path}", fg=typer.colors.GREEN, err=True)

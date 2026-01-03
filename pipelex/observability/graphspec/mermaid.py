@@ -5,6 +5,7 @@ to represent controller containment relationships.
 """
 
 import hashlib
+import operator
 from collections import defaultdict
 
 from pipelex.observability.graphspec.graphspec import (
@@ -343,5 +344,149 @@ def graphspec_to_mermaid(
     lines.append("    %% Style definitions")
     lines.append("    classDef failed fill:#ffcccc,stroke:#cc0000")
     lines.append("    classDef controller fill:#e6f3ff,stroke:#0066cc")
+
+    return "\n".join(lines)
+
+
+def graphspec_to_dataflow_mermaid(
+    graph: GraphSpec,
+    *,
+    direction: str = "LR",
+    show_stuff_codes: bool = False,
+) -> str:
+    """Convert a GraphSpec to a data-lineage focused Mermaid flowchart.
+
+    Unlike graphspec_to_mermaid (which shows orchestration/containment),
+    this shows how data (Stuff objects) flow between pipes.
+
+    The diagram shows:
+    - Pipe nodes as blue rectangles
+    - Stuff nodes as orange pills (representing data items)
+    - Edges from producer pipes to stuff, and from stuff to consumer pipes
+
+    Args:
+        graph: The GraphSpec to convert.
+        direction: Flowchart direction. Defaults to "LR" (left-to-right is natural for data flow).
+        show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
+
+    Returns:
+        Mermaid flowchart syntax as a string.
+
+    Raises:
+        ValueError: If direction is not a valid Mermaid direction.
+    """
+    if direction not in VALID_DIRECTIONS:
+        msg = f"Invalid direction '{direction}'. Must be one of: {', '.join(sorted(VALID_DIRECTIONS))}"
+        raise ValueError(msg)
+
+    lines: list[str] = []
+
+    # Header
+    lines.append(f"flowchart {direction}")
+
+    # Build ID mapping for pipe nodes
+    pipe_id_mapping: dict[str, str] = {}
+    for node in graph.nodes:
+        pipe_id_mapping[node.node_id] = sanitize_mermaid_id(node.node_id)
+
+    # Collect unique stuff objects from all node I/O
+    # Key is the digest (stuff_code), value is (name, concept)
+    stuff_registry: dict[str, tuple[str, str | None]] = {}
+
+    # Also track producers and consumers for each stuff
+    stuff_producers: dict[str, str] = {}  # digest -> producer_node_id
+    stuff_consumers: dict[str, list[str]] = defaultdict(list)  # digest -> consumer_node_ids
+
+    for node in graph.nodes:
+        # Collect outputs (this node produces these stuffs)
+        for output_spec in node.node_io.outputs:
+            if output_spec.digest:
+                stuff_registry[output_spec.digest] = (output_spec.name, output_spec.concept)
+                stuff_producers[output_spec.digest] = node.node_id
+
+        # Collect inputs (this node consumes these stuffs)
+        for input_spec in node.node_io.inputs:
+            if input_spec.digest:
+                if input_spec.digest not in stuff_registry:
+                    # Register stuff even if we don't know the producer (pipeline input)
+                    stuff_registry[input_spec.digest] = (input_spec.name, input_spec.concept)
+                stuff_consumers[input_spec.digest].append(node.node_id)
+
+    # Skip if no data flow information
+    if not stuff_registry:
+        lines.append("    %% No data flow information available")
+        lines.append("    note[No IOSpec data captured. Run with data flow tracing enabled.]")
+        return "\n".join(lines)
+
+    # Render pipe nodes
+    lines.append("    %% Pipe nodes")
+    rendered_pipes: set[str] = set()
+
+    # Only render pipes that participate in data flow
+    participating_pipes: set[str] = set(stuff_producers.values())
+    for consumers in stuff_consumers.values():
+        participating_pipes.update(consumers)
+
+    for node in sorted(graph.nodes, key=lambda n_iter: (n_iter.pipe_name or "", n_iter.node_id)):
+        if node.node_id not in participating_pipes:
+            continue
+        if node.node_id in rendered_pipes:
+            continue
+
+        mermaid_id = pipe_id_mapping[node.node_id]
+        label = _get_node_label(node)
+        if node.status == NodeStatus.FAILED:
+            lines.append(f'    {mermaid_id}["{label}"]:::pipe_failed')
+        else:
+            lines.append(f'    {mermaid_id}["{label}"]:::pipe')
+        rendered_pipes.add(node.node_id)
+
+    # Render stuff nodes
+    lines.append("")
+    lines.append("    %% Stuff nodes (data items)")
+    stuff_id_mapping: dict[str, str] = {}
+
+    for digest, (name, concept) in sorted(stuff_registry.items(), key=lambda item: item[1][0]):
+        stuff_mermaid_id = f"s_{sanitize_mermaid_id(digest)[2:]}"  # Use s_ prefix for stuff
+        stuff_id_mapping[digest] = stuff_mermaid_id
+
+        # Build label
+        if show_stuff_codes:
+            label = f"{escape_mermaid_label(name)} ({digest[:5]})"
+        else:
+            label = escape_mermaid_label(name)
+
+        if concept:
+            label = f"{label}<br/>{escape_mermaid_label(concept)}"
+
+        # Stuff nodes as pills (stadium shape)
+        lines.append(f'    {stuff_mermaid_id}(["{label}"]):::stuff')
+
+    # Render edges: producer -> stuff
+    lines.append("")
+    lines.append("    %% Data flow edges: producer -> stuff -> consumer")
+
+    for digest, producer_node_id in sorted(stuff_producers.items(), key=operator.itemgetter(0)):
+        producer_mermaid_id = pipe_id_mapping.get(producer_node_id)
+        prod_stuff_mermaid_id = stuff_id_mapping.get(digest)
+        if producer_mermaid_id and prod_stuff_mermaid_id:
+            lines.append(f"    {producer_mermaid_id} --> {prod_stuff_mermaid_id}")
+
+    # Render edges: stuff -> consumer
+    for digest, consumer_node_ids in sorted(stuff_consumers.items(), key=operator.itemgetter(0)):
+        cons_stuff_mermaid_id = stuff_id_mapping.get(digest)
+        if not cons_stuff_mermaid_id:
+            continue
+        for consumer_node_id in sorted(consumer_node_ids):
+            consumer_mermaid_id = pipe_id_mapping.get(consumer_node_id)
+            if consumer_mermaid_id:
+                lines.append(f"    {cons_stuff_mermaid_id} --> {consumer_mermaid_id}")
+
+    # Style definitions
+    lines.append("")
+    lines.append("    %% Style definitions")
+    lines.append("    classDef pipe fill:#e6f3ff,stroke:#0066cc")
+    lines.append("    classDef pipe_failed fill:#ffcccc,stroke:#cc0000")
+    lines.append("    classDef stuff fill:#fff3e6,stroke:#cc6600,stroke-width:2px")
 
     return "\n".join(lines)

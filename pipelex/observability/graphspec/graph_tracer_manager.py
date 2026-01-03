@@ -7,14 +7,14 @@ from typing_extensions import override
 
 from pipelex.observability.graphspec.graph_context import GraphContext
 from pipelex.observability.graphspec.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.observability.graphspec.graphspec import EdgeKind, GraphSpec, NodeKind
+from pipelex.observability.graphspec.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 
 if TYPE_CHECKING:
     from pipelex.observability.graphspec.graph_tracer import GraphTracer
 
-# Re-export NodeKind for use by pipe_abstract without additional imports
-__all__ = ["GraphTracerManager", "GraphTracerManagerAbstract", "NodeKind"]
+# Re-export NodeKind and IOSpec for use by pipe_abstract without additional imports
+__all__ = ["GraphTracerManager", "GraphTracerManagerAbstract", "IOSpec", "NodeKind"]
 
 
 class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
@@ -61,6 +61,7 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
+        input_specs: list[IOSpec] | None = None,
     ) -> tuple[str | None, GraphContext | None]:
         """Record the start of a pipe execution.
 
@@ -76,6 +77,7 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
             pipe_type=pipe_type,
             node_kind=node_kind,
             started_at=started_at,
+            input_specs=input_specs,
         )
 
     def on_pipe_end_success(
@@ -84,6 +86,7 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
         ended_at: datetime,
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
+        output_spec: IOSpec | None = None,
     ) -> None:
         """Record successful completion of a pipe execution."""
         if node_id is None:
@@ -96,6 +99,7 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
             ended_at=ended_at,
             output_preview=output_preview,
             metrics=metrics,
+            output_spec=output_spec,
         )
 
     def on_pipe_end_error(

@@ -6,7 +6,7 @@ from typing import Protocol
 from typing_extensions import override
 
 from pipelex.observability.graphspec.graph_context import GraphContext
-from pipelex.observability.graphspec.graphspec import EdgeKind, GraphSpec, NodeKind
+from pipelex.observability.graphspec.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 
 
 class GraphTracerProtocol(Protocol):
@@ -44,6 +44,7 @@ class GraphTracerProtocol(Protocol):
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
+        input_specs: list[IOSpec] | None = None,
     ) -> tuple[str, GraphContext]:
         """Record the start of a pipe execution.
 
@@ -53,6 +54,7 @@ class GraphTracerProtocol(Protocol):
             pipe_type: The pipe type (e.g., "PipeLLM", "PipeSequence").
             node_kind: The kind of node (controller, operator, etc.).
             started_at: When the pipe started executing.
+            input_specs: Optional list of IOSpec describing the inputs consumed.
 
         Returns:
             Tuple of (node_id for this pipe, updated GraphContext for children).
@@ -65,6 +67,7 @@ class GraphTracerProtocol(Protocol):
         ended_at: datetime,
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
+        output_spec: IOSpec | None = None,
     ) -> None:
         """Record successful completion of a pipe execution.
 
@@ -73,6 +76,7 @@ class GraphTracerProtocol(Protocol):
             ended_at: When the pipe finished executing.
             output_preview: Optional truncated preview of the output.
             metrics: Optional metrics (e.g., token counts).
+            output_spec: Optional IOSpec describing the output produced.
         """
         ...
 
@@ -140,6 +144,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
+        input_specs: list[IOSpec] | None = None,
     ) -> tuple[str, GraphContext]:
         node_id = graph_context.make_node_id()
         child_context = graph_context.copy_for_child(node_id, graph_context.node_sequence + 1)
@@ -152,6 +157,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         ended_at: datetime,
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
+        output_spec: IOSpec | None = None,
     ) -> None:
         pass
 

@@ -11,6 +11,8 @@ from pipelex.observability.graphspec.graphspec import (
     EdgeSpec,
     ErrorSpec,
     GraphSpec,
+    IOSpec,
+    NodeIOSpec,
     NodeKind,
     NodeSpec,
     NodeStatus,
@@ -30,6 +32,7 @@ class _MutableNodeData:
         node_kind: NodeKind,
         started_at: datetime,
         parent_node_id: str | None,
+        input_specs: list[IOSpec] | None = None,
     ) -> None:
         self.node_id = node_id
         self.pipe_code = pipe_code
@@ -42,6 +45,8 @@ class _MutableNodeData:
         self.output_preview: str | None = None
         self.metrics: dict[str, float] = {}
         self.error: ErrorSpec | None = None
+        self.input_specs: list[IOSpec] = input_specs or []
+        self.output_spec: IOSpec | None = None
 
     def to_node_spec(self) -> NodeSpec:
         """Convert to immutable NodeSpec."""
@@ -54,6 +59,16 @@ class _MutableNodeData:
             duration_ms=duration_ms,
         )
 
+        # Build NodeIOSpec from captured input/output specs
+        outputs: list[IOSpec] = []
+        if self.output_spec is not None:
+            outputs = [self.output_spec]
+
+        node_io = NodeIOSpec(
+            inputs=self.input_specs,
+            outputs=outputs,
+        )
+
         return NodeSpec(
             node_id=self.node_id,
             kind=self.node_kind,
@@ -61,6 +76,7 @@ class _MutableNodeData:
             pipe_type=self.pipe_type,
             status=self.status,
             timing=timing,
+            node_io=node_io,
             error=self.error,
             metrics=self.metrics,
         )
@@ -86,6 +102,8 @@ class GraphTracer(GraphTracerProtocol):
         self._edges: list[EdgeSpec] = []
         self._node_sequence: int = 0
         self._edge_sequence: int = 0
+        # Maps stuff_code (digest) to the node_id that produced it
+        self._stuff_producer_map: dict[str, str] = {}
 
     @property
     def is_active(self) -> bool:
@@ -111,6 +129,7 @@ class GraphTracer(GraphTracerProtocol):
         self._edges = []
         self._node_sequence = 0
         self._edge_sequence = 0
+        self._stuff_producer_map = {}
 
         return GraphContext(
             graph_id=graph_id,
@@ -124,13 +143,17 @@ class GraphTracer(GraphTracerProtocol):
         if not self._is_active:
             return None
 
-        self._is_active = False
-
         # Mark any still-running nodes as canceled (shouldn't happen in normal flow)
         for node_data in self._nodes.values():
             if node_data.status == NodeStatus.RUNNING:
                 node_data.status = NodeStatus.CANCELED
                 node_data.ended_at = datetime.now(UTC)
+
+        # Generate DATA edges by correlating input stuff_codes with producer nodes
+        # (must happen before setting _is_active = False since add_edge checks it)
+        self._generate_data_edges()
+
+        self._is_active = False
 
         # Build the final GraphSpec
         nodes = [node_data.to_node_spec() for node_data in self._nodes.values()]
@@ -149,8 +172,34 @@ class GraphTracer(GraphTracerProtocol):
         self._created_at = None
         self._nodes = {}
         self._edges = []
+        self._stuff_producer_map = {}
 
         return graph
+
+    def _generate_data_edges(self) -> None:
+        """Generate DATA edges by correlating input stuff_codes with producer nodes.
+
+        For each node's input with a digest (stuff_code), find the node that
+        produced that stuff and create a DATA edge from producer to consumer.
+        """
+        for consumer_node_id, node_data in self._nodes.items():
+            for input_spec in node_data.input_specs:
+                if input_spec.digest is None:
+                    continue
+                producer_node_id = self._stuff_producer_map.get(input_spec.digest)
+                if producer_node_id is None:
+                    # No known producer (may be initial input to pipeline)
+                    continue
+                if producer_node_id == consumer_node_id:
+                    # Don't create self-loops
+                    continue
+                # Create DATA edge: producer → consumer, labeled with the stuff name
+                self.add_edge(
+                    source_node_id=producer_node_id,
+                    target_node_id=consumer_node_id,
+                    edge_kind=EdgeKind.DATA,
+                    label=input_spec.name,
+                )
 
     @override
     def on_pipe_start(
@@ -160,6 +209,7 @@ class GraphTracer(GraphTracerProtocol):
         pipe_type: str,
         node_kind: NodeKind,
         started_at: datetime,
+        input_specs: list[IOSpec] | None = None,
     ) -> tuple[str, GraphContext]:
         """Record the start of a pipe execution."""
         if not self._is_active:
@@ -180,6 +230,7 @@ class GraphTracer(GraphTracerProtocol):
             node_kind=node_kind,
             started_at=started_at,
             parent_node_id=graph_context.parent_node_id,
+            input_specs=input_specs,
         )
         self._nodes[node_id] = node_data
 
@@ -207,6 +258,7 @@ class GraphTracer(GraphTracerProtocol):
         ended_at: datetime,
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
+        output_spec: IOSpec | None = None,
     ) -> None:
         """Record successful completion of a pipe execution."""
         if not self._is_active:
@@ -221,6 +273,13 @@ class GraphTracer(GraphTracerProtocol):
         node_data.output_preview = output_preview
         if metrics:
             node_data.metrics = metrics
+
+        # Store output spec and register in producer map for data flow tracking
+        if output_spec is not None:
+            node_data.output_spec = output_spec
+            # Register this node as the producer of this stuff_code (digest)
+            if output_spec.digest:
+                self._stuff_producer_map[output_spec.digest] = node_id
 
     @override
     def on_pipe_end_error(

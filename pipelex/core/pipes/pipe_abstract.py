@@ -359,6 +359,7 @@ class PipeAbstract(ABC, BaseModel):
         if parent_graph_context is not None:
             from pipelex.observability.graphspec.graph_tracer_manager import (  # noqa: PLC0415
                 GraphTracerManagerAbstract,
+                IOSpec,
                 NodeKind,
             )
 
@@ -366,12 +367,28 @@ class PipeAbstract(ABC, BaseModel):
             if tracer_manager is not None:
                 started_at = datetime.now(UTC)
                 node_kind = NodeKind.CONTROLLER if self.type in _CONTROLLER_PIPE_TYPES else NodeKind.OPERATOR
+
+                # Capture input specs from working memory for data flow tracking
+                input_specs: list[IOSpec] = []
+                for var_name in self.needed_inputs().required_names:
+                    stuff = working_memory.get_optional_stuff(var_name)
+                    if stuff is not None:
+                        input_specs.append(
+                            IOSpec(
+                                name=var_name,
+                                concept=stuff.concept.code,
+                                content_type=stuff.content.__class__.__name__,
+                                digest=stuff.stuff_code,
+                            )
+                        )
+
                 graph_node_id, child_graph_context = tracer_manager.on_pipe_start(
                     graph_context=parent_graph_context,
                     pipe_code=self.code,
                     pipe_type=self.type,
                     node_kind=node_kind,
                     started_at=started_at,
+                    input_specs=input_specs or None,
                 )
                 # Update job metadata with child graph context for nested pipes
                 if child_graph_context is not None:
@@ -409,9 +426,21 @@ class PipeAbstract(ABC, BaseModel):
 
         # Record graph tracing success
         if tracer_manager is not None:
+            # Capture output spec for data flow tracking
+            from pipelex.observability.graphspec.graph_tracer_manager import IOSpec  # noqa: PLC0415
+
+            main_stuff = pipe_output.main_stuff
+            output_spec = IOSpec(
+                name=output_name or main_stuff.stuff_name or "main_stuff",
+                concept=main_stuff.concept.code,
+                content_type=main_stuff.content.__class__.__name__,
+                digest=main_stuff.stuff_code,
+            )
+
             tracer_manager.on_pipe_end_success(
                 node_id=graph_node_id,
                 ended_at=datetime.now(UTC),
+                output_spec=output_spec,
             )
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
