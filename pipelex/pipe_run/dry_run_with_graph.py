@@ -1,0 +1,121 @@
+"""Dry run a pipe while capturing execution graph."""
+
+from pipelex import log
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry
+from pipelex.observability.graphspec import (
+    GraphSpec,
+    GraphTracer,
+    GraphTracerManager,
+)
+from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.system.telemetry.otel_constants import OTelConstants
+
+
+async def dry_run_pipe_with_graph(
+    pipe: PipeAbstract,
+    graph_id: str | None = None,
+) -> GraphSpec:
+    """Dry run a pipe while capturing its execution graph.
+
+    Args:
+        pipe: The pipe to dry run.
+        graph_id: Optional graph ID. If not provided, uses the pipe code.
+
+    Returns:
+        GraphSpec containing the execution graph of the dry run.
+
+    Raises:
+        Various exceptions if the dry run fails.
+    """
+    # Set up the graph tracer and register as singleton
+    tracer = GraphTracer()
+    manager = GraphTracerManager(tracer)  # This registers itself as singleton
+
+    try:
+        effective_graph_id = graph_id or f"dry_run_{pipe.code}"
+        graph_context = manager.setup(
+            graph_id=effective_graph_id,
+            pipeline_ref_domain=pipe.domain_code,
+            pipeline_ref_main_pipe=pipe.code,
+        )
+
+        # Get needed inputs and create working memory
+        needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
+
+        # Validate the pipe
+        pipe.validate_with_libraries()
+
+        # Create job metadata with graph context - the tracing will be done in run_pipe
+        job_metadata = JobMetadata(
+            user_id=OTelConstants.DEFAULT_USER_ID,
+            pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED,
+            graph_context=graph_context,
+        )
+
+        # Run the pipe in dry mode - run_pipe will handle the graph tracing
+        await pipe.run_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+        )
+
+        # Finalize and return the graph (also clears the singleton)
+        result = manager.teardown()
+        if result is None:
+            # This shouldn't happen if setup was called, but handle it gracefully
+            msg = "GraphTracer teardown returned None unexpectedly"
+            raise RuntimeError(msg)
+
+        return result
+
+    except Exception:
+        # Clean up the singleton on error
+        manager.teardown()
+        raise
+
+
+def _convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
+    """Convert PipeInput to the format needed by WorkingMemoryFactory.make_for_dry_run."""
+    needed_inputs_for_factory: list[TypedNamedStuffSpec] = []
+    class_registry = get_class_registry()
+
+    for named_stuff_spec in needed_inputs_spec.named_stuff_specs:
+        try:
+            concept = named_stuff_spec.concept
+            structure_class_name = concept.structure_class_name
+            structure_class = class_registry.get_class(name=structure_class_name)
+
+            if structure_class and issubclass(structure_class, StuffContent):
+                typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
+                    named=named_stuff_spec,
+                    structure_class=structure_class,
+                )
+                needed_inputs_for_factory.append(typed_named_stuff_spec)
+            else:
+                log.verbose(
+                    f"Could not get structure class '{structure_class_name}' for "
+                    f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
+                )
+                text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
+                    named=named_stuff_spec,
+                    structure_class=TextContent,
+                )
+                needed_inputs_for_factory.append(text_typed_named_stuff_spec)
+        except Exception as exc:
+            log.warning(f"Error getting structure class for concept '{named_stuff_spec.concept.code}': {exc}, falling back to TextContent")
+            text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
+                named=named_stuff_spec,
+                structure_class=TextContent,
+            )
+            needed_inputs_for_factory.append(text_typed_named_stuff_spec)
+
+    return needed_inputs_for_factory

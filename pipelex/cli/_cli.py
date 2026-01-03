@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex.cli.commands.build import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
+from pipelex.cli.commands.graph_cmd import graph_cmd
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.kit_cmd import kit_app
@@ -22,7 +23,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["init", "doctor", "kit", "build", "validate", "run", "show"]
+        return ["init", "doctor", "kit", "build", "validate", "run", "graph", "show"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -101,4 +102,5 @@ app.command(name="validate", help="Validate pipes: static validation for syntax 
     validate_cmd
 )
 app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.plx)")(run_cmd)
+app.command(name="graph", help="Dry run a pipe and output its execution graph as JSON")(graph_cmd)
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")

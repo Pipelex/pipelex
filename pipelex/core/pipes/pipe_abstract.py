@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, final
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, final
 
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
@@ -32,6 +33,12 @@ from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManager
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
+
+if TYPE_CHECKING:
+    from pipelex.observability.graphspec import GraphContext
+
+# Controller pipe types for graph node classification
+_CONTROLLER_PIPE_TYPES = {"PipeSequence", "PipeCondition", "PipeBatch", "PipeParallel"}
 
 PipeAbstractType = type["PipeAbstract"]
 
@@ -343,21 +350,69 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
 
-        match pipe_run_params.run_mode:
-            case PipeRunMode.LIVE:
-                pipe_output = await self.live_run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                    output_name=output_name,
+        # Handle graph tracing if enabled (using singleton to avoid hub import cycle)
+        graph_node_id: str | None = None
+        child_graph_context: GraphContext | None = None
+        tracer_manager = None
+
+        parent_graph_context = job_metadata.graph_context
+        if parent_graph_context is not None:
+            from pipelex.observability.graphspec.graph_tracer_manager import (  # noqa: PLC0415
+                GraphTracerManagerAbstract,
+                NodeKind,
+            )
+
+            tracer_manager = GraphTracerManagerAbstract.get_instance()
+            if tracer_manager is not None:
+                started_at = datetime.now(UTC)
+                node_kind = NodeKind.CONTROLLER if self.type in _CONTROLLER_PIPE_TYPES else NodeKind.OPERATOR
+                graph_node_id, child_graph_context = tracer_manager.on_pipe_start(
+                    graph_context=parent_graph_context,
+                    pipe_code=self.code,
+                    pipe_type=self.type,
+                    node_kind=node_kind,
+                    started_at=started_at,
                 )
-            case PipeRunMode.DRY:
-                pipe_output = await self.dry_run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                    output_name=output_name,
+                # Update job metadata with child graph context for nested pipes
+                if child_graph_context is not None:
+                    job_metadata = job_metadata.copy_with_update(
+                        otel_context=job_metadata.otel_context,
+                        graph_context=child_graph_context,
+                    )
+
+        try:
+            match pipe_run_params.run_mode:
+                case PipeRunMode.LIVE:
+                    pipe_output = await self.live_run_pipe(
+                        job_metadata=job_metadata,
+                        working_memory=working_memory,
+                        pipe_run_params=pipe_run_params,
+                        output_name=output_name,
+                    )
+                case PipeRunMode.DRY:
+                    pipe_output = await self.dry_run_pipe(
+                        job_metadata=job_metadata,
+                        working_memory=working_memory,
+                        pipe_run_params=pipe_run_params,
+                        output_name=output_name,
+                    )
+        except Exception as exc:
+            # Record graph tracing error
+            if tracer_manager is not None:
+                tracer_manager.on_pipe_end_error(
+                    node_id=graph_node_id,
+                    ended_at=datetime.now(UTC),
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
                 )
+            raise
+
+        # Record graph tracing success
+        if tracer_manager is not None:
+            tracer_manager.on_pipe_end_success(
+                node_id=graph_node_id,
+                ended_at=datetime.now(UTC),
+            )
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
         return pipe_output
