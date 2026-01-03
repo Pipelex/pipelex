@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator
 
 from pipelex.cogt.exceptions import GeneratedImageError
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.tools.misc.base_64_utils import extract_base_64_str_from_base64_url_if_possible
+from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
@@ -42,7 +42,7 @@ class GeneratedImageRawDetails(CustomBaseModel):
         if self.mime_type:
             ImageFormat.raise_if_unsupported_mime_type(self.mime_type)
         elif self.actual_url_or_prefixed_base64 and (
-            result := extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=self.actual_url_or_prefixed_base64)
+            result := extract_base64_str_from_base64_url_if_possible(possibly_base64_url=self.actual_url_or_prefixed_base64)
         ):
             base64_str, base64_extracted_mime_type = result
             ImageFormat.raise_if_unsupported_mime_type(base64_extracted_mime_type)

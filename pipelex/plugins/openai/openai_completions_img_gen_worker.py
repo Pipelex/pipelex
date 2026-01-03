@@ -15,7 +15,7 @@ from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import extract_base_64_str_from_base64_url_if_possible
+from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.image_utils import ImageFormat
 
 if TYPE_CHECKING:
@@ -109,7 +109,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                 if part.get("type") == "image_url":
                     if image_url := part.get("image_url"):
                         if the_url := image_url.get("url"):
-                            extracted = extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=the_url)
+                            extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=the_url)
                             if not extracted:
                                 msg = "No base64 string found in ImgGenCompletions response message"
                                 raise ImgGenGenerationError(msg)

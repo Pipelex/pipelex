@@ -2,7 +2,7 @@ from openai.types.chat.chat_completion_content_part_image_param import ImageURL
 
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageDetail, PromptImagePath, PromptImageUrl
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64
+from pipelex.tools.misc.base64_utils import load_binary_as_base64
 
 
 async def make_image_url_obj(prompt_image: PromptImage, detail: PromptImageDetail | None) -> ImageURL:

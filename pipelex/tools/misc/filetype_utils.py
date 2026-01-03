@@ -40,11 +40,11 @@ def detect_file_type_from_path(path: str | Path) -> FileType:
     return FileType(extension=extension, mime=mime)
 
 
-def detect_file_type_from_bytes(buf: bytes) -> FileType:
+def detect_file_type_from_bytes(raw_bytes: bytes) -> FileType:
     """Detect the file type of a given bytes object.
 
     Args:
-        buf: The bytes object to detect the type of.
+        raw_bytes: The bytes object to detect the type of.
 
     Returns:
         A FileType object containing the file extension and MIME type of the file.
@@ -53,20 +53,20 @@ def detect_file_type_from_bytes(buf: bytes) -> FileType:
         FileTypeError: If the file type cannot be identified.
 
     """
-    kind = filetype.guess(buf)  # pyright: ignore[reportUnknownMemberType]
+    kind = filetype.guess(raw_bytes)  # pyright: ignore[reportUnknownMemberType]
     if kind is None:
-        msg = f"Could not identify file type of given bytes: {buf[:300]!r}"
+        msg = f"Could not identify file type of given bytes: {raw_bytes[:300]!r}"
         raise FileTypeError(msg)
     extension = f"{kind.extension}"
     mime = f"{kind.mime}"
     return FileType(extension=extension, mime=mime)
 
 
-def detect_file_type_from_base64(b64: str | bytes) -> FileType:
+def detect_file_type_from_base64(base64_data: str | bytes) -> FileType:
     """Detect the file type of a given Base-64-encoded string.
 
     Args:
-        b64: The Base-64-encoded bytes or string to detect the type of.
+        base64_data: The base64-encoded bytes or string to detect the type of.
 
     Returns:
         A FileType object containing the file extension and MIME type of the file.
@@ -76,20 +76,20 @@ def detect_file_type_from_base64(b64: str | bytes) -> FileType:
 
     """
     # Normalise to bytes holding only the Base-64 alphabet
-    if isinstance(b64, bytes):
-        log.verbose(f"b64 is already bytes: {b64[:100]!r}")
-        b64_bytes = b64
+    if isinstance(base64_data, bytes):
+        log.verbose(f"b64 is already bytes: {base64_data[:100]!r}")
+        base64_bytes = base64_data
     else:  # str  →  handle optional data-URL header
-        log.verbose(f"b64 is a string: {b64[:100]!r}")
-        if b64.lstrip().startswith("data:") and "," in b64:
-            b64 = b64.split(",", 1)[1]
-        log.verbose(f"b64 after split: {b64[:100]!r}")
-        b64_bytes = b64.encode("ascii")  # Base-64 is pure ASCII
+        log.verbose(f"b64 is a string: {base64_data[:100]!r}")
+        if base64_data.lstrip().startswith("data:") and "," in base64_data:
+            base64_data = base64_data.split(",", 1)[1]
+        log.verbose(f"b64 after split: {base64_data[:100]!r}")
+        base64_bytes = base64_data.encode("ascii")  # Base-64 is pure ASCII
 
     try:
-        raw = base64.b64decode(b64_bytes, validate=True)
+        raw = base64.b64decode(base64_bytes, validate=True)
     except binascii.Error as exc:  # malformed Base-64
-        msg = f"Could not identify file type of given bytes because input is not valid Base-64: {exc}\n{b64_bytes[:100]!r}"
+        msg = f"Could not identify file type of given bytes because input is not valid base64: {exc}\n{base64_bytes[:100]!r}"
         raise FileTypeError(msg) from exc
 
-    return detect_file_type_from_bytes(buf=raw)
+    return detect_file_type_from_bytes(raw_bytes=raw)

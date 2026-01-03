@@ -9,7 +9,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.tools.misc.base_64_utils import extract_base_64_str_from_base64_url_if_possible
+from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -84,7 +84,7 @@ class GeneratedContentFactory:
             elif raw_details.actual_url_or_prefixed_base64:
                 if raw_details.actual_url_or_prefixed_base64.startswith("http"):
                     actual_url = raw_details.actual_url_or_prefixed_base64
-                elif result := extract_base_64_str_from_base64_url_if_possible(possibly_base64_url=raw_details.actual_url_or_prefixed_base64):
+                elif result := extract_base64_str_from_base64_url_if_possible(possibly_base64_url=raw_details.actual_url_or_prefixed_base64):
                     base64_str, base64_extracted_mime_type = result
                     actual_bytes = base64.b64decode(base64_str)
                 else:
