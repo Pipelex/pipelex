@@ -207,12 +207,17 @@ class ContentGenerator(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
+        img_gen_prompt: ImgGenPrompt | None,
     ) -> ImageContent:
-        return await self._generated_content_factory.make_image_content(
+        image_content = await self._generated_content_factory.make_image_content(
             primary_id=job_metadata.user_id,
             secondary_id=job_metadata.pipeline_run_id,
             raw_details=generated_image_raw_details,
         )
+        if img_gen_prompt:
+            image_content.source_prompt = img_gen_prompt.positive_text
+            image_content.source_negative_prompt = img_gen_prompt.negative_text
+        return image_content
 
     @override
     async def make_page_contents(
@@ -237,18 +242,21 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> ImageContent:
         img_gen_config = get_config().cogt.img_gen_config
+        img_gen_job_params = img_gen_job_params or img_gen_config.make_default_img_gen_job_params()
+        img_gen_job_config = img_gen_job_config or img_gen_config.img_gen_job_config
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
             img_gen_handle=img_gen_handle,
             img_gen_prompt=img_gen_prompt,
-            img_gen_job_params=img_gen_job_params or img_gen_config.make_default_img_gen_job_params(),
-            img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
+            img_gen_job_params=img_gen_job_params,
+            img_gen_job_config=img_gen_job_config,
             nb_images=1,
         )
         generated_image_raw_details = await img_gen_single_image(img_gen_assignment=img_gen_assignment)
         log.verbose(f"{self.__class__.__name__} generated image raw details: {generated_image_raw_details}")
         return await self.make_image_content(
             job_metadata=job_metadata,
+            img_gen_prompt=img_gen_prompt,
             generated_image_raw_details=generated_image_raw_details,
         )
 
@@ -278,6 +286,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             await self.make_image_content(
                 job_metadata=job_metadata,
                 generated_image_raw_details=raw_details,
+                img_gen_prompt=img_gen_prompt,
             )
             for raw_details in generated_images_as_raw_details
         ]
@@ -321,6 +330,7 @@ class ContentGenerator(ContentGeneratorProtocol):
                     pil_image=page_view_image,
                     output_format=ImageFormat.PNG,
                 ),
+                img_gen_prompt=None,
             )
             page_view_images_resolved.append(image_content)
 

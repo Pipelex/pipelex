@@ -152,6 +152,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
+        img_gen_prompt: ImgGenPrompt | None,
     ) -> ImageContent:
         return self._make_generated_image_fake(raw_details=generated_image_raw_details)
 
@@ -169,6 +170,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 image_content = await self.make_image_content(
                     job_metadata=job_metadata,
                     generated_image_raw_details=extracted_image,
+                    img_gen_prompt=None,
                 )
                 page_images.append(image_content)
             page_contents.append(
