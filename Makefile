@@ -590,6 +590,9 @@ cc: cleanderived c
 check: cc check-unused-imports check-config-sync check-rules check-urls pylint
 	@echo "> done: check"
 
+agent-check: fix-unused-imports format lint pyright mypy
+	@echo "> done: agent-check"
+
 v: validate
 	@echo "> done: v = validate"
 
