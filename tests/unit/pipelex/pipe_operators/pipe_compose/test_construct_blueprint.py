@@ -158,27 +158,33 @@ class TestConstructBlueprintFieldAccess:
     """Tests for field access utilities in ConstructBlueprint."""
 
     def test_get_required_variables_flat(self):
-        """Test extraction of required variables from flat construct."""
+        """Test extraction of required variables from flat construct returns root names only."""
         raw = ConstructBlueprintTestData.FLAT_MIXED[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         required_vars = blueprint.get_required_variables()
 
-        # Should include all 'from' paths and variables in templates
-        assert "deal.customer_name" in required_vars or "deal" in required_vars
-        assert "deal.amount" in required_vars or "deal" in required_vars
+        # Should return root names only (e.g., 'deal' from 'deal.customer_name')
+        assert "deal" in required_vars
+        # Should NOT contain full dotted paths
+        assert "deal.customer_name" not in required_vars
+        assert "deal.amount" not in required_vars
 
     def test_get_required_variables_nested(self):
-        """Test extraction of required variables includes nested constructs."""
+        """Test extraction of required variables includes nested constructs with root names only."""
         raw = ConstructBlueprintTestData.WITH_NESTED[1]
         blueprint = ConstructBlueprint.make_from_raw(raw)
 
         required_vars = blueprint.get_required_variables()
 
-        # Should include variables from nested construct too
-        assert "order.id" in required_vars or "order" in required_vars
-        assert "order.total_amount" in required_vars or "order" in required_vars
-        assert "customer.address.street" in required_vars or "customer" in required_vars
+        # Should return root names only from all levels (including nested constructs)
+        assert "order" in required_vars
+        assert "customer" in required_vars
+        # Should NOT contain full dotted paths
+        assert "order.id" not in required_vars
+        assert "order.total_amount" not in required_vars
+        assert "customer.address.street" not in required_vars
+        assert "customer.address.city" not in required_vars
 
     def test_field_names_returns_all_top_level_fields(self):
         """Test that field_names returns all top-level field names."""

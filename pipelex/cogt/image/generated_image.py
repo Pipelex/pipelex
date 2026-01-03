@@ -33,7 +33,7 @@ class GeneratedImageRawDetails(CustomBaseModel):
     @classmethod
     def validate_output_format(cls, output_format_str: str | None) -> str | None:
         if output_format_str:
-            return ImageFormat(output_format_str)
+            return ImageFormat(output_format_str).value
         else:
             return None
 

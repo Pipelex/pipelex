@@ -214,9 +214,11 @@ class ConstructBlueprint(BaseModel):
                         except Jinja2DetectVariablesError as exc:
                             msg = f"Error detecting required variables in construct template: {exc}"
                             raise ValueError(msg) from exc
-                        # Filter out internal variables
-                        template_vars = {var for var in template_vars if not var.startswith("_") and var not in {"preliminary_text", "place_holder"}}
-                        required.update(template_vars)
+                        # Extract root names and filter out internal variables (same approach as template mode)
+                        for var in template_vars:
+                            root_var = get_root_from_dotted_path(var)
+                            if not root_var.startswith("_") and root_var not in {"preliminary_text", "place_holder"}:
+                                required.add(root_var)
 
                 case ConstructFieldMethod.NESTED:
                     if field_blueprint.nested:
