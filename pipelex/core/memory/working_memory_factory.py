@@ -81,18 +81,14 @@ class WorkingMemoryFactory(BaseModel):
     @classmethod
     def create_mock_content(cls, typed_named_stuff_spec: TypedNamedStuffSpec) -> StuffContent:
         """Helper method to create mock content for a typed_named_stuff_spec."""
-        if typed_named_stuff_spec.structure_class:
-            # Create mock object using polyfactory
-            class MockFactory(ModelFactory[typed_named_stuff_spec.structure_class]):  # type: ignore[name-defined]
-                __model__ = typed_named_stuff_spec.structure_class
-                __check_model__ = True
-                __use_examples__ = True
-                __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
-            return MockFactory.build(factory_use_construct=True)  # type: ignore[no-any-return]
+        class MockFactory(ModelFactory[typed_named_stuff_spec.structure_class]):  # type: ignore[name-defined]
+            __model__ = typed_named_stuff_spec.structure_class
+            __check_model__ = True
+            __use_examples__ = True
+            __allow_none_optionals__ = False  # Ensure Optional fields always get values
 
-        # Fallback to text content
-        return TextContent(text=f"DRY RUN: Mock content for '{typed_named_stuff_spec.variable_name}' ({typed_named_stuff_spec.concept.code})")
+        return MockFactory.build(factory_use_construct=True)  # type: ignore[no-any-return]
 
     @classmethod
     def make_for_dry_run(cls, needed_inputs: list[TypedNamedStuffSpec]) -> "WorkingMemory":

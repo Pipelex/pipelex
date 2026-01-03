@@ -23,7 +23,7 @@
             "args": [
                 "-s",
                 "-vv",
-                "-k test_discord_newsletter_dry_run_working_memory"
+                "-k test_compose_image_content_multiple"
             ],
             "console": "integratedTerminal"
         },
@@ -50,6 +50,20 @@
                 "-vv",
                 "-m inference",
                 "-k test_img_gen_single_opaque"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug test inference PipeExtract",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_pipe_extract_from_pdf"
             ],
             "console": "integratedTerminal",
             "justMyCode": false

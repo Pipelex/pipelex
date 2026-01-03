@@ -2,6 +2,7 @@ from abc import ABC
 from typing import Any, TypeVar
 
 from kajson import kajson
+from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.cogt.templating.templating_style import TextFormat
@@ -61,7 +62,8 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
             title: Optional title for the rendering
             depth: Current nesting depth, used to prevent nesting too many sub-tables which would end up too narrow in the console
         """
-        return PrettyPrinter.make_pretty(value=self, inner_title=title, depth=depth)
+        json_data = self.smart_dump()
+        return JSON.from_data(json_data, indent=4)
 
     def pretty_print_content(self, title: str | None = None) -> None:
         pretty = self.rendered_pretty()

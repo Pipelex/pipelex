@@ -1,21 +1,25 @@
 import json
 
+from rich.console import Group
+from rich.markdown import Markdown
+from rich.text import Text
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ImageContentError
-from pipelex.cogt.extract.extract_output import ExtractedImage
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
-from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str
 from pipelex.tools.misc.path_utils import interpret_path_or_url
-from pipelex.types import Self
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class ImageContent(StuffContent):
     url: str
+    display_link: str | None = None
     source_prompt: str | None = None
     caption: str | None = None
+    mime_type: str | None = None
+    size: ImageSize | None = None
 
     @property
     @override
@@ -46,18 +50,46 @@ class ImageContent(StuffContent):
     def rendered_json(self) -> str:
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
 
-    @classmethod
-    def make_from_extracted_image(cls, extracted_image: ExtractedImage) -> Self:
-        if base_64 := extracted_image.base_64:
-            # Check if it's already a prefixed base64 string
-            if base_64.startswith("data:"):
-                prefixed_base64_str = base_64
-            else:
-                prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
-            return cls(
-                url=prefixed_base64_str,
-                caption=extracted_image.caption,
-            )
-        else:
-            msg = f"Base 64 is required for image content: {extracted_image}"
-            raise ImageContentError(msg)
+    @override
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        group = Group()
+
+        # title indicating it's an image:
+        title_text = Text("Image:", style="bold cyan")
+        group.renderables.append(title_text)
+
+        # URL with clickable markdown link
+        display_url = f"{self.url[:35]}…" if len(self.url) > 36 else self.url
+        url_markdown = Markdown(f"**URL:** [{display_url}]({self.url})")
+        group.renderables.append(url_markdown)
+
+        # Display link if present
+        if self.display_link is not None:
+            link_text = Text()
+            link_text.append("Display: ", style="bold")
+            link_text.append("Open Image", style=f"cyan link {self.display_link}")
+            group.renderables.append(link_text)
+
+        # Caption if present
+        if self.caption:
+            caption_text = Text()
+            caption_text.append("Caption: ", style="bold")
+            caption_text.append(self.caption, style="yellow italic")
+            group.renderables.append(caption_text)
+
+        # Size if present
+        if self.size:
+            size_text = Text()
+            size_text.append("Size: ", style="bold")
+            size_text.append(f"{self.size.width}x{self.size.height}", style="dim")
+            group.renderables.append(size_text)
+
+        # Source prompt if present
+        if self.source_prompt:
+            group.renderables.append(Text())  # Add spacing
+            prompt_text = Text()
+            prompt_text.append("Source Prompt: ", style="bold")
+            prompt_text.append(self.source_prompt, style="dim italic")
+            group.renderables.append(prompt_text)
+
+        return group

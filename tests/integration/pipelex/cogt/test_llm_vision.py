@@ -9,7 +9,7 @@ from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64
+from pipelex.tools.misc.base64_utils import load_binary_as_base64
 from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 
 

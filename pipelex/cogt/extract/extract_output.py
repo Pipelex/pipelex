@@ -1,25 +1,17 @@
 from pydantic import Field
 
+from pipelex.cogt.extract.bounding_box import BoundingBox
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, empty_list_factory_of
 
 
-class ExtractedImage(CustomBaseModel):
-    image_id: str
-    base_64: str | None = None
-    caption: str | None = None
-
-
-class ExtractedImageFromPage(ExtractedImage):
-    top_left_x: int | None = None
-    top_left_y: int | None = None
-    bottom_right_x: int | None = None
-    bottom_right_y: int | None = None
+class ExtractedImageFromPage(GeneratedImageRawDetails):
+    bounding_box: BoundingBox | None = None
 
 
 class Page(CustomBaseModel):
     text: str | None = None
     extracted_images: list[ExtractedImageFromPage] = Field(default_factory=empty_list_factory_of(ExtractedImageFromPage))
-    page_view: ExtractedImageFromPage | None = None
 
 
 class ExtractOutput(CustomBaseModel):

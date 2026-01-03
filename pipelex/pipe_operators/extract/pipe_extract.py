@@ -1,29 +1,22 @@
-from io import BytesIO
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
-from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.models.model_deck_check import check_extract_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import (
     get_content_generator,
     get_model_deck,
@@ -32,7 +25,9 @@ from pipelex.hub import (
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.page_content import PageContent
 
 
 class PipeExtractOutput(PipeOutput):
@@ -130,69 +125,13 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             image_uri=image_uri,
             pdf_uri=pdf_uri,
         )
-        extract_output = await content_generator.make_extract_pages(
+        page_contents = await content_generator.make_extract_pages(
             extract_input=extract_input,
             extract_handle=extract_setting.model,
             job_metadata=job_metadata,
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),
         )
-
-        # Build the output stuff, which is a list of page contents
-        page_view_contents: list[ImageContent] = []
-        if self.should_include_page_views:
-            log.verbose(f"should_include_page_views: {self.should_include_page_views}, pdf_uri: {pdf_uri}, image_uri: {image_uri}")
-            if pdf_uri:
-                page_view_contents.extend(
-                    ImageContent.make_from_extracted_image(extracted_image=page.page_view) for page in extract_output.pages.values() if page.page_view
-                )
-                log.verbose(f"page_view_contents: {page_view_contents}")
-                needs_to_generate_page_views: bool
-                if len(page_view_contents) == 0:
-                    log.verbose("No page views found in the OCR output")
-                    needs_to_generate_page_views = True
-                elif len(page_view_contents) < len(extract_output.pages):
-                    log.warning(f"Only {len(page_view_contents)} page found in the OCR output, but {len(extract_output.pages)} pages")
-                    needs_to_generate_page_views = True
-                else:
-                    log.verbose("All page views found in the OCR output")
-                    needs_to_generate_page_views = False
-
-                if needs_to_generate_page_views:
-                    page_views = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=pdf_uri, dpi=self.page_views_dpi)
-                    page_view_contents = []
-                    for page_view in page_views:
-                        page_view_binary = BytesIO()
-                        page_view.save(page_view_binary, format="PNG")
-                        raw_details = GeneratedImageRawDetails(
-                            actual_bytes=page_view_binary.getvalue(),
-                            width=page_view.width,
-                            height=page_view.height,
-                            output_format="png",
-                        )
-                        generated_image = await content_generator.make_generated_image(
-                            job_metadata=job_metadata,
-                            generated_image_raw_details=raw_details,
-                        )
-                        image_content = ImageContent(url=generated_image.url)
-                        page_view_contents.append(image_content)
-            elif image_uri:
-                page_view_contents = [ImageContent(url=image_uri)]
-
-        page_contents: list[PageContent] = []
-        for page_index, page in extract_output.pages.items():
-            images = [ImageContent.make_from_extracted_image(extracted_image=img) for img in page.extracted_images]
-            log.verbose(f"images: {images}, page_view_contents: {page_view_contents}, index: {page_index}")
-            page_view_content = page_view_contents[page_index - 1] if self.should_include_page_views else None
-            page_contents.append(
-                PageContent(
-                    text_and_images=TextAndImagesContent(
-                        text=TextContent(text=page.text) if page.text else None,
-                        images=images,
-                    ),
-                    page_view=page_view_content,
-                ),
-            )
 
         content: ListContent[PageContent] = ListContent(items=page_contents)
 

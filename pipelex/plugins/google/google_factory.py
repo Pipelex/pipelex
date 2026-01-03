@@ -14,7 +14,7 @@ from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.tools.misc.base_64_utils import load_binary_async
+from pipelex.tools.misc.base64_utils import load_binary_async
 
 
 class GoogleFactoryError(CogtError):

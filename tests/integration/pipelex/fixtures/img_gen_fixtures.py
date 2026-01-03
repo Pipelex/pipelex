@@ -1,14 +1,10 @@
 """Image generation test fixtures."""
 
-from pathlib import Path
-
 import pytest
 
-from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, Quality
 from pipelex.hub import get_model_deck
 from pipelex.tools.misc.image_utils import ImageFormat
-from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
 
 
@@ -119,10 +115,3 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
 def img_gen_job_params(request: pytest.FixtureRequest) -> ImgGenJobParams:
     assert isinstance(request.param, ImgGenJobParams)
     return request.param
-
-
-@pytest.fixture
-def generated_content_factory(tmp_path: Path) -> GeneratedContentFactory:
-    """Create a GeneratedContentFactory with a local storage provider."""
-    storage_provider = LocalStorageProvider(root_path=tmp_path)
-    return GeneratedContentFactory(storage_provider=storage_provider)

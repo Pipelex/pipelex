@@ -2,84 +2,121 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageInvalidUriError
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 
 class TestLocalStorageProvider:
-    """Unit tests for LocalStorageProvider."""
+    """Unit tests for LocalStorageProvider with pipelex-storage:// URI scheme."""
 
-    def test_store_and_load_roundtrip(self, tmp_path: Path) -> None:
-        """Test storing bytes and loading them back returns the same data."""
+    def test_store_returns_uri_with_scheme(self, tmp_path: Path) -> None:
+        """Test that store() returns a URI with the pipelex-storage:// scheme prefix."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        test_data = b"Hello, World!"
+        key = "test_file.bin"
+
+        returned_uri = provider.store(data=test_data, key=key)
+
+        assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
+        assert returned_uri.startswith(PIPELEX_STORAGE_SCHEME)
+
+    def test_load_with_valid_uri_returns_data(self, tmp_path: Path) -> None:
+        """Test roundtrip: store data with key, load with returned URI."""
         provider = LocalStorageProvider(root_path=tmp_path)
         test_data = b"Hello, World! \x00\x01\x02\xff"
-        uri = "test_file.bin"
+        key = "test_file.bin"
 
-        returned_path = provider.store(data=test_data, uri=uri)
-        loaded_data = provider.load(uri=uri)
+        returned_uri = provider.store(data=test_data, key=key)
+        loaded_data = provider.load(uri=returned_uri)
 
-        assert returned_path == str(tmp_path / uri)
         assert loaded_data == test_data
+
+    def test_load_with_invalid_uri_raises_error(self, tmp_path: Path) -> None:
+        """Test that loading a non-existent URI raises StorageFileNotFoundError."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        nonexistent_uri = f"{PIPELEX_STORAGE_SCHEME}nonexistent.bin"
+
+        with pytest.raises(StorageFileNotFoundError) as exc_info:
+            provider.load(uri=nonexistent_uri)
+
+        assert "nonexistent.bin" in str(exc_info.value)
+
+    def test_store_raises_if_key_has_scheme_prefix(self, tmp_path: Path) -> None:
+        """Test that passing a key with pipelex-storage:// prefix raises an error."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        invalid_key = f"{PIPELEX_STORAGE_SCHEME}already/prefixed.bin"
+
+        with pytest.raises(StorageInvalidKeyError) as exc_info:
+            provider.store(data=b"test", key=invalid_key)
+
+        assert "should not include scheme prefix" in str(exc_info.value).lower()
+
+    def test_display_link_returns_file_uri(self, tmp_path: Path) -> None:
+        """Test that display_link() returns a file:// URI for clickable terminal links."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        test_data = b"display test"
+        key = "subdir/display_test.bin"
+
+        returned_uri = provider.store(data=test_data, key=key)
+        display = provider.display_link(uri=returned_uri)
+
+        expected_uri = (tmp_path / key).as_uri()
+        assert display == expected_uri
+        assert display.startswith("file://")
 
     def test_store_creates_parent_directories(self, tmp_path: Path) -> None:
         """Test that storing to a nested path creates intermediate directories."""
         provider = LocalStorageProvider(root_path=tmp_path)
         test_data = b"nested content"
-        uri = "subdir/nested/deep/file.bin"
+        key = "subdir/nested/deep/file.bin"
 
-        provider.store(data=test_data, uri=uri)
-        loaded_data = provider.load(uri=uri)
+        returned_uri = provider.store(data=test_data, key=key)
+        loaded_data = provider.load(uri=returned_uri)
 
         assert loaded_data == test_data
         assert (tmp_path / "subdir" / "nested" / "deep" / "file.bin").exists()
 
-    def test_load_nonexistent_file_raises_error(self, tmp_path: Path) -> None:
-        """Test that loading a non-existent file raises StorageFileNotFoundError."""
-        provider = LocalStorageProvider(root_path=tmp_path)
-
-        with pytest.raises(StorageFileNotFoundError) as exc_info:
-            provider.load(uri="nonexistent.bin")
-
-        assert "nonexistent.bin" in str(exc_info.value)
-
     def test_store_overwrites_existing_file(self, tmp_path: Path) -> None:
-        """Test that storing to an existing path overwrites the file."""
+        """Test that storing with the same key overwrites the file."""
         provider = LocalStorageProvider(root_path=tmp_path)
-        uri = "overwrite_test.bin"
+        key = "overwrite_test.bin"
         original_data = b"original"
         new_data = b"updated content"
 
-        provider.store(data=original_data, uri=uri)
-        provider.store(data=new_data, uri=uri)
-        loaded_data = provider.load(uri=uri)
+        provider.store(data=original_data, key=key)
+        returned_uri = provider.store(data=new_data, key=key)
+        loaded_data = provider.load(uri=returned_uri)
 
         assert loaded_data == new_data
 
-    def test_invalid_uri_with_path_traversal_raises_error(self, tmp_path: Path) -> None:
-        """Test that URIs with path traversal (../) raise StorageInvalidUriError."""
+    def test_invalid_key_with_path_traversal_raises_error(self, tmp_path: Path) -> None:
+        """Test that keys with path traversal (../) raise StorageInvalidUriError."""
         provider = LocalStorageProvider(root_path=tmp_path)
 
         with pytest.raises(StorageInvalidUriError) as exc_info:
-            provider.store(data=b"malicious", uri="../outside.bin")
+            provider.store(data=b"malicious", key="../outside.bin")
 
         assert "path traversal" in str(exc_info.value).lower()
 
-    def test_load_invalid_uri_with_path_traversal_raises_error(self, tmp_path: Path) -> None:
-        """Test that loading with path traversal URI raises StorageInvalidUriError."""
+    def test_load_with_path_traversal_key_raises_error(self, tmp_path: Path) -> None:
+        """Test that loading with path traversal in URI raises StorageInvalidUriError."""
         provider = LocalStorageProvider(root_path=tmp_path)
+        # Manually construct a URI with path traversal (bypassing store validation)
+        malicious_uri = f"{PIPELEX_STORAGE_SCHEME}../../etc/passwd"
 
         with pytest.raises(StorageInvalidUriError) as exc_info:
-            provider.load(uri="../../etc/passwd")
+            provider.load(uri=malicious_uri)
 
         assert "path traversal" in str(exc_info.value).lower()
 
     def test_store_empty_bytes(self, tmp_path: Path) -> None:
         """Test storing and loading empty bytes."""
         provider = LocalStorageProvider(root_path=tmp_path)
-        uri = "empty.bin"
+        key = "empty.bin"
 
-        provider.store(data=b"", uri=uri)
-        loaded_data = provider.load(uri=uri)
+        returned_uri = provider.store(data=b"", key=key)
+        loaded_data = provider.load(uri=returned_uri)
 
         assert loaded_data == b""
 
@@ -87,18 +124,30 @@ class TestLocalStorageProvider:
         """Test storing and loading larger binary data."""
         provider = LocalStorageProvider(root_path=tmp_path)
         test_data = bytes(range(256)) * 1000  # ~256KB of data
-        uri = "large_file.bin"
+        key = "large_file.bin"
 
-        provider.store(data=test_data, uri=uri)
-        loaded_data = provider.load(uri=uri)
+        returned_uri = provider.store(data=test_data, key=key)
+        loaded_data = provider.load(uri=returned_uri)
 
         assert loaded_data == test_data
 
-    def test_absolute_uri_raises_error(self, tmp_path: Path) -> None:
-        """Test that absolute URIs are rejected."""
+    def test_absolute_key_raises_error(self, tmp_path: Path) -> None:
+        """Test that absolute paths as keys are rejected."""
         provider = LocalStorageProvider(root_path=tmp_path)
 
         with pytest.raises(StorageInvalidUriError) as exc_info:
-            provider.store(data=b"test", uri="/absolute/path.bin")
+            provider.store(data=b"test", key="/absolute/path.bin")
 
         assert "absolute" in str(exc_info.value).lower()
+
+    def test_file_actually_written_to_disk(self, tmp_path: Path) -> None:
+        """Test that the file is actually written to the filesystem."""
+        provider = LocalStorageProvider(root_path=tmp_path)
+        test_data = b"disk content"
+        key = "on_disk.bin"
+
+        provider.store(data=test_data, key=key)
+
+        file_path = tmp_path / key
+        assert file_path.exists()
+        assert file_path.read_bytes() == test_data

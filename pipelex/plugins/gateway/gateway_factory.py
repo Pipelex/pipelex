@@ -9,9 +9,12 @@ from portkey_ai import (
 from portkey_ai.api_resources import exceptions as portkey_exc
 
 from pipelex import log
+from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
+from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
+from pipelex.plugins.gateway.gateway_schemas import GatewayExtractRequestParams
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.urls import URLs
@@ -62,10 +65,22 @@ class GatewayFactory:
         cls, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         extra_headers: dict[str, str] = {}
+        extra_body: dict[str, Any] = {}
         if inference_model.extra_headers:
             extra_headers.update(inference_model.extra_headers)
         if not extra_headers.get(PortkeyHeaderKey.CONFIG) and not extra_headers.get(PortkeyHeaderKey.PROVIDER):
             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
+
+        if isinstance(inference_job, ExtractJob):
+            should_include_images = inference_job.job_params.should_include_images
+            extract_protocol = GatewayExtractProtocol.make_from_model_handle(model_handle=inference_model.name)
+            match extract_protocol:
+                case GatewayExtractProtocol.MISTRAL_DOC_AI:
+                    extra_body["include_image_base64"] = should_include_images
+                case GatewayExtractProtocol.AZURE_DOC_INTEL:
+                    request_params = GatewayExtractRequestParams(should_include_images=should_include_images)
+                    messages: list[dict[str, str]] = [{"role": "user", "content": request_params.model_dump_json()}]
+                    extra_body["messages"] = messages
 
         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
         if get_telemetry_manager().is_pipelex_gateway_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
@@ -79,7 +94,7 @@ class GatewayFactory:
             display_output = output_desc if output_desc == InferenceOutputType.TEXT else OTelConstants.OUTPUT_CLASS_REDACTED
             extra_headers[PortkeyHeaderKey.SPAN_NAME] = f"{unit_job_id} -> {display_output}"
 
-        return extra_headers, {}
+        return extra_headers, extra_body
 
     @classmethod
     def make_error_summary_from_portkey_error(cls, exc: portkey_exceptions.APIError) -> str:

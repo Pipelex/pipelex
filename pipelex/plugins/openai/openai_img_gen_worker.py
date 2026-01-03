@@ -5,6 +5,7 @@ from typing_extensions import override
 
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -97,8 +98,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
             generated_images.append(
                 GeneratedImageRawDetails(
                     base64_str=base64_str,
-                    width=width,
-                    height=height,
+                    size=ImageSize(width=width, height=height),
                     output_format=response_output_format,
                 ),
             )

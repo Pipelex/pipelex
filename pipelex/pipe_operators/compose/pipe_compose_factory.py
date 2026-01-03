@@ -27,7 +27,42 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
         output: StuffSpec,
         blueprint: PipeComposeBlueprint,
     ) -> PipeCompose:
-        preprocessed_template = preprocess_template(blueprint.template_source)
+        if blueprint.construct_blueprint is not None:
+            return PipeCompose(
+                domain_code=domain_code,
+                code=pipe_code,
+                description=description,
+                inputs=inputs,
+                output=output,
+                construct_blueprint=blueprint.construct_blueprint,
+            )
+        else:
+            return cls._make_template_mode(
+                pipe_code=pipe_code,
+                domain_code=domain_code,
+                description=description,
+                inputs=inputs,
+                output=output,
+                blueprint=blueprint,
+            )
+
+    @classmethod
+    def _make_template_mode(
+        cls,
+        pipe_code: str,
+        domain_code: str,
+        description: str,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
+        blueprint: PipeComposeBlueprint,
+    ) -> PipeCompose:
+        """Create PipeCompose in template mode (produces Text output)."""
+        template_source = blueprint.template_source
+        if template_source is None:
+            msg = "Template source is required for template mode"
+            raise PipeComposeFactoryError(msg)
+
+        preprocessed_template = preprocess_template(template_source)
         try:
             check_jinja2_parsing(
                 template_source=preprocessed_template,

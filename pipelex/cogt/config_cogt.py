@@ -86,9 +86,14 @@ class TenacityConfig(ConfigModel):
     wait_exp_base: float = Field(..., ge=1.1, le=10, description="Base for exponential backoff calculation")
 
 
+class GatewayTestConfig(ConfigModel):
+    config_id_substitutions: dict[str, str]
+
+
 class Cogt(ConfigModel):
     model_deck_config: ModelDeckConfig
     tenacity_config: TenacityConfig
     llm_config: LLMConfig
     img_gen_config: ImgGenConfig
     extract_config: ExtractConfig
+    gateway_test_config: GatewayTestConfig

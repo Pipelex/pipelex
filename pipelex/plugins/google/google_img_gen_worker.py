@@ -9,6 +9,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -133,8 +134,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                     raise ImgGenGenerationError(msg)
                 return GeneratedImageRawDetails(
                     actual_bytes=image_bytes,
-                    width=width,
-                    height=height,
+                    size=ImageSize(width=width, height=height),
                     mime_type=mime_type,
                 )
 

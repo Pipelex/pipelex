@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.plugins.fal.fal_poller import FalPoller
@@ -103,8 +104,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 generated_images.append(
                     GeneratedImageRawDetails(
                         base64_str=base64_str,
-                        width=width,
-                        height=height,
+                        size=ImageSize(width=width, height=height),
                         output_format=response_output_format,
                     ),
                 )
@@ -133,8 +133,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     raise ImgGenGenerationError(msg)
                 generated_image = GeneratedImageRawDetails(
                     actual_url_or_prefixed_base64=url,
-                    width=width,
-                    height=height,
+                    size=ImageSize(width=width, height=height),
                     mime_type=content_type,
                 )
                 generated_images.append(generated_image)

@@ -7,6 +7,7 @@ from jinja2.exceptions import (
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError, Jinja2StuffError
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 def _build_full_path(node: nodes.Node) -> str | None:
@@ -86,7 +87,7 @@ def _collect_full_variable_paths(node: nodes.Node, paths: set[str], declared_nam
     if isinstance(node, (nodes.Name, nodes.Getattr)):
         full_path = _build_full_path(node)
         if full_path:
-            root_name = full_path.split(".")[0]
+            root_name = get_root_from_dotted_path(full_path)
             # Only add if the root is not a declared local variable
             if root_name not in new_declared:
                 paths.add(full_path)

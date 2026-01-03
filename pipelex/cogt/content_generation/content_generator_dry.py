@@ -7,8 +7,9 @@ from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
-from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
+from pipelex.cogt.extract.extract_output import ExtractOutput, Page
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -17,11 +18,13 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-
-DRY_BASE_64_IMAGE = "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC"
 
 
 class ContentGeneratorDry(ContentGeneratorProtocol):
@@ -36,12 +39,12 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     def _make_generated_image_fake(
         self,
         raw_details: GeneratedImageRawDetails,
-    ) -> GeneratedImageResolved:
-        return GeneratedImageResolved(
+    ) -> ImageContent:
+        return ImageContent(
             url=raw_details.actual_url or "https://example.com/image.jpg",
+            display_link=raw_details.actual_url or "https://example.com/image.jpg",
             mime_type=raw_details.mime_type or "image/jpeg",
-            width=raw_details.width,
-            height=raw_details.height,
+            size=raw_details.size,
         )
 
     @override
@@ -145,12 +148,38 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         )
 
     @override
-    async def make_generated_image(
+    async def make_image_content(
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
-    ) -> GeneratedImageResolved:
+    ) -> ImageContent:
         return self._make_generated_image_fake(raw_details=generated_image_raw_details)
+
+    @override
+    async def make_page_contents(
+        self,
+        job_metadata: JobMetadata,
+        extract_output: ExtractOutput,
+    ) -> list[PageContent]:
+        page_contents: list[PageContent] = []
+        for page_index in sorted(extract_output.pages.keys()):
+            page = extract_output.pages[page_index]
+            page_images: list[ImageContent] = []
+            for extracted_image in page.extracted_images:
+                image_content = await self.make_image_content(
+                    job_metadata=job_metadata,
+                    generated_image_raw_details=extracted_image,
+                )
+                page_images.append(image_content)
+            page_contents.append(
+                PageContent(
+                    text_and_images=TextAndImagesContent(
+                        text=TextContent(text=page.text) if page.text else None,
+                        images=page_images,
+                    ),
+                )
+            )
+        return page_contents
 
     @override
     @update_job_metadata
@@ -161,7 +190,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> GeneratedImageResolved:
+    ) -> ImageContent:
         func_name = "make_single_image"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
@@ -169,8 +198,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         return self._make_generated_image_fake(
             raw_details=GeneratedImageRawDetails(
                 actual_url=image_url,
-                width=1024,
-                height=1024,
+                size=ImageSize(width=1024, height=1024),
                 mime_type="image/jpeg",
             ),
         )
@@ -185,7 +213,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> list[GeneratedImageResolved]:
+    ) -> list[ImageContent]:
         func_name = "make_image_list"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
@@ -193,8 +221,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             self._make_generated_image_fake(
                 raw_details=GeneratedImageRawDetails(
                     actual_url=image_urls[image_index % len(image_urls)],
-                    width=1024,
-                    height=1024,
+                    size=ImageSize(width=1024, height=1024),
                     mime_type="image/jpeg",
                 ),
             )
@@ -219,6 +246,31 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         )
 
     @override
+    async def make_render_page_views(
+        self,
+        job_metadata: JobMetadata,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
+        extract_job_config: ExtractJobConfig | None = None,
+    ) -> list[ImageContent]:
+        if not extract_input.pdf_uri:
+            msg = "PDF URI is required to render page views"
+            raise ValueError(msg)
+        nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
+        page_view_images_resolved: list[ImageContent] = []
+        for page_index in range(1, nb_pages + 1):
+            page_view_image = self._make_generated_image_fake(
+                raw_details=GeneratedImageRawDetails(
+                    actual_url=f"https://example.com/page_{page_index}.png",
+                    size=ImageSize(width=1024, height=1024),
+                    mime_type="image/jpeg",
+                ),
+            )
+            page_view_images_resolved.append(page_view_image)
+        return page_view_images_resolved
+
+    @override
     async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
@@ -226,31 +278,46 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-    ) -> ExtractOutput:
+    ) -> list[PageContent]:
         func_name = "make_extract_pages"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
+        nb_pages: int
         if extract_input.image_uri:
-            image_as_page = Page(
-                text="DRY RUN: OCR text",
-                extracted_images=[],
-                page_view=None,
-            )
-            extract_output = ExtractOutput(
-                pages={1: image_as_page},
-            )
+            nb_pages = 1
         else:
             nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
-            pages = {
-                page_index: Page(
-                    text="DRY RUN: OCR text",
-                    extracted_images=[],
-                    page_view=ExtractedImageFromPage(
-                        image_id=f"page_view_{page_index}",
-                        base_64=DRY_BASE_64_IMAGE,
-                        caption="DRY RUN: OCR text",
+        page_contents: list[PageContent] = []
+        for _ in range(1, nb_pages + 1):
+            page = Page(
+                text="DRY RUN: OCR text",
+                extracted_images=[],
+            )
+            page_contents.append(
+                PageContent(
+                    text_and_images=TextAndImagesContent(
+                        text=TextContent(text=page.text) if page.text else None,
+                        images=[],
                     ),
+                    page_view=None,
                 )
-                for page_index in range(1, nb_pages + 1)
-            }
-            extract_output = ExtractOutput(pages=pages)
-        return extract_output
+            )
+
+        if extract_job_params and extract_job_params.should_include_page_views:
+            page_view_contents: list[ImageContent] = []
+            if extract_input.pdf_uri:
+                page_view_contents = await self.make_render_page_views(
+                    extract_input=extract_input,
+                    extract_handle=extract_handle,
+                    job_metadata=job_metadata,
+                    extract_job_params=extract_job_params,
+                    extract_job_config=extract_job_config,
+                )
+            elif extract_input.image_uri:
+                page_view_contents = [ImageContent(url=extract_input.image_uri)]
+            if len(page_view_contents) != len(page_contents):
+                msg = f"Number of page view contents ({len(page_view_contents)}) does not match number of page contents ({len(page_contents)})"
+                raise ValueError(msg)
+            for page_content in page_contents:
+                page_content.page_view = page_view_contents.pop(0)
+
+        return page_contents

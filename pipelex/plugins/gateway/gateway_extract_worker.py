@@ -12,13 +12,14 @@ from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import make_base_64_url_from_location_async
+from pipelex.tools.misc.base64_utils import make_base64_url_from_location_async
 from pipelex.types import StrEnum
 
 
@@ -83,8 +84,9 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             if extract_job.job_params.should_caption_images:
                 msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
                 raise NotImplementedError(msg)
-            base64_url = await make_base_64_url_from_location_async(location=image_uri)
+            base64_url = await make_base64_url_from_location_async(location=image_uri)
             extract_output = await self.extract_base64_url(
+                extract_job=extract_job,
                 base64_url=base64_url,
                 document_type=DocumentKind.IMAGE,
                 should_include_images=False,
@@ -92,15 +94,12 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
 
         elif pdf_uri := extract_job.extract_input.pdf_uri:
             if extract_job.job_params.should_caption_images:
+                # TODO: handle model capability and skip UT when it's not supported
                 msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
                 raise ExtractCapabilityError(msg)
-            if extract_job.job_params.should_include_page_views:
-                log.verbose(f"Page views are not implemented by '{self.inference_model.tag}'.")
-                # TODO: use a model capability flag to check possibility before asking for it
-                # it it's asked and not available, raise
-                # the caller will be responsible to get the page views using other solution if needed
-            base64_url = await make_base_64_url_from_location_async(location=pdf_uri)
+            base64_url = await make_base64_url_from_location_async(location=pdf_uri)
             extract_output = await self.extract_base64_url(
+                extract_job=extract_job,
                 base64_url=base64_url,
                 document_type=DocumentKind.PDF,
                 should_include_images=extract_job.job_params.should_include_images,
@@ -112,18 +111,22 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
 
     async def extract_base64_url(
         self,
+        extract_job: ExtractJob,
         base64_url: str,
         document_type: DocumentKind,
         should_include_images: bool = False,
     ) -> ExtractOutput:
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
-        doc_tag = document_type.document_tag
 
+        doc_tag = document_type.document_tag
         attempt_number = 0
         response: GenericResponse | None = None
         retryer = self._make_retryer()
         try:
+            extra_headers, extra_body = GatewayFactory.make_extras(
+                inference_model=self.inference_model, inference_job=extract_job, output_desc=InferenceOutputType.PAGES
+            )
             async for attempt in retryer:
                 with attempt:
                     attempt_number += 1
@@ -131,7 +134,8 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                         "/",
                         model=self.inference_model.model_id,
                         document={"type": doc_tag, doc_tag: base64_url},
-                        include_image_base64=True,
+                        headers=extra_headers,
+                        **extra_body,
                     )
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
@@ -146,9 +150,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
 
-        return GatewayCompletionsFactory.make_extract_output_from_portkey_response(
-            response=response,
-        )
+        return GatewayCompletionsFactory.make_extract_output_from_response(inference_model=self.inference_model, response=response)
 
     def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
         if isinstance(exc, portkey_exceptions.NotFoundError):

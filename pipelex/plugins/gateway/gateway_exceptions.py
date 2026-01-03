@@ -15,3 +15,7 @@ class GatewayCredentialsError(GatewayError):
 
 class GatewayDeckError(GatewayError):
     pass
+
+
+class GatewayExtractResponseError(GatewayError):
+    pass

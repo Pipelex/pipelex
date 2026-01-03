@@ -193,11 +193,19 @@ sdxl_lightning = { "low" = 2, "medium" = 4, "high" = 8 }
 qwen_image = { "low" = 10, "medium" = 20, "high" = 28 }
 
 ####################################################################################################
-# OCR config
+# Extract config
 ####################################################################################################
 
 [cogt.extract_config]
 default_page_views_dpi = 72
+
+####################################################################################################
+# Gateway test config
+####################################################################################################
+
+[cogt.gateway_test_config.config_id_substitutions]
+# this is an empty dict, it's only used by Pipelex staff to override the ¨Pipelex Gateway¨ config
+# in order to test new model integrations or debug issues with the Gateway
 
 ####################################################################################################
 # Pipelex prompting config

@@ -12,6 +12,7 @@ from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
@@ -46,7 +47,11 @@ class PipeImgGenBlueprint(PipeBlueprint):
             template_category=template_category,
             template_source=preprocessed_template,
         )
-        required_variables = {path.split(".")[0] for path in full_paths if not path.split(".")[0].startswith("_")}
+        required_variables: set[str] = set()
+        for path in full_paths:
+            root = get_root_from_dotted_path(path)
+            if not root.startswith("_"):
+                required_variables.add(root)
 
         # Check that all required variables are in inputs
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()

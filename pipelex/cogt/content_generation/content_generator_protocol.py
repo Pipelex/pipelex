@@ -5,7 +5,7 @@ from typing import Any, ParamSpec, Protocol, TypeVar
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
-from pipelex.cogt.image.generated_image import GeneratedImageRawDetails, GeneratedImageResolved
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -13,6 +13,8 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -87,11 +89,17 @@ class ContentGeneratorProtocol(Protocol):
         nb_items: int | None = None,
     ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
 
-    async def make_generated_image(
+    async def make_image_content(
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
-    ) -> GeneratedImageResolved: ...
+    ) -> ImageContent: ...
+
+    async def make_page_contents(
+        self,
+        job_metadata: JobMetadata,
+        extract_output: ExtractOutput,
+    ) -> list[PageContent]: ...
 
     def make_single_image(
         self,
@@ -100,7 +108,7 @@ class ContentGeneratorProtocol(Protocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> Coroutine[Any, Any, GeneratedImageResolved]: ...
+    ) -> Coroutine[Any, Any, ImageContent]: ...
 
     def make_image_list(
         self,
@@ -110,7 +118,7 @@ class ContentGeneratorProtocol(Protocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> Coroutine[Any, Any, list[GeneratedImageResolved]]: ...
+    ) -> Coroutine[Any, Any, list[ImageContent]]: ...
 
     def make_templated_text(
         self,
@@ -120,6 +128,15 @@ class ContentGeneratorProtocol(Protocol):
         template_category: TemplateCategory | None = None,
     ) -> Coroutine[Any, Any, str]: ...
 
+    async def make_render_page_views(
+        self,
+        job_metadata: JobMetadata,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
+        extract_job_config: ExtractJobConfig | None = None,
+    ) -> list[ImageContent]: ...
+
     def make_extract_pages(
         self,
         job_metadata: JobMetadata,
@@ -127,4 +144,4 @@ class ContentGeneratorProtocol(Protocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams,
         extract_job_config: ExtractJobConfig,
-    ) -> Coroutine[Any, Any, ExtractOutput]: ...
+    ) -> Coroutine[Any, Any, list[PageContent]]: ...
