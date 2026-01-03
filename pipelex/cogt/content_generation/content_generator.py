@@ -355,7 +355,7 @@ class ContentGenerator(ContentGeneratorProtocol):
                     extract_handle=extract_handle,
                     job_metadata=job_metadata,
                     extract_job_params=extract_job_params,
-                    extract_job_config=ExtractJobConfig(),
+                    extract_job_config=extract_job_config,
                 )
             elif extract_input.image_uri:
                 page_view_contents = [ImageContent(url=extract_input.image_uri)]
