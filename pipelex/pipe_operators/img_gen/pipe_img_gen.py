@@ -45,6 +45,7 @@ class PipeImgGenOutput(PipeOutput):
 class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     prompt_blueprint: TemplateBlueprint
+    negative_prompt_blueprint: TemplateBlueprint | None
     img_gen_choice: ImgGenModelChoice | None = None
 
     # One-time settings (not in ImgGenSetting)
@@ -63,7 +64,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     @override
     def required_variables(self) -> set[str]:
         """Required variables are the variables that are used in the prompt template"""
-        return {variable_name for variable_name in self.prompt_blueprint.required_variables() if not variable_name.startswith("_")}
+        required_variables = {variable_name for variable_name in self.prompt_blueprint.required_variables() if not variable_name.startswith("_")}
+        if self.negative_prompt_blueprint:
+            required_variables.update(
+                {variable_name for variable_name in self.negative_prompt_blueprint.required_variables() if not variable_name.startswith("_")}
+            )
+        return required_variables
 
     @override
     def validate_inputs_static(self):
@@ -116,17 +122,30 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
 
         try:
-            context: dict[str, Any] = working_memory.generate_context()
+            positive_prompt_context: dict[str, Any] = working_memory.generate_context()
             if extra_params := pipe_run_params.params:
-                context = substitute_nested_in_context(context=context, extra_params=extra_params)
+                positive_prompt_context = substitute_nested_in_context(context=positive_prompt_context, extra_params=extra_params)
             if extra_context := self.prompt_blueprint.extra_context:
-                context.update(**extra_context)
-            img_gen_prompt_text = await content_generator.make_templated_text(
-                context=context,
+                positive_prompt_context.update(**extra_context)
+            positive_prompt_text = await content_generator.make_templated_text(
+                context=positive_prompt_context,
                 template=self.prompt_blueprint.template,
                 templating_style=self.prompt_blueprint.templating_style,
                 template_category=self.prompt_blueprint.category,
             )
+            negative_prompt_text: str | None = None
+            if self.negative_prompt_blueprint:
+                negative_prompt_context: dict[str, Any] = positive_prompt_context.copy()
+                if extra_params := pipe_run_params.params:
+                    negative_prompt_context = substitute_nested_in_context(context=negative_prompt_context, extra_params=extra_params)
+                if extra_context := self.negative_prompt_blueprint.extra_context:
+                    negative_prompt_context.update(**extra_context)
+                negative_prompt_text = await content_generator.make_templated_text(
+                    context=negative_prompt_context,
+                    template=self.negative_prompt_blueprint.template,
+                    templating_style=self.negative_prompt_blueprint.templating_style,
+                    template_category=self.negative_prompt_blueprint.category,
+                )
         except WorkingMemoryStuffNotFoundError as stuff_not_found_error:
             msg = f"While runnning the PipeImgGen '{self.code}' some inputs could not be found in the working_memory: {stuff_not_found_error}"
             raise PipeImgGenRunError(message=msg) from stuff_not_found_error
@@ -197,7 +216,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 job_metadata=job_metadata,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=ImgGenPrompt(
-                    positive_text=img_gen_prompt_text,
+                    positive_text=positive_prompt_text,
+                    negative_text=negative_prompt_text,
                 ),
                 nb_images=nb_images,
                 img_gen_job_params=img_gen_job_params,
@@ -207,7 +227,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             for generated_image in generated_image_list:
                 image_content = image_content_subclass(
                     url=generated_image.url,
-                    source_prompt=img_gen_prompt_text,
+                    source_prompt=positive_prompt_text,
+                    negative_text=negative_prompt_text,
                 )
                 image_content_items.append(image_content)
             the_content = ListContent(
@@ -219,7 +240,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 job_metadata=job_metadata,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=ImgGenPrompt(
-                    positive_text=img_gen_prompt_text,
+                    positive_text=positive_prompt_text,
+                    negative_text=negative_prompt_text,
                 ),
                 img_gen_job_params=img_gen_job_params,
                 img_gen_job_config=img_gen_config.img_gen_job_config,
@@ -227,7 +249,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
             the_content = image_content_subclass(
                 url=generated_image.url,
-                source_prompt=img_gen_prompt_text,
+                source_prompt=positive_prompt_text,
+                negative_text=negative_prompt_text,
             )
             log.verbose(the_content, title=f"output stuff content of PipeImg {self.code}")
 

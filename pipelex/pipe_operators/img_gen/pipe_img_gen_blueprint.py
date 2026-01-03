@@ -19,6 +19,7 @@ class PipeImgGenBlueprint(PipeBlueprint):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     prompt: str
+    negative_prompt: str | None = None
 
     model: ImgGenModelChoice | None = None
 

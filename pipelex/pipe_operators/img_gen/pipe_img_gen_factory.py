@@ -36,7 +36,14 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             template=blueprint.prompt,
             category=TemplateCategory.IMG_GEN_PROMPT,
         )
-
+        negative_prompt_blueprint = (
+            TemplateBlueprint(
+                template=blueprint.negative_prompt,
+                category=TemplateCategory.IMG_GEN_PROMPT,
+            )
+            if blueprint.negative_prompt
+            else None
+        )
         return PipeImgGen(
             domain_code=domain_code,
             code=pipe_code,
@@ -45,6 +52,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             output=output,
             output_multiplicity=final_multiplicity,
             prompt_blueprint=prompt_blueprint,
+            negative_prompt_blueprint=negative_prompt_blueprint,
             img_gen_choice=blueprint.model,
             aspect_ratio=blueprint.aspect_ratio,
             is_raw=blueprint.is_raw,

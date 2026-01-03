@@ -61,6 +61,7 @@ class ImgGenArgsFactory:
         # Common args that don't need rules
         args_dict: dict[str, Any] = {
             "prompt": img_gen_job.img_gen_prompt.positive_text,
+            "negative_prompt": img_gen_job.img_gen_prompt.negative_text,
         }
 
         for topic, taxonomy_value in model_rules.items():
