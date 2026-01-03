@@ -8,6 +8,7 @@ from pipelex.system.pipelex_service.exceptions import (
 )
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
+from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.terminal_utils import print_to_stderr
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -73,6 +74,7 @@ class RemoteConfigFetcher:
         url = PipelexDetails.REMOTE_CONFIG_URL
 
         try:
+            print(f"Fetching remote config with run mode = '{runtime_manager.run_mode}' from {url}")
             response = cls._fetch_remote_config_with_retry(url)
         except httpx.TimeoutException as exc:
             msg = f"Timeout while fetching remote configuration from {url}: {exc}"
