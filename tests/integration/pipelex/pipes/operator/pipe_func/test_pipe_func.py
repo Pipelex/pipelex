@@ -96,7 +96,7 @@ if __name__ == "__main__":
         wrapped_text_str = wrapped_text.text
 
         # In DRY mode, we get mock content, so we only check basic structure
-        if pipe_run_mode == PipeRunMode.DRY:
+        if pipe_run_mode.is_dry:
             # In dry mode, just verify we have text content and it's non-empty
             assert isinstance(wrapped_text_str, str)
             assert len(wrapped_text_str) > 0

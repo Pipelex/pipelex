@@ -330,11 +330,8 @@ class PipeAbstract(ABC, BaseModel):
         if indent_level > 0:
             indent = f"{indent}[yellow]↳[/yellow] "
         pipe_type_label = f"[white]{self.pipe_type}:[/white]"
-        match pipe_run_params.run_mode:
-            case PipeRunMode.LIVE:
-                pass
-            case PipeRunMode.DRY:
-                pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
+        if pipe_run_params.run_mode.is_dry:
+            pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
         pipe_code_label = f"[red]{self.code}[/red]"
         concept_code_label = f"[bold green]{self.output.concept.code}[/bold green]"
         arrow = "[yellow]→[/yellow]"

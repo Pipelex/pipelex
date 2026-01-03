@@ -12,7 +12,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipeline_tracker, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.exceptions import PipeRunError
-from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunMode, PipeRunParams
+from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -180,7 +180,7 @@ class PipeBatch(PipeController):
             content=list_content,
             name=output_name,
         )
-        method_name = "dry_run_pipe" if pipe_run_params.run_mode == PipeRunMode.DRY else "run_pipe"
+        method_name = "dry_run_pipe" if pipe_run_params.run_mode.is_dry else "run_pipe"
         for branch_index, (
             required_stuff_list,
             item_input_stuff,
