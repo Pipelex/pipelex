@@ -1,4 +1,4 @@
-"""CLI command to dry run a pipe and output the execution graph as JSON."""
+"""CLI command to dry run a pipe and output the execution graph."""
 
 from __future__ import annotations
 
@@ -21,6 +21,8 @@ from pipelex.cli.error_handlers import (
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.observability.graphspec import GraphSpec, graphspec_to_json, save_graphspec
+from pipelex.observability.graphspec.html_renderer import render_mermaid_html
+from pipelex.observability.graphspec.mermaid import VALID_DIRECTIONS, graphspec_to_mermaid
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
 from pipelex.pipelex import Pipelex
@@ -30,6 +32,57 @@ from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "graph"
+
+
+def _resolve_output_paths(
+    out: str | None,
+    generate_json: bool,
+    generate_mermaid: bool,
+    generate_html: bool,
+) -> tuple[Path | None, Path | None, Path | None]:
+    """Resolve output paths based on the --out option.
+
+    Args:
+        out: The --out option value (path, directory, or stem).
+        generate_json: Whether JSON output is requested.
+        generate_mermaid: Whether Mermaid output is requested.
+        generate_html: Whether HTML output is requested.
+
+    Returns:
+        Tuple of (json_path, mermaid_path, html_path). None means stdout/skip.
+    """
+    if out is None:
+        # Default behavior: JSON to stdout, others to CWD if requested
+        json_path: Path | None = None  # stdout
+        mermaid_path = Path("graph.mmd") if generate_mermaid else None
+        html_path = Path("graph.html") if generate_html else None
+        return json_path, mermaid_path, html_path
+
+    out_path = Path(out)
+
+    # Case 1: --out is an existing directory
+    if out_path.is_dir():
+        json_path = out_path / "graph.json" if generate_json else None
+        mermaid_path = out_path / "graph.mmd" if generate_mermaid else None
+        html_path = out_path / "graph.html" if generate_html else None
+        return json_path, mermaid_path, html_path
+
+    # Case 2: --out ends with .json - use as JSON path, derive siblings
+    if out.endswith(".json"):
+        stem = out_path.stem
+        parent = out_path.parent
+        json_path = out_path if generate_json else None
+        mermaid_path = parent / f"{stem}.mmd" if generate_mermaid else None
+        html_path = parent / f"{stem}.html" if generate_html else None
+        return json_path, mermaid_path, html_path
+
+    # Case 3: --out is a stem base
+    stem = out_path.name
+    parent = out_path.parent if out_path.parent != out_path else Path.cwd()
+    json_path = parent / f"{stem}.json" if generate_json else None
+    mermaid_path = parent / f"{stem}.mmd" if generate_mermaid else None
+    html_path = parent / f"{stem}.html" if generate_html else None
+    return json_path, mermaid_path, html_path
 
 
 def graph_cmd(
@@ -47,22 +100,56 @@ def graph_cmd(
     ] = None,
     output: Annotated[
         str | None,
-        typer.Option("--output", "-o", help="Path to save output JSON, defaults to stdout if not specified"),
+        typer.Option("--output", "-o", help="[Deprecated: use --out] Path to save output JSON"),
     ] = None,
+    out: Annotated[
+        str | None,
+        typer.Option("--out", help="Output path, directory, or stem (e.g., 'graph', './out/', 'result.json')"),
+    ] = None,
+    mermaid: Annotated[
+        bool,
+        typer.Option("--mermaid", help="Also generate Mermaid flowchart (.mmd file)"),
+    ] = False,
+    html: Annotated[
+        bool,
+        typer.Option("--html", help="Also generate HTML with embedded Mermaid (.html file)"),
+    ] = False,
+    direction: Annotated[
+        str,
+        typer.Option("--direction", help=f"Mermaid flowchart direction ({', '.join(sorted(VALID_DIRECTIONS))})"),
+    ] = "TD",
+    no_data_edges: Annotated[
+        bool,
+        typer.Option("--no-data-edges", help="Exclude data flow edges from Mermaid output"),
+    ] = False,
+    no_contains_edges: Annotated[
+        bool,
+        typer.Option("--no-contains-edges", help="Exclude parent-child (contains) edges from Mermaid output"),
+    ] = False,
 ) -> None:
-    """Dry run a pipe and output its execution graph as JSON.
+    """Dry run a pipe and output its execution graph.
 
-    This command validates and dry runs a pipe, capturing the execution graph
-    structure as a GraphSpec JSON. Useful for visualizing pipe structure
-    and debugging execution flow.
+    By default, outputs JSON to stdout. Use --out to save to file(s).
 
     Examples:
         pipelex graph my_pipe
-        pipelex graph my_bundle.plx
-        pipelex graph --bundle my_bundle.plx
-        pipelex graph --bundle my_bundle.plx --pipe my_pipe
-        pipelex graph my_pipe --output graph.json
+        pipelex graph my_pipe --out graph.json
+        pipelex graph my_pipe --mermaid --html --out ./output/
+        pipelex graph my_bundle.plx --mermaid --direction LR
     """
+    # Handle deprecated --output flag
+    if output and not out:
+        out = output
+
+    # Validate direction
+    if direction not in VALID_DIRECTIONS:
+        typer.secho(
+            f"Invalid direction '{direction}'. Must be one of: {', '.join(sorted(VALID_DIRECTIONS))}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
     if provided_options == 0:
@@ -153,14 +240,49 @@ def graph_cmd(
 
             graph_spec = asyncio.run(generate_graph(pipe_code=pipe_code, bundle_path=bundle_path))
 
-            # Output the graph
-            if output:
-                save_graphspec(graph_spec, Path(output))
-                typer.secho(f"✅ Graph saved to: {output}", fg=typer.colors.GREEN, err=True)
+            # Determine what outputs to generate
+            generate_json = True  # Always generate JSON (either to stdout or file)
+            generate_mermaid = mermaid or html  # Mermaid needed for HTML too
+            generate_html = html
+
+            # Resolve output paths
+            json_path, mermaid_path, html_path = _resolve_output_paths(
+                out=out,
+                generate_json=generate_json,
+                generate_mermaid=generate_mermaid,
+                generate_html=generate_html,
+            )
+
+            # Generate and save JSON
+            if json_path:
+                save_graphspec(graph_spec, json_path)
+                typer.secho(f"✅ JSON saved to: {json_path}", fg=typer.colors.GREEN, err=True)
             else:
-                # Output to stdout
+                # Output JSON to stdout
                 json_str = graphspec_to_json(graph_spec)
                 typer.echo(json_str)
+
+            # Generate and save Mermaid
+            if generate_mermaid:
+                mermaid_code = graphspec_to_mermaid(
+                    graph_spec,
+                    direction=direction,
+                    include_data_edges=not no_data_edges,
+                    include_contains_edges=not no_contains_edges,
+                )
+                if mermaid_path:
+                    mermaid_path.write_text(mermaid_code, encoding="utf-8")
+                    typer.secho(f"✅ Mermaid saved to: {mermaid_path}", fg=typer.colors.GREEN, err=True)
+
+                # Generate and save HTML (uses mermaid_code)
+                if generate_html and html_path:
+                    # Determine title from pipe name
+                    title = pipe_code or bundle_path or "Pipelex Graph"
+                    if bundle_path:
+                        title = Path(bundle_path).stem
+                    html_content = render_mermaid_html(mermaid_code, title=f"Graph: {title}")
+                    html_path.write_text(html_content, encoding="utf-8")
+                    typer.secho(f"✅ HTML saved to: {html_path}", fg=typer.colors.GREEN, err=True)
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.VALIDATION)

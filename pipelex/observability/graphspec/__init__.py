@@ -2,7 +2,8 @@
 
 This module provides the canonical, versioned data model (GraphSpec) for
 representing Pipelex pipeline execution graphs, along with JSON serialization,
-validation utilities, and a runtime tracer for building graphs during execution.
+validation utilities, a runtime tracer for building graphs during execution,
+and exporters for Mermaid flowcharts and HTML visualization.
 """
 
 from pipelex.observability.graphspec.exceptions import (
@@ -41,6 +42,8 @@ from pipelex.observability.graphspec.graphspec_io import (
     load_graphspec,
     save_graphspec,
 )
+from pipelex.observability.graphspec.html_renderer import render_mermaid_html
+from pipelex.observability.graphspec.mermaid import graphspec_to_mermaid
 from pipelex.observability.graphspec.validation import validate_graphspec
 
 __all__ = [
@@ -78,4 +81,7 @@ __all__ = [
     "save_graphspec",
     # Validation
     "validate_graphspec",
+    # Mermaid/HTML export
+    "graphspec_to_mermaid",
+    "render_mermaid_html",
 ]
