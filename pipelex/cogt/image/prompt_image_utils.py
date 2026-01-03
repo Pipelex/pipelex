@@ -1,4 +1,5 @@
 import asyncio
+import base64
 
 from pipelex.cogt.exceptions import PromptImageFactoryError
 from pipelex.cogt.image.prompt_image import (
@@ -11,10 +12,7 @@ from pipelex.cogt.image.prompt_image import (
 )
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.hub import get_storage_provider
-from pipelex.tools.misc.base_64_utils import (
-    encode_to_base64,
-    load_binary_as_base64_async,
-)
+from pipelex.tools.misc.base64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import (
     detect_file_type_from_base64,
@@ -64,7 +62,7 @@ async def promptimage_to_typed_bytes_or_url(
             storage_provider = get_storage_provider()
             image_bytes = storage_provider.load(uri=prompt_image.url)
             file_type = detect_file_type_from_bytes(image_bytes)
-            base64_bytes = encode_to_base64(image_bytes)
+            base64_bytes = base64.b64encode(image_bytes)
             typed_bytes_or_url = PromptImageTypedBase64(base_64=base64_bytes, file_type=file_type)
         else:
             file_path, url = clarify_path_or_url(path_or_uri=prompt_image.url)

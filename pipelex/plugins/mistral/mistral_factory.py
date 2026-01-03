@@ -31,7 +31,7 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.mistral.mistral_exceptions import MistralExtractResponseError
 from pipelex.plugins.openai.openai_utils import make_image_url_obj
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64
+from pipelex.tools.misc.base64_utils import load_binary_as_base64
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_path
 
 

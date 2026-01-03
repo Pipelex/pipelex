@@ -11,7 +11,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
+from pipelex.tools.misc.base64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.misc.path_utils import clarify_path_or_url
 
@@ -69,13 +69,10 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             raise NotImplementedError(msg)
         image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
         if image_url:
-            return await self.extract_from_image_url(
-                image_url=image_url,
-            )
-        assert image_path is not None
-        return await self.extract_from_image_file(
-            image_path=image_path,
-        )
+            return await self._extract_from_image_url(image_url=image_url)
+        else:
+            assert image_path is not None
+            return await self._extract_from_image_file(image_path=image_path)
 
     async def _make_extract_output_from_pdf(
         self,
@@ -101,7 +98,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             )
         return extract_output
 
-    async def extract_from_image_url(
+    async def _extract_from_image_url(
         self,
         image_url: str,
     ) -> ExtractOutput:
@@ -116,13 +113,13 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             mistral_extract_response=extract_response,
         )
 
-    async def extract_from_image_file(
+    async def _extract_from_image_file(
         self,
         image_path: str,
     ) -> ExtractOutput:
         b64 = await load_binary_as_base64_async(path=image_path)
 
-        file_type = detect_file_type_from_base64(b64=b64)
+        file_type = detect_file_type_from_base64(base64_data=b64)
         mime_type = file_type.mime
 
         extract_response = await self.mistral_client.ocr.process_async(

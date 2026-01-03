@@ -1,3 +1,5 @@
+import base64
+
 from pipelex.cogt.exceptions import PromptImageFactoryError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
@@ -7,11 +9,7 @@ from pipelex.cogt.image.prompt_image import (
     PromptImageTypedBase64,
     PromptImageUrl,
 )
-from pipelex.tools.misc.base_64_utils import (
-    encode_to_base64_async,
-    make_base_64_url,
-    strip_base_64_str_if_needed,
-)
+from pipelex.tools.misc.base64_utils import make_base64_url, strip_base64_str_if_needed
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 
 
@@ -27,7 +25,7 @@ class PromptImageFactory:
         if base_64:
             return PromptImageBase64(base_64=base_64)
         elif base_64_str:
-            stripped_base_64_str = strip_base_64_str_if_needed(base_64_str)
+            stripped_base_64_str = strip_base64_str_if_needed(base_64_str)
             return PromptImageBase64(base_64=stripped_base_64_str.encode())
         elif file_path:
             return PromptImagePath(file_path=file_path)
@@ -43,8 +41,8 @@ class PromptImageFactory:
         prompt_image_url: PromptImageUrl,
     ) -> PromptImageBase64:
         raw_image_bytes = await fetch_file_from_url_httpx_async(prompt_image_url.url)
-        base_64 = await encode_to_base64_async(raw_image_bytes)
-        return PromptImageBase64(base_64=base_64)
+        base64_bytes = base64.b64encode(raw_image_bytes)
+        return PromptImageBase64(base_64=base64_bytes)
 
     @classmethod
     async def make_promptimagebinary_from_url_async(
@@ -59,4 +57,4 @@ class PromptImageFactory:
         cls,
         prompt_image: PromptImageTypedBase64,
     ) -> str:
-        return make_base_64_url(base_64=prompt_image.base_64, file_type=prompt_image.file_type)
+        return make_base64_url(base64_bytes=prompt_image.base_64, file_type=prompt_image.file_type)
