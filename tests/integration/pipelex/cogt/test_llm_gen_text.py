@@ -11,10 +11,11 @@ from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.hub import get_llm_worker, get_model_deck
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
-def get_worker_and_job(llm_preset_id: str, user_text: str) -> tuple[LLMWorkerAbstract, LLMJob]:
+def get_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMetadata) -> tuple[LLMWorkerAbstract, LLMJob]:
     llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
     pretty_print(llm_setting, title=llm_preset_id)
     pretty_print(user_text)
@@ -24,6 +25,7 @@ def get_worker_and_job(llm_preset_id: str, user_text: str) -> tuple[LLMWorkerAbs
         llm_prompt=LLMPrompt(
             user_text=user_text,
         ),
+        job_metadata=job_metadata,
         llm_job_params=llm_job_params,
         llm_job_config=LLMJobConfig(
             max_retries=3,
@@ -38,13 +40,16 @@ def get_worker_and_job(llm_preset_id: str, user_text: str) -> tuple[LLMWorkerAbs
 @pytest.mark.usefixtures("routing_profile_override")
 class TestLLMGenText:
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str):
+    async def test_gen_text_using_handle(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str
+    ):
         pretty_print(prompt_text, title=f"Generating text about '{topic}' using '{llm_handle}'")
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
                 user_text=prompt_text,
             ),
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
             llm_job_config=LLMJobConfig(
                 max_retries=3,
@@ -55,15 +60,15 @@ class TestLLMGenText:
         pretty_print(generated_text)
 
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
-        llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text)
+    async def test_gen_text_using_llm_preset(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
+        llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text, job_metadata=job_metadata)
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
 
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_gen_text_multiple_using_llm_preset(self, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
-        llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text)
+    async def test_gen_text_multiple_using_llm_preset(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
+        llm_worker, llm_job = get_worker_and_job(llm_preset_id=llm_preset_id, user_text=prompt_text, job_metadata=job_metadata)
         job_params_base = llm_job.job_params
         max_tokens = 30
         temperature = 0.1

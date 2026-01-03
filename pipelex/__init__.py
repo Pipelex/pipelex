@@ -1,8 +1,9 @@
 from pipelex.tools.log.log import log
-from pipelex.tools.misc.pretty import pretty_print, pretty_print_md
+from pipelex.tools.misc.pretty import pretty_print, pretty_print_md, pretty_print_url
 
 __all__ = [
     "log",
     "pretty_print",
     "pretty_print_md",
+    "pretty_print_url",
 ]

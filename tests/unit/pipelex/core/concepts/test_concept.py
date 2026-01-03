@@ -1,6 +1,7 @@
 import pytest
 from kajson.kajson_manager import KajsonManager
 
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -15,12 +16,15 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 
 # Custom StuffContent class with nested ImageContent-like field for testing
 class NestedImageInfo(StructuredContent):
-    """A nested structure that contains image-like data."""
+    """A nested structure that contains image-like data (same structure as ImageContent)."""
 
     url: str
+    display_link: str | None = None
     source_prompt: str | None = None
+    source_negative_prompt: str | None = None
     caption: str | None = None
-    base_64: str | None = None
+    mime_type: str | None = None
+    size: ImageSize | None = None
 
 
 class DocumentWithNestedImage(StructuredContent):

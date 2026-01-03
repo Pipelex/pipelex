@@ -2,11 +2,13 @@ from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
+import shortuuid
 from pytest_mock import MockerFixture
 
 from pipelex import log
 from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -108,3 +110,18 @@ def load_empty_library() -> Generator[Callable[[], str], None, None]:
         library_manager = get_library_manager()
         library_manager.teardown(library_id=library_id)
         log.verbose(f"Torn down library: {library_id}")
+
+
+@pytest.fixture
+def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
+    """Provide a JobMetadata instance with test-specific values.
+
+    Uses the test node ID as pipeline_run_id for better traceability in logs.
+    """
+    test_id: str = request.node.nodeid  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    random_code: str = shortuuid.uuid()[:5]
+    pipeline_run_id: str = f"{test_id}-{random_code}"
+    return JobMetadata(
+        user_id="pytest",
+        pipeline_run_id=pipeline_run_id,
+    )

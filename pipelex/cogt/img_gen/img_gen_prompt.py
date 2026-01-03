@@ -9,6 +9,7 @@ from pipelex.tools.misc.json_utils import json_str
 
 class ImgGenPrompt(BaseModel):
     positive_text: str
+    negative_text: str | None = None
 
     def validate_before_execution(self):
         reaction = runtime_manager.problem_reactions.job

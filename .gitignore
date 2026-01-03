@@ -44,6 +44,7 @@ results/
 
 # personnal pipelex config files that overrides the default one
 pipelex_super.toml
+pipelex_override.toml
 telemetry_override.toml
 
 # local pipelex service configuration
@@ -57,4 +58,4 @@ gcp_credentials.json
 /pipelex.toml
 settings.local.json
 structures/
-telemetry_override.toml
+.pipelex/storage

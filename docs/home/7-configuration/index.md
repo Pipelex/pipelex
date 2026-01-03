@@ -34,7 +34,7 @@ In addition to `.pipelex/pipelex.toml`, Pipelex can apply override files at the 
 1. `pipelex_local.toml`
 2. `pipelex_{environment}.toml` (example: `pipelex_dev.toml`)
 3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; unit tests may use `tests/pipelex_unit_test.toml`)
-4. `pipelex_super.toml` (recommended to gitignore)
+4. `pipelex_override.toml` (recommended to gitignore)
 
 !!! info "Contributor details"
     For the full “where defaults live” and “how config is merged” explanation, see [Configuration Internals](../../contribute/configuration-defaults-and-overrides.md).
@@ -62,7 +62,7 @@ The exact loading sequence is:
    - Example environments: dev, staging, prod -> based on the environment variable `ENV` in your .env file
 5. Run mode overrides (`pipelex_{run_mode}.toml`)
    - Example run modes: normal, unit_test
-6. Super user overrides (`pipelex_super.toml`) (recommended to put in .gitignore)
+6. Final overrides (`pipelex_override.toml`) (recommended to put in .gitignore)
 
 Each subsequent configuration file in this sequence can override settings from the previous ones. This means:
 
@@ -77,7 +77,7 @@ Each subsequent configuration file in this sequence can override settings from t
 - Local overrides: `pipelex_local.toml`
 - Environment overrides: `pipelex_dev.toml`, `pipelex_staging.toml`, `pipelex_prod.toml`, etc.
 - Run mode overrides: `pipelex_normal.toml`, `tests/pipelex_unit_test.toml`, etc.
-- Super user overrides: `pipelex_super.toml`
+- Final overrides: `pipelex_override.toml`
 
 NB: The run_mode unit_test is used for testing purposes.
 
@@ -87,7 +87,7 @@ NB: The run_mode unit_test is used for testing purposes.
 2. Use `pipelex_local.toml` for machine-specific settings
 3. Use environment files for environment-specific settings (dev, staging, prod)
 4. Use run mode files for normal or unit_test configurations
-5. Use `pipelex_super.toml` sparingly, only for temporary overrides (add to .gitignore)
+5. Use `pipelex_override.toml` sparingly, only for temporary overrides (add to .gitignore)
 
 ## Best Practices
 

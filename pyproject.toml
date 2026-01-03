@@ -6,13 +6,14 @@ authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
 license = "MIT"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
     "License :: OSI Approved :: MIT License",
 ]
@@ -62,6 +63,7 @@ docling = ["docling>=2.64.0"]
 fal = ["fal-client>=0.4.1"]
 google = ["google-auth-oauthlib>=1.2.1"]
 google-genai = ["google-genai", "instructor[google-genai]"]
+huggingface = ["huggingface_hub>=0.23,<1.0.0"]
 mistralai = ["mistralai==1.5.2"]
 docs = [
     "mkdocs==1.6.1",

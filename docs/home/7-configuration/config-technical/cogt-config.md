@@ -65,7 +65,7 @@ guidance_scale = 3.5    # Controls adherence to prompt
 is_moderated = true    # Enable content moderation
 safety_tolerance = 5    # Safety level (1-6)
 is_raw = false         # Raw output mode
-output_format = "jpg"  # Options: png, jpg, webp
+output_format = "jpeg"  # Options: png, jpeg, webp
 seed = "auto"          # "auto" or specific integer
 ```
 
@@ -101,7 +101,6 @@ Configuration for Optical Character Recognition:
 
 ```toml
 [cogt.extract_config]
-page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 
 ## Unified Backend Integration
@@ -185,9 +184,9 @@ guidance_scale = 3.5
 is_moderated = true
 safety_tolerance = 5
 is_raw = false
-output_format = "jpg"
+output_format = "jpeg"
 seed = "auto"
 
 [cogt.extract_config]
-page_output_text_file_name = "page_text.md"
+default_page_views_dpi = 72
 ```

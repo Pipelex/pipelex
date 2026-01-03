@@ -100,6 +100,8 @@ def make_otel_gen_ai_output_type(output_type: str) -> otel_gen_ai_attributes.Gen
                 return otel_gen_ai_attributes.GenAiOutputTypeValues.JSON
             case InferenceOutputType.IMAGE:
                 return otel_gen_ai_attributes.GenAiOutputTypeValues.IMAGE
+            case InferenceOutputType.PAGES:
+                return otel_gen_ai_attributes.GenAiOutputTypeValues.JSON
     except ValueError as exc:
         msg = f"Invalid LLM output type: {output_type}, and we only support LLM output types for now in OpenTelemetry"
         raise ValueError(msg) from exc

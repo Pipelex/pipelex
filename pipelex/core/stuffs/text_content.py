@@ -6,7 +6,6 @@ from rich.markdown import Markdown
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.file_utils import ensure_directory_exists, save_text_to_path
 from pipelex.tools.misc.pretty import PrettyPrintable
 
 
@@ -46,8 +45,3 @@ class TextContent(StuffContent):
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         return Markdown(self.text)
-
-    def save_to_directory(self, directory: str):
-        ensure_directory_exists(directory)
-        filename = "text_content.txt"
-        save_text_to_path(text=self.text, path=f"{directory}/{filename}")

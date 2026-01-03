@@ -24,7 +24,7 @@ from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition im
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeConditionSimple:
-    async def test_direct_pipe_condition_should_fail(self, load_test_library: Callable[[list[Path]], None]):
+    async def test_direct_pipe_condition_should_fail(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """Test a PipeCondition created directly in code that should FAIL dry run."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create a PipeCondition directly in Python that requires an input
@@ -48,7 +48,7 @@ class TestPipeConditionSimple:
 
         with pytest.raises(PipeRunInputsError) as exc_info:
             await pipe_condition.run_pipe(
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
                 working_memory=empty_working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )
@@ -60,7 +60,7 @@ class TestPipeConditionSimple:
         assert "user_category" in error.missing_inputs
         assert "missing required inputs" in str(error)
 
-    async def test_direct_pipe_condition_should_succeed(self, load_test_library: Callable[[list[Path]], None]):
+    async def test_direct_pipe_condition_should_succeed(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """Test a PipeCondition created directly in code that should SUCCEED dry run."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create a PipeCondition directly in Python
@@ -97,7 +97,7 @@ class TestPipeConditionSimple:
 
         try:
             pipe_output = await pipe_condition.run_pipe(
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )

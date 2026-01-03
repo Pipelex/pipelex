@@ -2,8 +2,9 @@
 
 import pytest
 
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, OutputFormat, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, Quality
 from pipelex.hub import get_model_deck
+from pipelex.tools.misc.image_utils import ImageFormat
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
 
 
@@ -49,12 +50,18 @@ GOOGLE_IMG_GEN_MODELS = [
     "nano-banana-pro",
 ]
 
+# --- Qwen Models --------------------------------------------------------------------------
+QWEN_IMG_GEN_MODELS = [
+    "qwen-image",
+]
+
 # --- All Image Generation Handles ---------------------------------------------------------------
 ALL_IMG_GEN_HANDLES = [
-    *STABLE_DIFFUSION_IMG_GEN_MODELS,
     *FAL_IMG_GEN_MODELS,
-    *OPENAI_IMG_GEN_MODELS,
     *GOOGLE_IMG_GEN_MODELS,
+    *OPENAI_IMG_GEN_MODELS,
+    *QWEN_IMG_GEN_MODELS,
+    *STABLE_DIFFUSION_IMG_GEN_MODELS,
 ]
 
 
@@ -76,13 +83,33 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
         ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
             background=Background.OPAQUE,
-            quality=Quality.LOW,
-            guidance_scale=3.5,
+            nb_steps=10,
+            guidance_scale=2.5,
             is_moderated=None,
             safety_tolerance=1,
             is_raw=None,
-            output_format=OutputFormat.JPG,
-        )
+            output_format=ImageFormat.PNG,
+        ),
+        ImgGenJobParams(
+            aspect_ratio=AspectRatio.PORTRAIT_9_16,
+            background=Background.OPAQUE,
+            quality=Quality.MEDIUM,
+            guidance_scale=2.5,
+            is_moderated=None,
+            safety_tolerance=1,
+            is_raw=None,
+            output_format=ImageFormat.JPEG,
+        ),
+        ImgGenJobParams(
+            aspect_ratio=AspectRatio.LANDSCAPE_3_2,
+            background=Background.OPAQUE,
+            quality=Quality.HIGH,
+            guidance_scale=2.5,
+            is_moderated=None,
+            safety_tolerance=1,
+            is_raw=None,
+            output_format=ImageFormat.PNG,
+        ),
     ],
 )
 def img_gen_job_params(request: pytest.FixtureRequest) -> ImgGenJobParams:

@@ -4,6 +4,14 @@
 
 **Highlights:**
 
+- **`PipeCompose` Construct Mode** — New mode for deterministically building `StructuredContent` objects without an LLM. Compose fields from working memory variables, fixed values, templates, and nested structures.
+
+- **Content Storage System** — Configurable storage for generated artifacts (images, extracted pages). Supports `local` filesystem (`.pipelex/storage/`) and `in_memory` backends. Content referenced via stable `pipelex-storage://` URIs.
+
+- **Hugging Face Backend** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
+
+- **Python 3.14 Support** — Officially tested and supported.
+
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
     **Getting your API key:**
@@ -29,6 +37,8 @@
 ### Added
 
 - New backends & models
+    - Google `gemini-3.0-flash-preview`
+    - Mistral OCR models `mistral-ocr-2503`, `mistral-ocr-2505`, `mistral-ocr-2512`
     - **Scaleway** inference provider support for open-source models
     - **Mistral** Document AI (OCR) via Pipelex Gateway (disclaimer: it's flaky, needs many retries via tenacity)
     - **Portkey AI** backend integration for unified access to multiple models through a single API key
@@ -48,6 +58,11 @@
 
 ### Changed
 
+- **Breaking**: User override config renamed from `pipelex_super.toml` to `pipelex_override.toml`.
+- **Image Generation Architecture**: Refactored to taxonomy-based approach. Standardizes parameter translation (`aspect_ratio`, `quality`, `output_format`) to provider-specific APIs.
+- **Content Handling Overhaul**: `GeneratedImage` replaced by internal `GeneratedImageRawDetails`; `ImageContent` is now standard (without `base_64` field). `PipeExtract` outputs `PageContent` list directly. Content persistence now handled automatically by storage system.
+- **Document Extraction Improvements**: `pypdfium2` extractor now extracts embedded images from PDFs. Response parsing uses dedicated Pydantic schemas for validation.
+- **Default Model Change**: `extract_text_from_visuals` deck now defaults to `azure-document-intelligence` instead of `mistral-ocr`.
 - **`pipelex_inference` replaced by `pipelex_gateway`** with remote model configuration fetching for always-current model support
     - New environment variable `PIPELEX_GATEWAY_API_KEY`
     - Default routing profiles updated from `pipelex_first` to `pipelex_gateway_first` with automatic migration in `pipelex init`
@@ -60,7 +75,7 @@
 - **Main configuration defaults updated** in `.pipelex/pipelex.toml`:
     - Most settings now commented out by default (shown as examples rather than active overrides)
     - `is_generate_cost_report_file_enabled` default changed from `true` to `false`
-    - `pipelex_super.toml` (final override) moved from repo root to `.pipelex/` directory
+    - `pipelex_override.toml` (final override) moved from repo root to `.pipelex/` directory
     - `telemetry_override.toml` (personal telemetry settings) moved from repo root to `.pipelex/` directory
 - Documentation: clarified **Setup (first run)** vs **Configuration (TOML reference)**, added a Setup overview page, and added contributor docs for configuration defaults/overrides.
 - `pipelex init` now creates a documented `telemetry.toml` template instead of prompting for preferences

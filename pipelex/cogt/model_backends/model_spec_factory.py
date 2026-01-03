@@ -18,11 +18,12 @@ BackendModelSpecs = dict[str, Any]
 class InferenceModelSpecBlueprint(ConfigModel):
     enabled: bool = True
     sdk: str
+    variant: str | None = None
     model_type: ModelType = Field(default=ModelType.LLM, strict=False)
     model_id: str | None = None
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
-    costs: CostsByCategoryDict = Field(strict=False)
+    costs: CostsByCategoryDict | None = Field(default=None, strict=False)
     structure_method: StructureMethod | None = Field(default=None, strict=False)
     max_tokens: int | None = None
     max_prompt_images: int | None = None
@@ -87,11 +88,12 @@ class InferenceModelSpecFactory(BaseModel):
             backend_name=backend_name,
             name=name,
             sdk=blueprint.sdk,
+            variant=blueprint.variant,
             model_type=blueprint.model_type,
             model_id=blueprint.model_id or name,
             inputs=blueprint.inputs,
             outputs=blueprint.outputs,
-            costs=blueprint.costs,
+            costs=blueprint.costs or {},
             structure_method=blueprint.structure_method,
             max_tokens=blueprint.max_tokens,
             max_prompt_images=blueprint.max_prompt_images,

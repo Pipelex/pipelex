@@ -16,6 +16,7 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, Stru
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, PipeTestCases
 
 
@@ -26,6 +27,7 @@ from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, Pi
 class TestPipeLLMBasic:
     async def test_pipe_llm_simple(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ):
@@ -47,6 +49,7 @@ class TestPipeLLMBasic:
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
         )
         pipe_llm_output = await get_pipe_router().run(
             pipe_job=pipe_job,
@@ -78,6 +81,7 @@ class TestPipeLLMBasic:
     )
     async def test_pipe_llm_structured(
         self,
+        job_metadata: JobMetadata,
         topic: str,
         data: str,
         concept: str,
@@ -123,6 +127,7 @@ class TestPipeLLMBasic:
             pipe=pipe,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
         )
 
         pipe_llm_output = await get_pipe_router().run(pipe_job=pipe_job)
@@ -152,6 +157,7 @@ class TestPipeLLMBasic:
     @pytest.mark.parametrize(("stuff", "attribute_paths"), PipeTestCases.STUFFS_IMAGE_ATTRIBUTES)
     async def test_pipe_llm_attribute_image(
         self,
+        job_metadata: JobMetadata,
         stuff: Stuff,
         attribute_paths: list[str],
         pipe_run_mode: PipeRunMode,
@@ -180,6 +186,7 @@ class TestPipeLLMBasic:
                     blueprint=pipe_llm_blueprint,
                 ),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                job_metadata=job_metadata,
             )
 
             pipe_llm_output = await get_pipe_router().run(

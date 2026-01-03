@@ -1,4 +1,5 @@
 import importlib.util
+from typing import TYPE_CHECKING
 
 from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
@@ -61,6 +62,33 @@ class ImgGenWorkerFactory:
                 )
 
                 img_gen_worker = FalImgGenWorker(
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "huggingface_img_gen":
+                from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
+
+                from pipelex.plugins.huggingface.huggingface_factory import HuggingFaceFactory  # noqa: PLC0415
+                from pipelex.plugins.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker  # noqa: PLC0415
+
+                if TYPE_CHECKING:
+                    from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T  # noqa: PLC0415
+
+                provider_literal: PROVIDER_OR_POLICY_T
+                if provider_str := plugin.variant:
+                    provider_literal = HuggingFaceFactory.make_huggingface_inference_provider(provider_str=provider_str)
+                else:
+                    provider_literal = "auto"
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=AsyncInferenceClient(
+                        provider=provider_literal,
+                        token=backend.api_key,
+                    ),
+                )
+
+                img_gen_worker = HuggingFaceImgGenWorker(
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,

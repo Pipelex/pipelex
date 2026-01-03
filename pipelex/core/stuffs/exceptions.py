@@ -1,15 +1,23 @@
 from pipelex.base_exceptions import PipelexError
 
 
-class StuffArtefactError(PipelexError):
+class StuffError(PipelexError):
+    pass
+
+
+class StuffFactoryError(StuffError):
+    pass
+
+
+class StuffContentFactoryError(StuffError):
+    pass
+
+
+class StuffArtefactError(StuffError):
     pass
 
 
 class StuffArtefactReservedFieldError(StuffArtefactError):
-    pass
-
-
-class StuffError(PipelexError):
     pass
 
 

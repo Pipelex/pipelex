@@ -18,6 +18,7 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 @pytest.mark.dry_runnable
@@ -25,6 +26,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 class TestSpecialArgsConcept:
     async def test_create_concept_with_content_field(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_empty_library: Callable[[], None],
     ):
@@ -97,6 +99,7 @@ class TestSpecialArgsConcept:
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe_llm,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
             working_memory=working_memory,
         )
 

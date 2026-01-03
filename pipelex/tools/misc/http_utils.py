@@ -1,6 +1,8 @@
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.urls import URLs
 
+URL_MAX_LENGTH = 2048
+
 
 def get_user_agent() -> str:
     version = get_package_version()

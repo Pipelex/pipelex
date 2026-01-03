@@ -26,7 +26,9 @@ from pipelex.pipeline.job_metadata import JobMetadata
 class TestPipeSequenceSimple:
     """Simple integration test for PipeSequence controller."""
 
-    async def test_simple_sequence_processing(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_simple_sequence_processing(
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
         domain_code = "test_integration"
@@ -88,7 +90,7 @@ class TestPipeSequenceSimple:
 
         # Actually run the PipeSequence pipe
         pipe_output = await pipe_sequence.run_pipe(
-            job_metadata=JobMetadata(),
+            job_metadata=job_metadata,
             working_memory=working_memory,
             output_name="sequence_result",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),

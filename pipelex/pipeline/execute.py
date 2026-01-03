@@ -19,6 +19,7 @@ from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 
 
 async def execute_pipeline(
+    user_id: str | None = None,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
@@ -71,6 +72,8 @@ async def execute_pipeline(
     search_domain_codes:
         List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.
+    user_id:
+        Unique identifier for the user.
 
     Returns:
     -------
@@ -89,6 +92,7 @@ async def execute_pipeline(
         dynamic_output_concept_code=dynamic_output_concept_code,
         pipe_run_mode=pipe_run_mode,
         search_domain_codes=search_domain_codes,
+        user_id=user_id,
     )
 
     properties: dict[EventProperty, Any]

@@ -26,6 +26,14 @@
 #
 ####################################################################################################
 
+
+[pipelex.storage_config]
+# Uncomment to change the storage method: "local" (default) or "in_memory"
+# is_fetch_remote_content_enabled = true
+# uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+# method = "local"
+# local_storage_path = ".pipelex/storage"
+
 [pipelex.scan_config]
 # Uncomment to customize the excluded directories for scanning
 # excluded_dirs = [

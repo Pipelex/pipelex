@@ -63,7 +63,7 @@ class PipeCondition(PipeController):
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
-        required_variables.update(path.split(".")[0] for path in full_paths)
+        required_variables.update(get_root_from_dotted_path(path) for path in full_paths)
 
         # Variables from the outcomes map and default_outcome
         for pipe_code in self.pipe_dependencies():

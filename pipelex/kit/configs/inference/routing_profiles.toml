@@ -85,6 +85,10 @@ default = "google"
 description = "Use groq backend for all its supported models"
 default = "groq"
 
+[profiles.all_huggingface]
+description = "Use HuggingFace backend for all its supported models"
+default = "huggingface"
+
 [profiles.all_mistral]
 description = "Use Mistral backend for all its supported models"
 default = "mistral"

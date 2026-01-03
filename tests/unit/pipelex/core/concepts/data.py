@@ -138,11 +138,11 @@ class TestData:
     DOMAIN: ClassVar[str] = "test_images"
 
     # Test content instances
-    SAMPLE_IMAGE: ClassVar[ImageContent] = ImageContent(url="https://example.com/photo.jpg", base_64="base64data")
+    SAMPLE_IMAGE: ClassVar[ImageContent] = ImageContent(url="https://example.com/photo.jpg")
     SAMPLE_TEXT: ClassVar[TextContent] = TextContent(text="John Doe")
     SAMPLE_BIO: ClassVar[TextContent] = TextContent(text="Software engineer")
     COMPANY_NAME: ClassVar[TextContent] = TextContent(text="Tech Corp")
-    LOGO_IMAGE: ClassVar[ImageContent] = ImageContent(url="https://example.com/logo.png", base_64="logobase64")
+    LOGO_IMAGE: ClassVar[ImageContent] = ImageContent(url="https://example.com/logo.png")
     TITLE_TEXT: ClassVar[TextContent] = TextContent(text="Company Profile")
 
     # Test cases for image field search: (concept_code, expected_image_paths)

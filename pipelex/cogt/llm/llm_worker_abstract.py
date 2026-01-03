@@ -121,7 +121,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             case InferenceOutputType.OBJECT:
                 # Always use full class name in span name, exporter will redact if needed
                 output_desc = output_class_name or output_type
-            case InferenceOutputType.IMAGE:
+            case InferenceOutputType.IMAGE | InferenceOutputType.PAGES:
                 msg = "Image output type is not supported for LLM span"
                 raise NotImplementedError(msg)
 

@@ -9,6 +9,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.types import StrEnum
 
 
@@ -63,7 +64,9 @@ class PipeLLMBlueprint(PipeBlueprint):
         # Filter out internal variables that start with underscore and special variables
         # TODO: replace magic strings by StrEnum and also, make this check clearer and more readable
         filtered_variable_paths = {
-            var for var in required_variable_paths if not var.startswith("_") and var.split(".")[0] not in {"preliminary_text", "place_holder"}
+            var
+            for var in required_variable_paths
+            if not var.startswith("_") and get_root_from_dotted_path(var) not in {"preliminary_text", "place_holder"}
         }
 
         input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()

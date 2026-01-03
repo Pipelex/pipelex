@@ -25,6 +25,7 @@ class TestPipeRunningVariants:
     @pytest.mark.parametrize(("topic", "stuff", "pipe_code"), PipeTestCases.STUFF_AND_PIPE)
     async def test_pipe_from_stuff(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         topic: str,
         stuff: Stuff,
@@ -39,13 +40,14 @@ class TestPipeRunningVariants:
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
     @pytest.mark.parametrize(("topic", "pipe_code"), PipeTestCases.NO_INPUT)
     async def test_pipe_no_input(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         topic: str,
         pipe_code: str,
@@ -58,7 +60,7 @@ class TestPipeRunningVariants:
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=WorkingMemoryFactory.make_empty(),
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
             ),
         )
 
@@ -70,6 +72,7 @@ class TestPipeRunningVariants:
     @pytest.mark.parametrize(("topic", "pipe_code", "output_multiplicity"), PipeTestCases.NO_INPUT_PARALLEL1)
     async def test_pipe_batch_no_input(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         topic: str,
         pipe_code: str,
@@ -85,7 +88,7 @@ class TestPipeRunningVariants:
                     pipe_run_mode=pipe_run_mode,
                     output_multiplicity=output_multiplicity,
                 ),
-                job_metadata=JobMetadata(),
+                job_metadata=job_metadata,
                 working_memory=WorkingMemoryFactory.make_empty(),
             ),
         )
@@ -98,6 +101,7 @@ class TestPipeRunningVariants:
     @pytest.mark.parametrize(("pipe_code", "exception", "expected_error_message"), PipeTestCases.FAILURE_PIPES)
     async def test_pipe_infinite_loop(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         pipe_code: str,
         exception: type[Exception],
@@ -114,7 +118,7 @@ class TestPipeRunningVariants:
                         pipe_stack_limit=6,
                         pipe_run_mode=pipe_run_mode,
                     ),
-                    job_metadata=JobMetadata(),
+                    job_metadata=job_metadata,
                 ),
             )
         pretty_print(exc.value, title="exception")

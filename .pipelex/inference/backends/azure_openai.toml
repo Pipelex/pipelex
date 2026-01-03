@@ -170,11 +170,13 @@ outputs = ["image"]
 costs = { input = 10, output = 40 }
 
 [gpt-image-1.rules]
+prompt = "positive_only"
 num_images = "gpt"
 aspect_ratio = "gpt"
 background = "gpt"
 inference = "gpt"
 safety_checker = "unavailable"
+output_format = "gpt"
 
 [gpt-image-1-mini]
 sdk = "azure_rest_img_gen"
@@ -185,11 +187,13 @@ outputs = ["image"]
 costs = { input = 2.5, output = 8 }
 
 [gpt-image-1-mini.rules]
+prompt = "positive_only"
 num_images = "gpt"
 aspect_ratio = "gpt"
 background = "gpt"
 inference = "gpt"
 safety_checker = "unavailable"
+output_format = "gpt"
 
 ["gpt-image-1.5"]
 sdk = "azure_rest_img_gen"
@@ -200,8 +204,10 @@ outputs = ["image"]
 costs = { input = 8, output = 32 }
 
 ["gpt-image-1.5".rules]
+prompt = "positive_only"
 num_images = "gpt"
 aspect_ratio = "gpt"
 background = "gpt"
 inference = "gpt"
 safety_checker = "unavailable"
+output_format = "gpt"

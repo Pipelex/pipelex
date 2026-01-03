@@ -8,10 +8,11 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker, get_model_deck
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
-def get_async_worker_and_job(llm_preset_id: str, user_text: str):
+def get_async_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMetadata):
     llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
     pretty_print(llm_setting, title=llm_preset_id)
     pretty_print(user_text)
@@ -21,6 +22,7 @@ def get_async_worker_and_job(llm_preset_id: str, user_text: str):
         llm_prompt=LLMPrompt(
             user_text=user_text,
         ),
+        job_metadata=job_metadata,
         llm_job_params=llm_job_params,
         llm_job_config=LLMJobConfig(
             max_retries=3,
@@ -35,7 +37,9 @@ def get_async_worker_and_job(llm_preset_id: str, user_text: str):
 @pytest.mark.usefixtures("routing_profile_override")
 class TestLLMGenObject:
     @pytest.mark.parametrize(("user_text", "expected_instance"), LLMTestCases.SINGLE_OBJECT)
-    async def test_gen_object_async_using_handle(self, llm_job_params: LLMJobParams, llm_handle: str, user_text: str, expected_instance: BaseModel):
+    async def test_gen_object_async_using_handle(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, user_text: str, expected_instance: BaseModel
+    ):
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         if not llm_worker.is_gen_object_supported:
             pytest.skip(f"LLM worker '{llm_worker.desc}' does not support object generation")
@@ -43,6 +47,7 @@ class TestLLMGenObject:
             llm_prompt=LLMPrompt(
                 user_text=user_text,
             ),
+            job_metadata=job_metadata,
             llm_job_params=llm_job_params,
             llm_job_config=LLMJobConfig(
                 max_retries=3,
@@ -55,8 +60,10 @@ class TestLLMGenObject:
         assert output.model_dump(serialize_as_any=True) == expected_instance.model_dump(serialize_as_any=True)
 
     @pytest.mark.parametrize(("user_text", "expected_instance"), LLMTestCases.SINGLE_OBJECT)
-    async def test_gen_object_async_using_llm_preset(self, llm_preset_id: str, user_text: str, expected_instance: BaseModel):
-        llm_worker, llm_job = get_async_worker_and_job(llm_preset_id=llm_preset_id, user_text=user_text)
+    async def test_gen_object_async_using_llm_preset(
+        self, job_metadata: JobMetadata, llm_preset_id: str, user_text: str, expected_instance: BaseModel
+    ):
+        llm_worker, llm_job = get_async_worker_and_job(llm_preset_id=llm_preset_id, user_text=user_text, job_metadata=job_metadata)
         if not llm_worker.is_gen_object_supported:
             pytest.skip(f"'{llm_worker.desc}' does not support object generation")
         expected_class = expected_instance.__class__
@@ -68,6 +75,7 @@ class TestLLMGenObject:
     @pytest.mark.parametrize("case_tuples", LLMTestCases.MULTIPLE_OBJECTS)
     async def test_gen_object_async_multiple_using_handle(
         self,
+        job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
         llm_handle: str,
         case_tuples: list[tuple[str, BaseModel]],
@@ -83,6 +91,7 @@ class TestLLMGenObject:
                 llm_prompt=LLMPrompt(
                     user_text=user_text,
                 ),
+                job_metadata=job_metadata,
                 llm_job_params=llm_job_params,
                 llm_job_config=LLMJobConfig(
                     max_retries=3,
@@ -100,8 +109,10 @@ class TestLLMGenObject:
             assert output_instance.model_dump(serialize_as_any=True) == expected_instance.model_dump(serialize_as_any=True)
 
     @pytest.mark.parametrize("case_tuples", LLMTestCases.MULTIPLE_OBJECTS)
-    async def test_gen_object_async_multiple_using_llm_preset(self, llm_preset_id: str, case_tuples: list[tuple[str, BaseModel]]):
-        llm_worker, llm_job = get_async_worker_and_job(llm_preset_id=llm_preset_id, user_text=case_tuples[0][0])
+    async def test_gen_object_async_multiple_using_llm_preset(
+        self, job_metadata: JobMetadata, llm_preset_id: str, case_tuples: list[tuple[str, BaseModel]]
+    ):
+        llm_worker, llm_job = get_async_worker_and_job(llm_preset_id=llm_preset_id, user_text=case_tuples[0][0], job_metadata=job_metadata)
         if not llm_worker.is_gen_object_supported:
             pytest.skip(f"'{llm_worker.desc}' does not support object generation")
         tasks: list[asyncio.Task[BaseModel]] = []
@@ -112,6 +123,7 @@ class TestLLMGenObject:
                 llm_prompt=LLMPrompt(
                     user_text=user_text,
                 ),
+                job_metadata=job_metadata,
                 llm_job_params=llm_job.job_params,
                 llm_job_config=LLMJobConfig(
                     max_retries=3,

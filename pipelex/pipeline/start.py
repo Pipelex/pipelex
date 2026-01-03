@@ -20,6 +20,7 @@ async def start_pipeline(
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
+    user_id: str | None = None,
 ) -> tuple[str, asyncio.Task[PipeOutput]]:
     """Start a pipeline in the background.
 
@@ -64,6 +65,8 @@ async def start_pipeline(
     search_domain_codes:
         List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.
+    user_id:
+        Unique identifier for the user.
 
     Returns:
     -------
@@ -83,6 +86,7 @@ async def start_pipeline(
         dynamic_output_concept_code=dynamic_output_concept_code,
         pipe_run_mode=pipe_run_mode,
         search_domain_codes=search_domain_codes,
+        user_id=user_id,
     )
 
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))

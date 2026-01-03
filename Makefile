@@ -6,7 +6,7 @@ VIRTUAL_ENV := $(CURDIR)/.venv
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
 # The "?" is used to make the variable optional, so that it can be overridden by the user.
-PYTHON_VERSION ?= 3.11
+PYTHON_VERSION ?= 3.13
 # Note: VENV_* variables include quotes to handle paths with spaces (e.g., "My Projects/pipelex")
 VENV_PYTHON := "$(VIRTUAL_ENV)/bin/python"
 VENV_PYTEST := "$(VIRTUAL_ENV)/bin/pytest"
@@ -199,8 +199,9 @@ up-kit-configs:
 	@rsync -av --delete \
 		--exclude='.DS_Store' \
 		--exclude='pipelex_service.toml' \
-		--exclude='pipelex_super.toml' \
+		--exclude='pipelex_override.toml' \
 		--exclude='telemetry_override.toml' \
+		--exclude='storage' \
 		.pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs

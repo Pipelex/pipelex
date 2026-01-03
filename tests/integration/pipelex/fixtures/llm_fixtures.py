@@ -81,6 +81,7 @@ GOOGLE_MODELS = [
     "gemini-2.5-flash-lite",
     "gemini-2.5-pro",
     "gemini-3.0-pro",
+    "gemini-3.0-flash-preview",
 ]
 
 # --- Groq Models --------------------------------------------------------------------------------
@@ -236,8 +237,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     llm_preset_id_param = request.param
     if not is_llm_preset_supported(llm_preset_id=llm_preset_id_param):
         pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported by any enabled backend")
-    # if not is_llm_preset_supported_by_enabled_backends(llm_preset_id=llm_preset_id_param):
-    #     pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported by any enabled backend")
     return llm_preset_id_param
 
 

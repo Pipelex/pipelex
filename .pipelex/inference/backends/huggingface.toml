@@ -1,0 +1,43 @@
+################################################################################
+# Hugging Face Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Hugging Face models.
+# It contains model definitions for various image generation models
+# accessible through the Hugging Face Inference API with provider="auto".
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots or slashes must be quoted (e.g., ["stabilityai/stable-diffusion-2-1"])
+# - Model costs are in USD per million tokens (input/output)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "img_gen"
+sdk = "huggingface_img_gen"
+
+################################################################################
+# IMAGE GENERATION MODELS
+################################################################################
+
+# --- Qwen Image Models --------------------------------------------------
+[qwen-image]
+model_id = "Qwen/Qwen-Image"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.0, output = 0.0 }
+variant = "fal-ai"
+# variant = "replicate"
+
+[qwen-image.rules]
+prompt = "with_negative"
+aspect_ratio = "qwen_image"
+inference = "qwen_image"

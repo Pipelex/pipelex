@@ -1,7 +1,8 @@
 from typing import ClassVar
 
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.tools.misc.image_utils import ImageFormat
 
 
 class PipeImgGenInputTestCases:
@@ -89,7 +90,7 @@ class PipeImgGenInputTestCases:
             inputs={"prompt": "native.Text"},
             output="native.Image",
             prompt="@prompt",
-            output_format=OutputFormat.PNG,
+            output_format=ImageFormat.PNG,
         ),
     )
 
