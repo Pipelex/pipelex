@@ -152,8 +152,13 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
+        img_gen_prompt: ImgGenPrompt | None,
     ) -> ImageContent:
-        return self._make_generated_image_fake(raw_details=generated_image_raw_details)
+        image_content = self._make_generated_image_fake(raw_details=generated_image_raw_details)
+        if img_gen_prompt:
+            image_content.source_prompt = img_gen_prompt.positive_text
+            image_content.source_negative_prompt = img_gen_prompt.negative_text
+        return image_content
 
     @override
     async def make_page_contents(
@@ -169,6 +174,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
                 image_content = await self.make_image_content(
                     job_metadata=job_metadata,
                     generated_image_raw_details=extracted_image,
+                    img_gen_prompt=None,
                 )
                 page_images.append(image_content)
             page_contents.append(
@@ -195,12 +201,14 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
         image_url = image_urls[0]
-        return self._make_generated_image_fake(
-            raw_details=GeneratedImageRawDetails(
+        return await self.make_image_content(
+            job_metadata=job_metadata,
+            generated_image_raw_details=GeneratedImageRawDetails(
                 actual_url=image_url,
                 size=ImageSize(width=1024, height=1024),
                 mime_type="image/jpeg",
             ),
+            img_gen_prompt=img_gen_prompt,
         )
 
     @override
@@ -217,16 +225,19 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_image_list"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         image_urls = get_config().pipelex.dry_run_config.image_urls
-        return [
-            self._make_generated_image_fake(
-                raw_details=GeneratedImageRawDetails(
+        image_contents: list[ImageContent] = []
+        for image_index in range(nb_images):
+            image_content = await self.make_image_content(
+                job_metadata=job_metadata,
+                generated_image_raw_details=GeneratedImageRawDetails(
                     actual_url=image_urls[image_index % len(image_urls)],
                     size=ImageSize(width=1024, height=1024),
                     mime_type="image/jpeg",
                 ),
+                img_gen_prompt=img_gen_prompt,
             )
-            for image_index in range(nb_images)
-        ]
+            image_contents.append(image_content)
+        return image_contents
 
     @override
     async def make_templated_text(

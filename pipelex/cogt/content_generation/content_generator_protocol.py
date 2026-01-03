@@ -93,6 +93,7 @@ class ContentGeneratorProtocol(Protocol):
         self,
         job_metadata: JobMetadata,
         generated_image_raw_details: GeneratedImageRawDetails,
+        img_gen_prompt: ImgGenPrompt | None,
     ) -> ImageContent: ...
 
     async def make_page_contents(

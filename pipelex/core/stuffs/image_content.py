@@ -60,7 +60,7 @@ class ImageContent(StuffContent):
         group.renderables.append(title_text)
 
         # URL with clickable markdown link
-        display_url = f"{self.url[:35]}…" if len(self.url) > 36 else self.url
+        display_url = f"{self.url[:200]}…" if len(self.url) > 201 else self.url
         url_markdown = Markdown(f"**URL:** [{display_url}]({self.url})")
         group.renderables.append(url_markdown)
 

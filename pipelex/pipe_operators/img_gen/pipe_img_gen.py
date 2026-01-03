@@ -213,7 +213,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             base_class=ImageContent,
         )
         if nb_images > 1:
-            generated_image_list = await content_generator.make_image_list(
+            image_content_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=ImgGenPrompt(
@@ -224,20 +224,16 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 img_gen_job_params=img_gen_job_params,
                 img_gen_job_config=img_gen_config.img_gen_job_config,
             )
-            image_content_items: list[StuffContent] = []
-            for generated_image in generated_image_list:
-                image_content = image_content_subclass(
-                    url=generated_image.url,
-                    source_prompt=positive_prompt_text,
-                    source_negative_prompt=negative_prompt_text,
-                )
-                image_content_items.append(image_content)
+            subclass_content_items: list[ImageContent] = []
+            for image_content in image_content_list:
+                subclass_content = image_content_subclass.model_validate(image_content)
+                subclass_content_items.append(subclass_content)
             the_content = ListContent(
-                items=image_content_items,
+                items=subclass_content_items,
             )
             log.verbose(the_content, title="List of image contents")
         else:
-            generated_image = await content_generator.make_single_image(
+            image_content = await content_generator.make_single_image(
                 job_metadata=job_metadata,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=ImgGenPrompt(
@@ -248,11 +244,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 img_gen_job_config=img_gen_config.img_gen_job_config,
             )
 
-            the_content = image_content_subclass(
-                url=generated_image.url,
-                source_prompt=positive_prompt_text,
-                source_negative_prompt=negative_prompt_text,
-            )
+            the_content = image_content_subclass.model_validate(image_content)
             log.verbose(the_content, title=f"output stuff content of PipeImg {self.code}")
 
         output_stuff = StuffFactory.make_stuff(
