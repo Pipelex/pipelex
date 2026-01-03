@@ -114,7 +114,7 @@ endef
 export HELP
 
 .PHONY: \
-	all help env lock install update build \
+	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint pyright mypy pylint \
     rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu \
 	cleanderived cleanenv cleanall \
@@ -123,7 +123,7 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs docs docs-check docs-deploy \
+	li check-unused-imports fix-unused-imports check-TODOs docs docs-check docs-deploy \
 	test-count check-test-badge
 
 all help:
@@ -134,7 +134,18 @@ all help:
 ### SETUP
 ##########################################################################################
 
+# Quiet check-uv: only shows output if uv is missing (needs install)
 check-uv:
+	@command -v uv >/dev/null 2>&1 || { \
+		echo ""; \
+		echo "=== [$(PROJECT_NAME)] ===== (check-uv) ====== Ensuring uv ≥ $(UV_MIN_VERSION) =========="; \
+		echo "uv not found – installing latest …"; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	}
+	@uv self update >/dev/null 2>&1 || true
+
+# Verbose check-uv: always shows output (for setup commands)
+check-uv-verbose:
 	$(call PRINT_TITLE,"Ensuring uv ≥ $(UV_MIN_VERSION)")
 	@command -v uv >/dev/null 2>&1 || { \
 		echo "uv not found – installing latest …"; \
@@ -142,8 +153,18 @@ check-uv:
 	}
 	@uv self update >/dev/null 2>&1 || true
 
-
+# Quiet env: only shows output if venv needs to be created
 env: check-uv
+	@if [ ! -d "$(VIRTUAL_ENV)" ]; then \
+		echo ""; \
+		echo "=== [$(PROJECT_NAME)] ===== (env) ====== Creating virtual environment ================="; \
+		echo "Creating Python virtual env in \`${VIRTUAL_ENV}\`"; \
+		uv venv "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
+		echo "Using Python: $$($(VENV_PYTHON) --version) from $$(readlink $(VENV_PYTHON) 2>/dev/null || echo $(VENV_PYTHON))"; \
+	fi
+
+# Verbose env: always shows output (for setup commands like install, lock, update)
+env-verbose: check-uv-verbose
 	$(call PRINT_TITLE,"Creating virtual environment")
 	@if [ ! -d "$(VIRTUAL_ENV)" ]; then \
 		echo "Creating Python virtual env in \`${VIRTUAL_ENV}\`"; \
@@ -153,7 +174,7 @@ env: check-uv
 	fi
 	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(readlink $(VENV_PYTHON) 2>/dev/null || echo $(VENV_PYTHON))"
 
-install: env
+install: env-verbose
 	$(call PRINT_TITLE,"Installing dependencies")
 	@. "$(VIRTUAL_ENV)/bin/activate" && \
 	uv sync --all-extras && \
