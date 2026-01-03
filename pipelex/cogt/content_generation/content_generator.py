@@ -335,12 +335,14 @@ class ContentGenerator(ContentGeneratorProtocol):
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
     ) -> list[PageContent]:
+        extract_job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
+        extract_job_config = extract_job_config or ExtractJobConfig()
         extract_assignment = ExtractAssignment(
             job_metadata=job_metadata,
             extract_input=extract_input,
             extract_handle=extract_handle,
-            extract_job_params=extract_job_params or ExtractJobParams.make_default_extract_job_params(),
-            extract_job_config=extract_job_config or ExtractJobConfig(),
+            extract_job_params=extract_job_params,
+            extract_job_config=extract_job_config,
         )
         extract_output = await extract_gen_pages(extract_assignment=extract_assignment)
         page_contents = await self.make_page_contents(
