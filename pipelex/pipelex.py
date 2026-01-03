@@ -216,6 +216,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
+        if storage_provider is None:
+            match get_config().pipelex.storage_config.method:
+                case StorageMethod.LOCAL:
+                    log.dev(f"Using local storage at: {get_config().pipelex.storage_config.storage_path}")
+                    storage_provider = LocalStorageProvider(root_path=Path(get_config().pipelex.storage_config.storage_path))
+                case StorageMethod.IN_MEMORY:
+                    log.dev("Using in-memory storage")
+                    storage_provider = InMemoryStorageProvider()
         self.pipelex_hub.set_storage_provider(storage_provider)
 
         self.library_manager = library_manager or LibraryManager()
@@ -263,19 +271,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 var_name=var_name,
             )
             raise PipelexSetupError(error_msg) from credentials_exc
-        if content_generator:
-            self.pipelex_hub.set_content_generator(content_generator)
-        else:
-            if storage_provider is None:
-                match get_config().pipelex.storage_config.method:
-                    case StorageMethod.LOCAL:
-                        log.dev(f"Using local storage at: {get_config().pipelex.storage_config.storage_path}")
-                        storage_provider = LocalStorageProvider(root_path=Path(get_config().pipelex.storage_config.storage_path))
-                    case StorageMethod.IN_MEMORY:
-                        log.dev("Using in-memory storage")
-                        storage_provider = InMemoryStorageProvider()
+
+        if content_generator is None:
             generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-            self.pipelex_hub.set_content_generator(ContentGenerator(generated_content_factory=generated_content_factory))
+            content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
+        self.pipelex_hub.set_content_generator(content_generator)
 
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
