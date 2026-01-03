@@ -1,5 +1,6 @@
 from typing import Annotated
 
+import click
 import typer
 from click import Command, Context
 from typer.core import TyperGroup
@@ -19,6 +20,8 @@ from pipelex.tools.misc.package_utils import get_package_version
 
 
 class PipelexCLI(TyperGroup):
+    """Custom CLI group that handles global options like --no-logo."""
+
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
@@ -33,10 +36,27 @@ class PipelexCLI(TyperGroup):
             ctx.exit(1)
         return cmd
 
+    @override
+    def make_context(
+        self,
+        info_name: str | None,
+        args: list[str],
+        parent: Context | None = None,
+        **extra: object,
+    ) -> Context:
+        """Intercept --no-logo from args before Click/Typer processes them.
 
-def main() -> None:
-    """Entry point for the pipelex CLI."""
-    app()
+        This allows --no-logo to be placed anywhere in the command line
+        (before or after subcommands) while keeping the CLI architecture clean.
+        """
+        no_logo = "--no-logo" in args
+        if no_logo:
+            args = [arg for arg in args if arg != "--no-logo"]
+
+        ctx = super().make_context(info_name, args, parent, **extra)
+        ctx.ensure_object(dict)
+        ctx.obj["no_logo"] = no_logo
+        return ctx
 
 
 app = typer.Typer(
@@ -51,8 +71,16 @@ app = typer.Typer(
 def app_callback(ctx: typer.Context) -> None:
     console = get_console()
     package_version = get_package_version()
-    console.print(
-        f"""
+
+    # Get no_logo flag from context (set by PipelexCLI.make_context)
+    click_ctx = click.get_current_context()
+    no_logo = click_ctx.obj.get("no_logo", False) if click_ctx.obj else False
+
+    if no_logo:
+        console.print(f"Pipelex v{package_version}")
+    else:
+        console.print(
+            f"""
 
 ░█████████  ░[bold green4]██[/bold green4]                      ░██
 ░██     ░██                          ░██
@@ -64,7 +92,7 @@ def app_callback(ctx: typer.Context) -> None:
                ░██
                ░██                                     v[cyan]{package_version}[/cyan]
 """
-    )
+        )
     # Skip checks if no command is being run (e.g., just --help) or if running init/doctor command
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"init", "doctor"}:
         return
