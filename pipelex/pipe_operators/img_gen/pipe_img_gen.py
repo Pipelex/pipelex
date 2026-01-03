@@ -45,7 +45,7 @@ class PipeImgGenOutput(PipeOutput):
 class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     prompt_blueprint: TemplateBlueprint
-    negative_prompt_blueprint: TemplateBlueprint | None
+    negative_prompt_blueprint: TemplateBlueprint | None = None
     img_gen_choice: ImgGenModelChoice | None = None
 
     # One-time settings (not in ImgGenSetting)
@@ -122,7 +122,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         applied_output_multiplicity = multiplicity_resolution.resolved_multiplicity
 
         try:
-            positive_prompt_context: dict[str, Any] = working_memory.generate_context()
+            base_context: dict[str, Any] = working_memory.generate_context()
+            positive_prompt_context = base_context.copy()
             if extra_params := pipe_run_params.params:
                 positive_prompt_context = substitute_nested_in_context(context=positive_prompt_context, extra_params=extra_params)
             if extra_context := self.prompt_blueprint.extra_context:
@@ -135,7 +136,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
             negative_prompt_text: str | None = None
             if self.negative_prompt_blueprint:
-                negative_prompt_context: dict[str, Any] = positive_prompt_context.copy()
+                negative_prompt_context = base_context.copy()
                 if extra_params := pipe_run_params.params:
                     negative_prompt_context = substitute_nested_in_context(context=negative_prompt_context, extra_params=extra_params)
                 if extra_context := self.negative_prompt_blueprint.extra_context:

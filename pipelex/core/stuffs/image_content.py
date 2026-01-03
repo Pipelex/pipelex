@@ -17,6 +17,7 @@ class ImageContent(StuffContent):
     url: str
     display_link: str | None = None
     source_prompt: str | None = None
+    source_negative_prompt: str | None = None
     caption: str | None = None
     mime_type: str | None = None
     size: ImageSize | None = None
@@ -91,5 +92,20 @@ class ImageContent(StuffContent):
             prompt_text.append("Source Prompt: ", style="bold")
             prompt_text.append(self.source_prompt, style="dim italic")
             group.renderables.append(prompt_text)
+
+        # Source negative prompt if present
+        if self.source_negative_prompt:
+            group.renderables.append(Text())  # Add spacing
+            negative_prompt_text = Text()
+            negative_prompt_text.append("Source Negative Prompt: ", style="bold")
+            negative_prompt_text.append(self.source_negative_prompt, style="dim italic")
+            group.renderables.append(negative_prompt_text)
+
+        # MIME type if present
+        if self.mime_type:
+            mime_type_text = Text()
+            mime_type_text.append("MIME Type: ", style="bold")
+            mime_type_text.append(self.mime_type, style="dim")
+            group.renderables.append(mime_type_text)
 
         return group
