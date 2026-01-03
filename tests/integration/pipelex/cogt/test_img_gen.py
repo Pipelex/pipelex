@@ -18,20 +18,24 @@ SECONDARY_ID = "id_2"
 @pytest.mark.asyncio(loop_scope="class")
 @pytest.mark.usefixtures("routing_profile_override")
 class TestImageGeneration:
-    @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
+    @pytest.mark.parametrize(("topic", "positive_text", "negative_text"), ImageGenTestCases.IMAGE_GEN_PROMPT_CONTENTS)
     async def test_img_gen_single_opaque(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,
         img_gen_job_params: ImgGenJobParams,
         topic: str,
-        img_gen_prompt_text: str,
+        positive_text: str,
+        negative_text: str | None,
         generated_content_factory: GeneratedContentFactory,
     ):
         pretty_print(f"Testing image generation with handle '{img_gen_handle}', output format '{img_gen_job_params.output_format}'")
+        pretty_print(positive_text, title="Positive text")
+        pretty_print(negative_text, title="Negative text")
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
-            positive_text=img_gen_prompt_text,
+            positive_text=positive_text,
+            negative_text=negative_text,
             job_metadata=job_metadata,
             img_gen_job_params=img_gen_job_params,
         )
@@ -48,13 +52,14 @@ class TestImageGeneration:
         assert image_content.display_link is not None
         pretty_print_url(image_content.display_link, title=f"Image URL for topic '{topic}'")
 
-    @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
+    @pytest.mark.parametrize(("topic", "positive_text", "negative_text"), ImageGenTestCases.IMAGE_GEN_PROMPT_CONTENTS)
     async def test_img_gen_single_transparent(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,
         topic: str,
-        img_gen_prompt_text: str,
+        positive_text: str,
+        negative_text: str | None,
         generated_content_factory: GeneratedContentFactory,
     ):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
@@ -65,7 +70,8 @@ class TestImageGeneration:
             output_format=ImageFormat.PNG,
         )
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
-            positive_text=img_gen_prompt_text,
+            positive_text=positive_text,
+            negative_text=negative_text,
             job_metadata=job_metadata,
             img_gen_job_params=img_gen_job_params,
         )
@@ -82,19 +88,21 @@ class TestImageGeneration:
         assert image_content.display_link is not None
         pretty_print_url(image_content.display_link, title=f"Image URL for topic '{topic}'")
 
-    @pytest.mark.parametrize(("topic", "img_gen_prompt_text"), ImageGenTestCases.IMAGE_DESC)
+    @pytest.mark.parametrize(("topic", "positive_text", "negative_text"), ImageGenTestCases.IMAGE_GEN_PROMPT_CONTENTS)
     async def test_img_gen_multiple(
         self,
         job_metadata: JobMetadata,
         img_gen_handle: str,
         img_gen_job_params: ImgGenJobParams,
         topic: str,
-        img_gen_prompt_text: str,
+        positive_text: str,
+        negative_text: str | None,
         generated_content_factory: GeneratedContentFactory,
     ):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
-            positive_text=img_gen_prompt_text,
+            positive_text=positive_text,
+            negative_text=negative_text,
             job_metadata=job_metadata,
             img_gen_job_params=img_gen_job_params,
         )

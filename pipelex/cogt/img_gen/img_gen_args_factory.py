@@ -21,6 +21,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     InferenceTaxonomy,
     NumImagesTaxonomy,
     OutputFormatTaxonomy,
+    PromptTaxonomy,
     SafetyCheckerTaxonomy,
     SpecificTaxonomy,
 )
@@ -58,13 +59,19 @@ class ImgGenArgsFactory:
         """
         job_params = img_gen_job.job_params
 
-        # Common args that don't need rules
-        args_dict: dict[str, Any] = {
-            "prompt": img_gen_job.img_gen_prompt.positive_text,
-        }
+        args_dict: dict[str, Any] = {}
 
         for topic, taxonomy_value in model_rules.items():
             match topic:
+                case ImgGenArgTopic.PROMPT:
+                    prompt_taxonomy = PromptTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_prompt(
+                            prompt_taxonomy=prompt_taxonomy,
+                            positive_text=img_gen_job.img_gen_prompt.positive_text,
+                            negative_text=img_gen_job.img_gen_prompt.negative_text,
+                        )
+                    )
                 case ImgGenArgTopic.NUM_IMAGES:
                     num_images_taxonomy = NumImagesTaxonomy(taxonomy_value)
                     args_dict.update(
@@ -136,6 +143,23 @@ class ImgGenArgsFactory:
                 return {"num_images": nb_images}
             case NumImagesTaxonomy.GPT:
                 return {"n": nb_images}
+
+    @classmethod
+    def make_args_from_prompt(
+        cls,
+        prompt_taxonomy: PromptTaxonomy,
+        positive_text: str,
+        negative_text: str | None,
+    ) -> dict[str, Any]:
+        """Map prompt parameters to provider-specific format."""
+        match prompt_taxonomy:
+            case PromptTaxonomy.POSITIVE_ONLY:
+                return {"prompt": positive_text}
+            case PromptTaxonomy.WITH_NEGATIVE:
+                args_dict: dict[str, Any] = {"prompt": positive_text}
+                if negative_text:
+                    args_dict["negative_prompt"] = negative_text
+                return args_dict
 
     @classmethod
     def make_args_from_specific(cls, specific_taxonomy: SpecificTaxonomy) -> dict[str, Any]:

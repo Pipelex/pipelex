@@ -31,12 +31,13 @@ class ImgGenJobFactory:
     def make_img_gen_job_from_prompt_contents(
         cls,
         positive_text: str,
+        negative_text: str | None,
         job_metadata: JobMetadata,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
     ) -> ImgGenJob:
         img_gen_config = get_config().cogt.img_gen_config
-        img_gen_prompt = ImgGenPrompt(positive_text=positive_text)
+        img_gen_prompt = ImgGenPrompt(positive_text=positive_text, negative_text=negative_text)
         job_params = img_gen_job_params or img_gen_config.make_default_img_gen_job_params()
         job_config = img_gen_job_config or img_gen_config.img_gen_job_config
         job_report = ImgGenJobReport()

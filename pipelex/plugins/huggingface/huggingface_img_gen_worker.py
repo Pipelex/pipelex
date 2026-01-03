@@ -42,14 +42,11 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             img_gen_job=img_gen_job,
             nb_images=1,
         )
-        prompt = img_gen_job.img_gen_prompt.positive_text
-        negative_prompt = img_gen_job.img_gen_prompt.negative_text
+        prompt = args_dict.pop("prompt")
         model_id = self.inference_model.model_id
-
         return await self.hf_async_client.text_to_image(
             prompt=prompt,
             model=model_id,
-            negative_prompt=negative_prompt,
             extra_body=args_dict,
         )
 

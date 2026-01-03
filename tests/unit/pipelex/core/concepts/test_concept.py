@@ -21,6 +21,7 @@ class NestedImageInfo(StructuredContent):
     url: str
     display_link: str | None = None
     source_prompt: str | None = None
+    source_negative_prompt: str | None = None
     caption: str | None = None
     mime_type: str | None = None
     size: ImageSize | None = None
