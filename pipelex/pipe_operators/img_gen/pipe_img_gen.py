@@ -229,7 +229,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 image_content = image_content_subclass(
                     url=generated_image.url,
                     source_prompt=positive_prompt_text,
-                    negative_text=negative_prompt_text,
+                    source_negative_prompt=negative_prompt_text,
                 )
                 image_content_items.append(image_content)
             the_content = ListContent(
@@ -251,7 +251,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             the_content = image_content_subclass(
                 url=generated_image.url,
                 source_prompt=positive_prompt_text,
-                negative_text=negative_prompt_text,
+                source_negative_prompt=negative_prompt_text,
             )
             log.verbose(the_content, title=f"output stuff content of PipeImg {self.code}")
 
