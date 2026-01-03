@@ -4,7 +4,7 @@ from huggingface_hub import AsyncInferenceClient
 from PIL import Image
 from typing_extensions import override
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -44,7 +44,6 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         )
         prompt = args_dict.pop("prompt")
         model_id = self.inference_model.model_id
-        pretty_print(args_dict, title="Args dict")
         return await self.hf_async_client.text_to_image(
             prompt=prompt,
             model=model_id,

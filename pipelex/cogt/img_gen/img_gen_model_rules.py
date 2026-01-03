@@ -22,6 +22,7 @@ class ImgGenArgTopic(StrEnum):
     depending on the model backend being used.
     """
 
+    PROMPT = "prompt"
     NUM_IMAGES = "num_images"
     ASPECT_RATIO = "aspect_ratio"
     INFERENCE = "inference"
@@ -50,6 +51,18 @@ class SpecificTaxonomy(StrEnum):
     """
 
     FAL = "fal"
+
+
+class PromptTaxonomy(StrEnum):
+    """Taxonomy for prompt parameters.
+
+    Different models may use different parameter names and support different prompt types:
+    - POSITIVE_ONLY: uses `prompt` for positive text, no negative prompt support
+    - WITH_NEGATIVE: uses `prompt` for positive text and `negative_prompt` for negative text
+    """
+
+    POSITIVE_ONLY = "positive_only"
+    WITH_NEGATIVE = "with_negative"
 
 
 class AspectRatioTaxonomy(StrEnum):
