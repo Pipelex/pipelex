@@ -7,7 +7,7 @@ from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigValidationError,
 )
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
-from pipelex.system.pipelex_service.remote_config import RemoteConfig
+from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.terminal_utils import print_to_stderr
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -61,6 +61,23 @@ class RemoteConfigFetcher:
         return _fetch_with_retry(url)
 
     @classmethod
+    def _make_default_remote_config(cls) -> RemoteConfig:
+        """Create a default RemoteConfig for testing in offline environments.
+
+        Returns:
+            A minimal RemoteConfig with analytics disabled and empty model specs.
+        """
+        return RemoteConfig(
+            posthog=PipelexPosthogConfig(
+                project_api_key="",
+                endpoint="https://app.posthog.com",
+                is_geoip_enabled=False,
+                is_debug_enabled=False,
+            ),
+            backend_model_specs={},
+        )
+
+    @classmethod
     def fetch_remote_config(cls) -> RemoteConfig:
         """Fetch Pipelex Service remote configuration.
 
@@ -71,10 +88,14 @@ class RemoteConfigFetcher:
             RemoteConfigFetchError: If the HTTP request fails or returns an error.
             RemoteConfigValidationError: If the JSON doesn't match expected schema.
         """
+        # In Codex Cloud, return default config to avoid SSL issues with MITM proxy
+        if runtime_manager.is_in_codex_cloud:
+            print_to_stderr("Skipping remote config fetch in Codex Cloud, using defaults")
+            return cls._make_default_remote_config()
+
         url = PipelexDetails.REMOTE_CONFIG_URL
 
         try:
-            print_to_stderr(f"Fetching remote config with run mode = '{runtime_manager.run_mode}' from {url}")
             response = cls._fetch_remote_config_with_retry(url)
         except httpx.TimeoutException as exc:
             msg = f"Timeout while fetching remote configuration from {url}: {exc}"
