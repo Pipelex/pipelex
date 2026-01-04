@@ -23,6 +23,7 @@ from pipelex.observability.graphspec import (
     GraphSpec,
     GraphTracer,
     GraphTracerManager,
+    graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
     save_graphspec,
@@ -278,6 +279,15 @@ def run_cmd(
             dataflow_html = await render_mermaid_html_async(dataflow_mermaid, title=f"Data Flow: {pipe_code}")
             (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
             typer.secho(f"✅ Data flow HTML saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
+
+            # Generate combo view (LR - left-right, data flow with controller subgraphs)
+            combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction="LR")
+            (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
+            typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
+
+            combo_html = await render_mermaid_html_async(combo_mermaid, title=f"Combo: {pipe_code}")
+            (graph_output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
+            typer.secho(f"✅ Combo HTML saved to: {graph_output_dir / 'combo.html'}", fg=typer.colors.GREEN)
 
             typer.secho(f"\n📊 All graph outputs saved to: {graph_output_dir}", fg=typer.colors.CYAN, bold=True)
 

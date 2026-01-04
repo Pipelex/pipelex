@@ -129,6 +129,133 @@ def _render_node(
     return f"{indent}{node_str}"
 
 
+def _render_stuff_node(
+    digest: str,
+    name: str,
+    concept: str | None,
+    stuff_id_mapping: dict[str, str],
+    show_stuff_codes: bool,
+    indent: str = "    ",
+) -> str:
+    """Render a single stuff node in Mermaid syntax.
+
+    Args:
+        digest: The stuff digest (unique identifier).
+        name: The stuff name.
+        concept: The stuff concept (optional).
+        stuff_id_mapping: Map to store/retrieve stuff mermaid IDs.
+        show_stuff_codes: Whether to show digest in label.
+        indent: Indentation prefix.
+
+    Returns:
+        Mermaid stuff node declaration string.
+    """
+    stuff_mermaid_id = f"s_{sanitize_mermaid_id(digest)[2:]}"
+    stuff_id_mapping[digest] = stuff_mermaid_id
+
+    # Build label
+    if show_stuff_codes:
+        label = f"{escape_mermaid_label(name)} ({digest[:5]})"
+    else:
+        label = escape_mermaid_label(name)
+
+    if concept:
+        label = f"{label}<br/>{escape_mermaid_label(concept)}"
+
+    return f'{indent}{stuff_mermaid_id}(["{label}"]):::stuff'
+
+
+def _render_combo_subgraph_recursive(
+    node_id: str,
+    nodes_by_id: dict[str, NodeSpec],
+    id_mapping: dict[str, str],
+    children_map: dict[str, list[str]],
+    stuff_registry: dict[str, tuple[str, str | None]],
+    stuff_producers: dict[str, str],
+    stuff_id_mapping: dict[str, str],
+    show_stuff_codes: bool,
+    indent_level: int = 1,
+) -> list[str]:
+    """Recursively render pipes and their produced stuff within controller subgraphs.
+
+    This renders both pipe nodes and their produced stuff nodes inside subgraphs.
+
+    Args:
+        node_id: The node to render.
+        nodes_by_id: Map of node_id to NodeSpec.
+        id_mapping: Map of node_id to sanitized Mermaid ID.
+        children_map: Map of parent node_id to list of child node_ids.
+        stuff_registry: Map of digest to (name, concept) for all stuffs.
+        stuff_producers: Map of digest to producer node_id.
+        stuff_id_mapping: Map to store stuff mermaid IDs (mutated).
+        show_stuff_codes: Whether to show digest in stuff labels.
+        indent_level: Current indentation level.
+
+    Returns:
+        List of Mermaid syntax lines.
+    """
+    lines: list[str] = []
+    indent = "    " * indent_level
+    node = nodes_by_id.get(node_id)
+    mermaid_id = id_mapping.get(node_id, sanitize_mermaid_id(node_id))
+
+    if node is None:
+        return lines
+
+    children = children_map.get(node_id, [])
+
+    if children:
+        # This is a controller with children - render as subgraph
+        label = _get_node_label(node)
+        subgraph_id = f"sg_{mermaid_id}"
+        lines.append(f'{indent}subgraph {subgraph_id}["{label}"]')
+
+        # Sort children for deterministic output
+        sorted_children = sorted(
+            children,
+            key=lambda cid: (
+                nodes_by_id.get(cid, NodeSpec(node_id=cid, kind=NodeKind.OPERATOR, status=NodeStatus.SCHEDULED)).kind,
+                nodes_by_id.get(cid, NodeSpec(node_id=cid, kind=NodeKind.OPERATOR, status=NodeStatus.SCHEDULED)).pipe_name or "",
+                cid,
+            ),
+        )
+
+        for child_id in sorted_children:
+            child_lines = _render_combo_subgraph_recursive(
+                node_id=child_id,
+                nodes_by_id=nodes_by_id,
+                id_mapping=id_mapping,
+                children_map=children_map,
+                stuff_registry=stuff_registry,
+                stuff_producers=stuff_producers,
+                stuff_id_mapping=stuff_id_mapping,
+                show_stuff_codes=show_stuff_codes,
+                indent_level=indent_level + 1,
+            )
+            lines.extend(child_lines)
+
+        lines.append(f"{indent}end")
+    else:
+        # Leaf node - render as simple node
+        lines.append(_render_node(node, mermaid_id, indent))
+
+        # Also render any stuff nodes produced by this pipe
+        for digest, producer_node_id in stuff_producers.items():
+            if producer_node_id == node_id and digest in stuff_registry:
+                name, concept = stuff_registry[digest]
+                stuff_line = _render_stuff_node(
+                    digest=digest,
+                    name=name,
+                    concept=concept,
+                    stuff_id_mapping=stuff_id_mapping,
+                    show_stuff_codes=show_stuff_codes,
+                    indent=indent,
+                )
+                lines.append(stuff_line)
+
+    return lines
+
+
 def _render_subgraph_recursive(
     node_id: str,
     nodes_by_id: dict[str, NodeSpec],
@@ -498,6 +625,162 @@ def graphspec_to_dataflow_mermaid(
     lines.append("    %% Style definitions")
     lines.append("    classDef pipe fill:#e6f3ff,stroke:#0066cc")
     lines.append("    classDef pipe_failed fill:#ffcccc,stroke:#cc0000")
+    lines.append("    classDef stuff fill:#fff3e6,stroke:#cc6600,stroke-width:2px")
+
+    return "\n".join(lines)
+
+
+def graphspec_to_combo_mermaid(
+    graph: GraphSpec,
+    *,
+    direction: str = "LR",
+    show_stuff_codes: bool = False,
+) -> str:
+    """Convert a GraphSpec to a combined data-flow and orchestration Mermaid flowchart.
+
+    This view combines the best of both worlds:
+    - Data flow visualization: Shows Stuff nodes (data items) flowing between pipes
+    - Orchestration grouping: PipeControllers rendered as subgraphs containing their children
+
+    The diagram shows:
+    - Controller nodes as subgraphs containing their child pipes
+    - Pipe nodes as rectangles inside their controller subgraphs
+    - Stuff nodes as pills (stadium shape) inside subgraphs next to their producer pipe
+    - Stuff nodes without a producer (pipeline inputs) at top level
+    - Edges from producer pipes to stuff, and from stuff to consumer pipes
+
+    Args:
+        graph: The GraphSpec to convert.
+        direction: Flowchart direction. Defaults to "LR" (left-to-right for data flow).
+        show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
+
+    Returns:
+        Mermaid flowchart syntax as a string.
+
+    Raises:
+        ValueError: If direction is not a valid Mermaid direction.
+    """
+    if direction not in VALID_DIRECTIONS:
+        msg = f"Invalid direction '{direction}'. Must be one of: {', '.join(sorted(VALID_DIRECTIONS))}"
+        raise ValueError(msg)
+
+    lines: list[str] = []
+
+    # Header
+    lines.append(f"flowchart {direction}")
+
+    # Build ID mapping for all nodes
+    id_mapping: dict[str, str] = {}
+    for node in graph.nodes:
+        id_mapping[node.node_id] = sanitize_mermaid_id(node.node_id)
+
+    # Build node lookup
+    nodes_by_id: dict[str, NodeSpec] = {node.node_id: node for node in graph.nodes}
+
+    # Build containment tree
+    children_map, child_nodes = _build_containment_tree(graph.edges)
+    controller_node_ids = set(children_map.keys())
+
+    # Find root nodes (nodes that are not children of any other node)
+    root_nodes = [node for node in graph.nodes if node.node_id not in child_nodes]
+
+    # Sort root nodes for deterministic output
+    sorted_roots = sorted(root_nodes, key=lambda node: (node.kind, node.pipe_name or "", node.node_id))
+
+    # Collect unique stuff objects from all node I/O
+    # Key is the digest (stuff_code), value is (name, concept)
+    stuff_registry: dict[str, tuple[str, str | None]] = {}
+
+    # Also track producers and consumers for each stuff
+    stuff_producers: dict[str, str] = {}  # digest -> producer_node_id
+    stuff_consumers: dict[str, list[str]] = defaultdict(list)  # digest -> consumer_node_ids
+
+    for node in graph.nodes:
+        # Skip controllers - they don't directly transform data
+        if node.node_id in controller_node_ids:
+            continue
+
+        # Collect outputs (this node produces these stuffs)
+        for output_spec in node.node_io.outputs:
+            if output_spec.digest:
+                stuff_registry[output_spec.digest] = (output_spec.name, output_spec.concept)
+                stuff_producers[output_spec.digest] = node.node_id
+
+        # Collect inputs (this node consumes these stuffs)
+        for input_spec in node.node_io.inputs:
+            if input_spec.digest:
+                if input_spec.digest not in stuff_registry:
+                    # Register stuff even if we don't know the producer (pipeline input)
+                    stuff_registry[input_spec.digest] = (input_spec.name, input_spec.concept)
+                stuff_consumers[input_spec.digest].append(node.node_id)
+
+    # Will be populated during recursive rendering
+    stuff_id_mapping: dict[str, str] = {}
+
+    # Render pipe nodes and their produced stuff within controller subgraphs
+    lines.append("")
+    lines.append("    %% Pipe and stuff nodes within controller subgraphs")
+    for root_node in sorted_roots:
+        node_lines = _render_combo_subgraph_recursive(
+            node_id=root_node.node_id,
+            nodes_by_id=nodes_by_id,
+            id_mapping=id_mapping,
+            children_map=children_map,
+            stuff_registry=stuff_registry,
+            stuff_producers=stuff_producers,
+            stuff_id_mapping=stuff_id_mapping,
+            show_stuff_codes=show_stuff_codes,
+        )
+        lines.extend(node_lines)
+
+    # Skip if no data flow information
+    if not stuff_registry:
+        lines.append("")
+        lines.append("    %% No data flow information available")
+        lines.append("    note[No IOSpec data captured. Run with data flow tracing enabled.]")
+        return "\n".join(lines)
+
+    # Render stuff nodes without a producer (pipeline inputs) at top level
+    orphan_stuffs = [(digest, name, concept) for digest, (name, concept) in stuff_registry.items() if digest not in stuff_producers]
+    if orphan_stuffs:
+        lines.append("")
+        lines.append("    %% Pipeline input stuff nodes (no producer)")
+        for digest, name, concept in sorted(orphan_stuffs, key=operator.itemgetter(1)):
+            stuff_line = _render_stuff_node(
+                digest=digest,
+                name=name,
+                concept=concept,
+                stuff_id_mapping=stuff_id_mapping,
+                show_stuff_codes=show_stuff_codes,
+                indent="    ",
+            )
+            lines.append(stuff_line)
+
+    # Render edges: producer -> stuff
+    lines.append("")
+    lines.append("    %% Data flow edges: producer -> stuff -> consumer")
+
+    for digest, producer_node_id in sorted(stuff_producers.items(), key=operator.itemgetter(0)):
+        producer_mermaid_id = id_mapping.get(producer_node_id)
+        prod_stuff_mermaid_id = stuff_id_mapping.get(digest)
+        if producer_mermaid_id and prod_stuff_mermaid_id:
+            lines.append(f"    {producer_mermaid_id} --> {prod_stuff_mermaid_id}")
+
+    # Render edges: stuff -> consumer
+    for digest, consumer_node_ids in sorted(stuff_consumers.items(), key=operator.itemgetter(0)):
+        cons_stuff_mermaid_id = stuff_id_mapping.get(digest)
+        if not cons_stuff_mermaid_id:
+            continue
+        for consumer_node_id in sorted(consumer_node_ids):
+            consumer_mermaid_id = id_mapping.get(consumer_node_id)
+            if consumer_mermaid_id:
+                lines.append(f"    {cons_stuff_mermaid_id} --> {consumer_mermaid_id}")
+
+    # Style definitions
+    lines.append("")
+    lines.append("    %% Style definitions")
+    lines.append("    classDef failed fill:#ffcccc,stroke:#cc0000")
+    lines.append("    classDef controller fill:#e6f3ff,stroke:#0066cc")
     lines.append("    classDef stuff fill:#fff3e6,stroke:#cc6600,stroke-width:2px")
 
     return "\n".join(lines)

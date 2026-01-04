@@ -43,7 +43,11 @@ from pipelex.observability.graphspec.graphspec_io import (
     save_graphspec,
 )
 from pipelex.observability.graphspec.html_renderer import render_mermaid_html
-from pipelex.observability.graphspec.mermaid import graphspec_to_dataflow_mermaid, graphspec_to_orchestration_mermaid
+from pipelex.observability.graphspec.mermaid import (
+    graphspec_to_combo_mermaid,
+    graphspec_to_dataflow_mermaid,
+    graphspec_to_orchestration_mermaid,
+)
 from pipelex.observability.graphspec.validation import validate_graphspec
 
 __all__ = [
@@ -82,6 +86,7 @@ __all__ = [
     # Validation
     "validate_graphspec",
     # Mermaid/HTML export
+    "graphspec_to_combo_mermaid",
     "graphspec_to_dataflow_mermaid",
     "graphspec_to_orchestration_mermaid",
     "render_mermaid_html",
