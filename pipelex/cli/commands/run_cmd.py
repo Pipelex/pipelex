@@ -257,9 +257,9 @@ def run_cmd(
             (graph_output_dir / "orchestration.html").write_text(orch_html, encoding="utf-8")
             typer.secho(f"✅ Orchestration HTML saved to: {graph_output_dir / 'orchestration.html'}", fg=typer.colors.GREEN)
 
-            # Generate data flow view (left-to-right)
+            # Generate data flow view (top-down)
             if graph_full_data:
-                dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+                dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
                 dataflow_mermaid = dataflow_with_data.mermaid_code
                 (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
                 typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)
@@ -272,7 +272,7 @@ def run_cmd(
                 (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
                 typer.secho(f"✅ Data flow HTML (interactive) saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
             else:
-                dataflow_mermaid = graphspec_to_dataflow_mermaid(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+                dataflow_mermaid = graphspec_to_dataflow_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
                 (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
                 typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)
 
@@ -280,9 +280,9 @@ def run_cmd(
                 (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
                 typer.secho(f"✅ Data flow HTML saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
 
-            # Generate combo view (left-to-right, data flow with controller subgraphs)
+            # Generate combo view (top-down, data flow with controller subgraphs)
             if graph_full_data:
-                combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+                combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
                 combo_mermaid = combo_with_data.mermaid_code
                 (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
                 typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
@@ -295,7 +295,7 @@ def run_cmd(
                 (graph_output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
                 typer.secho(f"✅ Combo HTML (interactive) saved to: {graph_output_dir / 'combo.html'}", fg=typer.colors.GREEN)
             else:
-                combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+                combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
                 (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
                 typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
 

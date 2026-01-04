@@ -434,7 +434,7 @@ def graph_render_cmd(
 
             # Generate dataflow view
             if generate_dataflow:
-                df_direction = direction or FlowchartDirection.LEFT_TO_RIGHT
+                df_direction = direction or FlowchartDirection.TOP_DOWN
                 if interactive:
                     dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=df_direction)
                     dataflow_mermaid = dataflow_with_data.mermaid_code
@@ -470,7 +470,7 @@ def graph_render_cmd(
 
             # Generate combo view
             if generate_combo:
-                combo_direction = direction or FlowchartDirection.LEFT_TO_RIGHT
+                combo_direction = direction or FlowchartDirection.TOP_DOWN
                 if interactive:
                     combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=combo_direction)
                     combo_mermaid = combo_with_data.mermaid_code

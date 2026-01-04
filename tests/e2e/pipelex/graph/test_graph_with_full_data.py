@@ -21,6 +21,7 @@ from pipelex.graph.mermaid import (
 )
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from pipelex.tools.misc.mermaid_utils import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
@@ -32,18 +33,10 @@ from tests.conftest import TEST_OUTPUTS_DIR
 def _get_next_output_folder() -> Path:
     """Get the next numbered output folder in TEST_OUTPUTS_DIR.
 
-    Creates folders like: temp/test_outputs/graph_full_data/run_001, run_002, etc.
+    Creates folders like: temp/test_outputs/graph_full_data/run_01, run_02, etc.
     """
-    base_dir = Path(TEST_OUTPUTS_DIR) / "graph_full_data"
-    base_dir.mkdir(parents=True, exist_ok=True)
-
-    # Find existing folders and get next number
-    existing = [int(folder.name.split("_")[-1]) for folder in base_dir.iterdir() if folder.is_dir() and folder.name.startswith("run_")]
-    next_num = max(existing, default=0) + 1
-
-    output_dir = base_dir / f"run_{next_num:03d}"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    return output_dir
+    base_dir = str(Path(TEST_OUTPUTS_DIR) / "graph_full_data")
+    return Path(get_incremental_directory_path(base_dir, "run"))
 
 
 async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[str, int]:
@@ -61,7 +54,7 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     (output_dir / "orchestration.html").write_text(orch_html, encoding="utf-8")
 
     # Dataflow with data
-    dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+    dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
     (output_dir / "dataflow.mmd").write_text(dataflow_with_data.mermaid_code, encoding="utf-8")
 
     log.info(f"Dataflow stuff_data keys: {list(dataflow_with_data.stuff_data.keys())}")
@@ -78,7 +71,7 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     (output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
 
     # Combo with data
-    combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+    combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
     (output_dir / "combo.mmd").write_text(combo_with_data.mermaid_code, encoding="utf-8")
 
     log.info(f"Combo stuff_data keys: {list(combo_with_data.stuff_data.keys())}")

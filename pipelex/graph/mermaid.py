@@ -86,10 +86,7 @@ def _build_containment_tree(
     return dict(children_map), child_nodes
 
 
-def _collect_stuff_data(
-    graph: GraphSpec,
-    controller_node_ids: set[str],  # noqa: ARG001
-) -> dict[str, Any]:
+def _collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
     """Collect IOSpec.data from all stuff nodes in the graph.
 
     Note: We collect data from ALL nodes including controllers, because:
@@ -98,7 +95,6 @@ def _collect_stuff_data(
 
     Args:
         graph: The GraphSpec to extract data from.
-        controller_node_ids: Set of controller node IDs (currently unused).
 
     Returns:
         Dict mapping stuff mermaid IDs (s_xxx format) to their IOSpec.data content.
@@ -562,13 +558,13 @@ def graphspec_to_dataflow_mermaid(
 
     Args:
         graph: The GraphSpec to convert.
-        direction: Flowchart direction. Defaults to LEFT_TO_RIGHT if not specified.
+        direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
 
     Returns:
         Mermaid flowchart syntax as a string.
     """
-    effective_direction = direction or FlowchartDirection.LEFT_TO_RIGHT
+    effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
 
     # Header
@@ -703,7 +699,7 @@ def graphspec_to_dataflow_mermaid_with_data(
 
     Args:
         graph: The GraphSpec to convert.
-        direction: Flowchart direction. Defaults to LEFT_TO_RIGHT if not specified.
+        direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
 
     Returns:
@@ -716,9 +712,7 @@ def graphspec_to_dataflow_mermaid_with_data(
     )
 
     # Collect stuff data from graph
-    children_map, _ = _build_containment_tree(graph.edges)
-    controller_node_ids = set(children_map.keys())
-    stuff_data = _collect_stuff_data(graph=graph, controller_node_ids=controller_node_ids)
+    stuff_data = _collect_stuff_data(graph=graph)
 
     return MermaidWithData(mermaid_code=mermaid_code, stuff_data=stuff_data)
 
@@ -744,13 +738,13 @@ def graphspec_to_combo_mermaid(
 
     Args:
         graph: The GraphSpec to convert.
-        direction: Flowchart direction. Defaults to LEFT_TO_RIGHT if not specified.
+        direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
 
     Returns:
         Mermaid flowchart syntax as a string.
     """
-    effective_direction = direction or FlowchartDirection.LEFT_TO_RIGHT
+    effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
 
     # Header
@@ -898,7 +892,7 @@ def graphspec_to_combo_mermaid_with_data(
 
     Args:
         graph: The GraphSpec to convert.
-        direction: Flowchart direction. Defaults to LEFT_TO_RIGHT if not specified.
+        direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
 
     Returns:
@@ -911,8 +905,6 @@ def graphspec_to_combo_mermaid_with_data(
     )
 
     # Collect stuff data from graph
-    children_map, _ = _build_containment_tree(graph.edges)
-    controller_node_ids = set(children_map.keys())
-    stuff_data = _collect_stuff_data(graph=graph, controller_node_ids=controller_node_ids)
+    stuff_data = _collect_stuff_data(graph=graph)
 
     return MermaidWithData(mermaid_code=mermaid_code, stuff_data=stuff_data)
