@@ -135,7 +135,6 @@ costs = { input = 0.4, output = 2.0 }
 
 # TODO: add support to pricing per page
 
-# --- OCR Models ---------------------------------------------------------------
 [mistral-ocr-2503]
 model_type = "text_extractor"
 model_id = "mistral-ocr-2503"

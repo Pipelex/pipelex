@@ -41,6 +41,10 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
     def is_image_supported(self) -> bool:
         return self.inference_model.is_image_supported_for_extract
 
+    @property
+    def is_caption_supported(self) -> bool:
+        return self.inference_model.is_caption_supported_for_extract
+
     def _check_can_perform_job(self, extract_job: ExtractJob):
         # This can be overridden by subclasses for specific checks
         extract_input = extract_job.extract_input
@@ -51,6 +55,10 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         elif extract_input.pdf_uri:
             if not self.inference_model.is_pdf_supported_for_extract:
                 msg = f"Extract engine '{self.inference_model.tag}' does not support PDF extraction."
+                raise ExtractCapabilityError(msg)
+        if extract_job.job_params.should_caption_images:
+            if not self.inference_model.is_caption_supported_for_extract:
+                msg = f"Extract engine '{self.inference_model.tag}' does not support image captioning."
                 raise ExtractCapabilityError(msg)
 
     async def extract_pages(

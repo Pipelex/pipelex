@@ -30,6 +30,9 @@ class TestExtract:
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
+        if extract_job_params.should_caption_images and not extract_worker.is_caption_supported:
+            msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
+            pytest.skip(msg)
         extract_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(pdf_uri=file_path),
             extract_job_params=extract_job_params,
@@ -58,6 +61,9 @@ class TestExtract:
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
+        if extract_job_params.should_caption_images and not extract_worker.is_caption_supported:
+            msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
+            pytest.skip(msg)
         extract_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(pdf_uri=url),
             extract_job_params=extract_job_params,
@@ -80,6 +86,9 @@ class TestExtract:
         if not extract_worker.is_image_supported:
             msg = f"Image extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
+        if extract_job_params.should_caption_images and not extract_worker.is_caption_supported:
+            msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
+            pytest.skip(msg)
         extract_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(image_uri=file_path),
             extract_job_params=extract_job_params,
@@ -100,6 +109,9 @@ class TestExtract:
         extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
         if not extract_worker.is_image_supported:
             msg = f"Image extraction is not supported for this extract worker: '{extract_worker.desc}'"
+            pytest.skip(msg)
+        if extract_job_params.should_caption_images and not extract_worker.is_caption_supported:
+            msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
         extract_job = ExtractJobFactory.make_extract_job(
             extract_input=ExtractInput(image_uri=url),
