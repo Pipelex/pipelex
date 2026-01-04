@@ -18,7 +18,13 @@ from pipelex.tools.misc.filetype_utils import (
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
 )
-from pipelex.tools.misc.path_utils import clarify_path_or_url, is_pipelex_storage_uri
+from pipelex.tools.uri.resolved_uri import (
+    ResolvedBase64DataUrl,
+    ResolvedHttpUrl,
+    ResolvedLocalPath,
+    ResolvedPipelexStorage,
+)
+from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 async def promptimage_to_b64_async(prompt_image: PromptImage) -> bytes:
@@ -57,31 +63,31 @@ async def promptimage_to_typed_bytes_or_url(
     if isinstance(prompt_image, PromptImageBase64):
         typed_bytes_or_url = prompt_image.make_prompt_image_typed_base64()
     elif isinstance(prompt_image, PromptImageUrl):
-        # Check for Pipelex storage URI first
-        if is_pipelex_storage_uri(prompt_image.url):
-            storage_provider = get_storage_provider()
-            image_bytes = storage_provider.load(uri=prompt_image.url)
-            file_type = detect_file_type_from_bytes(image_bytes)
-            base64_bytes = base64.b64encode(image_bytes)
-            typed_bytes_or_url = PromptImageTypedBase64(base_64=base64_bytes, file_type=file_type)
-        else:
-            file_path, url = clarify_path_or_url(path_or_uri=prompt_image.url)
-            if url:
+        resolved = resolve_uri(prompt_image.url)
+        match resolved:
+            case ResolvedPipelexStorage():
+                storage_provider = get_storage_provider()
+                image_bytes = storage_provider.load(uri=resolved.storage_uri)
+                file_type = detect_file_type_from_bytes(image_bytes)
+                base64_bytes = base64.b64encode(image_bytes)
+                typed_bytes_or_url = PromptImageTypedBase64(base_64=base64_bytes, file_type=file_type)
+            case ResolvedHttpUrl():
                 if is_http_url_enabled:
-                    typed_bytes_or_url = prompt_image.url
+                    typed_bytes_or_url = resolved.url
                 else:
                     prompt_image_b64 = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image_url=prompt_image)
                     file_type = detect_file_type_from_base64(prompt_image_b64.base_64)
                     typed_bytes_or_url = PromptImageTypedBase64(base_64=prompt_image_b64.base_64, file_type=file_type)
-            elif file_path:
-                prompt_image_path = PromptImagePath(file_path=file_path)
+            case ResolvedLocalPath():
+                prompt_image_path = PromptImagePath(file_path=resolved.path)
                 return await promptimage_to_typed_bytes_or_url(
                     prompt_image=prompt_image_path,
                     is_http_url_enabled=is_http_url_enabled,
                 )
-            else:
-                msg = "No file path or URL found"
-                raise PromptImageFactoryError(msg)
+            case ResolvedBase64DataUrl():
+                base64_bytes = resolved.base64_data.encode("utf-8")
+                file_type = detect_file_type_from_base64(base64_bytes)
+                typed_bytes_or_url = PromptImageTypedBase64(base_64=base64_bytes, file_type=file_type)
     elif isinstance(prompt_image, PromptImagePath):
         b64 = await load_binary_as_base64_async(prompt_image.file_path)
         typed_bytes_or_url = PromptImageTypedBase64(base_64=b64, file_type=prompt_image.get_file_type())

@@ -19,7 +19,7 @@ from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletio
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base64_utils import make_base64_url_from_location_async
+from pipelex.tools.misc.base64_utils import make_base64_url_from_uri_async
 from pipelex.types import StrEnum
 
 
@@ -84,7 +84,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             if extract_job.job_params.should_caption_images:
                 msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
                 raise NotImplementedError(msg)
-            base64_url = await make_base64_url_from_location_async(location=image_uri)
+            base64_url = await make_base64_url_from_uri_async(uri=image_uri)
             extract_output = await self.extract_base64_url(
                 extract_job=extract_job,
                 base64_url=base64_url,
@@ -97,7 +97,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                 # TODO: handle model capability and skip UT when it's not supported
                 msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
                 raise ExtractCapabilityError(msg)
-            base64_url = await make_base64_url_from_location_async(location=pdf_uri)
+            base64_url = await make_base64_url_from_uri_async(uri=pdf_uri)
             extract_output = await self.extract_base64_url(
                 extract_job=extract_job,
                 base64_url=base64_url,

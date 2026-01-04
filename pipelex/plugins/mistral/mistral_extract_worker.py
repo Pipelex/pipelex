@@ -13,7 +13,13 @@ from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base64_utils import load_binary_as_base64_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
-from pipelex.tools.misc.path_utils import clarify_path_or_url
+from pipelex.tools.uri.resolved_uri import (
+    ResolvedBase64DataUrl,
+    ResolvedHttpUrl,
+    ResolvedLocalPath,
+    ResolvedPipelexStorage,
+)
+from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 class MistralExtractWorker(ExtractWorkerAbstract):
@@ -67,12 +73,15 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         if should_caption_image:
             msg = "Captioning is not implemented for Mistral OCR."
             raise NotImplementedError(msg)
-        image_path, image_url = clarify_path_or_url(path_or_uri=image_uri)
-        if image_url:
-            return await self._extract_from_image_url(image_url=image_url)
-        else:
-            assert image_path is not None
-            return await self._extract_from_image_file(image_path=image_path)
+        resolved = resolve_uri(image_uri)
+        match resolved:
+            case ResolvedHttpUrl():
+                return await self._extract_from_image_url(image_url=resolved.url)
+            case ResolvedLocalPath():
+                return await self._extract_from_image_file(image_path=resolved.path)
+            case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
+                msg = f"Unsupported URI type for Mistral image extraction: {resolved.kind}"
+                raise ExtractInputError(msg)
 
     async def _make_extract_output_from_pdf(
         self,
@@ -83,19 +92,22 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         if should_caption_images:
             msg = "Captioning is not implemented for Mistral OCR."
             raise ExtractCapabilityError(msg)
-        pdf_path, pdf_url = clarify_path_or_url(path_or_uri=pdf_uri)
         extract_output: ExtractOutput
-        if pdf_url:
-            extract_output = await self.extract_from_pdf_url(
-                pdf_url=pdf_url,
-                should_include_images=should_include_images,
-            )
-        else:  # pdf_path must be provided based on validation
-            assert pdf_path is not None
-            extract_output = await self.extract_from_pdf_file(
-                pdf_path=pdf_path,
-                should_include_images=should_include_images,
-            )
+        resolved = resolve_uri(pdf_uri)
+        match resolved:
+            case ResolvedHttpUrl():
+                extract_output = await self.extract_from_pdf_url(
+                    pdf_url=resolved.url,
+                    should_include_images=should_include_images,
+                )
+            case ResolvedLocalPath():
+                extract_output = await self.extract_from_pdf_file(
+                    pdf_path=resolved.path,
+                    should_include_images=should_include_images,
+                )
+            case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
+                msg = f"Unsupported URI type for Mistral PDF extraction: {resolved.kind}"
+                raise ExtractInputError(msg)
         return extract_output
 
     async def _extract_from_image_url(

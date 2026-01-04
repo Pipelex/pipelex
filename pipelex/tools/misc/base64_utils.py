@@ -5,7 +5,13 @@ import aiofiles
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
 from pipelex.tools.misc.file_utils import load_binary, load_binary_async
 from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_bytes
-from pipelex.tools.misc.path_utils import clarify_path_or_url
+from pipelex.tools.uri.resolved_uri import (
+    ResolvedBase64DataUrl,
+    ResolvedHttpUrl,
+    ResolvedLocalPath,
+    ResolvedPipelexStorage,
+)
+from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 def load_binary_as_base64(path: str) -> bytes:
@@ -40,13 +46,20 @@ async def make_base64_url_from_http_url_async(url: str) -> str:
     return make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
 
 
-async def make_base64_url_from_location_async(location: str) -> str:
-    pdf_path, pdf_url = clarify_path_or_url(path_or_uri=location)
-    if pdf_url:
-        base64_url = await make_base64_url_from_http_url_async(url=pdf_url)
-    else:  # pdf_path must be provided based on validation
-        assert pdf_path is not None
-        base64_url = await make_base64_url_from_path_async(path=pdf_path)
+async def make_base64_url_from_uri_async(uri: str) -> str:
+    base64_url: str
+    resolved = resolve_uri(uri)
+    match resolved:
+        case ResolvedHttpUrl():
+            base64_url = await make_base64_url_from_http_url_async(url=resolved.url)
+        case ResolvedLocalPath():
+            base64_url = await make_base64_url_from_path_async(path=resolved.path)
+        case ResolvedBase64DataUrl():
+            # Already a data URL, return as-is
+            base64_url = resolved.original
+        case ResolvedPipelexStorage():
+            msg = f"Unsupported URI type for base64 URL creation: {resolved.kind} (requires storage provider)"
+            raise ValueError(msg)
     return base64_url
 
 
