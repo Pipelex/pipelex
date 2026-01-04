@@ -56,6 +56,10 @@ class InferenceModelSpec(ConfigModel):
     def is_image_supported_for_extract(self) -> bool:
         return "image" in self.inputs
 
+    @property
+    def is_caption_supported_for_extract(self) -> bool:
+        return "captions" in self.outputs
+
     def get_instructor_mode(self) -> InstructorMode | None:
         if self.structure_method:
             return self.structure_method.as_instructor_mode()
