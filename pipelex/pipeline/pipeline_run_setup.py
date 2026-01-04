@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.graph.graph_context import GraphContext
 from pipelex.hub import (
     get_library_manager,
     get_otel_tracer,
@@ -13,7 +14,6 @@ from pipelex.hub import (
     get_telemetry_manager,
     set_current_library,
 )
-from pipelex.observability.graphspec.graph_context import GraphContext
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode

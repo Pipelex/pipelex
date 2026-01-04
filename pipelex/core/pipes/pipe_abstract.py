@@ -35,7 +35,7 @@ from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
 if TYPE_CHECKING:
-    from pipelex.observability.graphspec.graph_context import GraphContext
+    from pipelex.graph.graph_context import GraphContext
 
 # Controller pipe types for graph node classification
 _CONTROLLER_PIPE_TYPES = {"PipeSequence", "PipeCondition", "PipeBatch", "PipeParallel"}
@@ -354,7 +354,7 @@ class PipeAbstract(ABC, BaseModel):
 
         parent_graph_context = job_metadata.graph_context
         if parent_graph_context is not None:
-            from pipelex.observability.graphspec.graph_tracer_manager import (  # noqa: PLC0415
+            from pipelex.graph.graph_tracer_manager import (  # noqa: PLC0415
                 GraphTracerManagerAbstract,
                 IOSpec,
                 NodeKind,
@@ -424,7 +424,7 @@ class PipeAbstract(ABC, BaseModel):
         # Record graph tracing success
         if tracer_manager is not None:
             # Capture output spec for data flow tracking
-            from pipelex.observability.graphspec.graph_tracer_manager import IOSpec  # noqa: PLC0415
+            from pipelex.graph.graph_tracer_manager import IOSpec  # noqa: PLC0415
 
             main_stuff = pipe_output.main_stuff
             output_spec = IOSpec(

@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from pipelex.observability.graphspec.graph_context import GraphContext
+from pipelex.graph.graph_context import GraphContext
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.types import StrEnum
 

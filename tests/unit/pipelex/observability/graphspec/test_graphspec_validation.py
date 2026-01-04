@@ -3,11 +3,11 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.observability.graphspec.exceptions import (
+from pipelex.graph.exceptions import (
     GraphSpecValidationError,
     GraphSpecVersionError,
 )
-from pipelex.observability.graphspec.graphspec import (
+from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
     ErrorSpec,
@@ -17,8 +17,8 @@ from pipelex.observability.graphspec.graphspec import (
     NodeStatus,
     PipelineRef,
 )
-from pipelex.observability.graphspec.graphspec_io import graphspec_from_json, graphspec_to_json
-from pipelex.observability.graphspec.validation import validate_graphspec
+from pipelex.graph.graphspec_io import graphspec_from_json, graphspec_to_json
+from pipelex.graph.validation import validate_graphspec
 from tests.unit.pipelex.observability.graphspec.test_data import ValidGraphData
 
 

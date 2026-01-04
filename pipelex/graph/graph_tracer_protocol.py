@@ -5,8 +5,8 @@ from typing import Protocol
 
 from typing_extensions import override
 
-from pipelex.observability.graphspec.graph_context import GraphContext
-from pipelex.observability.graphspec.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 
 
 class GraphTracerProtocol(Protocol):

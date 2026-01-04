@@ -3,8 +3,8 @@
 This module provides validation functions to enforce GraphSpec invariants.
 """
 
-from pipelex.observability.graphspec.exceptions import GraphSpecValidationError
-from pipelex.observability.graphspec.graphspec import GraphSpec, NodeStatus
+from pipelex.graph.exceptions import GraphSpecValidationError
+from pipelex.graph.graphspec import GraphSpec, NodeStatus
 
 
 def validate_graphspec(graph: GraphSpec) -> None:

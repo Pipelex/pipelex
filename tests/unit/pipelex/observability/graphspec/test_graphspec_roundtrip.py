@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pipelex.observability.graphspec.graphspec import (
+from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
     ErrorSpec,
@@ -16,7 +16,7 @@ from pipelex.observability.graphspec.graphspec import (
     PipelineRef,
     TimingSpec,
 )
-from pipelex.observability.graphspec.graphspec_io import (
+from pipelex.graph.graphspec_io import (
     graphspec_from_json,
     graphspec_to_json,
     load_graphspec,

@@ -4,9 +4,9 @@ from datetime import UTC, datetime
 
 from typing_extensions import override
 
-from pipelex.observability.graphspec.graph_context import GraphContext
-from pipelex.observability.graphspec.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.observability.graphspec.graphspec import (
+from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
+from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
     ErrorSpec,

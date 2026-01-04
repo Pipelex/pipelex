@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from pipelex.observability.graphspec.graph_context import GraphContext
-from pipelex.observability.graphspec.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.observability.graphspec.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 
 if TYPE_CHECKING:
-    from pipelex.observability.graphspec.graph_tracer import GraphTracer
+    from pipelex.graph.graph_tracer import GraphTracer
 
 # Re-export NodeKind and IOSpec for use by pipe_abstract without additional imports
 __all__ = ["GraphTracerManager", "GraphTracerManagerAbstract", "IOSpec", "NodeKind"]

@@ -6,10 +6,10 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNa
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.graph.graph_tracer import GraphTracer
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
+from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_class_registry
-from pipelex.observability.graphspec.graph_tracer import GraphTracer
-from pipelex.observability.graphspec.graph_tracer_manager import GraphTracerManager
-from pipelex.observability.graphspec.graphspec import GraphSpec
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata

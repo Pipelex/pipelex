@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
-from pipelex.observability.graphspec.graphspec import (
+from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
     GraphSpec,
@@ -14,7 +14,7 @@ from pipelex.observability.graphspec.graphspec import (
     NodeStatus,
     PipelineRef,
 )
-from pipelex.observability.graphspec.mermaid import (
+from pipelex.graph.mermaid import (
     FlowchartDirection,
     escape_mermaid_label,
     graphspec_to_dataflow_mermaid,

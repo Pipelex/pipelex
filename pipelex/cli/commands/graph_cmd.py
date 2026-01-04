@@ -19,15 +19,15 @@ from pipelex.cli.error_handlers import (
     handle_validate_bundle_error,
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
-from pipelex.observability.graphspec.graphspec_io import graphspec_to_json, save_graphspec
-from pipelex.observability.graphspec.html_renderer import render_mermaid_html
-from pipelex.observability.graphspec.mermaid import (
+from pipelex.graph.graphspec_io import graphspec_to_json, save_graphspec
+from pipelex.graph.html_renderer import render_mermaid_html
+from pipelex.graph.mermaid import (
     FlowchartDirection,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
 )
+from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
 from pipelex.pipelex import Pipelex
@@ -37,7 +37,7 @@ from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
-    from pipelex.observability.graphspec.graphspec import GraphSpec
+    from pipelex.graph.graphspec import GraphSpec
 
 COMMAND = "graph"
 

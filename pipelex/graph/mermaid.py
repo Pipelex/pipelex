@@ -8,7 +8,7 @@ import hashlib
 import operator
 from collections import defaultdict
 
-from pipelex.observability.graphspec.graphspec import (
+from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
     GraphSpec,

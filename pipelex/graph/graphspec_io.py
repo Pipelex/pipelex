@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pipelex.observability.graphspec.exceptions import GraphSpecVersionError
-from pipelex.observability.graphspec.graphspec import (
+from pipelex.graph.exceptions import GraphSpecVersionError
+from pipelex.graph.graphspec import (
     SUPPORTED_SCHEMA_VERSIONS,
     GraphSpec,
 )

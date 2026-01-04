@@ -4,13 +4,13 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.graph.graph_context import GraphContext
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,
     get_telemetry_manager,
     teardown_current_library,
 )
-from pipelex.observability.graphspec.graph_context import GraphContext
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity

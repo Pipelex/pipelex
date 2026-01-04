@@ -18,17 +18,17 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
-from pipelex.hub import get_console, get_telemetry_manager
-from pipelex.observability.graphspec.graph_tracer import GraphTracer
-from pipelex.observability.graphspec.graph_tracer_manager import GraphTracerManager
-from pipelex.observability.graphspec.graphspec_io import save_graphspec
-from pipelex.observability.graphspec.html_renderer import render_mermaid_html_async
-from pipelex.observability.graphspec.mermaid import (
+from pipelex.graph.graph_tracer import GraphTracer
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
+from pipelex.graph.graphspec_io import save_graphspec
+from pipelex.graph.html_renderer import render_mermaid_html_async
+from pipelex.graph.mermaid import (
     FlowchartDirection,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
 )
+from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
@@ -43,7 +43,7 @@ from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_pat
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
-    from pipelex.observability.graphspec.graphspec import GraphSpec
+    from pipelex.graph.graphspec import GraphSpec
 
 COMMAND = "run"
 

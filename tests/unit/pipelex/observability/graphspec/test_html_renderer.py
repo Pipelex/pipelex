@@ -1,6 +1,6 @@
 """Unit tests for the HTML renderer module."""
 
-from pipelex.observability.graphspec.html_renderer import render_mermaid_html
+from pipelex.graph.html_renderer import render_mermaid_html
 
 
 class TestRenderMermaidHtml:
