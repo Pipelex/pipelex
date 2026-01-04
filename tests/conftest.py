@@ -41,12 +41,11 @@ def _make_default_remote_config() -> RemoteConfig:
 def _cached_fetch_remote_config() -> RemoteConfig:
     """Wrapper that caches the remote config for the entire test session."""
     if "config" not in _remote_config_cache:
-        # In Codex Cloud, use default config to avoid SSL issues with MITM proxy
+        # In Codex Cloud, use dummy default config to avoid SSL issues with MITM proxy
         if runtime_manager.is_in_codex_cloud:
             print_to_stderr("Using default remote config for Codex Cloud")
             _remote_config_cache["config"] = _make_default_remote_config()
         else:
-            print_to_stderr("Fetching remote config to cache it for the entire test session")
             _remote_config_cache["config"] = _original_fetch_remote_config()
     return _remote_config_cache["config"]
 

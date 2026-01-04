@@ -18,7 +18,7 @@ class RemoteConfigFetcher:
 
     # Retry configuration for remote config fetch
     # Using hardcoded values since this runs before config is fully loaded
-    FETCH_MAX_RETRIES = 1
+    FETCH_MAX_RETRIES = 5
     FETCH_WAIT_MULTIPLIER = 1
     FETCH_WAIT_MIN = 1
     FETCH_WAIT_MAX = 10
