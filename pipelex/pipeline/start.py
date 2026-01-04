@@ -21,6 +21,7 @@ async def start_pipeline(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
+    generate_graph: bool = False,
 ) -> tuple[str, asyncio.Task[PipeOutput]]:
     """Start a pipeline in the background.
 
@@ -67,6 +68,10 @@ async def start_pipeline(
         added if not already present.
     user_id:
         Unique identifier for the user.
+    generate_graph:
+        If True, enables execution graph tracing. Since this function returns immediately,
+        the caller is responsible for calling ``GraphTracerManager.get_instance().close_tracer(pipeline_run_id)``
+        after the task completes to retrieve the GraphSpec.
 
     Returns:
     -------
@@ -87,6 +92,7 @@ async def start_pipeline(
         pipe_run_mode=pipe_run_mode,
         search_domain_codes=search_domain_codes,
         user_id=user_id,
+        generate_graph=generate_graph,
     )
 
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))

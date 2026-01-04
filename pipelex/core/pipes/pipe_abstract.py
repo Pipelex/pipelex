@@ -407,8 +407,9 @@ class PipeAbstract(ABC, BaseModel):
                     )
         except Exception as exc:
             # Record graph tracing error
-            if tracer_manager is not None:
+            if tracer_manager is not None and parent_graph_context is not None:
                 tracer_manager.on_pipe_end_error(
+                    graph_id=parent_graph_context.graph_id,
                     node_id=graph_node_id,
                     ended_at=datetime.now(UTC),
                     error_type=type(exc).__name__,
@@ -417,7 +418,7 @@ class PipeAbstract(ABC, BaseModel):
             raise
 
         # Record graph tracing success
-        if tracer_manager is not None:
+        if tracer_manager is not None and parent_graph_context is not None:
             # Capture output spec for data flow tracking
 
             main_stuff = pipe_output.main_stuff
@@ -429,6 +430,7 @@ class PipeAbstract(ABC, BaseModel):
             )
 
             tracer_manager.on_pipe_end_success(
+                graph_id=parent_graph_context.graph_id,
                 node_id=graph_node_id,
                 ended_at=datetime.now(UTC),
                 output_spec=output_spec,

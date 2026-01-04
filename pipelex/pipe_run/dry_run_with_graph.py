@@ -1,12 +1,9 @@
-"""Dry run a pipe while capturing execution graph."""
-
 from pipelex import log
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_class_registry
@@ -33,13 +30,12 @@ async def dry_run_pipe_with_graph(
     Raises:
         Various exceptions if the dry run fails.
     """
-    # Set up the graph tracer and register as singleton
-    tracer = GraphTracer()
-    manager = GraphTracerManager(tracer)  # This registers itself as singleton
+    # Get or create the graph tracer manager singleton
+    manager = GraphTracerManager.get_or_create_instance()
+    effective_graph_id = graph_id or f"dry_run_{pipe.code}"
 
     try:
-        effective_graph_id = graph_id or f"dry_run_{pipe.code}"
-        graph_context = manager.setup(
+        graph_context = manager.open_tracer(
             graph_id=effective_graph_id,
             pipeline_ref_domain=pipe.domain_code,
             pipeline_ref_main_pipe=pipe.code,
@@ -66,18 +62,18 @@ async def dry_run_pipe_with_graph(
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
 
-        # Finalize and return the graph (also clears the singleton)
-        result = manager.teardown()
+        # Finalize and return the graph
+        result = manager.close_tracer(effective_graph_id)
         if result is None:
-            # This shouldn't happen if setup was called, but handle it gracefully
-            msg = "GraphTracer teardown returned None unexpectedly"
+            # This shouldn't happen if open_tracer was called, but handle it gracefully
+            msg = "GraphTracer close_tracer returned None unexpectedly"
             raise RuntimeError(msg)
 
         return result
 
     except Exception:
-        # Clean up the singleton on error
-        manager.teardown()
+        # Clean up the tracer on error
+        manager.close_tracer(effective_graph_id)
         raise
 
 

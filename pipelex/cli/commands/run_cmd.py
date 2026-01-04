@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import click
 import typer
@@ -18,8 +18,6 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
-from pipelex.graph.graph_tracer import GraphTracer
-from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec_io import save_graphspec
 from pipelex.graph.mermaid import (
     graphspec_to_combo_mermaid,
@@ -32,7 +30,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
-from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -41,9 +38,6 @@ from pipelex.tools.misc.file_utils import get_incremental_directory_path, get_in
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.mermaid_utils import render_mermaid_html_async
 from pipelex.tools.misc.package_utils import get_package_version
-
-if TYPE_CHECKING:
-    from pipelex.graph.graphspec import GraphSpec
 
 COMMAND = "run"
 
@@ -204,21 +198,6 @@ def run_cmd(
         # Execute pipeline
         typer.secho(f"\n🚀 Executing {source_description}...\n", fg=typer.colors.GREEN, bold=True)
 
-        # Set up graph tracing if requested
-        graph_spec: GraphSpec | None = None
-        graph_context = None
-        manager: GraphTracerManager | None = None
-
-        if generate_graph:
-            tracer = GraphTracer()
-            graph_manager = GraphTracerManager(tracer)
-            manager = graph_manager
-            graph_id = PipelineFactory.make_pipeline_run_id()
-            graph_context = graph_manager.setup(
-                graph_id=graph_id,
-                pipeline_ref_main_pipe=pipe_code,
-            )
-
         # Determine pipe run mode
         pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
@@ -227,15 +206,11 @@ def run_cmd(
                 pipe_code=pipe_code,
                 inputs=pipeline_inputs,
                 pipe_run_mode=pipe_run_mode,
-                graph_context=graph_context,
+                generate_graph=generate_graph,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-        finally:
-            # Teardown graph tracing (capture graph even on failure)
-            if manager is not None:
-                graph_spec = manager.teardown()
 
         # Pretty print main_stuff unless disabled
         if not no_pretty_print:
@@ -255,7 +230,7 @@ def run_cmd(
             typer.secho(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN)
 
         # Save graph outputs if requested
-        if graph_spec is not None:
+        if graph_spec := pipe_output.graph_spec:
             # Create output directory with incremental numbering
             base_dir = graph_dir or "results"
             dir_name = graph_name or f"{pipe_code}_graph"

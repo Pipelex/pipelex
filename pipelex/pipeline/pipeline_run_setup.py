@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
     get_otel_tracer,
@@ -33,6 +33,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
+    from pipelex.graph.graph_context import GraphContext
 
 
 async def pipeline_run_setup(
@@ -47,7 +48,7 @@ async def pipeline_run_setup(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
-    graph_context: GraphContext | None = None,
+    generate_graph: bool = False,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -93,9 +94,10 @@ async def pipeline_run_setup(
         added if not already present.
     user_id:
         Unique identifier for the user (optional).
-    graph_context:
-        Optional GraphContext for enabling execution graph tracing. When provided,
-        the execution will capture node timing, data flow, and status information.
+    generate_graph:
+        If True, enables execution graph tracing. The graph tracer will be opened with
+        graph_id equal to pipeline_run_id, and the execution will capture node timing,
+        data flow, and status information.
 
     Returns:
     -------
@@ -152,6 +154,16 @@ async def pipeline_run_setup(
     search_domain_codes = search_domain_codes or []
     if pipe.domain_code not in search_domain_codes:
         search_domain_codes.insert(0, pipe.domain_code)
+
+    # Initialize graph tracing if requested (after pipe is loaded so we have domain info)
+    graph_context: GraphContext | None = None
+    if generate_graph:
+        graph_tracer_manager = GraphTracerManager.get_or_create_instance()
+        graph_context = graph_tracer_manager.open_tracer(
+            graph_id=pipeline_run_id,
+            pipeline_ref_domain=pipe.domain_code,
+            pipeline_ref_main_pipe=pipe_code,
+        )
 
     working_memory: WorkingMemory | None = None
 

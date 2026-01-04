@@ -4,7 +4,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,
@@ -31,7 +31,7 @@ async def execute_pipeline(
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
-    graph_context: GraphContext | None = None,
+    generate_graph: bool = False,
 ) -> PipeOutput:
     """Execute a pipeline and wait for its completion.
 
@@ -76,14 +76,15 @@ async def execute_pipeline(
         added if not already present.
     user_id:
         Unique identifier for the user.
-    graph_context:
-        Optional GraphContext for enabling execution graph tracing. When provided,
-        the execution will capture node timing, data flow, and status information.
+    generate_graph:
+        If True, enables execution graph tracing. The graph will be available in
+        ``PipeOutput.graph_spec`` after execution completes.
 
     Returns:
     -------
     PipeOutput
-        The pipe output from the execution.
+        The pipe output from the execution. If ``generate_graph`` was True, the
+        execution graph is available in ``pipe_output.graph_spec``.
 
     """
     pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
@@ -98,10 +99,11 @@ async def execute_pipeline(
         pipe_run_mode=pipe_run_mode,
         search_domain_codes=search_domain_codes,
         user_id=user_id,
-        graph_context=graph_context,
+        generate_graph=generate_graph,
     )
 
     properties: dict[EventProperty, Any]
+    graph_spec_result = None
     try:
         pipe_output = await get_pipe_router().run(pipe_job)
     except PipeRouterError as exc:
@@ -135,9 +137,20 @@ async def execute_pipeline(
             pipe_stack=pipe_job.pipe_run_params.pipe_stack,
         ) from exc
     finally:
+        # Close graph tracer if it was opened (capture graph even on failure)
+        if generate_graph:
+            tracer_manager = GraphTracerManager.get_instance()
+            if tracer_manager is not None:
+                graph_spec_result = tracer_manager.close_tracer(pipeline_run_id)
+
         library = get_library_manager().get_library(library_id=library_id)
         library.teardown()
         teardown_current_library()
+
+    # Assign graph spec to output (only reached on success, when pipe_output is bound)
+    if graph_spec_result is not None:
+        pipe_output.graph_spec = graph_spec_result
+
     properties = {
         EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
         EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
