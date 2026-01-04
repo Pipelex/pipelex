@@ -164,6 +164,7 @@ async def pipeline_run_setup(
                 search_domain_codes=search_domain_codes,
             )
 
+    # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:
         if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
             pipe_run_mode = PipeRunMode(run_mode_from_env)

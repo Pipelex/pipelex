@@ -22,7 +22,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.observability.graphspec import GraphSpec, graphspec_to_json, save_graphspec
 from pipelex.observability.graphspec.html_renderer import render_mermaid_html
-from pipelex.observability.graphspec.mermaid import VALID_DIRECTIONS, graphspec_to_dataflow_mermaid, graphspec_to_mermaid
+from pipelex.observability.graphspec.mermaid import VALID_DIRECTIONS, graphspec_to_dataflow_mermaid, graphspec_to_orchestration_mermaid
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
 from pipelex.pipelex import Pipelex
@@ -278,7 +278,7 @@ def graph_cmd(
                     )
                 else:
                     # Orchestration diagram (default)
-                    mermaid_code = graphspec_to_mermaid(
+                    mermaid_code = graphspec_to_orchestration_mermaid(
                         graph_spec,
                         direction=direction,
                         include_data_edges=not no_data_edges,

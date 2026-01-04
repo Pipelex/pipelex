@@ -264,7 +264,7 @@ def _render_edges(
     return lines
 
 
-def graphspec_to_mermaid(
+def graphspec_to_orchestration_mermaid(
     graph: GraphSpec,
     *,
     direction: str = "TD",

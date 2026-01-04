@@ -24,11 +24,12 @@ from pipelex.observability.graphspec import (
     GraphTracer,
     GraphTracerManager,
     graphspec_to_dataflow_mermaid,
-    graphspec_to_mermaid,
+    graphspec_to_orchestration_mermaid,
     save_graphspec,
 )
 from pipelex.observability.graphspec.html_renderer import render_mermaid_html_async
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
@@ -84,6 +85,10 @@ def run_cmd(
         str | None,
         typer.Option("--graph-name", help="Base name for graph directory (default: {pipe_code}_graph)"),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
+    ] = False,
 ) -> None:
     """Execute a pipeline from a specific bundle file (or not), specifying its pipe code or not.
     If the bundle is provided, it will run its main pipe unless you specify a pipe code.
@@ -98,6 +103,7 @@ def run_cmd(
         pipelex run my_pipe --output results.json --no-pretty-print
         pipelex run my_pipe --graph
         pipelex run my_pipe --graph --graph-dir ./analysis
+        pipelex run my_pipe --dry-run
     """
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -209,10 +215,14 @@ def run_cmd(
                 pipeline_ref_main_pipe=pipe_code,
             )
 
+        # Determine pipe run mode
+        pipe_run_mode = PipeRunMode.DRY if dry_run else None
+
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
                 inputs=pipeline_inputs,
+                pipe_run_mode=pipe_run_mode,
                 graph_context=graph_context,
             )
         except PipelineExecutionError as exc:
@@ -252,7 +262,7 @@ def run_cmd(
             typer.secho(f"✅ Graph JSON saved to: {graph_output_dir / 'graph.json'}", fg=typer.colors.GREEN)
 
             # Generate orchestration view (TD - top-down)
-            orch_mermaid = graphspec_to_mermaid(graph_spec, direction="TD")
+            orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction="TD")
             (graph_output_dir / "orchestration.mmd").write_text(orch_mermaid, encoding="utf-8")
             typer.secho(f"✅ Orchestration Mermaid saved to: {graph_output_dir / 'orchestration.mmd'}", fg=typer.colors.GREEN)
 
