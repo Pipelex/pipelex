@@ -32,6 +32,7 @@ async def execute_pipeline(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     generate_graph: bool = False,
+    include_full_data: bool = False,
 ) -> PipeOutput:
     """Execute a pipeline and wait for its completion.
 
@@ -79,6 +80,10 @@ async def execute_pipeline(
     generate_graph:
         If True, enables execution graph tracing. The graph will be available in
         ``PipeOutput.graph_spec`` after execution completes.
+    include_full_data:
+        If True (and ``generate_graph`` is also True), the graph will include full
+        serialized input/output data in IOSpec.data fields. This uses ``smart_dump()``
+        on StuffContent objects for serialization.
 
     Returns:
     -------
@@ -100,6 +105,7 @@ async def execute_pipeline(
         search_domain_codes=search_domain_codes,
         user_id=user_id,
         generate_graph=generate_graph,
+        include_full_data=include_full_data,
     )
 
     properties: dict[EventProperty, Any]

@@ -1,5 +1,3 @@
-"""Protocol for GraphSpec tracing during pipe execution."""
-
 from datetime import datetime
 from typing import Protocol
 
@@ -16,13 +14,20 @@ class GraphTracerProtocol(Protocol):
     rather than data flow tracking.
     """
 
-    def setup(self, graph_id: str, pipeline_ref_domain: str | None = None, pipeline_ref_main_pipe: str | None = None) -> GraphContext:
+    def setup(
+        self,
+        graph_id: str,
+        pipeline_ref_domain: str | None = None,
+        pipeline_ref_main_pipe: str | None = None,
+        include_full_data: bool = False,
+    ) -> GraphContext:
         """Initialize tracing for a new pipeline run.
 
         Args:
             graph_id: Unique identifier for this execution graph.
             pipeline_ref_domain: Optional domain name for the pipeline.
             pipeline_ref_main_pipe: Optional main pipe name.
+            include_full_data: If True, capture full serialized content in IOSpec.data field.
 
         Returns:
             Initial GraphContext to pass through JobMetadata.
@@ -129,8 +134,9 @@ class GraphTracerNoOp(GraphTracerProtocol):
         graph_id: str,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
+        include_full_data: bool = False,
     ) -> GraphContext:
-        return GraphContext(graph_id=graph_id)
+        return GraphContext(graph_id=graph_id, include_full_data=include_full_data)
 
     @override
     def teardown(self) -> None:

@@ -18,6 +18,7 @@ class GraphContext(BaseModel):
         graph_id: Unique identifier for this execution graph (typically pipeline_run_id).
         parent_node_id: The node ID of the parent pipe (None for root).
         node_sequence: Monotonic counter for generating unique node IDs within this graph.
+        include_full_data: If True, capture full serialized content in IOSpec.data fields.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -25,6 +26,7 @@ class GraphContext(BaseModel):
     graph_id: str = Field(description="Unique identifier for the execution graph")
     parent_node_id: str | None = Field(default=None, description="Node ID of the parent pipe, None for root")
     node_sequence: int = Field(default=0, description="Monotonic counter for generating node IDs")
+    include_full_data: bool = Field(default=False, description="Whether to capture full input/output data")
 
     def make_node_id(self) -> str:
         """Generate a unique node ID within this graph.
@@ -48,4 +50,5 @@ class GraphContext(BaseModel):
             graph_id=self.graph_id,
             parent_node_id=child_node_id,
             node_sequence=next_sequence,
+            include_full_data=self.include_full_data,
         )

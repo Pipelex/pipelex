@@ -92,6 +92,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         graph_id: str,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
+        include_full_data: bool = False,
     ) -> GraphContext:
         """Create and initialize a new tracer for a pipeline run.
 
@@ -99,6 +100,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             graph_id: Unique identifier for this pipeline run.
             pipeline_ref_domain: Optional domain name for the pipeline.
             pipeline_ref_main_pipe: Optional main pipe name.
+            include_full_data: If True, capture full serialized content in IOSpec.data field.
 
         Returns:
             Initial GraphContext to pass through JobMetadata.
@@ -117,6 +119,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             graph_id=graph_id,
             pipeline_ref_domain=pipeline_ref_domain,
             pipeline_ref_main_pipe=pipeline_ref_main_pipe,
+            include_full_data=include_full_data,
         )
 
     def close_tracer(self, graph_id: str) -> GraphSpec | None:

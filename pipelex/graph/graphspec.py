@@ -87,6 +87,9 @@ class IOSpec(BaseModel):
 
     Previews are automatically truncated to MAX_PREVIEW_LENGTH to prevent
     accidental storage of large payloads or sensitive data.
+
+    The optional `data` field can hold the full serialized content when
+    full data capture is enabled (via --graph-full-data CLI option).
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -97,6 +100,7 @@ class IOSpec(BaseModel):
     preview: str | None = None
     size: int | None = None
     digest: str | None = None
+    data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("preview", mode="after")

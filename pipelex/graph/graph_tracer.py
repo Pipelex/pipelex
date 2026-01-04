@@ -116,6 +116,7 @@ class GraphTracer(GraphTracerProtocol):
         graph_id: str,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
+        include_full_data: bool = False,
     ) -> GraphContext:
         """Initialize tracing for a new pipeline run."""
         self._is_active = True
@@ -135,6 +136,7 @@ class GraphTracer(GraphTracerProtocol):
             graph_id=graph_id,
             parent_node_id=None,
             node_sequence=0,
+            include_full_data=include_full_data,
         )
 
     @override

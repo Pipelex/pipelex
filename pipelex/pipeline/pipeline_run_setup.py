@@ -49,6 +49,7 @@ async def pipeline_run_setup(
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
     generate_graph: bool = False,
+    include_full_data: bool = False,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -98,6 +99,10 @@ async def pipeline_run_setup(
         If True, enables execution graph tracing. The graph tracer will be opened with
         graph_id equal to pipeline_run_id, and the execution will capture node timing,
         data flow, and status information.
+    include_full_data:
+        If True (and ``generate_graph`` is also True), the graph will include full
+        serialized input/output data in IOSpec.data fields. This uses ``smart_dump()``
+        on StuffContent objects for serialization.
 
     Returns:
     -------
@@ -163,6 +168,7 @@ async def pipeline_run_setup(
             graph_id=pipeline_run_id,
             pipeline_ref_domain=pipe.domain_code,
             pipeline_ref_main_pipe=pipe_code,
+            include_full_data=include_full_data,
         )
 
     working_memory: WorkingMemory | None = None

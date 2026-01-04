@@ -83,6 +83,10 @@ def run_cmd(
         str | None,
         typer.Option("--graph-name", help="Base name for graph directory (default: {pipe_code}_graph)"),
     ] = None,
+    graph_full_data: Annotated[
+        bool,
+        typer.Option("--graph-full-data", help="Include full serialized input/output data in graph (requires --graph)"),
+    ] = False,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
@@ -101,6 +105,7 @@ def run_cmd(
         pipelex run my_pipe --output results.json --no-pretty-print
         pipelex run my_pipe --graph
         pipelex run my_pipe --graph --graph-dir ./analysis
+        pipelex run my_pipe --graph --graph-full-data
         pipelex run my_pipe --dry-run
     """
     # Validate mutual exclusivity
@@ -207,6 +212,7 @@ def run_cmd(
                 inputs=pipeline_inputs,
                 pipe_run_mode=pipe_run_mode,
                 generate_graph=generate_graph,
+                include_full_data=graph_full_data and generate_graph,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
