@@ -20,6 +20,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.observability.graphspec import (
+    FlowchartDirection,
     GraphSpec,
     GraphTracer,
     GraphTracerManager,
@@ -262,8 +263,8 @@ def run_cmd(
             save_graphspec(graph_spec, graph_output_dir / "graph.json")
             typer.secho(f"\n✅ Graph JSON saved to: {graph_output_dir / 'graph.json'}", fg=typer.colors.GREEN)
 
-            # Generate orchestration view (TD - top-down)
-            orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction="TD")
+            # Generate orchestration view (top-down)
+            orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
             (graph_output_dir / "orchestration.mmd").write_text(orch_mermaid, encoding="utf-8")
             typer.secho(f"✅ Orchestration Mermaid saved to: {graph_output_dir / 'orchestration.mmd'}", fg=typer.colors.GREEN)
 
@@ -271,8 +272,8 @@ def run_cmd(
             (graph_output_dir / "orchestration.html").write_text(orch_html, encoding="utf-8")
             typer.secho(f"✅ Orchestration HTML saved to: {graph_output_dir / 'orchestration.html'}", fg=typer.colors.GREEN)
 
-            # Generate data flow view (LR - left-right)
-            dataflow_mermaid = graphspec_to_dataflow_mermaid(graph_spec, direction="LR")
+            # Generate data flow view (left-to-right)
+            dataflow_mermaid = graphspec_to_dataflow_mermaid(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
             (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
             typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)
 
@@ -280,8 +281,8 @@ def run_cmd(
             (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
             typer.secho(f"✅ Data flow HTML saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
 
-            # Generate combo view (LR - left-right, data flow with controller subgraphs)
-            combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction="LR")
+            # Generate combo view (left-to-right, data flow with controller subgraphs)
+            combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
             (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
             typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
 

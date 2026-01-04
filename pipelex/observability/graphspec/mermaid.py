@@ -16,9 +16,33 @@ from pipelex.observability.graphspec.graphspec import (
     NodeSpec,
     NodeStatus,
 )
+from pipelex.types import StrEnum
 
-# Valid Mermaid flowchart directions
-VALID_DIRECTIONS = {"TB", "TD", "BT", "RL", "LR"}
+
+class FlowchartDirection(StrEnum):
+    """Valid Mermaid flowchart directions."""
+
+    TOP_TO_BOTTOM = "top_to_bottom"
+    TOP_DOWN = "top_down"
+    BOTTOM_TO_TOP = "bottom_to_top"
+    RIGHT_TO_LEFT = "right_to_left"
+    LEFT_TO_RIGHT = "left_to_right"
+
+    @property
+    def mermaid_code(self) -> str:
+        """Return the 2-letter Mermaid code for this direction."""
+        match self:
+            case FlowchartDirection.TOP_TO_BOTTOM:
+                return "TB"
+            case FlowchartDirection.TOP_DOWN:
+                return "TD"
+            case FlowchartDirection.BOTTOM_TO_TOP:
+                return "BT"
+            case FlowchartDirection.RIGHT_TO_LEFT:
+                return "RL"
+            case FlowchartDirection.LEFT_TO_RIGHT:
+                return "LR"
+
 
 # Light pastel colors for subgraph depth coloring (cycles through these)
 SUBGRAPH_DEPTH_COLORS = [
@@ -424,7 +448,7 @@ def _render_edges(
 def graphspec_to_orchestration_mermaid(
     graph: GraphSpec,
     *,
-    direction: str = "TD",
+    direction: FlowchartDirection | None = None,
     include_data_edges: bool = True,
     include_contains_edges: bool = False,
     include_selected_outcome_edges: bool = True,
@@ -433,7 +457,7 @@ def graphspec_to_orchestration_mermaid(
 
     Args:
         graph: The GraphSpec to convert.
-        direction: Flowchart direction (TB, TD, BT, RL, LR). Defaults to "TD".
+        direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
         include_data_edges: Whether to render DATA edges as dashed arrows.
         include_contains_edges: Whether to render CONTAINS as explicit arrows
             instead of subgraphs. Defaults to False (use subgraphs).
@@ -441,18 +465,12 @@ def graphspec_to_orchestration_mermaid(
 
     Returns:
         Mermaid flowchart syntax as a string.
-
-    Raises:
-        ValueError: If direction is not a valid Mermaid direction.
     """
-    if direction not in VALID_DIRECTIONS:
-        msg = f"Invalid direction '{direction}'. Must be one of: {', '.join(sorted(VALID_DIRECTIONS))}"
-        raise ValueError(msg)
-
+    effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
 
     # Header
-    lines.append(f"flowchart {direction}")
+    lines.append(f"flowchart {effective_direction.mermaid_code}")
 
     # Build ID mapping for all nodes
     id_mapping: dict[str, str] = {}
@@ -521,7 +539,7 @@ def graphspec_to_orchestration_mermaid(
 def graphspec_to_dataflow_mermaid(
     graph: GraphSpec,
     *,
-    direction: str = "LR",
+    direction: FlowchartDirection | None = None,
     show_stuff_codes: bool = False,
 ) -> str:
     """Convert a GraphSpec to a data-lineage focused Mermaid flowchart.
@@ -536,23 +554,17 @@ def graphspec_to_dataflow_mermaid(
 
     Args:
         graph: The GraphSpec to convert.
-        direction: Flowchart direction. Defaults to "LR" (left-to-right is natural for data flow).
+        direction: Flowchart direction. Defaults to LEFT_TO_RIGHT if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
 
     Returns:
         Mermaid flowchart syntax as a string.
-
-    Raises:
-        ValueError: If direction is not a valid Mermaid direction.
     """
-    if direction not in VALID_DIRECTIONS:
-        msg = f"Invalid direction '{direction}'. Must be one of: {', '.join(sorted(VALID_DIRECTIONS))}"
-        raise ValueError(msg)
-
+    effective_direction = direction or FlowchartDirection.LEFT_TO_RIGHT
     lines: list[str] = []
 
     # Header
-    lines.append(f"flowchart {direction}")
+    lines.append(f"flowchart {effective_direction.mermaid_code}")
 
     # Build ID mapping for pipe nodes
     pipe_id_mapping: dict[str, str] = {}
@@ -673,7 +685,7 @@ def graphspec_to_dataflow_mermaid(
 def graphspec_to_combo_mermaid(
     graph: GraphSpec,
     *,
-    direction: str = "LR",
+    direction: FlowchartDirection | None = None,
     show_stuff_codes: bool = False,
 ) -> str:
     """Convert a GraphSpec to a combined data-flow and orchestration Mermaid flowchart.
@@ -691,23 +703,17 @@ def graphspec_to_combo_mermaid(
 
     Args:
         graph: The GraphSpec to convert.
-        direction: Flowchart direction. Defaults to "LR" (left-to-right for data flow).
+        direction: Flowchart direction. Defaults to LEFT_TO_RIGHT if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
 
     Returns:
         Mermaid flowchart syntax as a string.
-
-    Raises:
-        ValueError: If direction is not a valid Mermaid direction.
     """
-    if direction not in VALID_DIRECTIONS:
-        msg = f"Invalid direction '{direction}'. Must be one of: {', '.join(sorted(VALID_DIRECTIONS))}"
-        raise ValueError(msg)
-
+    effective_direction = direction or FlowchartDirection.LEFT_TO_RIGHT
     lines: list[str] = []
 
     # Header
-    lines.append(f"flowchart {direction}")
+    lines.append(f"flowchart {effective_direction.mermaid_code}")
 
     # Build ID mapping for all nodes
     id_mapping: dict[str, str] = {}

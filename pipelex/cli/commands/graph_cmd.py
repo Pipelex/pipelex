@@ -20,13 +20,15 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
-from pipelex.observability.graphspec import GraphSpec, graphspec_to_json, save_graphspec
-from pipelex.observability.graphspec.html_renderer import render_mermaid_html
-from pipelex.observability.graphspec.mermaid import (
-    VALID_DIRECTIONS,
+from pipelex.observability.graphspec import (
+    FlowchartDirection,
+    GraphSpec,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
+    graphspec_to_json,
     graphspec_to_orchestration_mermaid,
+    render_mermaid_html,
+    save_graphspec,
 )
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
@@ -120,9 +122,9 @@ def graph_cmd(
         typer.Option("--html", help="Also generate HTML with embedded Mermaid (.html file)"),
     ] = False,
     direction: Annotated[
-        str,
-        typer.Option("--direction", help=f"Mermaid flowchart direction ({', '.join(sorted(VALID_DIRECTIONS))})"),
-    ] = "TD",
+        FlowchartDirection | None,
+        typer.Option("--direction", help="Flowchart direction"),
+    ] = None,
     no_data_edges: Annotated[
         bool,
         typer.Option("--no-data-edges", help="Exclude data flow edges from Mermaid output"),
@@ -155,15 +157,6 @@ def graph_cmd(
     # Handle deprecated --output flag
     if output and not out:
         out = output
-
-    # Validate direction
-    if direction not in VALID_DIRECTIONS:
-        typer.secho(
-            f"Invalid direction '{direction}'. Must be one of: {', '.join(sorted(VALID_DIRECTIONS))}",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
 
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -280,21 +273,10 @@ def graph_cmd(
             # Generate and save Mermaid
             if generate_mermaid:
                 if combo:
-                    # Combo diagram: data flow with controller subgraphs
-                    effective_direction = direction if direction != "TD" else "LR"
-                    mermaid_code = graphspec_to_combo_mermaid(
-                        graph_spec,
-                        direction=effective_direction,
-                    )
+                    mermaid_code = graphspec_to_combo_mermaid(graph_spec, direction=direction)
                 elif data_flow:
-                    # Data flow diagram: default to LR if user didn't specify direction
-                    effective_direction = direction if direction != "TD" else "LR"
-                    mermaid_code = graphspec_to_dataflow_mermaid(
-                        graph_spec,
-                        direction=effective_direction,
-                    )
+                    mermaid_code = graphspec_to_dataflow_mermaid(graph_spec, direction=direction)
                 else:
-                    # Orchestration diagram (default)
                     mermaid_code = graphspec_to_orchestration_mermaid(
                         graph_spec,
                         direction=direction,

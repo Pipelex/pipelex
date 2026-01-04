@@ -44,6 +44,7 @@ from pipelex.observability.graphspec.graphspec_io import (
 )
 from pipelex.observability.graphspec.html_renderer import render_mermaid_html
 from pipelex.observability.graphspec.mermaid import (
+    FlowchartDirection,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
@@ -56,6 +57,7 @@ __all__ = [
     "SUPPORTED_SCHEMA_VERSIONS",
     # Enums
     "EdgeKind",
+    "FlowchartDirection",
     "NodeKind",
     "NodeStatus",
     # Models

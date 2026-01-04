@@ -3,8 +3,6 @@
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
-import pytest
-
 from pipelex.observability.graphspec.graphspec import (
     EdgeKind,
     EdgeSpec,
@@ -17,6 +15,7 @@ from pipelex.observability.graphspec.graphspec import (
     PipelineRef,
 )
 from pipelex.observability.graphspec.mermaid import (
+    FlowchartDirection,
     escape_mermaid_label,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
@@ -198,17 +197,8 @@ class TestGraphspecToMermaid:
             nodes=[MermaidTestData.OPERATOR_NODE_1],
             edges=[],
         )
-        result = graphspec_to_orchestration_mermaid(graph, direction="LR")
+        result = graphspec_to_orchestration_mermaid(graph, direction=FlowchartDirection.LEFT_TO_RIGHT)
         assert result.startswith("flowchart LR")
-
-    def test_invalid_direction_raises(self) -> None:
-        """Test that invalid direction raises ValueError."""
-        graph = self._make_graph(
-            nodes=[MermaidTestData.OPERATOR_NODE_1],
-            edges=[],
-        )
-        with pytest.raises(ValueError, match="Invalid direction"):
-            graphspec_to_orchestration_mermaid(graph, direction="INVALID")
 
     def test_node_ids_are_sanitized(self) -> None:
         """Test that node IDs with special chars are sanitized."""
@@ -442,12 +432,6 @@ class TestDataFlowMermaid:
         graph = self._make_graph(nodes=[producer_node, consumer_node])
         result = graphspec_to_dataflow_mermaid(graph)
         assert "flowchart LR" in result
-
-    def test_invalid_direction_raises_error(self) -> None:
-        """Test that invalid direction raises ValueError."""
-        graph = self._make_graph(nodes=[])
-        with pytest.raises(ValueError, match="Invalid direction"):
-            graphspec_to_dataflow_mermaid(graph, direction="XX")
 
     def test_empty_io_shows_note(self) -> None:
         """Test that graph without IOSpec data shows informative note."""
