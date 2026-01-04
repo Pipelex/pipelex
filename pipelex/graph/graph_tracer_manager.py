@@ -3,8 +3,6 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from typing_extensions import override
-
 from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
@@ -13,30 +11,30 @@ from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 if TYPE_CHECKING:
     from pipelex.graph.graph_tracer import GraphTracer
 
-# Re-export NodeKind and IOSpec for use by pipe_abstract without additional imports
-__all__ = ["GraphTracerManager", "GraphTracerManagerAbstract", "IOSpec", "NodeKind"]
 
-
-class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
-    """Abstract singleton manager for graph tracing.
+class GraphTracerManager(metaclass=ABCSingletonMeta):
+    """Singleton manager for graph tracing.
 
     This provides a way to access the graph tracer without importing from hub,
-    avoiding circular dependency issues (similar to TelemetryManagerAbstract).
+    avoiding circular dependency issues.
     """
+
+    def __init__(self, tracer: "GraphTracer") -> None:
+        self._tracer = tracer
 
     @classmethod
     def clear_instance(cls) -> None:
         """Clear the singleton instance from MetaSingleton registry."""
-        MetaSingleton.clear_subclass_instances(GraphTracerManagerAbstract)
+        MetaSingleton.clear_subclass_instances(GraphTracerManager)
 
     @classmethod
-    def get_instance(cls) -> "GraphTracerManagerAbstract | None":
+    def get_instance(cls) -> "GraphTracerManager | None":
         """Get the singleton instance from MetaSingleton registry.
 
         This provides a way to access the graph tracer manager without importing from hub,
         avoiding circular dependency issues.
         """
-        return MetaSingleton.get_subclass_instance(GraphTracerManagerAbstract)  # type: ignore[type-abstract]
+        return MetaSingleton.get_subclass_instance(GraphTracerManager)  # type: ignore[type-abstract]
 
     @classmethod
     def get_instance_tracer(cls) -> GraphTracerProtocol | None:
@@ -50,9 +48,9 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
             return None
         return instance.get_tracer()
 
-    def get_tracer(self) -> GraphTracerProtocol | None:
-        """Get the graph tracer. Override in concrete class."""
-        return None
+    def get_tracer(self) -> GraphTracerProtocol:
+        """Get the graph tracer."""
+        return self._tracer
 
     def on_pipe_start(
         self,
@@ -69,8 +67,6 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
             Tuple of (node_id, child_graph_context) if tracing is active, (None, None) otherwise.
         """
         tracer = self.get_tracer()
-        if tracer is None:
-            return None, None
         return tracer.on_pipe_start(
             graph_context=graph_context,
             pipe_code=pipe_code,
@@ -92,8 +88,6 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
         if node_id is None:
             return
         tracer = self.get_tracer()
-        if tracer is None:
-            return
         tracer.on_pipe_end_success(
             node_id=node_id,
             ended_at=ended_at,
@@ -114,8 +108,6 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
         if node_id is None:
             return
         tracer = self.get_tracer()
-        if tracer is None:
-            return
         tracer.on_pipe_end_error(
             node_id=node_id,
             ended_at=ended_at,
@@ -123,17 +115,6 @@ class GraphTracerManagerAbstract(metaclass=ABCSingletonMeta):
             error_message=error_message,
             error_stack=error_stack,
         )
-
-
-class GraphTracerManager(GraphTracerManagerAbstract):
-    """Concrete implementation of the graph tracer manager."""
-
-    def __init__(self, tracer: "GraphTracer") -> None:
-        self._tracer = tracer
-
-    @override
-    def get_tracer(self) -> GraphTracerProtocol:
-        return self._tracer
 
     def setup(
         self,
@@ -152,7 +133,7 @@ class GraphTracerManager(GraphTracerManagerAbstract):
         """Finalize tracing and return the built GraphSpec."""
         result = self._tracer.teardown()
         # Clear the singleton so it can be re-created for the next run
-        GraphTracerManagerAbstract.clear_instance()
+        GraphTracerManager.clear_instance()
         return result
 
     def add_edge(

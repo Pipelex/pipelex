@@ -17,6 +17,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
+from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
@@ -354,13 +355,7 @@ class PipeAbstract(ABC, BaseModel):
 
         parent_graph_context = job_metadata.graph_context
         if parent_graph_context is not None:
-            from pipelex.graph.graph_tracer_manager import (  # noqa: PLC0415
-                GraphTracerManagerAbstract,
-                IOSpec,
-                NodeKind,
-            )
-
-            tracer_manager = GraphTracerManagerAbstract.get_instance()
+            tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 started_at = datetime.now(UTC)
                 node_kind = NodeKind.CONTROLLER if self.type in _CONTROLLER_PIPE_TYPES else NodeKind.OPERATOR
@@ -424,7 +419,6 @@ class PipeAbstract(ABC, BaseModel):
         # Record graph tracing success
         if tracer_manager is not None:
             # Capture output spec for data flow tracking
-            from pipelex.graph.graph_tracer_manager import IOSpec  # noqa: PLC0415
 
             main_stuff = pipe_output.main_stuff
             output_spec = IOSpec(
