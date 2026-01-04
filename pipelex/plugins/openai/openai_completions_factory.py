@@ -8,7 +8,7 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
-from openai.types.chat.chat_completion_content_part_image_param import ImageURL
+from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
 from openai.types.completion_usage import CompletionUsage
 from typing_extensions import override
 
@@ -53,7 +53,7 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
                     case PreparedImageBase64():
                         url = prepped_image.as_data_url()
 
-                image_url_obj = ImageURL(url=url, detail=detail.as_openai_detail)
+                image_url_obj = OpenAIImageURL(url=url, detail=detail.as_openai_detail)
                 image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)
 

@@ -32,7 +32,8 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.mistral.mistral_exceptions import MistralExtractResponseError
-from pipelex.plugins.openai.openai_utils import make_image_url_obj
+from pipelex.plugins.openai.openai_utils import make_openai_image_url_obj
+from pipelex.tools.misc.base64_utils import make_base64_url
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_bytes
 from pipelex.tools.uri.resolved_uri import (
@@ -87,9 +88,9 @@ class MistralFactory:
                         image_url = prompt_image.resolved.url
                     case ResolvedLocalPath():
                         raw_bytes = await load_binary_async(path=prompt_image.resolved.path)
-                        base64_str = base64.b64encode(raw_bytes).decode("utf-8")
+                        base64_bytes = base64.b64encode(raw_bytes)
                         file_type = detect_file_type_from_bytes(raw_bytes)
-                        image_url = f"data:{file_type.mime};base64,{base64_str}"
+                        image_url = make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
                     case ResolvedBase64DataUrl():
                         # Already a data URL
                         image_url = prompt_image.uri
@@ -98,14 +99,13 @@ class MistralFactory:
                         raise PromptImageFormatError(msg)
 
             case PromptImageBase64():
-                base64_str = prompt_image.base64_bytes.decode("utf-8")
                 file_type = detect_file_type_from_base64(prompt_image.base64_bytes)
-                image_url = f"data:{file_type.mime};base64,{base64_str}"
+                image_url = make_base64_url(base64_bytes=prompt_image.base64_bytes, file_type=file_type)
 
             case PromptImageBinary():
-                base64_str = base64.b64encode(prompt_image.binary_bytes).decode("utf-8")
-                file_type = detect_file_type_from_bytes(prompt_image.binary_bytes)
-                image_url = f"data:{file_type.mime};base64,{base64_str}"
+                base64_bytes = base64.b64encode(prompt_image.raw_bytes)
+                file_type = detect_file_type_from_bytes(prompt_image.raw_bytes)
+                image_url = make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
 
         return ImageURLChunk(image_url=image_url)
 
@@ -127,7 +127,7 @@ class MistralFactory:
 
         if user_images := llm_prompt.user_images:
             detail = llm_job.job_params.image_detail
-            image_url_objs = await asyncio.gather(*(make_image_url_obj(prompt_image=img, detail=detail) for img in user_images))
+            image_url_objs = await asyncio.gather(*(make_openai_image_url_obj(prompt_image=img, detail=detail) for img in user_images))
             for image_url_obj in image_url_objs:
                 image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)

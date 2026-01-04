@@ -1,5 +1,9 @@
 import urllib.parse
 
+from pipelex.tools.misc.base64_utils import (
+    make_base64_url_from_http_url_async,
+    make_base64_url_from_path_async,
+)
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
@@ -114,3 +118,34 @@ def _resolve_base64_data_url(uri: str) -> ResolvedBase64DataUrl:
         mime_type=mime_type,
         base64_data=base64_data,
     )
+
+
+async def make_base64_url_from_uri_async(uri: str) -> str:
+    """Convert a URI to a base64 data URL.
+
+    Resolves the URI and fetches/converts content to base64 format.
+    If the URI is already a data URL, returns it as-is.
+
+    Args:
+        uri: A URI string (http://, local path, or data: URL)
+
+    Returns:
+        A base64 data URL string containing the base64-encoded data, whichever way we got it.
+
+    Raises:
+        ValueError: If the URI type is not supported (e.g., pipelex-storage://)
+    """
+    base64_url: str
+    resolved_uri = resolve_uri(uri)
+    match resolved_uri:
+        case ResolvedBase64DataUrl():
+            # Already a data URL, return as-is
+            base64_url = resolved_uri.original
+        case ResolvedHttpUrl():
+            base64_url = await make_base64_url_from_http_url_async(url=resolved_uri.url)
+        case ResolvedLocalPath():
+            base64_url = await make_base64_url_from_path_async(path=resolved_uri.path)
+        case ResolvedPipelexStorage():
+            msg = f"Unsupported URI type for base64 URL creation: {resolved_uri.kind} (requires storage provider)"
+            raise ValueError(msg)
+    return base64_url

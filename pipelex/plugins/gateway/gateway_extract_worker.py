@@ -19,7 +19,7 @@ from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletio
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base64_utils import make_base64_url_from_uri_async
+from pipelex.tools.uri.uri_resolver import make_base64_url_from_uri_async
 from pipelex.types import StrEnum
 
 

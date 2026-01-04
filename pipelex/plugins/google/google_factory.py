@@ -47,7 +47,7 @@ class GoogleFactory:
                 mime_type = prompt_image.get_mime_type()
 
             case PromptImageBinary():
-                image_bytes = prompt_image.binary_bytes
+                image_bytes = prompt_image.raw_bytes
                 mime_type = prompt_image.get_mime_type()
 
             case PromptImageUri():

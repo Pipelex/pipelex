@@ -98,17 +98,17 @@ class PromptImageBinary(BaseModel):
     """A prompt image as raw binary bytes."""
 
     kind: Literal["binary"] = "binary"
-    binary_bytes: bytes
+    raw_bytes: bytes
 
     def get_file_type(self) -> FileType:
-        return detect_file_type_from_bytes(self.binary_bytes)
+        return detect_file_type_from_bytes(self.raw_bytes)
 
     def get_mime_type(self) -> str:
         return self.get_file_type().mime
 
     @override
     def __str__(self) -> str:
-        return "PromptImageBinary(binary_bytes=...)"
+        return "PromptImageBinary(raw_bytes=...)"
 
     @override
     def __repr__(self) -> str:
@@ -116,7 +116,7 @@ class PromptImageBinary(BaseModel):
 
     def short_description(self) -> str:
         """Return a short description of the image."""
-        return f"binary: {self.binary_bytes[:50].hex()}..."
+        return f"binary: {self.raw_bytes[:50].hex()}..."
 
 
 PromptImage = Annotated[

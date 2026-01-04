@@ -9,6 +9,7 @@ from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, Field
 
+from pipelex.tools.misc.base64_utils import make_base64_url
 from pipelex.tools.misc.filetype_utils import FileType
 
 
@@ -33,7 +34,7 @@ class PreparedImageBase64(BaseModel):
 
     def as_data_url(self) -> str:
         """Convert to a data: URL for APIs that accept it."""
-        return f"data:{self.mime_type};base64,{self.base64_bytes.decode('utf-8')}"
+        return make_base64_url(base64_bytes=self.base64_bytes, file_type=self.file_type)
 
 
 PreparedImage = Annotated[

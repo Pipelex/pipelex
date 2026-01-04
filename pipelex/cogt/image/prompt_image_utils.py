@@ -48,9 +48,9 @@ async def prepare_prompt_image(
             )
 
         case PromptImageBinary():
-            encoded_bytes = base64.b64encode(prompt_image.binary_bytes)
+            base64_bytes = base64.b64encode(prompt_image.raw_bytes)
             prepared = PreparedImageBase64(
-                base64_bytes=encoded_bytes,
+                base64_bytes=base64_bytes,
                 file_type=prompt_image.get_file_type(),
             )
 
@@ -82,10 +82,10 @@ async def prepare_prompt_image(
                     )
 
                 case ResolvedBase64DataUrl():
-                    encoded_bytes = prompt_image.resolved.base64_data.encode("utf-8")
+                    base64_bytes = prompt_image.resolved.base64_data.encode("utf-8")
                     prepared = PreparedImageBase64(
-                        base64_bytes=encoded_bytes,
-                        file_type=detect_file_type_from_base64(encoded_bytes),
+                        base64_bytes=base64_bytes,
+                        file_type=detect_file_type_from_base64(base64_bytes),
                     )
 
     return prepared

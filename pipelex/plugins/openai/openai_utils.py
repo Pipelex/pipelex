@@ -1,6 +1,6 @@
 import base64
 
-from openai.types.chat.chat_completion_content_part_image_param import ImageURL
+from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
 
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import (
@@ -10,6 +10,7 @@ from pipelex.cogt.image.prompt_image import (
     PromptImageDetail,
     PromptImageUri,
 )
+from pipelex.tools.misc.base64_utils import make_base64_url
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.uri.resolved_uri import (
@@ -20,7 +21,7 @@ from pipelex.tools.uri.resolved_uri import (
 )
 
 
-async def make_image_url_obj(prompt_image: PromptImage, detail: PromptImageDetail | None) -> ImageURL:
+async def make_openai_image_url_obj(prompt_image: PromptImage, detail: PromptImageDetail | None) -> OpenAIImageURL:
     """Convert a PromptImage to an OpenAI ImageURL object.
 
     Args:
@@ -41,9 +42,9 @@ async def make_image_url_obj(prompt_image: PromptImage, detail: PromptImageDetai
                     url = prompt_image.resolved.url
                 case ResolvedLocalPath():
                     raw_bytes = await load_binary_async(path=prompt_image.resolved.path)
-                    encoded_bytes = base64.b64encode(raw_bytes)
+                    base64_bytes = base64.b64encode(raw_bytes)
                     file_type = detect_file_type_from_bytes(raw_bytes)
-                    url = f"data:{file_type.mime};base64,{encoded_bytes.decode('utf-8')}"
+                    url = make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
                 case ResolvedBase64DataUrl():
                     # Already a data URL, reconstruct it
                     url = prompt_image.uri
@@ -53,11 +54,11 @@ async def make_image_url_obj(prompt_image: PromptImage, detail: PromptImageDetai
 
         case PromptImageBase64():
             file_type = prompt_image.get_file_type()
-            url = f"data:{file_type.mime};base64,{prompt_image.base64_bytes.decode('utf-8')}"
+            url = make_base64_url(base64_bytes=prompt_image.base64_bytes, file_type=file_type)
 
         case PromptImageBinary():
             file_type = prompt_image.get_file_type()
-            encoded_bytes = base64.b64encode(prompt_image.binary_bytes)
-            url = f"data:{file_type.mime};base64,{encoded_bytes.decode('utf-8')}"
+            base64_bytes = base64.b64encode(prompt_image.raw_bytes)
+            url = make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
 
-    return ImageURL(url=url, detail=detail.as_openai_detail)
+    return OpenAIImageURL(url=url, detail=detail.as_openai_detail)
