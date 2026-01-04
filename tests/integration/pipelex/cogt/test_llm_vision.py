@@ -2,7 +2,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import LLMCapabilityError, PromptImageFormatError
-from pipelex.cogt.image.prompt_image import PromptImageBase64, PromptImagePath
+from pipelex.cogt.image.prompt_image import PromptImageBase64, PromptImageUri
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
@@ -22,7 +22,7 @@ class TestLLMVision:
     async def test_gen_text_from_vision_by_url(
         self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_uri: str
     ):
-        prompt_image = PromptImageFactory.make_prompt_image(url=image_uri)
+        prompt_image = PromptImageFactory.make_prompt_image(uri=image_uri)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job(
@@ -71,7 +71,7 @@ class TestLLMVision:
     async def test_gen_text_from_vision_by_path(
         self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str
     ):
-        prompt_image = PromptImagePath(file_path=image_path)
+        prompt_image = PromptImageUri(uri=image_path)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
@@ -94,8 +94,8 @@ class TestLLMVision:
     async def test_gen_text_from_vision_2_images(
         self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_pair: tuple[str, str]
     ):
-        prompt_image1 = PromptImagePath(file_path=image_pair[0])
-        prompt_image2 = PromptImagePath(file_path=image_pair[1])
+        prompt_image1 = PromptImageUri(uri=image_pair[0])
+        prompt_image2 = PromptImageUri(uri=image_pair[1])
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(

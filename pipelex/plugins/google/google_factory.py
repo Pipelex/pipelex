@@ -1,4 +1,5 @@
 import asyncio
+import base64
 
 from google import genai
 from google.genai import types as genai_types
@@ -7,14 +8,21 @@ from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
     PromptImageBase64,
-    PromptImagePath,
-    PromptImageUrl,
+    PromptImageBinary,
+    PromptImageUri,
 )
-from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.tools.misc.base64_utils import load_binary_async
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
+from pipelex.tools.misc.file_utils import load_binary_async
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
+from pipelex.tools.uri.resolved_uri import (
+    ResolvedBase64DataUrl,
+    ResolvedHttpUrl,
+    ResolvedLocalPath,
+    ResolvedPipelexStorage,
+)
 
 
 class GoogleFactoryError(CogtError):
@@ -33,21 +41,34 @@ class GoogleFactory:
         image_bytes: bytes
         mime_type: str
 
-        if isinstance(prompt_image, PromptImageBase64):
-            image_bytes = prompt_image.get_decoded_bytes()
-            mime_type = prompt_image.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        if isinstance(prompt_image, PromptImagePath):
-            image_bytes = await load_binary_async(prompt_image.file_path)
-            mime_type = prompt_image.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        if isinstance(prompt_image, PromptImageUrl):
-            prompt_image_binary = await PromptImageFactory.make_promptimagebinary_from_url_async(prompt_image)
-            image_bytes = prompt_image_binary.binary
-            mime_type = prompt_image_binary.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        msg = f"Unsupported PromptImage type: '{type(prompt_image).__name__}'"
-        raise GoogleFactoryError(msg)
+        match prompt_image:
+            case PromptImageBase64():
+                image_bytes = prompt_image.get_decoded_bytes()
+                mime_type = prompt_image.get_mime_type()
+
+            case PromptImageBinary():
+                image_bytes = prompt_image.binary
+                mime_type = prompt_image.get_mime_type()
+
+            case PromptImageUri():
+                match prompt_image.resolved:
+                    case ResolvedHttpUrl():
+                        image_bytes = await fetch_file_from_url_httpx_async(prompt_image.resolved.url)
+                        mime_type = detect_file_type_from_bytes(image_bytes).mime
+
+                    case ResolvedLocalPath():
+                        image_bytes = await load_binary_async(prompt_image.resolved.path)
+                        mime_type = detect_file_type_from_bytes(image_bytes).mime
+
+                    case ResolvedBase64DataUrl():
+                        image_bytes = base64.b64decode(prompt_image.resolved.base64_data)
+                        mime_type = prompt_image.resolved.mime_type
+
+                    case ResolvedPipelexStorage():
+                        msg = f"Pipelex storage URIs not supported in GoogleFactory: {prompt_image.uri}"
+                        raise GoogleFactoryError(msg)
+
+        return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
 
     @classmethod
     async def prepare_user_contents(cls, llm_prompt: LLMPrompt) -> genai_types.ContentListUnion:

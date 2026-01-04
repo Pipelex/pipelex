@@ -1,3 +1,5 @@
+import asyncio
+import base64
 import os
 
 import aiofiles
@@ -25,14 +27,20 @@ from pipelex.cogt.exceptions import PromptImageFormatError
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImagePath, PromptImageUrl
+from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageBinary, PromptImageUri
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.mistral.mistral_exceptions import MistralExtractResponseError
 from pipelex.plugins.openai.openai_utils import make_image_url_obj
-from pipelex.tools.misc.base64_utils import load_binary_as_base64
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_path
+from pipelex.tools.misc.file_utils import load_binary_async
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_bytes
+from pipelex.tools.uri.resolved_uri import (
+    ResolvedBase64DataUrl,
+    ResolvedHttpUrl,
+    ResolvedLocalPath,
+    ResolvedPipelexStorage,
+)
 
 
 class MistralFactory:
@@ -51,14 +59,15 @@ class MistralFactory:
     # Message
     #########################################################
 
-    def make_simple_messages(self, llm_job: LLMJob) -> list[Messages]:
+    async def make_simple_messages(self, llm_job: LLMJob) -> list[Messages]:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         messages: list[Messages] = []
         user_content: list[ContentChunk] = []
         if user_text := llm_job.llm_prompt.user_text:
             user_content.append(TextChunk(text=user_text))
         if user_images := llm_job.llm_prompt.user_images:
-            user_content.extend(self.make_mistral_image_url(user_image) for user_image in user_images)
+            image_chunks = await asyncio.gather(*(self.make_mistral_image_url(prompt_image=img) for img in user_images))
+            user_content.extend(image_chunks)
         if user_content:
             messages.append(UserMessage(content=user_content))
 
@@ -67,19 +76,38 @@ class MistralFactory:
 
         return messages
 
-    def make_mistral_image_url(self, prompt_image: PromptImage) -> ImageURLChunk:
-        if isinstance(prompt_image, PromptImageUrl):
-            return ImageURLChunk(image_url=prompt_image.url)
-        if isinstance(prompt_image, PromptImagePath):
-            image_bytes = load_binary_as_base64(prompt_image.file_path).decode("utf-8")
-            file_type = detect_file_type_from_path(prompt_image.file_path)
-            return ImageURLChunk(image_url=f"data:{file_type.mime};base64,{image_bytes}")
-        if isinstance(prompt_image, PromptImageBase64):
-            image_bytes = prompt_image.base_64.decode("utf-8")
-            file_type = detect_file_type_from_base64(prompt_image.base_64)
-            return ImageURLChunk(image_url=f"data:{file_type.mime};base64,{image_bytes}")
-        msg = f"prompt_image of type {type(prompt_image)} is not supported"
-        raise PromptImageFormatError(msg)
+    async def make_mistral_image_url(self, prompt_image: PromptImage) -> ImageURLChunk:
+        """Convert a PromptImage to a Mistral ImageURLChunk."""
+        image_url: str
+        match prompt_image:
+            case PromptImageUri():
+                match prompt_image.resolved:
+                    case ResolvedHttpUrl():
+                        # Mistral accepts HTTP URLs directly
+                        image_url = prompt_image.resolved.url
+                    case ResolvedLocalPath():
+                        raw_bytes = await load_binary_async(path=prompt_image.resolved.path)
+                        base64_str = base64.b64encode(raw_bytes).decode("utf-8")
+                        file_type = detect_file_type_from_bytes(raw_bytes)
+                        image_url = f"data:{file_type.mime};base64,{base64_str}"
+                    case ResolvedBase64DataUrl():
+                        # Already a data URL
+                        image_url = prompt_image.uri
+                    case ResolvedPipelexStorage():
+                        msg = f"Pipelex storage URIs not supported in MistralFactory: {prompt_image.uri}"
+                        raise PromptImageFormatError(msg)
+
+            case PromptImageBase64():
+                base64_str = prompt_image.base_64.decode("utf-8")
+                file_type = detect_file_type_from_base64(prompt_image.base_64)
+                image_url = f"data:{file_type.mime};base64,{base64_str}"
+
+            case PromptImageBinary():
+                base64_str = base64.b64encode(prompt_image.binary).decode("utf-8")
+                file_type = detect_file_type_from_bytes(prompt_image.binary)
+                image_url = f"data:{file_type.mime};base64,{base64_str}"
+
+        return ImageURLChunk(image_url=image_url)
 
     async def make_simple_messages_openai_typed(
         self,
@@ -98,8 +126,9 @@ class MistralFactory:
             user_contents.append(user_part_text)
 
         if user_images := llm_prompt.user_images:
-            for prompt_image in user_images:
-                image_url_obj = await make_image_url_obj(prompt_image=prompt_image, detail=llm_job.job_params.image_detail)
+            detail = llm_job.job_params.image_detail
+            image_url_objs = await asyncio.gather(*(make_image_url_obj(prompt_image=img, detail=detail) for img in user_images))
+            for image_url_obj in image_url_objs:
                 image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)
 

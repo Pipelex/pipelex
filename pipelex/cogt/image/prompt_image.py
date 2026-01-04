@@ -1,20 +1,19 @@
 import base64
-from abc import ABC, abstractmethod
-from typing import Literal, Union
+from functools import cached_property
+from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
-from pipelex.tools.misc.file_utils import MAX_FILE_PATH_LENGTH
 from pipelex.tools.misc.filetype_utils import (
     FileType,
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
-    detect_file_type_from_path,
 )
 from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
-from pipelex.tools.typing.pydantic_utils import CustomBaseModel
+from pipelex.tools.uri.resolved_uri import ResolvedUri
+from pipelex.tools.uri.uri_resolver import resolve_uri
 from pipelex.types import StrEnum
 
 
@@ -28,72 +27,43 @@ class PromptImageDetail(StrEnum):
         return self.value
 
 
-class PromptImageTypedBase64(CustomBaseModel):
-    base_64: bytes
-    file_type: FileType
+class PromptImageUri(BaseModel):
+    """A prompt image specified by URI (path, URL, storage URI, or data URL)."""
 
+    kind: Literal["uri"] = "uri"
+    uri: str
 
-PromptImageTypedUrlOrBase64 = Union[str, PromptImageTypedBase64]
-
-
-class PromptImage(BaseModel, ABC):
-    @abstractmethod
-    def short_description(self) -> str:
-        pass
-
-
-class PromptImagePath(PromptImage):
-    file_path: str
-
-    @field_validator("file_path", mode="before")
+    @field_validator("uri", mode="before")
     @classmethod
-    def validate_file_path(cls, file_path: str) -> str:
-        if len(file_path) > MAX_FILE_PATH_LENGTH:
-            msg = f"File path is too long: {file_path}"
+    def validate_uri(cls, uri: str) -> str:
+        if len(uri) > URL_MAX_LENGTH:
+            msg = f"URI is too long: {uri[:100]}..."
             raise ValueError(msg)
-        return file_path
+        return uri
 
-    def get_file_type(self) -> FileType:
-        return detect_file_type_from_path(self.file_path)
-
-    def get_mime_type(self) -> str:
-        return self.get_file_type().mime
+    @cached_property
+    def resolved(self) -> ResolvedUri:
+        """Lazily resolve the URI to a typed ResolvedUri."""
+        return resolve_uri(self.uri)
 
     @override
     def __str__(self) -> str:
-        return f"PromptImagePath(file_path='{self.file_path}')"
-
-    @override
-    def short_description(self) -> str:
-        return f"file path: {self.file_path}"
-
-
-class PromptImageUrl(PromptImage):
-    url: str
-
-    @field_validator("url", mode="before")
-    @classmethod
-    def validate_url(cls, url: str) -> str:
-        if len(url) > URL_MAX_LENGTH:
-            msg = f"URL is too long: {url}"
-            raise ValueError(msg)
-        return url
-
-    @override
-    def __str__(self) -> str:
-        truncated_url = AttributePolisher.get_truncated_value(value=self.url)
-        return f"PromptImageUrl(url='{truncated_url!r}')"
+        truncated_uri = AttributePolisher.get_truncated_value(value=self.uri)
+        return f"PromptImageUri(uri={truncated_uri!r})"
 
     @override
     def __format__(self, format_spec: str) -> str:
         return self.__str__()
 
-    @override
     def short_description(self) -> str:
-        return self.url
+        """Return a short description of the image."""
+        return f"{self.resolved.kind.desc}: {self.uri[:100]}"
 
 
-class PromptImageBase64(PromptImage):
+class PromptImageBase64(BaseModel):
+    """A prompt image as raw base64-encoded bytes."""
+
+    kind: Literal["base64"] = "base64"
     base_64: bytes
 
     def get_file_type(self) -> FileType:
@@ -119,15 +89,15 @@ class PromptImageBase64(PromptImage):
     def __format__(self, format_spec: str) -> str:
         return self.__str__()
 
-    def make_prompt_image_typed_base64(self) -> PromptImageTypedBase64:
-        return PromptImageTypedBase64(base_64=self.base_64, file_type=self.get_file_type())
-
-    @override
     def short_description(self) -> str:
+        """Return a short description of the image."""
         return f"base64: {self.base_64[:100].decode('ascii', errors='replace')}..."
 
 
-class PromptImageBinary(PromptImage):
+class PromptImageBinary(BaseModel):
+    """A prompt image as raw binary bytes."""
+
+    kind: Literal["binary"] = "binary"
     binary: bytes
 
     def get_file_type(self) -> FileType:
@@ -144,6 +114,12 @@ class PromptImageBinary(PromptImage):
     def __repr__(self) -> str:
         return self.__str__()
 
-    @override
     def short_description(self) -> str:
+        """Return a short description of the image."""
         return f"binary: {self.binary[:50].hex()}..."
+
+
+PromptImage = Annotated[
+    Union[PromptImageUri, PromptImageBase64, PromptImageBinary],
+    Field(discriminator="kind"),
+]

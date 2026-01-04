@@ -2,7 +2,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import PromptImageFormatError
-from pipelex.cogt.image.prompt_image import PromptImagePath
+from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -57,7 +57,7 @@ class TestLLMInference:
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
     async def test_gen_text_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
         log.info(f"test_gen_text_from_image: Testing llm_handle '{llm_handle}'")
-        prompt_image = PromptImagePath(file_path=image_path)
+        prompt_image = PromptImageUri(uri=image_path)
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         if not llm_worker.is_vision_supported:
             msg = f"Vision is not supported for this LLM worker: '{llm_worker.desc}'"
@@ -83,7 +83,7 @@ class TestLLMInference:
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
     async def test_gen_object_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
         log.info(f"test_gen_object_from_image: Testing llm_handle '{llm_handle}'")
-        prompt_image = PromptImagePath(file_path=image_path)
+        prompt_image = PromptImageUri(uri=image_path)
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
 
         if not llm_worker.is_vision_supported:

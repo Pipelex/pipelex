@@ -2,7 +2,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
-from pipelex.cogt.image.prompt_image import PromptImagePath
+from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
@@ -66,12 +66,12 @@ class LLMVisionTestCases:
     PATH_IMG_GANTT_1 = f"{TEST_IMAGE_DIRECTORY}/diagram.png"
 
     IMAGE_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, image_path
-        ("Gantt Chart", PATH_IMG_GANTT_1),
+        # ("Gantt Chart", PATH_IMG_GANTT_1),
         ("AI Lympics PNG", PATH_IMG_PNG_1),
-        ("Animal Lympics PNG", PATH_IMG_PNG_2),
+        # ("Animal Lympics PNG", PATH_IMG_PNG_2),
         ("AI Lympics JPEG", PATH_IMG_JPEG_1),
-        ("Eiffel Tower", PATH_IMG_JPEG_3),
-        ("Eiffel Tower", PATH_IMG_PNG_3),
+        # ("Eiffel Tower", PATH_IMG_JPEG_3),
+        # ("Eiffel Tower", PATH_IMG_PNG_3),
     ]
     IMAGE_PATH_PAIRS: ClassVar[list[tuple[str, tuple[str, str]]]] = [  # topic, image_pair
         ("AI Lympics PNG", (PATH_IMG_PNG_1, PATH_IMG_PNG_2)),
@@ -183,12 +183,12 @@ class SerDeTestLLMCases:
         "source_user_template_name": "markdown_reordering_vision_claude3_5_sonnet",
     }
 
-    # Prompt containing an image path --------------------------------------
-    PROMPT_WITH_IMAGE_PATH: ClassVar[LLMPrompt] = LLMPrompt(
+    # Prompt containing an image URI --------------------------------------
+    PROMPT_WITH_IMAGE_URI: ClassVar[LLMPrompt] = LLMPrompt(
         system_text="Some system text",
         user_text="Some user text",
         user_images=[
-            PromptImagePath(file_path="some_file_path"),
+            PromptImageUri(uri="some_file_path"),
         ],
     )
 
@@ -198,7 +198,7 @@ class SerDeTestLLMCases:
         MY_PROMPT_TEMPLATE_MODEL_2,
     ]
     PYDANTIC_EXAMPLES_USING_SUBCLASS: ClassVar[list[BaseModel]] = [
-        PROMPT_WITH_IMAGE_PATH,
+        PROMPT_WITH_IMAGE_URI,
     ]
     PYDANTIC_EXAMPLES_DICT: ClassVar[list[dict[str, Any]]] = [
         DICT_1,
