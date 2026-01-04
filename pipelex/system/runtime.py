@@ -142,5 +142,9 @@ class RuntimeManager(BaseModel):
             case RunMode.CODEX_CLOUD_TEST:
                 return True
 
+    @property
+    def is_in_codex_cloud(self) -> bool:
+        return self.run_mode in {RunMode.CODEX_CLOUD, RunMode.CODEX_CLOUD_TEST}
+
 
 runtime_manager = RuntimeManager()
