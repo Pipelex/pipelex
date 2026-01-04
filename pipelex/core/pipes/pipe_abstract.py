@@ -420,14 +420,17 @@ class PipeAbstract(ABC, BaseModel):
         # Record graph tracing success
         if tracer_manager is not None and parent_graph_context is not None:
             # Capture output spec for data flow tracking
-            main_stuff = pipe_output.main_stuff
-            output_spec = IOSpec(
-                name=output_name or main_stuff.stuff_name or "main_stuff",
-                concept=main_stuff.concept.code,
-                content_type=main_stuff.content.__class__.__name__,
-                digest=main_stuff.stuff_code,
-                data=main_stuff.content.smart_dump() if parent_graph_context.include_full_data else None,
-            )
+            # Note: main_stuff may not exist for pipes like PipeParallel with add_each_output=true
+            main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+            output_spec: IOSpec | None = None
+            if main_stuff is not None:
+                output_spec = IOSpec(
+                    name=output_name or main_stuff.stuff_name or "main_stuff",
+                    concept=main_stuff.concept.code,
+                    content_type=main_stuff.content.__class__.__name__,
+                    digest=main_stuff.stuff_code,
+                    data=main_stuff.content.smart_dump() if parent_graph_context.include_full_data else None,
+                )
 
             tracer_manager.on_pipe_end_success(
                 graph_id=parent_graph_context.graph_id,

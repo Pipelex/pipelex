@@ -158,6 +158,190 @@ MERMAID_HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 
+# Interactive HTML template with clickable stuff nodes that show full data
+MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .mermaid-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        .data-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 80vw;
+            max-height: 80vh;
+            overflow: auto;
+            z-index: 1000;
+            display: none;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        .data-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #444;
+        }
+        .data-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+        .data-modal-close {
+            cursor: pointer;
+            color: #888;
+            font-size: 24px;
+            line-height: 1;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .data-modal-close:hover {
+            background: #333;
+            color: #fff;
+        }
+        .data-modal-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+        .data-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+        .clickable-stuff {
+            cursor: pointer !important;
+        }
+        .clickable-stuff:hover {
+            filter: brightness(1.1);
+        }
+        .hint {
+            color: #666;
+            font-size: 14px;
+            margin-top: 16px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <div class="mermaid-container">
+        <div class="mermaid">
+{{ mermaid_code }}
+        </div>
+    </div>
+    {% if has_data %}
+    <p class="hint">Click on data nodes (orange pills) to view their full content</p>
+    {% endif %}
+    <div class="data-modal-overlay" id="modal-overlay"></div>
+    <div class="data-modal" id="data-modal">
+        <div class="data-modal-header">
+            <span class="data-modal-title" id="modal-title">Data Content</span>
+            <span class="data-modal-close" onclick="hideModal()">&times;</span>
+        </div>
+        <pre class="data-modal-content" id="modal-content"></pre>
+    </div>
+    <script>
+        // Embedded stuff data from graph
+        const stuffData = {{ stuff_data_json }};
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+
+        // Wait for mermaid to render, then attach click handlers
+        setTimeout(() => {
+            // Find all stuff nodes (IDs starting with 's_')
+            const svgContainer = document.querySelector('.mermaid svg');
+            if (!svgContainer) return;
+
+            // Find nodes by their flowchart IDs
+            for (const stuffId of Object.keys(stuffData)) {
+                // Mermaid generates IDs like 'flowchart-s_xxx-123'
+                const nodes = svgContainer.querySelectorAll(`[id^="flowchart-${stuffId}"]`);
+                nodes.forEach(node => {
+                    node.classList.add('clickable-stuff');
+                    node.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        showModal(stuffId, stuffData[stuffId]);
+                    });
+                });
+            }
+        }, 500);
+
+        function showModal(stuffId, data) {
+            const modal = document.getElementById('data-modal');
+            const overlay = document.getElementById('modal-overlay');
+            const title = document.getElementById('modal-title');
+            const content = document.getElementById('modal-content');
+
+            title.textContent = `Data: ${stuffId}`;
+            content.textContent = JSON.stringify(data, null, 2);
+            modal.style.display = 'block';
+            overlay.style.display = 'block';
+        }
+
+        function hideModal() {
+            document.getElementById('data-modal').style.display = 'none';
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+
+        // Close modal when clicking overlay
+        document.getElementById('modal-overlay').addEventListener('click', hideModal);
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') hideModal();
+        });
+    </script>
+</body>
+</html>
+"""
+
+
 def render_mermaid_html(
     mermaid_code: str,
     *,
@@ -207,5 +391,36 @@ async def render_mermaid_html_async(
         temlating_context={
             "title": title,
             "mermaid_code": mermaid_code,
+        },
+    )
+
+
+async def render_mermaid_html_with_data_async(
+    mermaid_code: str,
+    stuff_data: dict[str, str | dict[str, object] | list[str] | list[dict[str, object]] | None],
+    *,
+    title: str = "Pipelex Graph",
+) -> str:
+    """Render Mermaid code with clickable stuff nodes into a standalone HTML page.
+
+    This renders an interactive version where clicking on stuff nodes (data items)
+    displays their full serialized content in a modal dialog.
+
+    Args:
+        mermaid_code: The Mermaid flowchart code to embed.
+        stuff_data: Mapping from stuff mermaid IDs to their full data content.
+        title: The page title (appears in browser tab and as h1).
+
+    Returns:
+        Complete HTML page as a string with interactive data display.
+    """
+    return await render_jinja2_async(
+        template_source=MERMAID_INTERACTIVE_HTML_TEMPLATE,
+        template_category=TemplateCategory.HTML,
+        temlating_context={
+            "title": title,
+            "mermaid_code": mermaid_code,
+            "stuff_data_json": json.dumps(stuff_data),
+            "has_data": bool(stuff_data),
         },
     )

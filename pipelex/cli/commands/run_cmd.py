@@ -21,7 +21,9 @@ from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.graph.graphspec_io import save_graphspec
 from pipelex.graph.mermaid import (
     graphspec_to_combo_mermaid,
+    graphspec_to_combo_mermaid_with_data,
     graphspec_to_dataflow_mermaid,
+    graphspec_to_dataflow_mermaid_with_data,
     graphspec_to_orchestration_mermaid,
 )
 from pipelex.hub import get_console, get_telemetry_manager
@@ -36,7 +38,7 @@ from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, get_incremental_file_path
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
-from pipelex.tools.misc.mermaid_utils import render_mermaid_html_async
+from pipelex.tools.misc.mermaid_utils import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "run"
@@ -256,22 +258,50 @@ def run_cmd(
             typer.secho(f"✅ Orchestration HTML saved to: {graph_output_dir / 'orchestration.html'}", fg=typer.colors.GREEN)
 
             # Generate data flow view (left-to-right)
-            dataflow_mermaid = graphspec_to_dataflow_mermaid(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
-            (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
-            typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)
+            if graph_full_data:
+                dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+                dataflow_mermaid = dataflow_with_data.mermaid_code
+                (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
+                typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)
 
-            dataflow_html = await render_mermaid_html_async(dataflow_mermaid, title=f"Data Flow: {pipe_code}")
-            (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
-            typer.secho(f"✅ Data flow HTML saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
+                dataflow_html = await render_mermaid_html_with_data_async(
+                    dataflow_mermaid,
+                    stuff_data=dataflow_with_data.stuff_data,
+                    title=f"Data Flow: {pipe_code}",
+                )
+                (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
+                typer.secho(f"✅ Data flow HTML (interactive) saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
+            else:
+                dataflow_mermaid = graphspec_to_dataflow_mermaid(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+                (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
+                typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)
+
+                dataflow_html = await render_mermaid_html_async(dataflow_mermaid, title=f"Data Flow: {pipe_code}")
+                (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
+                typer.secho(f"✅ Data flow HTML saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
 
             # Generate combo view (left-to-right, data flow with controller subgraphs)
-            combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
-            (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
-            typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
+            if graph_full_data:
+                combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+                combo_mermaid = combo_with_data.mermaid_code
+                (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
+                typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
 
-            combo_html = await render_mermaid_html_async(combo_mermaid, title=f"Combo: {pipe_code}")
-            (graph_output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
-            typer.secho(f"✅ Combo HTML saved to: {graph_output_dir / 'combo.html'}", fg=typer.colors.GREEN)
+                combo_html = await render_mermaid_html_with_data_async(
+                    combo_mermaid,
+                    stuff_data=combo_with_data.stuff_data,
+                    title=f"Combo: {pipe_code}",
+                )
+                (graph_output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
+                typer.secho(f"✅ Combo HTML (interactive) saved to: {graph_output_dir / 'combo.html'}", fg=typer.colors.GREEN)
+            else:
+                combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction=FlowchartDirection.LEFT_TO_RIGHT)
+                (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
+                typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
+
+                combo_html = await render_mermaid_html_async(combo_mermaid, title=f"Combo: {pipe_code}")
+                (graph_output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
+                typer.secho(f"✅ Combo HTML saved to: {graph_output_dir / 'combo.html'}", fg=typer.colors.GREEN)
 
             typer.secho(f"\n📊 All graph outputs saved to: {graph_output_dir}", fg=typer.colors.CYAN, bold=True)
 

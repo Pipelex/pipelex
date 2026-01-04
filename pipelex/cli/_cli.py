@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from pipelex.cli.commands.build import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
-from pipelex.cli.commands.graph_cmd import graph_cmd
+from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.kit_cmd import kit_app
@@ -130,5 +130,5 @@ app.command(name="validate", help="Validate pipes: static validation for syntax 
     validate_cmd
 )
 app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.plx)")(run_cmd)
-app.command(name="graph", help="Dry run a pipe and output its execution graph as JSON")(graph_cmd)
+app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")

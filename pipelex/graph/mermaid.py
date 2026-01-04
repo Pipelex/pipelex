@@ -6,7 +6,11 @@ to represent controller containment relationships.
 
 import operator
 from collections import defaultdict
+from typing import Any
 
+from pydantic import BaseModel, Field
+
+from pipelex import log
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
@@ -17,6 +21,19 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.mermaid_utils import escape_mermaid_label, sanitize_mermaid_id
+
+
+class MermaidWithData(BaseModel):
+    """Mermaid code paired with stuff data for interactive HTML rendering.
+
+    Attributes:
+        mermaid_code: The generated Mermaid flowchart syntax.
+        stuff_data: Mapping from stuff mermaid IDs to their full IOSpec.data content.
+    """
+
+    mermaid_code: str
+    stuff_data: dict[str, Any] = Field(default_factory=dict)
+
 
 # Light pastel colors for subgraph depth coloring (cycles through these)
 SUBGRAPH_DEPTH_COLORS = [
@@ -67,6 +84,53 @@ def _build_containment_tree(
             child_nodes.add(edge.target)
 
     return dict(children_map), child_nodes
+
+
+def _collect_stuff_data(
+    graph: GraphSpec,
+    controller_node_ids: set[str],  # noqa: ARG001
+) -> dict[str, Any]:
+    """Collect IOSpec.data from all stuff nodes in the graph.
+
+    Note: We collect data from ALL nodes including controllers, because:
+    - The root controller has the pipeline inputs with data
+    - Controllers also capture their outputs with data
+
+    Args:
+        graph: The GraphSpec to extract data from.
+        controller_node_ids: Set of controller node IDs (currently unused).
+
+    Returns:
+        Dict mapping stuff mermaid IDs (s_xxx format) to their IOSpec.data content.
+        Only includes entries where data is not None.
+    """
+    stuff_data: dict[str, Any] = {}
+
+    log.debug(f"_collect_stuff_data: {len(graph.nodes)} nodes")
+
+    for node in graph.nodes:
+        # Note: We include ALL nodes (including controllers) because they may have data
+        # on their inputs (pipeline inputs) or outputs (pipeline outputs)
+        log.debug(f"  Processing node: {node.node_id}, outputs={len(node.node_io.outputs)}, inputs={len(node.node_io.inputs)}")
+
+        # Collect data from outputs
+        for output_spec in node.node_io.outputs:
+            log.debug(f"    Output: digest={output_spec.digest}, has_data={output_spec.data is not None}")
+            if output_spec.digest and output_spec.data is not None:
+                stuff_mermaid_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
+                stuff_data[stuff_mermaid_id] = output_spec.data
+
+        # Collect data from inputs (for pipeline inputs without a producer)
+        for input_spec in node.node_io.inputs:
+            log.debug(f"    Input: digest={input_spec.digest}, has_data={input_spec.data is not None}")
+            if input_spec.digest and input_spec.data is not None:
+                stuff_mermaid_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
+                # Don't overwrite if already captured from output
+                if stuff_mermaid_id not in stuff_data:
+                    stuff_data[stuff_mermaid_id] = input_spec.data
+
+    log.debug(f"_collect_stuff_data: collected {len(stuff_data)} stuff items")
+    return stuff_data
 
 
 def _render_node(
@@ -626,6 +690,39 @@ def graphspec_to_dataflow_mermaid(
     return "\n".join(lines)
 
 
+def graphspec_to_dataflow_mermaid_with_data(
+    graph: GraphSpec,
+    *,
+    direction: FlowchartDirection | None = None,
+    show_stuff_codes: bool = False,
+) -> MermaidWithData:
+    """Convert a GraphSpec to a data-lineage Mermaid flowchart with embedded data.
+
+    This is the same as graphspec_to_dataflow_mermaid but also extracts IOSpec.data
+    for interactive HTML rendering where clicking stuff nodes shows their full data.
+
+    Args:
+        graph: The GraphSpec to convert.
+        direction: Flowchart direction. Defaults to LEFT_TO_RIGHT if not specified.
+        show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
+
+    Returns:
+        MermaidWithData containing mermaid code and stuff data mapping.
+    """
+    mermaid_code = graphspec_to_dataflow_mermaid(
+        graph=graph,
+        direction=direction,
+        show_stuff_codes=show_stuff_codes,
+    )
+
+    # Collect stuff data from graph
+    children_map, _ = _build_containment_tree(graph.edges)
+    controller_node_ids = set(children_map.keys())
+    stuff_data = _collect_stuff_data(graph=graph, controller_node_ids=controller_node_ids)
+
+    return MermaidWithData(mermaid_code=mermaid_code, stuff_data=stuff_data)
+
+
 def graphspec_to_combo_mermaid(
     graph: GraphSpec,
     *,
@@ -786,3 +883,36 @@ def graphspec_to_combo_mermaid(
             lines.append(f"    style {subgraph_id} fill:{color}")
 
     return "\n".join(lines)
+
+
+def graphspec_to_combo_mermaid_with_data(
+    graph: GraphSpec,
+    *,
+    direction: FlowchartDirection | None = None,
+    show_stuff_codes: bool = False,
+) -> MermaidWithData:
+    """Convert a GraphSpec to a combo Mermaid flowchart with embedded data.
+
+    This is the same as graphspec_to_combo_mermaid but also extracts IOSpec.data
+    for interactive HTML rendering where clicking stuff nodes shows their full data.
+
+    Args:
+        graph: The GraphSpec to convert.
+        direction: Flowchart direction. Defaults to LEFT_TO_RIGHT if not specified.
+        show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
+
+    Returns:
+        MermaidWithData containing mermaid code and stuff data mapping.
+    """
+    mermaid_code = graphspec_to_combo_mermaid(
+        graph=graph,
+        direction=direction,
+        show_stuff_codes=show_stuff_codes,
+    )
+
+    # Collect stuff data from graph
+    children_map, _ = _build_containment_tree(graph.edges)
+    controller_node_ids = set(children_map.keys())
+    stuff_data = _collect_stuff_data(graph=graph, controller_node_ids=controller_node_ids)
+
+    return MermaidWithData(mermaid_code=mermaid_code, stuff_data=stuff_data)

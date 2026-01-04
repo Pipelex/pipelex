@@ -244,11 +244,10 @@ class GraphTracer(GraphTracerProtocol):
                 edge_kind=EdgeKind.CONTAINS,
             )
 
-        # Create child context
-        child_context = GraphContext(
-            graph_id=graph_context.graph_id,
-            parent_node_id=node_id,
-            node_sequence=self._node_sequence,
+        # Create child context - use copy_for_child to preserve include_full_data
+        child_context = graph_context.copy_for_child(
+            child_node_id=node_id,
+            next_sequence=self._node_sequence,
         )
 
         return node_id, child_context
