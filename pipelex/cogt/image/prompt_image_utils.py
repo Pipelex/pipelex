@@ -63,29 +63,29 @@ async def promptimage_to_typed_bytes_or_url(
     if isinstance(prompt_image, PromptImageBase64):
         typed_bytes_or_url = prompt_image.make_prompt_image_typed_base64()
     elif isinstance(prompt_image, PromptImageUrl):
-        resolved = resolve_uri(prompt_image.url)
-        match resolved:
+        resolved_uri = resolve_uri(prompt_image.url)
+        match resolved_uri:
             case ResolvedPipelexStorage():
                 storage_provider = get_storage_provider()
-                image_bytes = storage_provider.load(uri=resolved.storage_uri)
+                image_bytes = storage_provider.load(uri=resolved_uri.storage_uri)
                 file_type = detect_file_type_from_bytes(image_bytes)
                 base64_bytes = base64.b64encode(image_bytes)
                 typed_bytes_or_url = PromptImageTypedBase64(base_64=base64_bytes, file_type=file_type)
             case ResolvedHttpUrl():
                 if is_http_url_enabled:
-                    typed_bytes_or_url = resolved.url
+                    typed_bytes_or_url = resolved_uri.url
                 else:
                     prompt_image_b64 = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image_url=prompt_image)
                     file_type = detect_file_type_from_base64(prompt_image_b64.base_64)
                     typed_bytes_or_url = PromptImageTypedBase64(base_64=prompt_image_b64.base_64, file_type=file_type)
             case ResolvedLocalPath():
-                prompt_image_path = PromptImagePath(file_path=resolved.path)
+                prompt_image_path = PromptImagePath(file_path=resolved_uri.path)
                 return await promptimage_to_typed_bytes_or_url(
                     prompt_image=prompt_image_path,
                     is_http_url_enabled=is_http_url_enabled,
                 )
             case ResolvedBase64DataUrl():
-                base64_bytes = resolved.base64_data.encode("utf-8")
+                base64_bytes = resolved_uri.base64_data.encode("utf-8")
                 file_type = detect_file_type_from_base64(base64_bytes)
                 typed_bytes_or_url = PromptImageTypedBase64(base_64=base64_bytes, file_type=file_type)
     elif isinstance(prompt_image, PromptImagePath):

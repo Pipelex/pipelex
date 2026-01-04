@@ -59,15 +59,15 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
 
     async def _extract_from_source(self, source_uri: str) -> ExtractOutput:
         """Extract text from a source URI (file path, file:// URI, or http(s) URL)."""
-        resolved = resolve_uri(source_uri)
+        resolved_uri = resolve_uri(source_uri)
         resolved_source: str
-        match resolved:
+        match resolved_uri:
             case ResolvedHttpUrl():
-                resolved_source = resolved.url
+                resolved_source = resolved_uri.url
             case ResolvedLocalPath():
-                resolved_source = resolved.path
+                resolved_source = resolved_uri.path
             case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for Docling extraction: {resolved.kind}"
+                msg = f"Unsupported URI type for Docling extraction: {resolved_uri.kind}"
                 raise ExtractInputError(msg)
 
         # Run synchronous Docling conversion in a thread pool to avoid blocking

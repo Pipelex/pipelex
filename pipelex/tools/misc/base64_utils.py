@@ -48,17 +48,17 @@ async def make_base64_url_from_http_url_async(url: str) -> str:
 
 async def make_base64_url_from_uri_async(uri: str) -> str:
     base64_url: str
-    resolved = resolve_uri(uri)
-    match resolved:
+    resolved_uri = resolve_uri(uri)
+    match resolved_uri:
         case ResolvedHttpUrl():
-            base64_url = await make_base64_url_from_http_url_async(url=resolved.url)
+            base64_url = await make_base64_url_from_http_url_async(url=resolved_uri.url)
         case ResolvedLocalPath():
-            base64_url = await make_base64_url_from_path_async(path=resolved.path)
+            base64_url = await make_base64_url_from_path_async(path=resolved_uri.path)
         case ResolvedBase64DataUrl():
             # Already a data URL, return as-is
-            base64_url = resolved.original
+            base64_url = resolved_uri.original
         case ResolvedPipelexStorage():
-            msg = f"Unsupported URI type for base64 URL creation: {resolved.kind} (requires storage provider)"
+            msg = f"Unsupported URI type for base64 URL creation: {resolved_uri.kind} (requires storage provider)"
             raise ValueError(msg)
     return base64_url
 

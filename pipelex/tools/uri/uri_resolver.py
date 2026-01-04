@@ -33,16 +33,16 @@ def resolve_uri(uri: str) -> ResolvedUri:
         A ResolvedUri variant with the parsed URI information.
 
     Example:
-        >>> resolved = resolve_uri("https://example.com/image.png")
-        >>> resolved.kind
+        >>> resolved_uri = resolve_uri("https://example.com/image.png")
+        >>> resolved_uri.kind
         UriKind.HTTP_URL
-        >>> resolved.url
+        >>> resolved_uri.url
         'https://example.com/image.png'
 
-        >>> resolved = resolve_uri("pipelex-storage://images/photo.png")
-        >>> resolved.kind
+        >>> resolved_uri = resolve_uri("pipelex-storage://images/photo.png")
+        >>> resolved_uri.kind
         UriKind.PIPELEX_STORAGE
-        >>> resolved.storage_uri
+        >>> resolved_uri.storage_uri
         'pipelex-storage://images/photo.png'
     """
     # Check for base64 data URLs first (data:{mime};base64,{data})

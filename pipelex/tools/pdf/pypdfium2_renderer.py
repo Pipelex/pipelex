@@ -249,28 +249,28 @@ class PyPdfium2Renderer:
             return await asyncio.to_thread(self._extract_text_from_pdf_pages_sync, pdf_input)
 
     async def render_pdf_pages_from_uri(self, pdf_uri: str, dpi: int) -> list[Image.Image]:
-        resolved = resolve_uri(pdf_uri)
-        match resolved:
+        resolved_uri = resolve_uri(pdf_uri)
+        match resolved_uri:
             case ResolvedHttpUrl():
-                pdf_bytes = await fetch_file_from_url_httpx_async(url=resolved.url)
+                pdf_bytes = await fetch_file_from_url_httpx_async(url=resolved_uri.url)
                 return await self.render_pdf_pages(pdf_input=pdf_bytes, dpi=dpi)
             case ResolvedLocalPath():
-                return await self.render_pdf_pages(pdf_input=resolved.path, dpi=dpi)
+                return await self.render_pdf_pages(pdf_input=resolved_uri.path, dpi=dpi)
             case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for PDF rendering: {resolved.kind}"
+                msg = f"Unsupported URI type for PDF rendering: {resolved_uri.kind}"
                 raise PyPdfium2RendererError(msg)
 
     async def extract_text_from_pdf_pages_from_uri(self, pdf_uri: str) -> list[str]:
         """Extract text from all pages of a PDF from URI."""
         pdf_input: PdfInput
-        resolved = resolve_uri(pdf_uri)
-        match resolved:
+        resolved_uri = resolve_uri(pdf_uri)
+        match resolved_uri:
             case ResolvedHttpUrl():
-                pdf_input = await fetch_file_from_url_httpx_async(url=resolved.url)
+                pdf_input = await fetch_file_from_url_httpx_async(url=resolved_uri.url)
             case ResolvedLocalPath():
-                pdf_input = resolved.path
+                pdf_input = resolved_uri.path
             case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for PDF text extraction: {resolved.kind}"
+                msg = f"Unsupported URI type for PDF text extraction: {resolved_uri.kind}"
                 raise PyPdfium2RendererError(msg)
         return await self.extract_text_from_pdf_pages(pdf_input=pdf_input)
 
@@ -345,14 +345,14 @@ class PyPdfium2Renderer:
             Dictionary mapping page index (1-based) to list of ExtractedImageFromPage
         """
         pdf_input: PdfInput
-        resolved = resolve_uri(pdf_uri)
-        match resolved:
+        resolved_uri = resolve_uri(pdf_uri)
+        match resolved_uri:
             case ResolvedHttpUrl():
-                pdf_input = await fetch_file_from_url_httpx_async(url=resolved.url)
+                pdf_input = await fetch_file_from_url_httpx_async(url=resolved_uri.url)
             case ResolvedLocalPath():
-                pdf_input = resolved.path
+                pdf_input = resolved_uri.path
             case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for PDF image extraction: {resolved.kind}"
+                msg = f"Unsupported URI type for PDF image extraction: {resolved_uri.kind}"
                 raise PyPdfium2RendererError(msg)
         return await self._extract_embedded_images_from_pdf(
             pdf_input=pdf_input,
