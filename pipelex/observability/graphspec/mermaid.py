@@ -170,11 +170,6 @@ def _render_subgraph_recursive(
         subgraph_id = f"sg_{mermaid_id}"
         lines.append(f'{indent}subgraph {subgraph_id}["{label}"]')
 
-        # Add a node inside the subgraph for the controller itself
-        # This allows edges to connect to the controller
-        inner_indent = "    " * (indent_level + 1)
-        lines.append(f'{inner_indent}{mermaid_id}(("{label}"))')
-
         # Sort children for deterministic output
         sorted_children = sorted(
             children,
@@ -212,6 +207,7 @@ def _render_edges(
     include_data_edges: bool,
     include_contains_edges: bool,
     include_selected_outcome_edges: bool,
+    controller_node_ids: set[str] | None = None,
 ) -> list[str]:
     """Render edges in Mermaid syntax.
 
@@ -221,16 +217,22 @@ def _render_edges(
         include_data_edges: Whether to include DATA edges.
         include_contains_edges: Whether to include CONTAINS edges as arrows.
         include_selected_outcome_edges: Whether to include SELECTED_OUTCOME edges.
+        controller_node_ids: Set of node IDs that are controllers with children (rendered as subgraphs).
 
     Returns:
         List of Mermaid edge declaration lines.
     """
     lines: list[str] = []
+    controller_ids = controller_node_ids or set()
 
     # Sort edges for deterministic output
     sorted_edges = sorted(edges, key=lambda edge: (edge.kind, edge.source, edge.target, edge.label or ""))
 
     for edge in sorted_edges:
+        # Skip edges to/from controllers (they are subgraphs, not nodes)
+        if edge.source in controller_ids or edge.target in controller_ids:
+            continue
+
         source_id = id_mapping.get(edge.source, sanitize_mermaid_id(edge.source))
         target_id = id_mapping.get(edge.target, sanitize_mermaid_id(edge.target))
 
@@ -334,6 +336,7 @@ def graphspec_to_orchestration_mermaid(
         include_data_edges=include_data_edges,
         include_contains_edges=include_contains_edges,
         include_selected_outcome_edges=include_selected_outcome_edges,
+        controller_node_ids=set(children_map.keys()),
     )
     if edge_lines:
         lines.append("")  # Blank line before edges
@@ -389,6 +392,10 @@ def graphspec_to_dataflow_mermaid(
     for node in graph.nodes:
         pipe_id_mapping[node.node_id] = sanitize_mermaid_id(node.node_id)
 
+    # Build containment tree to identify controllers (they shouldn't appear in dataflow)
+    children_map, _ = _build_containment_tree(graph.edges)
+    controller_node_ids = set(children_map.keys())
+
     # Collect unique stuff objects from all node I/O
     # Key is the digest (stuff_code), value is (name, concept)
     stuff_registry: dict[str, tuple[str, str | None]] = {}
@@ -398,6 +405,10 @@ def graphspec_to_dataflow_mermaid(
     stuff_consumers: dict[str, list[str]] = defaultdict(list)  # digest -> consumer_node_ids
 
     for node in graph.nodes:
+        # Skip controllers - they don't directly transform data
+        if node.node_id in controller_node_ids:
+            continue
+
         # Collect outputs (this node produces these stuffs)
         for output_spec in node.node_io.outputs:
             if output_spec.digest:
