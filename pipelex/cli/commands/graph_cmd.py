@@ -20,9 +20,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graphspec_io import graphspec_to_json, save_graphspec
-from pipelex.graph.html_renderer import render_mermaid_html
 from pipelex.graph.mermaid import (
-    FlowchartDirection,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
@@ -34,6 +32,8 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.tools.misc.chart_utils import FlowchartDirection  # noqa: TC001 - needed at runtime for typer
+from pipelex.tools.misc.mermaid_utils import render_mermaid_html
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:

@@ -15,12 +15,11 @@ from pipelex.graph.graphspec import (
     PipelineRef,
 )
 from pipelex.graph.mermaid import (
-    FlowchartDirection,
-    escape_mermaid_label,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
-    sanitize_mermaid_id,
 )
+from pipelex.tools.misc.chart_utils import FlowchartDirection
+from pipelex.tools.misc.mermaid_utils import escape_mermaid_label, sanitize_mermaid_id
 
 
 class MermaidTestData:

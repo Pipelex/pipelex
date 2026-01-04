@@ -21,9 +21,7 @@ from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec_io import save_graphspec
-from pipelex.graph.html_renderer import render_mermaid_html_async
 from pipelex.graph.mermaid import (
-    FlowchartDirection,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
@@ -38,8 +36,10 @@ from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, get_incremental_file_path
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.mermaid_utils import render_mermaid_html_async
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:

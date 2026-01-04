@@ -4,7 +4,6 @@ This module converts GraphSpec to Mermaid flowchart syntax, using subgraphs
 to represent controller containment relationships.
 """
 
-import hashlib
 import operator
 from collections import defaultdict
 
@@ -16,33 +15,8 @@ from pipelex.graph.graphspec import (
     NodeSpec,
     NodeStatus,
 )
-from pipelex.types import StrEnum
-
-
-class FlowchartDirection(StrEnum):
-    """Valid Mermaid flowchart directions."""
-
-    TOP_TO_BOTTOM = "top_to_bottom"
-    TOP_DOWN = "top_down"
-    BOTTOM_TO_TOP = "bottom_to_top"
-    RIGHT_TO_LEFT = "right_to_left"
-    LEFT_TO_RIGHT = "left_to_right"
-
-    @property
-    def mermaid_code(self) -> str:
-        """Return the 2-letter Mermaid code for this direction."""
-        match self:
-            case FlowchartDirection.TOP_TO_BOTTOM:
-                return "TB"
-            case FlowchartDirection.TOP_DOWN:
-                return "TD"
-            case FlowchartDirection.BOTTOM_TO_TOP:
-                return "BT"
-            case FlowchartDirection.RIGHT_TO_LEFT:
-                return "RL"
-            case FlowchartDirection.LEFT_TO_RIGHT:
-                return "LR"
-
+from pipelex.tools.misc.chart_utils import FlowchartDirection
+from pipelex.tools.misc.mermaid_utils import escape_mermaid_label, sanitize_mermaid_id
 
 # Light pastel colors for subgraph depth coloring (cycles through these)
 SUBGRAPH_DEPTH_COLORS = [
@@ -53,36 +27,6 @@ SUBGRAPH_DEPTH_COLORS = [
     "#f0e6ff",  # Light purple
     "#fff3e6",  # Light orange
 ]
-
-
-def sanitize_mermaid_id(node_id: str) -> str:
-    """Convert a node ID to a valid Mermaid identifier.
-
-    Mermaid IDs cannot contain special characters like ':', '-', '.'.
-    We use a hash-based approach to ensure uniqueness and validity.
-
-    Args:
-        node_id: The original node ID (may contain special characters).
-
-    Returns:
-        A sanitized Mermaid-safe identifier like 'n_abc1234567'.
-    """
-    # Using sha256 for hashing (only for ID generation, not security)
-    hash_digest = hashlib.sha256(node_id.encode()).hexdigest()[:10]
-    return f"n_{hash_digest}"
-
-
-def escape_mermaid_label(label: str) -> str:
-    """Escape special characters in Mermaid labels.
-
-    Args:
-        label: The label text to escape.
-
-    Returns:
-        Escaped label safe for use in Mermaid syntax.
-    """
-    # Escape quotes and other special characters
-    return label.replace('"', "'").replace("[", "(").replace("]", ")")
 
 
 def _get_node_label(node: NodeSpec) -> str:
