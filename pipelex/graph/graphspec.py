@@ -148,7 +148,7 @@ class NodeSpec(BaseModel):
 
     node_id: str = Field(validation_alias="id", serialization_alias="id")
     kind: NodeKind
-    pipe_name: str | None = None
+    pipe_code: str | None = None
     pipe_type: str | None = None
     status: NodeStatus
     timing: TimingSpec | None = None

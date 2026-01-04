@@ -55,8 +55,8 @@ def _get_node_label(node: NodeSpec) -> str:
     Returns:
         A human-readable label for the node.
     """
-    if node.pipe_name:
-        return escape_mermaid_label(node.pipe_name)
+    if node.pipe_code:
+        return escape_mermaid_label(node.pipe_code)
     if node.pipe_type:
         return escape_mermaid_label(node.pipe_type)
     return escape_mermaid_label(node.node_id)
@@ -260,7 +260,7 @@ def _render_combo_subgraph_recursive(
             children,
             key=lambda cid: (
                 nodes_by_id.get(cid, NodeSpec(node_id=cid, kind=NodeKind.OPERATOR, status=NodeStatus.SCHEDULED)).kind,
-                nodes_by_id.get(cid, NodeSpec(node_id=cid, kind=NodeKind.OPERATOR, status=NodeStatus.SCHEDULED)).pipe_name or "",
+                nodes_by_id.get(cid, NodeSpec(node_id=cid, kind=NodeKind.OPERATOR, status=NodeStatus.SCHEDULED)).pipe_code or "",
                 cid,
             ),
         )
@@ -356,7 +356,7 @@ def _render_subgraph_recursive(
             children,
             key=lambda cid: (
                 nodes_by_id.get(cid, NodeSpec(node_id=cid, kind=NodeKind.OPERATOR, status=NodeStatus.SCHEDULED)).kind,
-                nodes_by_id.get(cid, NodeSpec(node_id=cid, kind=NodeKind.OPERATOR, status=NodeStatus.SCHEDULED)).pipe_name or "",
+                nodes_by_id.get(cid, NodeSpec(node_id=cid, kind=NodeKind.OPERATOR, status=NodeStatus.SCHEDULED)).pipe_code or "",
                 cid,
             ),
         )
@@ -491,7 +491,7 @@ def graphspec_to_orchestration_mermaid(
     root_nodes = [node for node in graph.nodes if node.node_id not in child_nodes]
 
     # Sort root nodes for deterministic output
-    sorted_roots = sorted(root_nodes, key=lambda node: (node.kind, node.pipe_name or "", node.node_id))
+    sorted_roots = sorted(root_nodes, key=lambda node: (node.kind, node.pipe_code or "", node.node_id))
 
     # Track subgraph depths for coloring
     subgraph_depths: dict[str, int] = {}
@@ -621,7 +621,7 @@ def graphspec_to_dataflow_mermaid(
     for consumers in stuff_consumers.values():
         participating_pipes.update(consumers)
 
-    for node in sorted(graph.nodes, key=lambda n_iter: (n_iter.pipe_name or "", n_iter.node_id)):
+    for node in sorted(graph.nodes, key=lambda n_iter: (n_iter.pipe_code or "", n_iter.node_id)):
         if node.node_id not in participating_pipes:
             continue
         if node.node_id in rendered_pipes:
@@ -766,7 +766,7 @@ def graphspec_to_combo_mermaid(
     root_nodes = [node for node in graph.nodes if node.node_id not in child_nodes]
 
     # Sort root nodes for deterministic output
-    sorted_roots = sorted(root_nodes, key=lambda node: (node.kind, node.pipe_name or "", node.node_id))
+    sorted_roots = sorted(root_nodes, key=lambda node: (node.kind, node.pipe_code or "", node.node_id))
 
     # Collect unique stuff objects from all node I/O
     # Key is the digest (stuff_code), value is (name, concept)

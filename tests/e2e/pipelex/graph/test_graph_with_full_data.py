@@ -155,21 +155,21 @@ class TestGraphWithFullData:
                 if input_spec.data is not None:
                     inputs_with_data += 1
                     node_inputs_with_data += 1
-                    log.verbose(f"Node {node.pipe_name}: input '{input_spec.name}' has data")
+                    log.verbose(f"Node {node.pipe_code}: input '{input_spec.name}' has data")
                 else:
-                    log.warning(f"Node {node.pipe_name}: input '{input_spec.name}' is MISSING data")
+                    log.warning(f"Node {node.pipe_code}: input '{input_spec.name}' is MISSING data")
 
             for output_spec in node.node_io.outputs:
                 total_outputs += 1
                 if output_spec.data is not None:
                     outputs_with_data += 1
                     node_outputs_with_data += 1
-                    log.verbose(f"Node {node.pipe_name}: output '{output_spec.name}' has data")
+                    log.verbose(f"Node {node.pipe_code}: output '{output_spec.name}' has data")
                 else:
-                    log.warning(f"Node {node.pipe_name}: output '{output_spec.name}' is MISSING data")
+                    log.warning(f"Node {node.pipe_code}: output '{output_spec.name}' is MISSING data")
 
             # Track nodes missing data (only if they have inputs/outputs)
-            node_display_name = node.pipe_name or node.node_id
+            node_display_name = node.pipe_code or node.node_id
             if len(node.node_io.inputs) > 0 and node_inputs_with_data == 0:
                 nodes_missing_input_data.append(node_display_name)
             if len(node.node_io.outputs) > 0 and node_outputs_with_data == 0:

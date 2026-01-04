@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
+from pipelex.graph.graphspec import EdgeKind, NodeKind, NodeStatus
+
 
 class ValidGraphData:
     """Valid graph test data using ClassVar pattern per repo standards."""
@@ -20,7 +22,7 @@ class ValidGraphData:
     MINIMAL_NODE: ClassVar[dict[str, Any]] = {
         "id": "node_001",
         "kind": "operator",
-        "pipe_name": "generate_text",
+        "pipe_code": "generate_text",
         "pipe_type": "PipeLLM",
         "status": "succeeded",
         "timing": None,
@@ -69,7 +71,7 @@ class ValidGraphData:
     COMPLEX_NODE_1: ClassVar[dict[str, Any]] = {
         "id": "run_abc123:span_001",
         "kind": "controller",
-        "pipe_name": "main_sequence",
+        "pipe_code": "main_sequence",
         "pipe_type": "PipeSequence",
         "status": "succeeded",
         "timing": TIMING_SPEC,
@@ -85,7 +87,7 @@ class ValidGraphData:
     COMPLEX_NODE_2: ClassVar[dict[str, Any]] = {
         "id": "run_abc123:span_002",
         "kind": "operator",
-        "pipe_name": "generate_text",
+        "pipe_code": "generate_text",
         "pipe_type": "PipeLLM",
         "status": "succeeded",
         "timing": {
@@ -149,7 +151,7 @@ class InvalidGraphData:
     NODE_FAILED_NO_ERROR: ClassVar[dict[str, Any]] = {
         "id": "node_failed_001",
         "kind": "operator",
-        "pipe_name": "failed_pipe",
+        "pipe_code": "failed_pipe",
         "pipe_type": "PipeLLM",
         "status": "failed",
         "timing": None,
@@ -170,7 +172,7 @@ class InvalidGraphData:
     NODE_FAILED_WITH_ERROR: ClassVar[dict[str, Any]] = {
         "id": "node_failed_002",
         "kind": "operator",
-        "pipe_name": "failed_pipe",
+        "pipe_code": "failed_pipe",
         "pipe_type": "PipeLLM",
         "status": "failed",
         "timing": None,
@@ -195,7 +197,7 @@ class InvalidGraphData:
     DUPLICATE_NODE_ID_1: ClassVar[dict[str, Any]] = {
         "id": "duplicate_id",
         "kind": "operator",
-        "pipe_name": "pipe_a",
+        "pipe_code": "pipe_a",
         "pipe_type": "PipeLLM",
         "status": "succeeded",
         "timing": None,
@@ -208,7 +210,7 @@ class InvalidGraphData:
     DUPLICATE_NODE_ID_2: ClassVar[dict[str, Any]] = {
         "id": "duplicate_id",
         "kind": "operator",
-        "pipe_name": "pipe_b",
+        "pipe_code": "pipe_b",
         "pipe_type": "PipeCompose",
         "status": "succeeded",
         "timing": None,
@@ -249,3 +251,92 @@ class PreviewTruncationData:
 
     LONG_STACK_TEXT: ClassVar[str] = "S" * 5000
     EXPECTED_TRUNCATED_STACK: ClassVar[str] = "S" * 1997 + "..."
+
+
+class MermaidTestData:
+    """Test data for Mermaid exporter tests."""
+
+    GRAPH_ID: ClassVar[str] = "test_run:123"
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
+
+    # Node with special characters in ID
+    CONTROLLER_NODE: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:step-1",
+        "kind": NodeKind.CONTROLLER,
+        "pipe_code": "main_sequence",
+        "pipe_type": "PipeSequence",
+        "status": NodeStatus.SUCCEEDED,
+    }
+
+    OPERATOR_NODE_1: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:step-2",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "generate_text",
+        "pipe_type": "PipeLLM",
+        "status": NodeStatus.SUCCEEDED,
+    }
+
+    OPERATOR_NODE_2: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:step-3",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "compose_output",
+        "pipe_type": "PipeCompose",
+        "status": NodeStatus.SUCCEEDED,
+    }
+
+    FAILED_NODE: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:step-4",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "failed_pipe",
+        "pipe_type": "PipeLLM",
+        "status": NodeStatus.FAILED,
+    }
+
+    INPUT_NODE: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:input-1",
+        "kind": NodeKind.INPUT,
+        "pipe_code": "topic_input",
+        "pipe_type": None,
+        "status": NodeStatus.SUCCEEDED,
+    }
+
+    # Edges
+    CONTAINS_EDGE_1: ClassVar[dict[str, Any]] = {
+        "edge_id": "edge_contains_1",
+        "source": "run:123:step-1",
+        "target": "run:123:step-2",
+        "kind": EdgeKind.CONTAINS,
+        "label": None,
+    }
+
+    CONTAINS_EDGE_2: ClassVar[dict[str, Any]] = {
+        "edge_id": "edge_contains_2",
+        "source": "run:123:step-1",
+        "target": "run:123:step-3",
+        "kind": EdgeKind.CONTAINS,
+        "label": None,
+    }
+
+    DATA_EDGE: ClassVar[dict[str, Any]] = {
+        "edge_id": "edge_data_1",
+        "source": "run:123:step-2",
+        "target": "run:123:step-3",
+        "kind": EdgeKind.DATA,
+        "label": "generated_text",
+    }
+
+    CONTROL_EDGE: ClassVar[dict[str, Any]] = {
+        "edge_id": "edge_control_1",
+        "source": "run:123:step-2",
+        "target": "run:123:step-3",
+        "kind": EdgeKind.CONTROL,
+        "label": None,
+    }
+
+    SELECTED_OUTCOME_EDGE: ClassVar[dict[str, Any]] = {
+        "edge_id": "edge_outcome_1",
+        "source": "run:123:step-1",
+        "target": "run:123:step-4",
+        "kind": EdgeKind.SELECTED_OUTCOME,
+        "label": "success_branch",
+    }

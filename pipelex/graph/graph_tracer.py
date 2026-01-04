@@ -72,7 +72,7 @@ class _MutableNodeData:
         return NodeSpec(
             node_id=self.node_id,
             kind=self.node_kind,
-            pipe_name=self.pipe_code,
+            pipe_code=self.pipe_code,
             pipe_type=self.pipe_type,
             status=self.status,
             timing=timing,

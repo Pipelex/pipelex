@@ -19,7 +19,7 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.graph.graphspec_io import graphspec_from_json, graphspec_to_json
 from pipelex.graph.validation import validate_graphspec
-from tests.unit.pipelex.observability.graphspec.test_data import ValidGraphData
+from tests.unit.pipelex.graph.test_data import ValidGraphData
 
 
 class TestGraphSpecValidation:
@@ -30,7 +30,7 @@ class TestGraphSpecValidation:
         node = NodeSpec(
             node_id="node_001",
             kind=NodeKind.OPERATOR,
-            pipe_name="test_pipe",
+            pipe_code="test_pipe",
             pipe_type="PipeLLM",
             status=NodeStatus.SUCCEEDED,
         )
@@ -62,7 +62,7 @@ class TestGraphSpecValidation:
         node = NodeSpec(
             node_id="node_001",
             kind=NodeKind.OPERATOR,
-            pipe_name="test_pipe",
+            pipe_code="test_pipe",
             pipe_type="PipeLLM",
             status=NodeStatus.SUCCEEDED,
         )
@@ -94,7 +94,7 @@ class TestGraphSpecValidation:
         node1 = NodeSpec(
             node_id="duplicate_id",
             kind=NodeKind.OPERATOR,
-            pipe_name="pipe_a",
+            pipe_code="pipe_a",
             pipe_type="PipeLLM",
             status=NodeStatus.SUCCEEDED,
         )
@@ -102,7 +102,7 @@ class TestGraphSpecValidation:
         node2 = NodeSpec(
             node_id="duplicate_id",  # Same ID as node1
             kind=NodeKind.OPERATOR,
-            pipe_name="pipe_b",
+            pipe_code="pipe_b",
             pipe_type="PipeCompose",
             status=NodeStatus.SUCCEEDED,
         )
@@ -128,21 +128,21 @@ class TestGraphSpecValidation:
             NodeSpec(
                 node_id="node_a",
                 kind=NodeKind.OPERATOR,
-                pipe_name="pipe_a",
+                pipe_code="pipe_a",
                 pipe_type="PipeLLM",
                 status=NodeStatus.SUCCEEDED,
             ),
             NodeSpec(
                 node_id="node_b",
                 kind=NodeKind.OPERATOR,
-                pipe_name="pipe_b",
+                pipe_code="pipe_b",
                 pipe_type="PipeLLM",
                 status=NodeStatus.SUCCEEDED,
             ),
             NodeSpec(
                 node_id="node_c",
                 kind=NodeKind.OPERATOR,
-                pipe_name="pipe_c",
+                pipe_code="pipe_c",
                 pipe_type="PipeLLM",
                 status=NodeStatus.SUCCEEDED,
             ),
@@ -183,7 +183,7 @@ class TestGraphSpecValidation:
             NodeSpec(
                 node_id="node_001",
                 kind=NodeKind.OPERATOR,
-                pipe_name="test_pipe",
+                pipe_code="test_pipe",
                 pipe_type="PipeLLM",
                 status="invalid_status",  # type: ignore[arg-type]
             )
@@ -194,7 +194,7 @@ class TestGraphSpecValidation:
             NodeSpec(
                 node_id="node_001",
                 kind="invalid_kind",  # type: ignore[arg-type]
-                pipe_name="test_pipe",
+                pipe_code="test_pipe",
                 pipe_type="PipeLLM",
                 status=NodeStatus.SUCCEEDED,
             )
@@ -214,7 +214,7 @@ class TestGraphSpecValidation:
         node = NodeSpec(
             node_id="failed_node",
             kind=NodeKind.OPERATOR,
-            pipe_name="failed_pipe",
+            pipe_code="failed_pipe",
             pipe_type="PipeLLM",
             status=NodeStatus.FAILED,
             error=None,  # Missing error for failed status
@@ -245,7 +245,7 @@ class TestGraphSpecValidation:
         node = NodeSpec(
             node_id="failed_node",
             kind=NodeKind.OPERATOR,
-            pipe_name="failed_pipe",
+            pipe_code="failed_pipe",
             pipe_type="PipeLLM",
             status=NodeStatus.FAILED,
             error=error,
@@ -275,7 +275,7 @@ class TestGraphSpecValidation:
                 NodeSpec(
                     node_id="node_001",
                     kind=NodeKind.OPERATOR,
-                    pipe_name="test",
+                    pipe_code="test",
                     pipe_type="PipeLLM",
                     status=NodeStatus.SUCCEEDED,
                 )
@@ -299,14 +299,14 @@ class TestGraphSpecValidation:
             NodeSpec(
                 node_id="node_001",
                 kind=NodeKind.CONTROLLER,
-                pipe_name="main_sequence",
+                pipe_code="main_sequence",
                 pipe_type="PipeSequence",
                 status=NodeStatus.SUCCEEDED,
             ),
             NodeSpec(
                 node_id="node_002",
                 kind=NodeKind.OPERATOR,
-                pipe_name="generate_text",
+                pipe_code="generate_text",
                 pipe_type="PipeLLM",
                 status=NodeStatus.SUCCEEDED,
             ),
@@ -361,7 +361,7 @@ class TestGraphSpecValidation:
                 NodeSpec(
                     node_id="node_001",
                     kind=NodeKind.OPERATOR,
-                    pipe_name="test",
+                    pipe_code="test",
                     pipe_type="PipeLLM",
                     status=NodeStatus.SUCCEEDED,
                 )

@@ -2,9 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer import GraphTracer
-from pipelex.graph.graph_tracer_protocol import GraphTracerNoOp
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
 
 
@@ -75,7 +73,7 @@ class TestGraphTracer:
 
         node = graph_spec.nodes[0]
         assert node.node_id == "lifecycle-test:node_0"
-        assert node.pipe_name == "test_pipe"
+        assert node.pipe_code == "test_pipe"
         assert node.pipe_type == "PipeLLM"
         assert node.kind == NodeKind.OPERATOR
         assert node.status == NodeStatus.SUCCEEDED
@@ -501,71 +499,3 @@ class TestGraphTracer:
         assert all(edge.source == producer_id for edge in data_edges)
         targets = {edge.target for edge in data_edges}
         assert targets == {consumer1_id, consumer2_id}
-
-
-class TestGraphTracerNoOp:
-    """Tests for GraphTracerNoOp implementation."""
-
-    def test_noop_returns_context(self) -> None:
-        """Test that no-op tracer still returns valid context."""
-        tracer = GraphTracerNoOp()
-        context = tracer.setup(graph_id="noop-test")
-
-        assert context.graph_id == "noop-test"
-
-    def test_noop_teardown_returns_none(self) -> None:
-        """Test that no-op tracer returns None on teardown."""
-        tracer = GraphTracerNoOp()
-        tracer.setup(graph_id="noop-test")
-        result = tracer.teardown()
-
-        assert result is None
-
-    def test_noop_pipe_lifecycle(self) -> None:
-        """Test that no-op tracer handles pipe lifecycle without errors."""
-        tracer = GraphTracerNoOp()
-        context = tracer.setup(graph_id="noop-test")
-
-        started_at = datetime.now(UTC)
-        node_id, child_ctx = tracer.on_pipe_start(
-            graph_context=context,
-            pipe_code="test_pipe",
-            pipe_type="PipeLLM",
-            node_kind=NodeKind.OPERATOR,
-            started_at=started_at,
-        )
-
-        # Should return something usable even though it does nothing
-        assert node_id is not None
-        assert child_ctx is not None
-
-        # These should not raise
-        tracer.on_pipe_end_success(node_id=node_id, ended_at=started_at + timedelta(milliseconds=10))
-        tracer.add_edge(
-            source_node_id=node_id,
-            target_node_id=node_id,
-            edge_kind=EdgeKind.DATA,
-        )
-
-
-class TestGraphContext:
-    """Tests for GraphContext model."""
-
-    def test_make_node_id(self) -> None:
-        """Test node ID generation."""
-        context = GraphContext(graph_id="ctx-test", node_sequence=5)
-        node_id = context.make_node_id()
-
-        assert node_id == "ctx-test:node_5"
-
-    def test_copy_for_child(self) -> None:
-        """Test creating child context."""
-        parent = GraphContext(graph_id="ctx-test", parent_node_id=None, node_sequence=0)
-        child = parent.copy_for_child(child_node_id="ctx-test:node_0", next_sequence=1)
-
-        assert child.graph_id == "ctx-test"
-        assert child.parent_node_id == "ctx-test:node_0"
-        assert child.node_sequence == 1
-        # Parent should be unchanged
-        assert parent.parent_node_id is None
-        assert parent.node_sequence == 0

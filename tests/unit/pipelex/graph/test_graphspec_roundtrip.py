@@ -22,7 +22,7 @@ from pipelex.graph.graphspec_io import (
     load_graphspec,
     save_graphspec,
 )
-from tests.unit.pipelex.observability.graphspec.test_data import (
+from tests.unit.pipelex.graph.test_data import (
     PreviewTruncationData,
     ValidGraphData,
 )
@@ -46,7 +46,7 @@ class TestGraphSpecRoundtrip:
                 NodeSpec(
                     node_id="node_001",
                     kind=NodeKind.OPERATOR,
-                    pipe_name="generate_text",
+                    pipe_code="generate_text",
                     pipe_type="PipeLLM",
                     status=NodeStatus.SUCCEEDED,
                 )
@@ -100,7 +100,7 @@ class TestGraphSpecRoundtrip:
         node1 = NodeSpec(
             node_id="run_abc123:span_001",
             kind=NodeKind.CONTROLLER,
-            pipe_name="main_sequence",
+            pipe_code="main_sequence",
             pipe_type="PipeSequence",
             status=NodeStatus.SUCCEEDED,
             timing=timing1,
@@ -111,7 +111,7 @@ class TestGraphSpecRoundtrip:
         node2 = NodeSpec(
             node_id="run_abc123:span_002",
             kind=NodeKind.OPERATOR,
-            pipe_name="generate_text",
+            pipe_code="generate_text",
             pipe_type="PipeLLM",
             status=NodeStatus.SUCCEEDED,
             timing=timing2,
@@ -185,7 +185,7 @@ class TestGraphSpecRoundtrip:
         node = NodeSpec(
             node_id="failed_node_001",
             kind=NodeKind.OPERATOR,
-            pipe_name="failed_pipe",
+            pipe_code="failed_pipe",
             pipe_type="PipeLLM",
             status=NodeStatus.FAILED,
             error=error,
@@ -220,7 +220,7 @@ class TestGraphSpecRoundtrip:
                 NodeSpec(
                     node_id="node_file_001",
                     kind=NodeKind.OPERATOR,
-                    pipe_name="test_pipe",
+                    pipe_code="test_pipe",
                     pipe_type="PipeLLM",
                     status=NodeStatus.SUCCEEDED,
                 )
@@ -247,7 +247,7 @@ class TestGraphSpecRoundtrip:
                 NodeSpec(
                     node_id="node_001",
                     kind=NodeKind.OPERATOR,
-                    pipe_name="test",
+                    pipe_code="test",
                     pipe_type="PipeLLM",
                     status=NodeStatus.SUCCEEDED,
                 )
@@ -295,7 +295,7 @@ class TestGraphSpecRoundtrip:
             NodeSpec(
                 node_id=f"node_{kind}",
                 kind=kind,
-                pipe_name=f"pipe_{kind}",
+                pipe_code=f"pipe_{kind}",
                 pipe_type="TestType",
                 status=NodeStatus.SUCCEEDED,
             )
@@ -324,7 +324,7 @@ class TestGraphSpecRoundtrip:
             NodeSpec(
                 node_id=f"node_{idx}",
                 kind=NodeKind.OPERATOR,
-                pipe_name=f"pipe_{idx}",
+                pipe_code=f"pipe_{idx}",
                 pipe_type="TestType",
                 status=NodeStatus.SUCCEEDED,
             )
@@ -363,7 +363,7 @@ class TestGraphSpecRoundtrip:
             node = NodeSpec(
                 node_id=f"node_{status}",
                 kind=NodeKind.OPERATOR,
-                pipe_name=f"pipe_{status}",
+                pipe_code=f"pipe_{status}",
                 pipe_type="TestType",
                 status=status,
             )
@@ -372,7 +372,7 @@ class TestGraphSpecRoundtrip:
                 node = NodeSpec(
                     node_id=f"node_{status}",
                     kind=NodeKind.OPERATOR,
-                    pipe_name=f"pipe_{status}",
+                    pipe_code=f"pipe_{status}",
                     pipe_type="TestType",
                     status=status,
                     error=ErrorSpec(error_type="TestError", message="Test"),
