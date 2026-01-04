@@ -9,10 +9,9 @@ from pipelex import log
 from pipelex.hub import get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.system.pipelex_service.remote_config import PipelexPosthogConfig, RemoteConfig
+from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, runtime_manager
-from pipelex.tools.misc.terminal_utils import print_to_stderr
 
 pytest_plugins = [
     "pipelex.test_extras.shared_pytest_plugins",
@@ -25,28 +24,10 @@ _remote_config_cache: dict[str, RemoteConfig] = {}
 _original_fetch_remote_config = RemoteConfigFetcher.fetch_remote_config
 
 
-def _make_default_remote_config() -> RemoteConfig:
-    """Create a default RemoteConfig for environments where fetch fails (e.g., Codex Cloud SSL issues)."""
-    return RemoteConfig(
-        posthog=PipelexPosthogConfig(
-            project_api_key="",
-            endpoint="https://app.posthog.com",
-            is_geoip_enabled=False,
-            is_debug_enabled=False,
-        ),
-        backend_model_specs={},
-    )
-
-
 def _cached_fetch_remote_config() -> RemoteConfig:
     """Wrapper that caches the remote config for the entire test session."""
     if "config" not in _remote_config_cache:
-        # In Codex Cloud, use dummy default config to avoid SSL issues with MITM proxy
-        if runtime_manager.is_in_codex_cloud:
-            print_to_stderr("Using default remote config for Codex Cloud")
-            _remote_config_cache["config"] = _make_default_remote_config()
-        else:
-            _remote_config_cache["config"] = _original_fetch_remote_config()
+        _remote_config_cache["config"] = _original_fetch_remote_config()
     return _remote_config_cache["config"]
 
 

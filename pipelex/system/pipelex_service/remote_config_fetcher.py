@@ -61,7 +61,7 @@ class RemoteConfigFetcher:
         return _fetch_with_retry(url)
 
     @classmethod
-    def _make_default_remote_config(cls) -> RemoteConfig:
+    def _make_dummy_remote_config(cls) -> RemoteConfig:
         """Create a default RemoteConfig for testing in offline environments.
 
         Returns:
@@ -70,7 +70,7 @@ class RemoteConfigFetcher:
         return RemoteConfig(
             posthog=PipelexPosthogConfig(
                 project_api_key="",
-                endpoint="https://app.posthog.com",
+                endpoint="https://dummy-endpoint.pipelex.com",
                 is_geoip_enabled=False,
                 is_debug_enabled=False,
             ),
@@ -88,10 +88,10 @@ class RemoteConfigFetcher:
             RemoteConfigFetchError: If the HTTP request fails or returns an error.
             RemoteConfigValidationError: If the JSON doesn't match expected schema.
         """
-        # In Codex Cloud, return default config to avoid SSL issues with MITM proxy
+        # In Codex Cloud, return dummy config to avoid SSL issues with MITM proxy
         if runtime_manager.is_in_codex_cloud:
-            print_to_stderr("Skipping remote config fetch in Codex Cloud, using defaults")
-            return cls._make_default_remote_config()
+            print_to_stderr("Skipping remote config fetch in Codex Cloud, using dummy config instead")
+            return cls._make_dummy_remote_config()
 
         url = PipelexDetails.REMOTE_CONFIG_URL
 
