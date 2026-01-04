@@ -35,7 +35,7 @@ from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
 
 if TYPE_CHECKING:
-    from pipelex.observability.graphspec import GraphContext
+    from pipelex.observability.graphspec.graph_context import GraphContext
 
 # Controller pipe types for graph node classification
 _CONTROLLER_PIPE_TYPES = {"PipeSequence", "PipeCondition", "PipeBatch", "PipeParallel"}

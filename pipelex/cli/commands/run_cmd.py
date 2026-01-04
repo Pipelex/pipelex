@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import click
 import typer
@@ -19,17 +19,16 @@ from pipelex.cli.error_handlers import (
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.hub import get_console, get_telemetry_manager
-from pipelex.observability.graphspec import (
+from pipelex.observability.graphspec.graph_tracer import GraphTracer
+from pipelex.observability.graphspec.graph_tracer_manager import GraphTracerManager
+from pipelex.observability.graphspec.graphspec_io import save_graphspec
+from pipelex.observability.graphspec.html_renderer import render_mermaid_html_async
+from pipelex.observability.graphspec.mermaid import (
     FlowchartDirection,
-    GraphSpec,
-    GraphTracer,
-    GraphTracerManager,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
-    save_graphspec,
 )
-from pipelex.observability.graphspec.html_renderer import render_mermaid_html_async
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
@@ -42,6 +41,9 @@ from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, get_incremental_file_path
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
+
+if TYPE_CHECKING:
+    from pipelex.observability.graphspec.graphspec import GraphSpec
 
 COMMAND = "run"
 

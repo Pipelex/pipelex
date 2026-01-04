@@ -2,15 +2,10 @@
 
 from datetime import UTC, datetime, timedelta
 
-from pipelex.observability.graphspec import (
-    EdgeKind,
-    GraphContext,
-    GraphTracer,
-    GraphTracerNoOp,
-    IOSpec,
-    NodeKind,
-    NodeStatus,
-)
+from pipelex.observability.graphspec.graph_context import GraphContext
+from pipelex.observability.graphspec.graph_tracer import GraphTracer
+from pipelex.observability.graphspec.graph_tracer_protocol import GraphTracerNoOp
+from pipelex.observability.graphspec.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
 
 
 class TestGraphTracer:
