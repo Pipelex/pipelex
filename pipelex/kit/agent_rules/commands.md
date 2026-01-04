@@ -12,7 +12,7 @@
 
    This runs multiple code quality tools:
    - Pyright: Static type checking
-   - Ruff: Fix unised imports, lint, format  
+   - Ruff: Fix unused imports, lint, format  
    - Mypy: Static type checker
 
    Always fix any issues reported by these tools before proceeding.
