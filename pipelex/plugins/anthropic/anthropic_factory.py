@@ -9,7 +9,7 @@ from openai.types.chat import (
 )
 
 from pipelex.cogt.exceptions import CogtError
-from pipelex.cogt.image.prepared_image import PreparedImage, PreparedImageData, PreparedImageUrl
+from pipelex.cogt.image.prepared_image import PreparedImage, PreparedImageBase64, PreparedImageHttpUrl
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
@@ -64,16 +64,16 @@ class AnthropicFactory:
         """Convert a PreparedImage to an Anthropic ImageBlockParam."""
         image_block_param: ImageBlockParam
         match prepped_image:
-            case PreparedImageData():
+            case PreparedImageBase64():
                 image_block_param = {
                     "type": "image",
                     "source": {
                         "type": "base64",
                         "media_type": prepped_image.mime_type,  # type: ignore[typeddict-item]
-                        "data": prepped_image.base_64.decode("utf-8"),
+                        "data": prepped_image.base64_bytes.decode("utf-8"),
                     },  # pyright: ignore[reportAssignmentType]
                 }
-            case PreparedImageUrl():
+            case PreparedImageHttpUrl():
                 image_block_param = {
                     "type": "image",
                     "source": {

@@ -48,7 +48,7 @@ class TestLLMVision:
         self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str
     ):
         image_bytes = load_binary_as_base64(path=image_path)
-        prompt_image = PromptImageBase64(base_64=image_bytes)
+        prompt_image = PromptImageBase64(base64_bytes=image_bytes)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(

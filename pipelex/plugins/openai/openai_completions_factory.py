@@ -12,7 +12,7 @@ from openai.types.chat.chat_completion_content_part_image_param import ImageURL
 from openai.types.completion_usage import CompletionUsage
 from typing_extensions import override
 
-from pipelex.cogt.image.prepared_image import PreparedImageData, PreparedImageUrl
+from pipelex.cogt.image.prepared_image import PreparedImageBase64, PreparedImageHttpUrl
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
@@ -48,9 +48,9 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
             for prepped_image in prepped_images:
                 url: str
                 match prepped_image:
-                    case PreparedImageUrl():
+                    case PreparedImageHttpUrl():
                         url = prepped_image.url
-                    case PreparedImageData():
+                    case PreparedImageBase64():
                         url = prepped_image.as_data_url()
 
                 image_url_obj = ImageURL(url=url, detail=detail.as_openai_detail)

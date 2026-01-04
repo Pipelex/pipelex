@@ -98,13 +98,13 @@ class MistralFactory:
                         raise PromptImageFormatError(msg)
 
             case PromptImageBase64():
-                base64_str = prompt_image.base_64.decode("utf-8")
-                file_type = detect_file_type_from_base64(prompt_image.base_64)
+                base64_str = prompt_image.base64_bytes.decode("utf-8")
+                file_type = detect_file_type_from_base64(prompt_image.base64_bytes)
                 image_url = f"data:{file_type.mime};base64,{base64_str}"
 
             case PromptImageBinary():
-                base64_str = base64.b64encode(prompt_image.binary).decode("utf-8")
-                file_type = detect_file_type_from_bytes(prompt_image.binary)
+                base64_str = base64.b64encode(prompt_image.binary_bytes).decode("utf-8")
+                file_type = detect_file_type_from_bytes(prompt_image.binary_bytes)
                 image_url = f"data:{file_type.mime};base64,{base64_str}"
 
         return ImageURLChunk(image_url=image_url)

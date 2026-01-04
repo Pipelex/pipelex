@@ -12,18 +12,18 @@ from pydantic import BaseModel, Field
 from pipelex.tools.misc.filetype_utils import FileType
 
 
-class PreparedImageUrl(BaseModel):
-    """An HTTP URL that can be passed directly to the LLM."""
+class PreparedImageHttpUrl(BaseModel):
+    """An HTTP URL that can be passed directly to some LLMs."""
 
-    kind: Literal["url"] = "url"
+    kind: Literal["http_url"] = "http_url"
     url: str
 
 
-class PreparedImageData(BaseModel):
+class PreparedImageBase64(BaseModel):
     """Base64-encoded image data with mime type."""
 
-    kind: Literal["data"] = "data"
-    base_64: bytes
+    kind: Literal["base64"] = "base64"
+    base64_bytes: bytes
     file_type: FileType
 
     @property
@@ -33,10 +33,10 @@ class PreparedImageData(BaseModel):
 
     def as_data_url(self) -> str:
         """Convert to a data: URL for APIs that accept it."""
-        return f"data:{self.mime_type};base64,{self.base_64.decode('utf-8')}"
+        return f"data:{self.mime_type};base64,{self.base64_bytes.decode('utf-8')}"
 
 
 PreparedImage = Annotated[
-    Union[PreparedImageUrl, PreparedImageData],
+    Union[PreparedImageHttpUrl, PreparedImageBase64],
     Field(discriminator="kind"),
 ]

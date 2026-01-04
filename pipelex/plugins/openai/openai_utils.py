@@ -41,9 +41,9 @@ async def make_image_url_obj(prompt_image: PromptImage, detail: PromptImageDetai
                     url = prompt_image.resolved.url
                 case ResolvedLocalPath():
                     raw_bytes = await load_binary_async(path=prompt_image.resolved.path)
-                    base64_bytes = base64.b64encode(raw_bytes)
+                    encoded_bytes = base64.b64encode(raw_bytes)
                     file_type = detect_file_type_from_bytes(raw_bytes)
-                    url = f"data:{file_type.mime};base64,{base64_bytes.decode('utf-8')}"
+                    url = f"data:{file_type.mime};base64,{encoded_bytes.decode('utf-8')}"
                 case ResolvedBase64DataUrl():
                     # Already a data URL, reconstruct it
                     url = prompt_image.uri
@@ -53,11 +53,11 @@ async def make_image_url_obj(prompt_image: PromptImage, detail: PromptImageDetai
 
         case PromptImageBase64():
             file_type = prompt_image.get_file_type()
-            url = f"data:{file_type.mime};base64,{prompt_image.base_64.decode('utf-8')}"
+            url = f"data:{file_type.mime};base64,{prompt_image.base64_bytes.decode('utf-8')}"
 
         case PromptImageBinary():
             file_type = prompt_image.get_file_type()
-            base64_bytes = base64.b64encode(prompt_image.binary)
-            url = f"data:{file_type.mime};base64,{base64_bytes.decode('utf-8')}"
+            encoded_bytes = base64.b64encode(prompt_image.binary_bytes)
+            url = f"data:{file_type.mime};base64,{encoded_bytes.decode('utf-8')}"
 
     return ImageURL(url=url, detail=detail.as_openai_detail)

@@ -64,22 +64,22 @@ class PromptImageBase64(BaseModel):
     """A prompt image as raw base64-encoded bytes."""
 
     kind: Literal["base64"] = "base64"
-    base_64: bytes
+    base64_bytes: bytes
 
     def get_file_type(self) -> FileType:
-        return detect_file_type_from_base64(self.base_64)
+        return detect_file_type_from_base64(self.base64_bytes)
 
     def get_mime_type(self) -> str:
         return self.get_file_type().mime
 
     def get_decoded_bytes(self) -> bytes:
-        return base64.b64decode(self.base_64)
+        return base64.b64decode(self.base64_bytes)
 
     @override
     def __str__(self) -> str:
-        base_64_str = str(self.base_64)
-        truncated_base_64 = AttributePolisher.get_truncated_value(value=base_64_str)
-        return f"PromptImageBase64(base_64={truncated_base_64!r})"
+        base64_str = str(self.base64_bytes)
+        truncated_base64 = AttributePolisher.get_truncated_value(value=base64_str)
+        return f"PromptImageBase64(base64_bytes={truncated_base64!r})"
 
     @override
     def __repr__(self) -> str:
@@ -91,24 +91,24 @@ class PromptImageBase64(BaseModel):
 
     def short_description(self) -> str:
         """Return a short description of the image."""
-        return f"base64: {self.base_64[:100].decode('ascii', errors='replace')}..."
+        return f"base64: {self.base64_bytes[:100].decode('ascii', errors='replace')}..."
 
 
 class PromptImageBinary(BaseModel):
     """A prompt image as raw binary bytes."""
 
     kind: Literal["binary"] = "binary"
-    binary: bytes
+    binary_bytes: bytes
 
     def get_file_type(self) -> FileType:
-        return detect_file_type_from_bytes(self.binary)
+        return detect_file_type_from_bytes(self.binary_bytes)
 
     def get_mime_type(self) -> str:
         return self.get_file_type().mime
 
     @override
     def __str__(self) -> str:
-        return "PromptImageBinary(binary=...)"
+        return "PromptImageBinary(binary_bytes=...)"
 
     @override
     def __repr__(self) -> str:
@@ -116,7 +116,7 @@ class PromptImageBinary(BaseModel):
 
     def short_description(self) -> str:
         """Return a short description of the image."""
-        return f"binary: {self.binary[:50].hex()}..."
+        return f"binary: {self.binary_bytes[:50].hex()}..."
 
 
 PromptImage = Annotated[

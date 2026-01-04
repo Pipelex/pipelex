@@ -7,7 +7,7 @@ PreparedImage instances that can be consumed by LLM provider APIs.
 import asyncio
 import base64
 
-from pipelex.cogt.image.prepared_image import PreparedImage, PreparedImageData, PreparedImageUrl
+from pipelex.cogt.image.prepared_image import PreparedImage, PreparedImageBase64, PreparedImageHttpUrl
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
     PromptImageBase64,
@@ -37,20 +37,20 @@ async def prepare_prompt_image(
         is_http_url_enabled: Whether to pass HTTP URLs directly to the LLM
 
     Returns:
-        A PreparedImage (URL or Data) ready for the LLM API
+        A PreparedImage (HttpUrl or Base64) ready for the LLM API
     """
     prepared: PreparedImage
     match prompt_image:
         case PromptImageBase64():
-            prepared = PreparedImageData(
-                base_64=prompt_image.base_64,
+            prepared = PreparedImageBase64(
+                base64_bytes=prompt_image.base64_bytes,
                 file_type=prompt_image.get_file_type(),
             )
 
         case PromptImageBinary():
-            base64_bytes = base64.b64encode(prompt_image.binary)
-            prepared = PreparedImageData(
-                base_64=base64_bytes,
+            encoded_bytes = base64.b64encode(prompt_image.binary_bytes)
+            prepared = PreparedImageBase64(
+                base64_bytes=encoded_bytes,
                 file_type=prompt_image.get_file_type(),
             )
 
@@ -58,34 +58,34 @@ async def prepare_prompt_image(
             match prompt_image.resolved:
                 case ResolvedHttpUrl():
                     if is_http_url_enabled:
-                        prepared = PreparedImageUrl(url=prompt_image.resolved.url)
+                        prepared = PreparedImageHttpUrl(url=prompt_image.resolved.url)
                     else:
-                        raw_bytes = await fetch_file_from_url_httpx_async(prompt_image.resolved.url)
-                        prepared = PreparedImageData(
-                            base_64=base64.b64encode(raw_bytes),
+                        raw_bytes = await fetch_file_from_url_httpx_async(url=prompt_image.resolved.url)
+                        prepared = PreparedImageBase64(
+                            base64_bytes=base64.b64encode(raw_bytes),
                             file_type=detect_file_type_from_bytes(raw_bytes),
                         )
 
                 case ResolvedLocalPath():
                     raw_bytes = await load_binary_async(prompt_image.resolved.path)
-                    prepared = PreparedImageData(
-                        base_64=base64.b64encode(raw_bytes),
+                    prepared = PreparedImageBase64(
+                        base64_bytes=base64.b64encode(raw_bytes),
                         file_type=detect_file_type_from_bytes(raw_bytes),
                     )
 
                 case ResolvedPipelexStorage():
                     storage = get_storage_provider()
                     raw_bytes = storage.load(uri=prompt_image.resolved.storage_uri)
-                    prepared = PreparedImageData(
-                        base_64=base64.b64encode(raw_bytes),
+                    prepared = PreparedImageBase64(
+                        base64_bytes=base64.b64encode(raw_bytes),
                         file_type=detect_file_type_from_bytes(raw_bytes),
                     )
 
                 case ResolvedBase64DataUrl():
-                    base64_bytes = prompt_image.resolved.base64_data.encode("utf-8")
-                    prepared = PreparedImageData(
-                        base_64=base64_bytes,
-                        file_type=detect_file_type_from_base64(base64_bytes),
+                    encoded_bytes = prompt_image.resolved.base64_data.encode("utf-8")
+                    prepared = PreparedImageBase64(
+                        base64_bytes=encoded_bytes,
+                        file_type=detect_file_type_from_base64(encoded_bytes),
                     )
 
     return prepared
