@@ -260,7 +260,7 @@ def run_cmd(
 
             # Save JSON
             save_graphspec(graph_spec, graph_output_dir / "graph.json")
-            typer.secho(f"✅ Graph JSON saved to: {graph_output_dir / 'graph.json'}", fg=typer.colors.GREEN)
+            typer.secho(f"\n✅ Graph JSON saved to: {graph_output_dir / 'graph.json'}", fg=typer.colors.GREEN)
 
             # Generate orchestration view (TD - top-down)
             orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction="TD")

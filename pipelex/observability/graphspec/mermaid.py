@@ -20,6 +20,16 @@ from pipelex.observability.graphspec.graphspec import (
 # Valid Mermaid flowchart directions
 VALID_DIRECTIONS = {"TB", "TD", "BT", "RL", "LR"}
 
+# Light pastel colors for subgraph depth coloring (cycles through these)
+SUBGRAPH_DEPTH_COLORS = [
+    "#e6f3ff",  # Light blue
+    "#e6ffe6",  # Light green
+    "#fffde6",  # Light yellow
+    "#ffe6f0",  # Light pink
+    "#f0e6ff",  # Light purple
+    "#fff3e6",  # Light orange
+]
+
 
 def sanitize_mermaid_id(node_id: str) -> str:
     """Convert a node ID to a valid Mermaid identifier.
@@ -173,8 +183,10 @@ def _render_combo_subgraph_recursive(
     stuff_registry: dict[str, tuple[str, str | None]],
     stuff_producers: dict[str, str],
     stuff_id_mapping: dict[str, str],
+    subgraph_depths: dict[str, int],
     show_stuff_codes: bool,
     indent_level: int = 1,
+    depth: int = 0,
 ) -> list[str]:
     """Recursively render pipes and their produced stuff within controller subgraphs.
 
@@ -188,8 +200,10 @@ def _render_combo_subgraph_recursive(
         stuff_registry: Map of digest to (name, concept) for all stuffs.
         stuff_producers: Map of digest to producer node_id.
         stuff_id_mapping: Map to store stuff mermaid IDs (mutated).
+        subgraph_depths: Map to track subgraph IDs and their depths (mutated).
         show_stuff_codes: Whether to show digest in stuff labels.
         indent_level: Current indentation level.
+        depth: Current depth in the subgraph hierarchy (for coloring).
 
     Returns:
         List of Mermaid syntax lines.
@@ -210,6 +224,9 @@ def _render_combo_subgraph_recursive(
         subgraph_id = f"sg_{mermaid_id}"
         lines.append(f'{indent}subgraph {subgraph_id}["{label}"]')
 
+        # Track this subgraph's depth for styling
+        subgraph_depths[subgraph_id] = depth
+
         # Sort children for deterministic output
         sorted_children = sorted(
             children,
@@ -229,8 +246,10 @@ def _render_combo_subgraph_recursive(
                 stuff_registry=stuff_registry,
                 stuff_producers=stuff_producers,
                 stuff_id_mapping=stuff_id_mapping,
+                subgraph_depths=subgraph_depths,
                 show_stuff_codes=show_stuff_codes,
                 indent_level=indent_level + 1,
+                depth=depth + 1,
             )
             lines.extend(child_lines)
 
@@ -264,7 +283,9 @@ def _render_subgraph_recursive(
     edges: list[EdgeSpec],
     include_data_edges: bool,
     include_selected_outcome_edges: bool,
+    subgraph_depths: dict[str, int],
     indent_level: int = 1,
+    depth: int = 0,
 ) -> list[str]:
     """Recursively render a node and its children as subgraphs.
 
@@ -276,7 +297,9 @@ def _render_subgraph_recursive(
         edges: All edges (for rendering non-contains edges).
         include_data_edges: Whether to include data edges.
         include_selected_outcome_edges: Whether to include selected outcome edges.
+        subgraph_depths: Map to track subgraph IDs and their depths (mutated).
         indent_level: Current indentation level.
+        depth: Current depth in the subgraph hierarchy (for coloring).
 
     Returns:
         List of Mermaid syntax lines.
@@ -297,6 +320,9 @@ def _render_subgraph_recursive(
         subgraph_id = f"sg_{mermaid_id}"
         lines.append(f'{indent}subgraph {subgraph_id}["{label}"]')
 
+        # Track this subgraph's depth for styling
+        subgraph_depths[subgraph_id] = depth
+
         # Sort children for deterministic output
         sorted_children = sorted(
             children,
@@ -316,7 +342,9 @@ def _render_subgraph_recursive(
                 edges=edges,
                 include_data_edges=include_data_edges,
                 include_selected_outcome_edges=include_selected_outcome_edges,
+                subgraph_depths=subgraph_depths,
                 indent_level=indent_level + 1,
+                depth=depth + 1,
             )
             lines.extend(child_lines)
 
@@ -443,6 +471,9 @@ def graphspec_to_orchestration_mermaid(
     # Sort root nodes for deterministic output
     sorted_roots = sorted(root_nodes, key=lambda node: (node.kind, node.pipe_name or "", node.node_id))
 
+    # Track subgraph depths for coloring
+    subgraph_depths: dict[str, int] = {}
+
     # Render nodes (using subgraphs for containment)
     for root_node in sorted_roots:
         node_lines = _render_subgraph_recursive(
@@ -453,6 +484,7 @@ def graphspec_to_orchestration_mermaid(
             edges=graph.edges,
             include_data_edges=include_data_edges,
             include_selected_outcome_edges=include_selected_outcome_edges,
+            subgraph_depths=subgraph_depths,
         )
         lines.extend(node_lines)
 
@@ -474,6 +506,14 @@ def graphspec_to_orchestration_mermaid(
     lines.append("    %% Style definitions")
     lines.append("    classDef failed fill:#ffcccc,stroke:#cc0000")
     lines.append("    classDef controller fill:#e6f3ff,stroke:#0066cc")
+
+    # Apply depth-based colors to subgraphs
+    if subgraph_depths:
+        lines.append("")
+        lines.append("    %% Subgraph depth-based coloring")
+        for subgraph_id, sg_depth in sorted(subgraph_depths.items()):
+            color = SUBGRAPH_DEPTH_COLORS[sg_depth % len(SUBGRAPH_DEPTH_COLORS)]
+            lines.append(f"    style {subgraph_id} fill:{color}")
 
     return "\n".join(lines)
 
@@ -717,6 +757,9 @@ def graphspec_to_combo_mermaid(
     # Will be populated during recursive rendering
     stuff_id_mapping: dict[str, str] = {}
 
+    # Track subgraph depths for coloring
+    subgraph_depths: dict[str, int] = {}
+
     # Render pipe nodes and their produced stuff within controller subgraphs
     lines.append("")
     lines.append("    %% Pipe and stuff nodes within controller subgraphs")
@@ -729,6 +772,7 @@ def graphspec_to_combo_mermaid(
             stuff_registry=stuff_registry,
             stuff_producers=stuff_producers,
             stuff_id_mapping=stuff_id_mapping,
+            subgraph_depths=subgraph_depths,
             show_stuff_codes=show_stuff_codes,
         )
         lines.extend(node_lines)
@@ -782,5 +826,13 @@ def graphspec_to_combo_mermaid(
     lines.append("    classDef failed fill:#ffcccc,stroke:#cc0000")
     lines.append("    classDef controller fill:#e6f3ff,stroke:#0066cc")
     lines.append("    classDef stuff fill:#fff3e6,stroke:#cc6600,stroke-width:2px")
+
+    # Apply depth-based colors to subgraphs
+    if subgraph_depths:
+        lines.append("")
+        lines.append("    %% Subgraph depth-based coloring")
+        for subgraph_id, sg_depth in sorted(subgraph_depths.items()):
+            color = SUBGRAPH_DEPTH_COLORS[sg_depth % len(SUBGRAPH_DEPTH_COLORS)]
+            lines.append(f"    style {subgraph_id} fill:{color}")
 
     return "\n".join(lines)
