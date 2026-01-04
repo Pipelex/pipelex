@@ -13,6 +13,7 @@ from pipelex.hub import (
     get_telemetry_manager,
     set_current_library,
 )
+from pipelex.observability.graphspec.graph_context import GraphContext
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -46,6 +47,7 @@ async def pipeline_run_setup(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
+    graph_context: GraphContext | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -91,6 +93,9 @@ async def pipeline_run_setup(
         added if not already present.
     user_id:
         Unique identifier for the user (optional).
+    graph_context:
+        Optional GraphContext for enabling execution graph tracing. When provided,
+        the execution will capture node timing, data flow, and status information.
 
     Returns:
     -------
@@ -187,6 +192,7 @@ async def pipeline_run_setup(
         user_id=user_id,
         pipeline_run_id=pipeline.pipeline_run_id,
         otel_context=otel_context,
+        graph_context=graph_context,
     )
 
     pipe_run_params = PipeRunParamsFactory.make_run_params(

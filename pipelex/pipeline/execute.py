@@ -10,6 +10,7 @@ from pipelex.hub import (
     get_telemetry_manager,
     teardown_current_library,
 )
+from pipelex.observability.graphspec.graph_context import GraphContext
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
@@ -30,6 +31,7 @@ async def execute_pipeline(
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
+    graph_context: GraphContext | None = None,
 ) -> PipeOutput:
     """Execute a pipeline and wait for its completion.
 
@@ -74,6 +76,9 @@ async def execute_pipeline(
         added if not already present.
     user_id:
         Unique identifier for the user.
+    graph_context:
+        Optional GraphContext for enabling execution graph tracing. When provided,
+        the execution will capture node timing, data flow, and status information.
 
     Returns:
     -------
@@ -93,6 +98,7 @@ async def execute_pipeline(
         pipe_run_mode=pipe_run_mode,
         search_domain_codes=search_domain_codes,
         user_id=user_id,
+        graph_context=graph_context,
     )
 
     properties: dict[EventProperty, Any]

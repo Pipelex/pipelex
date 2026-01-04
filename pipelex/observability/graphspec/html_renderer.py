@@ -5,7 +5,7 @@ viewed in a browser.
 """
 
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 
 # HTML template for rendering Mermaid diagrams
 # The mermaid_code is inserted unescaped since it's plain text for Mermaid parsing
@@ -67,7 +67,10 @@ def render_mermaid_html(
     *,
     title: str = "Pipelex Graph",
 ) -> str:
-    """Render Mermaid code into a standalone HTML page.
+    """Render Mermaid code into a standalone HTML page (sync version).
+
+    Use this when NOT inside an async event loop. For async contexts,
+    use render_mermaid_html_async instead.
 
     Args:
         mermaid_code: The Mermaid flowchart code to embed.
@@ -77,6 +80,32 @@ def render_mermaid_html(
         Complete HTML page as a string.
     """
     return render_jinja2_sync(
+        template_source=MERMAID_HTML_TEMPLATE,
+        template_category=TemplateCategory.HTML,
+        temlating_context={
+            "title": title,
+            "mermaid_code": mermaid_code,
+        },
+    )
+
+
+async def render_mermaid_html_async(
+    mermaid_code: str,
+    *,
+    title: str = "Pipelex Graph",
+) -> str:
+    """Render Mermaid code into a standalone HTML page (async version).
+
+    Use this when inside an async event loop.
+
+    Args:
+        mermaid_code: The Mermaid flowchart code to embed.
+        title: The page title (appears in browser tab and as h1).
+
+    Returns:
+        Complete HTML page as a string.
+    """
+    return await render_jinja2_async(
         template_source=MERMAID_HTML_TEMPLATE,
         template_category=TemplateCategory.HTML,
         temlating_context={

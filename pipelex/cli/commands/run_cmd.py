@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from typing import Annotated
 
 import click
@@ -18,10 +19,21 @@ from pipelex.cli.error_handlers import (
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.hub import get_console, get_telemetry_manager
+from pipelex.observability.graphspec import (
+    GraphSpec,
+    GraphTracer,
+    GraphTracerManager,
+    graphspec_to_dataflow_mermaid,
+    graphspec_to_mermaid,
+    save_graphspec,
+)
+from pipelex.observability.graphspec.html_renderer import render_mermaid_html_async
+from pipelex.observability.graphspec.mermaid import VALID_DIRECTIONS
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -61,6 +73,26 @@ def run_cmd(
         bool,
         typer.Option("--no-pretty-print", help="Skip pretty printing the main_stuff"),
     ] = False,
+    graph_json: Annotated[
+        str | None,
+        typer.Option("--graph-json", help="Path to save execution graph as JSON"),
+    ] = None,
+    graph_mermaid: Annotated[
+        str | None,
+        typer.Option("--graph-mermaid", help="Path to save execution graph as Mermaid (.mmd)"),
+    ] = None,
+    graph_html: Annotated[
+        str | None,
+        typer.Option("--graph-html", help="Path to save execution graph as HTML"),
+    ] = None,
+    graph_data_flow: Annotated[
+        bool,
+        typer.Option("--graph-data-flow", help="Use data flow view instead of orchestration view"),
+    ] = False,
+    graph_direction: Annotated[
+        str,
+        typer.Option("--graph-direction", help=f"Mermaid direction ({', '.join(sorted(VALID_DIRECTIONS))})"),
+    ] = "TD",
 ) -> None:
     """Execute a pipeline from a specific bundle file (or not), specifying its pipe code or not.
     If the bundle is provided, it will run its main pipe unless you specify a pipe code.
@@ -73,6 +105,8 @@ def run_cmd(
         pipelex run --pipe my_pipe --inputs data.json
         pipelex run my_bundle.plx --inputs data.json
         pipelex run my_pipe --output results.json --no-pretty-print
+        pipelex run my_pipe --graph-json execution.json --graph-mermaid execution.mmd
+        pipelex run my_pipe --graph-html dataflow.html --graph-data-flow
     """
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -80,6 +114,18 @@ def run_cmd(
         ctx: click.Context = click.get_current_context()
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
+
+    # Validate graph direction
+    if graph_direction not in VALID_DIRECTIONS:
+        typer.secho(
+            f"Invalid graph direction '{graph_direction}'. Must be one of: {', '.join(sorted(VALID_DIRECTIONS))}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # Determine if graph tracing is requested
+    generate_graph = any([graph_json, graph_mermaid, graph_html])
 
     # Let's analyze the options and determine what pipe code to use and if we need to load a bundle
     pipe_code: str | None = None
@@ -166,14 +212,34 @@ def run_cmd(
         # Execute pipeline
         typer.secho(f"\n🚀 Executing {source_description}...\n", fg=typer.colors.GREEN, bold=True)
 
+        # Set up graph tracing if requested
+        graph_spec: GraphSpec | None = None
+        graph_context = None
+        manager: GraphTracerManager | None = None
+
+        if generate_graph:
+            tracer = GraphTracer()
+            graph_manager = GraphTracerManager(tracer)
+            manager = graph_manager
+            graph_id = PipelineFactory.make_pipeline_run_id()
+            graph_context = graph_manager.setup(
+                graph_id=graph_id,
+                pipeline_ref_main_pipe=pipe_code,
+            )
+
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
                 inputs=pipeline_inputs,
+                graph_context=graph_context,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
+        finally:
+            # Teardown graph tracing (capture graph even on failure)
+            if manager is not None:
+                graph_spec = manager.teardown()
 
         # Pretty print main_stuff unless disabled
         if not no_pretty_print:
@@ -191,6 +257,32 @@ def run_cmd(
             working_memory_dict = pipe_output.working_memory.smart_dump()
             save_as_json_to_path(object_to_save=working_memory_dict, path=output_path)
             typer.secho(f"✅ Working memory saved to: {output_path}", fg=typer.colors.GREEN)
+
+        # Save graph outputs if requested
+        if graph_spec is not None:
+            if graph_json:
+                save_graphspec(graph_spec, Path(graph_json))
+                typer.secho(f"✅ Graph JSON saved to: {graph_json}", fg=typer.colors.GREEN)
+
+            if graph_mermaid or graph_html:
+                # Generate Mermaid code
+                if graph_data_flow:
+                    # Data flow view: default to LR if user didn't override direction
+                    effective_direction = graph_direction if graph_direction != "TD" else "LR"
+                    mermaid_code = graphspec_to_dataflow_mermaid(graph_spec, direction=effective_direction)
+                else:
+                    # Orchestration view (default)
+                    mermaid_code = graphspec_to_mermaid(graph_spec, direction=graph_direction)
+
+                if graph_mermaid:
+                    Path(graph_mermaid).write_text(mermaid_code, encoding="utf-8")
+                    typer.secho(f"✅ Graph Mermaid saved to: {graph_mermaid}", fg=typer.colors.GREEN)
+
+                if graph_html:
+                    title = f"Execution: {pipe_code}" if pipe_code else "Pipeline Execution"
+                    html_content = await render_mermaid_html_async(mermaid_code, title=title)
+                    Path(graph_html).write_text(html_content, encoding="utf-8")
+                    typer.secho(f"✅ Graph HTML saved to: {graph_html}", fg=typer.colors.GREEN)
 
         typer.secho("✅ Pipeline execution completed successfully", fg=typer.colors.GREEN)
 
