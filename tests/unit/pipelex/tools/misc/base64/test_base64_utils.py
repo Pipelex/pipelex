@@ -19,48 +19,49 @@ class TestBase64Utils:
 
     @pytest.mark.asyncio
     async def test_load_binary_as_base64_async(self) -> None:
-        """Test asynchronous loading of binary file as base64."""
+        """Test asynchronous loading of binary file as base64 string."""
         file_path = FileHelperTestCases.TEST_IMAGE
         with open(file_path, "rb") as file_handle:
-            expected = base64.b64encode(file_handle.read())
+            expected = base64.b64encode(file_handle.read()).decode("ascii")
 
         result = await load_binary_as_base64(path=file_path)
 
         assert result == expected
+        assert isinstance(result, str)
 
     def test_make_base64_url_png(self) -> None:
         """Test creating a base64 data URL for PNG."""
-        base64_bytes = b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
+        base64_data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
         file_type = FileType(extension="png", mime="image/png")
 
-        result = make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
+        result = make_base64_url(base64_data=base64_data, file_type=file_type)
 
         assert result == "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
 
     def test_make_base64_url_jpeg(self) -> None:
         """Test creating a base64 data URL for JPEG."""
-        base64_bytes = b"/9j/4AAQSkZJRgABAQAAAQABAAD"
+        base64_data = "/9j/4AAQSkZJRgABAQAAAQABAAD"
         file_type = FileType(extension="jpg", mime="image/jpeg")
 
-        result = make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
+        result = make_base64_url(base64_data=base64_data, file_type=file_type)
 
         assert result == "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD"
 
     def test_make_base64_url_pdf(self) -> None:
         """Test creating a base64 data URL for PDF."""
-        base64_bytes = b"JVBERi0xLjQK"
+        base64_data = "JVBERi0xLjQK"
         file_type = FileType(extension="pdf", mime="application/pdf")
 
-        result = make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
+        result = make_base64_url(base64_data=base64_data, file_type=file_type)
 
         assert result == "data:application/pdf;base64,JVBERi0xLjQK"
 
     def test_make_base64_url_webp(self) -> None:
         """Test creating a base64 data URL for WebP."""
-        base64_bytes = b"UklGRhYAAABXRUJQ"
+        base64_data = "UklGRhYAAABXRUJQ"
         file_type = FileType(extension="webp", mime="image/webp")
 
-        result = make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
+        result = make_base64_url(base64_data=base64_data, file_type=file_type)
 
         assert result == "data:image/webp;base64,UklGRhYAAABXRUJQ"
 

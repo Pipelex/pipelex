@@ -24,7 +24,7 @@ class PreparedImageBase64(BaseModel):
     """Base64-encoded image data with mime type."""
 
     kind: Literal["base64"] = "base64"
-    base64_bytes: bytes
+    base64_data: str
     file_type: FileType
 
     @property
@@ -34,7 +34,7 @@ class PreparedImageBase64(BaseModel):
 
     def as_data_url(self) -> str:
         """Convert to a data: URL for APIs that accept it."""
-        return make_base64_url(base64_bytes=self.base64_bytes, file_type=self.file_type)
+        return make_base64_url(base64_data=self.base64_data, file_type=self.file_type)
 
 
 PreparedImage = Annotated[

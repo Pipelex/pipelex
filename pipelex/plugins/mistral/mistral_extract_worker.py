@@ -136,7 +136,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
 
         extract_response = await self.mistral_client.ocr.process_async(
             model=self.inference_model.model_id,
-            document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64.decode('utf-8')}"},
+            document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64}"},
         )
         return await MistralFactory.make_extract_output_from_mistral_response(
             mistral_extract_response=extract_response,

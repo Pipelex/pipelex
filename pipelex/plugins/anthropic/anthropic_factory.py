@@ -70,7 +70,7 @@ class AnthropicFactory:
                     "source": {
                         "type": "base64",
                         "media_type": prepped_image.mime_type,  # type: ignore[typeddict-item]
-                        "data": prepped_image.base64_bytes.decode("utf-8"),
+                        "data": prepped_image.base64_data,
                     },  # pyright: ignore[reportAssignmentType]
                 }
             case PreparedImageHttpUrl():
