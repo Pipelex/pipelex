@@ -119,7 +119,7 @@ Extracts text content from the candidate's CV PDF document using OCR technology,
 """
 inputs = { cv_pdf = "PDF" }
 output = "Page[]"
-model = "extract_text_from_pdf"
+model = "extract_basic_from_pdf"
 
 [pipe.extract_job_offer_text]
 type = "PipeExtract"
@@ -128,7 +128,7 @@ Extracts text content from the job offer PDF document using OCR technology, conv
 """
 inputs = { job_offer_pdf = "PDF" }
 output = "Page[]"
-model = "extract_text_from_pdf"
+model = "extract_basic_from_pdf"
 
 [pipe.analyze_match]
 type = "PipeLLM"

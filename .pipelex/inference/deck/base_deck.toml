@@ -111,7 +111,7 @@ cheap_llm_for_creativity = [
 pdf_text_extractor = [
     "azure-document-intelligence",
     "mistral-ocr",
-    "pypdfium2-extract-text",
+    "pypdfium2-extract-pdf",
 ]
 image_text_extractor = ["mistral-ocr"]
 
@@ -173,11 +173,11 @@ for_object = "cheap_llm_for_structured"
 ####################################################################################################
 
 [extract]
-choice_default = "extract_text_from_visuals"
+choice_default = "extract_ocr_from_document"
 
 [extract.presets]
-extract_text_from_visuals = { model = "azure-document-intelligence", max_nb_images = 100, image_min_size = 50 }
-extract_text_from_pdf = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+extract_ocr_from_document = { model = "azure-document-intelligence", max_nb_images = 100, image_min_size = 50 }
+extract_basic_from_pdf = { model = "pypdfium2-extract-pdf", max_nb_images = 100, image_min_size = 50 }
 
 ####################################################################################################
 # Image Generation Presets

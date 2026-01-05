@@ -452,8 +452,8 @@ OCR presets combine OCR model selection with optimized parameters:
 ```toml
 [extract.presets]
 # General purpose OCR
-extract_text_from_visuals = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-extract_text_from_pdf = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+extract_ocr_from_document = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+extract_basic_from_pdf = { model = "pypdfium2-extract-pdf", max_nb_images = 100, image_min_size = 50 }
 ```
 
 ### Image Generation Presets
@@ -478,7 +478,7 @@ for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
 
 [extract]
-choice_default = "extract_text_from_visuals"
+choice_default = "extract_ocr_from_document"
 
 [img_gen]
 choice_default = "gen_image_basic"
@@ -504,7 +504,7 @@ my_custom_img_gen = { model = "flux-dev", quality = "medium" }
 # Add custom aliases
 [aliases]
 my_custom_llm = "claude-3-sonnet"
-my_custom_extract = "pypdfium2-extract-text"
+my_custom_extract = "pypdfium2-extract-pdf"
 my_custom_img_gen = "base-img-gen"
 ```
 
