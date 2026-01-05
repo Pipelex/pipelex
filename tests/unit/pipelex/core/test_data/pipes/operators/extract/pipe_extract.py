@@ -12,7 +12,7 @@ type = "PipeExtract"
 description = "Extract text from document"
 inputs = { document = "PDF" }
 output = "Page[]"
-model = "extract_text_from_pdf"
+model = "extract_basic_from_pdf"
 """,
     PipelexBundleBlueprint(
         domain="test_pipes",
@@ -25,7 +25,7 @@ model = "extract_text_from_pdf"
                     "document": NativeConceptCode.PDF,
                 },
                 output=NativeConceptCode.PAGE.as_output_multiple_indeterminate,
-                model="extract_text_from_pdf",
+                model="extract_basic_from_pdf",
             ),
         },
     ),

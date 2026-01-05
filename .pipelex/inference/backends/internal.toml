@@ -19,7 +19,7 @@
 ################################################################################
 
 # --- PyPDFium2 Text Extractor -------------------------------------------------
-[pypdfium2-extract-text]
+[pypdfium2-extract-pdf]
 model_type = "text_extractor"
 sdk = "pypdfium2"
 model_id = "extract-text"

@@ -24,7 +24,7 @@ def is_extract_handle_supported_by_enabled_backends(extract_handle: str) -> bool
 # ================================================================================================
 
 EXTRACT_HANDLE_FROM_PDF = [
-    "pypdfium2-extract-text",
+    "pypdfium2-extract-pdf",
     "docling-extract-text",
     "mistral-ocr",
     "mistral-ocr-2503",
@@ -86,8 +86,8 @@ def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "extract_text_from_visuals",
-        "extract_text_from_pdf",
+        "extract_ocr_from_document",
+        "extract_basic_from_pdf",
     ],
 )
 def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
@@ -97,7 +97,7 @@ def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "extract_text_from_visuals",
+        "extract_ocr_from_document",
     ],
 )
 def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
