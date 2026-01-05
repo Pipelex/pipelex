@@ -11,6 +11,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.stuffs.pdf_content import PDFContent
+from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.graphspec_io import save_graphspec
 from pipelex.graph.mermaid import (
@@ -19,6 +20,8 @@ from pipelex.graph.mermaid import (
     graphspec_to_dataflow_mermaid_with_data,
     graphspec_to_orchestration_mermaid,
 )
+from pipelex.graph.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
@@ -202,6 +205,24 @@ class TestGraphWithFullData:
             f"Dataflow should have stuff_data extracted from graph. Graph has {inputs_with_data} inputs and {outputs_with_data} outputs with data."
         )
 
+        # Generate ReactFlow HTML
+        analysis = GraphAnalysis.from_graphspec(graph_spec)
+        viewspec = graphspec_to_viewspec(graph_spec, analysis)
+        reactflow_html = await generate_reactflow_html_async(viewspec, graphspec=graph_spec, title="Graph: cv_job_matcher")
+        reactflow_path = output_dir / "combo.reactflow.html"
+        reactflow_path.write_text(reactflow_html, encoding="utf-8")
+        log.info(f"Saved ReactFlow HTML to: {reactflow_path}")
+
+        # Verify ReactFlow HTML structure
+        assert reactflow_path.exists()
+        assert reactflow_path.stat().st_size > 0
+        html_content = reactflow_path.read_text(encoding="utf-8")
+        assert '<script type="application/json" id="pipelex-viewspec">' in html_content
+        assert '<script type="application/json" id="pipelex-graphspec">' in html_content
+        assert "ReactFlow" in html_content
+        assert "getLayoutedElements" in html_content
+        assert f'"{graph_spec.graph_id}"' in html_content  # ViewSpec should contain graph_id
+
         # Final summary
         log.info(
             f"Graph summary:\n"
@@ -210,5 +231,6 @@ class TestGraphWithFullData:
             f"  - Inputs with data: {inputs_with_data}/{total_inputs}\n"
             f"  - Outputs with data: {outputs_with_data}/{total_outputs}\n"
             f"  - Dataflow stuff_data entries: {stats['dataflow_stuff_data_count']}\n"
-            f"  - Combo stuff_data entries: {stats['combo_stuff_data_count']}"
+            f"  - Combo stuff_data entries: {stats['combo_stuff_data_count']}\n"
+            f"  - ReactFlow HTML: {reactflow_path.stat().st_size} bytes"
         )

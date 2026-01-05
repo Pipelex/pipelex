@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -19,6 +20,7 @@ from pipelex.cli.error_handlers import (
     handle_validate_bundle_error,
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import graphspec_to_json, load_graphspec, save_graphspec
 from pipelex.graph.mermaid import (
     graphspec_to_combo_mermaid,
@@ -27,6 +29,8 @@ from pipelex.graph.mermaid import (
     graphspec_to_dataflow_mermaid_with_data,
     graphspec_to_orchestration_mermaid,
 )
+from pipelex.graph.reactflow_html import generate_reactflow_html
+from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
@@ -55,7 +59,8 @@ def _resolve_output_paths(
     generate_json: bool,
     generate_mermaid: bool,
     generate_html: bool,
-) -> tuple[Path | None, Path | None, Path | None]:
+    generate_reactflow: bool = False,
+) -> tuple[Path | None, Path | None, Path | None, Path | None]:
     """Resolve output paths based on the --out option.
 
     Args:
@@ -63,16 +68,18 @@ def _resolve_output_paths(
         generate_json: Whether JSON output is requested.
         generate_mermaid: Whether Mermaid output is requested.
         generate_html: Whether HTML output is requested.
+        generate_reactflow: Whether ReactFlow output is requested.
 
     Returns:
-        Tuple of (json_path, mermaid_path, html_path). None means stdout/skip.
+        Tuple of (json_path, mermaid_path, html_path, reactflow_path). None means stdout/skip.
     """
     if out is None:
         # Default behavior: JSON to stdout, others to CWD if requested
         json_path: Path | None = None  # stdout
         mermaid_path = Path("graph.mmd") if generate_mermaid else None
         html_path = Path("graph.html") if generate_html else None
-        return json_path, mermaid_path, html_path
+        reactflow_path = Path("graph.reactflow.html") if generate_reactflow else None
+        return json_path, mermaid_path, html_path, reactflow_path
 
     out_path = Path(out)
 
@@ -81,7 +88,8 @@ def _resolve_output_paths(
         json_path = out_path / "graph.json" if generate_json else None
         mermaid_path = out_path / "graph.mmd" if generate_mermaid else None
         html_path = out_path / "graph.html" if generate_html else None
-        return json_path, mermaid_path, html_path
+        reactflow_path = out_path / "graph.reactflow.html" if generate_reactflow else None
+        return json_path, mermaid_path, html_path, reactflow_path
 
     # Case 2: --out ends with .json - use as JSON path, derive siblings
     if out.endswith(".json"):
@@ -90,7 +98,8 @@ def _resolve_output_paths(
         json_path = out_path if generate_json else None
         mermaid_path = parent / f"{stem}.mmd" if generate_mermaid else None
         html_path = parent / f"{stem}.html" if generate_html else None
-        return json_path, mermaid_path, html_path
+        reactflow_path = parent / f"{stem}.reactflow.html" if generate_reactflow else None
+        return json_path, mermaid_path, html_path, reactflow_path
 
     # Case 3: --out is a stem base
     stem = out_path.name
@@ -98,7 +107,8 @@ def _resolve_output_paths(
     json_path = parent / f"{stem}.json" if generate_json else None
     mermaid_path = parent / f"{stem}.mmd" if generate_mermaid else None
     html_path = parent / f"{stem}.html" if generate_html else None
-    return json_path, mermaid_path, html_path
+    reactflow_path = parent / f"{stem}.reactflow.html" if generate_reactflow else None
+    return json_path, mermaid_path, html_path, reactflow_path
 
 
 @graph_app.command("trace", help="Dry run a pipe and output its execution graph")
@@ -150,6 +160,18 @@ def graph_trace_cmd(
     combo: Annotated[
         bool,
         typer.Option("--combo", help="Generate combo diagram (data flow with controller subgraphs)"),
+    ] = False,
+    reactflow: Annotated[
+        bool,
+        typer.Option("--reactflow", help="Also generate ReactFlow interactive HTML (.reactflow.html file)"),
+    ] = False,
+    reactflow_offline: Annotated[
+        bool,
+        typer.Option("--reactflow-offline", help="Use inline dependencies for ReactFlow (works offline, larger file)"),
+    ] = False,
+    reactflow_open: Annotated[
+        bool,
+        typer.Option("--reactflow-open", help="Open ReactFlow HTML in browser after generation"),
     ] = False,
 ) -> None:
     """Dry run a pipe and output its execution graph.
@@ -264,11 +286,12 @@ def graph_trace_cmd(
             generate_html = html
 
             # Resolve output paths
-            json_path, mermaid_path, html_path = _resolve_output_paths(
+            json_path, mermaid_path, html_path, reactflow_path = _resolve_output_paths(
                 out=out,
                 generate_json=generate_json,
                 generate_mermaid=generate_mermaid,
                 generate_html=generate_html,
+                generate_reactflow=reactflow,
             )
 
             # Generate and save JSON
@@ -306,6 +329,32 @@ def graph_trace_cmd(
                     html_content = render_mermaid_html(mermaid_code, title=f"Graph: {title}")
                     html_path.write_text(html_content, encoding="utf-8")
                     typer.secho(f"✅ HTML saved to: {html_path}", fg=typer.colors.GREEN, err=True)
+
+            # Generate and save ReactFlow HTML
+            if reactflow and reactflow_path:
+                # Determine title from pipe name
+                title = pipe_code or bundle_path or "Pipelex Graph"
+                if bundle_path:
+                    title = Path(bundle_path).stem
+
+                # Create ViewSpec from GraphSpec
+                analysis = GraphAnalysis.from_graphspec(graph_spec)
+                viewspec = graphspec_to_viewspec(graph_spec, analysis)
+
+                # Generate ReactFlow HTML
+                reactflow_html = generate_reactflow_html(
+                    viewspec,
+                    graphspec=graph_spec,
+                    use_cdn=not reactflow_offline,
+                    title=f"Graph: {title}",
+                )
+                reactflow_path.write_text(reactflow_html, encoding="utf-8")
+                typer.secho(f"✅ ReactFlow HTML saved to: {reactflow_path}", fg=typer.colors.GREEN, err=True)
+
+                # Open in browser if requested
+                if reactflow_open:
+                    webbrowser.open(f"file://{reactflow_path.absolute()}")
+                    typer.secho("🌐 Opened ReactFlow HTML in browser", fg=typer.colors.BLUE, err=True)
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
