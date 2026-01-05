@@ -15,7 +15,7 @@ from pipelex.cogt.image.prompt_image import (
     PromptImageUri,
 )
 from pipelex.hub import get_storage_provider
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_bytes
 from pipelex.tools.uri.resolved_uri import (
@@ -60,7 +60,7 @@ async def prepare_prompt_image(
                     if is_http_url_enabled:
                         prepared = PreparedImageHttpUrl(url=prompt_image.resolved.url)
                     else:
-                        raw_bytes = await fetch_file_from_url_httpx_async(url=prompt_image.resolved.url)
+                        raw_bytes = await fetch_file_from_url_httpx(url=prompt_image.resolved.url)
                         prepared = PreparedImageBase64(
                             base64_bytes=base64.b64encode(raw_bytes),
                             file_type=detect_file_type_from_bytes(raw_bytes),

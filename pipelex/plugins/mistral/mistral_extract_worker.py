@@ -11,7 +11,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base64_utils import load_binary_as_base64_async
+from pipelex.tools.misc.base64_utils import load_binary_as_base64
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
@@ -129,7 +129,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         self,
         image_path: str,
     ) -> ExtractOutput:
-        b64 = await load_binary_as_base64_async(path=image_path)
+        b64 = await load_binary_as_base64(path=image_path)
 
         file_type = detect_file_type_from_base64(base64_data=b64)
         mime_type = file_type.mime

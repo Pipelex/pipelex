@@ -10,7 +10,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -59,7 +59,7 @@ class GeneratedContentFactory:
         return uri_format.format(primary_id=primary_id, secondary_id=secondary_id, hash=hash_digest, extension=extension)
 
     async def _fetch_remote_content(self, url: str) -> bytes:
-        return await fetch_file_from_url_httpx_async(url=url)
+        return await fetch_file_from_url_httpx(url=url)
 
     async def make_image_content(
         self,

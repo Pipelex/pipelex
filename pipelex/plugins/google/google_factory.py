@@ -14,7 +14,7 @@ from pipelex.cogt.image.prompt_image import (
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.uri.resolved_uri import (
@@ -53,7 +53,7 @@ class GoogleFactory:
             case PromptImageUri():
                 match prompt_image.resolved:
                     case ResolvedHttpUrl():
-                        image_bytes = await fetch_file_from_url_httpx_async(prompt_image.resolved.url)
+                        image_bytes = await fetch_file_from_url_httpx(prompt_image.resolved.url)
                         mime_type = detect_file_type_from_bytes(image_bytes).mime
 
                     case ResolvedLocalPath():

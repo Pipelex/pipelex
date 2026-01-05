@@ -12,7 +12,7 @@ from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.system.exceptions import ToolError
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
@@ -252,7 +252,7 @@ class PyPdfium2Renderer:
         resolved_uri = resolve_uri(pdf_uri)
         match resolved_uri:
             case ResolvedHttpUrl():
-                pdf_bytes = await fetch_file_from_url_httpx_async(url=resolved_uri.url)
+                pdf_bytes = await fetch_file_from_url_httpx(url=resolved_uri.url)
                 return await self.render_pdf_pages(pdf_input=pdf_bytes, dpi=dpi)
             case ResolvedLocalPath():
                 return await self.render_pdf_pages(pdf_input=resolved_uri.path, dpi=dpi)
@@ -266,7 +266,7 @@ class PyPdfium2Renderer:
         resolved_uri = resolve_uri(pdf_uri)
         match resolved_uri:
             case ResolvedHttpUrl():
-                pdf_input = await fetch_file_from_url_httpx_async(url=resolved_uri.url)
+                pdf_input = await fetch_file_from_url_httpx(url=resolved_uri.url)
             case ResolvedLocalPath():
                 pdf_input = resolved_uri.path
             case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
@@ -348,7 +348,7 @@ class PyPdfium2Renderer:
         resolved_uri = resolve_uri(pdf_uri)
         match resolved_uri:
             case ResolvedHttpUrl():
-                pdf_input = await fetch_file_from_url_httpx_async(url=resolved_uri.url)
+                pdf_input = await fetch_file_from_url_httpx(url=resolved_uri.url)
             case ResolvedLocalPath():
                 pdf_input = resolved_uri.path
             case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
