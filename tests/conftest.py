@@ -9,6 +9,12 @@ from pipelex import log
 from pipelex.hub import get_library_manager, get_report_delegate, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.pipelex_service.pipelex_service_config import (
+    PipelexServiceConfig,
+)
+from pipelex.system.pipelex_service.pipelex_service_config import (
+    load_pipelex_service_config_if_exists as _original_load_pipelex_service_config,
+)
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -31,10 +37,31 @@ def _cached_fetch_remote_config() -> RemoteConfig:
     return _remote_config_cache["config"]
 
 
+# Session-level cache for pipelex service config to avoid flaky tests from concurrent file reads
+_pipelex_service_config_cache: dict[str, PipelexServiceConfig | None] = {}
+
+
+def _cached_load_pipelex_service_config(config_dir: str) -> PipelexServiceConfig | None:
+    """Wrapper that caches the pipelex service config for the entire test session.
+
+    This prevents flaky tests caused by concurrent file reads during parallel pytest-xdist execution.
+    The cache key includes the config_dir to handle different config directories.
+    """
+    if config_dir not in _pipelex_service_config_cache:
+        _pipelex_service_config_cache[config_dir] = _original_load_pipelex_service_config(config_dir)
+    return _pipelex_service_config_cache[config_dir]
+
+
 @pytest.fixture(scope="session", autouse=True)
-def cache_remote_config_for_session(session_mocker: MockerFixture):
-    """Cache remote configuration for the entire test session to avoid repeated fetches."""
+def cache_configs_for_session(session_mocker: MockerFixture):
+    """Cache configurations for the entire test session to avoid repeated fetches and flaky tests."""
+    # Cache remote config to avoid repeated network fetches
     session_mocker.patch.object(RemoteConfigFetcher, "fetch_remote_config", _cached_fetch_remote_config)
+    # Cache pipelex service config to avoid flaky tests from concurrent file reads
+    session_mocker.patch(
+        "pipelex.pipelex.load_pipelex_service_config_if_exists",
+        _cached_load_pipelex_service_config,
+    )
 
 
 def _get_test_integration_mode() -> IntegrationMode:
