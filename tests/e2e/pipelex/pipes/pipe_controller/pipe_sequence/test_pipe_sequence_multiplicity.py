@@ -14,7 +14,6 @@ from pipelex.pipeline.execute import execute_pipeline
 @pytest.mark.inference
 @pytest.mark.asyncio
 class TestPipeSequenceMultiplicity:
-    @pytest.mark.usefixtures("request")
     async def test_creative_ideation_sequence_with_multiplicity(self, pipe_run_mode: PipeRunMode):
         """Test creative ideation sequence with nb_output and batching."""
         # Create test input
