@@ -1,4 +1,3 @@
-
 from pydantic import Field
 
 from pipelex.system.configuration.config_model import ConfigModel

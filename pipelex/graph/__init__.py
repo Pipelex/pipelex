@@ -9,6 +9,8 @@ This module provides:
 """
 
 from pipelex.graph.graph_analysis import GraphAnalysis, StuffInfo
+from pipelex.graph.graph_config import GraphsInclusion
+from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs
 from pipelex.graph.graphspec import (
     CURRENT_SCHEMA_VERSION,
     SUPPORTED_SCHEMA_VERSIONS,
@@ -52,6 +54,11 @@ __all__ = [
     # GraphAnalysis
     "GraphAnalysis",
     "StuffInfo",
+    # GraphConfig
+    "GraphsInclusion",
+    # GraphFactory
+    "GraphOutputs",
+    "generate_graph_outputs",
     # ViewSpec
     "CURRENT_VIEWSPEC_VERSION",
     "ViewSpec",

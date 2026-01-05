@@ -26,6 +26,21 @@
 #
 ####################################################################################################
 
+[pipelex.pipeline_execution_config]
+# Uncomment to disable conversion of data URLs to pipelex-storage:// URIs
+# is_normalize_data_urls_to_storage = false
+
+[pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
+# Uncomment to customize which graph outputs are generated (all enabled by default):
+# graphspec_json = false
+# orchestration_mmd = false
+# orchestration_html = false
+# dataflow_mmd = false
+# dataflow_html = false
+# combo_mmd = false
+# combo_html = false
+# reactflow_viewspec = false
+# reactflow_html = false
 
 [pipelex.storage_config]
 # Uncomment to change the storage method: "local" (default) or "in_memory"
@@ -70,6 +85,24 @@
 # Uncomment to change the log level for specific packages:
 # pipelex = "INFO"
 
+[pipelex.observer_config]
+# Uncomment to change the directory where the observer will save its results:
+# observer_dir = "results/observer"
+
+[pipelex.feature_config]
+# WIP/Experimental feature flags:
+# is_pipeline_tracking_enabled = false
+# is_reporting_enabled = true
+
+[pipelex.reporting_config]
+# Uncomment to customize the reporting configuration:
+# is_log_costs_to_console = false
+# is_generate_cost_report_file_enabled = false
+# cost_report_dir_path = "reports"
+# cost_report_base_name = "cost_report"
+# cost_report_extension = "csv"
+# cost_report_unit_scale = 1.0
+
 [cogt]
 [cogt.model_deck_config]
 # Uncomment to disable model fallback: it will raise errors instead of using secondary model options:
@@ -94,25 +127,3 @@
 # is_dump_kwargs_enabled = true
 # is_dump_response_enabled = true
 # is_dump_error_enabled = true
-
-[pipelex.observer_config]
-# Uncomment to change the directory where the observer will save its results:
-# observer_dir = "results/observer"
-
-[pipelex.feature_config]
-# WIP/Experimental feature flags:
-# is_pipeline_tracking_enabled = false
-# is_reporting_enabled = true
-
-[pipelex.reporting_config]
-# Uncomment to customize the reporting configuration:
-# is_log_costs_to_console = false
-# is_generate_cost_report_file_enabled = false
-# cost_report_dir_path = "reports"
-# cost_report_base_name = "cost_report"
-# cost_report_extension = "csv"
-# cost_report_unit_scale = 1.0
-
-[pipelex.pipeline_execution_config]
-# Uncomment to disable conversion of data URLs to pipelex-storage:// URIs
-# is_normalize_data_urls_to_storage = false

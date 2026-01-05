@@ -19,15 +19,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
-from pipelex.graph.graph_config import DataInclusion
-from pipelex.graph.graphspec_io import save_graphspec
-from pipelex.graph.mermaid import (
-    graphspec_to_combo_mermaid,
-    graphspec_to_combo_mermaid_with_data,
-    graphspec_to_dataflow_mermaid,
-    graphspec_to_dataflow_mermaid_with_data,
-    graphspec_to_orchestration_mermaid,
-)
+from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -37,10 +29,8 @@ from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
-from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, get_incremental_file_path
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path, save_as_json_to_path
-from pipelex.tools.misc.mermaid_utils import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "run"
@@ -212,7 +202,6 @@ def run_cmd(
             generate_graph=graph,
             include_full_data=graph_full_data or None,
         )
-        effective_full_data = execution_config.graph_config.data_inclusion.get(DataInclusion.STUFF_JSON_CONTENT, False)
 
         try:
             pipe_output = await execute_pipeline(
@@ -248,67 +237,64 @@ def run_cmd(
             base_dir = graph_dir or "results"
             dir_name = graph_name or f"{pipe_code}_graph"
             graph_output_dir = Path(get_incremental_directory_path(base_path=base_dir, base_name=dir_name))
+            graph_output_dir.mkdir(parents=True, exist_ok=True)
 
-            # Save JSON
-            save_graphspec(graph_spec, graph_output_dir / "graph.json")
-            typer.secho(f"\n✅ Graph JSON saved to: {graph_output_dir / 'graph.json'}", fg=typer.colors.GREEN)
+            # Generate all graph outputs
+            graph_outputs = await generate_graph_outputs(
+                graph_spec=graph_spec,
+                graph_config=execution_config.graph_config,
+                pipe_code=pipe_code,
+            )
 
-            # Generate orchestration view (top-down)
-            orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-            (graph_output_dir / "orchestration.mmd").write_text(orch_mermaid, encoding="utf-8")
-            typer.secho(f"✅ Orchestration Mermaid saved to: {graph_output_dir / 'orchestration.mmd'}", fg=typer.colors.GREEN)
+            # Save outputs to files (only those that were generated)
+            saved_count = 0
+            if graph_outputs.graphspec_json is not None:
+                (graph_output_dir / "graphspec.json").write_text(graph_outputs.graphspec_json, encoding="utf-8")
+                typer.secho(f"\n✅ GraphSpec JSON saved to: {graph_output_dir / 'graphspec.json'}", fg=typer.colors.GREEN)
+                saved_count += 1
 
-            orch_html = await render_mermaid_html_async(orch_mermaid, title=f"Orchestration: {pipe_code}")
-            (graph_output_dir / "orchestration.html").write_text(orch_html, encoding="utf-8")
-            typer.secho(f"✅ Orchestration HTML saved to: {graph_output_dir / 'orchestration.html'}", fg=typer.colors.GREEN)
+            if graph_outputs.orchestration_mmd is not None:
+                (graph_output_dir / "orchestration.mmd").write_text(graph_outputs.orchestration_mmd, encoding="utf-8")
+                typer.secho(f"✅ Orchestration Mermaid saved to: {graph_output_dir / 'orchestration.mmd'}", fg=typer.colors.GREEN)
+                saved_count += 1
 
-            # Generate data flow view (top-down)
-            if effective_full_data:
-                dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-                dataflow_mermaid = dataflow_with_data.mermaid_code
-                (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
+            if graph_outputs.orchestration_html is not None:
+                (graph_output_dir / "orchestration.html").write_text(graph_outputs.orchestration_html, encoding="utf-8")
+                typer.secho(f"✅ Orchestration HTML saved to: {graph_output_dir / 'orchestration.html'}", fg=typer.colors.GREEN)
+                saved_count += 1
+
+            if graph_outputs.dataflow_mmd is not None:
+                (graph_output_dir / "dataflow.mmd").write_text(graph_outputs.dataflow_mmd, encoding="utf-8")
                 typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)
+                saved_count += 1
 
-                dataflow_html = await render_mermaid_html_with_data_async(
-                    dataflow_mermaid,
-                    stuff_data=dataflow_with_data.stuff_data,
-                    title=f"Data Flow: {pipe_code}",
-                )
-                (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
-                typer.secho(f"✅ Data flow HTML (interactive) saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
-            else:
-                dataflow_mermaid = graphspec_to_dataflow_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-                (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
-                typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)
-
-                dataflow_html = await render_mermaid_html_async(dataflow_mermaid, title=f"Data Flow: {pipe_code}")
-                (graph_output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
+            if graph_outputs.dataflow_html is not None:
+                (graph_output_dir / "dataflow.html").write_text(graph_outputs.dataflow_html, encoding="utf-8")
                 typer.secho(f"✅ Data flow HTML saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
+                saved_count += 1
 
-            # Generate combo view (top-down, data flow with controller subgraphs)
-            if effective_full_data:
-                combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-                combo_mermaid = combo_with_data.mermaid_code
-                (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
+            if graph_outputs.combo_mmd is not None:
+                (graph_output_dir / "combo.mmd").write_text(graph_outputs.combo_mmd, encoding="utf-8")
                 typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
+                saved_count += 1
 
-                combo_html = await render_mermaid_html_with_data_async(
-                    combo_mermaid,
-                    stuff_data=combo_with_data.stuff_data,
-                    title=f"Combo: {pipe_code}",
-                )
-                (graph_output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
-                typer.secho(f"✅ Combo HTML (interactive) saved to: {graph_output_dir / 'combo.html'}", fg=typer.colors.GREEN)
-            else:
-                combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-                (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")
-                typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
-
-                combo_html = await render_mermaid_html_async(combo_mermaid, title=f"Combo: {pipe_code}")
-                (graph_output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
+            if graph_outputs.combo_html is not None:
+                (graph_output_dir / "combo.html").write_text(graph_outputs.combo_html, encoding="utf-8")
                 typer.secho(f"✅ Combo HTML saved to: {graph_output_dir / 'combo.html'}", fg=typer.colors.GREEN)
+                saved_count += 1
 
-            typer.secho(f"\n📊 All graph outputs saved to: {graph_output_dir}", fg=typer.colors.CYAN, bold=True)
+            if graph_outputs.reactflow_viewspec is not None:
+                (graph_output_dir / "viewspec.json").write_text(graph_outputs.reactflow_viewspec, encoding="utf-8")
+                typer.secho(f"✅ ReactFlow ViewSpec saved to: {graph_output_dir / 'viewspec.json'}", fg=typer.colors.GREEN)
+                saved_count += 1
+
+            if graph_outputs.reactflow_html is not None:
+                (graph_output_dir / "reactflow.html").write_text(graph_outputs.reactflow_html, encoding="utf-8")
+                typer.secho(f"✅ ReactFlow HTML saved to: {graph_output_dir / 'reactflow.html'}", fg=typer.colors.GREEN)
+                saved_count += 1
+
+            if saved_count > 0:
+                typer.secho(f"\n📊 {saved_count} graph outputs saved to: {graph_output_dir}", fg=typer.colors.CYAN, bold=True)
 
         typer.secho("✅ Pipeline execution completed successfully", fg=typer.colors.GREEN)
 
