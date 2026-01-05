@@ -16,8 +16,10 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
 )
+from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
+from pipelex.graph.graph_config import DataInclusion
 from pipelex.graph.graphspec_io import save_graphspec
 from pipelex.graph.mermaid import (
     graphspec_to_combo_mermaid,
@@ -74,9 +76,9 @@ def run_cmd(
         typer.Option("--no-pretty-print", help="Skip pretty printing the main_stuff"),
     ] = False,
     graph: Annotated[
-        bool,
-        typer.Option("--graph", help="Generate execution graph outputs (JSON, Mermaid, HTML for both orchestration and data flow views)"),
-    ] = False,
+        bool | None,
+        typer.Option("--graph/--no-graph", help="Generate execution graph outputs (JSON, Mermaid, HTML for both orchestration and data flow views)"),
+    ] = None,
     graph_dir: Annotated[
         str | None,
         typer.Option("--graph-dir", help="Base directory for graph output (default: results)"),
@@ -116,9 +118,6 @@ def run_cmd(
         ctx: click.Context = click.get_current_context()
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
-
-    # Determine if graph tracing is requested
-    generate_graph = graph
 
     # Let's analyze the options and determine what pipe code to use and if we need to load a bundle
     pipe_code: str | None = None
@@ -208,13 +207,19 @@ def run_cmd(
         # Determine pipe run mode
         pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
+        # Build effective execution config with CLI overrides
+        execution_config = get_config().pipelex.pipeline_execution_config.with_graph_overrides(
+            generate_graph=graph,
+            include_full_data=graph_full_data or None,
+        )
+        effective_full_data = execution_config.graph_config.data_inclusion.get(DataInclusion.STUFF_JSON_CONTENT, False)
+
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
                 inputs=pipeline_inputs,
                 pipe_run_mode=pipe_run_mode,
-                generate_graph=generate_graph,
-                include_full_data=graph_full_data and generate_graph,
+                execution_config=execution_config,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
@@ -258,7 +263,7 @@ def run_cmd(
             typer.secho(f"✅ Orchestration HTML saved to: {graph_output_dir / 'orchestration.html'}", fg=typer.colors.GREEN)
 
             # Generate data flow view (top-down)
-            if graph_full_data:
+            if effective_full_data:
                 dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
                 dataflow_mermaid = dataflow_with_data.mermaid_code
                 (graph_output_dir / "dataflow.mmd").write_text(dataflow_mermaid, encoding="utf-8")
@@ -281,7 +286,7 @@ def run_cmd(
                 typer.secho(f"✅ Data flow HTML saved to: {graph_output_dir / 'dataflow.html'}", fg=typer.colors.GREEN)
 
             # Generate combo view (top-down, data flow with controller subgraphs)
-            if graph_full_data:
+            if effective_full_data:
                 combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
                 combo_mermaid = combo_with_data.mermaid_code
                 (graph_output_dir / "combo.mmd").write_text(combo_mermaid, encoding="utf-8")

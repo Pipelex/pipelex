@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from pipelex import log, pretty_print
+from pipelex.config import get_config
 from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec
@@ -114,6 +115,12 @@ class TestGraphWithFullData:
         3. Saves all outputs (graph.json, mermaid, HTML) to a numbered folder
         4. Verifies interactive rendering works with the captured data
         """
+        # Build effective config with graph tracing and full data capture enabled
+        exec_config = get_config().pipelex.pipeline_execution_config.with_graph_overrides(
+            generate_graph=True,
+            include_full_data=True,
+        )
+
         # Run pipeline with graph tracing and full data capture
         pipe_output = await execute_pipeline(
             pipe_code="cv_job_matcher",
@@ -123,8 +130,7 @@ class TestGraphWithFullData:
                 "job_offer_pdf": PDFContent(url=PDFTestCases.PDF_FILE_PATH_2),
             },
             pipe_run_mode=pipe_run_mode,
-            generate_graph=True,
-            include_full_data=True,
+            execution_config=exec_config,
         )
 
         # Basic assertions

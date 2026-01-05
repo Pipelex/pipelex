@@ -2,9 +2,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex.client.protocol import PipelineInputs
-from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.graph.graph_config import DataInclusion
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
@@ -27,6 +27,7 @@ from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
 
 
 async def pipeline_run_setup(
+    execution_config: PipelineExecutionConfig,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
@@ -50,8 +52,6 @@ async def pipeline_run_setup(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
-    generate_graph: bool = False,
-    include_full_data: bool = False,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -61,6 +61,9 @@ async def pipeline_run_setup(
 
     Parameters
     ----------
+    execution_config:
+        Pipeline execution configuration including graph tracing settings.
+        Must be provided by the caller (typically resolved at the entry point).
     library_id:
         Unique identifier for the library instance. If not provided, defaults to the
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
@@ -97,14 +100,6 @@ async def pipeline_run_setup(
         added if not already present.
     user_id:
         Unique identifier for the user (optional).
-    generate_graph:
-        If True, enables execution graph tracing. The graph tracer will be opened with
-        graph_id equal to pipeline_run_id, and the execution will capture node timing,
-        data flow, and status information.
-    include_full_data:
-        If True (and ``generate_graph`` is also True), the graph will include full
-        serialized input/output data in IOSpec.data fields. This uses ``smart_dump()``
-        on StuffContent objects for serialization.
 
     Returns:
     -------
@@ -164,13 +159,13 @@ async def pipeline_run_setup(
 
     # Initialize graph tracing if requested (after pipe is loaded so we have domain info)
     graph_context: GraphContext | None = None
-    if generate_graph:
+    if execution_config.is_generate_graph:
         graph_tracer_manager = GraphTracerManager.get_or_create_instance()
         graph_context = graph_tracer_manager.open_tracer(
             graph_id=pipeline_run_id,
             pipeline_ref_domain=pipe.domain_code,
             pipeline_ref_main_pipe=pipe_code,
-            include_full_data=include_full_data,
+            include_full_data=execution_config.graph_config.data_inclusion.get(DataInclusion.STUFF_JSON_CONTENT, False),
         )
 
     working_memory: WorkingMemory | None = None
@@ -185,7 +180,7 @@ async def pipeline_run_setup(
             )
 
     # Normalize data URLs to pipelex-storage:// URIs if configured
-    if working_memory and get_config().pipelex.pipeline_execution_config.is_normalize_data_urls_to_storage:
+    if working_memory and execution_config.is_normalize_data_urls_to_storage:
         working_memory = normalize_data_urls_to_storage(working_memory)
 
     # TODO: rethink this, it's not forcing

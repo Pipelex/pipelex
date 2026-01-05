@@ -270,6 +270,34 @@ pipe_stack_limit = 20
 
 [pipelex.pipeline_execution_config]
 is_normalize_data_urls_to_storage = true
+is_generate_graph = false
+
+[pipelex.pipeline_execution_config.graph_config]
+max_preview_length = 200
+max_stack_length = 2000
+
+[pipelex.pipeline_execution_config.graph_config.data_inclusion]
+stuff_json_content = false
+
+[pipelex.pipeline_execution_config.graph_config.mermaid_config]
+direction = "top_down"
+is_include_data_edges = true
+is_include_contains_edges = false
+is_include_selected_outcome_edges = true
+is_show_stuff_codes = false
+
+[pipelex.pipeline_execution_config.graph_config.mermaid_config.style]
+theme = "light"
+
+[pipelex.pipeline_execution_config.graph_config.reactflow_config]
+is_use_cdn = true
+layout_direction = "TB"
+nodesep = 50
+ranksep = 80
+default_title = "Pipelex Graph"
+
+[pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
+theme = "dark"
 
 ####################################################################################################
 # Dry run config

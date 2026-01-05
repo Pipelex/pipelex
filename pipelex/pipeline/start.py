@@ -1,12 +1,14 @@
 import asyncio
 
 from pipelex.client.protocol import PipelineInputs
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
 async def start_pipeline(
@@ -21,7 +23,7 @@ async def start_pipeline(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
-    generate_graph: bool = False,
+    execution_config: PipelineExecutionConfig | None = None,
 ) -> tuple[str, asyncio.Task[PipeOutput]]:
     """Start a pipeline in the background.
 
@@ -68,9 +70,12 @@ async def start_pipeline(
         added if not already present.
     user_id:
         Unique identifier for the user.
-    generate_graph:
-        If True, enables execution graph tracing. Since this function returns immediately,
-        the caller is responsible for calling ``GraphTracerManager.get_instance().close_tracer(pipeline_run_id)``
+    execution_config:
+        Pipeline execution configuration including graph tracing settings.
+        If not provided, uses the default from
+        ``get_config().pipelex.pipeline_execution_config``. Since this function
+        returns immediately, the caller is responsible for calling
+        ``GraphTracerManager.get_instance().close_tracer(pipeline_run_id)``
         after the task completes to retrieve the GraphSpec.
 
     Returns:
@@ -80,7 +85,12 @@ async def start_pipeline(
         can be awaited to get the pipe output.
 
     """
-    pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+    # Use provided config or get default
+    execution_config = execution_config or get_config().pipelex.pipeline_execution_config
+
+    # TODO: make sure we close the graph tracer after the task completes
+    pipe_job, pipeline_run_id, _library_id = await pipeline_run_setup(
+        execution_config=execution_config,
         library_id=library_id,
         library_dirs=library_dirs,
         pipe_code=pipe_code,
@@ -92,7 +102,6 @@ async def start_pipeline(
         pipe_run_mode=pipe_run_mode,
         search_domain_codes=search_domain_codes,
         user_id=user_id,
-        generate_graph=generate_graph,
     )
 
     task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))

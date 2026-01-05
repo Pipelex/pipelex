@@ -2,6 +2,7 @@ from typing import Any
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.client.protocol import PipelineInputs
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -16,6 +17,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 
 
@@ -31,8 +33,7 @@ async def execute_pipeline(
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
-    generate_graph: bool = False,
-    include_full_data: bool = False,
+    execution_config: PipelineExecutionConfig | None = None,
 ) -> PipeOutput:
     """Execute a pipeline and wait for its completion.
 
@@ -77,13 +78,10 @@ async def execute_pipeline(
         added if not already present.
     user_id:
         Unique identifier for the user.
-    generate_graph:
-        If True, enables execution graph tracing. The graph will be available in
-        ``PipeOutput.graph_spec`` after execution completes.
-    include_full_data:
-        If True (and ``generate_graph`` is also True), the graph will include full
-        serialized input/output data in IOSpec.data fields. This uses ``smart_dump()``
-        on StuffContent objects for serialization.
+    execution_config:
+        Pipeline execution configuration including graph tracing settings.
+        If provided, uses this config directly. If None, uses the default from
+        ``get_config().pipelex.pipeline_execution_config``.
 
     Returns:
     -------
@@ -92,7 +90,11 @@ async def execute_pipeline(
         execution graph is available in ``pipe_output.graph_spec``.
 
     """
+    # Use provided config or get default
+    execution_config = execution_config or get_config().pipelex.pipeline_execution_config
+
     pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+        execution_config=execution_config,
         library_id=library_id,
         library_dirs=library_dirs,
         pipe_code=pipe_code,
@@ -104,8 +106,6 @@ async def execute_pipeline(
         pipe_run_mode=pipe_run_mode,
         search_domain_codes=search_domain_codes,
         user_id=user_id,
-        generate_graph=generate_graph,
-        include_full_data=include_full_data,
     )
 
     properties: dict[EventProperty, Any]
@@ -144,7 +144,7 @@ async def execute_pipeline(
         ) from exc
     finally:
         # Close graph tracer if it was opened (capture graph even on failure)
-        if generate_graph:
+        if execution_config.is_generate_graph:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 graph_spec_result = tracer_manager.close_tracer(pipeline_run_id)
