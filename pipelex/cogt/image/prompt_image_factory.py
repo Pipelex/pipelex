@@ -7,7 +7,10 @@ from pipelex.cogt.image.prompt_image import (
     PromptImageBinary,
     PromptImageUri,
 )
-from pipelex.tools.misc.base64_utils import strip_base64_str_if_needed
+from pipelex.tools.misc.base64_utils import (
+    extract_base64_str_from_base64_url_if_possible,
+    strip_base64_str_if_needed,
+)
 
 
 class PromptImageFactory:
@@ -37,6 +40,11 @@ class PromptImageFactory:
             stripped_base64_data = strip_base64_str_if_needed(base64_data)
             return PromptImageBase64(base64_data=stripped_base64_data)
         if uri:
+            # Check if it's a data URL and extract base64 data to avoid URL_MAX_LENGTH validation
+            extracted = extract_base64_str_from_base64_url_if_possible(uri)
+            if extracted is not None:
+                extracted_base64_data, _mime_type = extracted
+                return PromptImageBase64(base64_data=extracted_base64_data)
             return PromptImageUri(uri=uri)
         msg = "PromptImageFactory requires one of: uri, base64_data, or raw_bytes"
         raise PromptImageFactoryError(msg)
