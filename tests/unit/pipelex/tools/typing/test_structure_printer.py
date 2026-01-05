@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Literal
 
-import pytest
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex import pretty_print
@@ -123,7 +122,6 @@ class GanttChart(StructuredContent):
 
 
 class TestStructurePrinter:
-    @pytest.mark.usefixtures("request")
     def test_simple_text_content(self):
         """Test structure of simple text content"""
         result = StructurePrinter().get_type_structure(SimpleTextContent)
@@ -134,7 +132,6 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    @pytest.mark.usefixtures("request")
     def test_simple_structured_content(self):
         """Test structure of simple structured content"""
         result = StructurePrinter().get_type_structure(SimpleStructuredContent)
@@ -147,7 +144,6 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    @pytest.mark.usefixtures("request")
     def test_enum_content(self):
         """Test structure of content with enum"""
         result = StructurePrinter().get_type_structure(DocumentTypeContent)
@@ -162,7 +158,6 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    @pytest.mark.usefixtures("request")
     def test_nested_content(self):
         """Test structure of nested content"""
         result = StructurePrinter().get_type_structure(PersonContent)
@@ -198,7 +193,6 @@ class TestStructurePrinter:
         pretty_print(expected, "expected")
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    @pytest.mark.usefixtures("request")
     def test_list_content(self):
         """Test structure of list content"""
         result = StructurePrinter().get_type_structure(ComplexListContent)
@@ -235,7 +229,6 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    @pytest.mark.usefixtures("request")
     def test_model_with_field_description(self):
         """Test structure of a model with field descriptions"""
 
@@ -257,7 +250,6 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    @pytest.mark.usefixtures("request")
     def test_model_with_docstring_and_field_description(self):
         """Test structure of a model with both docstring and field descriptions"""
 
@@ -286,7 +278,6 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    @pytest.mark.usefixtures("request")
     def test_literal_field_content(self) -> None:
         """Test structure of content with Literal field"""
         result = StructurePrinter().get_type_structure(MusicCategoryContent)
@@ -311,7 +302,6 @@ class TestStructurePrinter:
         ]
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
-    @pytest.mark.usefixtures("request")
     def test_gantt_chart_content(self):
         result = StructurePrinter().get_type_structure(GanttChart, base_class=StructuredContent)
         expected = [

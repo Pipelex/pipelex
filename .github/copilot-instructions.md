@@ -20,6 +20,14 @@
 
    Always fix any issues reported by these tools before proceeding.
 
+### Cleaning Derived Files
+
+   If you need to clean derived files and caches, typically after you erased files or moved tests, the linters can get confused, the pytest collection can be off...
+
+   ```bash
+   make cleanderived
+   ```
+
 ### Running Tests
 
    After you're finished making code changes, you must always run tests using `make test-xdist`.
@@ -139,7 +147,16 @@ This document outlines the core coding standards, best practices, and quality co
 
     - Import all necessary libraries at the top of the file
     - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
-    - Do not bother with ordering the imports, our Ruff linter will handle it for us. Same goes with removing unused imports.
+    - Do not bother with ordering the imports, our Ruff linter will handle it for us.
+
+#### **Removing unused imports**
+
+    - To remove unused imports, run `make fix-unused-imports` or `make fui` (shorthand). This is faster and cheaper than rewriting with LLM.
+
+#### **No re-exports in `__init__.py`**
+
+    - Do NOT fill `__init__.py` files with re-exports.
+    - Always use direct full-path imports everywhere. For example:
 
 - **Logging and Pretty Printing**:
 
@@ -254,6 +271,7 @@ NEVER USE unittest.mock. YOU MUST USE pytest-mock instead.
     - `tests/integration/` - for integration tests that test component interactions
     - `tests/e2e/` - for end-to-end tests that test complete workflows
     - `tests/test_pipelines/` - for test pipeline definitions (PLX files and their structuring python files)
+- Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
 - Always put test inside Test classes: 1 TestClass per module.

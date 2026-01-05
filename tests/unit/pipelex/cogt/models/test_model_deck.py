@@ -40,7 +40,7 @@ class TestModelDeckGetOptionalInferenceModel:
                 for_object=LLMSetting(model="default_object", temperature=0.1, max_tokens=1000),
             ),
             extract_presets={},
-            extract_choice_default="extract_text_from_visuals",
+            extract_choice_default="extract_ocr_from_document",
             img_gen_presets={},
             img_gen_choice_default="gen_image_basic",
             model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
