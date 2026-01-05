@@ -8,12 +8,12 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
 )
-from openai.types.chat.chat_completion_content_part_image_param import ImageURL
+from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
 from openai.types.completion_usage import CompletionUsage
 from typing_extensions import override
 
-from pipelex.cogt.image.prompt_image import PromptImageDetail, PromptImageTypedBase64
-from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+from pipelex.cogt.image.prepared_image import PreparedImageBase64, PreparedImageHttpUrl
+from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -46,13 +46,14 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
             detail = llm_job.job_params.image_detail or PromptImageDetail.AUTO
             prepped_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=self.is_http_url_enabled)
             for prepped_image in prepped_images:
-                if isinstance(prepped_image, str):
-                    url = prepped_image
-                else:
-                    assert isinstance(prepped_image, PromptImageTypedBase64)
-                    url = PromptImageFactory.make_base_64_url_from_prompt_image_typed_base64(prompt_image=prepped_image)
+                url: str
+                match prepped_image:
+                    case PreparedImageHttpUrl():
+                        url = prepped_image.url
+                    case PreparedImageBase64():
+                        url = prepped_image.as_data_url()
 
-                image_url_obj = ImageURL(url=url, detail=detail.as_openai_detail)
+                image_url_obj = OpenAIImageURL(url=url, detail=detail.as_openai_detail)
                 image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)
 

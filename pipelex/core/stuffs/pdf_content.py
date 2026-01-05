@@ -3,7 +3,7 @@ from typing_extensions import override
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
-from pipelex.tools.misc.path_utils import interpret_path_or_url
+from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 class PDFContent(StuffContent):
@@ -12,7 +12,7 @@ class PDFContent(StuffContent):
     @property
     @override
     def short_desc(self) -> str:
-        url_desc = interpret_path_or_url(path_or_uri=self.url).desc
+        url_desc = resolve_uri(self.url).kind.desc
         return f"{url_desc} of a PDF document"
 
     @override

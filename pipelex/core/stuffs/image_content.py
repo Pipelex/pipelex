@@ -9,8 +9,8 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
-from pipelex.tools.misc.path_utils import interpret_path_or_url
 from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 class ImageContent(StuffContent):
@@ -25,8 +25,8 @@ class ImageContent(StuffContent):
     @property
     @override
     def short_desc(self) -> str:
-        url_desc = interpret_path_or_url(path_or_uri=self.url).desc
-        return f"{url_desc} or an image"
+        url_desc = resolve_uri(self.url).kind.desc
+        return f"{url_desc} of an image"
 
     @override
     def rendered_plain(self) -> str:

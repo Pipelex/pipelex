@@ -2,59 +2,40 @@ import base64
 
 import aiofiles
 
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx_async
-from pipelex.tools.misc.file_utils import load_binary, load_binary_async
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
+from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import FileType, detect_file_type_from_bytes
-from pipelex.tools.misc.path_utils import clarify_path_or_url
 
 
-def load_binary_as_base64(path: str) -> bytes:
-    with open(path, "rb") as file_pointer:
-        return base64.b64encode(file_pointer.read())
-
-
-async def load_binary_as_base64_async(path: str) -> bytes:
+async def load_binary_as_base64(path: str) -> str:
+    """Load a file and return its contents as a base64-encoded string."""
     async with aiofiles.open(path, "rb") as fp:  # pyright: ignore[reportUnknownMemberType]
         data_bytes = await fp.read()
-        return base64.b64encode(data_bytes)
+        return base64.b64encode(data_bytes).decode("ascii")
 
 
-def make_base64_url_from_path(path: str) -> str:
-    raw_bytes = load_binary(path=path)
-    base64_bytes = base64.b64encode(raw_bytes)
-    file_type = detect_file_type_from_bytes(raw_bytes=raw_bytes)
-    return make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
-
-
-async def make_base64_url_from_path_async(path: str) -> str:
+async def make_base64_url_from_path(path: str) -> str:
+    """Create a data: URL from a local file path."""
     raw_bytes = await load_binary_async(path=path)
-    base64_bytes = base64.b64encode(raw_bytes)
+    base64_data = base64.b64encode(raw_bytes).decode("ascii")
     file_type = detect_file_type_from_bytes(raw_bytes=raw_bytes)
-    return make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
+    return make_base64_url(base64_data=base64_data, file_type=file_type)
 
 
-async def make_base64_url_from_http_url_async(url: str) -> str:
-    raw_bytes = await fetch_file_from_url_httpx_async(url=url)
-    base64_bytes = base64.b64encode(raw_bytes)
+async def make_base64_url_from_http_url(url: str) -> str:
+    """Fetch a URL and create a data: URL from its contents."""
+    raw_bytes = await fetch_file_from_url_httpx(url=url)
+    base64_data = base64.b64encode(raw_bytes).decode("ascii")
     file_type = detect_file_type_from_bytes(raw_bytes=raw_bytes)
-    return make_base64_url(base64_bytes=base64_bytes, file_type=file_type)
-
-
-async def make_base64_url_from_location_async(location: str) -> str:
-    pdf_path, pdf_url = clarify_path_or_url(path_or_uri=location)
-    if pdf_url:
-        base64_url = await make_base64_url_from_http_url_async(url=pdf_url)
-    else:  # pdf_path must be provided based on validation
-        assert pdf_path is not None
-        base64_url = await make_base64_url_from_path_async(path=pdf_path)
-    return base64_url
+    return make_base64_url(base64_data=base64_data, file_type=file_type)
 
 
 def make_base64_url(
-    base64_bytes: bytes,
+    base64_data: str,
     file_type: FileType,
 ) -> str:
-    return f"data:{file_type.mime};base64,{base64_bytes.decode('utf-8')}"
+    """Create a data: URL from base64 string and file type."""
+    return f"data:{file_type.mime};base64,{base64_data}"
 
 
 def is_prefixed_base64_url(possibly_base64_url: str) -> bool:

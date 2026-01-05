@@ -1,53 +1,32 @@
 import asyncio
+import base64
 
 from google import genai
 from google.genai import types as genai_types
 
-from pipelex.cogt.exceptions import CogtError
-from pipelex.cogt.image.prompt_image import (
-    PromptImage,
-    PromptImageBase64,
-    PromptImagePath,
-    PromptImageUrl,
-)
-from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+from pipelex.cogt.image.prompt_image import PromptImage
+from pipelex.cogt.image.prompt_image_utils import prepare_prompt_image_as_base64
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.tools.misc.base64_utils import load_binary_async
-
-
-class GoogleFactoryError(CogtError):
-    pass
 
 
 class GoogleFactory:
-    @staticmethod
-    def make_google_client(backend: InferenceBackend) -> genai.Client:
+    @classmethod
+    def make_google_client(cls, backend: InferenceBackend) -> genai.Client:
         """Create a Google Gemini API client."""
         return genai.Client(api_key=backend.api_key)
 
     @classmethod
     async def prepare_image_part(cls, prompt_image: PromptImage) -> genai_types.Part:
-        """Convert a PromptImage to Google genai Part format."""
-        image_bytes: bytes
-        mime_type: str
+        """Convert a PromptImage to Google genai Part format.
 
-        if isinstance(prompt_image, PromptImageBase64):
-            image_bytes = prompt_image.get_decoded_bytes()
-            mime_type = prompt_image.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        if isinstance(prompt_image, PromptImagePath):
-            image_bytes = await load_binary_async(prompt_image.file_path)
-            mime_type = prompt_image.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        if isinstance(prompt_image, PromptImageUrl):
-            prompt_image_binary = await PromptImageFactory.make_promptimagebinary_from_url_async(prompt_image)
-            image_bytes = prompt_image_binary.binary
-            mime_type = prompt_image_binary.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        msg = f"Unsupported PromptImage type: '{type(prompt_image).__name__}'"
-        raise GoogleFactoryError(msg)
+        Uses the unified prepare_prompt_image_as_base64() which supports all URI types
+        including pipelex-storage://.
+        """
+        prepared = await prepare_prompt_image_as_base64(prompt_image)
+        image_bytes = base64.b64decode(prepared.base64_data)
+        return genai_types.Part.from_bytes(data=image_bytes, mime_type=prepared.mime_type)
 
     @classmethod
     async def prepare_user_contents(cls, llm_prompt: LLMPrompt) -> genai_types.ContentListUnion:
