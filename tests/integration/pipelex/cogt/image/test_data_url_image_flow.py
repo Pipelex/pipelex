@@ -14,10 +14,26 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from tests.cases import ImageTestCases
+
+
+class ArticleWithImage(StructuredContent):
+    """Test StructuredContent with an embedded ImageContent."""
+
+    title: str
+    image: ImageContent
+    description: str | None = None
+
+
+class NestedArticle(StructuredContent):
+    """Test StructuredContent with nested StructuredContent containing ImageContent."""
+
+    main_article: ArticleWithImage
+    related_image: ImageContent | None = None
 
 
 @pytest.mark.dry_runnable
@@ -183,3 +199,126 @@ class TestDataUrlImageFlow:
         normalized_stuff = normalized_memory.get_stuff("test_image")
         assert isinstance(normalized_stuff.content, ImageContent)
         assert normalized_stuff.content.url == http_url
+
+    async def test_normalization_with_structured_content(
+        self,
+        mocker: MockerFixture,
+    ) -> None:
+        """Test that normalizer handles StructuredContent with embedded ImageContent."""
+        # Setup in-memory storage
+        provider = InMemoryStorageProvider()
+        mocker.patch("pipelex.pipeline.input_normalizer.get_storage_provider", return_value=provider)
+
+        # Create StructuredContent with embedded ImageContent containing data URL
+        article = ArticleWithImage(
+            title="Test Article",
+            image=ImageContent(url=ImageTestCases.MINIMAL_PNG_DATA_URL),
+            description="A test article with an image",
+        )
+        stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DYNAMIC),
+            content=article,
+            name="test_article",
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+
+        # Normalize
+        normalized_memory = normalize_data_urls_to_storage(working_memory)
+
+        # Verify the embedded image URL was converted to pipelex-storage://
+        normalized_stuff = normalized_memory.get_stuff("test_article")
+        assert isinstance(normalized_stuff.content, ArticleWithImage)
+        normalized_article = normalized_stuff.content
+        assert normalized_article.title == "Test Article"
+        assert normalized_article.description == "A test article with an image"
+        assert normalized_article.image.url.startswith("pipelex-storage://")
+
+        # Verify the stored data is correct
+        stored_bytes = provider.load(uri=normalized_article.image.url)
+        expected_bytes = base64.b64decode(ImageTestCases.MINIMAL_PNG_BASE64)
+        assert stored_bytes == expected_bytes
+
+    async def test_normalization_with_nested_structured_content(
+        self,
+        mocker: MockerFixture,
+    ) -> None:
+        """Test that normalizer recursively handles nested StructuredContent."""
+        # Setup in-memory storage
+        provider = InMemoryStorageProvider()
+        mocker.patch("pipelex.pipeline.input_normalizer.get_storage_provider", return_value=provider)
+
+        # Create nested StructuredContent with ImageContent at multiple levels
+        nested = NestedArticle(
+            main_article=ArticleWithImage(
+                title="Main Article",
+                image=ImageContent(url=ImageTestCases.MINIMAL_PNG_DATA_URL),
+            ),
+            related_image=ImageContent(url=ImageTestCases.MINIMAL_JPEG_DATA_URL),
+        )
+        stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DYNAMIC),
+            content=nested,
+            name="nested_article",
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+
+        # Normalize
+        normalized_memory = normalize_data_urls_to_storage(working_memory)
+
+        # Verify all image URLs were converted
+        normalized_stuff = normalized_memory.get_stuff("nested_article")
+        assert isinstance(normalized_stuff.content, NestedArticle)
+        normalized_nested = normalized_stuff.content
+
+        # Check nested ImageContent
+        assert normalized_nested.main_article.image.url.startswith("pipelex-storage://")
+
+        # Check top-level ImageContent
+        assert normalized_nested.related_image is not None
+        assert normalized_nested.related_image.url.startswith("pipelex-storage://")
+
+        # Verify both stored data are correct
+        nested_stored = provider.load(uri=normalized_nested.main_article.image.url)
+        assert nested_stored == base64.b64decode(ImageTestCases.MINIMAL_PNG_BASE64)
+
+        related_stored = provider.load(uri=normalized_nested.related_image.url)
+        assert related_stored == base64.b64decode(ImageTestCases.MINIMAL_JPEG_BASE64)
+
+    async def test_normalization_with_list_in_structured_content(
+        self,
+        mocker: MockerFixture,
+    ) -> None:
+        """Test that normalizer handles lists of ImageContent within StructuredContent."""
+        # Setup in-memory storage
+        provider = InMemoryStorageProvider()
+        mocker.patch("pipelex.pipeline.input_normalizer.get_storage_provider", return_value=provider)
+
+        # Create a StructuredContent subclass with a list of images
+        class GalleryContent(StructuredContent):
+            title: str
+            images: list[ImageContent]
+
+        gallery = GalleryContent(
+            title="Test Gallery",
+            images=[
+                ImageContent(url=ImageTestCases.MINIMAL_PNG_DATA_URL),
+                ImageContent(url=ImageTestCases.MINIMAL_JPEG_DATA_URL),
+            ],
+        )
+        stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DYNAMIC),
+            content=gallery,
+            name="gallery",
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+
+        # Normalize
+        normalized_memory = normalize_data_urls_to_storage(working_memory)
+
+        # Verify all images in the list were converted
+        normalized_stuff = normalized_memory.get_stuff("gallery")
+        assert isinstance(normalized_stuff.content, GalleryContent)
+        normalized_gallery = normalized_stuff.content
+        assert len(normalized_gallery.images) == 2
+        for image_item in normalized_gallery.images:
+            assert image_item.url.startswith("pipelex-storage://")
