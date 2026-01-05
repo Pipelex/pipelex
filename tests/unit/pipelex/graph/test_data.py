@@ -340,3 +340,126 @@ class MermaidTestData:
         "kind": EdgeKind.SELECTED_OUTCOME,
         "label": "success_branch",
     }
+
+    # Nodes with IOSpec containing data for _with_data tests
+    PRODUCER_NODE_WITH_DATA: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:producer",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "data_producer",
+        "pipe_type": "PipeLLM",
+        "status": NodeStatus.SUCCEEDED,
+        "node_io": {
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "generated_output",
+                    "concept": "Text",
+                    "digest": "digest_abc123",
+                    "data": "This is the full output content from the LLM",
+                }
+            ],
+        },
+    }
+
+    CONSUMER_NODE_WITH_DATA: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:consumer",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "data_consumer",
+        "pipe_type": "PipeCompose",
+        "status": NodeStatus.SUCCEEDED,
+        "node_io": {
+            "inputs": [
+                {
+                    "name": "input_text",
+                    "concept": "Text",
+                    "digest": "digest_abc123",
+                    "data": "This is the full output content from the LLM",
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "composed_output",
+                    "concept": "Text",
+                    "digest": "digest_xyz789",
+                    "data": {"title": "Composed Result", "content": "Rich structured data"},
+                }
+            ],
+        },
+    }
+
+    PIPELINE_INPUT_NODE_WITH_DATA: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:pipeline-input",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "first_step",
+        "pipe_type": "PipeLLM",
+        "status": NodeStatus.SUCCEEDED,
+        "node_io": {
+            "inputs": [
+                {
+                    "name": "user_prompt",
+                    "concept": "Text",
+                    "digest": "digest_input_001",
+                    "data": "User's original input prompt",
+                }
+            ],
+            "outputs": [],
+        },
+    }
+
+    # Multi-consumer scenario: one stuff consumed by multiple pipes
+    SHARED_STUFF_PRODUCER: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:shared-producer",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "shared_producer",
+        "pipe_type": "PipeLLM",
+        "status": NodeStatus.SUCCEEDED,
+        "node_io": {
+            "inputs": [],
+            "outputs": [
+                {
+                    "name": "shared_data",
+                    "concept": "Text",
+                    "digest": "digest_shared",
+                    "data": "Data that will be consumed by multiple pipes",
+                }
+            ],
+        },
+    }
+
+    SHARED_STUFF_CONSUMER_A: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:consumer-a",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "consumer_a",
+        "pipe_type": "PipeCompose",
+        "status": NodeStatus.SUCCEEDED,
+        "node_io": {
+            "inputs": [
+                {
+                    "name": "shared_input",
+                    "concept": "Text",
+                    "digest": "digest_shared",
+                    "data": "Data that will be consumed by multiple pipes",
+                }
+            ],
+            "outputs": [],
+        },
+    }
+
+    SHARED_STUFF_CONSUMER_B: ClassVar[dict[str, Any]] = {
+        "node_id": "run:123:consumer-b",
+        "kind": NodeKind.OPERATOR,
+        "pipe_code": "consumer_b",
+        "pipe_type": "PipeCompose",
+        "status": NodeStatus.SUCCEEDED,
+        "node_io": {
+            "inputs": [
+                {
+                    "name": "shared_input",
+                    "concept": "Text",
+                    "digest": "digest_shared",
+                    "data": "Data that will be consumed by multiple pipes",
+                }
+            ],
+            "outputs": [],
+        },
+    }

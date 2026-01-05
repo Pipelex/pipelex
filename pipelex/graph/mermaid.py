@@ -2,15 +2,18 @@
 
 This module converts GraphSpec to Mermaid flowchart syntax, using subgraphs
 to represent controller containment relationships.
+
+The module uses GraphAnalysis for pre-computed graph analysis, avoiding
+duplicated analysis logic across different rendering functions.
 """
 
 import operator
-from collections import defaultdict
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from pipelex import log
+from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
@@ -60,30 +63,6 @@ def _get_node_label(node: NodeSpec) -> str:
     if node.pipe_type:
         return escape_mermaid_label(node.pipe_type)
     return escape_mermaid_label(node.node_id)
-
-
-def _build_containment_tree(
-    edges: list[EdgeSpec],
-) -> tuple[dict[str, list[str]], set[str]]:
-    """Build a tree structure from CONTAINS edges.
-
-    Args:
-        edges: List of all edges.
-
-    Returns:
-        Tuple of:
-        - dict mapping parent node_id to list of child node_ids
-        - set of all node_ids that are children (have a parent)
-    """
-    children_map: dict[str, list[str]] = defaultdict(list)
-    child_nodes: set[str] = set()
-
-    for edge in edges:
-        if edge.kind == EdgeKind.CONTAINS:
-            children_map[edge.source].append(edge.target)
-            child_nodes.add(edge.target)
-
-    return dict(children_map), child_nodes
 
 
 def _collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
@@ -473,6 +452,9 @@ def graphspec_to_orchestration_mermaid(
     effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
 
+    # Pre-compute graph analysis
+    analysis = GraphAnalysis.from_graphspec(graph)
+
     # Header
     lines.append(f"flowchart {effective_direction.mermaid_code}")
 
@@ -481,28 +463,16 @@ def graphspec_to_orchestration_mermaid(
     for node in graph.nodes:
         id_mapping[node.node_id] = sanitize_mermaid_id(node.node_id)
 
-    # Build node lookup
-    nodes_by_id: dict[str, NodeSpec] = {node.node_id: node for node in graph.nodes}
-
-    # Build containment tree
-    children_map, child_nodes = _build_containment_tree(graph.edges)
-
-    # Find root nodes (nodes that are not children of any other node)
-    root_nodes = [node for node in graph.nodes if node.node_id not in child_nodes]
-
-    # Sort root nodes for deterministic output
-    sorted_roots = sorted(root_nodes, key=lambda node: (node.kind, node.pipe_code or "", node.node_id))
-
     # Track subgraph depths for coloring
     subgraph_depths: dict[str, int] = {}
 
     # Render nodes (using subgraphs for containment)
-    for root_node in sorted_roots:
+    for root_node in analysis.root_nodes:
         node_lines = _render_subgraph_recursive(
             node_id=root_node.node_id,
-            nodes_by_id=nodes_by_id,
+            nodes_by_id=analysis.nodes_by_id,
             id_mapping=id_mapping,
-            children_map=children_map,
+            children_map=analysis.containment_tree,
             edges=graph.edges,
             include_data_edges=include_data_edges,
             include_selected_outcome_edges=include_selected_outcome_edges,
@@ -517,7 +487,7 @@ def graphspec_to_orchestration_mermaid(
         include_data_edges=include_data_edges,
         include_contains_edges=include_contains_edges,
         include_selected_outcome_edges=include_selected_outcome_edges,
-        controller_node_ids=set(children_map.keys()),
+        controller_node_ids=analysis.controller_node_ids,
     )
     if edge_lines:
         lines.append("")  # Blank line before edges
@@ -567,6 +537,9 @@ def graphspec_to_dataflow_mermaid(
     effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
 
+    # Pre-compute graph analysis
+    analysis = GraphAnalysis.from_graphspec(graph)
+
     # Header
     lines.append(f"flowchart {effective_direction.mermaid_code}")
 
@@ -575,50 +548,24 @@ def graphspec_to_dataflow_mermaid(
     for node in graph.nodes:
         pipe_id_mapping[node.node_id] = sanitize_mermaid_id(node.node_id)
 
-    # Build containment tree to identify controllers (they shouldn't appear in dataflow)
-    children_map, _ = _build_containment_tree(graph.edges)
-    controller_node_ids = set(children_map.keys())
-
-    # Collect unique stuff objects from all node I/O
-    # Key is the digest (stuff_code), value is (name, concept)
-    stuff_registry: dict[str, tuple[str, str | None]] = {}
-
-    # Also track producers and consumers for each stuff
-    stuff_producers: dict[str, str] = {}  # digest -> producer_node_id
-    stuff_consumers: dict[str, list[str]] = defaultdict(list)  # digest -> consumer_node_ids
-
-    for node in graph.nodes:
-        # Skip controllers - they don't directly transform data
-        if node.node_id in controller_node_ids:
-            continue
-
-        # Collect outputs (this node produces these stuffs)
-        for output_spec in node.node_io.outputs:
-            if output_spec.digest:
-                stuff_registry[output_spec.digest] = (output_spec.name, output_spec.concept)
-                stuff_producers[output_spec.digest] = node.node_id
-
-        # Collect inputs (this node consumes these stuffs)
-        for input_spec in node.node_io.inputs:
-            if input_spec.digest:
-                if input_spec.digest not in stuff_registry:
-                    # Register stuff even if we don't know the producer (pipeline input)
-                    stuff_registry[input_spec.digest] = (input_spec.name, input_spec.concept)
-                stuff_consumers[input_spec.digest].append(node.node_id)
-
     # Skip if no data flow information
-    if not stuff_registry:
+    if not analysis.has_data_flow_info():
         lines.append("    %% No data flow information available")
         lines.append("    note[No IOSpec data captured. Run with data flow tracing enabled.]")
         return "\n".join(lines)
+
+    # Build stuff registry as tuple format for compatibility with rendering code
+    stuff_registry: dict[str, tuple[str, str | None]] = {}
+    for digest, stuff_info in analysis.stuff_registry.items():
+        stuff_registry[digest] = (stuff_info.name, stuff_info.concept)
 
     # Render pipe nodes
     lines.append("    %% Pipe nodes")
     rendered_pipes: set[str] = set()
 
     # Only render pipes that participate in data flow
-    participating_pipes: set[str] = set(stuff_producers.values())
-    for consumers in stuff_consumers.values():
+    participating_pipes: set[str] = set(analysis.stuff_producers.values())
+    for consumers in analysis.stuff_consumers.values():
         participating_pipes.update(consumers)
 
     for node in sorted(graph.nodes, key=lambda n_iter: (n_iter.pipe_code or "", n_iter.node_id)):
@@ -660,14 +607,14 @@ def graphspec_to_dataflow_mermaid(
     lines.append("")
     lines.append("    %% Data flow edges: producer -> stuff -> consumer")
 
-    for digest, producer_node_id in sorted(stuff_producers.items(), key=operator.itemgetter(0)):
+    for digest, producer_node_id in sorted(analysis.stuff_producers.items(), key=operator.itemgetter(0)):
         producer_mermaid_id = pipe_id_mapping.get(producer_node_id)
         prod_stuff_mermaid_id = stuff_id_mapping.get(digest)
         if producer_mermaid_id and prod_stuff_mermaid_id:
             lines.append(f"    {producer_mermaid_id} --> {prod_stuff_mermaid_id}")
 
     # Render edges: stuff -> consumer
-    for digest, consumer_node_ids in sorted(stuff_consumers.items(), key=operator.itemgetter(0)):
+    for digest, consumer_node_ids in sorted(analysis.stuff_consumers.items(), key=operator.itemgetter(0)):
         cons_stuff_mermaid_id = stuff_id_mapping.get(digest)
         if not cons_stuff_mermaid_id:
             continue
@@ -747,6 +694,9 @@ def graphspec_to_combo_mermaid(
     effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
 
+    # Pre-compute graph analysis
+    analysis = GraphAnalysis.from_graphspec(graph)
+
     # Header
     lines.append(f"flowchart {effective_direction.mermaid_code}")
 
@@ -755,45 +705,10 @@ def graphspec_to_combo_mermaid(
     for node in graph.nodes:
         id_mapping[node.node_id] = sanitize_mermaid_id(node.node_id)
 
-    # Build node lookup
-    nodes_by_id: dict[str, NodeSpec] = {node.node_id: node for node in graph.nodes}
-
-    # Build containment tree
-    children_map, child_nodes = _build_containment_tree(graph.edges)
-    controller_node_ids = set(children_map.keys())
-
-    # Find root nodes (nodes that are not children of any other node)
-    root_nodes = [node for node in graph.nodes if node.node_id not in child_nodes]
-
-    # Sort root nodes for deterministic output
-    sorted_roots = sorted(root_nodes, key=lambda node: (node.kind, node.pipe_code or "", node.node_id))
-
-    # Collect unique stuff objects from all node I/O
-    # Key is the digest (stuff_code), value is (name, concept)
+    # Build stuff registry as tuple format for compatibility with rendering code
     stuff_registry: dict[str, tuple[str, str | None]] = {}
-
-    # Also track producers and consumers for each stuff
-    stuff_producers: dict[str, str] = {}  # digest -> producer_node_id
-    stuff_consumers: dict[str, list[str]] = defaultdict(list)  # digest -> consumer_node_ids
-
-    for node in graph.nodes:
-        # Skip controllers - they don't directly transform data
-        if node.node_id in controller_node_ids:
-            continue
-
-        # Collect outputs (this node produces these stuffs)
-        for output_spec in node.node_io.outputs:
-            if output_spec.digest:
-                stuff_registry[output_spec.digest] = (output_spec.name, output_spec.concept)
-                stuff_producers[output_spec.digest] = node.node_id
-
-        # Collect inputs (this node consumes these stuffs)
-        for input_spec in node.node_io.inputs:
-            if input_spec.digest:
-                if input_spec.digest not in stuff_registry:
-                    # Register stuff even if we don't know the producer (pipeline input)
-                    stuff_registry[input_spec.digest] = (input_spec.name, input_spec.concept)
-                stuff_consumers[input_spec.digest].append(node.node_id)
+    for digest, stuff_info in analysis.stuff_registry.items():
+        stuff_registry[digest] = (stuff_info.name, stuff_info.concept)
 
     # Will be populated during recursive rendering
     stuff_id_mapping: dict[str, str] = {}
@@ -804,14 +719,14 @@ def graphspec_to_combo_mermaid(
     # Render pipe nodes and their produced stuff within controller subgraphs
     lines.append("")
     lines.append("    %% Pipe and stuff nodes within controller subgraphs")
-    for root_node in sorted_roots:
+    for root_node in analysis.root_nodes:
         node_lines = _render_combo_subgraph_recursive(
             node_id=root_node.node_id,
-            nodes_by_id=nodes_by_id,
+            nodes_by_id=analysis.nodes_by_id,
             id_mapping=id_mapping,
-            children_map=children_map,
+            children_map=analysis.containment_tree,
             stuff_registry=stuff_registry,
-            stuff_producers=stuff_producers,
+            stuff_producers=analysis.stuff_producers,
             stuff_id_mapping=stuff_id_mapping,
             subgraph_depths=subgraph_depths,
             show_stuff_codes=show_stuff_codes,
@@ -819,14 +734,14 @@ def graphspec_to_combo_mermaid(
         lines.extend(node_lines)
 
     # Skip if no data flow information
-    if not stuff_registry:
+    if not analysis.has_data_flow_info():
         lines.append("")
         lines.append("    %% No data flow information available")
         lines.append("    note[No IOSpec data captured. Run with data flow tracing enabled.]")
         return "\n".join(lines)
 
     # Render stuff nodes without a producer (pipeline inputs) at top level
-    orphan_stuffs = [(digest, name, concept) for digest, (name, concept) in stuff_registry.items() if digest not in stuff_producers]
+    orphan_stuffs = [(digest, name, concept) for digest, (name, concept) in stuff_registry.items() if digest not in analysis.stuff_producers]
     if orphan_stuffs:
         lines.append("")
         lines.append("    %% Pipeline input stuff nodes (no producer)")
@@ -845,14 +760,14 @@ def graphspec_to_combo_mermaid(
     lines.append("")
     lines.append("    %% Data flow edges: producer -> stuff -> consumer")
 
-    for digest, producer_node_id in sorted(stuff_producers.items(), key=operator.itemgetter(0)):
+    for digest, producer_node_id in sorted(analysis.stuff_producers.items(), key=operator.itemgetter(0)):
         producer_mermaid_id = id_mapping.get(producer_node_id)
         prod_stuff_mermaid_id = stuff_id_mapping.get(digest)
         if producer_mermaid_id and prod_stuff_mermaid_id:
             lines.append(f"    {producer_mermaid_id} --> {prod_stuff_mermaid_id}")
 
     # Render edges: stuff -> consumer
-    for digest, consumer_node_ids in sorted(stuff_consumers.items(), key=operator.itemgetter(0)):
+    for digest, consumer_node_ids in sorted(analysis.stuff_consumers.items(), key=operator.itemgetter(0)):
         cons_stuff_mermaid_id = stuff_id_mapping.get(digest)
         if not cons_stuff_mermaid_id:
             continue
