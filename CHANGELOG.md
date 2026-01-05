@@ -34,6 +34,8 @@
 
     See the [Build Commands documentation](https://docs.pipelex.com/home/9-tools/cli/#build-commands) for usage examples.
 
+- **Langfuse & OpenTelemetry Observability** — New OpenTelemetry-based observability system enables powerful tracing and Evals through Langfuse integration. Also supports OTLP-compatible backends (Datadog, Honeycomb, etc.). Configured via `.pipelex/telemetry.toml`.
+
 ### Added
 
 - New backends & models
@@ -43,11 +45,13 @@
     - **Mistral** Document AI (OCR) via Pipelex Gateway (disclaimer: it's flaky, needs many retries via tenacity)
     - **Portkey AI** backend integration for unified access to multiple models through a single API key
     - Mistral Document AI (OCR) via Pipelex Gateway (disclaimer: it's flaky, needs many retries via tenacity)
-- OpenTelemetry-based observability system with native support for Langfuse and OTLP-compatible backends (Datadog, Honeycomb, etc.), configured via `.pipelex/telemetry.toml`
+- **Unified URI Handling System**: New `pipelex.tools.uri` module providing type-safe parsing for HTTP/HTTPS URLs, local file paths, file URIs, `pipelex-storage://` URIs, and base64 data URLs.
+- **Automatic Data URL Normalization**: Pipeline pre-processing step that converts large `data:` URLs in `ImageContent` to `pipelex-storage://` URIs for improved performance. Configurable via `is_normalize_data_urls_to_storage` in `pipelex.toml`.
+- **`PreparedImage` Abstraction**: New models (`PreparedImageHttpUrl`, `PreparedImageBase64`) representing images ready for LLM provider APIs.
+- Comprehensive unit and integration tests for URI resolver, data URL normalization, and `pipelex-storage://` image handling.
 - Pipelex Gateway service with terms of service management via `.pipelex/pipelex_service.toml` and interactive acceptance flow in `pipelex init`
 - Configurable retry logic with exponential backoff for inference API calls, configurable in `pipelex.toml` under `[cogt.tenacity_config]`
 - Context manager support for the `Pipelex` class (`with Pipelex.make(): ...`) for graceful shutdown
-- Validation for `PipeCompose` output concepts: must be strictly compatible with the Text concept
 - Validation for Pipelex Bundle concept keys: cannot create a native concept
 - Validation for `PipeSequence`: The multiplicity of the output of the sequence must be the same as the multiplicity of the output of the last step.
 - Validation for `PipeFunc`: The multiplicity of the output of the pipe must be the same as the multiplicity of the output of the function: If the multiplicity is true, the return type of the function must be a subclass of `ListContent`. If the multiplicity is false, the return type of the function must not be a subclass of `ListContent`.
@@ -77,6 +81,10 @@
     - `is_generate_cost_report_file_enabled` default changed from `true` to `false`
     - `pipelex_override.toml` (final override) moved from repo root to `.pipelex/` directory
     - `telemetry_override.toml` (personal telemetry settings) moved from repo root to `.pipelex/` directory
+- **Image Prompt Representation**: Redesigned `PromptImage` models—consolidated `PromptImagePath` and `PromptImageUrl` into `PromptImageUri`; now uses Pydantic discriminated union for URI, base64, and raw bytes sources.
+- **Centralized Image Preparation**: Moved image fetching and base64 conversion logic to `pipelex.cogt.image.prompt_image_utils`, simplifying LLM provider plugins (Anthropic, Google, Mistral, OpenAI).
+- **Unified Resource Loading**: Updated all file/URL reading components (PDF renderers, document extractors) to use the new URI handling system, replacing the legacy `pipelex.tools.misc.path_utils` module.
+- **Async HTTP Fetching**: Renamed `fetch_file_from_url_httpx_async` to `fetch_file_from_url_httpx`; removed redundant synchronous version.
 - Documentation: clarified **Setup (first run)** vs **Configuration (TOML reference)**, added a Setup overview page, and added contributor docs for configuration defaults/overrides.
 - `pipelex init` now creates a documented `telemetry.toml` template instead of prompting for preferences
 - Model catalog updated with latest models (gpt-5.1, claude-4.5-opus, gemini-3.0-pro, etc.) and updated waterfalls in `base_deck.toml`
@@ -87,6 +95,10 @@
 - The `runner`, `structures`, and `inputs` CLI commands now accept `--output-dir` option (defaults to `target_dir`)
 - Cost report now displays a note clarifying that it only includes LLM costs
 - `description` field is not Optional anymore in the `PipeAbstract`, `PipeBlueprint` and `PipeSpec` classes.
+
+### Removed
+
+- **`openai_utils` Module**: Removed `pipelex.plugins.openai.openai_utils`; logic now in centralized image preparation utilities.
 
 ### Deprecated
 

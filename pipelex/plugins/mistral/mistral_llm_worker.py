@@ -54,7 +54,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
-        messages = self.mistral_factory.make_simple_messages(llm_job=llm_job)
+        messages = await self.mistral_factory.make_simple_messages(llm_job=llm_job)
         response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
             messages=messages,
             model=self.inference_model.model_id,

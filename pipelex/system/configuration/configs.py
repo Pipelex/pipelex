@@ -159,6 +159,10 @@ class BuilderConfig(ConfigModel):
     default_directory_base_name: str
 
 
+class PipelineExecutionConfig(ConfigModel):
+    is_normalize_data_urls_to_storage: bool
+
+
 class Pipelex(ConfigModel):
     storage_config: StorageConfig
     feature_config: FeatureConfig
@@ -173,6 +177,7 @@ class Pipelex(ConfigModel):
 
     dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig
+    pipeline_execution_config: PipelineExecutionConfig
     reporting_config: ReportingConfig
     observer_config: ObserverConfig
     scan_config: ScanConfig

@@ -112,3 +112,7 @@
 # cost_report_base_name = "cost_report"
 # cost_report_extension = "csv"
 # cost_report_unit_scale = 1.0
+
+[pipelex.pipeline_execution_config]
+# Uncomment to disable conversion of data URLs to pipelex-storage:// URIs
+# is_normalize_data_urls_to_storage = false

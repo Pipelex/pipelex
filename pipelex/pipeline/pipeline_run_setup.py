@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex.client.protocol import PipelineInputs
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -23,6 +24,7 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError
+from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.environment import get_optional_env
@@ -181,6 +183,10 @@ async def pipeline_run_setup(
                 pipeline_inputs=inputs,
                 search_domain_codes=search_domain_codes,
             )
+
+    # Normalize data URLs to pipelex-storage:// URIs if configured
+    if working_memory and get_config().pipelex.pipeline_execution_config.is_normalize_data_urls_to_storage:
+        working_memory = normalize_data_urls_to_storage(working_memory)
 
     # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:
