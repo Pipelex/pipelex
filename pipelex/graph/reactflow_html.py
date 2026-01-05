@@ -12,7 +12,8 @@ from pipelex.graph.viewspec import ViewSpec
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.urls import URLs
 
-# ReactFlow HTML template with embedded viewer
+# ReactFlow HTML template with embedded viewer - Dataflow View
+# This template renders a dataflow graph with pipe nodes and stuff (data) nodes,
 REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,15 +48,19 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             --color-error: #ef4444;
             --color-error-bg: rgba(239, 68, 68, 0.15);
             --color-warning: #f59e0b;
-            --color-controller: #8b5cf6;
-            --color-controller-bg: rgba(139, 92, 246, 0.15);
-            --color-operator: #06b6d4;
-            --color-operator-bg: rgba(6, 182, 212, 0.15);
+            --color-stuff: #f59e0b;
+            --color-stuff-bg: rgba(245, 158, 11, 0.15);
+            --color-stuff-border: #d97706;
+            --color-pipe: #3b82f6;
+            --color-pipe-bg: rgba(59, 130, 246, 0.1);
+            --color-pipe-failed: #ef4444;
+            --color-pipe-failed-bg: rgba(239, 68, 68, 0.15);
             --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             --font-mono: 'JetBrains Mono', 'Monaco', 'Menlo', monospace;
             --radius-sm: 4px;
             --radius-md: 8px;
             --radius-lg: 12px;
+            --radius-pill: 999px;
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
             --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
             --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
@@ -168,7 +173,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             position: fixed;
             top: 70px;
             right: 16px;
-            width: 360px;
+            width: 400px;
             max-height: calc(100vh - 90px);
             background: var(--color-surface);
             border: 1px solid var(--color-border);
@@ -187,8 +192,14 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             align-items: center;
             justify-content: space-between;
             padding: 16px 20px;
-            background: linear-gradient(135deg, var(--color-accent), var(--color-controller));
+            background: linear-gradient(135deg, var(--color-accent), var(--color-stuff));
             color: white;
+        }
+        .inspector-header.stuff {
+            background: linear-gradient(135deg, var(--color-stuff), var(--color-stuff-border));
+        }
+        .inspector-header.pipe {
+            background: linear-gradient(135deg, var(--color-pipe), var(--color-accent));
         }
         .inspector-title {
             font-size: 15px;
@@ -250,6 +261,10 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             background: var(--color-surface-hover);
             color: var(--color-text-muted);
         }
+        .inspector-badge.stuff {
+            background: var(--color-stuff-bg);
+            color: var(--color-stuff);
+        }
         .inspector-section {
             margin-bottom: 16px;
         }
@@ -283,8 +298,10 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             line-height: 1.5;
             color: var(--color-text-muted);
             overflow-x: auto;
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
         .inspector-row {
             display: flex;
@@ -331,17 +348,33 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             height: 12px;
             border-radius: 3px;
         }
-        .legend-dot.controller {
-            background: var(--color-controller);
+        .legend-dot.pipe {
+            background: var(--color-pipe);
         }
-        .legend-dot.operator {
-            background: var(--color-operator);
+        .legend-dot.stuff {
+            background: var(--color-stuff);
+            border-radius: 6px;
         }
         .legend-dot.success {
             background: var(--color-success);
         }
         .legend-dot.error {
             background: var(--color-error);
+        }
+
+        /* Hint */
+        .hint {
+            position: fixed;
+            bottom: 16px;
+            right: 16px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            font-size: 12px;
+            color: var(--color-text-dim);
+            z-index: 100;
+            box-shadow: var(--shadow-md);
         }
     </style>
 </head>
@@ -358,7 +391,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <div id="inspector" class="inspector-panel">
-        <div class="inspector-header">
+        <div class="inspector-header" id="inspector-header">
             <div>
                 <div id="inspector-title" class="inspector-title">Node Details</div>
                 <div id="inspector-subtitle" class="inspector-subtitle"></div>
@@ -369,16 +402,18 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
     </div>
 
     <div class="legend">
-        <div class="legend-item"><div class="legend-dot controller"></div>Controller</div>
-        <div class="legend-item"><div class="legend-dot operator"></div>Operator</div>
+        <div class="legend-item"><div class="legend-dot pipe"></div>Pipe</div>
+        <div class="legend-item"><div class="legend-dot stuff"></div>Data</div>
         <div class="legend-item"><div class="legend-dot success"></div>Success</div>
         <div class="legend-item"><div class="legend-dot error"></div>Failed</div>
     </div>
 
+    <div class="hint">Click on nodes to view details</div>
+
     <!-- Embedded ViewSpec -->
     <script type="application/json" id="pipelex-viewspec">{{ viewspec_json }}</script>
     {% if graphspec_json %}
-    <!-- Embedded GraphSpec (optional, for inspector) -->
+    <!-- Embedded GraphSpec (for dataflow extraction) -->
     <script type="application/json" id="pipelex-graphspec">{{ graphspec_json }}</script>
     {% endif %}
 
@@ -391,25 +426,101 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         const graphspecElement = document.getElementById('pipelex-graphspec');
         const graphspec = graphspecElement ? JSON.parse(graphspecElement.textContent) : null;
 
+        // ====================================================================
+        // DATAFLOW ANALYSIS: Extract stuff nodes and build producer/consumer maps
+        // This mirrors the Python GraphAnalysis logic
+        // ====================================================================
+        function buildDataflowAnalysis(graphspec) {
+            if (!graphspec) return null;
+
+            const stuffRegistry = {};      // digest -> { name, concept, data }
+            const stuffProducers = {};     // digest -> producer_node_id
+            const stuffConsumers = {};     // digest -> [consumer_node_ids]
+            const containmentTree = {};    // parent_id -> [child_ids]
+            const childNodeIds = new Set();
+
+            // Build containment tree from edges
+            for (const edge of graphspec.edges) {
+                if (edge.kind === 'contains') {
+                    if (!containmentTree[edge.source]) containmentTree[edge.source] = [];
+                    containmentTree[edge.source].push(edge.target);
+                    childNodeIds.add(edge.target);
+                }
+            }
+
+            // Controller IDs are nodes that have children
+            const controllerNodeIds = new Set(Object.keys(containmentTree));
+
+            // Process nodes for stuff extraction
+            for (const node of graphspec.nodes) {
+                // Skip controllers - they don't directly transform data
+                if (controllerNodeIds.has(node.node_id)) continue;
+
+                const nodeIo = node.node_io || {};
+
+                // Collect outputs (this node produces these stuffs)
+                for (const output of (nodeIo.outputs || [])) {
+                    if (output.digest) {
+                        stuffRegistry[output.digest] = {
+                            name: output.name,
+                            concept: output.concept,
+                            data: output.data,
+                        };
+                        stuffProducers[output.digest] = node.node_id;
+                    }
+                }
+
+                // Collect inputs (this node consumes these stuffs)
+                for (const input of (nodeIo.inputs || [])) {
+                    if (input.digest) {
+                        // Register stuff even if we don't know the producer (pipeline input)
+                        if (!stuffRegistry[input.digest]) {
+                            stuffRegistry[input.digest] = {
+                                name: input.name,
+                                concept: input.concept,
+                                data: input.data,
+                            };
+                        }
+                        if (!stuffConsumers[input.digest]) stuffConsumers[input.digest] = [];
+                        stuffConsumers[input.digest].push(node.node_id);
+                    }
+                }
+            }
+
+            return {
+                stuffRegistry,
+                stuffProducers,
+                stuffConsumers,
+                controllerNodeIds,
+                childNodeIds,
+            };
+        }
+
+        const dataflowAnalysis = buildDataflowAnalysis(graphspec);
+        const hasDataflow = dataflowAnalysis && Object.keys(dataflowAnalysis.stuffRegistry).length > 0;
+
         // Update header stats
         const statsEl = document.getElementById('header-stats');
-        const nodeCount = viewspec.nodes.length;
-        const edgeCount = viewspec.edges.length;
+        const pipeCount = hasDataflow
+            ? graphspec.nodes.filter(n => !dataflowAnalysis.controllerNodeIds.has(n.node_id)).length
+            : viewspec.nodes.length;
+        const stuffCount = hasDataflow ? Object.keys(dataflowAnalysis.stuffRegistry).length : 0;
         const succeededCount = viewspec.nodes.filter(n => n.status === 'succeeded').length;
         const failedCount = viewspec.nodes.filter(n => n.status === 'failed').length;
+
         statsEl.innerHTML = `
             <div class="stat-item">
                 <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                 </svg>
-                <span class="stat-value">${nodeCount}</span> nodes
+                <span class="stat-value">${pipeCount}</span> pipes
             </div>
-            <div class="stat-item">
+            ${stuffCount > 0 ? `<div class="stat-item" style="color: var(--color-stuff)">
                 <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                    <ellipse cx="12" cy="12" rx="10" ry="6"/>
                 </svg>
-                <span class="stat-value">${edgeCount}</span> edges
-            </div>
+                <span class="stat-value">${stuffCount}</span> data
+            </div>` : ''}
             ${succeededCount > 0 ? `<div class="stat-item" style="color: var(--color-success)">
                 <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="20 6 9 17 4 12"/>
@@ -429,63 +540,25 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         const ReactFlowLib = window.ReactFlowRenderer || window.ReactFlow || {};
         const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MiniMap, MarkerType } = ReactFlowLib;
 
-        // Node style generator
-        function getNodeStyle(node) {
-            const isController = node.kind === 'controller';
-            const isSucceeded = node.ui?.classes?.includes('succeeded');
-            const isFailed = node.ui?.classes?.includes('failed');
-
-            let borderColor = '#475569';
-            let bgColor = '#1e293b';
-
-            if (isController) {
-                borderColor = '#8b5cf6';
-                bgColor = 'rgba(139, 92, 246, 0.1)';
-            } else {
-                borderColor = '#06b6d4';
-                bgColor = 'rgba(6, 182, 212, 0.1)';
-            }
-
-            if (isFailed) {
-                borderColor = '#ef4444';
-                bgColor = 'rgba(239, 68, 68, 0.15)';
-            }
-
-            const badge = node.ui?.badges?.[0] || '';
-
-            return {
-                style: {
-                    background: bgColor,
-                    border: `2px solid ${borderColor}`,
-                    borderRadius: '8px',
-                    padding: '0',
-                    minWidth: '160px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                },
-                badge,
-                isController,
-                isSucceeded,
-                isFailed,
-            };
-        }
-
         // Dagre layout function
         function getLayoutedElements(nodes, edges, direction = 'TB') {
             const g = new dagre.graphlib.Graph();
             g.setDefaultEdgeLabel(() => ({}));
             g.setGraph({
                 rankdir: direction,
-                nodesep: 60,
-                ranksep: 100,
-                edgesep: 30,
+                nodesep: 50,
+                ranksep: 80,
+                edgesep: 20,
                 marginx: 40,
                 marginy: 40,
             });
 
             nodes.forEach((node) => {
-                const labelLen = node.data?.label?.length || 10;
-                const width = Math.max(160, Math.min(280, labelLen * 9 + 60));
-                g.setNode(node.id, { width, height: 60 });
+                const nodeData = node.data || {};
+                const isStuff = nodeData.isStuff;
+                const width = isStuff ? 180 : 200;
+                const height = isStuff ? 50 : 60;
+                g.setNode(node.id, { width, height });
             });
 
             edges.forEach((edge) => {
@@ -496,8 +569,9 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
 
             const layoutedNodes = nodes.map((node) => {
                 const nodeWithPosition = g.node(node.id);
-                const labelLen = node.data?.label?.length || 10;
-                const width = Math.max(160, Math.min(280, labelLen * 9 + 60));
+                const nodeData = node.data || {};
+                const isStuff = nodeData.isStuff;
+                const width = isStuff ? 180 : 200;
                 return {
                     ...node,
                     position: {
@@ -510,13 +584,183 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             return { nodes: layoutedNodes, edges };
         }
 
-        // Main React component
-        function GraphViewer() {
-            // Convert ViewSpec to ReactFlow format
-            const initialNodes = viewspec.nodes.map(node => {
-                const { style, badge, isController, isSucceeded, isFailed } = getNodeStyle(node);
-                const labelLen = node.label?.length || 10;
-                const width = Math.max(160, Math.min(280, labelLen * 9 + 60));
+        // ====================================================================
+        // BUILD DATAFLOW NODES AND EDGES
+        // ====================================================================
+        function buildDataflowGraph(graphspec, analysis) {
+            const nodes = [];
+            const edges = [];
+            const nodeIdMap = {};  // original node_id -> graphspec node
+
+            // Map node IDs to nodes
+            for (const node of graphspec.nodes) {
+                nodeIdMap[node.node_id] = node;
+            }
+
+            // Find participating pipes (those that produce or consume data)
+            const participatingPipes = new Set();
+            for (const producer of Object.values(analysis.stuffProducers)) {
+                participatingPipes.add(producer);
+            }
+            for (const consumers of Object.values(analysis.stuffConsumers)) {
+                for (const consumer of consumers) {
+                    participatingPipes.add(consumer);
+                }
+            }
+
+            // Create pipe nodes (only those that participate in data flow)
+            for (const node of graphspec.nodes) {
+                if (!participatingPipes.has(node.node_id)) continue;
+
+                const isFailed = node.status === 'failed';
+                const label = node.pipe_code || node.node_id.split(':').pop();
+
+                nodes.push({
+                    id: node.node_id,
+                    type: 'default',
+                    data: {
+                        label: React.createElement('div', {
+                            style: {
+                                padding: '10px 14px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px',
+                                textAlign: 'center',
+                            }
+                        },
+                            React.createElement('span', {
+                                style: {
+                                    fontFamily: "'JetBrains Mono', monospace",
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    color: '#f1f5f9',
+                                }
+                            }, label)
+                        ),
+                        nodeData: node,
+                        isPipe: true,
+                        isStuff: false,
+                    },
+                    position: { x: 0, y: 0 },
+                    style: {
+                        background: isFailed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+                        border: isFailed ? '2px solid #ef4444' : '2px solid #3b82f6',
+                        borderRadius: '8px',
+                        padding: '0',
+                        minWidth: '160px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                    },
+                });
+            }
+
+            // Create stuff nodes
+            for (const [digest, stuffInfo] of Object.entries(analysis.stuffRegistry)) {
+                const stuffId = `stuff_${digest}`;
+                const label = stuffInfo.name;
+                const concept = stuffInfo.concept || '';
+
+                nodes.push({
+                    id: stuffId,
+                    type: 'default',
+                    data: {
+                        label: React.createElement('div', {
+                            style: {
+                                padding: '8px 16px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '2px',
+                                textAlign: 'center',
+                            }
+                        },
+                            React.createElement('span', {
+                                style: {
+                                    fontFamily: "'JetBrains Mono', monospace",
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    color: '#f1f5f9',
+                                }
+                            }, label),
+                            concept && React.createElement('span', {
+                                style: {
+                                    fontSize: '10px',
+                                    color: '#94a3b8',
+                                }
+                            }, concept)
+                        ),
+                        stuffData: stuffInfo,
+                        stuffDigest: digest,
+                        isStuff: true,
+                        isPipe: false,
+                    },
+                    position: { x: 0, y: 0 },
+                    style: {
+                        background: 'rgba(245, 158, 11, 0.15)',
+                        border: '2px solid #d97706',
+                        borderRadius: '999px',  // Pill shape
+                        padding: '0',
+                        minWidth: '140px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                        cursor: 'pointer',
+                    },
+                });
+            }
+
+            // Create edges: producer -> stuff
+            let edgeId = 0;
+            for (const [digest, producerNodeId] of Object.entries(analysis.stuffProducers)) {
+                const stuffId = `stuff_${digest}`;
+                edges.push({
+                    id: `edge_${edgeId++}`,
+                    source: producerNodeId,
+                    target: stuffId,
+                    type: 'smoothstep',
+                    animated: false,
+                    style: {
+                        stroke: '#3b82f6',
+                        strokeWidth: 2,
+                    },
+                    markerEnd: {
+                        type: MarkerType?.ArrowClosed || 'arrowclosed',
+                        color: '#3b82f6',
+                    },
+                });
+            }
+
+            // Create edges: stuff -> consumer
+            for (const [digest, consumers] of Object.entries(analysis.stuffConsumers)) {
+                const stuffId = `stuff_${digest}`;
+                for (const consumerNodeId of consumers) {
+                    edges.push({
+                        id: `edge_${edgeId++}`,
+                        source: stuffId,
+                        target: consumerNodeId,
+                        type: 'smoothstep',
+                        animated: false,
+                        style: {
+                            stroke: '#3b82f6',
+                            strokeWidth: 2,
+                        },
+                        markerEnd: {
+                            type: MarkerType?.ArrowClosed || 'arrowclosed',
+                            color: '#3b82f6',
+                        },
+                    });
+                }
+            }
+
+            return { nodes, edges };
+        }
+
+        // ====================================================================
+        // FALLBACK: Build orchestration graph from ViewSpec (no dataflow)
+        // ====================================================================
+        function buildOrchestrationGraph(viewspec) {
+            const nodes = viewspec.nodes.map(node => {
+                const isController = node.kind === 'controller';
+                const isFailed = node.ui?.classes?.includes('failed');
+                const isSucceeded = node.ui?.classes?.includes('succeeded');
+                const badge = node.ui?.badges?.[0] || '';
 
                 return {
                     id: node.id,
@@ -544,9 +788,6 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                                         fontSize: '13px',
                                         fontWeight: 600,
                                         color: '#f1f5f9',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
                                     }
                                 }, node.label),
                                 isSucceeded && React.createElement('span', {
@@ -595,13 +836,22 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                             )
                         ),
                         nodeData: node,
+                        isPipe: true,
+                        isStuff: false,
                     },
                     position: node.position || { x: 0, y: 0 },
-                    style: { ...style, width },
+                    style: {
+                        background: isFailed ? 'rgba(239, 68, 68, 0.15)' : (isController ? 'rgba(139, 92, 246, 0.1)' : 'rgba(6, 182, 212, 0.1)'),
+                        border: `2px solid ${isFailed ? '#ef4444' : (isController ? '#8b5cf6' : '#06b6d4')}`,
+                        borderRadius: '8px',
+                        padding: '0',
+                        minWidth: '160px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                    },
                 };
             });
 
-            const initialEdges = viewspec.edges.map(edge => ({
+            const edges = viewspec.edges.map(edge => ({
                 id: edge.id,
                 source: edge.source,
                 target: edge.target,
@@ -630,11 +880,26 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 },
             }));
 
-            // Apply layout if positions are missing
-            const needsLayout = initialNodes.some(n => !n.position || (n.position.x === 0 && n.position.y === 0));
+            return { nodes, edges };
+        }
+
+        // ====================================================================
+        // MAIN REACT COMPONENT
+        // ====================================================================
+        function GraphViewer() {
+            // Build graph based on available data
+            let initialData;
+            if (hasDataflow) {
+                initialData = buildDataflowGraph(graphspec, dataflowAnalysis);
+            } else {
+                initialData = buildOrchestrationGraph(viewspec);
+            }
+
+            // Apply layout
+            const needsLayout = initialData.nodes.some(n => !n.position || (n.position.x === 0 && n.position.y === 0));
             const layouted = needsLayout
-                ? getLayoutedElements(initialNodes, initialEdges, viewspec.layout?.direction || 'TB')
-                : { nodes: initialNodes, edges: initialEdges };
+                ? getLayoutedElements(initialData.nodes, initialData.edges, viewspec.layout?.direction || 'TB')
+                : initialData;
 
             const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
             const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
@@ -644,15 +909,55 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 const inspectorContent = document.getElementById('inspector-content');
                 const inspectorTitle = document.getElementById('inspector-title');
                 const inspectorSubtitle = document.getElementById('inspector-subtitle');
+                const inspectorHeader = document.getElementById('inspector-header');
 
-                const nodeData = node.data.nodeData || {};
-                inspectorTitle.textContent = nodeData.label || node.id;
-                inspectorSubtitle.textContent = nodeData.inspector?.pipe_type || nodeData.kind || '';
+                const nodeData = node.data || {};
 
-                const timing = nodeData.inspector?.timing;
-                const ioPreview = nodeData.inspector?.io_preview;
-                const status = nodeData.status;
-                const badge = nodeData.ui?.badges?.[0];
+                // Handle stuff nodes
+                if (nodeData.isStuff) {
+                    const stuffData = nodeData.stuffData || {};
+                    inspectorTitle.textContent = stuffData.name || 'Data';
+                    inspectorSubtitle.textContent = stuffData.concept || 'Data Item';
+                    inspectorHeader.className = 'inspector-header stuff';
+
+                    let html = '';
+                    html += '<div class="inspector-badges">';
+                    html += '<span class="inspector-badge stuff">📦 Data Item</span>';
+                    html += '</div>';
+
+                    html += `<div class="inspector-section">
+                        <div class="inspector-section-title">Name</div>
+                        <div class="inspector-value pipe-code">${stuffData.name || 'N/A'}</div>
+                    </div>`;
+
+                    if (stuffData.concept) {
+                        html += `<div class="inspector-section">
+                            <div class="inspector-section-title">Concept</div>
+                            <div class="inspector-value">${stuffData.concept}</div>
+                        </div>`;
+                    }
+
+                    if (stuffData.data) {
+                        html += `<div class="inspector-section">
+                            <div class="inspector-section-title">Data Content</div>
+                            <pre class="inspector-pre">${JSON.stringify(stuffData.data, null, 2)}</pre>
+                        </div>`;
+                    }
+
+                    inspectorContent.innerHTML = html;
+                    inspector.classList.add('visible');
+                    return;
+                }
+
+                // Handle pipe nodes
+                const pipeData = nodeData.nodeData || {};
+                inspectorTitle.textContent = pipeData.pipe_code || pipeData.label || node.id;
+                inspectorSubtitle.textContent = pipeData.pipe_type || nodeData.kind || 'Pipe';
+                inspectorHeader.className = 'inspector-header pipe';
+
+                const timing = pipeData.timing;
+                const nodeIo = pipeData.node_io;
+                const status = pipeData.status;
 
                 let html = '';
 
@@ -663,17 +968,23 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 } else if (status === 'failed') {
                     html += '<span class="inspector-badge error">✕ Failed</span>';
                 }
-                if (badge) {
-                    html += `<span class="inspector-badge neutral">⏱ ${badge}</span>`;
+                if (timing?.duration_ms) {
+                    html += `<span class="inspector-badge neutral">⏱ ${timing.duration_ms}ms</span>`;
                 }
                 html += '</div>';
 
-                // Info rows
-                if (nodeData.inspector?.pipe_code) {
-                    const pipeCode = nodeData.inspector.pipe_code;
+                // Pipe info
+                if (pipeData.pipe_code) {
                     html += `<div class="inspector-section">
                         <div class="inspector-section-title">Pipe Code</div>
-                        <div class="inspector-value pipe-code">${pipeCode}</div>
+                        <div class="inspector-value pipe-code">${pipeData.pipe_code}</div>
+                    </div>`;
+                }
+
+                if (pipeData.pipe_type) {
+                    html += `<div class="inspector-section">
+                        <div class="inspector-section-title">Pipe Type</div>
+                        <div class="inspector-value">${pipeData.pipe_type}</div>
                     </div>`;
                 }
 
@@ -695,24 +1006,24 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     </div>`;
                 }
 
-                if (ioPreview?.inputs?.length > 0) {
+                if (nodeIo?.inputs?.length > 0) {
                     html += `<div class="inspector-section">
-                        <div class="inspector-section-title">Inputs (${ioPreview.inputs.length})</div>
-                        <div class="inspector-pre">${ioPreview.inputs.map(i => `${i.name}: ${i.concept}`).join('\\n')}</div>
+                        <div class="inspector-section-title">Inputs (${nodeIo.inputs.length})</div>
+                        <div class="inspector-pre">${nodeIo.inputs.map(i => `${i.name}: ${i.concept || 'unknown'}`).join('\\n')}</div>
                     </div>`;
                 }
 
-                if (ioPreview?.outputs?.length > 0) {
+                if (nodeIo?.outputs?.length > 0) {
                     html += `<div class="inspector-section">
-                        <div class="inspector-section-title">Outputs (${ioPreview.outputs.length})</div>
-                        <div class="inspector-pre">${ioPreview.outputs.map(o => `${o.name}: ${o.concept}`).join('\\n')}</div>
+                        <div class="inspector-section-title">Outputs (${nodeIo.outputs.length})</div>
+                        <div class="inspector-pre">${nodeIo.outputs.map(o => `${o.name}: ${o.concept || 'unknown'}`).join('\\n')}</div>
                     </div>`;
                 }
 
-                if (nodeData.inspector?.error) {
+                if (pipeData.error) {
                     html += `<div class="inspector-section">
                         <div class="inspector-section-title">Error</div>
-                        <div class="inspector-pre" style="color: var(--color-error);">${JSON.stringify(nodeData.inspector.error, null, 2)}</div>
+                        <pre class="inspector-pre" style="color: var(--color-error);">${JSON.stringify(pipeData.error, null, 2)}</pre>
                     </div>`;
                 }
 
@@ -747,11 +1058,10 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     Controls ? React.createElement(Controls, { showInteractive: false }) : null,
                     MiniMap ? React.createElement(MiniMap, {
                         nodeColor: (n) => {
-                            const kind = n.data?.nodeData?.kind;
+                            if (n.data?.isStuff) return '#f59e0b';
                             const status = n.data?.nodeData?.status;
                             if (status === 'failed') return '#ef4444';
-                            if (kind === 'controller') return '#8b5cf6';
-                            return '#06b6d4';
+                            return '#3b82f6';
                         },
                         maskColor: 'rgba(15, 23, 42, 0.8)',
                         style: { background: '#1e293b' },
