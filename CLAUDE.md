@@ -20,6 +20,14 @@
 
    Always fix any issues reported by these tools before proceeding.
 
+### Cleaning Derived Files
+
+   If you need to cleanderived, typically after you erased files or moved tests, the linters can get confused, the pytest collection can be off...
+
+   ```bash
+   make cleanderived
+   ```
+
 ### Running Tests
 
    After you're finished making code changes, you must always run tests using `make test-xdist`.
