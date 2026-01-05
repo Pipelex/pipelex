@@ -64,7 +64,7 @@ class TestReactFlowHtml:
 
         assert "unpkg.com/react@18" in html
         assert "unpkg.com/react-dom@18" in html
-        assert "unpkg.com/@xyflow/react@11" in html
+        assert "unpkg.com/reactflow@11" in html
         assert "unpkg.com/dagre@0.8.5" in html
 
     def test_custom_title_in_html(self) -> None:

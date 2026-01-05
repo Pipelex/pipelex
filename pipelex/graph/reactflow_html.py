@@ -10,6 +10,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.viewspec import ViewSpec
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
+from pipelex.urls import URLs
 
 # ReactFlow HTML template with embedded viewer
 REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
@@ -18,7 +19,6 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
-    {% if use_cdn %}
     <!-- React and ReactDOM from CDN -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -27,97 +27,352 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
     <link rel="stylesheet" href="https://unpkg.com/reactflow@11.11.4/dist/style.css">
     <!-- Dagre for layout -->
     <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --color-bg: #0f172a;
+            --color-surface: #1e293b;
+            --color-surface-hover: #334155;
+            --color-border: #334155;
+            --color-text: #f1f5f9;
+            --color-text-muted: #94a3b8;
+            --color-text-dim: #64748b;
+            --color-accent: #3b82f6;
+            --color-accent-hover: #60a5fa;
+            --color-success: #10b981;
+            --color-success-bg: rgba(16, 185, 129, 0.15);
+            --color-error: #ef4444;
+            --color-error-bg: rgba(239, 68, 68, 0.15);
+            --color-warning: #f59e0b;
+            --color-controller: #8b5cf6;
+            --color-controller-bg: rgba(139, 92, 246, 0.15);
+            --color-operator: #06b6d4;
+            --color-operator-bg: rgba(6, 182, 212, 0.15);
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Monaco', 'Menlo', monospace;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: var(--font-sans);
             height: 100vh;
             overflow: hidden;
+            background: var(--color-bg);
+            color: var(--color-text);
+        }
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            z-index: 100;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header-logo {
+            height: 28px;
+            width: auto;
+        }
+        .header-title {
+            font-size: 14px;
+            color: var(--color-text-muted);
+            font-weight: 500;
+        }
+        .header-stats {
+            display: flex;
+            gap: 16px;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--color-text-muted);
+        }
+        .stat-value {
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        .stat-icon {
+            width: 16px;
+            height: 16px;
+            opacity: 0.7;
         }
         #root {
+            flex: 1;
             width: 100%;
-            height: 100%;
+            overflow: hidden;
         }
         .react-flow-container {
             width: 100%;
             height: 100%;
+            background: var(--color-bg);
         }
+        .react-flow__node {
+            font-family: var(--font-sans);
+        }
+        .react-flow__background {
+            background: var(--color-bg) !important;
+        }
+        .react-flow__controls {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+        }
+        .react-flow__controls-button {
+            background: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            fill: var(--color-text-muted);
+        }
+        .react-flow__controls-button:hover {
+            background: var(--color-surface-hover);
+        }
+        .react-flow__minimap {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+        }
+        .react-flow__edge-path {
+            stroke-width: 2;
+        }
+        .react-flow__edge-text {
+            font-size: 11px;
+            fill: var(--color-text-muted);
+        }
+        .react-flow__edge-textbg {
+            fill: var(--color-bg);
+        }
+
+        /* Inspector Panel */
         .inspector-panel {
             position: fixed;
-            top: 10px;
-            right: 10px;
-            width: 300px;
-            max-height: 80vh;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            padding: 16px;
-            overflow-y: auto;
-            z-index: 10;
+            top: 70px;
+            right: 16px;
+            width: 360px;
+            max-height: calc(100vh - 90px);
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            z-index: 1000;
             display: none;
         }
         .inspector-panel.visible {
-            display: block;
+            display: flex;
+            flex-direction: column;
         }
         .inspector-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, var(--color-accent), var(--color-controller));
+            color: white;
+        }
+        .inspector-title {
+            font-size: 15px;
             font-weight: 600;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .inspector-subtitle {
+            font-size: 12px;
+            opacity: 0.85;
+            margin-top: 2px;
         }
         .inspector-close {
-            float: right;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            color: #999;
-            font-size: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: var(--radius-sm);
+            font-size: 18px;
             line-height: 1;
+            transition: background 0.15s;
         }
         .inspector-close:hover {
-            color: #333;
+            background: rgba(255,255,255,0.3);
         }
         .inspector-content {
-            font-size: 13px;
-            line-height: 1.5;
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .inspector-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .inspector-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 999px;
+        }
+        .inspector-badge.success {
+            background: var(--color-success-bg);
+            color: var(--color-success);
+        }
+        .inspector-badge.error {
+            background: var(--color-error-bg);
+            color: var(--color-error);
+        }
+        .inspector-badge.neutral {
+            background: var(--color-surface-hover);
+            color: var(--color-text-muted);
         }
         .inspector-section {
             margin-bottom: 16px;
         }
+        .inspector-section:last-child {
+            margin-bottom: 0;
+        }
         .inspector-section-title {
+            font-size: 11px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--color-text-dim);
             margin-bottom: 8px;
-            color: #666;
         }
         .inspector-value {
+            font-size: 14px;
+            color: var(--color-text);
             word-break: break-word;
         }
+        .inspector-value.pipe-code {
+            font-family: var(--font-mono);
+            color: var(--color-accent);
+        }
         .inspector-pre {
-            background: #f5f5f5;
-            padding: 8px;
-            border-radius: 4px;
-            font-family: 'Monaco', 'Menlo', monospace;
+            background: var(--color-bg);
+            border: 1px solid var(--color-border);
+            padding: 12px;
+            border-radius: var(--radius-md);
+            font-family: var(--font-mono);
             font-size: 12px;
+            line-height: 1.5;
+            color: var(--color-text-muted);
             overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .inspector-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--color-border);
+        }
+        .inspector-row:last-child {
+            border-bottom: none;
+        }
+        .inspector-row-label {
+            color: var(--color-text-dim);
+            font-size: 13px;
+        }
+        .inspector-row-value {
+            color: var(--color-text);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* Legend */
+        .legend {
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: 12px 16px;
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--color-text-muted);
+        }
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+        .legend-dot.controller {
+            background: var(--color-controller);
+        }
+        .legend-dot.operator {
+            background: var(--color-operator);
+        }
+        .legend-dot.success {
+            background: var(--color-success);
+        }
+        .legend-dot.error {
+            background: var(--color-error);
         }
     </style>
-    {% else %}
-    <!-- Inline dependencies would go here for offline mode -->
-    <!-- For now, we'll still use CDN but this is where bundled JS would be -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/reactflow@11.11.4/dist/umd/index.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/reactflow@11.11.4/dist/style.css">
-    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
-    {% endif %}
 </head>
 <body>
-    <div id="root"></div>
+    <div id="app-container">
+        <header class="header">
+            <div class="header-left">
+                <img src="{{ logo_url }}" alt="Pipelex" class="header-logo">
+                <span class="header-title">{{ title }}</span>
+            </div>
+            <div class="header-stats" id="header-stats"></div>
+        </header>
+        <div id="root"></div>
+    </div>
+
     <div id="inspector" class="inspector-panel">
         <div class="inspector-header">
-            <span id="inspector-title">Node Details</span>
+            <div>
+                <div id="inspector-title" class="inspector-title">Node Details</div>
+                <div id="inspector-subtitle" class="inspector-subtitle"></div>
+            </div>
             <span class="inspector-close" onclick="closeInspector()">&times;</span>
         </div>
         <div id="inspector-content" class="inspector-content"></div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot controller"></div>Controller</div>
+        <div class="legend-item"><div class="legend-dot operator"></div>Operator</div>
+        <div class="legend-item"><div class="legend-dot success"></div>Success</div>
+        <div class="legend-item"><div class="legend-dot error"></div>Failed</div>
     </div>
 
     <!-- Embedded ViewSpec -->
@@ -136,20 +391,101 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         const graphspecElement = document.getElementById('pipelex-graphspec');
         const graphspec = graphspecElement ? JSON.parse(graphspecElement.textContent) : null;
 
+        // Update header stats
+        const statsEl = document.getElementById('header-stats');
+        const nodeCount = viewspec.nodes.length;
+        const edgeCount = viewspec.edges.length;
+        const succeededCount = viewspec.nodes.filter(n => n.status === 'succeeded').length;
+        const failedCount = viewspec.nodes.filter(n => n.status === 'failed').length;
+        statsEl.innerHTML = `
+            <div class="stat-item">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                </svg>
+                <span class="stat-value">${nodeCount}</span> nodes
+            </div>
+            <div class="stat-item">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+                <span class="stat-value">${edgeCount}</span> edges
+            </div>
+            ${succeededCount > 0 ? `<div class="stat-item" style="color: var(--color-success)">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                <span class="stat-value">${succeededCount}</span>
+            </div>` : ''}
+            ${failedCount > 0 ? `<div class="stat-item" style="color: var(--color-error)">
+                <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <span class="stat-value">${failedCount}</span>
+            </div>` : ''}
+        `;
+
         // ReactFlow setup
         const { React, ReactDOM } = window;
-        // reactflow UMD exposes window.ReactFlowRenderer
         const ReactFlowLib = window.ReactFlowRenderer || window.ReactFlow || {};
-        const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MiniMap } = ReactFlowLib;
+        const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MiniMap, MarkerType } = ReactFlowLib;
+
+        // Node style generator
+        function getNodeStyle(node) {
+            const isController = node.kind === 'controller';
+            const isSucceeded = node.ui?.classes?.includes('succeeded');
+            const isFailed = node.ui?.classes?.includes('failed');
+
+            let borderColor = '#475569';
+            let bgColor = '#1e293b';
+
+            if (isController) {
+                borderColor = '#8b5cf6';
+                bgColor = 'rgba(139, 92, 246, 0.1)';
+            } else {
+                borderColor = '#06b6d4';
+                bgColor = 'rgba(6, 182, 212, 0.1)';
+            }
+
+            if (isFailed) {
+                borderColor = '#ef4444';
+                bgColor = 'rgba(239, 68, 68, 0.15)';
+            }
+
+            const badge = node.ui?.badges?.[0] || '';
+
+            return {
+                style: {
+                    background: bgColor,
+                    border: `2px solid ${borderColor}`,
+                    borderRadius: '8px',
+                    padding: '0',
+                    minWidth: '160px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                },
+                badge,
+                isController,
+                isSucceeded,
+                isFailed,
+            };
+        }
 
         // Dagre layout function
         function getLayoutedElements(nodes, edges, direction = 'TB') {
             const g = new dagre.graphlib.Graph();
             g.setDefaultEdgeLabel(() => ({}));
-            g.setGraph({ rankdir: direction, nodesep: 50, ranksep: 80 });
+            g.setGraph({
+                rankdir: direction,
+                nodesep: 60,
+                ranksep: 100,
+                edgesep: 30,
+                marginx: 40,
+                marginy: 40,
+            });
 
             nodes.forEach((node) => {
-                g.setNode(node.id, { width: 150, height: 50 });
+                const labelLen = node.data?.label?.length || 10;
+                const width = Math.max(160, Math.min(280, labelLen * 9 + 60));
+                g.setNode(node.id, { width, height: 60 });
             });
 
             edges.forEach((edge) => {
@@ -160,11 +496,13 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
 
             const layoutedNodes = nodes.map((node) => {
                 const nodeWithPosition = g.node(node.id);
+                const labelLen = node.data?.label?.length || 10;
+                const width = Math.max(160, Math.min(280, labelLen * 9 + 60));
                 return {
                     ...node,
                     position: {
-                        x: nodeWithPosition.x - 75,
-                        y: nodeWithPosition.y - 25,
+                        x: nodeWithPosition.x - width / 2,
+                        y: nodeWithPosition.y - 30,
                     },
                 };
             });
@@ -175,37 +513,127 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         // Main React component
         function GraphViewer() {
             // Convert ViewSpec to ReactFlow format
-            const initialNodes = viewspec.nodes.map(node => ({
-                id: node.id,
-                type: node.type || 'default',
-                data: {
-                    label: node.label,
-                    ...node.inspector,
-                },
-                position: node.position || { x: 0, y: 0 },
-                style: {
-                    background: node.ui?.classes?.includes('failed') ? '#fee' :
-                               node.ui?.classes?.includes('succeeded') ? '#efe' : '#fff',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    padding: '10px',
-                },
-                parentId: node.parent_id,
-            }));
+            const initialNodes = viewspec.nodes.map(node => {
+                const { style, badge, isController, isSucceeded, isFailed } = getNodeStyle(node);
+                const labelLen = node.label?.length || 10;
+                const width = Math.max(160, Math.min(280, labelLen * 9 + 60));
+
+                return {
+                    id: node.id,
+                    type: 'default',
+                    data: {
+                        label: React.createElement('div', {
+                            style: {
+                                padding: '10px 14px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '4px',
+                            }
+                        },
+                            React.createElement('div', {
+                                style: {
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '8px',
+                                }
+                            },
+                                React.createElement('span', {
+                                    style: {
+                                        fontFamily: "'JetBrains Mono', monospace",
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        color: '#f1f5f9',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                    }
+                                }, node.label),
+                                isSucceeded && React.createElement('span', {
+                                    style: {
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: '#10b981',
+                                        flexShrink: 0,
+                                    }
+                                }),
+                                isFailed && React.createElement('span', {
+                                    style: {
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        background: '#ef4444',
+                                        flexShrink: 0,
+                                    }
+                                })
+                            ),
+                            React.createElement('div', {
+                                style: {
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    gap: '8px',
+                                }
+                            },
+                                React.createElement('span', {
+                                    style: {
+                                        fontSize: '11px',
+                                        color: '#64748b',
+                                    }
+                                }, isController ? 'Controller' : node.inspector?.pipe_type || 'Operator'),
+                                badge && React.createElement('span', {
+                                    style: {
+                                        fontSize: '10px',
+                                        color: '#94a3b8',
+                                        background: 'rgba(255,255,255,0.1)',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        fontFamily: "'JetBrains Mono', monospace",
+                                    }
+                                }, badge)
+                            )
+                        ),
+                        nodeData: node,
+                    },
+                    position: node.position || { x: 0, y: 0 },
+                    style: { ...style, width },
+                };
+            });
 
             const initialEdges = viewspec.edges.map(edge => ({
                 id: edge.id,
                 source: edge.source,
                 target: edge.target,
-                type: edge.type || 'default',
+                type: 'smoothstep',
                 animated: edge.animated || false,
                 label: edge.label,
+                labelStyle: {
+                    fontSize: 11,
+                    fontWeight: 500,
+                    fill: '#94a3b8',
+                    fontFamily: "'JetBrains Mono', monospace",
+                },
+                labelBgStyle: {
+                    fill: '#0f172a',
+                    fillOpacity: 0.9,
+                },
+                labelBgPadding: [6, 4],
+                labelBgBorderRadius: 4,
+                style: {
+                    stroke: edge.kind === 'data' ? '#3b82f6' : '#475569',
+                    strokeWidth: edge.kind === 'data' ? 2 : 1,
+                },
+                markerEnd: {
+                    type: MarkerType?.ArrowClosed || 'arrowclosed',
+                    color: edge.kind === 'data' ? '#3b82f6' : '#475569',
+                },
             }));
 
             // Apply layout if positions are missing
             const needsLayout = initialNodes.some(n => !n.position || (n.position.x === 0 && n.position.y === 0));
             const layouted = needsLayout
-                ? getLayoutedElements(initialNodes, initialEdges, viewspec.layout.direction)
+                ? getLayoutedElements(initialNodes, initialEdges, viewspec.layout?.direction || 'TB')
                 : { nodes: initialNodes, edges: initialEdges };
 
             const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
@@ -215,47 +643,85 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 const inspector = document.getElementById('inspector');
                 const inspectorContent = document.getElementById('inspector-content');
                 const inspectorTitle = document.getElementById('inspector-title');
+                const inspectorSubtitle = document.getElementById('inspector-subtitle');
 
-                inspectorTitle.textContent = node.data.label || node.id;
+                const nodeData = node.data.nodeData || {};
+                inspectorTitle.textContent = nodeData.label || node.id;
+                inspectorSubtitle.textContent = nodeData.inspector?.pipe_type || nodeData.kind || '';
+
+                const timing = nodeData.inspector?.timing;
+                const ioPreview = nodeData.inspector?.io_preview;
+                const status = nodeData.status;
+                const badge = nodeData.ui?.badges?.[0];
 
                 let html = '';
-                if (node.data.pipe_code) {
+
+                // Status badges
+                html += '<div class="inspector-badges">';
+                if (status === 'succeeded') {
+                    html += '<span class="inspector-badge success">✓ Succeeded</span>';
+                } else if (status === 'failed') {
+                    html += '<span class="inspector-badge error">✕ Failed</span>';
+                }
+                if (badge) {
+                    html += `<span class="inspector-badge neutral">⏱ ${badge}</span>`;
+                }
+                html += '</div>';
+
+                // Info rows
+                if (nodeData.inspector?.pipe_code) {
+                    const pipeCode = nodeData.inspector.pipe_code;
                     html += `<div class="inspector-section">
                         <div class="inspector-section-title">Pipe Code</div>
-                        <div class="inspector-value">${node.data.pipe_code}</div>
-                    </div>`;
-                }
-                if (node.data.pipe_type) {
-                    html += `<div class="inspector-section">
-                        <div class="inspector-section-title">Pipe Type</div>
-                        <div class="inspector-value">${node.data.pipe_type}</div>
-                    </div>`;
-                }
-                if (node.data.timing) {
-                    html += `<div class="inspector-section">
-                        <div class="inspector-section-title">Timing</div>
-                        <div class="inspector-pre">${JSON.stringify(node.data.timing, null, 2)}</div>
-                    </div>`;
-                }
-                if (node.data.io_preview) {
-                    html += `<div class="inspector-section">
-                        <div class="inspector-section-title">I/O</div>
-                        <div class="inspector-pre">${JSON.stringify(node.data.io_preview, null, 2)}</div>
-                    </div>`;
-                }
-                if (node.data.error) {
-                    html += `<div class="inspector-section">
-                        <div class="inspector-section-title">Error</div>
-                        <div class="inspector-pre">${JSON.stringify(node.data.error, null, 2)}</div>
+                        <div class="inspector-value pipe-code">${pipeCode}</div>
                     </div>`;
                 }
 
-                inspectorContent.innerHTML = html || '<div>No additional information</div>';
+                if (timing) {
+                    html += `<div class="inspector-section">
+                        <div class="inspector-section-title">Timing</div>
+                        <div class="inspector-row">
+                            <span class="inspector-row-label">Started</span>
+                            <span class="inspector-row-value">${new Date(timing.started_at).toLocaleTimeString()}</span>
+                        </div>
+                        <div class="inspector-row">
+                            <span class="inspector-row-label">Ended</span>
+                            <span class="inspector-row-value">${new Date(timing.ended_at).toLocaleTimeString()}</span>
+                        </div>
+                        <div class="inspector-row">
+                            <span class="inspector-row-label">Duration</span>
+                            <span class="inspector-row-value">${timing.duration_ms}ms</span>
+                        </div>
+                    </div>`;
+                }
+
+                if (ioPreview?.inputs?.length > 0) {
+                    html += `<div class="inspector-section">
+                        <div class="inspector-section-title">Inputs (${ioPreview.inputs.length})</div>
+                        <div class="inspector-pre">${ioPreview.inputs.map(i => `${i.name}: ${i.concept}`).join('\\n')}</div>
+                    </div>`;
+                }
+
+                if (ioPreview?.outputs?.length > 0) {
+                    html += `<div class="inspector-section">
+                        <div class="inspector-section-title">Outputs (${ioPreview.outputs.length})</div>
+                        <div class="inspector-pre">${ioPreview.outputs.map(o => `${o.name}: ${o.concept}`).join('\\n')}</div>
+                    </div>`;
+                }
+
+                if (nodeData.inspector?.error) {
+                    html += `<div class="inspector-section">
+                        <div class="inspector-section-title">Error</div>
+                        <div class="inspector-pre" style="color: var(--color-error);">${JSON.stringify(nodeData.inspector.error, null, 2)}</div>
+                    </div>`;
+                }
+
+                inspectorContent.innerHTML = html || '<div style="color: var(--color-text-dim)">No additional information</div>';
                 inspector.classList.add('visible');
             };
 
             if (!ReactFlow) {
-                return React.createElement('div', { style: { padding: '20px' } },
+                return React.createElement('div', { style: { padding: '20px', color: '#f1f5f9' } },
                     React.createElement('p', null, 'Loading ReactFlow...')
                 );
             }
@@ -268,10 +734,28 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     onEdgesChange: onEdgesChange,
                     onNodeClick: onNodeClick,
                     fitView: true,
+                    fitViewOptions: { padding: 0.2 },
+                    defaultEdgeOptions: { type: 'smoothstep' },
+                    proOptions: { hideAttribution: true },
                 },
-                    Background ? React.createElement(Background, {}) : null,
-                    Controls ? React.createElement(Controls, {}) : null,
-                    MiniMap ? React.createElement(MiniMap, {}) : null
+                    Background ? React.createElement(Background, {
+                        variant: 'dots',
+                        gap: 20,
+                        size: 1,
+                        color: '#334155',
+                    }) : null,
+                    Controls ? React.createElement(Controls, { showInteractive: false }) : null,
+                    MiniMap ? React.createElement(MiniMap, {
+                        nodeColor: (n) => {
+                            const kind = n.data?.nodeData?.kind;
+                            const status = n.data?.nodeData?.status;
+                            if (status === 'failed') return '#ef4444';
+                            if (kind === 'controller') return '#8b5cf6';
+                            return '#06b6d4';
+                        },
+                        maskColor: 'rgba(15, 23, 42, 0.8)',
+                        style: { background: '#1e293b' },
+                    }) : null
                 )
             );
         }
@@ -329,6 +813,7 @@ def generate_reactflow_html(
         template_category=TemplateCategory.HTML,
         temlating_context={
             "title": title,
+            "logo_url": URLs.logo_white_on_transparent,
             "viewspec_json": viewspec_json,
             "graphspec_json": graphspec_json,
             "use_cdn": use_cdn,
@@ -370,6 +855,7 @@ async def generate_reactflow_html_async(
         template_category=TemplateCategory.HTML,
         temlating_context={
             "title": title,
+            "logo_url": URLs.logo_white_on_transparent,
             "viewspec_json": viewspec_json,
             "graphspec_json": graphspec_json,
             "use_cdn": use_cdn,
