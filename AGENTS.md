@@ -22,7 +22,7 @@
 
 ### Cleaning Derived Files
 
-   If you need to cleanderived, typically after you erased files or moved tests, the linters can get confused, the pytest collection can be off...
+   If you need to clean derived files and caches, typically after you erased files or moved tests, the linters can get confused, the pytest collection can be off...
 
    ```bash
    make cleanderived
