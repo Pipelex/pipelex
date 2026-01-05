@@ -47,8 +47,8 @@ class TestLLMVision:
     async def test_gen_text_from_vision_by_bytes(
         self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, image_path: str
     ):
-        image_bytes = await load_binary_as_base64(path=image_path)
-        prompt_image = PromptImageBase64(base64_bytes=image_bytes)
+        base64_data = await load_binary_as_base64(path=image_path)
+        prompt_image = PromptImageBase64(base64_data=base64_data)
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(

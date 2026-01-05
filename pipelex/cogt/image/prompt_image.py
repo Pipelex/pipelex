@@ -61,25 +61,24 @@ class PromptImageUri(BaseModel):
 
 
 class PromptImageBase64(BaseModel):
-    """A prompt image as raw base64-encoded bytes."""
+    """A prompt image as base64-encoded string."""
 
     kind: Literal["base64"] = "base64"
-    base64_bytes: bytes
+    base64_data: str
 
     def get_file_type(self) -> FileType:
-        return detect_file_type_from_base64(self.base64_bytes)
+        return detect_file_type_from_base64(self.base64_data)
 
     def get_mime_type(self) -> str:
         return self.get_file_type().mime
 
     def get_decoded_bytes(self) -> bytes:
-        return base64.b64decode(self.base64_bytes)
+        return base64.b64decode(self.base64_data)
 
     @override
     def __str__(self) -> str:
-        base64_str = str(self.base64_bytes)
-        truncated_base64 = AttributePolisher.get_truncated_value(value=base64_str)
-        return f"PromptImageBase64(base64_bytes={truncated_base64!r})"
+        truncated_base64 = AttributePolisher.get_truncated_value(value=self.base64_data)
+        return f"PromptImageBase64(base64_data={truncated_base64!r})"
 
     @override
     def __repr__(self) -> str:
@@ -91,7 +90,7 @@ class PromptImageBase64(BaseModel):
 
     def short_description(self) -> str:
         """Return a short description of the image."""
-        return f"base64: {self.base64_bytes[:100].decode('ascii', errors='replace')}..."
+        return f"base64: {self.base64_data[:100]}..."
 
 
 class PromptImageBinary(BaseModel):
