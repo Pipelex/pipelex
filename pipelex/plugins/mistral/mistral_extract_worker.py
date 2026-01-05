@@ -11,8 +11,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base64_utils import load_binary_as_base64
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
+from pipelex.tools.misc.base64_utils import make_base64_url_from_path
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
     ResolvedHttpUrl,
@@ -49,13 +48,13 @@ class MistralExtractWorker(ExtractWorkerAbstract):
     ) -> ExtractOutput:
         # TODO: report usage
         if image_uri := extract_job.extract_input.image_uri:
-            extract_output = await self._make_extract_output_from_image(
+            extract_output = await self._extract_page_from_image(
                 image_uri=image_uri,
                 should_caption_image=extract_job.job_params.should_caption_images,
             )
 
         elif pdf_uri := extract_job.extract_input.pdf_uri:
-            extract_output = await self._make_extract_output_from_pdf(
+            extract_output = await self._extract_pages_from_pdf(
                 pdf_uri=pdf_uri,
                 should_include_images=extract_job.job_params.should_include_images,
                 should_caption_images=extract_job.job_params.should_caption_images,
@@ -65,7 +64,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             raise ExtractInputError(msg)
         return extract_output
 
-    async def _make_extract_output_from_image(
+    async def _extract_page_from_image(
         self,
         image_uri: str,
         should_caption_image: bool = False,
@@ -74,16 +73,18 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             msg = "Captioning is not implemented for Mistral OCR."
             raise NotImplementedError(msg)
         resolved_uri = resolve_uri(image_uri)
+        image_url: str
         match resolved_uri:
             case ResolvedHttpUrl():
-                return await self._extract_from_image_url(image_url=resolved_uri.url)
+                image_url = resolved_uri.url
             case ResolvedLocalPath():
-                return await self._extract_from_image_file(image_path=resolved_uri.path)
+                image_url = await make_base64_url_from_path(path=resolved_uri.path)
             case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
                 msg = f"Unsupported URI type for Mistral image extraction: {resolved_uri.kind}"
                 raise ExtractInputError(msg)
+        return await self._extract_from_image_url(image_url=image_url)
 
-    async def _make_extract_output_from_pdf(
+    async def _extract_pages_from_pdf(
         self,
         pdf_uri: str,
         should_include_images: bool,
@@ -92,23 +93,20 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         if should_caption_images:
             msg = "Captioning is not implemented for Mistral OCR."
             raise ExtractCapabilityError(msg)
-        extract_output: ExtractOutput
         resolved_uri = resolve_uri(pdf_uri)
+        pdf_url: str
         match resolved_uri:
             case ResolvedHttpUrl():
-                extract_output = await self.extract_from_pdf_url(
-                    pdf_url=resolved_uri.url,
-                    should_include_images=should_include_images,
-                )
+                pdf_url = resolved_uri.url
             case ResolvedLocalPath():
-                extract_output = await self.extract_from_pdf_file(
-                    pdf_path=resolved_uri.path,
-                    should_include_images=should_include_images,
-                )
+                pdf_url = await self._get_signed_url_from_pdf_file(pdf_path=resolved_uri.path)
             case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
                 msg = f"Unsupported URI type for Mistral PDF extraction: {resolved_uri.kind}"
                 raise ExtractInputError(msg)
-        return extract_output
+        return await self._extract_from_pdf_url(
+            pdf_url=pdf_url,
+            should_include_images=should_include_images,
+        )
 
     async def _extract_from_image_url(
         self,
@@ -125,24 +123,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             mistral_extract_response=extract_response,
         )
 
-    async def _extract_from_image_file(
-        self,
-        image_path: str,
-    ) -> ExtractOutput:
-        b64 = await load_binary_as_base64(path=image_path)
-
-        file_type = detect_file_type_from_base64(base64_data=b64)
-        mime_type = file_type.mime
-
-        extract_response = await self.mistral_client.ocr.process_async(
-            model=self.inference_model.model_id,
-            document={"type": "image_url", "image_url": f"data:{mime_type};base64,{b64}"},
-        )
-        return await MistralFactory.make_extract_output_from_mistral_response(
-            mistral_extract_response=extract_response,
-        )
-
-    async def extract_from_pdf_url(
+    async def _extract_from_pdf_url(
         self,
         pdf_url: str,
         should_include_images: bool = False,
@@ -161,22 +142,16 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             should_include_images=should_include_images,
         )
 
-    async def extract_from_pdf_file(
+    async def _get_signed_url_from_pdf_file(
         self,
         pdf_path: str,
-        should_include_images: bool = False,
-    ) -> ExtractOutput:
-        # Upload the file
+    ) -> str:
+        """Upload a PDF file to Mistral and return a signed URL for it."""
         uploaded_file_id = await MistralFactory.upload_file_to_mistral_for_ocr(
             mistral_client=self.mistral_client,
             file_path=pdf_path,
         )
-
-        # Get signed URL
         signed_url = await self.mistral_client.files.get_signed_url_async(
             file_id=uploaded_file_id,
         )
-        return await self.extract_from_pdf_url(
-            pdf_url=signed_url.url,
-            should_include_images=should_include_images,
-        )
+        return signed_url.url
