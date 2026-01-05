@@ -30,7 +30,16 @@ This document outlines the core coding standards, best practices, and quality co
 
     - Import all necessary libraries at the top of the file
     - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
-    - Do not bother with ordering the imports, our Ruff linter will handle it for us. Same goes with removing unused imports.
+    - Do not bother with ordering the imports, our Ruff linter will handle it for us.
+
+### **Removing unused imports**
+
+    - To remove unused imports, run `make fix-unused-imports` or `make fui` (shorthand). This is faster and cheaper than rewriting with LLM.
+
+### **No re-exports in `__init__.py`**
+
+    - Do NOT fill `__init__.py` files with re-exports.
+    - Always use direct full-path imports everywhere. For example:
 
 - **Logging and Pretty Printing**:
 
