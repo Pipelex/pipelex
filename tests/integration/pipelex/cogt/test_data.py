@@ -7,6 +7,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.types import StrEnum
+from tests.cases import ImageTestCases
 from tests.integration.pipelex.test_data import PipeTestCases
 
 
@@ -86,6 +87,11 @@ class LLMVisionTestCases:
             "Gantt chart",
             PipeTestCases.URL_IMG_GANTT_PNG,
         ),
+    ]
+
+    # Data URLs for vision tests (topic, data_url)
+    IMAGE_DATA_URLS: ClassVar[list[tuple[str, str]]] = [
+        ("Pipelex Logo Tiny", ImageTestCases.LOGO_TINY_PNG_DATA_URL),
     ]
 
 

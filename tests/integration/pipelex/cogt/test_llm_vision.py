@@ -113,3 +113,33 @@ class TestLLMVision:
             pytest.skip(f"Vision capability not supported for this LLM: {llm_handle} because {exc}")
         except PromptImageFormatError as exc:
             pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
+
+    @pytest.mark.parametrize(("topic", "data_url"), LLMVisionTestCases.IMAGE_DATA_URLS)
+    async def test_gen_text_from_vision_by_data_url(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, data_url: str
+    ):
+        """Test LLM vision using a data URL (embedded base64 image).
+
+        This verifies that data URLs like 'data:image/png;base64,...' are correctly
+        handled by the LLM vision pipeline.
+        """
+        prompt_image = PromptImageFactory.make_prompt_image(uri=data_url)
+        llm_worker = get_llm_worker(llm_handle=llm_handle)
+        log.info(f"Using llm_worker: {llm_worker.desc}")
+        llm_job = LLMJobFactory.make_llm_job(
+            llm_prompt=LLMPrompt(
+                user_text=LLMVisionTestCases.VISION_USER_TEXT,
+                user_images=[prompt_image],
+            ),
+            job_metadata=job_metadata,
+            llm_job_params=llm_job_params,
+        )
+
+        try:
+            generated_text = await llm_worker.gen_text(llm_job=llm_job)
+            assert generated_text
+            pretty_print(generated_text, title=f"Vision of {topic} (data URL)")
+        except LLMCapabilityError as exc:
+            pytest.skip(f"Vision capability not supported for this LLM: {llm_handle} because {exc}")
+        except PromptImageFormatError as exc:
+            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")

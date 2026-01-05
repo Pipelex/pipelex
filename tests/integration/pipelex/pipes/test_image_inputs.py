@@ -238,3 +238,43 @@ class TestImageInputs:
             assert pipe_output.main_stuff.concept.code == "Analysis"
             # Verify the content is some kind of text output (analysis result)
             assert pipe_output.main_stuff.content is not None
+
+    @pytest.mark.parametrize(("_topic", "data_url"), ImageTestCases.DATA_URL_TEST_CASES)
+    async def test_image_input_with_data_url(
+        self,
+        job_metadata: JobMetadata,
+        pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
+        _topic: str,
+        data_url: str,
+    ) -> None:
+        """Test that ImageContent with data URL works as pipeline input.
+
+        This test verifies that a data URL (data:image/png;base64,...) can be used
+        as the URL in ImageContent and is correctly processed through the pipeline.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        # Create ImageContent with data URL
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.IMAGE),
+                content=ImageContent(url=data_url),
+                name="image",
+            ),
+        )
+
+        # Run the extract_article_from_image pipe (which expects an Image input)
+        pipe_output = await get_pipe_router().run(
+            pipe_job=PipeJobFactory.make_pipe_job(
+                pipe=get_required_pipe(pipe_code="extract_article_from_image"),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                working_memory=working_memory,
+                job_metadata=job_metadata,
+            ),
+        )
+
+        # Verify the pipeline executed successfully
+        assert pipe_output is not None
+        assert pipe_output.working_memory is not None
+        assert pipe_output.main_stuff is not None
