@@ -397,13 +397,13 @@ def build_partial_cmd(
         if output_path:
             match extension:
                 case "md":
-                    markdown_output = pipe_output.main_stuff.content.rendered_markdown()
+                    markdown_output = await pipe_output.main_stuff.content.rendered_markdown()
                     save_text_to_path(text=markdown_output, path=output_path)
                 case "txt":
-                    text_output = pipe_output.main_stuff.content.rendered_plain()
+                    text_output = await pipe_output.main_stuff.content.rendered_plain()
                     save_text_to_path(text=text_output, path=output_path)
                 case "html":
-                    html_output = pipe_output.main_stuff.content.rendered_html()
+                    html_output = await pipe_output.main_stuff.content.rendered_html()
                     save_text_to_path(text=html_output, path=output_path)
                 case "json":
                     json_output = pipe_output.main_stuff.content.smart_dump()

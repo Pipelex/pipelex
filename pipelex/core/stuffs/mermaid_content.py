@@ -4,7 +4,7 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 
 
 class MermaidContent(StuffContent):
@@ -21,13 +21,13 @@ class MermaidContent(StuffContent):
         return self.mermaid_code
 
     @override
-    def rendered_plain(self) -> str:
+    async def rendered_plain(self) -> str:
         return self.mermaid_code
 
     @override
-    def rendered_html(self) -> str:
+    async def rendered_html(self) -> str:
         template_source = '<div class="mermaid">{{ mermaid_code|e }}</div>'
-        return render_jinja2_sync(
+        return await render_jinja2_async(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             temlating_context={
@@ -36,9 +36,9 @@ class MermaidContent(StuffContent):
         )
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return self.mermaid_code
 
     @override
-    def rendered_json(self) -> str:
+    async def rendered_json(self) -> str:
         return json.dumps({"mermaid": self.mermaid_code})

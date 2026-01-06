@@ -105,7 +105,7 @@ class PipelineTracker(PipelineTrackerProtocol):
                 self.nx_graph.nodes[node][NodeAttributeKey.COMMENT] = comment
             return node
 
-        stuff_content_rendered = stuff.content.rendered_plain()[:250]
+        stuff_content_rendered = "stuff.content.rendered_plain()[:250]"
         stuff_content_type = type(stuff.content).__name__
         stuff_description = f"{stuff_content_type}"
         stuff_description += f"<br/><br/>{stuff_content_rendered}…"

@@ -42,7 +42,7 @@ def text_format(context: Context, value: Any, text_format: TextFormat | None = N
 # TODO: better separate tag and render
 # Filter to tag the variable with a tag style and a provided name, appropriate for tagging in a prompt
 @pass_context
-def tag(context: Context, value: Any, tag_name: str | None = None) -> Any:
+async def tag(context: Context, value: Any, tag_name: str | None = None) -> Any:
     if isinstance(value, Undefined):
         # maybe we don't need this check
         if tag_name:
@@ -52,7 +52,7 @@ def tag(context: Context, value: Any, tag_name: str | None = None) -> Any:
         raise Jinja2ContextError(msg)
 
     if isinstance(value, Jinja2TaggableAbstract):
-        value, tag_name = value.render_tagged_for_jinja2(context=context, tag_name=tag_name)
+        value, tag_name = await value.render_tagged_for_jinja2(context=context, tag_name=tag_name)
 
     return render_any_tagged_for_jinja2(context=context, value=value, tag_name=tag_name)
 
