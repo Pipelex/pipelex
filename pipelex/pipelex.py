@@ -51,7 +51,7 @@ from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig, StorageMethod
+from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
 )
@@ -77,6 +77,7 @@ from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
+from pipelex.tools.storage.storage_config import StorageMethod
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.types import Self
 from pipelex.urls import URLs

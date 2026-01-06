@@ -1,5 +1,5 @@
 from pipelex.config import get_config
-from pipelex.system.configuration.configs import StorageMethod
+from pipelex.tools.storage.storage_config import StorageMethod
 
 
 class TestStorageConfigIntegration:
