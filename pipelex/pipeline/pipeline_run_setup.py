@@ -163,7 +163,7 @@ async def pipeline_run_setup(
 
     # Normalize data URLs to pipelex-storage:// URIs if configured
     if working_memory and get_config().pipelex.pipeline_execution_config.is_normalize_data_urls_to_storage:
-        working_memory = normalize_data_urls_to_storage(working_memory)
+        working_memory = await normalize_data_urls_to_storage(working_memory)
 
     if pipe_run_mode is None:
         if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):

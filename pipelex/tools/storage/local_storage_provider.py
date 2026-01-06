@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import aiofiles
 from typing_extensions import override
 
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError
@@ -50,7 +51,7 @@ class LocalStorageProvider(StorageProviderAbstract):
         return resolved_path
 
     @override
-    def _load(self, key: str) -> bytes:
+    async def _load(self, key: str) -> bytes:
         """Load bytes from a file.
 
         Args:
@@ -69,10 +70,11 @@ class LocalStorageProvider(StorageProviderAbstract):
             msg = f"File not found: '{key}'"
             raise StorageFileNotFoundError(msg)
 
-        return file_path.read_bytes()
+        async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
+            return await file_handle.read()
 
     @override
-    def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Store bytes to a file.
 
         Args:
@@ -88,10 +90,11 @@ class LocalStorageProvider(StorageProviderAbstract):
         # Create parent directories if they don't exist
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        file_path.write_bytes(data)
+        async with aiofiles.open(file_path, "wb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
+            await file_handle.write(data)
 
     @override
-    def display_link(self, uri: str) -> str:
+    async def display_link(self, uri: str) -> str:
         """Return a file:// URI for this storage URI.
 
         Args:

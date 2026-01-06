@@ -14,7 +14,7 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
     root: InMemoryStorageRoot = {}
 
     @override
-    def _load(self, key: str) -> bytes:
+    async def _load(self, key: str) -> bytes:
         """Load bytes from memory.
 
         Args:
@@ -34,7 +34,7 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         return self.root[key]
 
     @override
-    def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Store bytes in memory.
 
         Args:
@@ -45,7 +45,7 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         self.root[key] = data
 
     @override
-    def display_link(self, uri: str) -> str | None:
+    async def display_link(self, uri: str) -> str | None:
         """In-memory storage cannot generate a display link.
 
         Args:

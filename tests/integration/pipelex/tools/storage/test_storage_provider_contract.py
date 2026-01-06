@@ -6,16 +6,20 @@ future S3/GCP implementations) must satisfy to work with ImageContent.
 When implementing a new storage provider, ensure all these tests pass.
 
 Storage Provider Contract Requirements:
+
 - store(data: bytes, key: str) -> str: Must return a pipelex-storage:// URI
 - load(uri: str) -> bytes: Must load data from a pipelex-storage:// URI
 - display_link(uri: str) -> str | None: Must return a human-readable link or None
 """
+
+import pytest
 
 from pipelex.tools.misc.file_utils import load_binary
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract
 from tests.cases import ImageTestCases
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestStorageProviderContract:
     """Tests that verify storage providers implement the full contract.
 
@@ -25,7 +29,7 @@ class TestStorageProviderContract:
     When implementing a new storage provider, ensure all these tests pass.
     """
 
-    def test_store_returns_pipelex_storage_uri(
+    async def test_store_returns_pipelex_storage_uri(
         self,
         storage_provider: StorageProviderAbstract,
     ) -> None:
@@ -37,12 +41,12 @@ class TestStorageProviderContract:
         test_data = b"contract test data"
         key = "contract/test.bin"
 
-        uri = storage_provider.store(data=test_data, key=key)
+        uri = await storage_provider.store(data=test_data, key=key)
 
         assert uri.startswith(PIPELEX_STORAGE_SCHEME)
         assert uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
 
-    def test_load_retrieves_stored_data(
+    async def test_load_retrieves_stored_data(
         self,
         storage_provider: StorageProviderAbstract,
     ) -> None:
@@ -55,12 +59,12 @@ class TestStorageProviderContract:
         image_bytes = load_binary(path=ImageTestCases.IMAGE_FILE_PATH_LOGO_TINY)
         key = "contract/image.png"
 
-        uri = storage_provider.store(data=image_bytes, key=key)
-        retrieved = storage_provider.load(uri=uri)
+        uri = await storage_provider.store(data=image_bytes, key=key)
+        retrieved = await storage_provider.load(uri=uri)
 
         assert retrieved == image_bytes
 
-    def test_display_link_returns_string_or_none(
+    async def test_display_link_returns_string_or_none(
         self,
         storage_provider: StorageProviderAbstract,
     ) -> None:
@@ -75,8 +79,8 @@ class TestStorageProviderContract:
         test_data = b"display link test"
         key = "contract/display.bin"
 
-        uri = storage_provider.store(data=test_data, key=key)
-        display = storage_provider.display_link(uri=uri)
+        uri = await storage_provider.store(data=test_data, key=key)
+        display = await storage_provider.display_link(uri=uri)
 
         # Must be string or None
         assert display is None or isinstance(display, str)
@@ -85,7 +89,7 @@ class TestStorageProviderContract:
         if display is not None:
             assert len(display) > 0
 
-    def test_handles_nested_key_paths(
+    async def test_handles_nested_key_paths(
         self,
         storage_provider: StorageProviderAbstract,
     ) -> None:
@@ -97,12 +101,12 @@ class TestStorageProviderContract:
         test_data = b"nested path test"
         key = "level1/level2/level3/file.png"
 
-        uri = storage_provider.store(data=test_data, key=key)
-        retrieved = storage_provider.load(uri=uri)
+        uri = await storage_provider.store(data=test_data, key=key)
+        retrieved = await storage_provider.load(uri=uri)
 
         assert retrieved == test_data
 
-    def test_handles_overwrite(
+    async def test_handles_overwrite(
         self,
         storage_provider: StorageProviderAbstract,
     ) -> None:
@@ -114,13 +118,13 @@ class TestStorageProviderContract:
         original = b"original data"
         updated = b"updated data"
 
-        storage_provider.store(data=original, key=key)
-        uri = storage_provider.store(data=updated, key=key)
-        retrieved = storage_provider.load(uri=uri)
+        await storage_provider.store(data=original, key=key)
+        uri = await storage_provider.store(data=updated, key=key)
+        retrieved = await storage_provider.load(uri=uri)
 
         assert retrieved == updated
 
-    def test_handles_empty_data(
+    async def test_handles_empty_data(
         self,
         storage_provider: StorageProviderAbstract,
     ) -> None:
@@ -130,12 +134,12 @@ class TestStorageProviderContract:
         """
         key = "contract/empty.bin"
 
-        uri = storage_provider.store(data=b"", key=key)
-        retrieved = storage_provider.load(uri=uri)
+        uri = await storage_provider.store(data=b"", key=key)
+        retrieved = await storage_provider.load(uri=uri)
 
         assert retrieved == b""
 
-    def test_handles_large_binary_data(
+    async def test_handles_large_binary_data(
         self,
         storage_provider: StorageProviderAbstract,
     ) -> None:
@@ -148,8 +152,8 @@ class TestStorageProviderContract:
         large_data = bytes(range(256)) * 1000
         key = "contract/large.bin"
 
-        uri = storage_provider.store(data=large_data, key=key)
-        retrieved = storage_provider.load(uri=uri)
+        uri = await storage_provider.store(data=large_data, key=key)
+        retrieved = await storage_provider.load(uri=uri)
 
         assert retrieved == large_data
         assert len(retrieved) == len(large_data)

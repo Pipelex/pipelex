@@ -15,6 +15,7 @@ from pipelex.tools.storage.gcp_storage_provider import GcpStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestGcpStorageProvider:
     """Unit tests for GcpStorageProvider using mocks for google.cloud.storage."""
 
@@ -104,7 +105,7 @@ class TestGcpStorageProvider:
             signed_urls_lifespan=3600,
         )
 
-    def test_store_returns_uri_with_scheme(
+    async def test_store_returns_uri_with_scheme(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
     ) -> None:
@@ -112,12 +113,12 @@ class TestGcpStorageProvider:
         test_data = b"Hello, World!"
         key = "test/file.bin"
 
-        returned_uri = gcp_provider_no_signed_urls.store(data=test_data, key=key)
+        returned_uri = await gcp_provider_no_signed_urls.store(data=test_data, key=key)
 
         assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
         assert returned_uri.startswith(PIPELEX_STORAGE_SCHEME)
 
-    def test_store_calls_upload_from_string(
+    async def test_store_calls_upload_from_string(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
         mock_gcp_storage: dict[str, Any],
@@ -127,7 +128,7 @@ class TestGcpStorageProvider:
         key = "test/file.bin"
         content_type = "application/octet-stream"
 
-        gcp_provider_no_signed_urls.store(data=test_data, key=key, content_type=content_type)
+        await gcp_provider_no_signed_urls.store(data=test_data, key=key, content_type=content_type)
 
         mock_gcp_storage["bucket"].blob.assert_called_once_with(key)
         mock_gcp_storage["blob"].upload_from_string.assert_called_once_with(
@@ -135,7 +136,7 @@ class TestGcpStorageProvider:
             content_type=content_type,
         )
 
-    def test_load_returns_data(
+    async def test_load_returns_data(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
         mock_gcp_storage: dict[str, Any],
@@ -145,11 +146,11 @@ class TestGcpStorageProvider:
         mock_gcp_storage["blob"].download_as_bytes.return_value = expected_data
 
         uri = f"{PIPELEX_STORAGE_SCHEME}test/file.bin"
-        loaded_data = gcp_provider_no_signed_urls.load(uri=uri)
+        loaded_data = await gcp_provider_no_signed_urls.load(uri=uri)
 
         assert loaded_data == expected_data
 
-    def test_load_with_nonexistent_key_raises_error(
+    async def test_load_with_nonexistent_key_raises_error(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
         mock_gcp_storage: dict[str, Any],
@@ -159,11 +160,11 @@ class TestGcpStorageProvider:
         nonexistent_uri = f"{PIPELEX_STORAGE_SCHEME}nonexistent/file.bin"
 
         with pytest.raises(StorageFileNotFoundError) as exc_info:
-            gcp_provider_no_signed_urls.load(uri=nonexistent_uri)
+            await gcp_provider_no_signed_urls.load(uri=nonexistent_uri)
 
         assert "nonexistent/file.bin" in str(exc_info.value)
 
-    def test_store_raises_if_key_has_scheme_prefix(
+    async def test_store_raises_if_key_has_scheme_prefix(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
     ) -> None:
@@ -171,11 +172,11 @@ class TestGcpStorageProvider:
         invalid_key = f"{PIPELEX_STORAGE_SCHEME}already/prefixed.bin"
 
         with pytest.raises(StorageInvalidKeyError) as exc_info:
-            gcp_provider_no_signed_urls.store(data=b"test", key=invalid_key)
+            await gcp_provider_no_signed_urls.store(data=b"test", key=invalid_key)
 
         assert "should not include scheme prefix" in str(exc_info.value).lower()
 
-    def test_display_link_returns_public_url_when_signed_urls_disabled(
+    async def test_display_link_returns_public_url_when_signed_urls_disabled(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
         gcp_bucket_name: str,
@@ -184,12 +185,12 @@ class TestGcpStorageProvider:
         key = "display/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
 
-        display = gcp_provider_no_signed_urls.display_link(uri=uri)
+        display = await gcp_provider_no_signed_urls.display_link(uri=uri)
 
         expected_url = f"https://storage.googleapis.com/{gcp_bucket_name}/{key}"
         assert display == expected_url
 
-    def test_display_link_returns_signed_url_when_signed_urls_enabled(
+    async def test_display_link_returns_signed_url_when_signed_urls_enabled(
         self,
         gcp_provider_with_signed_urls: GcpStorageProvider,
         mock_gcp_storage: dict[str, Any],
@@ -200,7 +201,7 @@ class TestGcpStorageProvider:
         expected_signed_url = "https://storage.googleapis.com/signed-url?signature=xyz"
         mock_gcp_storage["blob"].generate_signed_url.return_value = expected_signed_url
 
-        display = gcp_provider_with_signed_urls.display_link(uri=uri)
+        display = await gcp_provider_with_signed_urls.display_link(uri=uri)
 
         assert display == expected_signed_url
         mock_gcp_storage["blob"].generate_signed_url.assert_called_once_with(
@@ -208,7 +209,7 @@ class TestGcpStorageProvider:
             method="GET",
         )
 
-    def test_credentials_file_not_found_raises_error(
+    async def test_credentials_file_not_found_raises_error(
         self,
         gcp_bucket_name: str,
         gcp_project_id: str,
@@ -222,11 +223,11 @@ class TestGcpStorageProvider:
         )
 
         with pytest.raises(StorageGcpCredentialsError) as exc_info:
-            provider.store(data=b"test", key="test.bin")
+            await provider.store(data=b"test", key="test.bin")
 
         assert "credentials file not found" in str(exc_info.value).lower()
 
-    def test_store_with_nested_path(
+    async def test_store_with_nested_path(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
         mock_gcp_storage: dict[str, Any],
@@ -235,12 +236,12 @@ class TestGcpStorageProvider:
         test_data = b"nested content"
         key = "level1/level2/level3/deep_file.bin"
 
-        returned_uri = gcp_provider_no_signed_urls.store(data=test_data, key=key)
+        returned_uri = await gcp_provider_no_signed_urls.store(data=test_data, key=key)
 
         assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
         mock_gcp_storage["bucket"].blob.assert_called_with(key)
 
-    def test_store_empty_bytes(
+    async def test_store_empty_bytes(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
         mock_gcp_storage: dict[str, Any],
@@ -248,19 +249,19 @@ class TestGcpStorageProvider:
         """Test storing empty bytes."""
         key = "empty.bin"
 
-        returned_uri = gcp_provider_no_signed_urls.store(data=b"", key=key)
+        returned_uri = await gcp_provider_no_signed_urls.store(data=b"", key=key)
 
         assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
         mock_gcp_storage["blob"].upload_from_string.assert_called_once_with(b"", content_type=None)
 
-    def test_multiple_operations_use_same_bucket(
+    async def test_multiple_operations_use_same_bucket(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
         mock_gcp_storage: dict[str, Any],
     ) -> None:
         """Test that multiple operations reuse the same bucket (lazy initialization)."""
-        gcp_provider_no_signed_urls.store(data=b"data1", key="file1.bin")
-        gcp_provider_no_signed_urls.store(data=b"data2", key="file2.bin")
+        await gcp_provider_no_signed_urls.store(data=b"data1", key="file1.bin")
+        await gcp_provider_no_signed_urls.store(data=b"data2", key="file2.bin")
 
         # Client should only be created once (lazy initialization)
         mock_gcp_storage["from_service_account_json"].assert_called_once()

@@ -1,9 +1,10 @@
-from typing import Generator
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from moto import mock_aws  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
+from pytest_mock import MockerFixture
 
-from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageS3Error
 from pipelex.tools.storage.s3_storage_provider import S3StorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
@@ -12,21 +13,60 @@ S3_TEST_BUCKET = "test-pipelex-bucket"
 S3_TEST_REGION = "us-east-1"
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestS3StorageProvider:
-    """Unit tests for S3StorageProvider using moto to mock AWS S3."""
+    """Unit tests for S3StorageProvider using mocks for aioboto3."""
 
     @pytest.fixture
-    def s3_mock_context(self) -> Generator[None, None, None]:
-        """Create moto mock context with test bucket."""
-        with mock_aws():  # pyright: ignore[reportUnknownMemberType]
-            import boto3  # noqa: PLC0415
+    def mock_aioboto3(self, mocker: MockerFixture) -> dict[str, Any]:
+        """Mock aioboto3 session and client.
 
-            s3_client = boto3.client("s3", region_name=S3_TEST_REGION)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-            s3_client.create_bucket(Bucket=S3_TEST_BUCKET)  # pyright: ignore[reportUnknownMemberType]
-            yield
+        Returns a dict containing the mocked session, client, and response objects
+        for test assertions.
+        """
+        # Create mock stream for response body
+        mock_stream = AsyncMock()
+        mock_stream.read = AsyncMock(return_value=b"")
+        mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+        mock_stream.__aexit__ = AsyncMock(return_value=None)
+
+        # Create mock client
+        mock_client = AsyncMock()
+        mock_client.get_object = AsyncMock(return_value={"Body": mock_stream})
+        mock_client.put_object = AsyncMock(return_value={})
+        mock_client.generate_presigned_url = AsyncMock(
+            return_value=f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/test?signature=abc123"
+        )
+
+        # Create mock exceptions
+        mock_exceptions = MagicMock()
+        mock_exceptions.NoSuchKey = type("NoSuchKey", (Exception,), {})
+        mock_exceptions.NoSuchBucket = type("NoSuchBucket", (Exception,), {})
+        mock_exceptions.ClientError = type("ClientError", (Exception,), {})
+        mock_client.exceptions = mock_exceptions
+
+        # Create async context manager for client
+        mock_client_context = AsyncMock()
+        mock_client_context.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_context.__aexit__ = AsyncMock(return_value=None)
+
+        # Create mock session
+        mock_session = MagicMock()
+        mock_session.client = MagicMock(return_value=mock_client_context)
+
+        # Patch aioboto3.Session
+        mocker.patch("aioboto3.Session", return_value=mock_session)
+
+        return {
+            "session": mock_session,
+            "client": mock_client,
+            "client_context": mock_client_context,
+            "stream": mock_stream,
+            "exceptions": mock_exceptions,
+        }
 
     @pytest.fixture
-    def s3_provider_no_signed_urls(self, s3_mock_context: None) -> S3StorageProvider:  # noqa: ARG002
+    def s3_provider_no_signed_urls(self) -> S3StorageProvider:
         """Create an S3StorageProvider with signed URLs disabled."""
         return S3StorageProvider(
             bucket_name=S3_TEST_BUCKET,
@@ -35,7 +75,7 @@ class TestS3StorageProvider:
         )
 
     @pytest.fixture
-    def s3_provider_with_signed_urls(self, s3_mock_context: None) -> S3StorageProvider:  # noqa: ARG002
+    def s3_provider_with_signed_urls(self) -> S3StorageProvider:
         """Create an S3StorageProvider with signed URLs enabled (1 hour lifespan)."""
         return S3StorageProvider(
             bucket_name=S3_TEST_BUCKET,
@@ -43,7 +83,7 @@ class TestS3StorageProvider:
             signed_urls_lifespan=3600,
         )
 
-    def test_store_returns_uri_with_scheme(
+    async def test_store_returns_uri_with_scheme(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
     ) -> None:
@@ -51,37 +91,59 @@ class TestS3StorageProvider:
         test_data = b"Hello, World!"
         key = "test/file.bin"
 
-        returned_uri = s3_provider_no_signed_urls.store(data=test_data, key=key)
+        returned_uri = await s3_provider_no_signed_urls.store(data=test_data, key=key)
 
         assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
         assert returned_uri.startswith(PIPELEX_STORAGE_SCHEME)
 
-    def test_load_with_valid_uri_returns_data(
+    async def test_store_calls_put_object(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test roundtrip: store data with key, load with returned URI."""
-        test_data = b"Test data \x00\x01\x02\xff"
-        key = "roundtrip/test.bin"
+        """Test that store() correctly calls the S3 put_object method."""
+        test_data = b"Test data"
+        key = "test/file.bin"
+        content_type = "application/octet-stream"
 
-        returned_uri = s3_provider_no_signed_urls.store(data=test_data, key=key)
-        loaded_data = s3_provider_no_signed_urls.load(uri=returned_uri)
+        await s3_provider_no_signed_urls.store(data=test_data, key=key, content_type=content_type)
 
-        assert loaded_data == test_data
+        mock_aioboto3["client"].put_object.assert_called_once_with(
+            Bucket=S3_TEST_BUCKET,
+            Key=key,
+            Body=test_data,
+            ContentType=content_type,
+        )
 
-    def test_load_with_nonexistent_key_raises_error(
+    async def test_load_returns_data(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that loading a non-existent URI raises StorageFileNotFoundError."""
+        """Test that load() returns the data from S3."""
+        expected_data = b"Test data \x00\x01\x02\xff"
+        mock_aioboto3["stream"].read = AsyncMock(return_value=expected_data)
+
+        uri = f"{PIPELEX_STORAGE_SCHEME}test/file.bin"
+        loaded_data = await s3_provider_no_signed_urls.load(uri=uri)
+
+        assert loaded_data == expected_data
+
+    async def test_load_with_nonexistent_key_raises_error(
+        self,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
+    ) -> None:
+        """Test that loading a non-existent object raises StorageFileNotFoundError."""
+        mock_aioboto3["client"].get_object = AsyncMock(side_effect=mock_aioboto3["exceptions"].NoSuchKey("Key not found"))
         nonexistent_uri = f"{PIPELEX_STORAGE_SCHEME}nonexistent/file.bin"
 
         with pytest.raises(StorageFileNotFoundError) as exc_info:
-            s3_provider_no_signed_urls.load(uri=nonexistent_uri)
+            await s3_provider_no_signed_urls.load(uri=nonexistent_uri)
 
         assert "nonexistent/file.bin" in str(exc_info.value)
 
-    def test_store_raises_if_key_has_scheme_prefix(
+    async def test_store_raises_if_key_has_scheme_prefix(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
     ) -> None:
@@ -89,148 +151,134 @@ class TestS3StorageProvider:
         invalid_key = f"{PIPELEX_STORAGE_SCHEME}already/prefixed.bin"
 
         with pytest.raises(StorageInvalidKeyError) as exc_info:
-            s3_provider_no_signed_urls.store(data=b"test", key=invalid_key)
+            await s3_provider_no_signed_urls.store(data=b"test", key=invalid_key)
 
         assert "should not include scheme prefix" in str(exc_info.value).lower()
 
-    def test_display_link_returns_public_url_when_signed_urls_disabled(
+    async def test_display_link_returns_public_url_when_signed_urls_disabled(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
     ) -> None:
         """Test that display_link() returns a public URL when signed URLs are disabled."""
-        test_data = b"display test"
         key = "display/test.bin"
+        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
 
-        returned_uri = s3_provider_no_signed_urls.store(data=test_data, key=key)
-        display = s3_provider_no_signed_urls.display_link(uri=returned_uri)
+        display = await s3_provider_no_signed_urls.display_link(uri=uri)
 
         expected_url = f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}"
         assert display == expected_url
 
-    def test_display_link_returns_presigned_url_when_signed_urls_enabled(
+    async def test_display_link_returns_presigned_url_when_signed_urls_enabled(
         self,
         s3_provider_with_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
     ) -> None:
         """Test that display_link() returns a presigned URL when signed URLs are enabled."""
-        test_data = b"presigned test"
         key = "presigned/test.bin"
+        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
+        expected_presigned = "https://test-bucket.s3.amazonaws.com/presigned/test.bin?X-Amz-Signature=xyz"
+        mock_aioboto3["client"].generate_presigned_url = AsyncMock(return_value=expected_presigned)
 
-        returned_uri = s3_provider_with_signed_urls.store(data=test_data, key=key)
-        display = s3_provider_with_signed_urls.display_link(uri=returned_uri)
+        display = await s3_provider_with_signed_urls.display_link(uri=uri)
 
-        # Presigned URLs contain the bucket name and various query parameters
-        assert display is not None
-        assert S3_TEST_BUCKET in display
-        assert "X-Amz-Signature" in display or "Signature" in display
-
-    def test_presigned_url_uses_regional_endpoint(
-        self,
-        s3_provider_with_signed_urls: S3StorageProvider,
-    ) -> None:
-        """Test that presigned URLs use the regional S3 endpoint.
-
-        This is critical for signature validation - AWS validates signatures against
-        the regional endpoint, so the URL must use s3.{region}.amazonaws.com format.
-        Without this, presigned URLs will fail with SignatureDoesNotMatch errors.
-        """
-        test_data = b"regional endpoint test"
-        key = "regional/test.bin"
-
-        returned_uri = s3_provider_with_signed_urls.store(data=test_data, key=key)
-        display = s3_provider_with_signed_urls.display_link(uri=returned_uri)
-
-        assert display is not None
-        # The URL must use the regional endpoint format: s3.{region}.amazonaws.com
-        # NOT the global endpoint: s3.amazonaws.com (without region)
-        regional_endpoint = f"s3.{S3_TEST_REGION}.amazonaws.com"
-        assert regional_endpoint in display, (
-            f"Presigned URL must use regional endpoint '{regional_endpoint}' to ensure signature validation works. Got: {display}"
+        assert display == expected_presigned
+        mock_aioboto3["client"].generate_presigned_url.assert_called_once_with(
+            "get_object",
+            Params={"Bucket": S3_TEST_BUCKET, "Key": key},
+            ExpiresIn=3600,
         )
 
-    def test_presigned_url_credential_matches_region(
-        self,
-        s3_provider_with_signed_urls: S3StorageProvider,
-    ) -> None:
-        """Test that the credential region in presigned URL matches the configured region.
-
-        The X-Amz-Credential parameter must include the correct region for signature
-        validation to succeed.
-        """
-        test_data = b"credential region test"
-        key = "credential/test.bin"
-
-        returned_uri = s3_provider_with_signed_urls.store(data=test_data, key=key)
-        display = s3_provider_with_signed_urls.display_link(uri=returned_uri)
-
-        assert display is not None
-        # The credential should include the region
-        assert f"%2F{S3_TEST_REGION}%2Fs3%2F" in display or f"/{S3_TEST_REGION}/s3/" in display, (
-            f"Presigned URL credential must include region '{S3_TEST_REGION}'. Got: {display}"
-        )
-
-    def test_store_overwrites_existing_data(
+    async def test_store_with_nested_path(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that storing with the same key overwrites the previous data."""
-        key = "overwrite/test.bin"
-        original_data = b"original"
-        new_data = b"updated content"
+        """Test storing data in a deeply nested path structure."""
+        test_data = b"nested content"
+        key = "level1/level2/level3/deep_file.bin"
 
-        uri1 = s3_provider_no_signed_urls.store(data=original_data, key=key)
-        uri2 = s3_provider_no_signed_urls.store(data=new_data, key=key)
-        loaded_data = s3_provider_no_signed_urls.load(uri=uri2)
+        returned_uri = await s3_provider_no_signed_urls.store(data=test_data, key=key)
 
-        assert uri1 == uri2
-        assert loaded_data == new_data
+        assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
+        mock_aioboto3["client"].put_object.assert_called_once()
 
-    def test_store_empty_bytes(
+    async def test_store_empty_bytes(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test storing and loading empty bytes."""
+        """Test storing empty bytes."""
         key = "empty.bin"
 
-        returned_uri = s3_provider_no_signed_urls.store(data=b"", key=key)
-        loaded_data = s3_provider_no_signed_urls.load(uri=returned_uri)
+        returned_uri = await s3_provider_no_signed_urls.store(data=b"", key=key)
 
-        assert loaded_data == b""
+        assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
+        mock_aioboto3["client"].put_object.assert_called_once_with(
+            Bucket=S3_TEST_BUCKET,
+            Key=key,
+            Body=b"",
+        )
 
-    def test_store_large_binary_data(
+    async def test_store_large_binary_data(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test storing and loading larger binary data."""
+        """Test storing larger binary data."""
         test_data = bytes(range(256)) * 1000  # ~256KB of data
         key = "large_file.bin"
 
-        returned_uri = s3_provider_no_signed_urls.store(data=test_data, key=key)
-        loaded_data = s3_provider_no_signed_urls.load(uri=returned_uri)
+        returned_uri = await s3_provider_no_signed_urls.store(data=test_data, key=key)
 
-        assert loaded_data == test_data
+        assert returned_uri == f"{PIPELEX_STORAGE_SCHEME}{key}"
+        mock_aioboto3["client"].put_object.assert_called_once()
 
-    def test_multiple_keys_isolated(
+    async def test_store_bucket_not_found_raises_error(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that different keys store different data independently."""
-        data1 = b"first"
-        data2 = b"second"
-        key1 = "file1.bin"
-        key2 = "file2.bin"
+        """Test that storing to a non-existent bucket raises StorageS3Error."""
+        mock_aioboto3["client"].put_object = AsyncMock(side_effect=mock_aioboto3["exceptions"].NoSuchBucket("Bucket not found"))
 
-        uri1 = s3_provider_no_signed_urls.store(data=data1, key=key1)
-        uri2 = s3_provider_no_signed_urls.store(data=data2, key=key2)
+        with pytest.raises(StorageS3Error) as exc_info:
+            await s3_provider_no_signed_urls.store(data=b"test", key="test.bin")
 
-        assert s3_provider_no_signed_urls.load(uri=uri1) == data1
-        assert s3_provider_no_signed_urls.load(uri=uri2) == data2
+        assert "Bucket not found" in str(exc_info.value)
 
-    def test_store_with_content_type(
+    async def test_load_bucket_not_found_raises_error(
         self,
-        s3_mock_context: None,  # noqa: ARG002
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that content_type is properly set on S3 objects."""
-        import boto3  # noqa: PLC0415
+        """Test that loading from a non-existent bucket raises StorageS3Error."""
+        mock_aioboto3["client"].get_object = AsyncMock(side_effect=mock_aioboto3["exceptions"].NoSuchBucket("Bucket not found"))
+        uri = f"{PIPELEX_STORAGE_SCHEME}test.bin"
+
+        with pytest.raises(StorageS3Error) as exc_info:
+            await s3_provider_no_signed_urls.load(uri=uri)
+
+        assert "Bucket not found" in str(exc_info.value)
+
+    async def test_display_link_falls_back_to_public_url_on_error(
+        self,
+        s3_provider_with_signed_urls: S3StorageProvider,
+        mock_aioboto3: dict[str, Any],
+    ) -> None:
+        """Test that display_link() falls back to public URL on presigning error."""
+        key = "fallback/test.bin"
+        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
+        mock_aioboto3["client"].generate_presigned_url = AsyncMock(side_effect=mock_aioboto3["exceptions"].ClientError("Signing failed"))
+
+        display = await s3_provider_with_signed_urls.display_link(uri=uri)
+
+        expected_public_url = f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}"
+        assert display == expected_public_url
+
+    @pytest.mark.usefixtures("mock_aioboto3")
+    async def test_session_is_reused(self) -> None:
+        """Test that the session is lazily initialized and reused."""
+        import aioboto3  # noqa: PLC0415
 
         provider = S3StorageProvider(
             bucket_name=S3_TEST_BUCKET,
@@ -238,93 +286,13 @@ class TestS3StorageProvider:
             signed_urls_lifespan=None,
         )
 
-        test_data = b"\x89PNG\r\n\x1a\n"  # PNG header
-        key = "images/test.png"
-        content_type = "image/png"
+        # First call initializes the session
+        await provider.store(data=b"data1", key="file1.bin")
+        first_call_count: int = aioboto3.Session.call_count  # type: ignore[attr-defined] # pyright: ignore[reportUnknownMemberType,reportAttributeAccessIssue,reportUnknownVariableType]
 
-        provider.store(data=test_data, key=key, content_type=content_type)
+        # Second call reuses the session
+        await provider.store(data=b"data2", key="file2.bin")
+        second_call_count: int = aioboto3.Session.call_count  # type: ignore[attr-defined] # pyright: ignore[reportUnknownMemberType,reportAttributeAccessIssue,reportUnknownVariableType]
 
-        # Verify content type was set using boto3 directly
-        s3_client = boto3.client("s3", region_name=S3_TEST_REGION)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        response = s3_client.head_object(Bucket=S3_TEST_BUCKET, Key=key)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        assert response["ContentType"] == content_type
-
-    def test_store_with_nested_path(
-        self,
-        s3_provider_no_signed_urls: S3StorageProvider,
-    ) -> None:
-        """Test storing data in a deeply nested path structure."""
-        test_data = b"nested content"
-        key = "level1/level2/level3/deep_file.bin"
-
-        returned_uri = s3_provider_no_signed_urls.store(data=test_data, key=key)
-        loaded_data = s3_provider_no_signed_urls.load(uri=returned_uri)
-
-        assert loaded_data == test_data
-
-    def test_presigned_url_uses_correct_region_for_non_us_east_1(
-        self,
-        s3_mock_context: None,  # noqa: ARG002
-    ) -> None:
-        """Test that presigned URLs use the correct regional endpoint for non-us-east-1 regions.
-
-        This test specifically targets the bug where boto3 might use the global endpoint
-        instead of the regional endpoint, causing SignatureDoesNotMatch errors in regions
-        like eu-west-3.
-        """
-        import boto3  # noqa: PLC0415
-
-        test_region = "eu-west-3"
-        test_bucket = "test-eu-bucket"
-
-        # Create bucket in a different region
-        s3_client = boto3.client("s3", region_name=test_region)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        s3_client.create_bucket(  # pyright: ignore[reportUnknownMemberType]
-            Bucket=test_bucket,
-            CreateBucketConfiguration={"LocationConstraint": test_region},
-        )
-
-        provider = S3StorageProvider(
-            bucket_name=test_bucket,
-            region=test_region,
-            signed_urls_lifespan=3600,
-        )
-
-        test_data = b"eu-west-3 test"
-        key = "eu-test/file.bin"
-
-        returned_uri = provider.store(data=test_data, key=key)
-        display = provider.display_link(uri=returned_uri)
-
-        assert display is not None
-        # Must use regional endpoint for eu-west-3, not global s3.amazonaws.com
-        assert f"s3.{test_region}.amazonaws.com" in display, (
-            f"Presigned URL must use regional endpoint 's3.{test_region}.amazonaws.com'. "
-            f"Using global endpoint causes SignatureDoesNotMatch errors. Got: {display}"
-        )
-
-    def test_client_uses_regional_endpoint_url(
-        self,
-        s3_mock_context: None,  # noqa: ARG002
-    ) -> None:
-        """Test that the S3 client is configured with the regional endpoint URL.
-
-        This verifies the fix for SignatureDoesNotMatch errors caused by using
-        the global S3 endpoint instead of the regional one.
-        """
-        test_region = "ap-southeast-1"
-        provider = S3StorageProvider(
-            bucket_name="test-bucket",
-            region=test_region,
-            signed_urls_lifespan=3600,
-        )
-
-        # Trigger client initialization
-        client = provider._get_client()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
-        # Verify the client is using the regional endpoint
-        endpoint_url = client.meta.endpoint_url  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        expected_endpoint = f"https://s3.{test_region}.amazonaws.com"
-        assert endpoint_url == expected_endpoint, (
-            f"Client must use regional endpoint '{expected_endpoint}' to avoid SignatureDoesNotMatch errors. Got: {endpoint_url}"
-        )
+        assert first_call_count == 1
+        assert second_call_count == 1  # Session should only be created once

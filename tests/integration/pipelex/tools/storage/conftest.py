@@ -1,9 +1,8 @@
 from pathlib import Path
-from typing import Any, Generator, Literal, cast
-from unittest.mock import MagicMock
+from typing import Any, Literal, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from moto import mock_aws  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
@@ -32,15 +31,70 @@ def storage_method(request: pytest.FixtureRequest) -> StorageMethodLiteral:
 
 
 @pytest.fixture
-def s3_mock() -> Generator[None, None, None]:
-    """Start moto mock for S3 tests."""
-    with mock_aws():  # pyright: ignore[reportUnknownMemberType]
-        import boto3  # noqa: PLC0415
+def s3_mock(mocker: MockerFixture) -> dict[str, Any]:
+    """Mock aioboto3 for S3 tests.
 
-        # Create the test bucket
-        s3_client = boto3.client("s3", region_name=S3_TEST_REGION)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-        s3_client.create_bucket(Bucket=S3_TEST_BUCKET)  # pyright: ignore[reportUnknownMemberType]
-        yield
+    Creates a mock that simulates S3 behavior using an in-memory dict.
+    """
+    # Storage for mock data
+    mock_data_storage: dict[str, bytes] = {}
+
+    def create_mock_stream(key: str) -> AsyncMock:
+        """Create a mock async stream for response body."""
+        stream = AsyncMock()
+        stream.read = AsyncMock(side_effect=lambda: mock_data_storage.get(key, b""))
+        stream.__aenter__ = AsyncMock(return_value=stream)
+        stream.__aexit__ = AsyncMock(return_value=None)
+        return stream
+
+    # Create mock exceptions
+    mock_exceptions = MagicMock()
+    mock_exceptions.NoSuchKey = type("NoSuchKey", (Exception,), {})
+    mock_exceptions.NoSuchBucket = type("NoSuchBucket", (Exception,), {})
+    mock_exceptions.ClientError = type("ClientError", (Exception,), {})
+
+    def mock_get_object(Bucket: str, Key: str) -> dict[str, Any]:  # noqa: ARG001, N803
+        if Key not in mock_data_storage:
+            msg = f"Key {Key} not found"
+            raise mock_exceptions.NoSuchKey(msg)
+        return {"Body": create_mock_stream(Key)}
+
+    def mock_put_object(Bucket: str, Key: str, Body: bytes, **kwargs: Any) -> dict[str, Any]:  # noqa: ARG001, N803
+        mock_data_storage[Key] = Body
+        return {}
+
+    def mock_generate_presigned_url(
+        method: str,  # noqa: ARG001
+        Params: dict[str, str],  # noqa: N803
+        ExpiresIn: int,  # noqa: ARG001, N803
+    ) -> str:
+        key = Params.get("Key", "")
+        return f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}?X-Amz-Signature=mock"
+
+    # Create mock client with sync functions wrapped in AsyncMock
+    mock_client = AsyncMock()
+    mock_client.get_object = AsyncMock(side_effect=mock_get_object)
+    mock_client.put_object = AsyncMock(side_effect=mock_put_object)
+    mock_client.generate_presigned_url = AsyncMock(side_effect=mock_generate_presigned_url)
+    mock_client.exceptions = mock_exceptions
+
+    # Create async context manager for client
+    mock_client_context = AsyncMock()
+    mock_client_context.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client_context.__aexit__ = AsyncMock(return_value=None)
+
+    # Create mock session
+    mock_session = MagicMock()
+    mock_session.client = MagicMock(return_value=mock_client_context)
+
+    # Patch aioboto3.Session
+    mocker.patch("aioboto3.Session", return_value=mock_session)
+
+    return {
+        "session": mock_session,
+        "client": mock_client,
+        "storage": mock_data_storage,
+    }
 
 
 @pytest.fixture
@@ -102,7 +156,7 @@ def storage_provider(
         case "in_memory":
             return InMemoryStorageProvider()
         case "s3":
-            # Request the s3_mock fixture to set up moto
+            # Request the s3_mock fixture to set up aioboto3 mocks
             request.getfixturevalue("s3_mock")
             return S3StorageProvider(
                 bucket_name=S3_TEST_BUCKET,

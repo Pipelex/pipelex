@@ -15,6 +15,7 @@ class S3StorageProvider(StorageProviderAbstract):
     """Storage provider implementation for AWS S3 storage.
 
     Files are stored in an S3 bucket with keys being path strings.
+    Uses aioboto3 for async S3 operations.
     """
 
     def __init__(
@@ -33,45 +34,58 @@ class S3StorageProvider(StorageProviderAbstract):
         self._bucket_name = bucket_name
         self._region = region
         self._signed_urls_lifespan = signed_urls_lifespan
-        self._s3_client: Any = None
+        self._session: Any = None
 
-    def _get_client(self) -> Any:
-        """Get or create the S3 client (lazy initialization).
-
-        Returns:
-            The boto3 S3 client.
+    def _check_dependency(self) -> None:
+        """Check if aioboto3 is installed.
 
         Raises:
-            MissingDependencyError: If boto3 is not installed.
+            MissingDependencyError: If aioboto3 is not installed.
         """
-        if self._s3_client is None:
-            if importlib.util.find_spec("boto3") is None:
-                lib_name = "boto3"
-                lib_extra_name = "s3"
-                msg = "boto3 is required for S3 storage."
-                raise MissingDependencyError(
-                    lib_name,
-                    lib_extra_name,
-                    msg,
-                )
-
-            import boto3  # noqa: PLC0415 - optional dependency, lazy import
-            from botocore.config import Config  # noqa: PLC0415 - optional dependency, lazy import
-
-            # Use regional endpoint to ensure presigned URLs have correct signatures
-            endpoint_url = f"https://s3.{self._region}.amazonaws.com"
-            config = Config(signature_version="s3v4")  # pyright: ignore[reportUnknownArgumentType]
-
-            self._s3_client = boto3.client(  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-                "s3",
-                region_name=self._region,
-                endpoint_url=endpoint_url,
-                config=config,
+        if importlib.util.find_spec("aioboto3") is None:
+            lib_name = "aioboto3"
+            lib_extra_name = "s3"
+            msg = "aioboto3 is required for S3 storage."
+            raise MissingDependencyError(
+                lib_name,
+                lib_extra_name,
+                msg,
             )
-        return self._s3_client  # pyright: ignore[reportUnknownVariableType,reportUnknownMemberType]
+
+    def _get_session(self) -> Any:
+        """Get or create the aioboto3 session (lazy initialization).
+
+        Returns:
+            The aioboto3 Session.
+        """
+        self._check_dependency()
+
+        if self._session is None:
+            import aioboto3  # noqa: PLC0415 - optional dependency, lazy import
+
+            self._session = aioboto3.Session()  # pyright: ignore[reportUnknownMemberType]
+        return self._session
+
+    def _get_client_config(self) -> dict[str, Any]:
+        """Get the configuration for creating S3 clients.
+
+        Returns:
+            Dictionary of client configuration parameters.
+        """
+        from botocore.config import Config  # noqa: PLC0415 - optional dependency, lazy import
+
+        endpoint_url = f"https://s3.{self._region}.amazonaws.com"
+        config = Config(signature_version="s3v4")  # pyright: ignore[reportUnknownArgumentType]
+
+        return {
+            "service_name": "s3",
+            "region_name": self._region,
+            "endpoint_url": endpoint_url,
+            "config": config,
+        }
 
     @override
-    def _load(self, key: str) -> bytes:
+    async def _load(self, key: str) -> bytes:
         """Load bytes from an S3 object.
 
         Args:
@@ -84,21 +98,24 @@ class S3StorageProvider(StorageProviderAbstract):
             StorageFileNotFoundError: If the object does not exist.
             StorageS3Error: If the S3 operation fails.
         """
-        client = self._get_client()
+        session = self._get_session()
+        client_config = self._get_client_config()
 
-        try:
-            response = client.get_object(Bucket=self._bucket_name, Key=key)
-            data: bytes = response["Body"].read()
-            return data
-        except client.exceptions.NoSuchKey as exc:
-            msg = f"Object not found in S3: '{key}'"
-            raise StorageFileNotFoundError(msg) from exc
-        except client.exceptions.NoSuchBucket as exc:
-            msg = f"Bucket not found in S3: '{self._bucket_name}'"
-            raise StorageS3Error(msg) from exc
+        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+            try:
+                response = await client.get_object(Bucket=self._bucket_name, Key=key)
+                async with response["Body"] as stream:
+                    data: bytes = await stream.read()
+                return data
+            except client.exceptions.NoSuchKey as exc:
+                msg = f"Object not found in S3: '{key}'"
+                raise StorageFileNotFoundError(msg) from exc
+            except client.exceptions.NoSuchBucket as exc:
+                msg = f"Bucket not found in S3: '{self._bucket_name}'"
+                raise StorageS3Error(msg) from exc
 
     @override
-    def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Store bytes to an S3 object.
 
         Args:
@@ -109,20 +126,22 @@ class S3StorageProvider(StorageProviderAbstract):
         Raises:
             StorageS3Error: If the S3 operation fails.
         """
-        client = self._get_client()
+        session = self._get_session()
+        client_config = self._get_client_config()
 
-        try:
-            put_params: dict[str, Any] = {
-                "Bucket": self._bucket_name,
-                "Key": key,
-                "Body": data,
-            }
-            if content_type:
-                put_params["ContentType"] = content_type
-            client.put_object(**put_params)
-        except client.exceptions.NoSuchBucket as exc:
-            msg = f"Bucket not found in S3: '{self._bucket_name}'"
-            raise StorageS3Error(msg) from exc
+        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+            try:
+                put_params: dict[str, Any] = {
+                    "Bucket": self._bucket_name,
+                    "Key": key,
+                    "Body": data,
+                }
+                if content_type:
+                    put_params["ContentType"] = content_type
+                await client.put_object(**put_params)
+            except client.exceptions.NoSuchBucket as exc:
+                msg = f"Bucket not found in S3: '{self._bucket_name}'"
+                raise StorageS3Error(msg) from exc
 
     def _make_public_url(self, key: str) -> str:
         """Build a public URL for an S3 object.
@@ -136,7 +155,7 @@ class S3StorageProvider(StorageProviderAbstract):
         return f"https://{self._bucket_name}.s3.{self._region}.amazonaws.com/{key}"
 
     @override
-    def display_link(self, uri: str) -> str | None:
+    async def display_link(self, uri: str) -> str | None:
         """Return a URL for this storage URI.
 
         Args:
@@ -150,14 +169,16 @@ class S3StorageProvider(StorageProviderAbstract):
         if self._signed_urls_lifespan is None:
             return self._make_public_url(key)
 
-        client = self._get_client()
+        session = self._get_session()
+        client_config = self._get_client_config()
 
-        try:
-            presigned_url: str = client.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": self._bucket_name, "Key": key},
-                ExpiresIn=self._signed_urls_lifespan,
-            )
-            return presigned_url
-        except client.exceptions.ClientError:
-            return self._make_public_url(key)
+        async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
+            try:
+                presigned_url: str = await client.generate_presigned_url(
+                    "get_object",
+                    Params={"Bucket": self._bucket_name, "Key": key},
+                    ExpiresIn=self._signed_urls_lifespan,
+                )
+                return presigned_url
+            except client.exceptions.ClientError:
+                return self._make_public_url(key)

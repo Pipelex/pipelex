@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 from datetime import timedelta
 from pathlib import Path
@@ -19,6 +20,7 @@ class GcpStorageProvider(StorageProviderAbstract):
     """Storage provider implementation for Google Cloud Storage.
 
     Files are stored in a GCS bucket with keys being path strings.
+    Uses asyncio.to_thread to wrap sync GCS operations.
     """
 
     def __init__(
@@ -77,9 +79,8 @@ class GcpStorageProvider(StorageProviderAbstract):
             self._bucket = client.bucket(self._bucket_name)  # pyright: ignore[reportUnknownMemberType]
         return self._bucket  # pyright: ignore[reportUnknownVariableType,reportUnknownMemberType]
 
-    @override
-    def _load(self, key: str) -> bytes:
-        """Load bytes from a GCS object.
+    def _load_sync(self, key: str) -> bytes:
+        """Synchronous implementation of load for use with to_thread.
 
         Args:
             key: Storage key (without scheme prefix).
@@ -89,7 +90,6 @@ class GcpStorageProvider(StorageProviderAbstract):
 
         Raises:
             StorageFileNotFoundError: If the object does not exist.
-            StorageGcpError: If the GCS operation fails.
         """
         bucket = self._get_bucket()
 
@@ -109,8 +109,23 @@ class GcpStorageProvider(StorageProviderAbstract):
             raise StorageFileNotFoundError(msg) from exc
 
     @override
-    def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
-        """Store bytes to a GCS object.
+    async def _load(self, key: str) -> bytes:
+        """Load bytes from a GCS object.
+
+        Args:
+            key: Storage key (without scheme prefix).
+
+        Returns:
+            The object contents as bytes.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
+        """
+        return await asyncio.to_thread(self._load_sync, key)
+
+    def _store_sync(self, data: bytes, key: str, content_type: str | None) -> None:
+        """Synchronous implementation of store for use with to_thread.
 
         Args:
             data: The bytes to store.
@@ -129,6 +144,20 @@ class GcpStorageProvider(StorageProviderAbstract):
             msg = f"Failed to store object to GCS: '{key}': {exc}"
             raise StorageGcpError(msg) from exc
 
+    @override
+    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+        """Store bytes to a GCS object.
+
+        Args:
+            data: The bytes to store.
+            key: Storage key (without scheme prefix).
+            content_type: Optional MIME type for the object.
+
+        Raises:
+            StorageGcpError: If the GCS operation fails.
+        """
+        await asyncio.to_thread(self._store_sync, data, key, content_type)
+
     def _make_public_url(self, key: str) -> str:
         """Build a public URL for a GCS object.
 
@@ -140,8 +169,29 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         return f"https://storage.googleapis.com/{self._bucket_name}/{key}"
 
+    def _generate_signed_url_sync(self, key: str) -> str | None:
+        """Synchronous implementation of signed URL generation for use with to_thread.
+
+        Args:
+            key: Storage key (without scheme prefix).
+
+        Returns:
+            Signed URL or public URL if signing fails.
+        """
+        bucket = self._get_bucket()
+
+        try:
+            blob = bucket.blob(key)
+            signed_url: str = blob.generate_signed_url(
+                expiration=timedelta(seconds=self._signed_urls_lifespan or 0),
+                method="GET",
+            )
+            return signed_url
+        except GoogleAPIError:
+            return self._make_public_url(key)
+
     @override
-    def display_link(self, uri: str) -> str | None:
+    async def display_link(self, uri: str) -> str | None:
         """Return a URL for this storage URI.
 
         Args:
@@ -155,14 +205,4 @@ class GcpStorageProvider(StorageProviderAbstract):
         if self._signed_urls_lifespan is None:
             return self._make_public_url(key)
 
-        bucket = self._get_bucket()
-
-        try:
-            blob = bucket.blob(key)
-            signed_url: str = blob.generate_signed_url(
-                expiration=timedelta(seconds=self._signed_urls_lifespan),
-                method="GET",
-            )
-            return signed_url
-        except GoogleAPIError:
-            return self._make_public_url(key)
+        return await asyncio.to_thread(self._generate_signed_url_sync, key)

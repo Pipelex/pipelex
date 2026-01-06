@@ -53,7 +53,7 @@ class StorageProviderAbstract(ABC):
             raise StorageInvalidKeyError(msg)
         return f"{PIPELEX_STORAGE_SCHEME}{key}"
 
-    def load(self, uri: str) -> bytes:
+    async def load(self, uri: str) -> bytes:
         """Load data from storage.
 
         Args:
@@ -63,10 +63,10 @@ class StorageProviderAbstract(ABC):
             The stored bytes.
         """
         key = self._strip_scheme(uri)
-        return self._load(key)
+        return await self._load(key)
 
     @abstractmethod
-    def _load(self, key: str) -> bytes:
+    async def _load(self, key: str) -> bytes:
         """Load data from storage by key.
 
         Args:
@@ -76,7 +76,7 @@ class StorageProviderAbstract(ABC):
             The stored bytes.
         """
 
-    def store(self, data: bytes, key: str, content_type: str | None = None) -> str:
+    async def store(self, data: bytes, key: str, content_type: str | None = None) -> str:
         """Store data and return full URI with scheme.
 
         Args:
@@ -88,11 +88,11 @@ class StorageProviderAbstract(ABC):
             Full URI with PIPELEX_STORAGE_SCHEME prefix.
         """
         uri = self._add_scheme(key)
-        self._store(data=data, key=key, content_type=content_type)
+        await self._store(data=data, key=key, content_type=content_type)
         return uri
 
     @abstractmethod
-    def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Store data in storage.
 
         Args:
@@ -102,7 +102,7 @@ class StorageProviderAbstract(ABC):
         """
 
     @abstractmethod
-    def display_link(self, uri: str) -> str | None:
+    async def display_link(self, uri: str) -> str | None:
         """Return human-readable link for this URI.
 
         Args:
