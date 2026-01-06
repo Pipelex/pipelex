@@ -266,6 +266,9 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             word-wrap: break-word;
             line-height: 1.5;
         }
+        .data-modal-content.text-content {
+            line-height: 0.8;
+        }
         .data-modal-content.html-content {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #fff;
@@ -315,7 +318,7 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
         <div class="format-tabs" id="format-tabs">
             <button class="format-tab active" data-format="json" id="tab-json">JSON</button>
-            <button class="format-tab" data-format="text" id="tab-text">Text</button>
+            <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
             <button class="format-tab" data-format="html" id="tab-html">HTML</button>
         </div>
         <div class="data-modal-content" id="modal-content"></div>
@@ -388,7 +391,7 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
 
         function renderContent(stuffId, format) {
             const content = document.getElementById('modal-content');
-            content.classList.remove('html-content');
+            content.classList.remove('html-content', 'text-content');
 
             if (format === 'json') {
                 const data = stuffDataJson?.[stuffId];
@@ -396,6 +399,7 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
                 content.textContent = data ? JSON.stringify(data, null, 2) : 'No JSON data available';
             } else if (format === 'text') {
                 const data = stuffDataText?.[stuffId];
+                content.classList.add('text-content');
                 content.innerHTML = '';
                 content.textContent = data || 'No text data available';
             } else if (format === 'html') {

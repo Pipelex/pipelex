@@ -303,6 +303,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             white-space: pre-wrap;
             word-break: break-word;
         }
+        /* No-wrap variant for Rich-formatted ASCII tables (Pretty/Text tab) */
+        .inspector-pre.nowrap {
+            white-space: pre;
+            word-break: normal;
+            -webkit-overflow-scrolling: touch;
+        }
         .inspector-row {
             display: flex;
             justify-content: space-between;
@@ -482,7 +488,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         function buildDataflowAnalysis(graphspec) {
             if (!graphspec) return null;
 
-            const stuffRegistry = {};      // digest -> { name, concept, data }
+            const stuffRegistry = {};      // digest -> { name, concept, data, dataText, dataHtml }
             const stuffProducers = {};     // digest -> producer_node_id
             const stuffConsumers = {};     // digest -> [consumer_node_ids]
             const containmentTree = {};    // parent_id -> [child_ids]
@@ -514,6 +520,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                             name: output.name,
                             concept: output.concept,
                             data: output.data,
+                            dataText: output.data_text,
+                            dataHtml: output.data_html,
                         };
                         stuffProducers[output.digest] = node.node_id;
                     }
@@ -528,6 +536,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                                 name: input.name,
                                 concept: input.concept,
                                 data: input.data,
+                                dataText: input.data_text,
+                                dataHtml: input.data_html,
                             };
                         }
                         if (!stuffConsumers[input.digest]) stuffConsumers[input.digest] = [];
@@ -973,9 +983,10 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     inspectorHeader.className = 'inspector-header stuff';
 
                     // Check which formats are available
+                    // First check graphspec-extracted data, then fallback to separate dictionaries
                     const hasJson = !!stuffData.data;
-                    const hasText = stuffMermaidId && !!stuffDataText[stuffMermaidId];
-                    const hasHtml = stuffMermaidId && !!stuffDataHtml[stuffMermaidId];
+                    const hasText = !!stuffData.dataText || (stuffMermaidId && !!stuffDataText[stuffMermaidId]);
+                    const hasHtml = !!stuffData.dataHtml || (stuffMermaidId && !!stuffDataHtml[stuffMermaidId]);
                     const hasMultipleFormats = [hasJson, hasText, hasHtml].filter(Boolean).length > 1;
 
                     let html = '';
@@ -1006,7 +1017,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         html += `<button class="format-tab ${jsonActive}" data-format="json" `;
                         html += `${!hasJson ? 'disabled' : ''}>JSON</button>`;
                         html += `<button class="format-tab ${textActive}" data-format="text" `;
-                        html += `${!hasText ? 'disabled' : ''}>Text</button>`;
+                        html += `${!hasText ? 'disabled' : ''}>Pretty</button>`;
                         html += `<button class="format-tab ${htmlActive}" data-format="html" `;
                         html += `${!hasHtml ? 'disabled' : ''}>HTML</button>`;
                         html += '</div>';
@@ -1024,6 +1035,9 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     // Store current stuff data for format switching
                     window.currentStuffJsonData = stuffData.data;
                     window.currentStuffMermaidId = stuffMermaidId;
+                    // Store graphspec-extracted text/html data (preferred over dictionary lookups)
+                    window.currentStuffDataText = stuffData.dataText;
+                    window.currentStuffDataHtml = stuffData.dataHtml;
 
                     // Attach format tab handlers
                     const formatTabs = document.getElementById('stuff-format-tabs');
@@ -1205,20 +1219,31 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
 
             const stuffMermaidId = window.currentStuffMermaidId;
             const jsonData = window.currentStuffJsonData;
+            // Prefer graphspec-extracted data, fallback to dictionary lookups
+            const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
+            const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
 
             if (format === 'json') {
                 container.className = '';
                 const jsonStr = JSON.stringify(jsonData, null, 2);
-                container.innerHTML = `<pre class="inspector-pre">${jsonStr}</pre>`;
+                container.innerHTML = `<pre class="inspector-pre">${escapeHtml(jsonStr)}</pre>`;
             } else if (format === 'text') {
-                const textContent = stuffDataText[stuffMermaidId] || 'No text data available';
+                // Use nowrap class for Rich-formatted ASCII tables
+                const textContent = textData || 'No text data available';
                 container.className = '';
-                container.innerHTML = `<pre class="inspector-pre">${textContent}</pre>`;
+                container.innerHTML = `<pre class="inspector-pre nowrap">${escapeHtml(textContent)}</pre>`;
             } else if (format === 'html') {
-                const htmlContent = stuffDataHtml[stuffMermaidId] || 'No HTML data available';
+                const htmlContent = htmlData || 'No HTML data available';
                 container.className = 'inspector-html-content';
                 container.innerHTML = htmlContent;
             }
+        }
+
+        // Escape HTML to prevent XSS when displaying JSON/text content
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>
