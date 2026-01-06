@@ -1010,26 +1010,10 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     const hasMultipleFormats = [hasJson, hasText, hasHtml].filter(Boolean).length > 1;
 
                     let html = '';
-                    html += '<div class="inspector-badges">';
-                    html += '<span class="inspector-badge stuff">📦 Data Item</span>';
-                    html += '</div>';
-
-                    html += `<div class="inspector-section">
-                        <div class="inspector-section-title">Name</div>
-                        <div class="inspector-value pipe-code">${stuffData.name || 'N/A'}</div>
-                    </div>`;
-
-                    if (stuffData.concept) {
-                        html += `<div class="inspector-section">
-                            <div class="inspector-section-title">Concept</div>
-                            <div class="inspector-value">${stuffData.concept}</div>
-                        </div>`;
-                    }
 
                     // Add format tabs if multiple formats available
                     if (hasMultipleFormats) {
                         html += '<div class="inspector-section">';
-                        html += '<div class="inspector-section-title">Data Content</div>';
                         html += '<div class="format-tabs" id="stuff-format-tabs">';
                         const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
                         const textActive = currentStuffFormat === 'text' ? 'active' : '';
@@ -1045,7 +1029,6 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         html += '</div>';
                     } else if (hasJson || hasText || hasHtml) {
                         html += '<div class="inspector-section">';
-                        html += '<div class="inspector-section-title">Data Content</div>';
                         html += '<div id="stuff-data-content"></div>';
                         html += '</div>';
                     }
