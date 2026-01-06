@@ -10,6 +10,7 @@ default_set = "pipelex_language"
 coding_standards = [
     "commands.md",
     "python_standards.md",
+    "pipelex_standards.md",
     "pytest_standards.md",
     "docs.md",
     "tdd.md",
@@ -18,6 +19,7 @@ pipelex_language = ["write_pipelex.md", "run_pipelex.md", "llms.md"]
 all = [
     "commands.md",
     "python_standards.md",
+    "pipelex_standards.md",
     "write_pipelex.md",
     "run_pipelex.md",
     "docs.md",
@@ -32,6 +34,10 @@ alwaysApply = false
 [agent_rules.cursor.files.python_standards.front_matter]
 description = "Python coding standards and best practices"
 globs = ["**/*.py"]
+
+[agent_rules.cursor.files.pipelex_standards.front_matter]
+description = "Standards related to developing the Pipelex codebase"
+alwaysApply = true
 
 [agent_rules.cursor.files.pytest_standards.front_matter]
 description = "Guidelines for writing unit tests"
