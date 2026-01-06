@@ -459,10 +459,47 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             background: #333;
             color: #fff;
         }
+        .format-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 8px;
+        }
         .format-tabs {
             display: flex;
             gap: 4px;
-            margin-bottom: 12px;
+        }
+        .format-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            background: #333;
+            color: #888;
+            border: none;
+            transition: all 0.2s;
+        }
+        .action-btn:hover {
+            background: #444;
+            color: #fff;
+        }
+        .action-btn.copied {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        .action-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
         }
         .format-tab {
             padding: 6px 12px;
@@ -570,10 +607,24 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             <span class="data-modal-title" id="modal-title">Data Content</span>
             <span class="data-modal-close" onclick="hideModal()">&times;</span>
         </div>
-        <div class="format-tabs" id="format-tabs">
-            <button class="format-tab active" data-format="html" id="tab-html">HTML</button>
-            <button class="format-tab" data-format="json" id="tab-json">JSON</button>
-            <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
+        <div class="format-toolbar">
+            <div class="format-tabs" id="format-tabs">
+                <button class="format-tab active" data-format="html" id="tab-html">HTML</button>
+                <button class="format-tab" data-format="json" id="tab-json">JSON</button>
+                <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
+            </div>
+            <div class="format-actions">
+                <button class="action-btn" id="copy-btn" onclick="copyContent()" title="Copy">
+                    <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z
+                        m3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z
+                        m0 16H8V7h11v14z"/></svg>
+                </button>
+                <button class="action-btn" id="download-btn" onclick="downloadContent()" title="Download">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         <div class="data-modal-content" id="modal-content"></div>
     </div>
@@ -852,6 +903,69 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             document.getElementById('data-modal').style.display = 'none';
             document.getElementById('modal-overlay').style.display = 'none';
             currentStuffId = null;
+        }
+
+        // Get current content based on format
+        function getCurrentContent() {
+            if (!currentStuffId) return null;
+
+            if (currentFormat === 'json') {
+                const data = stuffDataJson?.[currentStuffId];
+                if (!data) return null;
+                return { content: JSON.stringify(data, null, 2), ext: 'json', mime: 'application/json' };
+            } else if (currentFormat === 'text') {
+                const data = stuffDataText?.[currentStuffId];
+                if (!data) return null;
+                return { content: data, ext: 'txt', mime: 'text/plain' };
+            } else if (currentFormat === 'html') {
+                const data = stuffDataHtml?.[currentStuffId];
+                if (!data) return null;
+                return { content: data, ext: 'html', mime: 'text/html' };
+            }
+            return null;
+        }
+
+        // Copy content to clipboard
+        function copyContent() {
+            const data = getCurrentContent();
+            if (!data) return;
+
+            navigator.clipboard.writeText(data.content).then(() => {
+                const btn = document.getElementById('copy-btn');
+                const checkIcon = '<svg viewBox="0 0 24 24">' +
+                    '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+                const copyIcon = '<svg viewBox="0 0 24 24">' +
+                    '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z' +
+                    'm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z' +
+                    'm0 16H8V7h11v14z"/></svg>';
+                btn.innerHTML = checkIcon;
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = copyIcon;
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+
+        // Download content as file
+        function downloadContent() {
+            const data = getCurrentContent();
+            if (!data) return;
+
+            // Get name from metadata or use ID
+            const meta = stuffMetadata?.[currentStuffId];
+            const baseName = meta?.name || currentStuffId || 'data';
+            const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${data.ext}`;
+
+            const blob = new Blob([data.content], { type: data.mime });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         }
 
         // Close modal when clicking overlay
