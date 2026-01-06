@@ -2,8 +2,12 @@
 
 from datetime import UTC, datetime
 
+import pytest
+
+from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
+from pipelex.graph.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow_html import generate_reactflow_html
 from pipelex.graph.viewspec import ViewSpec
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
@@ -12,20 +16,25 @@ from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 class TestReactFlowHtml:
     """Tests for generate_reactflow_html function."""
 
-    def test_generates_html_with_embedded_viewspec(self) -> None:
+    @pytest.fixture
+    def rf_config(self) -> ReactFlowRenderingConfig:
+        """Get the default ReactFlow config for testing."""
+        return get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+
+    def test_generates_html_with_embedded_viewspec(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that HTML contains embedded ViewSpec as JSON."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
             graph_id="test_graph",
         )
-        html = generate_reactflow_html(viewspec)
+        html = generate_reactflow_html(viewspec, rf_config)
 
         assert "<!DOCTYPE html>" in html
         assert '<script type="application/json" id="pipelex-viewspec">' in html
         assert "test_graph" in html
         assert "const viewspec = JSON.parse" in html
 
-    def test_embeds_graphspec_when_provided(self) -> None:
+    def test_embeds_graphspec_when_provided(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that GraphSpec is embedded when provided."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
@@ -38,71 +47,72 @@ class TestReactFlowHtml:
             nodes=[],
             edges=[],
         )
-        html = generate_reactflow_html(viewspec, graphspec=graphspec)
+        html = generate_reactflow_html(viewspec, rf_config, graphspec=graphspec)
 
         assert '<script type="application/json" id="pipelex-graphspec">' in html
         assert "test_graph" in html
 
-    def test_does_not_embed_graphspec_when_not_provided(self) -> None:
+    def test_does_not_embed_graphspec_when_not_provided(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that GraphSpec script tag is not present when not provided."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
             graph_id="test_graph",
         )
-        html = generate_reactflow_html(viewspec)
+        html = generate_reactflow_html(viewspec, rf_config)
 
         # Should not have graphspec script tag
         assert '<script type="application/json" id="pipelex-graphspec">' not in html
 
-    def test_cdn_mode_includes_cdn_scripts(self) -> None:
+    def test_cdn_mode_includes_cdn_scripts(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that CDN mode includes CDN script tags."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
             graph_id="test_graph",
         )
-        html = generate_reactflow_html(viewspec, use_cdn=True)
+        cdn_config = rf_config.model_copy(update={"is_use_cdn": True})
+        html = generate_reactflow_html(viewspec, cdn_config)
 
         assert "unpkg.com/react@18" in html
         assert "unpkg.com/react-dom@18" in html
         assert "unpkg.com/reactflow@11" in html
         assert "unpkg.com/dagre@0.8.5" in html
 
-    def test_custom_title_in_html(self) -> None:
+    def test_custom_title_in_html(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that custom title appears in HTML."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
             graph_id="test_graph",
         )
-        html = generate_reactflow_html(viewspec, title="My Custom Graph")
+        html = generate_reactflow_html(viewspec, rf_config, title="My Custom Graph")
 
         assert "<title>My Custom Graph</title>" in html
 
-    def test_includes_reactflow_viewer_code(self) -> None:
+    def test_includes_reactflow_viewer_code(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that HTML includes ReactFlow viewer JavaScript."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
             graph_id="test_graph",
         )
-        html = generate_reactflow_html(viewspec)
+        html = generate_reactflow_html(viewspec, rf_config)
 
         assert "ReactFlow" in html
         assert "getLayoutedElements" in html
         assert "onNodeClick" in html
         assert "inspector" in html
 
-    def test_includes_inspector_panel(self) -> None:
+    def test_includes_inspector_panel(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that HTML includes inspector panel markup."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
             graph_id="test_graph",
         )
-        html = generate_reactflow_html(viewspec)
+        html = generate_reactflow_html(viewspec, rf_config)
 
         assert 'id="inspector"' in html
         assert "inspector-panel" in html
         assert "closeInspector" in html
 
-    def test_full_viewspec_serialized(self) -> None:
+    def test_full_viewspec_serialized(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that full ViewSpec with nodes and edges is serialized."""
         # Create a simple graph and convert to ViewSpec
         node = NodeSpec(
@@ -121,19 +131,19 @@ class TestReactFlowHtml:
         analysis = GraphAnalysis.from_graphspec(graph)
         viewspec = graphspec_to_viewspec(graph, analysis)
 
-        html = generate_reactflow_html(viewspec)
+        html = generate_reactflow_html(viewspec, rf_config)
 
         # ViewSpec should be embedded with node data
         assert "node_1" in html
         assert "test_pipe" in html
 
-    def test_html_is_valid_structure(self) -> None:
+    def test_html_is_valid_structure(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that generated HTML has valid structure."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
             graph_id="test_graph",
         )
-        html = generate_reactflow_html(viewspec)
+        html = generate_reactflow_html(viewspec, rf_config)
 
         # Check for essential HTML structure
         assert html.startswith("<!DOCTYPE html>")
@@ -143,13 +153,13 @@ class TestReactFlowHtml:
         assert "</html>" in html
         assert '<div id="root">' in html
 
-    def test_dagre_layout_included(self) -> None:
+    def test_dagre_layout_included(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that Dagre layout function is included."""
         viewspec = ViewSpec(
             created_at=datetime.now(UTC),
             graph_id="test_graph",
         )
-        html = generate_reactflow_html(viewspec)
+        html = generate_reactflow_html(viewspec, rf_config)
 
         assert "dagre" in html
         assert "getLayoutedElements" in html

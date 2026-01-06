@@ -48,6 +48,14 @@ stuff_html_content = true
 # reactflow_viewspec = false
 # reactflow_html = false
 
+[pipelex.pipeline_execution_config.graph_config.reactflow_config]
+# Uncomment to customize ReactFlow graph rendering:
+# edge_type = "bezier"    # Options: "bezier", "smoothstep", "step", "straight"
+# nodesep = 50            # Horizontal spacing between nodes
+# ranksep = 80            # Vertical spacing between ranks/levels
+# initial_zoom = 1.0      # Initial zoom level (1.0 = 100%)
+# pan_to_top = true       # Pan to show top of graph on load
+
 [pipelex.storage_config]
 # Uncomment to change the storage method: "local" (default) or "in_memory"
 # is_fetch_remote_content_enabled = true

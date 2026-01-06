@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from pipelex import log
+from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import load_graphspec
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
@@ -66,7 +67,8 @@ class TestReactFlowFromJson:
         assert viewspec.index is not None
 
         # Generate ReactFlow HTML
-        reactflow_html = await generate_reactflow_html_async(viewspec, graphspec=graph_spec, title=f"Graph: {topic}")
+        rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+        reactflow_html = await generate_reactflow_html_async(viewspec, rf_config, graphspec=graph_spec, title=f"Graph: {topic}")
 
         # Save outputs to TEST_OUTPUTS_DIR
         output_dir = _get_next_output_folder()
@@ -119,7 +121,8 @@ class TestReactFlowFromJson:
         viewspec = graphspec_to_viewspec(graph_spec, analysis)
 
         # Generate ReactFlow HTML without GraphSpec
-        reactflow_html = await generate_reactflow_html_async(viewspec, graphspec=None, title="Test Graph")
+        rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+        reactflow_html = await generate_reactflow_html_async(viewspec, rf_config, graphspec=None, title="Test Graph")
 
         # Verify ViewSpec is embedded
         assert '<script type="application/json" id="pipelex-viewspec">' in reactflow_html

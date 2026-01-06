@@ -305,6 +305,9 @@ is_use_cdn = true
 layout_direction = "TB"
 nodesep = 50
 ranksep = 80
+edge_type = "bezier"
+initial_zoom = 1.0
+pan_to_top = true
 default_title = "Pipelex Graph"
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config.style]

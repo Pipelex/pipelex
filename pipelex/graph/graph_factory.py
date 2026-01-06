@@ -176,10 +176,10 @@ async def generate_graph_outputs(
 
             reactflow_html = await generate_reactflow_html_async(
                 viewspec,
+                graph_config.reactflow_config,
                 graphspec=graph_spec,
                 stuff_data_text=rf_stuff_data_text,
                 stuff_data_html=rf_stuff_data_html,
-                use_cdn=graph_config.reactflow_config.is_use_cdn,
                 title=f"ReactFlow: {pipe_code}",
             )
 

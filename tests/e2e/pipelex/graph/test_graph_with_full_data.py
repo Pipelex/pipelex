@@ -289,7 +289,8 @@ class TestGraphWithFullData:
         # Generate ReactFlow HTML
         analysis = GraphAnalysis.from_graphspec(graph_spec)
         viewspec = graphspec_to_viewspec(graph_spec, analysis)
-        reactflow_html = await generate_reactflow_html_async(viewspec, graphspec=graph_spec, title="Graph: cv_job_matcher")
+        rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+        reactflow_html = await generate_reactflow_html_async(viewspec, rf_config, graphspec=graph_spec, title="Graph: cv_job_matcher")
         reactflow_path = output_dir / "reactflow.html"
         reactflow_path.write_text(reactflow_html, encoding="utf-8")
         log.info(f"Saved ReactFlow HTML to: {reactflow_path}")

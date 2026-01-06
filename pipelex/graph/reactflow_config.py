@@ -10,6 +10,13 @@ class ReactFlowTheme(StrEnum):
     SYSTEM = "system"
 
 
+class ReactFlowEdgeType(StrEnum):
+    BEZIER = "bezier"
+    SMOOTHSTEP = "smoothstep"
+    STEP = "step"
+    STRAIGHT = "straight"
+
+
 class ReactFlowStyle(ConfigModel):
     """ReactFlow theming preset."""
 
@@ -23,5 +30,8 @@ class ReactFlowRenderingConfig(ConfigModel):
     layout_direction: str
     nodesep: int
     ranksep: int
+    edge_type: ReactFlowEdgeType = Field(strict=False)
+    initial_zoom: float
+    pan_to_top: bool
     default_title: str
     style: ReactFlowStyle

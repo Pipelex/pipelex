@@ -346,10 +346,13 @@ def graph_trace_cmd(
                 viewspec = graphspec_to_viewspec(graph_spec, analysis)
 
                 # Generate ReactFlow HTML
+                rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
+                if reactflow_offline:
+                    rf_config = rf_config.model_copy(update={"is_use_cdn": False})
                 reactflow_html = generate_reactflow_html(
                     viewspec,
+                    rf_config,
                     graphspec=graph_spec,
-                    use_cdn=not reactflow_offline,
                     title=f"Graph: {title}",
                 )
                 reactflow_path.write_text(reactflow_html, encoding="utf-8")
@@ -542,6 +545,7 @@ def graph_render_cmd(
                 # Generate ReactFlow HTML
                 reactflow_html = await generate_reactflow_html_async(
                     viewspec,
+                    graph_config.reactflow_config,
                     graphspec=graph_spec,
                     stuff_data_text=rf_stuff_data_text,
                     stuff_data_html=rf_stuff_data_html,

@@ -153,6 +153,7 @@ class TestGraphRenderersFromJson:
         # Generate ReactFlow HTML (with embedded GraphSpec for full data)
         reactflow_html = await generate_reactflow_html_async(
             viewspec,
+            graph_config.reactflow_config,
             graphspec=graph_spec,
             stuff_data_text=rf_stuff_data_text,
             stuff_data_html=rf_stuff_data_html,

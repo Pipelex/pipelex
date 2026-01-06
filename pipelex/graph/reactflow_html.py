@@ -8,6 +8,7 @@ import json
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.graph.graphspec import GraphSpec
+from pipelex.graph.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.viewspec import ViewSpec
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.urls import URLs
@@ -645,8 +646,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             g.setDefaultEdgeLabel(() => ({}));
             g.setGraph({
                 rankdir: direction,
-                nodesep: 50,
-                ranksep: 80,
+                nodesep: {{ nodesep }},
+                ranksep: {{ ranksep }},
                 edgesep: 20,
                 marginx: 40,
                 marginy: 40,
@@ -813,7 +814,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     id: `edge_${edgeId++}`,
                     source: producerNodeId,
                     target: stuffId,
-                    type: 'smoothstep',
+                    type: '{{ edge_type }}',
                     animated: false,
                     style: {
                         stroke: '#3b82f6',
@@ -834,7 +835,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         id: `edge_${edgeId++}`,
                         source: stuffId,
                         target: consumerNodeId,
-                        type: 'smoothstep',
+                        type: '{{ edge_type }}',
                         animated: false,
                         style: {
                             stroke: '#3b82f6',
@@ -954,7 +955,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 id: edge.id,
                 source: edge.source,
                 target: edge.target,
-                type: 'smoothstep',
+                type: '{{ edge_type }}',
                 animated: edge.animated || false,
                 label: edge.label,
                 labelStyle: {
@@ -1178,6 +1179,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 );
             }
 
+            {% if pan_to_top %}
             // Pan to show the top of the graph after initial fit
             const onInit = (reactFlowInstance) => {
                 setTimeout(() => {
@@ -1194,6 +1196,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     });
                 }, 100);
             };
+            {% endif %}
 
             return React.createElement('div', { className: 'react-flow-container' },
                 React.createElement(ReactFlow, {
@@ -1202,10 +1205,10 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     onNodesChange: onNodesChange,
                     onEdgesChange: onEdgesChange,
                     onNodeClick: onNodeClick,
-                    onInit: onInit,
+                    {% if pan_to_top %}onInit: onInit,{% endif %}
                     fitView: true,
-                    fitViewOptions: { padding: 0.1, minZoom: 1.0 },
-                    defaultEdgeOptions: { type: 'smoothstep' },
+                    fitViewOptions: { padding: 0.1, minZoom: {{ initial_zoom }} },
+                    defaultEdgeOptions: { type: '{{ edge_type }}' },
                     proOptions: { hideAttribution: true },
                 },
                     Background ? React.createElement(Background, {
@@ -1322,22 +1325,22 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
 
 def generate_reactflow_html(
     viewspec: ViewSpec,
+    config: ReactFlowRenderingConfig,
     *,
     graphspec: GraphSpec | None = None,
     stuff_data_text: dict[str, str] | None = None,
     stuff_data_html: dict[str, str] | None = None,
-    use_cdn: bool = True,
-    title: str = "Pipelex Graph",
+    title: str | None = None,
 ) -> str:
     """Generate single-file HTML with embedded ViewSpec and ReactFlow viewer.
 
     Args:
         viewspec: The ViewSpec to embed and render.
+        config: ReactFlow rendering configuration.
         graphspec: Optional GraphSpec to embed (for inspector details).
         stuff_data_text: Optional mapping from stuff IDs to their ASCII text representation.
         stuff_data_html: Optional mapping from stuff IDs to their HTML representation.
-        use_cdn: If True, load ReactFlow from CDN. If False, use inline bundles (not yet implemented).
-        title: The page title.
+        title: Optional page title, overrides config.default_title.
 
     Returns:
         Complete HTML page as a string with embedded ReactFlow viewer.
@@ -1355,25 +1358,30 @@ def generate_reactflow_html(
         template_source=REACTFLOW_HTML_TEMPLATE,
         template_category=TemplateCategory.HTML,
         temlating_context={
-            "title": title,
+            "title": title or config.default_title,
             "logo_url": URLs.logo_white_on_transparent,
             "viewspec_json": viewspec_json,
             "graphspec_json": graphspec_json,
             "stuff_data_text_json": json.dumps(stuff_data_text or {}),
             "stuff_data_html_json": json.dumps(stuff_data_html or {}),
-            "use_cdn": use_cdn,
+            "use_cdn": config.is_use_cdn,
+            "nodesep": config.nodesep,
+            "ranksep": config.ranksep,
+            "edge_type": config.edge_type,
+            "initial_zoom": config.initial_zoom,
+            "pan_to_top": config.pan_to_top,
         },
     )
 
 
 async def generate_reactflow_html_async(
     viewspec: ViewSpec,
+    config: ReactFlowRenderingConfig,
     *,
     graphspec: GraphSpec | None = None,
     stuff_data_text: dict[str, str] | None = None,
     stuff_data_html: dict[str, str] | None = None,
-    use_cdn: bool = True,
-    title: str = "Pipelex Graph",
+    title: str | None = None,
 ) -> str:
     """Generate single-file HTML with embedded ViewSpec and ReactFlow viewer (async version).
 
@@ -1381,11 +1389,11 @@ async def generate_reactflow_html_async(
 
     Args:
         viewspec: The ViewSpec to embed and render.
+        config: ReactFlow rendering configuration.
         graphspec: Optional GraphSpec to embed (for inspector details).
         stuff_data_text: Optional mapping from stuff IDs to their ASCII text representation.
         stuff_data_html: Optional mapping from stuff IDs to their HTML representation.
-        use_cdn: If True, load ReactFlow from CDN. If False, use inline bundles (not yet implemented).
-        title: The page title.
+        title: Optional page title, overrides config.default_title.
 
     Returns:
         Complete HTML page as a string with embedded ReactFlow viewer.
@@ -1403,12 +1411,17 @@ async def generate_reactflow_html_async(
         template_source=REACTFLOW_HTML_TEMPLATE,
         template_category=TemplateCategory.HTML,
         temlating_context={
-            "title": title,
+            "title": title or config.default_title,
             "logo_url": URLs.logo_white_on_transparent,
             "viewspec_json": viewspec_json,
             "graphspec_json": graphspec_json,
             "stuff_data_text_json": json.dumps(stuff_data_text or {}),
             "stuff_data_html_json": json.dumps(stuff_data_html or {}),
-            "use_cdn": use_cdn,
+            "use_cdn": config.is_use_cdn,
+            "nodesep": config.nodesep,
+            "ranksep": config.ranksep,
+            "edge_type": config.edge_type,
+            "initial_zoom": config.initial_zoom,
+            "pan_to_top": config.pan_to_top,
         },
     )
