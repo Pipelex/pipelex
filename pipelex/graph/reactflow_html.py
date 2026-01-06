@@ -838,8 +838,11 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             nodes.forEach((node) => {
                 const nodeData = node.data || {};
                 const isStuff = nodeData.isStuff;
-                const width = isStuff ? 180 : 200;
-                const height = isStuff ? 50 : 60;
+                // Estimate width based on label length (rough: 8px per character + padding)
+                const labelText = nodeData.label?.props?.children?.[0]?.props?.children || '';
+                const estimatedWidth = Math.max(180, Math.min(400, labelText.length * 8 + 60));
+                const width = isStuff ? Math.max(180, estimatedWidth) : Math.max(200, estimatedWidth);
+                const height = isStuff ? 60 : 70;
                 g.setNode(node.id, { width, height });
             });
 
@@ -896,6 +899,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
 
                 const isFailed = node.status === 'failed';
                 const label = node.pipe_code || node.node_id.split(':').pop();
+                // Calculate width: ~8px per char (monospace 13px) + padding (28px)
+                const nodeWidth = Math.max(160, label.length * 8 + 28);
 
                 nodes.push({
                     id: node.node_id,
@@ -929,7 +934,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         border: isFailed ? '2px solid var(--color-pipe-failed)' : '2px solid var(--color-pipe)',
                         borderRadius: '8px',
                         padding: '0',
-                        minWidth: '160px',
+                        width: nodeWidth + 'px',
                         boxShadow: 'var(--shadow-md)',
                     },
                 });
@@ -940,6 +945,9 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 const stuffId = `stuff_${digest}`;
                 const label = stuffInfo.name;
                 const concept = stuffInfo.concept || '';
+                // For pill shape, need extra padding. ~7px per char (12px font) + side padding (48px)
+                const textWidth = Math.max(label.length, concept.length) * 7 + 48;
+                const stuffWidth = Math.max(140, textWidth);
 
                 nodes.push({
                     id: stuffId,
@@ -947,7 +955,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     data: {
                         label: React.createElement('div', {
                             style: {
-                                padding: '8px 16px',
+                                padding: '8px 24px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -981,7 +989,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         border: '2px solid var(--color-stuff-border)',
                         borderRadius: '999px',  // Pill shape
                         padding: '0',
-                        minWidth: '140px',
+                        width: stuffWidth + 'px',
                         boxShadow: 'var(--shadow-md)',
                         cursor: 'pointer',
                     },
@@ -1043,6 +1051,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 const isFailed = node.ui?.classes?.includes('failed');
                 const isSucceeded = node.ui?.classes?.includes('succeeded');
                 const badge = node.ui?.badges?.[0] || '';
+                // Calculate width: ~8px per char (monospace 13px) + padding + status dot
+                const nodeWidth = Math.max(160, (node.label?.length || 10) * 8 + 50);
 
                 return {
                     id: node.id,
@@ -1127,7 +1137,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         border: isFailed ? '2px solid var(--color-pipe-failed)' : '2px solid var(--color-pipe)',
                         borderRadius: '8px',
                         padding: '0',
-                        minWidth: '160px',
+                        width: nodeWidth + 'px',
                         boxShadow: 'var(--shadow-md)',
                     },
                 };
