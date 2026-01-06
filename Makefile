@@ -235,6 +235,20 @@ check-config-sync: env
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"
 
+update-gateway-models: env
+	$(call PRINT_TITLE,"Updating gateway models reference")
+	$(VENV_PIPELEX_DEV) update-gateway-models
+
+ugm: update-gateway-models
+	@echo "> done: ugm = update-gateway-models"
+
+check-gateway-models: env
+	$(call PRINT_TITLE,"Checking gateway models reference is up-to-date")
+	$(VENV_PIPELEX_DEV) check-gateway-models --quiet
+
+cgm: check-gateway-models
+	@echo "> done: cgm = check-gateway-models"
+
 ##############################################################################################
 ############################      Cleaning                        ############################
 ##############################################################################################
@@ -587,7 +601,7 @@ c: format lint pyright mypy
 cc: cleanderived c
 	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
 
-check: cc check-unused-imports check-config-sync check-rules check-urls pylint
+check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models pylint
 	@echo "> done: check"
 
 agent-check: fix-unused-imports format lint pyright mypy

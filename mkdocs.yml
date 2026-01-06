@@ -114,6 +114,7 @@ nav:
     - Setup (first run):
       - Overview: home/5-setup/index.md
       - Configure AI Providers: home/5-setup/configure-ai-providers.md
+      - Gateway Available Models: home/5-setup/gateway-models.md
       - Project Organization: home/5-setup/project-organization.md
       - Telemetry: home/5-setup/telemetry.md
     - Build Reliable AI Workflows:

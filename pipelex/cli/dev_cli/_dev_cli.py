@@ -9,8 +9,10 @@ from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
+from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -21,7 +23,7 @@ class PipelexDevCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["check-config-sync", "check-rules", "check-urls"]
+        return ["check-config-sync", "check-gateway-models", "check-rules", "check-urls", "update-gateway-models"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -94,3 +96,20 @@ def check_urls_command(
 ) -> None:
     """Check all URLs in pipelex/urls.py for broken links."""
     check_urls_cmd(quiet=quiet, timeout=timeout)
+
+
+@app.command(name="check-gateway-models", help="Verify that gateway models reference is up-to-date")
+def check_gateway_models_command(
+    show_diff: Annotated[bool, typer.Option("--show-diff/--no-diff", help="Show differences if found")] = True,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
+) -> None:
+    """Verify that the Pipelex Gateway models reference file is up-to-date."""
+    check_gateway_models_cmd(show_diff=show_diff, quiet=quiet)
+
+
+@app.command(name="update-gateway-models", help="Update the gateway models reference file")
+def update_gateway_models_command(
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
+) -> None:
+    """Update the Pipelex Gateway models reference file from remote config."""
+    update_gateway_models_cmd(quiet=quiet)

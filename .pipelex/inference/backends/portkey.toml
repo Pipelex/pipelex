@@ -161,15 +161,6 @@ max_prompt_images = 100
 costs = { input = 0.25, output = 1.25 }
 x-portkey-provider = "@anthropic"
 
-[claude-3-opus]
-model_id = "claude-3-opus-20240229"
-max_tokens = 4096
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-max_prompt_images = 100
-costs = { input = 15.0, output = 75.0 }
-x-portkey-provider = "@anthropic"
-
 ["claude-3.7-sonnet"]
 model_id = "claude-3-7-sonnet-20250219"
 max_tokens = 8192
