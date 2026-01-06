@@ -96,17 +96,18 @@ def pytest_configure(config: Config) -> None:  # noqa: ARG001
         console.print()
         console.print(
             Panel(
-                "[bold yellow]Pipelex Gateway Setup Required[/bold yellow]\n\n"
+                "[bold yellow]Pipelex Service Terms Agreement Required[/bold yellow]\n\n"
                 "Tests cannot run because Pipelex Gateway is enabled but terms haven't been accepted.\n\n"
                 "[bold]To fix this, choose one option:[/bold]\n\n"
-                "  [cyan]1.[/cyan] Run [green]pipelex init config[/green] to accept terms and configure backends\n\n"
-                "  [cyan]2.[/cyan] Disable gateway in [blue].pipelex/inference/backends.toml[/blue]:\n"
+                "  [cyan]1.[/cyan] Run [green]pipelex init agreement[/green] to accept terms (quick, no config reset)\n\n"
+                "  [cyan]2.[/cyan] Run [green]pipelex init config[/green] to fully reset and configure backends\n\n"
+                "  [cyan]3.[/cyan] Disable gateway in [blue].pipelex/inference/backends.toml[/blue]:\n"
                 "     [dim]Set pipelex_gateway.enabled = false[/dim]\n",
                 title="⚠️  Setup Required",
                 border_style="yellow",
             )
         )
-        pytest.exit("Gateway terms not accepted - run 'pipelex init config' first", returncode=1)
+        pytest.exit("Service terms not accepted - run 'pipelex init agreement' first", returncode=1)
 
 
 @pytest.fixture
