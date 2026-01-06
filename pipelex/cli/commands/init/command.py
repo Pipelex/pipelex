@@ -16,6 +16,7 @@ from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.routing import customize_routing_profile
 from pipelex.cli.commands.init.telemetry import setup_telemetry
 from pipelex.cli.commands.init.ui.gateway_ui import (
+    build_gateway_terms_panel,
     display_gateway_accepted_message,
     display_gateway_declined_message,
     prompt_gateway_acceptance,
@@ -27,7 +28,10 @@ from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
-from pipelex.system.pipelex_service.pipelex_service_config import load_pipelex_service_config_if_exists
+from pipelex.system.pipelex_service.pipelex_service_config import (
+    is_pipelex_gateway_enabled,
+    load_pipelex_service_config_if_exists,
+)
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.misc.file_utils import path_exists
 
@@ -136,6 +140,8 @@ def confirm_initialization(
         console.print("\n[yellow]Initialization cancelled.[/yellow]")
         if needs_config or needs_inference or needs_routing or needs_telemetry:
             match focus:
+                case InitFocus.AGREEMENT:
+                    init_cmd_str = "pipelex init agreement"
                 case InitFocus.ALL:
                     init_cmd_str = "pipelex init"
                 case InitFocus.CONFIG | InitFocus.INFERENCE | InitFocus.ROUTING | InitFocus.TELEMETRY:
@@ -279,6 +285,57 @@ def execute_initialization(
     console.print()
 
 
+def _init_agreement(console: Console) -> None:
+    """Handle the agreement-only initialization flow.
+
+    This prompts the user to accept Pipelex Gateway terms without resetting any configuration.
+    If gateway is not enabled, it informs the user that no action is needed.
+
+    Args:
+        console: Rich Console instance for user interaction.
+    """
+    # Check if gateway is even enabled
+    if not is_pipelex_gateway_enabled():
+        console.print()
+        console.print("[green]✓ Pipelex Gateway is not enabled.[/green]")
+        console.print("[dim]No terms acceptance is required.[/dim]")
+        console.print()
+        return
+
+    # Check current terms acceptance status
+    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+
+    if pipelex_service_config is not None and pipelex_service_config.agreement.terms_accepted:
+        console.print()
+        console.print("[green]✓ Pipelex Gateway terms have already been accepted.[/green]")
+        console.print()
+        return
+
+    # Show the terms panel and prompt for acceptance
+    console.print()
+    console.print(build_gateway_terms_panel())
+    console.print()
+
+    accepted = Confirm.ask(
+        "[bold]Do you accept the Pipelex Gateway terms of service?[/bold]",
+        console=console,
+        default=True,
+    )
+
+    if accepted:
+        display_gateway_accepted_message(console)
+        update_service_terms_acceptance(accepted=True)
+    else:
+        display_gateway_declined_message(console)
+        update_service_terms_acceptance(accepted=False)
+        # Disable the gateway since terms were declined
+        backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
+        if path_exists(backends_toml_path):
+            disable_gateway_backend(backends_toml_path)
+
+    console.print()
+
+
 def init_cmd(
     focus: InitFocus = InitFocus.ALL,
     skip_confirmation: bool = False,
@@ -289,13 +346,18 @@ def init_cmd(
     of the configuration, overwriting any existing files.
 
     Args:
-        focus: What to initialize - 'config', 'inference', 'routing', 'telemetry', or 'all' (default)
+        focus: What to initialize - 'agreement', 'config', 'inference', 'routing', 'telemetry', or 'all' (default)
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
     """
+    console = get_console()
+
+    # Handle agreement-only flow separately (no reset needed)
+    if focus == InitFocus.AGREEMENT:
+        _init_agreement(console)
+        return
+
     # Config updates are not yet supported - always reset
     reset = True
-
-    console = get_console()
     pipelex_config_dir = config_manager.pipelex_config_dir
     telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
     backends_toml_path = os.path.join(pipelex_config_dir, "inference", "backends.toml")

@@ -114,6 +114,7 @@ nav:
     - Setup (first run):
       - Overview: home/5-setup/index.md
       - Configure AI Providers: home/5-setup/configure-ai-providers.md
+      - Gateway Available Models: home/5-setup/gateway-models.md
       - Project Organization: home/5-setup/project-organization.md
       - Telemetry: home/5-setup/telemetry.md
     - Build Reliable AI Workflows:
@@ -161,7 +162,6 @@ nav:
         - Pipe Run: home/7-configuration/config-practical/pipe-run-config.md
         - Reporting: home/7-configuration/config-practical/reporting-config.md
         - Telemetry: home/7-configuration/config-practical/telemetry-config.md
-        - Tracker: home/7-configuration/config-practical/tracker-config.md
       - Technical Configuration:
         - AWS: home/7-configuration/config-technical/aws-config.md
         - Cogt: home/7-configuration/config-technical/cogt-config.md
@@ -189,7 +189,6 @@ nav:
       - Overview: home/10-advanced-customizations/index.md
       - Secrets Provider: home/10-advanced-customizations/secrets-provider-injection.md
       - Reporting Delegate: home/10-advanced-customizations/reporting-delegate-injection.md
-      - Pipeline Tracker: home/10-advanced-customizations/pipeline-tracker-injection.md
       - Storage Provider: home/10-advanced-customizations/storage-provider-injection.md
       - Template Provider: home/10-advanced-customizations/template-provider-injection.md
       - Observer Provider: home/10-advanced-customizations/observer-provider-injection.md

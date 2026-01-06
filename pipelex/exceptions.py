@@ -46,7 +46,6 @@ from pipelex.pipeline.exceptions import (
     PipelineExecutionError,
     PipeStackOverflowError,
 )
-from pipelex.pipeline.track.exceptions import JobHistoryError
 from pipelex.system.exceptions import (
     ConfigModelError,
     ConfigValidationError,
@@ -114,8 +113,6 @@ __all__ = [
     "PipeStackOverflowError",
     "PipelineExecutionError",
     "PipeExecutionError",
-    # from pipelex.pipeline.track.exceptions
-    "JobHistoryError",
     # from pipelex.system.exceptions
     "ToolError",
     "NestedKeyConflictError",

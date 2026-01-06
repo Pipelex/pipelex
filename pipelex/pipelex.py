@@ -41,11 +41,6 @@ from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.pipeline_manager import PipelineManager
-from pipelex.pipeline.track.pipeline_tracker import PipelineTracker
-from pipelex.pipeline.track.pipeline_tracker_protocol import (
-    PipelineTrackerNoOp,
-    PipelineTrackerProtocol,
-)
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
@@ -125,7 +120,6 @@ class Pipelex(metaclass=MetaSingleton):
         self.reporting_delegate: ReportingProtocol | None = None
         self.telemetry_manager: TelemetryManagerAbstract | None = None
         # pipeline
-        self.pipeline_tracker: PipelineTrackerProtocol | None = None
         self.library_manager: LibraryManagerAbstract | None = None
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
@@ -166,7 +160,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
         pipeline_manager: PipelineManager | None = None,
-        pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
         telemetry_config: TelemetryConfig | None = None,
@@ -305,17 +298,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
-        # --- Pipeline Tracking (deprecated) ----------------------------------------------------
-
-        if pipeline_tracker:
-            self.pipeline_tracker = pipeline_tracker
-        elif get_config().pipelex.feature_config.is_pipeline_tracking_enabled:
-            self.pipeline_tracker = PipelineTracker(tracker_config=get_config().pipelex.tracker_config)
-        else:
-            self.pipeline_tracker = PipelineTrackerNoOp()
-        self.pipelex_hub.set_pipeline_tracker(pipeline_tracker=self.pipeline_tracker)
-        self.pipeline_tracker.setup()
-
         # --- Libraries & Registries -------------------------------------------------------------
 
         if get_config().pipelex.feature_config.is_reporting_enabled:
@@ -355,8 +337,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def teardown(self):
         # pipelex
         self.pipeline_manager.teardown()
-        if self.pipeline_tracker:
-            self.pipeline_tracker.teardown()
         if self.telemetry_manager:
             self.telemetry_manager.teardown()
 
@@ -395,7 +375,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
         pipeline_manager: PipelineManager | None = None,
-        pipeline_tracker: PipelineTracker | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
         telemetry_config: TelemetryConfig | None = None,
@@ -418,7 +397,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             inference_manager: Custom inference routing manager
             content_generator: Custom content generation implementation
             pipeline_manager: Custom pipeline management
-            pipeline_tracker: Custom pipeline tracking/logging
             pipe_router: Custom pipe routing logic
             reporting_delegate: Custom reporting handler
             telemetry_config: Custom telemetry configuration
@@ -448,7 +426,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 inference_manager=inference_manager,
                 content_generator=content_generator,
                 pipeline_manager=pipeline_manager,
-                pipeline_tracker=pipeline_tracker,
                 pipe_router=pipe_router,
                 reporting_delegate=reporting_delegate,
                 telemetry_config=telemetry_config,

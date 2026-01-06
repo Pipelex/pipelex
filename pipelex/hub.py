@@ -29,7 +29,6 @@ from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
-from pipelex.pipeline.track.pipeline_tracker_protocol import PipelineTrackerProtocol
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
@@ -72,7 +71,6 @@ class PipelexHub:
         self._pipe_router: PipeRouterProtocol | None = None
 
         # pipeline
-        self._pipeline_tracker: PipelineTrackerProtocol | None = None
         self._pipeline_manager: PipelineManagerAbstract | None = None
         self._observer: ObserverProtocol | None = None
 
@@ -176,9 +174,6 @@ class PipelexHub:
 
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
-
-    def set_pipeline_tracker(self, pipeline_tracker: PipelineTrackerProtocol):
-        self._pipeline_tracker = pipeline_tracker
 
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
@@ -296,12 +291,6 @@ class PipelexHub:
             msg = "PipeRouter is not initialized"
             raise RuntimeError(msg)
         return self._pipe_router
-
-    def get_pipeline_tracker(self) -> PipelineTrackerProtocol:
-        if self._pipeline_tracker is None:
-            msg = "PipelineTracker is not initialized"
-            raise RuntimeError(msg)
-        return self._pipeline_tracker
 
     def get_required_pipeline_manager(self) -> PipelineManagerAbstract:
         if self._pipeline_manager is None:
@@ -476,10 +465,6 @@ def get_required_concept(concept_ref: str) -> Concept:
 
 def get_pipe_router() -> PipeRouterProtocol:
     return get_pipelex_hub().get_required_pipe_router()
-
-
-def get_pipeline_tracker() -> PipelineTrackerProtocol:
-    return get_pipelex_hub().get_pipeline_tracker()
 
 
 def get_pipeline_manager() -> PipelineManagerAbstract:
