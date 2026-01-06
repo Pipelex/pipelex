@@ -101,10 +101,6 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             color: var(--color-text-muted);
             font-weight: 500;
         }
-        .header-stats {
-            display: flex;
-            gap: 16px;
-        }
         .stat-item {
             display: flex;
             align-items: center;
@@ -142,6 +138,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             border: 1px solid var(--color-border);
             border-radius: var(--radius-md);
             box-shadow: var(--shadow-md);
+            bottom: 57px !important;
+            left: 16px !important;
         }
         .react-flow__controls-button {
             background: var(--color-surface);
@@ -150,12 +148,6 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         }
         .react-flow__controls-button:hover {
             background: var(--color-surface-hover);
-        }
-        .react-flow__minimap {
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-md);
         }
         .react-flow__edge-path {
             stroke-width: 2;
@@ -168,24 +160,41 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             fill: var(--color-bg);
         }
 
-        /* Inspector Panel */
+        /* Inspector Sidebar */
         .inspector-panel {
             position: fixed;
-            top: 70px;
-            right: 16px;
-            width: 400px;
-            max-height: calc(100vh - 90px);
+            top: 57px;
+            right: 0;
+            width: 420px;
+            min-width: 300px;
+            max-width: 80vw;
+            height: calc(100vh - 57px - 41px);
             background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-lg);
+            border-left: 1px solid var(--color-border);
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
             overflow: hidden;
             z-index: 1000;
             display: none;
+            transition: none;
         }
         .inspector-panel.visible {
             display: flex;
             flex-direction: column;
+        }
+        .inspector-resize-handle {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 6px;
+            height: 100%;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 10;
+            transition: background 0.2s;
+        }
+        .inspector-resize-handle:hover,
+        .inspector-resize-handle.dragging {
+            background: var(--color-accent);
         }
         .inspector-header {
             display: flex;
@@ -385,20 +394,39 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             background: #2a2530;
         }
 
-        /* Legend */
-        .legend {
+        /* Top hint capsule */
+        .top-hint {
             position: fixed;
-            bottom: 16px;
-            left: 16px;
+            top: 70px;
+            right: 16px;
             background: var(--color-surface);
             border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
-            padding: 12px 16px;
-            display: flex;
-            gap: 20px;
+            border-radius: var(--radius-pill);
+            padding: 8px 16px;
             font-size: 12px;
+            color: var(--color-text-dim);
             z-index: 100;
             box-shadow: var(--shadow-md);
+        }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--color-surface);
+            border-top: 1px solid var(--color-border);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            font-size: 12px;
+        }
+        .footer-legend {
+            display: flex;
+            gap: 20px;
         }
         .legend-item {
             display: flex;
@@ -424,20 +452,9 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         .legend-dot.error {
             background: var(--color-error);
         }
-
-        /* Hint */
-        .hint {
-            position: fixed;
-            bottom: 16px;
-            right: 16px;
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
-            padding: 10px 14px;
-            font-size: 12px;
-            color: var(--color-text-dim);
-            z-index: 100;
-            box-shadow: var(--shadow-md);
+        .footer-stats {
+            display: flex;
+            gap: 16px;
         }
     </style>
 </head>
@@ -448,12 +465,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 <img src="{{ logo_url }}" alt="Pipelex" class="header-logo">
                 <span class="header-title">{{ title }}</span>
             </div>
-            <div class="header-stats" id="header-stats"></div>
         </header>
         <div id="root"></div>
     </div>
 
     <div id="inspector" class="inspector-panel">
+        <div class="inspector-resize-handle" id="inspector-resize-handle"></div>
         <div class="inspector-header" id="inspector-header">
             <div>
                 <div id="inspector-title" class="inspector-title">Node Details</div>
@@ -464,14 +481,17 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         <div id="inspector-content" class="inspector-content"></div>
     </div>
 
-    <div class="legend">
-        <div class="legend-item"><div class="legend-dot pipe"></div>Pipe</div>
-        <div class="legend-item"><div class="legend-dot stuff"></div>Data</div>
-        <div class="legend-item"><div class="legend-dot success"></div>Success</div>
-        <div class="legend-item"><div class="legend-dot error"></div>Failed</div>
-    </div>
+    <div class="top-hint" id="top-hint">Click on nodes to view details</div>
 
-    <div class="hint">Click on nodes to view details</div>
+    <footer class="footer">
+        <div class="footer-legend">
+            <div class="legend-item"><div class="legend-dot pipe"></div>Pipe</div>
+            <div class="legend-item"><div class="legend-dot stuff"></div>Data</div>
+            <div class="legend-item"><div class="legend-dot success"></div>Success</div>
+            <div class="legend-item"><div class="legend-dot error"></div>Failed</div>
+        </div>
+        <div class="footer-stats" id="footer-stats"></div>
+    </footer>
 
     <!-- Embedded ViewSpec -->
     <script type="application/json" id="pipelex-viewspec">{{ viewspec_json }}</script>
@@ -578,8 +598,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         const dataflowAnalysis = buildDataflowAnalysis(graphspec);
         const hasDataflow = dataflowAnalysis && Object.keys(dataflowAnalysis.stuffRegistry).length > 0;
 
-        // Update header stats
-        const statsEl = document.getElementById('header-stats');
+        // Update footer stats
+        const statsEl = document.getElementById('footer-stats');
         const pipeCount = hasDataflow
             ? graphspec.nodes.filter(n => !dataflowAnalysis.controllerNodeIds.has(n.node_id)).length
             : viewspec.nodes.length;
@@ -617,7 +637,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         // ReactFlow setup
         const { React, ReactDOM } = window;
         const ReactFlowLib = window.ReactFlowRenderer || window.ReactFlow || {};
-        const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MiniMap, MarkerType } = ReactFlowLib;
+        const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MarkerType } = ReactFlowLib;
 
         // Dagre layout function
         function getLayoutedElements(nodes, edges, direction = 'TB') {
@@ -1064,6 +1084,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         renderStuffContent(bestFormat);
                     }
 
+                    document.getElementById('top-hint').style.display = 'none';
                     inspector.classList.add('visible');
                     return;
                 }
@@ -1147,6 +1168,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 }
 
                 inspectorContent.innerHTML = html || '<div style="color: var(--color-text-dim)">No additional information</div>';
+                document.getElementById('top-hint').style.display = 'none';
                 inspector.classList.add('visible');
             };
 
@@ -1174,17 +1196,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         size: 1,
                         color: '#334155',
                     }) : null,
-                    Controls ? React.createElement(Controls, { showInteractive: false }) : null,
-                    MiniMap ? React.createElement(MiniMap, {
-                        nodeColor: (n) => {
-                            if (n.data?.isStuff) return '#f59e0b';
-                            const status = n.data?.nodeData?.status;
-                            if (status === 'failed') return '#ef4444';
-                            return '#3b82f6';
-                        },
-                        maskColor: 'rgba(15, 23, 42, 0.8)',
-                        style: { background: '#1e293b' },
-                    }) : null
+                    Controls ? React.createElement(Controls, { showInteractive: false }) : null
                 )
             );
         }
@@ -1196,6 +1208,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         // Close inspector function
         function closeInspector() {
             document.getElementById('inspector').classList.remove('visible');
+            document.getElementById('top-hint').style.display = '';
         }
 
         // Close inspector on Escape key
@@ -1204,6 +1217,41 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 closeInspector();
             }
         });
+
+        // Inspector resize functionality
+        (function() {
+            const inspector = document.getElementById('inspector');
+            const resizeHandle = document.getElementById('inspector-resize-handle');
+            let isResizing = false;
+            let startX = 0;
+            let startWidth = 0;
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                startX = e.clientX;
+                startWidth = inspector.offsetWidth;
+                resizeHandle.classList.add('dragging');
+                document.body.style.cursor = 'ew-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const deltaX = startX - e.clientX;
+                const newWidth = Math.max(300, Math.min(startWidth + deltaX, window.innerWidth * 0.8));
+                inspector.style.width = newWidth + 'px';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    resizeHandle.classList.remove('dragging');
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+        })();
 
         // Set stuff display format and re-render
         function setStuffFormat(format) {
