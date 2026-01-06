@@ -261,7 +261,8 @@ This document outlines the core coding standards, best practices, and quality co
 
 ### Unit test generalities
 
-NEVER USE unittest.mock. YOU MUST USE pytest-mock instead.
+NEVER USE unittest.mock. Instead YOU MUST USE pytest-mock: `from pytest_mock import MockerFixture`.
+NEVER EVER put more than one TestClass into a test module.
 
 #### Test file structure
 
@@ -274,7 +275,9 @@ NEVER USE unittest.mock. YOU MUST USE pytest-mock instead.
 - Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
-- Always put test inside Test classes: 1 TestClass per module.
+- Always put tests inside Test classes: 1 TestClass per module.
+- NEVER EVER put more than one TestClass into a test module.
+- Put fixtures into conftest.py files for easy sharing.
 
 #### Markers
 
@@ -333,7 +336,7 @@ class TestFooBar:
 - Verify working memory state
 - Check output structure and content
 - Use meaningful test case names
-- Include docstrings explaining test purpose but not on top of the file and not on top of the class.
+- Include concise docstrings explaining test purpose but not on top of the file and not on top of the class.
 - Log outputs for debugging
 
 ## Writing Docs

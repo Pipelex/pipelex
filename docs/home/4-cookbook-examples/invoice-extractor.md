@@ -22,16 +22,14 @@ async def process_invoice(pdf_url: str) -> ListContent[Invoice]:
     return pipe_output.main_stuff_as_list(item_type=Invoice)
 ```
 
-This example also showcases some of the powerful observer features of Pipelex. After the pipeline runs, it generates a cost report and a flowchart of the execution.
+This example also showcases some of the powerful observer features of Pipelex. After the pipeline runs, it generates a cost report.
 
 ```python
 # Print the cost reporting
 get_report_delegate().generate_report()
-
-# Print the flowchart url of the pipeline.
-get_pipeline_tracker().output_flowchart()
 ```
-This is invaluable for understanding the cost and the execution flow of your pipelines.
+
+This is invaluable for understanding the cost of your pipelines.
 
 ## The Data Structure: `Invoice` Model
 

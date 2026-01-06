@@ -12,6 +12,7 @@ GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
         "pipelex_service.toml",
         "pipelex_override.toml",
         "telemetry_override.toml",
+        "pipelex_gateway_models.md",  # Auto-generated from remote config
     }
 )
 

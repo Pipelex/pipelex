@@ -62,7 +62,12 @@ make ccs                      - Shorthand -> check-config-sync
 make check-rules              - Verify installed agent rules match kit templates
 make check-urls               - Check all URLs in pipelex/urls.py for broken links (quiet)
 make cu                       - Check URLs with verbose output (shows details)
+make update-gateway-models    - Update gateway models reference
+make ugm                      - Shorthand -> update-gateway-models
+make check-gateway-models     - Check gateway models reference is up-to-date
+make cgm                      - Shorthand -> check-gateway-models
 
+make up                       - Shorthand -> update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
@@ -128,7 +133,7 @@ export HELP
 	validate v check c cc agent-check \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-TODOs docs docs-check docs-deploy \
-	test-count check-test-badge \
+	test-count check-test-badge update-gateway-models ugm check-gateway-models cgm up \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg
 
 all help:
@@ -239,6 +244,20 @@ check-config-sync: env
 
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"
+
+update-gateway-models: env
+	$(call PRINT_TITLE,"Updating gateway models reference")
+	$(VENV_PIPELEX_DEV) update-gateway-models
+
+ugm: update-gateway-models
+	@echo "> done: ugm = update-gateway-models"
+
+check-gateway-models: env
+	$(call PRINT_TITLE,"Checking gateway models reference is up-to-date")
+	$(VENV_PIPELEX_DEV) check-gateway-models --quiet
+
+cgm: check-gateway-models
+	@echo "> done: cgm = check-gateway-models"
 
 ##############################################################################################
 ############################      Cleaning                        ############################
@@ -632,7 +651,10 @@ c: format lint pyright mypy
 cc: cleanderived c
 	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
 
-check: cc check-unused-imports check-config-sync check-rules check-urls pylint
+up: update-gateway-models up-kit-configs rules
+	@echo "> done: up = update-gateway-models up-kit-configs rules"
+
+check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models pylint
 	@echo "> done: check"
 
 agent-check: fix-unused-imports format lint pyright mypy

@@ -1,6 +1,5 @@
 from typing import Literal
 
-import shortuuid
 from typing_extensions import override
 
 from pipelex import log
@@ -12,8 +11,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_pipeline_tracker, get_required_pipe
-from pipelex.pipe_controllers.condition.pipe_condition_details import PipeConditionDetails
+from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.exceptions import PipeRunError
@@ -40,16 +38,6 @@ class PipeCondition(PipeController):
         if self.default_outcome:
             codes.add(self.default_outcome)
         return codes - set(SpecialOutcome.value_list())
-
-    def _make_pipe_condition_details(self, evaluated_expression: str, chosen_pipe_code: str) -> PipeConditionDetails:
-        return PipeConditionDetails(
-            code=shortuuid.uuid()[:5],
-            test_expression=self.expression,
-            outcomes=self.outcome_map,
-            default_pipe_code=self.default_outcome,
-            evaluated_expression=evaluated_expression,
-            chosen_pipe_code=chosen_pipe_code,
-        )
 
     @override
     def pipe_dependencies(self) -> set[str]:
@@ -221,18 +209,13 @@ class PipeCondition(PipeController):
 
         chosen_pipe = get_required_pipe(pipe_code=outcome)
 
-        condition_details = self._make_pipe_condition_details(
-            evaluated_expression=self.expression,
-            chosen_pipe_code=chosen_pipe.code,
-        )
-
         # Get required variables and validate they exist in working memory
         # Extract root names from full paths for looking up stuffs in working memory
         required_variables = chosen_pipe.required_variables()
         # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
         required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables if not req_var.startswith("_")}
         try:
-            required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
+            working_memory.get_stuffs(names=required_stuff_names)
         except WorkingMemoryStuffNotFoundError as exc:
             pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
             pipe_condition_path_str = ".".join(pipe_condition_path)
@@ -240,16 +223,7 @@ class PipeCondition(PipeController):
             msg = f"Some required stuff(s) not found: {error_details}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        for required_stuff in required_stuffs:
-            get_pipeline_tracker().add_condition_step(
-                from_stuff=required_stuff,
-                to_condition=condition_details,
-                condition_expression=self.expression,
-                pipe_layer=pipe_run_params.pipe_layers,
-                comment="PipeCondition required for condition",
-            )
-
-        pipe_output = await get_pipe_router().run(
+        return await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=outcome),
                 job_metadata=job_metadata,
@@ -258,13 +232,6 @@ class PipeCondition(PipeController):
                 output_name=output_name,
             ),
         )
-        get_pipeline_tracker().add_choice_step(
-            from_condition=condition_details,
-            to_stuff=pipe_output.main_stuff,
-            pipe_layer=pipe_run_params.pipe_layers,
-            comment="PipeCondition chosen pipe",
-        )
-        return pipe_output
 
     @override
     async def _dry_run_controller_pipe(

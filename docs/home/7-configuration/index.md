@@ -23,7 +23,7 @@ For a complete list of all possible configuration options, refer to the configur
 
 The main project configuration files are:
 
-- `.pipelex/pipelex.toml`: project customization (logging, reporting, tracker, feature flags, etc.)
+- `.pipelex/pipelex.toml`: project customization (logging, reporting, feature flags, etc.)
 - `.pipelex/telemetry.toml`: custom telemetry destinations
 - `.pipelex/inference/…`: inference backends, routing profiles, and model presets
 

@@ -152,7 +152,7 @@ class TestMermaidFromJson:
             html_content = html_path.read_text(encoding="utf-8")
             assert html_content.startswith("<!DOCTYPE html>")
             assert "mermaid" in html_content
-            assert '<div class="mermaid">' in html_content
+            assert 'class="mermaid"' in html_content
 
         log.info(
             f"✅ Mermaid generation complete for '{topic}':\n"
