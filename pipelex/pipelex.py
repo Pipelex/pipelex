@@ -1,5 +1,4 @@
 import types
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from kajson.class_registry import ClassRegistry
@@ -70,12 +69,8 @@ from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.storage.gcp_storage_provider import GcpStorageProvider
-from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
-from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
-from pipelex.tools.storage.s3_storage_provider import S3StorageProvider
-from pipelex.tools.storage.storage_config import StorageMethod
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.storage.storage_provider_factory import make_storage_provider_from_config
 from pipelex.types import Self
 from pipelex.urls import URLs
 
@@ -214,34 +209,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         if storage_provider is None:
             storage_config = get_config().pipelex.storage_config
-            match storage_config.method:
-                case StorageMethod.LOCAL:
-                    log.dev(f"Using local storage at: {storage_config.storage_path}")
-                    storage_provider = LocalStorageProvider(root_path=Path(storage_config.storage_path))
-                case StorageMethod.IN_MEMORY:
-                    log.dev("Using in-memory storage")
-                    storage_provider = InMemoryStorageProvider()
-                case StorageMethod.S3:
-                    if storage_config.s3 is None:
-                        msg = "S3 config is required when method is s3"
-                        raise PipelexConfigError(msg)
-                    log.dev(f"Using S3 storage: bucket={storage_config.s3.bucket_name}, region={storage_config.s3.region}")
-                    storage_provider = S3StorageProvider(
-                        bucket_name=storage_config.s3.bucket_name,
-                        region=storage_config.s3.region,
-                        signed_urls_lifespan=storage_config.s3.signed_urls_lifespan,
-                    )
-                case StorageMethod.GCP:
-                    if storage_config.gcp is None:
-                        msg = "GCP config is required when method is gcp"
-                        raise PipelexConfigError(msg)
-                    log.dev(f"Using GCP storage: bucket={storage_config.gcp.bucket_name}, project={storage_config.gcp.project_id}")
-                    storage_provider = GcpStorageProvider(
-                        bucket_name=storage_config.gcp.bucket_name,
-                        project_id=storage_config.gcp.project_id,
-                        credentials_file_path=storage_config.gcp.credentials_file_path,
-                        signed_urls_lifespan=storage_config.gcp.signed_urls_lifespan,
-                    )
+            storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
         self.library_manager = library_manager or LibraryManager()

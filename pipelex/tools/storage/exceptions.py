@@ -5,6 +5,10 @@ class StorageError(ToolError):
     """Base exception for storage-related errors."""
 
 
+class StorageConfigError(StorageError):
+    """Raised when a storage configuration is invalid."""
+
+
 class StorageFileNotFoundError(StorageError):
     """Raised when a requested file does not exist in storage."""
 
