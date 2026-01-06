@@ -307,7 +307,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         .inspector-pre.nowrap {
             white-space: pre;
             word-break: normal;
-            line-height: 0.8;
+            line-height: 1;
+            padding-right: 20px;
             -webkit-overflow-scrolling: touch;
         }
         .inspector-row {
@@ -359,11 +360,29 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             cursor: not-allowed;
         }
         .inspector-html-content {
-            background: #fff;
-            color: #333;
+            background: var(--color-bg);
+            color: var(--color-text-muted);
             padding: 12px;
             border-radius: var(--radius-md);
             font-family: var(--font-sans);
+        }
+        .inspector-html-content table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .inspector-html-content th,
+        .inspector-html-content td {
+            border: 1px solid var(--color-border);
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .inspector-html-content th {
+            background: #252a30;
+            color: var(--color-text);
+            font-weight: 600;
+        }
+        .inspector-html-content tr:hover {
+            background: #2a2530;
         }
 
         /* Legend */
@@ -480,7 +499,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         const stuffDataHtml = stuffDataHtmlElement ? JSON.parse(stuffDataHtmlElement.textContent || '{}') : {};
 
         // Track current format selection for stuff display
-        let currentStuffFormat = 'json';
+        let currentStuffFormat = 'html';
 
         // ====================================================================
         // DATAFLOW ANALYSIS: Extract stuff nodes and build producer/consumer maps
@@ -1015,12 +1034,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
                         const textActive = currentStuffFormat === 'text' ? 'active' : '';
                         const htmlActive = currentStuffFormat === 'html' ? 'active' : '';
+                        html += `<button class="format-tab ${htmlActive}" data-format="html" `;
+                        html += `${!hasHtml ? 'disabled' : ''}>HTML</button>`;
                         html += `<button class="format-tab ${jsonActive}" data-format="json" `;
                         html += `${!hasJson ? 'disabled' : ''}>JSON</button>`;
                         html += `<button class="format-tab ${textActive}" data-format="text" `;
                         html += `${!hasText ? 'disabled' : ''}>Pretty</button>`;
-                        html += `<button class="format-tab ${htmlActive}" data-format="html" `;
-                        html += `${!hasHtml ? 'disabled' : ''}>HTML</button>`;
                         html += '</div>';
                         html += '<div id="stuff-data-content"></div>';
                         html += '</div>';
@@ -1053,11 +1072,11 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
 
                     // Render initial content
                     if (hasJson || hasText || hasHtml) {
-                        // Determine best available format
+                        // Determine best available format (HTML -> JSON -> Pretty)
                         let bestFormat = currentStuffFormat;
-                        if (bestFormat === 'json' && !hasJson) bestFormat = hasText ? 'text' : 'html';
-                        if (bestFormat === 'text' && !hasText) bestFormat = hasJson ? 'json' : 'html';
                         if (bestFormat === 'html' && !hasHtml) bestFormat = hasJson ? 'json' : 'text';
+                        if (bestFormat === 'json' && !hasJson) bestFormat = hasHtml ? 'html' : 'text';
+                        if (bestFormat === 'text' && !hasText) bestFormat = hasHtml ? 'html' : 'json';
 
                         renderStuffContent(bestFormat);
                     }
