@@ -42,7 +42,7 @@ pipelex init telemetry
 
 This command creates the `.pipelex/` directory with:
 
-- **pipelex.toml** - Main configuration file for logging, reporting, tracking, etc.
+- **pipelex.toml** - Main configuration file for logging, reporting, etc.
 - **inference/** - AI backend and routing configuration
     - `backends.toml` - Backend provider settings
     - `routing_profiles.toml` - Model routing rules

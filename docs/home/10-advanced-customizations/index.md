@@ -15,7 +15,6 @@ from pipelex import Pipelex
 
 pipelex = Pipelex.make(
     template_provider=MyTemplateProvider(),
-    pipeline_tracker=MyPipelineTracker(),
     reporting_delegate=MyReportingDelegate(),
     secrets_provider=MySecretsProvider(),
     content_generator=MyContentGenerator(),
@@ -38,7 +37,6 @@ hub.set_template_provider(MyTemplateProvider())
 Some components have "NoOp" (No Operation) implementations that are used when the feature is disabled:
 
 - `ReportingNoOp`: Used when reporting is disabled
-- `PipelineTrackerNoOp`: Used when pipeline tracking is disabled
 - `ActivityManagerNoOp`: Used when activity tracking is disabled
 
 These NoOp implementations implement the same protocol but do nothing, allowing the system to function without the specific feature.
@@ -58,7 +56,6 @@ All custom implementations MUST:
 Some components are controlled by feature flags in the configuration:
 
 - `is_reporting_enabled`: Controls Reporting system
-- `is_pipeline_tracking_enabled`: Controls Pipeline Tracking
 
 When a feature is disabled, the corresponding NoOp implementation is used automatically.
 
@@ -68,36 +65,30 @@ Pipelex supports injection of the following components:
 
 **Template Provider** (`TemplateLibrary`)
 
- - Protocol: `TemplateProviderAbstract`
- - Default: `TemplateLibrary`
- - [Details](template-provider-injection.md)
+- Protocol: `TemplateProviderAbstract`
+- Default: `TemplateLibrary`
+- [Details](template-provider-injection.md)
 
 **Reporting Delegate** (`ReportingManager`)
 
- - Protocol: `ReportingProtocol`
- - Default: `ReportingManager` or `ReportingNoOp` if disabled
- - [Details](reporting-delegate-injection.md)
-
-**Pipeline Tracker** (`PipelineTracker`)
-
- - Protocol: `PipelineTrackerProtocol`
- - Default: `PipelineTracker` or `PipelineTrackerNoOp` if disabled
- - [Details](pipeline-tracker-injection.md)
+- Protocol: `ReportingProtocol`
+- Default: `ReportingManager` or `ReportingNoOp` if disabled
+- [Details](reporting-delegate-injection.md)
 
 **Secrets Provider** (`EnvSecretsProvider`)
 
- - Protocol: `SecretsProviderAbstract`
- - Default: `EnvSecretsProvider`
- - [Details](secrets-provider-injection.md)
+- Protocol: `SecretsProviderAbstract`
+- Default: `EnvSecretsProvider`
+- [Details](secrets-provider-injection.md)
 
 **Content Generator** (`ContentGenerator`)
- - Protocol: `ContentGeneratorProtocol`
- - Default: `ContentGenerator`
- - [Details](content-generator-injection.md)
- 
+
+- Protocol: `ContentGeneratorProtocol`
+- Default: `ContentGenerator`
+- [Details](content-generator-injection.md)
+
 **Pipe Router** (`PipeRouter`)
 
-    - Protocol: `PipeRouterProtocol`
-    - Default: `PipeRouter`
-    - [Details](pipe-router-injection.md)
-
+- Protocol: `PipeRouterProtocol`
+- Default: `PipeRouter`
+- [Details](pipe-router-injection.md)

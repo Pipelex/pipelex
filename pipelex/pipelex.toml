@@ -36,7 +36,6 @@ default_directory_base_name = "pipeline"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags
-is_pipeline_tracking_enabled = false
 is_reporting_enabled = true
 
 [pipelex.reporting_config]
@@ -235,27 +234,6 @@ default_reaction = "raise"
 # missing_input_variable = "log"
 # extraneous_input_variable = "log"
 # inadequate_input_concept = "log"
-
-####################################################################################################
-# History graph config
-####################################################################################################
-
-[pipelex.tracker_config]
-is_debug_mode = false
-is_include_text_preview = false
-is_include_interactivity = false
-nb_items_limit = "unlimited"
-theme = "base"
-layout = "dagre"                                     # "elk", "dagre", "fixed"
-sub_graph_colors = ["#e6f5ff", "#fff5f7", "#f0fff0"]
-wrapping_width = "auto"
-
-# TODO: adapt the length of the edges to different cases?
-pipe_edge_style = "---->"
-branch_edge_style = "-...-"
-aggregate_edge_style = "-...-"
-condition_edge_style = "-----"
-choice_edge_style = "-----"
 
 ####################################################################################################
 # Pipelex run config
