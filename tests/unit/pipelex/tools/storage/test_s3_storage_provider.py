@@ -123,6 +123,51 @@ class TestS3StorageProvider:
         assert S3_TEST_BUCKET in display
         assert "X-Amz-Signature" in display or "Signature" in display
 
+    def test_presigned_url_uses_regional_endpoint(
+        self,
+        s3_provider_with_signed_urls: S3StorageProvider,
+    ) -> None:
+        """Test that presigned URLs use the regional S3 endpoint.
+
+        This is critical for signature validation - AWS validates signatures against
+        the regional endpoint, so the URL must use s3.{region}.amazonaws.com format.
+        Without this, presigned URLs will fail with SignatureDoesNotMatch errors.
+        """
+        test_data = b"regional endpoint test"
+        key = "regional/test.bin"
+
+        returned_uri = s3_provider_with_signed_urls.store(data=test_data, key=key)
+        display = s3_provider_with_signed_urls.display_link(uri=returned_uri)
+
+        assert display is not None
+        # The URL must use the regional endpoint format: s3.{region}.amazonaws.com
+        # NOT the global endpoint: s3.amazonaws.com (without region)
+        regional_endpoint = f"s3.{S3_TEST_REGION}.amazonaws.com"
+        assert regional_endpoint in display, (
+            f"Presigned URL must use regional endpoint '{regional_endpoint}' to ensure signature validation works. Got: {display}"
+        )
+
+    def test_presigned_url_credential_matches_region(
+        self,
+        s3_provider_with_signed_urls: S3StorageProvider,
+    ) -> None:
+        """Test that the credential region in presigned URL matches the configured region.
+
+        The X-Amz-Credential parameter must include the correct region for signature
+        validation to succeed.
+        """
+        test_data = b"credential region test"
+        key = "credential/test.bin"
+
+        returned_uri = s3_provider_with_signed_urls.store(data=test_data, key=key)
+        display = s3_provider_with_signed_urls.display_link(uri=returned_uri)
+
+        assert display is not None
+        # The credential should include the region
+        assert f"%2F{S3_TEST_REGION}%2Fs3%2F" in display or f"/{S3_TEST_REGION}/s3/" in display, (
+            f"Presigned URL credential must include region '{S3_TEST_REGION}'. Got: {display}"
+        )
+
     def test_store_overwrites_existing_data(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
@@ -216,3 +261,70 @@ class TestS3StorageProvider:
         loaded_data = s3_provider_no_signed_urls.load(uri=returned_uri)
 
         assert loaded_data == test_data
+
+    def test_presigned_url_uses_correct_region_for_non_us_east_1(
+        self,
+        s3_mock_context: None,  # noqa: ARG002
+    ) -> None:
+        """Test that presigned URLs use the correct regional endpoint for non-us-east-1 regions.
+
+        This test specifically targets the bug where boto3 might use the global endpoint
+        instead of the regional endpoint, causing SignatureDoesNotMatch errors in regions
+        like eu-west-3.
+        """
+        import boto3  # noqa: PLC0415
+
+        test_region = "eu-west-3"
+        test_bucket = "test-eu-bucket"
+
+        # Create bucket in a different region
+        s3_client = boto3.client("s3", region_name=test_region)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+        s3_client.create_bucket(  # pyright: ignore[reportUnknownMemberType]
+            Bucket=test_bucket,
+            CreateBucketConfiguration={"LocationConstraint": test_region},
+        )
+
+        provider = S3StorageProvider(
+            bucket_name=test_bucket,
+            region=test_region,
+            signed_urls_lifespan=3600,
+        )
+
+        test_data = b"eu-west-3 test"
+        key = "eu-test/file.bin"
+
+        returned_uri = provider.store(data=test_data, key=key)
+        display = provider.display_link(uri=returned_uri)
+
+        assert display is not None
+        # Must use regional endpoint for eu-west-3, not global s3.amazonaws.com
+        assert f"s3.{test_region}.amazonaws.com" in display, (
+            f"Presigned URL must use regional endpoint 's3.{test_region}.amazonaws.com'. "
+            f"Using global endpoint causes SignatureDoesNotMatch errors. Got: {display}"
+        )
+
+    def test_client_uses_regional_endpoint_url(
+        self,
+        s3_mock_context: None,  # noqa: ARG002
+    ) -> None:
+        """Test that the S3 client is configured with the regional endpoint URL.
+
+        This verifies the fix for SignatureDoesNotMatch errors caused by using
+        the global S3 endpoint instead of the regional one.
+        """
+        test_region = "ap-southeast-1"
+        provider = S3StorageProvider(
+            bucket_name="test-bucket",
+            region=test_region,
+            signed_urls_lifespan=3600,
+        )
+
+        # Trigger client initialization
+        client = provider._get_client()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+        # Verify the client is using the regional endpoint
+        endpoint_url = client.meta.endpoint_url  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+        expected_endpoint = f"https://s3.{test_region}.amazonaws.com"
+        assert endpoint_url == expected_endpoint, (
+            f"Client must use regional endpoint '{expected_endpoint}' to avoid SignatureDoesNotMatch errors. Got: {endpoint_url}"
+        )
