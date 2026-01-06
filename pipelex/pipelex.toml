@@ -277,7 +277,9 @@ max_preview_length = 200
 max_stack_length = 2000
 
 [pipelex.pipeline_execution_config.graph_config.data_inclusion]
-stuff_json_content = false
+stuff_json_content = true
+stuff_text_content = true
+stuff_html_content = true
 
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 graphspec_json = true

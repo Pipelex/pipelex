@@ -10,10 +10,11 @@ duplicated analysis logic across different rendering functions.
 import operator
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.graph.graph_analysis import GraphAnalysis
+from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
@@ -24,18 +25,26 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.mermaid_utils import escape_mermaid_label, sanitize_mermaid_id
+from pipelex.tools.misc.pretty import PrettyPrinter
 
 
-class MermaidWithData(BaseModel):
-    """Mermaid code paired with stuff data for interactive HTML rendering.
+class MermaidOutput(BaseModel):
+    """Mermaid code paired with optional stuff data for interactive HTML rendering.
 
     Attributes:
         mermaid_code: The generated Mermaid flowchart syntax.
-        stuff_data: Mapping from stuff mermaid IDs to their full IOSpec.data content.
+        stuff_data: Optional mapping from stuff mermaid IDs to their full IOSpec.data content.
+            Only populated when GraphConfig.data_inclusion.stuff_json_content is True.
+        stuff_data_text: Optional mapping from stuff mermaid IDs to their ASCII text representation.
+            Only populated when GraphConfig.data_inclusion.stuff_text_content is True.
+        stuff_data_html: Optional mapping from stuff mermaid IDs to their HTML representation.
+            Only populated when GraphConfig.data_inclusion.stuff_html_content is True.
     """
 
     mermaid_code: str
-    stuff_data: dict[str, Any] = Field(default_factory=dict)
+    stuff_data: dict[str, Any] | None = None
+    stuff_data_text: dict[str, str] | None = None
+    stuff_data_html: dict[str, str] | None = None
 
 
 # Light pastel colors for subgraph depth coloring (cycles through these)
@@ -106,6 +115,82 @@ def _collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
 
     log.debug(f"_collect_stuff_data: collected {len(stuff_data)} stuff items")
     return stuff_data
+
+
+def collect_stuff_data_text(graph: GraphSpec) -> dict[str, str]:
+    """Collect IOSpec.data as ASCII text from all stuff nodes in the graph.
+
+    Uses PrettyPrinter to convert the data to Rich renderables, then exports as plain text.
+
+    Note: We collect data from ALL nodes including controllers, because:
+    - The root controller has the pipeline inputs with data
+    - Controllers also capture their outputs with data
+
+    Args:
+        graph: The GraphSpec to extract data from.
+
+    Returns:
+        Dict mapping stuff mermaid IDs (s_xxx format) to their text representation.
+        Only includes entries where data is not None.
+    """
+    stuff_data_text: dict[str, str] = {}
+
+    for node in graph.nodes:
+        # Collect data from outputs
+        for output_spec in node.node_io.outputs:
+            if output_spec.digest and output_spec.data is not None:
+                stuff_mermaid_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
+                pretty = PrettyPrinter.make_pretty(output_spec.data, depth=0)
+                stuff_data_text[stuff_mermaid_id] = PrettyPrinter.pretty_text(pretty)
+
+        # Collect data from inputs (for pipeline inputs without a producer)
+        for input_spec in node.node_io.inputs:
+            if input_spec.digest and input_spec.data is not None:
+                stuff_mermaid_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
+                # Don't overwrite if already captured from output
+                if stuff_mermaid_id not in stuff_data_text:
+                    pretty = PrettyPrinter.make_pretty(input_spec.data, depth=0)
+                    stuff_data_text[stuff_mermaid_id] = PrettyPrinter.pretty_text(pretty)
+
+    return stuff_data_text
+
+
+def collect_stuff_data_html(graph: GraphSpec) -> dict[str, str]:
+    """Collect IOSpec.data as HTML from all stuff nodes in the graph.
+
+    Uses PrettyPrinter to convert the data to Rich renderables, then exports as HTML.
+
+    Note: We collect data from ALL nodes including controllers, because:
+    - The root controller has the pipeline inputs with data
+    - Controllers also capture their outputs with data
+
+    Args:
+        graph: The GraphSpec to extract data from.
+
+    Returns:
+        Dict mapping stuff mermaid IDs (s_xxx format) to their HTML representation.
+        Only includes entries where data is not None.
+    """
+    stuff_data_html: dict[str, str] = {}
+
+    for node in graph.nodes:
+        # Collect data from outputs
+        for output_spec in node.node_io.outputs:
+            if output_spec.digest and output_spec.data is not None:
+                stuff_mermaid_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
+                pretty = PrettyPrinter.make_pretty(output_spec.data, depth=0)
+                stuff_data_html[stuff_mermaid_id] = PrettyPrinter.pretty_html(pretty)
+
+        # Collect data from inputs (for pipeline inputs without a producer)
+        for input_spec in node.node_io.inputs:
+            if input_spec.digest and input_spec.data is not None:
+                stuff_mermaid_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
+                # Don't overwrite if already captured from output
+                if stuff_mermaid_id not in stuff_data_html:
+                    pretty = PrettyPrinter.make_pretty(input_spec.data, depth=0)
+                    stuff_data_html[stuff_mermaid_id] = PrettyPrinter.pretty_html(pretty)
+
+    return stuff_data_html
 
 
 def _render_node(
@@ -512,10 +597,11 @@ def graphspec_to_orchestration_mermaid(
 
 def graphspec_to_dataflow_mermaid(
     graph: GraphSpec,
+    graph_config: GraphConfig,
     *,
     direction: FlowchartDirection | None = None,
     show_stuff_codes: bool = False,
-) -> str:
+) -> MermaidOutput:
     """Convert a GraphSpec to a data-lineage focused Mermaid flowchart.
 
     Unlike graphspec_to_mermaid (which shows orchestration/containment),
@@ -528,11 +614,12 @@ def graphspec_to_dataflow_mermaid(
 
     Args:
         graph: The GraphSpec to convert.
+        graph_config: Configuration controlling data inclusion and rendering options.
         direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
 
     Returns:
-        Mermaid flowchart syntax as a string.
+        MermaidOutput containing mermaid code and optional stuff data mapping.
     """
     effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
@@ -552,7 +639,8 @@ def graphspec_to_dataflow_mermaid(
     if not analysis.has_data_flow_info():
         lines.append("    %% No data flow information available")
         lines.append("    note[No IOSpec data captured. Run with data flow tracing enabled.]")
-        return "\n".join(lines)
+        mermaid_code = "\n".join(lines)
+        return MermaidOutput(mermaid_code=mermaid_code, stuff_data=None)
 
     # Build stuff registry as tuple format for compatibility with rendering code
     stuff_registry: dict[str, tuple[str, str | None]] = {}
@@ -630,46 +718,35 @@ def graphspec_to_dataflow_mermaid(
     lines.append("    classDef pipe_failed fill:#ffcccc,stroke:#cc0000")
     lines.append("    classDef stuff fill:#fff3e6,stroke:#cc6600,stroke-width:2px")
 
-    return "\n".join(lines)
+    mermaid_code = "\n".join(lines)
 
+    # Collect stuff data in configured formats
+    stuff_data: dict[str, Any] | None = None
+    stuff_data_text: dict[str, str] | None = None
+    stuff_data_html: dict[str, str] | None = None
 
-def graphspec_to_dataflow_mermaid_with_data(
-    graph: GraphSpec,
-    *,
-    direction: FlowchartDirection | None = None,
-    show_stuff_codes: bool = False,
-) -> MermaidWithData:
-    """Convert a GraphSpec to a data-lineage Mermaid flowchart with embedded data.
+    if graph_config.data_inclusion.stuff_json_content:
+        stuff_data = _collect_stuff_data(graph=graph)
+    if graph_config.data_inclusion.stuff_text_content:
+        stuff_data_text = collect_stuff_data_text(graph=graph)
+    if graph_config.data_inclusion.stuff_html_content:
+        stuff_data_html = collect_stuff_data_html(graph=graph)
 
-    This is the same as graphspec_to_dataflow_mermaid but also extracts IOSpec.data
-    for interactive HTML rendering where clicking stuff nodes shows their full data.
-
-    Args:
-        graph: The GraphSpec to convert.
-        direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
-        show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
-
-    Returns:
-        MermaidWithData containing mermaid code and stuff data mapping.
-    """
-    mermaid_code = graphspec_to_dataflow_mermaid(
-        graph=graph,
-        direction=direction,
-        show_stuff_codes=show_stuff_codes,
+    return MermaidOutput(
+        mermaid_code=mermaid_code,
+        stuff_data=stuff_data,
+        stuff_data_text=stuff_data_text,
+        stuff_data_html=stuff_data_html,
     )
-
-    # Collect stuff data from graph
-    stuff_data = _collect_stuff_data(graph=graph)
-
-    return MermaidWithData(mermaid_code=mermaid_code, stuff_data=stuff_data)
 
 
 def graphspec_to_combo_mermaid(
     graph: GraphSpec,
+    graph_config: GraphConfig,
     *,
     direction: FlowchartDirection | None = None,
     show_stuff_codes: bool = False,
-) -> str:
+) -> MermaidOutput:
     """Convert a GraphSpec to a combined data-flow and orchestration Mermaid flowchart.
 
     This view combines the best of both worlds:
@@ -685,11 +762,12 @@ def graphspec_to_combo_mermaid(
 
     Args:
         graph: The GraphSpec to convert.
+        graph_config: Configuration controlling data inclusion and rendering options.
         direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
 
     Returns:
-        Mermaid flowchart syntax as a string.
+        MermaidOutput containing mermaid code and optional stuff data mapping.
     """
     effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
@@ -738,7 +816,8 @@ def graphspec_to_combo_mermaid(
         lines.append("")
         lines.append("    %% No data flow information available")
         lines.append("    note[No IOSpec data captured. Run with data flow tracing enabled.]")
-        return "\n".join(lines)
+        mermaid_code = "\n".join(lines)
+        return MermaidOutput(mermaid_code=mermaid_code, stuff_data=None)
 
     # Render stuff nodes without a producer (pipeline inputs) at top level
     orphan_stuffs = [(digest, name, concept) for digest, (name, concept) in stuff_registry.items() if digest not in analysis.stuff_producers]
@@ -791,35 +870,23 @@ def graphspec_to_combo_mermaid(
             color = SUBGRAPH_DEPTH_COLORS[sg_depth % len(SUBGRAPH_DEPTH_COLORS)]
             lines.append(f"    style {subgraph_id} fill:{color}")
 
-    return "\n".join(lines)
+    mermaid_code = "\n".join(lines)
 
+    # Collect stuff data in configured formats
+    stuff_data: dict[str, Any] | None = None
+    stuff_data_text: dict[str, str] | None = None
+    stuff_data_html: dict[str, str] | None = None
 
-def graphspec_to_combo_mermaid_with_data(
-    graph: GraphSpec,
-    *,
-    direction: FlowchartDirection | None = None,
-    show_stuff_codes: bool = False,
-) -> MermaidWithData:
-    """Convert a GraphSpec to a combo Mermaid flowchart with embedded data.
+    if graph_config.data_inclusion.stuff_json_content:
+        stuff_data = _collect_stuff_data(graph=graph)
+    if graph_config.data_inclusion.stuff_text_content:
+        stuff_data_text = collect_stuff_data_text(graph=graph)
+    if graph_config.data_inclusion.stuff_html_content:
+        stuff_data_html = collect_stuff_data_html(graph=graph)
 
-    This is the same as graphspec_to_combo_mermaid but also extracts IOSpec.data
-    for interactive HTML rendering where clicking stuff nodes shows their full data.
-
-    Args:
-        graph: The GraphSpec to convert.
-        direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
-        show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
-
-    Returns:
-        MermaidWithData containing mermaid code and stuff data mapping.
-    """
-    mermaid_code = graphspec_to_combo_mermaid(
-        graph=graph,
-        direction=direction,
-        show_stuff_codes=show_stuff_codes,
+    return MermaidOutput(
+        mermaid_code=mermaid_code,
+        stuff_data=stuff_data,
+        stuff_data_text=stuff_data_text,
+        stuff_data_html=stuff_data_html,
     )
-
-    # Collect stuff data from graph
-    stuff_data = _collect_stuff_data(graph=graph)
-
-    return MermaidWithData(mermaid_code=mermaid_code, stuff_data=stuff_data)

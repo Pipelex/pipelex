@@ -16,6 +16,8 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.graph.mermaid import graphspec_to_combo_mermaid
 
+from .conftest import make_graph_config
+
 
 class TestComboMermaid:
     """Tests for graphspec_to_combo_mermaid function."""
@@ -55,8 +57,9 @@ class TestComboMermaid:
             "status": NodeStatus.SUCCEEDED,
         }
         graph = self._make_graph(nodes=[node])
-        result = graphspec_to_combo_mermaid(graph)
-        assert "No data flow information available" in result
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
+        assert "No data flow information available" in result.mermaid_code
 
     def test_controller_renders_as_subgraph(self) -> None:
         """Test that controllers with children render as subgraphs."""
@@ -86,14 +89,15 @@ class TestComboMermaid:
             nodes=[controller_node, child_node],
             edges=[contains_edge],
         )
-        result = graphspec_to_combo_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
 
         # Should have subgraph for controller
-        assert "subgraph" in result
-        assert "main_sequence" in result
-        assert "end" in result
+        assert "subgraph" in result.mermaid_code
+        assert "main_sequence" in result.mermaid_code
+        assert "end" in result.mermaid_code
         # Child node should be inside
-        assert "generate_text" in result
+        assert "generate_text" in result.mermaid_code
 
     def test_stuff_nodes_appear_with_producer(self) -> None:
         """Test that stuff nodes appear next to their producer pipes."""
@@ -123,11 +127,12 @@ class TestComboMermaid:
             nodes=[controller_node, producer_node],
             edges=[contains_edge],
         )
-        result = graphspec_to_combo_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
 
         # Stuff node should be rendered
-        assert "my_output" in result
-        assert ":::stuff" in result
+        assert "my_output" in result.mermaid_code
+        assert ":::stuff" in result.mermaid_code
 
     def test_pipeline_input_stuff_at_top_level(self) -> None:
         """Test that pipeline input stuffs (no producer) render at top level."""
@@ -142,12 +147,13 @@ class TestComboMermaid:
             ),
         }
         graph = self._make_graph(nodes=[consumer_node])
-        result = graphspec_to_combo_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
 
         # Pipeline input stuff should appear
-        assert "pipeline_input" in result
+        assert "pipeline_input" in result.mermaid_code
         # Should have comment about no producer
-        assert "Pipeline input stuff nodes" in result or "no producer" in result
+        assert "Pipeline input stuff nodes" in result.mermaid_code or "no producer" in result.mermaid_code
 
     def test_data_flow_edges_producer_to_stuff_to_consumer(self) -> None:
         """Test that edges connect producer -> stuff -> consumer."""
@@ -172,10 +178,11 @@ class TestComboMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node, consumer_node])
-        result = graphspec_to_combo_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
 
         # Verify producer -> stuff -> consumer edges exist
-        lines = result.split("\n")
+        lines = result.mermaid_code.split("\n")
         edge_lines = [line for line in lines if " --> " in line]
         # Should have at least 2 edges: producer->stuff, stuff->consumer
         assert len(edge_lines) >= 2
@@ -213,15 +220,16 @@ class TestComboMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node, consumer1_node, consumer2_node])
-        result = graphspec_to_combo_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
 
         # All pipe nodes and stuff should appear
-        assert "producer" in result
-        assert "consumer_a" in result
-        assert "consumer_b" in result
+        assert "producer" in result.mermaid_code
+        assert "consumer_a" in result.mermaid_code
+        assert "consumer_b" in result.mermaid_code
 
         # Multiple edges should exist
-        lines = result.split("\n")
+        lines = result.mermaid_code.split("\n")
         edge_lines = [line for line in lines if " --> " in line]
         # 1 edge producer->stuff, 2 edges stuff->consumers = 3 total
         assert len(edge_lines) >= 3
@@ -239,8 +247,9 @@ class TestComboMermaid:
             ),
         }
         graph = self._make_graph(nodes=[failed_node])
-        result = graphspec_to_combo_mermaid(graph)
-        assert ":::failed" in result
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
+        assert ":::failed" in result.mermaid_code
 
     def test_style_definitions_included(self) -> None:
         """Test that style definitions are included."""
@@ -255,10 +264,11 @@ class TestComboMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_combo_mermaid(graph)
-        assert "classDef failed" in result
-        assert "classDef controller" in result
-        assert "classDef stuff" in result
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
+        assert "classDef failed" in result.mermaid_code
+        assert "classDef controller" in result.mermaid_code
+        assert "classDef stuff" in result.mermaid_code
 
     def test_show_stuff_codes_option(self) -> None:
         """Test that show_stuff_codes option includes digest in label."""
@@ -273,14 +283,15 @@ class TestComboMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
+        graph_config = make_graph_config()
 
         # Without show_stuff_codes
-        result_without = graphspec_to_combo_mermaid(graph, show_stuff_codes=False)
-        assert "xyzab" not in result_without  # First 5 chars
+        result_without = graphspec_to_combo_mermaid(graph, graph_config, show_stuff_codes=False)
+        assert "xyzab" not in result_without.mermaid_code  # First 5 chars
 
         # With show_stuff_codes
-        result_with = graphspec_to_combo_mermaid(graph, show_stuff_codes=True)
-        assert "xyzab" in result_with  # First 5 chars should be shown
+        result_with = graphspec_to_combo_mermaid(graph, graph_config, show_stuff_codes=True)
+        assert "xyzab" in result_with.mermaid_code  # First 5 chars should be shown
 
     def test_deterministic_output(self) -> None:
         """Test that output is deterministic (same input = same output)."""
@@ -326,9 +337,10 @@ class TestComboMermaid:
             nodes=[controller_node, producer_node, consumer_node],
             edges=[contains_edge_1, contains_edge_2],
         )
-        result1 = graphspec_to_combo_mermaid(graph)
-        result2 = graphspec_to_combo_mermaid(graph)
-        assert result1 == result2
+        graph_config = make_graph_config()
+        result1 = graphspec_to_combo_mermaid(graph, graph_config)
+        result2 = graphspec_to_combo_mermaid(graph, graph_config)
+        assert result1.mermaid_code == result2.mermaid_code
 
     def test_subgraph_depth_coloring(self) -> None:
         """Test that nested subgraphs get depth-based coloring."""
@@ -370,8 +382,9 @@ class TestComboMermaid:
             nodes=[outer_ctrl, inner_ctrl, leaf_node],
             edges=[outer_contains, inner_contains],
         )
-        result = graphspec_to_combo_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_combo_mermaid(graph, graph_config)
 
         # Should have multiple subgraphs with different colors
-        assert "subgraph" in result
-        assert "style sg_" in result  # Subgraph styling
+        assert "subgraph" in result.mermaid_code
+        assert "style sg_" in result.mermaid_code  # Subgraph styling

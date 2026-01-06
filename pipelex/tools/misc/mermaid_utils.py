@@ -159,6 +159,7 @@ MERMAID_HTML_TEMPLATE = """<!DOCTYPE html>
 
 
 # Interactive HTML template with clickable stuff nodes that show full data
+# Supports multiple formats (JSON, Text, HTML) with runtime toggle
 MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -204,12 +205,13 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 13px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            min-width: 400px;
         }
         .data-modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             padding-bottom: 12px;
             border-bottom: 1px solid #444;
         }
@@ -231,10 +233,45 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             background: #333;
             color: #fff;
         }
+        .format-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .format-tab {
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            background: #333;
+            color: #888;
+            border: none;
+            transition: all 0.2s;
+        }
+        .format-tab:hover {
+            background: #444;
+            color: #ccc;
+        }
+        .format-tab.active {
+            background: #3b82f6;
+            color: #fff;
+        }
+        .format-tab:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
         .data-modal-content {
             white-space: pre-wrap;
             word-wrap: break-word;
             line-height: 1.5;
+        }
+        .data-modal-content.html-content {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fff;
+            color: #333;
+            padding: 12px;
+            border-radius: 4px;
         }
         .data-modal-overlay {
             position: fixed;
@@ -276,11 +313,22 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             <span class="data-modal-title" id="modal-title">Data Content</span>
             <span class="data-modal-close" onclick="hideModal()">&times;</span>
         </div>
-        <pre class="data-modal-content" id="modal-content"></pre>
+        <div class="format-tabs" id="format-tabs">
+            <button class="format-tab active" data-format="json" id="tab-json">JSON</button>
+            <button class="format-tab" data-format="text" id="tab-text">Text</button>
+            <button class="format-tab" data-format="html" id="tab-html">HTML</button>
+        </div>
+        <div class="data-modal-content" id="modal-content"></div>
     </div>
     <script>
-        // Embedded stuff data from graph
-        const stuffData = {{ stuff_data_json }};
+        // Embedded stuff data from graph (all formats)
+        const stuffDataJson = {{ stuff_data_json }};
+        const stuffDataText = {{ stuff_data_text_json }};
+        const stuffDataHtml = {{ stuff_data_html_json }};
+
+        // Track current state
+        let currentStuffId = null;
+        let currentFormat = 'json';
 
         mermaid.initialize({
             startOnLoad: true,
@@ -298,28 +346,105 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             const svgContainer = document.querySelector('.mermaid svg');
             if (!svgContainer) return;
 
-            // Find nodes by their flowchart IDs
-            for (const stuffId of Object.keys(stuffData)) {
+            // Find nodes by their flowchart IDs - use any available data source
+            const allStuffIds = new Set([
+                ...Object.keys(stuffDataJson || {}),
+                ...Object.keys(stuffDataText || {}),
+                ...Object.keys(stuffDataHtml || {})
+            ]);
+
+            for (const stuffId of allStuffIds) {
                 // Mermaid generates IDs like 'flowchart-s_xxx-123'
                 const nodes = svgContainer.querySelectorAll(`[id^="flowchart-${stuffId}"]`);
                 nodes.forEach(node => {
                     node.classList.add('clickable-stuff');
                     node.addEventListener('click', (e) => {
                         e.stopPropagation();
-                        showModal(stuffId, stuffData[stuffId]);
+                        showModal(stuffId);
                     });
                 });
             }
         }, 500);
 
-        function showModal(stuffId, data) {
+        // Set up format tab handlers
+        document.querySelectorAll('.format-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (tab.disabled) return;
+                const format = tab.dataset.format;
+                setFormat(format);
+            });
+        });
+
+        function setFormat(format) {
+            currentFormat = format;
+            // Update tab styling
+            document.querySelectorAll('.format-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${format}`).classList.add('active');
+            // Re-render content if modal is open
+            if (currentStuffId) {
+                renderContent(currentStuffId, format);
+            }
+        }
+
+        function renderContent(stuffId, format) {
+            const content = document.getElementById('modal-content');
+            content.classList.remove('html-content');
+
+            if (format === 'json') {
+                const data = stuffDataJson?.[stuffId];
+                content.innerHTML = '';
+                content.textContent = data ? JSON.stringify(data, null, 2) : 'No JSON data available';
+            } else if (format === 'text') {
+                const data = stuffDataText?.[stuffId];
+                content.innerHTML = '';
+                content.textContent = data || 'No text data available';
+            } else if (format === 'html') {
+                const data = stuffDataHtml?.[stuffId];
+                if (data) {
+                    content.classList.add('html-content');
+                    content.innerHTML = data;
+                } else {
+                    content.innerHTML = '';
+                    content.textContent = 'No HTML data available';
+                }
+            }
+        }
+
+        function updateTabAvailability(stuffId) {
+            const jsonTab = document.getElementById('tab-json');
+            const textTab = document.getElementById('tab-text');
+            const htmlTab = document.getElementById('tab-html');
+
+            jsonTab.disabled = !stuffDataJson?.[stuffId];
+            textTab.disabled = !stuffDataText?.[stuffId];
+            htmlTab.disabled = !stuffDataHtml?.[stuffId];
+
+            // Find first available format
+            if (!jsonTab.disabled) return 'json';
+            if (!textTab.disabled) return 'text';
+            if (!htmlTab.disabled) return 'html';
+            return 'json';
+        }
+
+        function showModal(stuffId) {
+            currentStuffId = stuffId;
             const modal = document.getElementById('data-modal');
             const overlay = document.getElementById('modal-overlay');
             const title = document.getElementById('modal-title');
-            const content = document.getElementById('modal-content');
 
             title.textContent = `Data: ${stuffId}`;
-            content.textContent = JSON.stringify(data, null, 2);
+
+            // Update tab availability and select best format
+            const availableFormat = updateTabAvailability(stuffId);
+
+            // If current format is not available, switch to available one
+            const currentTab = document.getElementById(`tab-${currentFormat}`);
+            if (currentTab.disabled) {
+                setFormat(availableFormat);
+            } else {
+                renderContent(stuffId, currentFormat);
+            }
+
             modal.style.display = 'block';
             overlay.style.display = 'block';
         }
@@ -327,6 +452,7 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
         function hideModal() {
             document.getElementById('data-modal').style.display = 'none';
             document.getElementById('modal-overlay').style.display = 'none';
+            currentStuffId = null;
         }
 
         // Close modal when clicking overlay
@@ -397,30 +523,38 @@ async def render_mermaid_html_async(
 
 async def render_mermaid_html_with_data_async(
     mermaid_code: str,
-    stuff_data: dict[str, str | dict[str, object] | list[str] | list[dict[str, object]] | None],
+    stuff_data: dict[str, str | dict[str, object] | list[str] | list[dict[str, object]] | None] | None = None,
+    stuff_data_text: dict[str, str] | None = None,
+    stuff_data_html: dict[str, str] | None = None,
     *,
     title: str = "Pipelex Graph",
 ) -> str:
     """Render Mermaid code with clickable stuff nodes into a standalone HTML page.
 
     This renders an interactive version where clicking on stuff nodes (data items)
-    displays their full serialized content in a modal dialog.
+    displays their full serialized content in a modal dialog. Supports multiple
+    display formats (JSON, Text, HTML) with runtime toggle.
 
     Args:
         mermaid_code: The Mermaid flowchart code to embed.
-        stuff_data: Mapping from stuff mermaid IDs to their full data content.
+        stuff_data: Mapping from stuff mermaid IDs to their full data content (JSON format).
+        stuff_data_text: Mapping from stuff mermaid IDs to their ASCII text representation.
+        stuff_data_html: Mapping from stuff mermaid IDs to their HTML representation.
         title: The page title (appears in browser tab and as h1).
 
     Returns:
         Complete HTML page as a string with interactive data display.
     """
+    has_data = bool(stuff_data or stuff_data_text or stuff_data_html)
     return await render_jinja2_async(
         template_source=MERMAID_INTERACTIVE_HTML_TEMPLATE,
         template_category=TemplateCategory.HTML,
         temlating_context={
             "title": title,
             "mermaid_code": mermaid_code,
-            "stuff_data_json": json.dumps(stuff_data),
-            "has_data": bool(stuff_data),
+            "stuff_data_json": json.dumps(stuff_data or {}),
+            "stuff_data_text_json": json.dumps(stuff_data_text or {}),
+            "stuff_data_html_json": json.dumps(stuff_data_html or {}),
+            "has_data": has_data,
         },
     )

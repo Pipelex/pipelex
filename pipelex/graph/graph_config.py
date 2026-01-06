@@ -1,27 +1,28 @@
-from pydantic import field_validator
-
 from pipelex.graph.mermaid_config import MermaidRenderingConfig
 from pipelex.graph.reactflow_config import ReactFlowRenderingConfig
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import StrEnum
 
 
-class DataInclusion(StrEnum):
-    STUFF_JSON_CONTENT = "stuff_json_content"
+class DataInclusionConfig(ConfigModel):
+    """Controls which data is included in graph outputs."""
+
+    stuff_json_content: bool
+    stuff_text_content: bool
+    stuff_html_content: bool
 
 
-class GraphsInclusion(StrEnum):
+class GraphsInclusionConfig(ConfigModel):
     """Controls which graph outputs are generated."""
 
-    GRAPHSPEC_JSON = "graphspec_json"
-    ORCHESTRATION_MMD = "orchestration_mmd"
-    ORCHESTRATION_HTML = "orchestration_html"
-    DATAFLOW_MMD = "dataflow_mmd"
-    DATAFLOW_HTML = "dataflow_html"
-    COMBO_MMD = "combo_mmd"
-    COMBO_HTML = "combo_html"
-    REACTFLOW_VIEWSPEC = "reactflow_viewspec"
-    REACTFLOW_HTML = "reactflow_html"
+    graphspec_json: bool
+    orchestration_mmd: bool
+    orchestration_html: bool
+    dataflow_mmd: bool
+    dataflow_html: bool
+    combo_mmd: bool
+    combo_html: bool
+    reactflow_viewspec: bool
+    reactflow_html: bool
 
 
 class GraphConfig(ConfigModel):
@@ -29,23 +30,7 @@ class GraphConfig(ConfigModel):
 
     max_preview_length: int
     max_stack_length: int
-    data_inclusion: dict[DataInclusion, bool]
-    graphs_inclusion: dict[GraphsInclusion, bool]
+    data_inclusion: DataInclusionConfig
+    graphs_inclusion: GraphsInclusionConfig
     mermaid_config: MermaidRenderingConfig
     reactflow_config: ReactFlowRenderingConfig
-
-    @field_validator("data_inclusion", mode="before")
-    @classmethod
-    def validate_data_inclusion(cls, input_dict: dict[str, bool]) -> dict[DataInclusion, bool]:
-        the_dict: dict[DataInclusion, bool] = {}
-        for key, value in input_dict.items():
-            the_dict[DataInclusion(key)] = value
-        return the_dict
-
-    @field_validator("graphs_inclusion", mode="before")
-    @classmethod
-    def validate_graphs_inclusion(cls, input_dict: dict[str, bool]) -> dict[GraphsInclusion, bool]:
-        the_dict: dict[GraphsInclusion, bool] = {}
-        for key, value in input_dict.items():
-            the_dict[GraphsInclusion(key)] = value
-        return the_dict

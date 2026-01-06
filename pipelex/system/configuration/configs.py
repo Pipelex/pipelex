@@ -8,7 +8,7 @@ from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.graph.graph_config import DataInclusion, GraphConfig
+from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.plx_config import PlxConfig
 from pipelex.pipeline.track.tracker_config import TrackerConfig
 from pipelex.system.configuration.config_model import ConfigModel
@@ -175,7 +175,7 @@ class PipelineExecutionConfig(ConfigModel):
 
         Args:
             generate_graph: If not None, overrides is_generate_graph.
-            include_full_data: If not None, overrides graph_config.data_inclusion["stuff_json_content"].
+            include_full_data: If not None, overrides graph_config.data_inclusion.stuff_json_content.
 
         Returns:
             A new PipelineExecutionConfig with the specified overrides applied.
@@ -186,8 +186,7 @@ class PipelineExecutionConfig(ConfigModel):
             updates["is_generate_graph"] = generate_graph
 
         if include_full_data is not None:
-            new_data_inclusion = dict(self.graph_config.data_inclusion)
-            new_data_inclusion[DataInclusion.STUFF_JSON_CONTENT] = include_full_data
+            new_data_inclusion = self.graph_config.data_inclusion.model_copy(update={"stuff_json_content": include_full_data})
             updates["graph_config"] = self.graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
         if updates:

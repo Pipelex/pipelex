@@ -30,6 +30,12 @@
 # Uncomment to disable conversion of data URLs to pipelex-storage:// URIs
 # is_normalize_data_urls_to_storage = false
 
+[pipelex.pipeline_execution_config.graph_config.data_inclusion]
+# Uncomment to include stuff data in graph outputs:
+stuff_json_content = true
+stuff_text_content = true
+stuff_html_content = true
+
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 # Uncomment to customize which graph outputs are generated (all enabled by default):
 # graphspec_json = false

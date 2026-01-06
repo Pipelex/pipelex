@@ -38,8 +38,6 @@ def _map_node_kind_to_view_type(kind: NodeKind) -> str:
             return "error"
         case NodeKind.PIPE_CALL:
             return "operator"  # Treat pipe_call as operator for now
-        case _:
-            return "default"
 
 
 def _map_edge_kind_to_view_type(kind: EdgeKind) -> str:
@@ -60,8 +58,6 @@ def _map_edge_kind_to_view_type(kind: EdgeKind) -> str:
             return "contains"
         case EdgeKind.SELECTED_OUTCOME:
             return "control"  # Treat selected_outcome as control for now
-        case _:
-            return "default"
 
 
 def _build_node_label(node_spec: Any) -> str:
@@ -102,8 +98,6 @@ def _build_ui_classes(status: NodeStatus) -> list[str]:
             return ["skipped"]
         case NodeStatus.CANCELED:
             return ["canceled"]
-        case _:
-            return []
 
 
 def _build_ui_badges(timing: Any | None, metrics: dict[str, float] | None) -> list[str]:

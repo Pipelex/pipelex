@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.graph.graph_config import DataInclusion
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
@@ -165,7 +164,7 @@ async def pipeline_run_setup(
             graph_id=pipeline_run_id,
             pipeline_ref_domain=pipe.domain_code,
             pipeline_ref_main_pipe=pipe_code,
-            include_full_data=execution_config.graph_config.data_inclusion.get(DataInclusion.STUFF_JSON_CONTENT, False),
+            include_full_data=execution_config.graph_config.data_inclusion.stuff_json_content,
         )
 
     working_memory: WorkingMemory | None = None

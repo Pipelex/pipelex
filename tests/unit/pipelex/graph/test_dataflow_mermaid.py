@@ -6,6 +6,8 @@ from typing import Any, ClassVar
 from pipelex.graph.graphspec import EdgeSpec, GraphSpec, IOSpec, NodeIOSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
 from pipelex.graph.mermaid import graphspec_to_dataflow_mermaid
 
+from .conftest import make_graph_config
+
 
 class TestDataFlowMermaid:
     """Tests for graphspec_to_dataflow_mermaid function."""
@@ -45,8 +47,9 @@ class TestDataFlowMermaid:
             "status": NodeStatus.SUCCEEDED,
         }
         graph = self._make_graph(nodes=[node])
-        result = graphspec_to_dataflow_mermaid(graph)
-        assert "No data flow information available" in result
+        graph_config = make_graph_config()
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
+        assert "No data flow information available" in result.mermaid_code
 
     def test_stuff_nodes_rendered_as_pills(self) -> None:
         """Test that stuff nodes are rendered as stadium/pill shapes."""
@@ -61,10 +64,11 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
         # Stuff nodes use pill shape: ([...])
-        assert '(["my_stuff' in result
-        assert ":::stuff" in result
+        assert '(["my_stuff' in result.mermaid_code
+        assert ":::stuff" in result.mermaid_code
 
     def test_pipe_nodes_rendered_as_rectangles(self) -> None:
         """Test that pipe nodes are rendered as rectangles."""
@@ -79,10 +83,11 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
         # Pipes use rectangle shape: [...]
-        assert '["producer_pipe"]' in result
-        assert ":::pipe" in result
+        assert '["producer_pipe"]' in result.mermaid_code
+        assert ":::pipe" in result.mermaid_code
 
     def test_edges_from_producer_to_stuff_to_consumer(self) -> None:
         """Test that edges connect producer -> stuff -> consumer."""
@@ -107,10 +112,11 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node, consumer_node])
-        result = graphspec_to_dataflow_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # Verify producer -> stuff -> consumer edges
-        lines = result.split("\n")
+        lines = result.mermaid_code.split("\n")
         edge_lines = [line for line in lines if " --> " in line]
         # Should have at least 2 edges: producer->stuff, stuff->consumer
         assert len(edge_lines) >= 2
@@ -148,15 +154,16 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node, consumer1_node, consumer2_node])
-        result = graphspec_to_dataflow_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # All three pipe nodes should appear
-        assert "producer" in result
-        assert "consumer_a" in result
-        assert "consumer_b" in result
+        assert "producer" in result.mermaid_code
+        assert "consumer_a" in result.mermaid_code
+        assert "consumer_b" in result.mermaid_code
 
         # Edge lines from stuff to both consumers
-        lines = result.split("\n")
+        lines = result.mermaid_code.split("\n")
         edge_lines = [line for line in lines if " --> " in line]
         # 1 edge producer->stuff, 2 edges stuff->consumers = 3 total
         assert len(edge_lines) >= 3
@@ -174,14 +181,15 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
+        graph_config = make_graph_config()
 
         # Without show_stuff_codes
-        result_without = graphspec_to_dataflow_mermaid(graph, show_stuff_codes=False)
-        assert "xyzab" not in result_without  # First 5 chars
+        result_without = graphspec_to_dataflow_mermaid(graph, graph_config, show_stuff_codes=False)
+        assert "xyzab" not in result_without.mermaid_code  # First 5 chars
 
         # With show_stuff_codes
-        result_with = graphspec_to_dataflow_mermaid(graph, show_stuff_codes=True)
-        assert "xyzab" in result_with  # First 5 chars should be shown
+        result_with = graphspec_to_dataflow_mermaid(graph, graph_config, show_stuff_codes=True)
+        assert "xyzab" in result_with.mermaid_code  # First 5 chars should be shown
 
     def test_failed_pipe_has_failed_class(self) -> None:
         """Test that failed pipe nodes get the pipe_failed class."""
@@ -196,8 +204,9 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[failed_producer])
-        result = graphspec_to_dataflow_mermaid(graph)
-        assert ":::pipe_failed" in result
+        graph_config = make_graph_config()
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
+        assert ":::pipe_failed" in result.mermaid_code
 
     def test_style_definitions_included(self) -> None:
         """Test that style definitions for pipe and stuff classes are included."""
@@ -212,10 +221,11 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid(graph)
-        assert "classDef pipe" in result
-        assert "classDef pipe_failed" in result
-        assert "classDef stuff" in result
+        graph_config = make_graph_config()
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
+        assert "classDef pipe" in result.mermaid_code
+        assert "classDef pipe_failed" in result.mermaid_code
+        assert "classDef stuff" in result.mermaid_code
 
     def test_concept_in_stuff_label(self) -> None:
         """Test that concept is included in stuff node label."""
@@ -230,9 +240,10 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid(graph)
+        graph_config = make_graph_config()
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
         # Concept should be on a new line in the label
-        assert "MyConcept" in result
+        assert "MyConcept" in result.mermaid_code
 
     def test_deterministic_output(self) -> None:
         """Test that output is deterministic (same input = same output)."""
@@ -257,6 +268,7 @@ class TestDataFlowMermaid:
             ),
         }
         graph = self._make_graph(nodes=[producer_node, consumer_node])
-        result1 = graphspec_to_dataflow_mermaid(graph)
-        result2 = graphspec_to_dataflow_mermaid(graph)
-        assert result1 == result2
+        graph_config = make_graph_config()
+        result1 = graphspec_to_dataflow_mermaid(graph, graph_config)
+        result2 = graphspec_to_dataflow_mermaid(graph, graph_config)
+        assert result1.mermaid_code == result2.mermaid_code

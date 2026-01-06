@@ -19,14 +19,13 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
     handle_validate_bundle_error,
 )
+from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import graphspec_to_json, load_graphspec, save_graphspec
 from pipelex.graph.mermaid import (
     graphspec_to_combo_mermaid,
-    graphspec_to_combo_mermaid_with_data,
     graphspec_to_dataflow_mermaid,
-    graphspec_to_dataflow_mermaid_with_data,
     graphspec_to_orchestration_mermaid,
 )
 from pipelex.graph.reactflow_html import generate_reactflow_html
@@ -305,10 +304,13 @@ def graph_trace_cmd(
 
             # Generate and save Mermaid
             if generate_mermaid:
+                graph_config = get_config().pipelex.pipeline_execution_config.graph_config
                 if combo:
-                    mermaid_code = graphspec_to_combo_mermaid(graph_spec, direction=direction)
+                    mermaid_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=direction)
+                    mermaid_code = mermaid_output.mermaid_code
                 elif data_flow:
-                    mermaid_code = graphspec_to_dataflow_mermaid(graph_spec, direction=direction)
+                    mermaid_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=direction)
+                    mermaid_code = mermaid_output.mermaid_code
                 else:
                     mermaid_code = graphspec_to_orchestration_mermaid(
                         graph_spec,
@@ -467,6 +469,15 @@ def graph_render_cmd(
 
         async def render_views() -> None:
             """Inner async function to render views with async HTML generation."""
+            # Get graph config and modify data inclusion based on --interactive flag
+            base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+            if interactive:
+                # Enable stuff data collection when interactive mode is requested
+                new_data_inclusion = base_graph_config.data_inclusion.model_copy(update={"stuff_json_content": True})
+                graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
+            else:
+                graph_config = base_graph_config
+
             # Generate orchestration view
             if generate_orchestration:
                 orch_direction = direction or FlowchartDirection.TOP_DOWN
@@ -484,72 +495,49 @@ def graph_render_cmd(
             # Generate dataflow view
             if generate_dataflow:
                 df_direction = direction or FlowchartDirection.TOP_DOWN
-                if interactive:
-                    dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=df_direction)
-                    dataflow_mermaid = dataflow_with_data.mermaid_code
-                    dataflow_mmd_path = output_dir / f"{stem}_dataflow.mmd"
-                    dataflow_mmd_path.write_text(dataflow_mermaid, encoding="utf-8")
-                    typer.secho(f"✅ Data flow Mermaid saved to: {dataflow_mmd_path}", fg=typer.colors.GREEN, err=True)
+                dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=df_direction)
+                dataflow_mermaid = dataflow_output.mermaid_code
+                dataflow_mmd_path = output_dir / f"{stem}_dataflow.mmd"
+                dataflow_mmd_path.write_text(dataflow_mermaid, encoding="utf-8")
+                typer.secho(f"✅ Data flow Mermaid saved to: {dataflow_mmd_path}", fg=typer.colors.GREEN, err=True)
 
-                    if not no_html:
-                        if dataflow_with_data.stuff_data:
-                            dataflow_html = await render_mermaid_html_with_data_async(
-                                dataflow_mermaid,
-                                stuff_data=dataflow_with_data.stuff_data,
-                                title=f"Data Flow: {stem}",
-                            )
-                            typer.secho(f"  → Found {len(dataflow_with_data.stuff_data)} stuff items with data", fg=typer.colors.CYAN, err=True)
-                        else:
-                            dataflow_html = await render_mermaid_html_async(dataflow_mermaid, title=f"Data Flow: {stem}")
-                            typer.secho("  → No stuff data found in graph (run with --graph-full-data to capture)", fg=typer.colors.YELLOW, err=True)
-                        dataflow_html_path = output_dir / f"{stem}_dataflow.html"
-                        dataflow_html_path.write_text(dataflow_html, encoding="utf-8")
-                        typer.secho(f"✅ Data flow HTML saved to: {dataflow_html_path}", fg=typer.colors.GREEN, err=True)
-                else:
-                    dataflow_mermaid = graphspec_to_dataflow_mermaid(graph_spec, direction=df_direction)
-                    dataflow_mmd_path = output_dir / f"{stem}_dataflow.mmd"
-                    dataflow_mmd_path.write_text(dataflow_mermaid, encoding="utf-8")
-                    typer.secho(f"✅ Data flow Mermaid saved to: {dataflow_mmd_path}", fg=typer.colors.GREEN, err=True)
-
-                    if not no_html:
+                if not no_html:
+                    if dataflow_output.stuff_data:
+                        dataflow_html = await render_mermaid_html_with_data_async(
+                            dataflow_mermaid,
+                            stuff_data=dataflow_output.stuff_data,
+                            title=f"Data Flow: {stem}",
+                        )
+                        typer.secho(f"  → Found {len(dataflow_output.stuff_data)} stuff items with data", fg=typer.colors.CYAN, err=True)
+                    else:
                         dataflow_html = await render_mermaid_html_async(dataflow_mermaid, title=f"Data Flow: {stem}")
-                        dataflow_html_path = output_dir / f"{stem}_dataflow.html"
-                        dataflow_html_path.write_text(dataflow_html, encoding="utf-8")
-                        typer.secho(f"✅ Data flow HTML saved to: {dataflow_html_path}", fg=typer.colors.GREEN, err=True)
+                        if interactive:
+                            typer.secho("  → No stuff data found in graph (run with --graph-full-data to capture)", fg=typer.colors.YELLOW, err=True)
+                    dataflow_html_path = output_dir / f"{stem}_dataflow.html"
+                    dataflow_html_path.write_text(dataflow_html, encoding="utf-8")
+                    typer.secho(f"✅ Data flow HTML saved to: {dataflow_html_path}", fg=typer.colors.GREEN, err=True)
 
             # Generate combo view
             if generate_combo:
                 combo_direction = direction or FlowchartDirection.TOP_DOWN
-                if interactive:
-                    combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=combo_direction)
-                    combo_mermaid = combo_with_data.mermaid_code
-                    combo_mmd_path = output_dir / f"{stem}_combo.mmd"
-                    combo_mmd_path.write_text(combo_mermaid, encoding="utf-8")
-                    typer.secho(f"✅ Combo Mermaid saved to: {combo_mmd_path}", fg=typer.colors.GREEN, err=True)
+                combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=combo_direction)
+                combo_mermaid = combo_output.mermaid_code
+                combo_mmd_path = output_dir / f"{stem}_combo.mmd"
+                combo_mmd_path.write_text(combo_mermaid, encoding="utf-8")
+                typer.secho(f"✅ Combo Mermaid saved to: {combo_mmd_path}", fg=typer.colors.GREEN, err=True)
 
-                    if not no_html:
-                        if combo_with_data.stuff_data:
-                            combo_html = await render_mermaid_html_with_data_async(
-                                combo_mermaid,
-                                stuff_data=combo_with_data.stuff_data,
-                                title=f"Combo: {stem}",
-                            )
-                        else:
-                            combo_html = await render_mermaid_html_async(combo_mermaid, title=f"Combo: {stem}")
-                        combo_html_path = output_dir / f"{stem}_combo.html"
-                        combo_html_path.write_text(combo_html, encoding="utf-8")
-                        typer.secho(f"✅ Combo HTML saved to: {combo_html_path}", fg=typer.colors.GREEN, err=True)
-                else:
-                    combo_mermaid = graphspec_to_combo_mermaid(graph_spec, direction=combo_direction)
-                    combo_mmd_path = output_dir / f"{stem}_combo.mmd"
-                    combo_mmd_path.write_text(combo_mermaid, encoding="utf-8")
-                    typer.secho(f"✅ Combo Mermaid saved to: {combo_mmd_path}", fg=typer.colors.GREEN, err=True)
-
-                    if not no_html:
+                if not no_html:
+                    if combo_output.stuff_data:
+                        combo_html = await render_mermaid_html_with_data_async(
+                            combo_mermaid,
+                            stuff_data=combo_output.stuff_data,
+                            title=f"Combo: {stem}",
+                        )
+                    else:
                         combo_html = await render_mermaid_html_async(combo_mermaid, title=f"Combo: {stem}")
-                        combo_html_path = output_dir / f"{stem}_combo.html"
-                        combo_html_path.write_text(combo_html, encoding="utf-8")
-                        typer.secho(f"✅ Combo HTML saved to: {combo_html_path}", fg=typer.colors.GREEN, err=True)
+                    combo_html_path = output_dir / f"{stem}_combo.html"
+                    combo_html_path.write_text(combo_html, encoding="utf-8")
+                    typer.secho(f"✅ Combo HTML saved to: {combo_html_path}", fg=typer.colors.GREEN, err=True)
 
         asyncio.run(render_views())
         typer.secho(f"\n📊 All outputs saved to: {output_dir}", fg=typer.colors.CYAN, bold=True, err=True)

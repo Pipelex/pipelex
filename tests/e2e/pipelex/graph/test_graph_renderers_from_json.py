@@ -8,13 +8,16 @@ from pathlib import Path
 
 import pytest
 
-from pipelex import log
+from pipelex import log, pretty_print
+from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import load_graphspec
 from pipelex.graph.mermaid import (
     FlowchartDirection,
-    graphspec_to_combo_mermaid_with_data,
-    graphspec_to_dataflow_mermaid_with_data,
+    collect_stuff_data_html,
+    collect_stuff_data_text,
+    graphspec_to_combo_mermaid,
+    graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
 )
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
@@ -40,6 +43,12 @@ def _get_next_output_folder() -> Path:
 @pytest.mark.asyncio(loop_scope="class")
 class TestGraphRenderersFromJson:
     """E2E tests for generating all graph renderings from JSON for comparison."""
+
+    def _get_graph_config_with_data(self):
+        """Get a graph config with stuff data inclusion enabled."""
+        base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+        new_data_inclusion = base_graph_config.data_inclusion.model_copy(update={"stuff_json_content": True})
+        return base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
     @pytest.mark.parametrize(
         ("topic", "graph_json_path"),
@@ -72,6 +81,9 @@ class TestGraphRenderersFromJson:
         output_dir = _get_next_output_folder()
         log.info(f"Saving all graph renderings to: {output_dir}")
 
+        graph_config = self._get_graph_config_with_data()
+        pretty_print(graph_config, title="Graph config")
+
         # ==================== MERMAID OUTPUTS ====================
 
         # Orchestration
@@ -81,29 +93,35 @@ class TestGraphRenderersFromJson:
         (output_dir / "orchestration.html").write_text(orch_html, encoding="utf-8")
 
         # Dataflow with data
-        dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-        (output_dir / "dataflow.mmd").write_text(dataflow_with_data.mermaid_code, encoding="utf-8")
-        if dataflow_with_data.stuff_data:
+        dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+        (output_dir / "dataflow.mmd").write_text(dataflow_output.mermaid_code, encoding="utf-8")
+        has_dataflow_data = dataflow_output.stuff_data or dataflow_output.stuff_data_text or dataflow_output.stuff_data_html
+        if has_dataflow_data:
             dataflow_html = await render_mermaid_html_with_data_async(
-                dataflow_with_data.mermaid_code,
-                stuff_data=dataflow_with_data.stuff_data,
+                dataflow_output.mermaid_code,
+                stuff_data=dataflow_output.stuff_data,
+                stuff_data_text=dataflow_output.stuff_data_text,
+                stuff_data_html=dataflow_output.stuff_data_html,
                 title=f"Dataflow (Interactive): {topic}",
             )
         else:
-            dataflow_html = await render_mermaid_html_async(dataflow_with_data.mermaid_code, title=f"Dataflow: {topic}")
+            dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title=f"Dataflow: {topic}")
         (output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
 
         # Combo with data
-        combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-        (output_dir / "combo.mmd").write_text(combo_with_data.mermaid_code, encoding="utf-8")
-        if combo_with_data.stuff_data:
+        combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+        (output_dir / "combo.mmd").write_text(combo_output.mermaid_code, encoding="utf-8")
+        has_combo_data = combo_output.stuff_data or combo_output.stuff_data_text or combo_output.stuff_data_html
+        if has_combo_data:
             combo_html = await render_mermaid_html_with_data_async(
-                combo_with_data.mermaid_code,
-                stuff_data=combo_with_data.stuff_data,
+                combo_output.mermaid_code,
+                stuff_data=combo_output.stuff_data,
+                stuff_data_text=combo_output.stuff_data_text,
+                stuff_data_html=combo_output.stuff_data_html,
                 title=f"Combo (Interactive): {topic}",
             )
         else:
-            combo_html = await render_mermaid_html_async(combo_with_data.mermaid_code, title=f"Combo: {topic}")
+            combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title=f"Combo: {topic}")
         (output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
 
         # ==================== REACTFLOW OUTPUTS ====================
@@ -116,8 +134,22 @@ class TestGraphRenderersFromJson:
         viewspec_path = output_dir / "viewspec.json"
         viewspec_path.write_text(viewspec.model_dump_json(indent=2), encoding="utf-8")
 
+        # Collect stuff data in alternate formats if configured
+        rf_stuff_data_text: dict[str, str] | None = None
+        rf_stuff_data_html: dict[str, str] | None = None
+        if graph_config.data_inclusion.stuff_text_content:
+            rf_stuff_data_text = collect_stuff_data_text(graph_spec)
+        if graph_config.data_inclusion.stuff_html_content:
+            rf_stuff_data_html = collect_stuff_data_html(graph_spec)
+
         # Generate ReactFlow HTML (with embedded GraphSpec for full data)
-        reactflow_html = await generate_reactflow_html_async(viewspec, graphspec=graph_spec, title=f"ReactFlow: {topic}")
+        reactflow_html = await generate_reactflow_html_async(
+            viewspec,
+            graphspec=graph_spec,
+            stuff_data_text=rf_stuff_data_text,
+            stuff_data_html=rf_stuff_data_html,
+            title=f"ReactFlow: {topic}",
+        )
         reactflow_path = output_dir / "reactflow.html"
         reactflow_path.write_text(reactflow_html, encoding="utf-8")
 

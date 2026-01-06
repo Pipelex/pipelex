@@ -1,14 +1,16 @@
-"""Unit tests for the graphspec_to_dataflow_mermaid_with_data function."""
+"""Unit tests for graphspec_to_dataflow_mermaid with stuff data included."""
 
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from pipelex.graph.graphspec import EdgeSpec, GraphSpec, IOSpec, NodeIOSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
-from pipelex.graph.mermaid import MermaidWithData, graphspec_to_dataflow_mermaid, graphspec_to_dataflow_mermaid_with_data
+from pipelex.graph.mermaid import MermaidOutput, graphspec_to_dataflow_mermaid
+
+from .conftest import make_graph_config
 
 
 class TestDataFlowMermaidWithData:
-    """Tests for graphspec_to_dataflow_mermaid_with_data function."""
+    """Tests for graphspec_to_dataflow_mermaid with data inclusion enabled."""
 
     GRAPH_ID: ClassVar[str] = "dataflow_data_test:001"
     CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
@@ -36,8 +38,8 @@ class TestDataFlowMermaidWithData:
             edges=edge_specs,
         )
 
-    def test_returns_mermaid_with_data(self) -> None:
-        """Test that function returns MermaidWithData instance."""
+    def test_returns_mermaid_output(self) -> None:
+        """Test that function returns MermaidOutput instance with stuff_data when configured."""
         producer_node = {
             "node_id": "node_1",
             "kind": NodeKind.OPERATOR,
@@ -49,9 +51,10 @@ class TestDataFlowMermaidWithData:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid_with_data(graph)
+        graph_config = make_graph_config(include_stuff_json=True)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
-        assert isinstance(result, MermaidWithData)
+        assert isinstance(result, MermaidOutput)
         assert isinstance(result.mermaid_code, str)
         assert isinstance(result.stuff_data, dict)
 
@@ -68,9 +71,11 @@ class TestDataFlowMermaidWithData:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid_with_data(graph)
+        graph_config = make_graph_config(include_stuff_json=True)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # Should have stuff_data with the data content
+        assert result.stuff_data is not None
         assert len(result.stuff_data) > 0
         # Data should be present in values
         data_values = list(result.stuff_data.values())
@@ -89,9 +94,11 @@ class TestDataFlowMermaidWithData:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid_with_data(graph)
+        graph_config = make_graph_config(include_stuff_json=True)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # Keys should start with s_ prefix
+        assert result.stuff_data is not None
         for key in result.stuff_data:
             assert key.startswith("s_"), f"Key {key} should start with 's_'"
 
@@ -108,9 +115,11 @@ class TestDataFlowMermaidWithData:
             ),
         }
         graph = self._make_graph(nodes=[consumer_node])
-        result = graphspec_to_dataflow_mermaid_with_data(graph)
+        graph_config = make_graph_config(include_stuff_json=True)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # Should have stuff_data for the input
+        assert result.stuff_data is not None
         assert len(result.stuff_data) > 0
         data_values = list(result.stuff_data.values())
         assert "input data content" in data_values
@@ -138,14 +147,16 @@ class TestDataFlowMermaidWithData:
             ),
         }
         graph = self._make_graph(nodes=[producer_node, consumer_node])
-        result = graphspec_to_dataflow_mermaid_with_data(graph)
+        graph_config = make_graph_config(include_stuff_json=True)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # Should only have one entry for this digest
+        assert result.stuff_data is not None
         data_values = list(result.stuff_data.values())
         assert data_values.count("the data") == 1
 
-    def test_mermaid_code_matches_non_data_version(self) -> None:
-        """Test that mermaid_code is the same as graphspec_to_dataflow_mermaid output."""
+    def test_mermaid_code_same_regardless_of_data_config(self) -> None:
+        """Test that mermaid_code is the same regardless of data inclusion config."""
         producer_node = {
             "node_id": "node_1",
             "kind": NodeKind.OPERATOR,
@@ -158,10 +169,29 @@ class TestDataFlowMermaidWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
 
-        result_with_data = graphspec_to_dataflow_mermaid_with_data(graph)
-        result_without_data = graphspec_to_dataflow_mermaid(graph)
+        result_with_data = graphspec_to_dataflow_mermaid(graph, make_graph_config(include_stuff_json=True))
+        result_without_data = graphspec_to_dataflow_mermaid(graph, make_graph_config(include_stuff_json=False))
 
-        assert result_with_data.mermaid_code == result_without_data
+        assert result_with_data.mermaid_code == result_without_data.mermaid_code
+
+    def test_stuff_data_none_when_not_configured(self) -> None:
+        """Test that stuff_data is None when data inclusion is disabled."""
+        producer_node = {
+            "node_id": "node_1",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "producer",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[],
+                outputs=[IOSpec(name="output", concept="Text", digest="stuff_001", data="test data")],
+            ),
+        }
+        graph = self._make_graph(nodes=[producer_node])
+        graph_config = make_graph_config(include_stuff_json=False)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
+
+        # stuff_data should be None when not configured
+        assert result.stuff_data is None
 
     def test_empty_stuff_data_when_no_data_field(self) -> None:
         """Test that stuff_data is empty when IOSpec has no data field populated."""
@@ -176,9 +206,11 @@ class TestDataFlowMermaidWithData:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid_with_data(graph)
+        graph_config = make_graph_config(include_stuff_json=True)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # stuff_data should be empty since data=None
+        assert result.stuff_data is not None
         assert len(result.stuff_data) == 0
 
     def test_dict_data_preserved(self) -> None:
@@ -195,9 +227,11 @@ class TestDataFlowMermaidWithData:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid_with_data(graph)
+        graph_config = make_graph_config(include_stuff_json=True)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # Dict data should be preserved
+        assert result.stuff_data is not None
         assert len(result.stuff_data) > 0
         data_values = list(result.stuff_data.values())
         assert dict_data in data_values
@@ -216,9 +250,11 @@ class TestDataFlowMermaidWithData:
             ),
         }
         graph = self._make_graph(nodes=[producer_node])
-        result = graphspec_to_dataflow_mermaid_with_data(graph)
+        graph_config = make_graph_config(include_stuff_json=True)
+        result = graphspec_to_dataflow_mermaid(graph, graph_config)
 
         # List data should be preserved
+        assert result.stuff_data is not None
         assert len(result.stuff_data) > 0
         data_values = list(result.stuff_data.values())
         assert list_data in data_values

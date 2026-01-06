@@ -11,13 +11,12 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from pipelex.graph.graph_analysis import GraphAnalysis
-from pipelex.graph.graph_config import DataInclusion, GraphConfig, GraphsInclusion
 from pipelex.graph.graphspec_io import graphspec_to_json
 from pipelex.graph.mermaid import (
+    collect_stuff_data_html,
+    collect_stuff_data_text,
     graphspec_to_combo_mermaid,
-    graphspec_to_combo_mermaid_with_data,
     graphspec_to_dataflow_mermaid,
-    graphspec_to_dataflow_mermaid_with_data,
     graphspec_to_orchestration_mermaid,
 )
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
@@ -26,6 +25,7 @@ from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.mermaid_utils import render_mermaid_html_async, render_mermaid_html_with_data_async
 
 if TYPE_CHECKING:
+    from pipelex.graph.graph_config import GraphConfig
     from pipelex.graph.graphspec import GraphSpec
 
 
@@ -86,7 +86,6 @@ async def generate_graph_outputs(
         GraphOutputs containing generated content as strings (None for disabled outputs).
     """
     inclusion = graph_config.graphs_inclusion
-    include_full_data = graph_config.data_inclusion.get(DataInclusion.STUFF_JSON_CONTENT, False)
 
     graphspec_json: str | None = None
     orchestration_mmd: str | None = None
@@ -99,68 +98,76 @@ async def generate_graph_outputs(
     reactflow_html: str | None = None
 
     # Generate GraphSpec JSON
-    if inclusion.get(GraphsInclusion.GRAPHSPEC_JSON, True):
+    if inclusion.graphspec_json:
         graphspec_json = graphspec_to_json(graph_spec)
 
     # Generate orchestration view
-    if inclusion.get(GraphsInclusion.ORCHESTRATION_MMD, True):
+    if inclusion.orchestration_mmd:
         orchestration_mmd = graphspec_to_orchestration_mermaid(graph_spec, direction=direction)
 
-    if inclusion.get(GraphsInclusion.ORCHESTRATION_HTML, True):
+    if inclusion.orchestration_html:
         # Need the mermaid code to generate HTML
         mmd_for_html = orchestration_mmd or graphspec_to_orchestration_mermaid(graph_spec, direction=direction)
         orchestration_html = await render_mermaid_html_async(mmd_for_html, title=f"Orchestration: {pipe_code}")
 
     # Generate data flow view
-    if inclusion.get(GraphsInclusion.DATAFLOW_MMD, True) or inclusion.get(GraphsInclusion.DATAFLOW_HTML, True):
-        if include_full_data:
-            dataflow_with_data = graphspec_to_dataflow_mermaid_with_data(graph_spec, direction=direction)
-            if inclusion.get(GraphsInclusion.DATAFLOW_MMD, True):
-                dataflow_mmd = dataflow_with_data.mermaid_code
-            if inclusion.get(GraphsInclusion.DATAFLOW_HTML, True):
+    if inclusion.dataflow_mmd or inclusion.dataflow_html:
+        dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=direction)
+        if inclusion.dataflow_mmd:
+            dataflow_mmd = dataflow_output.mermaid_code
+        if inclusion.dataflow_html:
+            has_any_stuff_data = dataflow_output.stuff_data or dataflow_output.stuff_data_text or dataflow_output.stuff_data_html
+            if has_any_stuff_data:
                 dataflow_html = await render_mermaid_html_with_data_async(
-                    dataflow_with_data.mermaid_code,
-                    stuff_data=dataflow_with_data.stuff_data,
+                    dataflow_output.mermaid_code,
+                    stuff_data=dataflow_output.stuff_data,
+                    stuff_data_text=dataflow_output.stuff_data_text,
+                    stuff_data_html=dataflow_output.stuff_data_html,
                     title=f"Data Flow: {pipe_code}",
                 )
-        else:
-            mmd_code = graphspec_to_dataflow_mermaid(graph_spec, direction=direction)
-            if inclusion.get(GraphsInclusion.DATAFLOW_MMD, True):
-                dataflow_mmd = mmd_code
-            if inclusion.get(GraphsInclusion.DATAFLOW_HTML, True):
-                dataflow_html = await render_mermaid_html_async(mmd_code, title=f"Data Flow: {pipe_code}")
+            else:
+                dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title=f"Data Flow: {pipe_code}")
 
     # Generate combo view
-    if inclusion.get(GraphsInclusion.COMBO_MMD, True) or inclusion.get(GraphsInclusion.COMBO_HTML, True):
-        if include_full_data:
-            combo_with_data = graphspec_to_combo_mermaid_with_data(graph_spec, direction=direction)
-            if inclusion.get(GraphsInclusion.COMBO_MMD, True):
-                combo_mmd = combo_with_data.mermaid_code
-            if inclusion.get(GraphsInclusion.COMBO_HTML, True):
+    if inclusion.combo_mmd or inclusion.combo_html:
+        combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=direction)
+        if inclusion.combo_mmd:
+            combo_mmd = combo_output.mermaid_code
+        if inclusion.combo_html:
+            has_any_stuff_data = combo_output.stuff_data or combo_output.stuff_data_text or combo_output.stuff_data_html
+            if has_any_stuff_data:
                 combo_html = await render_mermaid_html_with_data_async(
-                    combo_with_data.mermaid_code,
-                    stuff_data=combo_with_data.stuff_data,
+                    combo_output.mermaid_code,
+                    stuff_data=combo_output.stuff_data,
+                    stuff_data_text=combo_output.stuff_data_text,
+                    stuff_data_html=combo_output.stuff_data_html,
                     title=f"Combo: {pipe_code}",
                 )
-        else:
-            mmd_code = graphspec_to_combo_mermaid(graph_spec, direction=direction)
-            if inclusion.get(GraphsInclusion.COMBO_MMD, True):
-                combo_mmd = mmd_code
-            if inclusion.get(GraphsInclusion.COMBO_HTML, True):
-                combo_html = await render_mermaid_html_async(mmd_code, title=f"Combo: {pipe_code}")
+            else:
+                combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title=f"Combo: {pipe_code}")
 
     # Generate ReactFlow outputs
-    if inclusion.get(GraphsInclusion.REACTFLOW_VIEWSPEC, True) or inclusion.get(GraphsInclusion.REACTFLOW_HTML, True):
+    if inclusion.reactflow_viewspec or inclusion.reactflow_html:
         analysis = GraphAnalysis.from_graphspec(graph_spec)
         viewspec = graphspec_to_viewspec(graph_spec, analysis)
 
-        if inclusion.get(GraphsInclusion.REACTFLOW_VIEWSPEC, True):
+        if inclusion.reactflow_viewspec:
             reactflow_viewspec = viewspec.model_dump_json(indent=2)
 
-        if inclusion.get(GraphsInclusion.REACTFLOW_HTML, True):
+        if inclusion.reactflow_html:
+            # Collect stuff data in alternate formats if configured
+            rf_stuff_data_text: dict[str, str] | None = None
+            rf_stuff_data_html: dict[str, str] | None = None
+            if graph_config.data_inclusion.stuff_text_content:
+                rf_stuff_data_text = collect_stuff_data_text(graph_spec)
+            if graph_config.data_inclusion.stuff_html_content:
+                rf_stuff_data_html = collect_stuff_data_html(graph_spec)
+
             reactflow_html = await generate_reactflow_html_async(
                 viewspec,
                 graphspec=graph_spec,
+                stuff_data_text=rf_stuff_data_text,
+                stuff_data_html=rf_stuff_data_html,
                 use_cdn=graph_config.reactflow_config.is_use_cdn,
                 title=f"ReactFlow: {pipe_code}",
             )

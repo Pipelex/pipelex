@@ -322,6 +322,43 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             font-weight: 500;
         }
 
+        /* Format tabs for stuff data */
+        .format-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .format-tab {
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--color-surface-hover);
+            color: var(--color-text-muted);
+            border: none;
+            transition: all 0.2s;
+        }
+        .format-tab:hover {
+            background: var(--color-border);
+            color: var(--color-text);
+        }
+        .format-tab.active {
+            background: var(--color-accent);
+            color: #fff;
+        }
+        .format-tab:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .inspector-html-content {
+            background: #fff;
+            color: #333;
+            padding: 12px;
+            border-radius: var(--radius-md);
+            font-family: var(--font-sans);
+        }
+
         /* Legend */
         .legend {
             position: fixed;
@@ -416,6 +453,9 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
     <!-- Embedded GraphSpec (for dataflow extraction) -->
     <script type="application/json" id="pipelex-graphspec">{{ graphspec_json }}</script>
     {% endif %}
+    <!-- Embedded stuff data in multiple formats for display toggle -->
+    <script type="application/json" id="pipelex-stuff-data-text">{{ stuff_data_text_json }}</script>
+    <script type="application/json" id="pipelex-stuff-data-html">{{ stuff_data_html_json }}</script>
 
     <script>
         // Parse embedded ViewSpec
@@ -425,6 +465,15 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         // Parse GraphSpec if present
         const graphspecElement = document.getElementById('pipelex-graphspec');
         const graphspec = graphspecElement ? JSON.parse(graphspecElement.textContent) : null;
+
+        // Parse stuff data in alternate formats (for display toggle)
+        const stuffDataTextElement = document.getElementById('pipelex-stuff-data-text');
+        const stuffDataText = stuffDataTextElement ? JSON.parse(stuffDataTextElement.textContent || '{}') : {};
+        const stuffDataHtmlElement = document.getElementById('pipelex-stuff-data-html');
+        const stuffDataHtml = stuffDataHtmlElement ? JSON.parse(stuffDataHtmlElement.textContent || '{}') : {};
+
+        // Track current format selection for stuff display
+        let currentStuffFormat = 'json';
 
         // ====================================================================
         // DATAFLOW ANALYSIS: Extract stuff nodes and build producer/consumer maps
@@ -916,9 +965,18 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 // Handle stuff nodes
                 if (nodeData.isStuff) {
                     const stuffData = nodeData.stuffData || {};
+                    const stuffDigest = nodeData.stuffDigest;
+                    const stuffMermaidId = stuffDigest ? `s_${stuffDigest.substring(0, 10)}` : null;
+
                     inspectorTitle.textContent = stuffData.name || 'Data';
                     inspectorSubtitle.textContent = stuffData.concept || 'Data Item';
                     inspectorHeader.className = 'inspector-header stuff';
+
+                    // Check which formats are available
+                    const hasJson = !!stuffData.data;
+                    const hasText = stuffMermaidId && !!stuffDataText[stuffMermaidId];
+                    const hasHtml = stuffMermaidId && !!stuffDataHtml[stuffMermaidId];
+                    const hasMultipleFormats = [hasJson, hasText, hasHtml].filter(Boolean).length > 1;
 
                     let html = '';
                     html += '<div class="inspector-badges">';
@@ -937,14 +995,58 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         </div>`;
                     }
 
-                    if (stuffData.data) {
-                        html += `<div class="inspector-section">
-                            <div class="inspector-section-title">Data Content</div>
-                            <pre class="inspector-pre">${JSON.stringify(stuffData.data, null, 2)}</pre>
-                        </div>`;
+                    // Add format tabs if multiple formats available
+                    if (hasMultipleFormats) {
+                        html += '<div class="inspector-section">';
+                        html += '<div class="inspector-section-title">Data Content</div>';
+                        html += '<div class="format-tabs" id="stuff-format-tabs">';
+                        const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
+                        const textActive = currentStuffFormat === 'text' ? 'active' : '';
+                        const htmlActive = currentStuffFormat === 'html' ? 'active' : '';
+                        html += `<button class="format-tab ${jsonActive}" data-format="json" `;
+                        html += `${!hasJson ? 'disabled' : ''}>JSON</button>`;
+                        html += `<button class="format-tab ${textActive}" data-format="text" `;
+                        html += `${!hasText ? 'disabled' : ''}>Text</button>`;
+                        html += `<button class="format-tab ${htmlActive}" data-format="html" `;
+                        html += `${!hasHtml ? 'disabled' : ''}>HTML</button>`;
+                        html += '</div>';
+                        html += '<div id="stuff-data-content"></div>';
+                        html += '</div>';
+                    } else if (hasJson || hasText || hasHtml) {
+                        html += '<div class="inspector-section">';
+                        html += '<div class="inspector-section-title">Data Content</div>';
+                        html += '<div id="stuff-data-content"></div>';
+                        html += '</div>';
                     }
 
                     inspectorContent.innerHTML = html;
+
+                    // Store current stuff data for format switching
+                    window.currentStuffJsonData = stuffData.data;
+                    window.currentStuffMermaidId = stuffMermaidId;
+
+                    // Attach format tab handlers
+                    const formatTabs = document.getElementById('stuff-format-tabs');
+                    if (formatTabs) {
+                        formatTabs.querySelectorAll('.format-tab').forEach(tab => {
+                            tab.addEventListener('click', () => {
+                                if (tab.disabled) return;
+                                setStuffFormat(tab.dataset.format);
+                            });
+                        });
+                    }
+
+                    // Render initial content
+                    if (hasJson || hasText || hasHtml) {
+                        // Determine best available format
+                        let bestFormat = currentStuffFormat;
+                        if (bestFormat === 'json' && !hasJson) bestFormat = hasText ? 'text' : 'html';
+                        if (bestFormat === 'text' && !hasText) bestFormat = hasJson ? 'json' : 'html';
+                        if (bestFormat === 'html' && !hasHtml) bestFormat = hasJson ? 'json' : 'text';
+
+                        renderStuffContent(bestFormat);
+                    }
+
                     inspector.classList.add('visible');
                     return;
                 }
@@ -1085,6 +1187,39 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 closeInspector();
             }
         });
+
+        // Set stuff display format and re-render
+        function setStuffFormat(format) {
+            currentStuffFormat = format;
+            // Update tab styling
+            document.querySelectorAll('.format-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.format === format);
+            });
+            renderStuffContent(format);
+        }
+
+        // Render stuff content in the specified format
+        function renderStuffContent(format) {
+            const container = document.getElementById('stuff-data-content');
+            if (!container) return;
+
+            const stuffMermaidId = window.currentStuffMermaidId;
+            const jsonData = window.currentStuffJsonData;
+
+            if (format === 'json') {
+                container.className = '';
+                const jsonStr = JSON.stringify(jsonData, null, 2);
+                container.innerHTML = `<pre class="inspector-pre">${jsonStr}</pre>`;
+            } else if (format === 'text') {
+                const textContent = stuffDataText[stuffMermaidId] || 'No text data available';
+                container.className = '';
+                container.innerHTML = `<pre class="inspector-pre">${textContent}</pre>`;
+            } else if (format === 'html') {
+                const htmlContent = stuffDataHtml[stuffMermaidId] || 'No HTML data available';
+                container.className = 'inspector-html-content';
+                container.innerHTML = htmlContent;
+            }
+        }
     </script>
 </body>
 </html>
@@ -1095,6 +1230,8 @@ def generate_reactflow_html(
     viewspec: ViewSpec,
     *,
     graphspec: GraphSpec | None = None,
+    stuff_data_text: dict[str, str] | None = None,
+    stuff_data_html: dict[str, str] | None = None,
     use_cdn: bool = True,
     title: str = "Pipelex Graph",
 ) -> str:
@@ -1103,6 +1240,8 @@ def generate_reactflow_html(
     Args:
         viewspec: The ViewSpec to embed and render.
         graphspec: Optional GraphSpec to embed (for inspector details).
+        stuff_data_text: Optional mapping from stuff IDs to their ASCII text representation.
+        stuff_data_html: Optional mapping from stuff IDs to their HTML representation.
         use_cdn: If True, load ReactFlow from CDN. If False, use inline bundles (not yet implemented).
         title: The page title.
 
@@ -1126,6 +1265,8 @@ def generate_reactflow_html(
             "logo_url": URLs.logo_white_on_transparent,
             "viewspec_json": viewspec_json,
             "graphspec_json": graphspec_json,
+            "stuff_data_text_json": json.dumps(stuff_data_text or {}),
+            "stuff_data_html_json": json.dumps(stuff_data_html or {}),
             "use_cdn": use_cdn,
         },
     )
@@ -1135,6 +1276,8 @@ async def generate_reactflow_html_async(
     viewspec: ViewSpec,
     *,
     graphspec: GraphSpec | None = None,
+    stuff_data_text: dict[str, str] | None = None,
+    stuff_data_html: dict[str, str] | None = None,
     use_cdn: bool = True,
     title: str = "Pipelex Graph",
 ) -> str:
@@ -1145,6 +1288,8 @@ async def generate_reactflow_html_async(
     Args:
         viewspec: The ViewSpec to embed and render.
         graphspec: Optional GraphSpec to embed (for inspector details).
+        stuff_data_text: Optional mapping from stuff IDs to their ASCII text representation.
+        stuff_data_html: Optional mapping from stuff IDs to their HTML representation.
         use_cdn: If True, load ReactFlow from CDN. If False, use inline bundles (not yet implemented).
         title: The page title.
 
@@ -1168,6 +1313,8 @@ async def generate_reactflow_html_async(
             "logo_url": URLs.logo_white_on_transparent,
             "viewspec_json": viewspec_json,
             "graphspec_json": graphspec_json,
+            "stuff_data_text_json": json.dumps(stuff_data_text or {}),
+            "stuff_data_html_json": json.dumps(stuff_data_html or {}),
             "use_cdn": use_cdn,
         },
     )
