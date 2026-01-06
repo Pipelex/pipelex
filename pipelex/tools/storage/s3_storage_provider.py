@@ -56,8 +56,18 @@ class S3StorageProvider(StorageProviderAbstract):
                 )
 
             import boto3  # noqa: PLC0415 - optional dependency, lazy import
+            from botocore.config import Config  # noqa: PLC0415 - optional dependency, lazy import
 
-            self._s3_client = boto3.client("s3", region_name=self._region)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+            # Use regional endpoint to ensure presigned URLs have correct signatures
+            endpoint_url = f"https://s3.{self._region}.amazonaws.com"
+            config = Config(signature_version="s3v4")  # pyright: ignore[reportUnknownArgumentType]
+
+            self._s3_client = boto3.client(  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+                "s3",
+                region_name=self._region,
+                endpoint_url=endpoint_url,
+                config=config,
+            )
         return self._s3_client  # pyright: ignore[reportUnknownVariableType,reportUnknownMemberType]
 
     @override

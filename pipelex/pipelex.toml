@@ -4,7 +4,7 @@
 
 [pipelex.storage_config]
 is_fetch_remote_content_enabled = true
-method = "local"
+method = "local"                       # local, in_memory, s3, gcp
 
 [pipelex.storage_config.local]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
