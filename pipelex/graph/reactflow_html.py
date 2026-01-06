@@ -1178,6 +1178,23 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 );
             }
 
+            // Pan to show the top of the graph after initial fit
+            const onInit = (reactFlowInstance) => {
+                setTimeout(() => {
+                    // Find the topmost node position
+                    const currentNodes = reactFlowInstance.getNodes();
+                    if (currentNodes.length === 0) return;
+                    const minY = Math.min(...currentNodes.map(n => n.position.y));
+                    const viewport = reactFlowInstance.getViewport();
+                    // Adjust viewport to show the top with some padding
+                    reactFlowInstance.setViewport({
+                        x: viewport.x,
+                        y: -minY * viewport.zoom + 80,
+                        zoom: viewport.zoom
+                    });
+                }, 100);
+            };
+
             return React.createElement('div', { className: 'react-flow-container' },
                 React.createElement(ReactFlow, {
                     nodes: nodes,
@@ -1185,8 +1202,9 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     onNodesChange: onNodesChange,
                     onEdgesChange: onEdgesChange,
                     onNodeClick: onNodeClick,
+                    onInit: onInit,
                     fitView: true,
-                    fitViewOptions: { padding: 0.2 },
+                    fitViewOptions: { padding: 0.1, minZoom: 1.0 },
                     defaultEdgeOptions: { type: 'smoothstep' },
                     proOptions: { hideAttribution: true },
                 },
