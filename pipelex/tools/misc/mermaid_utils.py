@@ -517,12 +517,12 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             text-align: left;
         }
         .data-modal-content.html-content th {
-            background: #2d2d2d;
+            background: #252a30;
             color: #e0e0e0;
             font-weight: 600;
         }
         .data-modal-content.html-content tr:hover {
-            background: #2a2a2a;
+            background: #2a2530;
         }
         .data-modal-overlay {
             position: fixed;
@@ -571,9 +571,9 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             <span class="data-modal-close" onclick="hideModal()">&times;</span>
         </div>
         <div class="format-tabs" id="format-tabs">
-            <button class="format-tab active" data-format="text" id="tab-text">Pretty</button>
-            <button class="format-tab" data-format="html" id="tab-html">HTML</button>
+            <button class="format-tab active" data-format="html" id="tab-html">HTML</button>
             <button class="format-tab" data-format="json" id="tab-json">JSON</button>
+            <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
         </div>
         <div class="data-modal-content" id="modal-content"></div>
     </div>
@@ -587,7 +587,7 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
 
         // Track current state
         let currentStuffId = null;
-        let currentFormat = 'text';
+        let currentFormat = 'html';
         let currentTheme = '{{ theme }}';
 
         // Theme-specific color palettes for custom node styling
@@ -807,11 +807,11 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             textTab.disabled = !stuffDataText?.[stuffId];
             htmlTab.disabled = !stuffDataHtml?.[stuffId];
 
-            // Find first available format (Pretty -> HTML -> JSON)
-            if (!textTab.disabled) return 'text';
+            // Find first available format (HTML -> JSON -> Pretty)
             if (!htmlTab.disabled) return 'html';
             if (!jsonTab.disabled) return 'json';
-            return 'text';
+            if (!textTab.disabled) return 'text';
+            return 'html';
         }
 
         function showModal(stuffId) {
