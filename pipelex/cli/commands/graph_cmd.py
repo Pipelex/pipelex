@@ -24,11 +24,13 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import graphspec_to_json, load_graphspec, save_graphspec
 from pipelex.graph.mermaid import (
+    collect_stuff_data_html,
+    collect_stuff_data_text,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
 )
-from pipelex.graph.reactflow_html import generate_reactflow_html
+from pipelex.graph.reactflow_html import generate_reactflow_html, generate_reactflow_html_async
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -378,7 +380,7 @@ def graph_trace_cmd(
         Pipelex.teardown_if_needed()
 
 
-@graph_app.command("render", help="Render an existing graph.json file to Mermaid and HTML")
+@graph_app.command("render", help="Render an existing graph.json file to Mermaid combo.html and/or ReactFlow HTML")
 def graph_render_cmd(
     input_file: Annotated[
         Path,
@@ -386,46 +388,43 @@ def graph_render_cmd(
     ],
     out: Annotated[
         str | None,
-        typer.Option("--out", "-o", help="Output path, directory, or stem (default: same directory as input)"),
+        typer.Option("--out", "-o", help="Output directory (default: same directory as input)"),
     ] = None,
     direction: Annotated[
         FlowchartDirection | None,
-        typer.Option("--direction", help="Flowchart direction (default: LR for dataflow/combo, TB for orchestration)"),
+        typer.Option("--direction", help="Flowchart direction (default: TB)"),
     ] = None,
-    orchestration: Annotated[
+    mermaid: Annotated[
         bool,
-        typer.Option("--orchestration", help="Generate orchestration diagram"),
+        typer.Option("--mermaid", "-m", help="Generate Mermaid combo.html only"),
     ] = False,
-    data_flow: Annotated[
+    reactflow: Annotated[
         bool,
-        typer.Option("--data-flow", help="Generate data flow diagram"),
+        typer.Option("--reactflow", "-r", help="Generate ReactFlow reactflow.html only"),
     ] = False,
-    combo: Annotated[
+    all_views: Annotated[
         bool,
-        typer.Option("--combo", help="Generate combo diagram (data flow with controller subgraphs)"),
+        typer.Option("--all", "-a", help="Generate all views: orchestration, dataflow, combo (Mermaid) + ReactFlow"),
     ] = False,
-    interactive: Annotated[
+    open_browser: Annotated[
         bool,
-        typer.Option("--interactive", "-i", help="Generate interactive HTML with clickable data nodes (requires data in graph.json)"),
-    ] = False,
-    no_html: Annotated[
-        bool,
-        typer.Option("--no-html", help="Skip HTML generation, only output .mmd files"),
+        typer.Option("--open", help="Open the generated HTML in the default browser"),
     ] = False,
 ) -> None:
-    """Render an existing graph.json file to Mermaid diagrams and HTML.
+    """Render an existing graph.json file to HTML visualizations.
 
-    This is useful for debugging graph generation or regenerating
-    visualizations without re-running a pipeline.
-
-    By default generates all three views (orchestration, dataflow, combo).
-    Use flags to generate only specific views.
+    By default generates both combo.html (Mermaid) and reactflow.html.
+    Use --mermaid or --reactflow to generate only one of them.
+    Use --all to generate all Mermaid views (orchestration, dataflow, combo) + ReactFlow.
 
     Examples:
-        pipelex graph render results/my_pipe_graph/graph.json
-        pipelex graph render graph.json --out ./output/
-        pipelex graph render graph.json --data-flow --interactive
-        pipelex graph render graph.json --combo --direction TB
+        pipelex graph render graph.json                    # combo.html + reactflow.html
+        pipelex graph render graph.json --mermaid          # combo.html only
+        pipelex graph render graph.json --reactflow        # reactflow.html only
+        pipelex graph render graph.json --all              # all views
+        pipelex graph render graph.json --open             # open in browser
+        pipelex graph render graph.json -o ./output/       # custom output directory
+        pipelex graph render tests/data/graphs/cv_matching_graph.json --reactflow -o ./temp/test_outputs/ --open
     """
     # Validate input file exists
     if not input_file.exists():
@@ -446,103 +445,128 @@ def graph_render_cmd(
         typer.secho(f"✅ Loaded graph with {len(graph_spec.nodes)} nodes", fg=typer.colors.GREEN, err=True)
 
         # Determine output directory
+        output_dir: Path
         if out:
-            out_path = Path(out)
-            if out_path.suffix:
-                # It's a file path, use its parent directory
-                output_dir = out_path.parent
-                stem = out_path.stem
-            else:
-                # It's a directory
-                output_dir = out_path
-                stem = input_file.stem.replace("graph", "rendered") if input_file.stem == "graph" else input_file.stem
+            output_dir = Path(out)
         else:
             output_dir = input_file.parent
-            stem = input_file.stem.replace("graph", "rendered") if input_file.stem == "graph" else f"{input_file.stem}_rendered"
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Determine which views to generate (default: all)
-        generate_orchestration = orchestration or (not orchestration and not data_flow and not combo)
-        generate_dataflow = data_flow or (not orchestration and not data_flow and not combo)
-        generate_combo = combo or (not orchestration and not data_flow and not combo)
+        # Determine what to generate:
+        # - Default (no flags): combo.html + reactflow.html
+        # - --mermaid: combo.html only
+        # - --reactflow: reactflow.html only
+        # - --all: orchestration, dataflow, combo + reactflow
+        generate_mermaid_combo = (not mermaid and not reactflow and not all_views) or mermaid or all_views
+        generate_reactflow = (not mermaid and not reactflow and not all_views) or reactflow or all_views
+        generate_orchestration = all_views
+        generate_dataflow = all_views
+
+        generated_files: list[Path] = []
 
         async def render_views() -> None:
             """Inner async function to render views with async HTML generation."""
-            # Get graph config and modify data inclusion based on --interactive flag
+            nonlocal generated_files
+
+            # Get graph config with data inclusion enabled for interactive views
             base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
-            if interactive:
-                # Enable stuff data collection when interactive mode is requested
-                new_data_inclusion = base_graph_config.data_inclusion.model_copy(update={"stuff_json_content": True})
-                graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
-            else:
-                graph_config = base_graph_config
+            new_data_inclusion = base_graph_config.data_inclusion.model_copy(
+                update={
+                    "stuff_json_content": True,
+                    "stuff_text_content": True,
+                    "stuff_html_content": True,
+                }
+            )
+            graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
-            # Generate orchestration view
+            flow_direction = direction or FlowchartDirection.TOP_DOWN
+
+            # Generate orchestration view (only with --all)
             if generate_orchestration:
-                orch_direction = direction or FlowchartDirection.TOP_DOWN
-                orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=orch_direction)
-                orch_mmd_path = output_dir / f"{stem}_orchestration.mmd"
-                orch_mmd_path.write_text(orch_mermaid, encoding="utf-8")
-                typer.secho(f"✅ Orchestration Mermaid saved to: {orch_mmd_path}", fg=typer.colors.GREEN, err=True)
+                orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=flow_direction)
+                orch_html = await render_mermaid_html_async(orch_mermaid, title=f"Orchestration: {input_file.stem}")
+                orch_html_path = output_dir / "orchestration.html"
+                orch_html_path.write_text(orch_html, encoding="utf-8")
+                generated_files.append(orch_html_path)
+                typer.secho("✅ orchestration.html", fg=typer.colors.GREEN, err=True)
 
-                if not no_html:
-                    orch_html = await render_mermaid_html_async(orch_mermaid, title=f"Orchestration: {stem}")
-                    orch_html_path = output_dir / f"{stem}_orchestration.html"
-                    orch_html_path.write_text(orch_html, encoding="utf-8")
-                    typer.secho(f"✅ Orchestration HTML saved to: {orch_html_path}", fg=typer.colors.GREEN, err=True)
-
-            # Generate dataflow view
+            # Generate dataflow view (only with --all)
             if generate_dataflow:
-                df_direction = direction or FlowchartDirection.TOP_DOWN
-                dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=df_direction)
-                dataflow_mermaid = dataflow_output.mermaid_code
-                dataflow_mmd_path = output_dir / f"{stem}_dataflow.mmd"
-                dataflow_mmd_path.write_text(dataflow_mermaid, encoding="utf-8")
-                typer.secho(f"✅ Data flow Mermaid saved to: {dataflow_mmd_path}", fg=typer.colors.GREEN, err=True)
+                dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=flow_direction)
+                if dataflow_output.stuff_data:
+                    dataflow_html = await render_mermaid_html_with_data_async(
+                        dataflow_output.mermaid_code,
+                        stuff_data=dataflow_output.stuff_data,
+                        stuff_data_text=dataflow_output.stuff_data_text,
+                        stuff_data_html=dataflow_output.stuff_data_html,
+                        stuff_metadata=dataflow_output.stuff_metadata,
+                        title=f"Dataflow: {input_file.stem}",
+                    )
+                else:
+                    dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title=f"Dataflow: {input_file.stem}")
+                dataflow_html_path = output_dir / "dataflow.html"
+                dataflow_html_path.write_text(dataflow_html, encoding="utf-8")
+                generated_files.append(dataflow_html_path)
+                typer.secho("✅ dataflow.html", fg=typer.colors.GREEN, err=True)
 
-                if not no_html:
-                    if dataflow_output.stuff_data:
-                        dataflow_html = await render_mermaid_html_with_data_async(
-                            dataflow_mermaid,
-                            stuff_data=dataflow_output.stuff_data,
-                            stuff_metadata=dataflow_output.stuff_metadata,
-                            title=f"Data Flow: {stem}",
-                        )
-                        typer.secho(f"  → Found {len(dataflow_output.stuff_data)} stuff items with data", fg=typer.colors.CYAN, err=True)
-                    else:
-                        dataflow_html = await render_mermaid_html_async(dataflow_mermaid, title=f"Data Flow: {stem}")
-                        if interactive:
-                            typer.secho("  → No stuff data found in graph (run with --graph-full-data to capture)", fg=typer.colors.YELLOW, err=True)
-                    dataflow_html_path = output_dir / f"{stem}_dataflow.html"
-                    dataflow_html_path.write_text(dataflow_html, encoding="utf-8")
-                    typer.secho(f"✅ Data flow HTML saved to: {dataflow_html_path}", fg=typer.colors.GREEN, err=True)
+            # Generate combo view (default + --mermaid + --all)
+            if generate_mermaid_combo:
+                combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=flow_direction)
+                if combo_output.stuff_data:
+                    combo_html = await render_mermaid_html_with_data_async(
+                        combo_output.mermaid_code,
+                        stuff_data=combo_output.stuff_data,
+                        stuff_data_text=combo_output.stuff_data_text,
+                        stuff_data_html=combo_output.stuff_data_html,
+                        stuff_metadata=combo_output.stuff_metadata,
+                        title=f"Combo: {input_file.stem}",
+                    )
+                else:
+                    combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title=f"Combo: {input_file.stem}")
+                combo_html_path = output_dir / "combo.html"
+                combo_html_path.write_text(combo_html, encoding="utf-8")
+                generated_files.append(combo_html_path)
+                typer.secho("✅ combo.html", fg=typer.colors.GREEN, err=True)
 
-            # Generate combo view
-            if generate_combo:
-                combo_direction = direction or FlowchartDirection.TOP_DOWN
-                combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=combo_direction)
-                combo_mermaid = combo_output.mermaid_code
-                combo_mmd_path = output_dir / f"{stem}_combo.mmd"
-                combo_mmd_path.write_text(combo_mermaid, encoding="utf-8")
-                typer.secho(f"✅ Combo Mermaid saved to: {combo_mmd_path}", fg=typer.colors.GREEN, err=True)
+            # Generate ReactFlow view (default + --reactflow + --all)
+            if generate_reactflow:
+                # Create ViewSpec from GraphSpec
+                analysis = GraphAnalysis.from_graphspec(graph_spec)
+                viewspec = graphspec_to_viewspec(graph_spec, analysis)
 
-                if not no_html:
-                    if combo_output.stuff_data:
-                        combo_html = await render_mermaid_html_with_data_async(
-                            combo_mermaid,
-                            stuff_data=combo_output.stuff_data,
-                            stuff_metadata=combo_output.stuff_metadata,
-                            title=f"Combo: {stem}",
-                        )
-                    else:
-                        combo_html = await render_mermaid_html_async(combo_mermaid, title=f"Combo: {stem}")
-                    combo_html_path = output_dir / f"{stem}_combo.html"
-                    combo_html_path.write_text(combo_html, encoding="utf-8")
-                    typer.secho(f"✅ Combo HTML saved to: {combo_html_path}", fg=typer.colors.GREEN, err=True)
+                # Collect stuff data in alternate formats
+                rf_stuff_data_text = collect_stuff_data_text(graph_spec) if graph_config.data_inclusion.stuff_text_content else None
+                rf_stuff_data_html = collect_stuff_data_html(graph_spec) if graph_config.data_inclusion.stuff_html_content else None
+
+                # Generate ReactFlow HTML
+                reactflow_html = await generate_reactflow_html_async(
+                    viewspec,
+                    graphspec=graph_spec,
+                    stuff_data_text=rf_stuff_data_text,
+                    stuff_data_html=rf_stuff_data_html,
+                    title=f"ReactFlow: {input_file.stem}",
+                )
+                reactflow_path = output_dir / "reactflow.html"
+                reactflow_path.write_text(reactflow_html, encoding="utf-8")
+                generated_files.append(reactflow_path)
+                typer.secho("✅ reactflow.html", fg=typer.colors.GREEN, err=True)
 
         asyncio.run(render_views())
-        typer.secho(f"\n📊 All outputs saved to: {output_dir}", fg=typer.colors.CYAN, bold=True, err=True)
+
+        typer.secho(f"\n📊 Saved to: {output_dir}", fg=typer.colors.CYAN, bold=True, err=True)
+
+        # Open in browser if requested
+        if open_browser and generated_files:
+            if len(generated_files) == 1:
+                # Open the single generated file
+                file_to_open = generated_files[0]
+                webbrowser.open(f"file://{file_to_open.absolute()}")
+                typer.secho(f"🌐 Opened {file_to_open.name} in browser", fg=typer.colors.BLUE, err=True)
+            else:
+                # Open the output directory so user can see all files
+                webbrowser.open(f"file://{output_dir.absolute()}")
+                typer.secho("🌐 Opened output directory in browser", fg=typer.colors.BLUE, err=True)
 
     except Exception as exc:
         log.error(f"Error rendering graph: {exc}")
