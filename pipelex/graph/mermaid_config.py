@@ -6,7 +6,8 @@ from pipelex.types import StrEnum
 
 
 class MermaidTheme(StrEnum):
-    LIGHT = "light"
+    DEFAULT = "default"
+    BASE = "base"
     DARK = "dark"
     NEUTRAL = "neutral"
     FOREST = "forest"

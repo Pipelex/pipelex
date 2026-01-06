@@ -298,7 +298,7 @@ is_include_selected_outcome_edges = true
 is_show_stuff_codes = false
 
 [pipelex.pipeline_execution_config.graph_config.mermaid_config.style]
-theme = "light"
+theme = "dark"
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config]
 is_use_cdn = true

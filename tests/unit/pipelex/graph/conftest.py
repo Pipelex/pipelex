@@ -2,11 +2,9 @@
 
 import pytest
 
-from pipelex.graph.graph_config import DataInclusionConfig, GraphConfig, GraphsInclusionConfig
+from pipelex.config import get_config
+from pipelex.graph.graph_config import DataInclusionConfig, GraphConfig
 from pipelex.graph.graph_context import GraphContext
-from pipelex.graph.mermaid_config import MermaidRenderingConfig, MermaidStyle, MermaidTheme
-from pipelex.graph.reactflow_config import ReactFlowRenderingConfig, ReactFlowStyle, ReactFlowTheme
-from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
 def make_defaulted_data_inclusion_config(
@@ -85,39 +83,13 @@ def make_graph_config(
     Returns:
         A GraphConfig configured for testing.
     """
-    return GraphConfig(
-        data_inclusion=DataInclusionConfig(
-            stuff_json_content=include_stuff_json,
-            stuff_text_content=include_stuff_text,
-            stuff_html_content=include_stuff_html,
-        ),
-        graphs_inclusion=GraphsInclusionConfig(
-            graphspec_json=True,
-            orchestration_mmd=True,
-            orchestration_html=True,
-            dataflow_mmd=True,
-            dataflow_html=True,
-            combo_mmd=True,
-            combo_html=True,
-            reactflow_viewspec=True,
-            reactflow_html=True,
-        ),
-        mermaid_config=MermaidRenderingConfig(
-            direction=FlowchartDirection.TOP_DOWN,
-            is_include_data_edges=True,
-            is_include_contains_edges=False,
-            is_include_selected_outcome_edges=True,
-            is_show_stuff_codes=False,
-            style=MermaidStyle(theme=MermaidTheme.LIGHT),
-        ),
-        reactflow_config=ReactFlowRenderingConfig(
-            is_use_cdn=True,
-            layout_direction="TB",
-            nodesep=50,
-            ranksep=80,
-            default_title="Test Graph",
-            style=ReactFlowStyle(theme=ReactFlowTheme.DARK),
-        ),
+    default_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+    return default_graph_config.model_copy(
+        update={
+            "data_inclusion": default_graph_config.data_inclusion.model_copy(
+                update={"stuff_json_content": include_stuff_json, "stuff_text_content": include_stuff_text, "stuff_html_content": include_stuff_html},
+            ),
+        }
     )
 
 

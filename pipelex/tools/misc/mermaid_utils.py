@@ -119,9 +119,35 @@ MERMAID_HTML_TEMPLATE = """<!DOCTYPE html>
             padding: 20px;
             background-color: #f5f5f5;
         }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
         h1 {
             color: #333;
-            margin-bottom: 20px;
+            margin: 0;
+        }
+        .theme-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .theme-selector label {
+            font-size: 14px;
+            color: #666;
+        }
+        .theme-selector select {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .theme-selector select:hover {
+            border-color: #999;
         }
         .mermaid-container {
             background-color: white;
@@ -136,22 +162,59 @@ MERMAID_HTML_TEMPLATE = """<!DOCTYPE html>
     </style>
 </head>
 <body>
-    <h1>{{ title }}</h1>
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <div class="theme-selector">
+            <label for="theme-select">Theme:</label>
+            <select id="theme-select">
+                <option value="default">Default</option>
+                <option value="dark">Dark</option>
+                <option value="forest">Forest</option>
+                <option value="neutral">Neutral</option>
+                <option value="base">Base</option>
+            </select>
+        </div>
+    </div>
     <div class="mermaid-container">
-        <div class="mermaid">
+        <div class="mermaid" id="mermaid-diagram">
 {{ mermaid_code }}
         </div>
     </div>
     <script>
-        mermaid.initialize({
-            startOnLoad: true,
-            theme: 'default',
-            flowchart: {
-                useMaxWidth: true,
-                htmlLabels: true,
-                curve: 'basis'
-            }
+        const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
+        let currentTheme = '{{ theme }}';
+
+        function initMermaid(theme) {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme,
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true,
+                    curve: 'basis'
+                }
+            });
+        }
+
+        async function renderDiagram(theme) {
+            const container = document.getElementById('mermaid-diagram');
+            container.innerHTML = mermaidCode;
+            container.removeAttribute('data-processed');
+            initMermaid(theme);
+            await mermaid.run({ nodes: [container] });
+        }
+
+        // Set initial theme in dropdown
+        document.getElementById('theme-select').value = currentTheme;
+
+        // Handle theme change
+        document.getElementById('theme-select').addEventListener('change', async (e) => {
+            currentTheme = e.target.value;
+            await renderDiagram(currentTheme);
         });
+
+        // Initial render on page load
+        renderDiagram(currentTheme);
     </script>
 </body>
 </html>
@@ -174,9 +237,35 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             padding: 20px;
             background-color: #f5f5f5;
         }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
         h1 {
             color: #333;
-            margin-bottom: 20px;
+            margin: 0;
+        }
+        .theme-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .theme-selector label {
+            font-size: 14px;
+            color: #666;
+        }
+        .theme-selector select {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            background: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .theme-selector select:hover {
+            border-color: #999;
         }
         .mermaid-container {
             background-color: white;
@@ -301,9 +390,21 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
     </style>
 </head>
 <body>
-    <h1>{{ title }}</h1>
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <div class="theme-selector">
+            <label for="theme-select">Theme:</label>
+            <select id="theme-select">
+                <option value="default">Default</option>
+                <option value="dark">Dark</option>
+                <option value="forest">Forest</option>
+                <option value="neutral">Neutral</option>
+                <option value="base">Base</option>
+            </select>
+        </div>
+    </div>
     <div class="mermaid-container">
-        <div class="mermaid">
+        <div class="mermaid" id="mermaid-diagram">
 {{ mermaid_code }}
         </div>
     </div>
@@ -328,46 +429,72 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
         const stuffDataJson = {{ stuff_data_json }};
         const stuffDataText = {{ stuff_data_text_json }};
         const stuffDataHtml = {{ stuff_data_html_json }};
+        const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
 
         // Track current state
         let currentStuffId = null;
         let currentFormat = 'json';
+        let currentTheme = '{{ theme }}';
 
-        mermaid.initialize({
-            startOnLoad: true,
-            theme: 'default',
-            flowchart: {
-                useMaxWidth: true,
-                htmlLabels: true,
-                curve: 'basis'
-            }
+        function initMermaid(theme) {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme,
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true,
+                    curve: 'basis'
+                }
+            });
+        }
+
+        function attachClickHandlers() {
+            // Wait for mermaid to render, then attach click handlers
+            setTimeout(() => {
+                const svgContainer = document.querySelector('.mermaid svg');
+                if (!svgContainer) return;
+
+                // Find nodes by their flowchart IDs - use any available data source
+                const allStuffIds = new Set([
+                    ...Object.keys(stuffDataJson || {}),
+                    ...Object.keys(stuffDataText || {}),
+                    ...Object.keys(stuffDataHtml || {})
+                ]);
+
+                for (const stuffId of allStuffIds) {
+                    // Mermaid generates IDs like 'flowchart-s_xxx-123'
+                    const nodes = svgContainer.querySelectorAll(`[id^="flowchart-${stuffId}"]`);
+                    nodes.forEach(node => {
+                        node.classList.add('clickable-stuff');
+                        node.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            showModal(stuffId);
+                        });
+                    });
+                }
+            }, 500);
+        }
+
+        async function renderDiagram(theme) {
+            const container = document.getElementById('mermaid-diagram');
+            container.innerHTML = mermaidCode;
+            container.removeAttribute('data-processed');
+            initMermaid(theme);
+            await mermaid.run({ nodes: [container] });
+            attachClickHandlers();
+        }
+
+        // Set initial theme in dropdown
+        document.getElementById('theme-select').value = currentTheme;
+
+        // Handle theme change
+        document.getElementById('theme-select').addEventListener('change', async (e) => {
+            currentTheme = e.target.value;
+            await renderDiagram(currentTheme);
         });
 
-        // Wait for mermaid to render, then attach click handlers
-        setTimeout(() => {
-            // Find all stuff nodes (IDs starting with 's_')
-            const svgContainer = document.querySelector('.mermaid svg');
-            if (!svgContainer) return;
-
-            // Find nodes by their flowchart IDs - use any available data source
-            const allStuffIds = new Set([
-                ...Object.keys(stuffDataJson || {}),
-                ...Object.keys(stuffDataText || {}),
-                ...Object.keys(stuffDataHtml || {})
-            ]);
-
-            for (const stuffId of allStuffIds) {
-                // Mermaid generates IDs like 'flowchart-s_xxx-123'
-                const nodes = svgContainer.querySelectorAll(`[id^="flowchart-${stuffId}"]`);
-                nodes.forEach(node => {
-                    node.classList.add('clickable-stuff');
-                    node.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        showModal(stuffId);
-                    });
-                });
-            }
-        }, 500);
+        // Initial render on page load
+        renderDiagram(currentTheme);
 
         // Set up format tab handlers
         document.querySelectorAll('.format-tab').forEach(tab => {
@@ -476,6 +603,7 @@ def render_mermaid_html(
     mermaid_code: str,
     *,
     title: str = "Pipelex Graph",
+    theme: str = "default",
 ) -> str:
     """Render Mermaid code into a standalone HTML page (sync version).
 
@@ -485,6 +613,7 @@ def render_mermaid_html(
     Args:
         mermaid_code: The Mermaid flowchart code to embed.
         title: The page title (appears in browser tab and as h1).
+        theme: The Mermaid theme to use (default, base, dark, forest, neutral).
 
     Returns:
         Complete HTML page as a string.
@@ -495,6 +624,7 @@ def render_mermaid_html(
         temlating_context={
             "title": title,
             "mermaid_code": mermaid_code,
+            "theme": theme,
         },
     )
 
@@ -503,6 +633,7 @@ async def render_mermaid_html_async(
     mermaid_code: str,
     *,
     title: str = "Pipelex Graph",
+    theme: str = "default",
 ) -> str:
     """Render Mermaid code into a standalone HTML page (async version).
 
@@ -511,6 +642,7 @@ async def render_mermaid_html_async(
     Args:
         mermaid_code: The Mermaid flowchart code to embed.
         title: The page title (appears in browser tab and as h1).
+        theme: The Mermaid theme to use (default, base, dark, forest, neutral).
 
     Returns:
         Complete HTML page as a string.
@@ -521,6 +653,7 @@ async def render_mermaid_html_async(
         temlating_context={
             "title": title,
             "mermaid_code": mermaid_code,
+            "theme": theme,
         },
     )
 
@@ -532,6 +665,7 @@ async def render_mermaid_html_with_data_async(
     stuff_data_html: dict[str, str] | None = None,
     *,
     title: str = "Pipelex Graph",
+    theme: str = "default",
 ) -> str:
     """Render Mermaid code with clickable stuff nodes into a standalone HTML page.
 
@@ -545,6 +679,7 @@ async def render_mermaid_html_with_data_async(
         stuff_data_text: Mapping from stuff mermaid IDs to their ASCII text representation.
         stuff_data_html: Mapping from stuff mermaid IDs to their HTML representation.
         title: The page title (appears in browser tab and as h1).
+        theme: The Mermaid theme to use (default, base, dark, forest, neutral).
 
     Returns:
         Complete HTML page as a string with interactive data display.
@@ -560,5 +695,6 @@ async def render_mermaid_html_with_data_async(
             "stuff_data_text_json": json.dumps(stuff_data_text or {}),
             "stuff_data_html_json": json.dumps(stuff_data_html or {}),
             "has_data": has_data,
+            "theme": theme,
         },
     )

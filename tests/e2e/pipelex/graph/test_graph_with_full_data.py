@@ -56,6 +56,9 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     )
     graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
+    # Get theme from config
+    mermaid_theme = graph_config.mermaid_config.style.theme
+
     # Save graph.json
     graph_json_path = output_dir / "graph.json"
     save_graphspec(graph_spec, graph_json_path)
@@ -65,7 +68,7 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     # Orchestration
     orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
     (output_dir / "orchestration.mmd").write_text(orch_mermaid, encoding="utf-8")
-    orch_html = await render_mermaid_html_async(orch_mermaid, title="Orchestration")
+    orch_html = await render_mermaid_html_async(orch_mermaid, title="Orchestration", theme=mermaid_theme)
     (output_dir / "orchestration.html").write_text(orch_html, encoding="utf-8")
 
     # Dataflow with data
@@ -83,9 +86,10 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
             stuff_data_text=dataflow_output.stuff_data_text,
             stuff_data_html=dataflow_output.stuff_data_html,
             title="Dataflow (Interactive)",
+            theme=mermaid_theme,
         )
     else:
-        dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title="Dataflow")
+        dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title="Dataflow", theme=mermaid_theme)
     (output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
 
     # Combo with data
@@ -102,9 +106,10 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
             stuff_data_text=combo_output.stuff_data_text,
             stuff_data_html=combo_output.stuff_data_html,
             title="Combo (Interactive)",
+            theme=mermaid_theme,
         )
     else:
-        combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title="Combo")
+        combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title="Combo", theme=mermaid_theme)
     (output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
 
     log.info(f"✅ All graph outputs saved to: {output_dir}")

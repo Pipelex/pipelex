@@ -307,6 +307,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         .inspector-pre.nowrap {
             white-space: pre;
             word-break: normal;
+            line-height: 0.8;
             -webkit-overflow-scrolling: touch;
         }
         .inspector-row {

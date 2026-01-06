@@ -102,6 +102,9 @@ async def generate_graph_outputs(
     if inclusion.graphspec_json:
         graphspec_json = graphspec_to_json(graph_spec)
 
+    # Get the mermaid theme from config
+    mermaid_theme = graph_config.mermaid_config.style.theme
+
     # Generate orchestration view
     if inclusion.orchestration_mmd:
         orchestration_mmd = graphspec_to_orchestration_mermaid(graph_spec, direction=direction)
@@ -109,7 +112,7 @@ async def generate_graph_outputs(
     if inclusion.orchestration_html:
         # Need the mermaid code to generate HTML
         mmd_for_html = orchestration_mmd or graphspec_to_orchestration_mermaid(graph_spec, direction=direction)
-        orchestration_html = await render_mermaid_html_async(mmd_for_html, title=f"Orchestration: {pipe_code}")
+        orchestration_html = await render_mermaid_html_async(mmd_for_html, title=f"Orchestration: {pipe_code}", theme=mermaid_theme)
 
     # Generate data flow view
     if inclusion.dataflow_mmd or inclusion.dataflow_html:
@@ -125,9 +128,10 @@ async def generate_graph_outputs(
                     stuff_data_text=dataflow_output.stuff_data_text,
                     stuff_data_html=dataflow_output.stuff_data_html,
                     title=f"Data Flow: {pipe_code}",
+                    theme=mermaid_theme,
                 )
             else:
-                dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title=f"Data Flow: {pipe_code}")
+                dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title=f"Data Flow: {pipe_code}", theme=mermaid_theme)
 
     # Generate combo view
     if inclusion.combo_mmd or inclusion.combo_html:
@@ -143,9 +147,10 @@ async def generate_graph_outputs(
                     stuff_data_text=combo_output.stuff_data_text,
                     stuff_data_html=combo_output.stuff_data_html,
                     title=f"Combo: {pipe_code}",
+                    theme=mermaid_theme,
                 )
             else:
-                combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title=f"Combo: {pipe_code}")
+                combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title=f"Combo: {pipe_code}", theme=mermaid_theme)
 
     # Generate ReactFlow outputs
     if inclusion.reactflow_viewspec or inclusion.reactflow_html:
