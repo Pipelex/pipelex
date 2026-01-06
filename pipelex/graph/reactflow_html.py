@@ -455,11 +455,17 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             font-weight: 500;
         }
 
-        /* Format tabs for stuff data */
+        /* Format toolbar for stuff data */
+        .format-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 8px;
+        }
         .format-tabs {
             display: flex;
             gap: 4px;
-            margin-bottom: 12px;
         }
         .format-tab {
             padding: 6px 12px;
@@ -483,6 +489,37 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
         .format-tab:disabled {
             opacity: 0.4;
             cursor: not-allowed;
+        }
+        .format-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 14px;
+            background: var(--color-surface-hover);
+            color: var(--color-text-muted);
+            border: none;
+            transition: all 0.2s;
+        }
+        .action-btn:hover {
+            background: var(--color-border);
+            color: var(--color-text);
+        }
+        .action-btn.copied {
+            background: var(--color-success-bg);
+            color: var(--color-success);
+        }
+        .action-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
         }
         .inspector-html-content {
             background: var(--color-bg);
@@ -1184,6 +1221,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     // Add format tabs if multiple formats available
                     if (hasMultipleFormats) {
                         html += '<div class="inspector-section">';
+                        html += '<div class="format-toolbar">';
                         html += '<div class="format-tabs" id="stuff-format-tabs">';
                         const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
                         const textActive = currentStuffFormat === 'text' ? 'active' : '';
@@ -1195,10 +1233,38 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         html += `<button class="format-tab ${textActive}" data-format="text" `;
                         html += `${!hasText ? 'disabled' : ''}>Pretty</button>`;
                         html += '</div>';
+                        html += '<div class="format-actions">';
+                        html += '<button class="action-btn" id="copy-btn" ';
+                        html += 'onclick="copyStuffContent()" title="Copy">';
+                        html += '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z';
+                        html += 'm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z';
+                        html += 'm0 16H8V7h11v14z"/></svg></button>';
+                        html += '<button class="action-btn" id="download-btn" ';
+                        html += 'onclick="downloadStuffContent()" title="Download">';
+                        html += '<svg viewBox="0 0 24 24">';
+                        html += '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>';
+                        html += '</svg></button>';
+                        html += '</div>';
+                        html += '</div>';
                         html += '<div id="stuff-data-content"></div>';
                         html += '</div>';
                     } else if (hasJson || hasText || hasHtml) {
                         html += '<div class="inspector-section">';
+                        html += '<div class="format-toolbar">';
+                        html += '<div class="format-tabs"></div>';
+                        html += '<div class="format-actions">';
+                        html += '<button class="action-btn" id="copy-btn" ';
+                        html += 'onclick="copyStuffContent()" title="Copy">';
+                        html += '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z';
+                        html += 'm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z';
+                        html += 'm0 16H8V7h11v14z"/></svg></button>';
+                        html += '<button class="action-btn" id="download-btn" ';
+                        html += 'onclick="downloadStuffContent()" title="Download">';
+                        html += '<svg viewBox="0 0 24 24">';
+                        html += '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>';
+                        html += '</svg></button>';
+                        html += '</div>';
+                        html += '</div>';
                         html += '<div id="stuff-data-content"></div>';
                         html += '</div>';
                     }
@@ -1458,6 +1524,64 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 container.className = 'inspector-html-content';
                 container.innerHTML = htmlContent;
             }
+        }
+
+        // Get current stuff content based on active format
+        function getCurrentStuffContent() {
+            const stuffMermaidId = window.currentStuffMermaidId;
+            const jsonData = window.currentStuffJsonData;
+            const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
+            const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+
+            if (currentStuffFormat === 'json' && jsonData) {
+                return { content: JSON.stringify(jsonData, null, 2), ext: 'json', mime: 'application/json' };
+            } else if (currentStuffFormat === 'text' && textData) {
+                return { content: textData, ext: 'txt', mime: 'text/plain' };
+            } else if (currentStuffFormat === 'html' && htmlData) {
+                return { content: htmlData, ext: 'html', mime: 'text/html' };
+            }
+            return null;
+        }
+
+        // Copy stuff content to clipboard
+        function copyStuffContent() {
+            const data = getCurrentStuffContent();
+            if (!data) return;
+
+            navigator.clipboard.writeText(data.content).then(() => {
+                const btn = document.getElementById('copy-btn');
+                const checkIcon = '<svg viewBox="0 0 24 24">' +
+                    '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+                const copyIcon = '<svg viewBox="0 0 24 24">' +
+                    '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z' +
+                    'm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z' +
+                    'm0 16H8V7h11v14z"/></svg>';
+                btn.innerHTML = checkIcon;
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = copyIcon;
+                    btn.classList.remove('copied');
+                }, 1500);
+            });
+        }
+
+        // Download stuff content as file
+        function downloadStuffContent() {
+            const data = getCurrentStuffContent();
+            if (!data) return;
+
+            const stuffName = document.getElementById('inspector-title')?.textContent || 'data';
+            const filename = `${stuffName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${data.ext}`;
+
+            const blob = new Blob([data.content], { type: data.mime });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
         }
 
         // Escape HTML to prevent XSS when displaying JSON/text content
