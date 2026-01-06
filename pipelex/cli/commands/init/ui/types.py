@@ -7,6 +7,7 @@ class InitFocus(StrEnum):
     """Focus options for initialization."""
 
     ALL = "all"
+    AGREEMENT = "agreement"
     CONFIG = "config"
     INFERENCE = "inference"
     ROUTING = "routing"

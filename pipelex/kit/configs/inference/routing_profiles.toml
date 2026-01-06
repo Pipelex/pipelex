@@ -138,7 +138,7 @@ default = "internal"
 # =========================================================================================
 [profiles.example_routing_using_patterns]
 description = "Example routing profile using patterns"
-default = "pipelex_inference"
+default = "pipelex_gateway"
 
 [profiles.example_routing_using_patterns.routes]
 # Pattern matching: "model-pattern" = "backend-name"
@@ -158,17 +158,17 @@ default = "pipelex_inference"
 description = "Example routing profile using specific models"
 
 [profiles.example_routing_using_specific_models.routes]
-"gpt-5-nano" = "pipelex_inference"
+"gpt-5-nano" = "pipelex_gateway"
 "gpt-4o-mini" = "blackboxai"
 "gpt-5-mini" = "openai"
 "gpt-5-chat" = "azure_openai"
 
-"claude-4-sonnet" = "pipelex_inference"
+"claude-4-sonnet" = "pipelex_gateway"
 "claude-3.7-sonnet" = "blackboxai"
 
-"gemini-2.5-flash-lite" = "pipelex_inference"
+"gemini-2.5-flash-lite" = "pipelex_gateway"
 "gemini-2.5-flash" = "blackboxai"
 "gemini-2.5-pro" = "vertexai"
 
-"grok-3" = "pipelex_inference"
+"grok-3" = "pipelex_gateway"
 "grok-3-mini" = "xai"

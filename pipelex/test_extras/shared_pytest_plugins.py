@@ -1,7 +1,9 @@
 import os
 
 import pytest
-from pytest import FixtureRequest, Parser
+from pytest import Config, FixtureRequest, Parser
+from rich.console import Console
+from rich.panel import Panel
 
 from pipelex.hub import get_console
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -61,6 +63,51 @@ def pytest_addoption(parser: Parser):
         help="Pipe run mode: 'live' or 'dry'",
         choices=("live", "dry"),
     )
+
+
+def pytest_configure(config: Config) -> None:  # noqa: ARG001
+    """Check prerequisites before test collection starts.
+
+    Validates that Pipelex Gateway terms are accepted when gateway is enabled.
+    This runs early to provide clear feedback before wasting time on test collection.
+    """
+    # Skip check in CI environments (IntegrationMode.CI doesn't require terms)
+    if is_env_var_set(key="GITHUB_ACTIONS") or is_env_var_set(key="CI"):
+        return
+
+    # Skip check in Codex Cloud (terms acceptance handled differently)
+    if is_env_var_truthy(key=CODEX_CLOUD_ENV_VAR_KEY):
+        return
+
+    # Import here to avoid circular imports during pytest startup
+    from pipelex.system.configuration.config_loader import config_manager  # noqa: PLC0415
+    from pipelex.system.pipelex_service.pipelex_service_config import (  # noqa: PLC0415
+        is_pipelex_gateway_enabled,
+        load_pipelex_service_config_if_exists,
+    )
+
+    if not is_pipelex_gateway_enabled():
+        return
+
+    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+
+    if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
+        console = Console()
+        console.print()
+        console.print(
+            Panel(
+                "[bold yellow]Pipelex Service Terms Agreement Required[/bold yellow]\n\n"
+                "Tests cannot run because Pipelex Gateway is enabled but terms haven't been accepted.\n\n"
+                "[bold]To fix this, choose one option:[/bold]\n\n"
+                "  [cyan]1.[/cyan] Run [green]pipelex init agreement[/green] to accept terms (quick, no config reset)\n\n"
+                "  [cyan]2.[/cyan] Run [green]pipelex init config[/green] to fully reset and configure backends\n\n"
+                "  [cyan]3.[/cyan] Disable gateway in [blue].pipelex/inference/backends.toml[/blue]:\n"
+                "     [dim]Set pipelex_gateway.enabled = false[/dim]\n",
+                title="⚠️  Setup Required",
+                border_style="yellow",
+            )
+        )
+        pytest.exit("Service terms not accepted - run 'pipelex init agreement' first", returncode=1)
 
 
 @pytest.fixture

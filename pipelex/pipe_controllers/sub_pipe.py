@@ -8,7 +8,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.hub import get_pipeline_tracker, get_required_pipe
+from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -129,15 +129,5 @@ class SubPipe(BaseModel):
                 pipe_run_params=sub_pipe_run_params,
                 output_name=self.output_name,
             )
-
-            if new_output_stuff := pipe_output.working_memory.get_optional_main_stuff():
-                for stuff in required_stuffs:
-                    get_pipeline_tracker().add_pipe_step(
-                        from_stuff=stuff,
-                        to_stuff=new_output_stuff,
-                        pipe_code=self.pipe_code,
-                        pipe_layer=sub_pipe_run_params.pipe_layers,
-                        comment="SubPipe on required_stuff",
-                    )
 
         return pipe_output

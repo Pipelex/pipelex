@@ -31,7 +31,7 @@ Get **free credits** for testing and development with a single API key that work
 
 3. Run `pipelex init` and accept the Gateway terms of service when prompted.
 
-That's it! Your pipelines can now access any supported LLM.
+That's it! Your pipelines can now access any supported LLM. See [Gateway Available Models](./gateway-models.md) for the full list.
 
 !!! info "Terms of Service & Telemetry"
     When using Pipelex Gateway, you'll be prompted to accept our terms of service. By using the Gateway, identified telemetry is automatically enabled (tied to your hashed API key) to help us monitor service quality and enforce fair usage.

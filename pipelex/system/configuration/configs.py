@@ -9,7 +9,6 @@ from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.language.plx_config import PlxConfig
-from pipelex.pipeline.track.tracker_config import TrackerConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
@@ -124,7 +123,6 @@ class PromptingConfig(ConfigModel):
 
 
 class FeatureConfig(ConfigModel):
-    is_pipeline_tracking_enabled: bool
     is_reporting_enabled: bool
 
 
@@ -170,7 +168,6 @@ class Pipelex(ConfigModel):
     aws_config: AwsConfig
 
     validation_error_config: ValidationErrorConfig
-    tracker_config: TrackerConfig
     structure_config: StructureConfig
     prompting_config: PromptingConfig
     plx_config: PlxConfig

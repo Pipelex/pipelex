@@ -54,7 +54,6 @@ AMAZON_MODELS = [
 # --- Anthropic Models (Claude) ------------------------------------------------------------------
 ANTHROPIC_MODELS = [
     "claude-3-haiku",
-    "claude-3-opus",
     "claude-3.7-sonnet",
     "claude-4-opus",
     "claude-4-sonnet",
