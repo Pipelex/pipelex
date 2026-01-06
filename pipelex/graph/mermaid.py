@@ -23,8 +23,8 @@ from pipelex.graph.graphspec import (
     NodeSpec,
     NodeStatus,
 )
+from pipelex.tools.mermaid.mermaid_utils import escape_mermaid_label, sanitize_mermaid_id
 from pipelex.tools.misc.chart_utils import FlowchartDirection
-from pipelex.tools.misc.mermaid_utils import escape_mermaid_label, sanitize_mermaid_id
 
 
 class MermaidOutput(BaseModel):

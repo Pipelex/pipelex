@@ -30,6 +30,11 @@ from pipelex.graph.mermaid import (
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
 )
+from pipelex.graph.mermaid_html import (
+    render_mermaid_html,
+    render_mermaid_html_async,
+    render_mermaid_html_with_data_async,
+)
 from pipelex.graph.reactflow_html import generate_reactflow_html, generate_reactflow_html_async
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
@@ -40,11 +45,6 @@ from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundl
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.chart_utils import FlowchartDirection
-from pipelex.tools.misc.mermaid_utils import (
-    render_mermaid_html,
-    render_mermaid_html_async,
-    render_mermaid_html_with_data_async,
-)
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -427,7 +427,7 @@ def graph_render_cmd(
         pipelex graph render graph.json --all              # all views
         pipelex graph render graph.json --open             # open in browser
         pipelex graph render graph.json -o ./output/       # custom output directory
-        pipelex graph render tests/data/graphs/cv_matching_graph.json --reactflow -o ./temp/test_outputs/ --open
+        pipelex graph render tests/data/graphs/cv_matching_graph.json --reactflow -o ./temp/test_outputs/
     """
     # Validate input file exists
     if not input_file.exists():

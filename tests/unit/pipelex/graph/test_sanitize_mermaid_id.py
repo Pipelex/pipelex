@@ -1,6 +1,6 @@
 """Unit tests for the sanitize_mermaid_id function."""
 
-from pipelex.tools.misc.mermaid_utils import sanitize_mermaid_id
+from pipelex.tools.mermaid.mermaid_utils import sanitize_mermaid_id
 
 
 class TestSanitizeMermaidId:

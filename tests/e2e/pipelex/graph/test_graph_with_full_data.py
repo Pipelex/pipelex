@@ -21,15 +21,15 @@ from pipelex.graph.mermaid import (
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
 )
+from pipelex.graph.mermaid_html import (
+    render_mermaid_html_async,
+    render_mermaid_html_with_data_async,
+)
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
-from pipelex.tools.misc.mermaid_utils import (
-    render_mermaid_html_async,
-    render_mermaid_html_with_data_async,
-)
 from tests.cases import PDFTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
 

@@ -20,13 +20,13 @@ from pipelex.graph.mermaid import (
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
 )
-from pipelex.graph.reactflow_html import generate_reactflow_html_async
-from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
-from pipelex.tools.misc.file_utils import get_incremental_directory_path
-from pipelex.tools.misc.mermaid_utils import (
+from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
 )
+from pipelex.graph.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
+from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.conftest import TEST_OUTPUTS_DIR
 from tests.e2e.pipelex.graph.test_data import GraphTestData
 

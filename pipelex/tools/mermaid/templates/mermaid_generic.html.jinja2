@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #333;
+            --label-color: #666;
+            --border-color: #ccc;
+            --border-hover: #999;
+            --select-bg: white;
+            --container-bg: white;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            transition: background-color 0.3s;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: var(--text-color);
+            margin: 0;
+            transition: color 0.3s;
+        }
+        .theme-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .theme-selector label {
+            font-size: 14px;
+            color: var(--label-color);
+            transition: color 0.3s;
+        }
+        .theme-selector select {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--select-bg);
+            color: var(--text-color);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .theme-selector select:hover {
+            border-color: var(--border-hover);
+        }
+        .mermaid-container {
+            background-color: var(--container-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ title }}</h1>
+        <div class="theme-selector">
+            <label for="theme-select">Theme:</label>
+            <select id="theme-select">
+                <option value="default">Default</option>
+                <option value="dark">Dark</option>
+                <option value="forest">Forest</option>
+                <option value="neutral">Neutral</option>
+                <option value="base">Base</option>
+            </select>
+        </div>
+    </div>
+    <div class="mermaid-container">
+        <div class="mermaid" id="mermaid-diagram">
+{{ mermaid_code }}
+        </div>
+    </div>
+    <script>
+        const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
+        let currentTheme = '{{ theme }}';
+
+        // Page theme palettes (just for page styling, not diagram)
+        const pageThemes = {
+            default: { bg: '#f5f5f5', text: '#333', label: '#666', border: '#ccc',
+                       borderHover: '#999', selectBg: 'white', containerBg: 'white' },
+            dark:    { bg: '#1a1a2e', text: '#e0f7fa', label: '#80deea', border: '#2d4a5a',
+                       borderHover: '#00bcd4', selectBg: '#2d4a5a', containerBg: '#16213e' },
+            forest:  { bg: '#f0fdf4', text: '#14532d', label: '#166534', border: '#86efac',
+                       borderHover: '#4ade80', selectBg: 'white', containerBg: '#fafffe' },
+            neutral: { bg: '#fafafa', text: '#171717', label: '#525252', border: '#d4d4d4',
+                       borderHover: '#a3a3a3', selectBg: 'white', containerBg: 'white' },
+            base:    { bg: '#fff', text: '#18181b', label: '#52525b', border: '#e4e4e7',
+                       borderHover: '#a1a1aa', selectBg: 'white', containerBg: '#fafafa' }
+        };
+
+        function applyPageTheme(theme) {
+            const palette = pageThemes[theme] || pageThemes.default;
+            document.documentElement.style.setProperty('--bg-color', palette.bg);
+            document.documentElement.style.setProperty('--text-color', palette.text);
+            document.documentElement.style.setProperty('--label-color', palette.label);
+            document.documentElement.style.setProperty('--border-color', palette.border);
+            document.documentElement.style.setProperty('--border-hover', palette.borderHover);
+            document.documentElement.style.setProperty('--select-bg', palette.selectBg);
+            document.documentElement.style.setProperty('--container-bg', palette.containerBg);
+        }
+
+        function initMermaid(theme) {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme,
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true,
+                    curve: 'basis'
+                }
+            });
+        }
+
+        async function renderDiagram(theme) {
+            const container = document.getElementById('mermaid-diagram');
+            container.innerHTML = mermaidCode;
+            container.removeAttribute('data-processed');
+            applyPageTheme(theme);
+            initMermaid(theme);
+            await mermaid.run({ nodes: [container] });
+        }
+
+        // Set initial theme in dropdown
+        document.getElementById('theme-select').value = currentTheme;
+
+        // Handle theme change
+        document.getElementById('theme-select').addEventListener('change', async (e) => {
+            currentTheme = e.target.value;
+            await renderDiagram(currentTheme);
+        });
+
+        // Initial render on page load
+        renderDiagram(currentTheme);
+    </script>
+</body>
+</html>
+

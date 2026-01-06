@@ -1,6 +1,6 @@
 """Unit tests for the escape_mermaid_label function."""
 
-from pipelex.tools.misc.mermaid_utils import escape_mermaid_label
+from pipelex.tools.mermaid.mermaid_utils import escape_mermaid_label
 
 
 class TestEscapeMermaidLabel:

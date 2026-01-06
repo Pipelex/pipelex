@@ -20,10 +20,10 @@ from pipelex.graph.mermaid import (
     graphspec_to_dataflow_mermaid,
     graphspec_to_orchestration_mermaid,
 )
+from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.misc.chart_utils import FlowchartDirection
-from pipelex.tools.misc.mermaid_utils import render_mermaid_html_async, render_mermaid_html_with_data_async
 
 if TYPE_CHECKING:
     from pipelex.graph.graph_config import GraphConfig
