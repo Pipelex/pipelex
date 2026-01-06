@@ -34,7 +34,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        :root {
+        /* Dark theme (default) */
+        :root, [data-theme="dark"] {
             --color-bg: #0f172a;
             --color-surface: #1e293b;
             --color-surface-hover: #334155;
@@ -52,8 +53,11 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             --color-stuff: #f59e0b;
             --color-stuff-bg: rgba(245, 158, 11, 0.15);
             --color-stuff-border: #d97706;
+            --color-stuff-text: #fef3c7;
+            --color-stuff-text-dim: #fcd34d;
             --color-pipe: #3b82f6;
             --color-pipe-bg: rgba(59, 130, 246, 0.1);
+            --color-pipe-text: #dbeafe;
             --color-pipe-failed: #ef4444;
             --color-pipe-failed-bg: rgba(239, 68, 68, 0.15);
             --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -65,6 +69,68 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
             --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
             --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+        /* Light theme */
+        [data-theme="light"] {
+            --color-bg: #f8fafc;
+            --color-surface: #ffffff;
+            --color-surface-hover: #f1f5f9;
+            --color-border: #e2e8f0;
+            --color-text: #1e293b;
+            --color-text-muted: #64748b;
+            --color-text-dim: #94a3b8;
+            --color-accent: #3b82f6;
+            --color-accent-hover: #2563eb;
+            --color-success: #10b981;
+            --color-success-bg: rgba(16, 185, 129, 0.1);
+            --color-error: #ef4444;
+            --color-error-bg: rgba(239, 68, 68, 0.1);
+            --color-warning: #f59e0b;
+            --color-stuff: #f59e0b;
+            --color-stuff-bg: rgba(245, 158, 11, 0.1);
+            --color-stuff-border: #d97706;
+            --color-stuff-text: #78350f;
+            --color-stuff-text-dim: #92400e;
+            --color-pipe: #3b82f6;
+            --color-pipe-bg: rgba(59, 130, 246, 0.08);
+            --color-pipe-text: #1e3a8a;
+            --color-pipe-failed: #ef4444;
+            --color-pipe-failed-bg: rgba(239, 68, 68, 0.1);
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+        /* System theme - follows OS preference */
+        @media (prefers-color-scheme: light) {
+            [data-theme="system"] {
+                --color-bg: #f8fafc;
+                --color-surface: #ffffff;
+                --color-surface-hover: #f1f5f9;
+                --color-border: #e2e8f0;
+                --color-text: #1e293b;
+                --color-text-muted: #64748b;
+                --color-text-dim: #94a3b8;
+                --color-accent: #3b82f6;
+                --color-accent-hover: #2563eb;
+                --color-success: #10b981;
+                --color-success-bg: rgba(16, 185, 129, 0.1);
+                --color-error: #ef4444;
+                --color-error-bg: rgba(239, 68, 68, 0.1);
+                --color-warning: #f59e0b;
+                --color-stuff: #f59e0b;
+                --color-stuff-bg: rgba(245, 158, 11, 0.1);
+                --color-stuff-border: #d97706;
+                --color-stuff-text: #78350f;
+                --color-stuff-text-dim: #92400e;
+                --color-pipe: #3b82f6;
+                --color-pipe-bg: rgba(59, 130, 246, 0.08);
+                --color-pipe-text: #1e3a8a;
+                --color-pipe-failed: #ef4444;
+                --color-pipe-failed-bg: rgba(239, 68, 68, 0.1);
+                --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+                --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+                --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+            }
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -97,11 +163,39 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             height: 28px;
             width: auto;
         }
+        .header-logo.dark-logo { display: block; }
+        .header-logo.light-logo { display: none; }
+        [data-theme="light"] .header-logo.dark-logo { display: none; }
+        [data-theme="light"] .header-logo.light-logo { display: block; }
+        @media (prefers-color-scheme: light) {
+            [data-theme="system"] .header-logo.dark-logo { display: none; }
+            [data-theme="system"] .header-logo.light-logo { display: block; }
+        }
         .header-title {
             font-size: 14px;
             color: var(--color-text-muted);
             font-weight: 500;
         }
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: var(--color-surface-hover);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-size: 16px;
+            line-height: 1;
+        }
+        .theme-toggle:hover {
+            background: var(--color-accent);
+            border-color: var(--color-accent);
+        }
+        .theme-icon { display: none; }
+        .theme-icon.active { display: inline; }
         .stat-item {
             display: flex;
             align-items: center;
@@ -387,12 +481,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             text-align: left;
         }
         .inspector-html-content th {
-            background: #252a30;
+            background: var(--color-surface-hover);
             color: var(--color-text);
             font-weight: 600;
         }
         .inspector-html-content tr:hover {
-            background: #2a2530;
+            background: var(--color-surface-hover);
         }
 
         /* Top hint capsule */
@@ -463,9 +557,15 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
     <div id="app-container">
         <header class="header">
             <div class="header-left">
-                <img src="{{ logo_url }}" alt="Pipelex" class="header-logo">
+                <img src="{{ logo_dark }}" alt="Pipelex" class="header-logo dark-logo">
+                <img src="{{ logo_light }}" alt="Pipelex" class="header-logo light-logo">
                 <span class="header-title">{{ title }}</span>
             </div>
+            <button id="theme-toggle" class="theme-toggle" title="Toggle theme (Dark/Light/System)">
+                <span class="theme-icon dark-icon">🌙</span>
+                <span class="theme-icon light-icon">☀️</span>
+                <span class="theme-icon system-icon">💻</span>
+            </button>
         </header>
         <div id="root"></div>
     </div>
@@ -505,6 +605,30 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
     <script type="application/json" id="pipelex-stuff-data-html">{{ stuff_data_html_json }}</script>
 
     <script>
+        // Theme switching functionality
+        const themes = ['dark', 'light', 'system'];
+        const initialTheme = '{{ initial_theme }}';
+        let currentThemeIndex = themes.indexOf(localStorage.getItem('pipelex-theme') || initialTheme);
+        if (currentThemeIndex === -1) currentThemeIndex = 0;
+
+        function applyTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('pipelex-theme', theme);
+            // Update button icons
+            document.querySelectorAll('.theme-icon').forEach(icon => icon.classList.remove('active'));
+            const activeIcon = document.querySelector(`.${theme}-icon`);
+            if (activeIcon) activeIcon.classList.add('active');
+        }
+
+        // Set up theme toggle button
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+            applyTheme(themes[currentThemeIndex]);
+        });
+
+        // Apply initial theme immediately
+        applyTheme(themes[currentThemeIndex]);
+
         // Parse embedded ViewSpec
         const viewspecElement = document.getElementById('pipelex-viewspec');
         const viewspec = JSON.parse(viewspecElement.textContent);
@@ -733,7 +857,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                                     fontFamily: "'JetBrains Mono', monospace",
                                     fontSize: '13px',
                                     fontWeight: 600,
-                                    color: '#f1f5f9',
+                                    color: 'var(--color-pipe-text)',
                                 }
                             }, label)
                         ),
@@ -743,12 +867,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     },
                     position: { x: 0, y: 0 },
                     style: {
-                        background: isFailed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.1)',
-                        border: isFailed ? '2px solid #ef4444' : '2px solid #3b82f6',
+                        background: isFailed ? 'var(--color-pipe-failed-bg)' : 'var(--color-pipe-bg)',
+                        border: isFailed ? '2px solid var(--color-pipe-failed)' : '2px solid var(--color-pipe)',
                         borderRadius: '8px',
                         padding: '0',
                         minWidth: '160px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                        boxShadow: 'var(--shadow-md)',
                     },
                 });
             }
@@ -778,13 +902,13 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                                     fontFamily: "'JetBrains Mono', monospace",
                                     fontSize: '12px',
                                     fontWeight: 600,
-                                    color: '#f1f5f9',
+                                    color: 'var(--color-stuff-text)',
                                 }
                             }, label),
                             concept && React.createElement('span', {
                                 style: {
                                     fontSize: '10px',
-                                    color: '#94a3b8',
+                                    color: 'var(--color-stuff-text-dim)',
                                 }
                             }, concept)
                         ),
@@ -795,12 +919,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     },
                     position: { x: 0, y: 0 },
                     style: {
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        border: '2px solid #d97706',
+                        background: 'var(--color-stuff-bg)',
+                        border: '2px solid var(--color-stuff-border)',
                         borderRadius: '999px',  // Pill shape
                         padding: '0',
                         minWidth: '140px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                        boxShadow: 'var(--shadow-md)',
                         cursor: 'pointer',
                     },
                 });
@@ -817,12 +941,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     type: '{{ edge_type }}',
                     animated: false,
                     style: {
-                        stroke: '#3b82f6',
+                        stroke: 'var(--color-pipe)',
                         strokeWidth: 2,
                     },
                     markerEnd: {
                         type: MarkerType?.ArrowClosed || 'arrowclosed',
-                        color: '#3b82f6',
+                        color: 'var(--color-pipe)',
                     },
                 });
             }
@@ -838,12 +962,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                         type: '{{ edge_type }}',
                         animated: false,
                         style: {
-                            stroke: '#3b82f6',
+                            stroke: 'var(--color-pipe)',
                             strokeWidth: 2,
                         },
                         markerEnd: {
                             type: MarkerType?.ArrowClosed || 'arrowclosed',
-                            color: '#3b82f6',
+                            color: 'var(--color-pipe)',
                         },
                     });
                 }
@@ -887,7 +1011,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                                         fontFamily: "'JetBrains Mono', monospace",
                                         fontSize: '13px',
                                         fontWeight: 600,
-                                        color: '#f1f5f9',
+                                        color: 'var(--color-pipe-text)',
                                     }
                                 }, node.label),
                                 isSucceeded && React.createElement('span', {
@@ -895,7 +1019,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                                         width: '8px',
                                         height: '8px',
                                         borderRadius: '50%',
-                                        background: '#10b981',
+                                        background: 'var(--color-success)',
                                         flexShrink: 0,
                                     }
                                 }),
@@ -904,7 +1028,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                                         width: '8px',
                                         height: '8px',
                                         borderRadius: '50%',
-                                        background: '#ef4444',
+                                        background: 'var(--color-error)',
                                         flexShrink: 0,
                                     }
                                 })
@@ -920,14 +1044,14 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                                 React.createElement('span', {
                                     style: {
                                         fontSize: '11px',
-                                        color: '#64748b',
+                                        color: 'var(--color-text-dim)',
                                     }
                                 }, isController ? 'Controller' : node.inspector?.pipe_type || 'Operator'),
                                 badge && React.createElement('span', {
                                     style: {
                                         fontSize: '10px',
-                                        color: '#94a3b8',
-                                        background: 'rgba(255,255,255,0.1)',
+                                        color: 'var(--color-text-muted)',
+                                        background: 'var(--color-surface-hover)',
                                         padding: '2px 6px',
                                         borderRadius: '4px',
                                         fontFamily: "'JetBrains Mono', monospace",
@@ -941,12 +1065,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                     },
                     position: node.position || { x: 0, y: 0 },
                     style: {
-                        background: isFailed ? 'rgba(239, 68, 68, 0.15)' : (isController ? 'rgba(139, 92, 246, 0.1)' : 'rgba(6, 182, 212, 0.1)'),
-                        border: `2px solid ${isFailed ? '#ef4444' : (isController ? '#8b5cf6' : '#06b6d4')}`,
+                        background: isFailed ? 'var(--color-pipe-failed-bg)' : 'var(--color-pipe-bg)',
+                        border: isFailed ? '2px solid var(--color-pipe-failed)' : '2px solid var(--color-pipe)',
                         borderRadius: '8px',
                         padding: '0',
                         minWidth: '160px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+                        boxShadow: 'var(--shadow-md)',
                     },
                 };
             });
@@ -961,7 +1085,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 labelStyle: {
                     fontSize: 11,
                     fontWeight: 500,
-                    fill: '#94a3b8',
+                    fill: 'var(--color-text-muted)',
                     fontFamily: "'JetBrains Mono', monospace",
                 },
                 labelBgStyle: {
@@ -971,12 +1095,12 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 labelBgPadding: [6, 4],
                 labelBgBorderRadius: 4,
                 style: {
-                    stroke: edge.kind === 'data' ? '#3b82f6' : '#475569',
+                    stroke: edge.kind === 'data' ? 'var(--color-pipe)' : 'var(--color-text-dim)',
                     strokeWidth: edge.kind === 'data' ? 2 : 1,
                 },
                 markerEnd: {
                     type: MarkerType?.ArrowClosed || 'arrowclosed',
-                    color: edge.kind === 'data' ? '#3b82f6' : '#475569',
+                    color: edge.kind === 'data' ? 'var(--color-pipe)' : 'var(--color-text-dim)',
                 },
             }));
 
@@ -1174,7 +1298,7 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             };
 
             if (!ReactFlow) {
-                return React.createElement('div', { style: { padding: '20px', color: '#f1f5f9' } },
+                return React.createElement('div', { style: { padding: '20px', color: 'var(--color-text)' } },
                     React.createElement('p', null, 'Loading ReactFlow...')
                 );
             }
@@ -1359,7 +1483,8 @@ def generate_reactflow_html(
         template_category=TemplateCategory.HTML,
         temlating_context={
             "title": title or config.default_title,
-            "logo_url": URLs.logo_white_on_transparent,
+            "logo_dark": URLs.logo_white_on_transparent,
+            "logo_light": URLs.logo_black_on_transparent,
             "viewspec_json": viewspec_json,
             "graphspec_json": graphspec_json,
             "stuff_data_text_json": json.dumps(stuff_data_text or {}),
@@ -1370,6 +1495,7 @@ def generate_reactflow_html(
             "edge_type": config.edge_type,
             "initial_zoom": config.initial_zoom,
             "pan_to_top": config.pan_to_top,
+            "initial_theme": config.style.theme,
         },
     )
 
@@ -1412,7 +1538,8 @@ async def generate_reactflow_html_async(
         template_category=TemplateCategory.HTML,
         temlating_context={
             "title": title or config.default_title,
-            "logo_url": URLs.logo_white_on_transparent,
+            "logo_dark": URLs.logo_white_on_transparent,
+            "logo_light": URLs.logo_black_on_transparent,
             "viewspec_json": viewspec_json,
             "graphspec_json": graphspec_json,
             "stuff_data_text_json": json.dumps(stuff_data_text or {}),
@@ -1423,5 +1550,6 @@ async def generate_reactflow_html_async(
             "edge_type": config.edge_type,
             "initial_zoom": config.initial_zoom,
             "pan_to_top": config.pan_to_top,
+            "initial_theme": config.style.theme,
         },
     )
