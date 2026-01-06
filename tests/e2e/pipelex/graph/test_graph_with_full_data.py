@@ -85,6 +85,7 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
             stuff_data=dataflow_output.stuff_data,
             stuff_data_text=dataflow_output.stuff_data_text,
             stuff_data_html=dataflow_output.stuff_data_html,
+            stuff_metadata=dataflow_output.stuff_metadata,
             title="Dataflow (Interactive)",
             theme=mermaid_theme,
         )
@@ -105,6 +106,7 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
             stuff_data=combo_output.stuff_data,
             stuff_data_text=combo_output.stuff_data_text,
             stuff_data_html=combo_output.stuff_data_html,
+            stuff_metadata=combo_output.stuff_metadata,
             title="Combo (Interactive)",
             theme=mermaid_theme,
         )

@@ -506,6 +506,7 @@ def graph_render_cmd(
                         dataflow_html = await render_mermaid_html_with_data_async(
                             dataflow_mermaid,
                             stuff_data=dataflow_output.stuff_data,
+                            stuff_metadata=dataflow_output.stuff_metadata,
                             title=f"Data Flow: {stem}",
                         )
                         typer.secho(f"  → Found {len(dataflow_output.stuff_data)} stuff items with data", fg=typer.colors.CYAN, err=True)
@@ -531,6 +532,7 @@ def graph_render_cmd(
                         combo_html = await render_mermaid_html_with_data_async(
                             combo_mermaid,
                             stuff_data=combo_output.stuff_data,
+                            stuff_metadata=combo_output.stuff_metadata,
                             title=f"Combo: {stem}",
                         )
                     else:

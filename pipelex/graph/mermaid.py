@@ -38,12 +38,15 @@ class MermaidOutput(BaseModel):
             Only populated when GraphConfig.data_inclusion.stuff_text_content is True.
         stuff_data_html: Optional mapping from stuff mermaid IDs to their HTML representation.
             Only populated when GraphConfig.data_inclusion.stuff_html_content is True.
+        stuff_metadata: Optional mapping from stuff mermaid IDs to their display metadata (name, concept).
+            Always populated when any stuff data is present.
     """
 
     mermaid_code: str
     stuff_data: dict[str, Any] | None = None
     stuff_data_text: dict[str, str] | None = None
     stuff_data_html: dict[str, str] | None = None
+    stuff_metadata: dict[str, dict[str, str]] | None = None
 
 
 # Light pastel colors for subgraph depth coloring (cycles through these)
@@ -183,6 +186,45 @@ def collect_stuff_data_html(graph: GraphSpec) -> dict[str, str]:
                     stuff_data_html[stuff_mermaid_id] = input_spec.data_html
 
     return stuff_data_html
+
+
+def collect_stuff_metadata(graph: GraphSpec) -> dict[str, dict[str, str]]:
+    """Collect IOSpec metadata (name, concept) from all stuff nodes in the graph.
+
+    Note: We collect data from ALL nodes including controllers, because:
+    - The root controller has the pipeline inputs with data
+    - Controllers also capture their outputs with data
+
+    Args:
+        graph: The GraphSpec to extract metadata from.
+
+    Returns:
+        Dict mapping stuff mermaid IDs (s_xxx format) to their metadata dict with 'name' and 'concept'.
+    """
+    stuff_metadata: dict[str, dict[str, str]] = {}
+
+    for node in graph.nodes:
+        # Collect metadata from outputs
+        for output_spec in node.node_io.outputs:
+            if output_spec.digest:
+                stuff_mermaid_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
+                meta: dict[str, str] = {"name": output_spec.name}
+                if output_spec.concept:
+                    meta["concept"] = output_spec.concept
+                stuff_metadata[stuff_mermaid_id] = meta
+
+        # Collect metadata from inputs (for pipeline inputs without a producer)
+        for input_spec in node.node_io.inputs:
+            if input_spec.digest:
+                stuff_mermaid_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
+                # Don't overwrite if already captured from output
+                if stuff_mermaid_id not in stuff_metadata:
+                    meta = {"name": input_spec.name}
+                    if input_spec.concept:
+                        meta["concept"] = input_spec.concept
+                    stuff_metadata[stuff_mermaid_id] = meta
+
+    return stuff_metadata
 
 
 def _render_node(
@@ -733,11 +775,17 @@ def graphspec_to_dataflow_mermaid(
     else:
         log.debug("no stuff data html to collect for graph_spec")
 
+    # Collect metadata if any stuff data is present
+    stuff_metadata: dict[str, dict[str, str]] | None = None
+    if stuff_data or stuff_data_text or stuff_data_html:
+        stuff_metadata = collect_stuff_metadata(graph=graph)
+
     return MermaidOutput(
         mermaid_code=mermaid_code,
         stuff_data=stuff_data,
         stuff_data_text=stuff_data_text,
         stuff_data_html=stuff_data_html,
+        stuff_metadata=stuff_metadata,
     )
 
 
@@ -885,9 +933,15 @@ def graphspec_to_combo_mermaid(
     if graph_config.data_inclusion.stuff_html_content:
         stuff_data_html = collect_stuff_data_html(graph=graph)
 
+    # Collect metadata if any stuff data is present
+    stuff_metadata: dict[str, dict[str, str]] | None = None
+    if stuff_data or stuff_data_text or stuff_data_html:
+        stuff_metadata = collect_stuff_metadata(graph=graph)
+
     return MermaidOutput(
         mermaid_code=mermaid_code,
         stuff_data=stuff_data,
         stuff_data_text=stuff_data_text,
         stuff_data_html=stuff_data_html,
+        stuff_metadata=stuff_metadata,
     )

@@ -106,6 +106,7 @@ class TestMermaidFromJson:
             dataflow_html = await render_mermaid_html_with_data_async(
                 dataflow_output.mermaid_code,
                 stuff_data=dataflow_output.stuff_data,
+                stuff_metadata=dataflow_output.stuff_metadata,
                 title=f"Dataflow (Interactive): {topic}",
             )
         else:
@@ -128,6 +129,7 @@ class TestMermaidFromJson:
             combo_html = await render_mermaid_html_with_data_async(
                 combo_output.mermaid_code,
                 stuff_data=combo_output.stuff_data,
+                stuff_metadata=combo_output.stuff_metadata,
                 title=f"Combo (Interactive): {topic}",
             )
         else:

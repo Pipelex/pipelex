@@ -127,6 +127,7 @@ async def generate_graph_outputs(
                     stuff_data=dataflow_output.stuff_data,
                     stuff_data_text=dataflow_output.stuff_data_text,
                     stuff_data_html=dataflow_output.stuff_data_html,
+                    stuff_metadata=dataflow_output.stuff_metadata,
                     title=f"Data Flow: {pipe_code}",
                     theme=mermaid_theme,
                 )
@@ -146,6 +147,7 @@ async def generate_graph_outputs(
                     stuff_data=combo_output.stuff_data,
                     stuff_data_text=combo_output.stuff_data_text,
                     stuff_data_html=combo_output.stuff_data_html,
+                    stuff_metadata=combo_output.stuff_metadata,
                     title=f"Combo: {pipe_code}",
                     theme=mermaid_theme,
                 )

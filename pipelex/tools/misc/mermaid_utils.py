@@ -408,7 +408,8 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             color: #d4d4d4;
             padding: 20px;
             border-radius: 12px;
-            max-width: 80vw;
+            width: 80vw;
+            max-width: 1200px;
             max-height: 80vh;
             overflow: auto;
             z-index: 1000;
@@ -416,7 +417,7 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 13px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            min-width: 400px;
+            min-width: 600px;
         }
         .data-modal-header {
             display: flex;
@@ -430,6 +431,20 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             font-size: 16px;
             font-weight: 600;
             color: #fff;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .data-modal-title-primary {
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+        .data-modal-title-secondary {
+            font-size: 11px;
+            font-weight: 400;
+            color: #666;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
         }
         .data-modal-close {
             cursor: pointer;
@@ -478,14 +493,36 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             line-height: 1.5;
         }
         .data-modal-content.text-content {
-            line-height: 0.8;
+            line-height: 1;
+            white-space: pre;
+            word-wrap: normal;
+            overflow-x: auto;
+            padding-right: 20px;
         }
         .data-modal-content.html-content {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #fff;
-            color: #333;
+            background: #1e1e1e;
+            color: #d4d4d4;
             padding: 12px;
             border-radius: 4px;
+        }
+        .data-modal-content.html-content table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .data-modal-content.html-content th,
+        .data-modal-content.html-content td {
+            border: 1px solid #444;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .data-modal-content.html-content th {
+            background: #2d2d2d;
+            color: #e0e0e0;
+            font-weight: 600;
+        }
+        .data-modal-content.html-content tr:hover {
+            background: #2a2a2a;
         }
         .data-modal-overlay {
             position: fixed;
@@ -534,9 +571,9 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             <span class="data-modal-close" onclick="hideModal()">&times;</span>
         </div>
         <div class="format-tabs" id="format-tabs">
-            <button class="format-tab active" data-format="json" id="tab-json">JSON</button>
-            <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
+            <button class="format-tab active" data-format="text" id="tab-text">Pretty</button>
             <button class="format-tab" data-format="html" id="tab-html">HTML</button>
+            <button class="format-tab" data-format="json" id="tab-json">JSON</button>
         </div>
         <div class="data-modal-content" id="modal-content"></div>
     </div>
@@ -545,11 +582,12 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
         const stuffDataJson = {{ stuff_data_json }};
         const stuffDataText = {{ stuff_data_text_json }};
         const stuffDataHtml = {{ stuff_data_html_json }};
+        const stuffMetadata = {{ stuff_metadata_json }};
         const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
 
         // Track current state
         let currentStuffId = null;
-        let currentFormat = 'json';
+        let currentFormat = 'text';
         let currentTheme = '{{ theme }}';
 
         // Theme-specific color palettes for custom node styling
@@ -769,11 +807,11 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             textTab.disabled = !stuffDataText?.[stuffId];
             htmlTab.disabled = !stuffDataHtml?.[stuffId];
 
-            // Find first available format
-            if (!jsonTab.disabled) return 'json';
+            // Find first available format (Pretty -> HTML -> JSON)
             if (!textTab.disabled) return 'text';
             if (!htmlTab.disabled) return 'html';
-            return 'json';
+            if (!jsonTab.disabled) return 'json';
+            return 'text';
         }
 
         function showModal(stuffId) {
@@ -782,7 +820,18 @@ MERMAID_INTERACTIVE_HTML_TEMPLATE = """<!DOCTYPE html>
             const overlay = document.getElementById('modal-overlay');
             const title = document.getElementById('modal-title');
 
-            title.textContent = `Data: ${stuffId}`;
+            // Build title from metadata (name + concept as primary, ID as secondary)
+            const meta = stuffMetadata?.[stuffId];
+            if (meta && (meta.name || meta.concept)) {
+                const primaryParts = [];
+                if (meta.name) primaryParts.push(meta.name);
+                if (meta.concept) primaryParts.push(`(${meta.concept})`);
+                const primary = `<span class="data-modal-title-primary">${primaryParts.join(' ')}</span>`;
+                const secondary = `<span class="data-modal-title-secondary">${stuffId}</span>`;
+                title.innerHTML = primary + secondary;
+            } else {
+                title.innerHTML = `<span class="data-modal-title-primary">${stuffId}</span>`;
+            }
 
             // Update tab availability and select best format
             const availableFormat = updateTabAvailability(stuffId);
@@ -882,6 +931,7 @@ async def render_mermaid_html_with_data_async(
     stuff_data: dict[str, str | dict[str, object] | list[str] | list[dict[str, object]] | None] | None = None,
     stuff_data_text: dict[str, str] | None = None,
     stuff_data_html: dict[str, str] | None = None,
+    stuff_metadata: dict[str, dict[str, str]] | None = None,
     *,
     title: str = "Pipelex Graph",
     theme: str = "default",
@@ -897,6 +947,7 @@ async def render_mermaid_html_with_data_async(
         stuff_data: Mapping from stuff mermaid IDs to their full data content (JSON format).
         stuff_data_text: Mapping from stuff mermaid IDs to their ASCII text representation.
         stuff_data_html: Mapping from stuff mermaid IDs to their HTML representation.
+        stuff_metadata: Mapping from stuff mermaid IDs to their display metadata (name, concept).
         title: The page title (appears in browser tab and as h1).
         theme: The Mermaid theme to use (default, base, dark, forest, neutral).
 
@@ -913,6 +964,7 @@ async def render_mermaid_html_with_data_async(
             "stuff_data_json": json.dumps(stuff_data or {}),
             "stuff_data_text_json": json.dumps(stuff_data_text or {}),
             "stuff_data_html_json": json.dumps(stuff_data_html or {}),
+            "stuff_metadata_json": json.dumps(stuff_metadata or {}),
             "has_data": has_data,
             "theme": theme,
         },
