@@ -4,9 +4,14 @@
 
 [pipelex.storage_config]
 is_fetch_remote_content_enabled = true
-uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 method = "local"
+
+[pipelex.storage_config.local]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 local_storage_path = ".pipelex/storage"
+
+[pipelex.storage_config.in_memory]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 
 [pipelex.observer_config]
 observer_dir = "results/observer"
