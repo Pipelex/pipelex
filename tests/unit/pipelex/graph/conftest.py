@@ -3,9 +3,71 @@
 import pytest
 
 from pipelex.graph.graph_config import DataInclusionConfig, GraphConfig, GraphsInclusionConfig
+from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.mermaid_config import MermaidRenderingConfig, MermaidStyle, MermaidTheme
 from pipelex.graph.reactflow_config import ReactFlowRenderingConfig, ReactFlowStyle, ReactFlowTheme
 from pipelex.tools.misc.chart_utils import FlowchartDirection
+
+
+def make_defaulted_data_inclusion_config(
+    stuff_json_content: bool = False,
+    stuff_text_content: bool = False,
+    stuff_html_content: bool = False,
+) -> DataInclusionConfig:
+    """Create a DataInclusionConfig for testing.
+
+    Args:
+        stuff_json_content: Whether to include JSON stuff data.
+        stuff_text_content: Whether to include plain text stuff data.
+        stuff_html_content: Whether to include HTML stuff data.
+
+    Returns:
+        A DataInclusionConfig configured for testing.
+    """
+    return DataInclusionConfig(
+        stuff_json_content=stuff_json_content,
+        stuff_text_content=stuff_text_content,
+        stuff_html_content=stuff_html_content,
+    )
+
+
+def make_graph_context(
+    graph_id: str = "test-graph",
+    parent_node_id: str | None = None,
+    node_sequence: int = 0,
+    stuff_json_content: bool = False,
+    stuff_text_content: bool = False,
+    stuff_html_content: bool = False,
+) -> GraphContext:
+    """Create a GraphContext for testing.
+
+    Args:
+        graph_id: The graph identifier.
+        parent_node_id: Optional parent node ID.
+        node_sequence: The node sequence counter.
+        stuff_json_content: Whether to include JSON stuff data.
+        stuff_text_content: Whether to include plain text stuff data.
+        stuff_html_content: Whether to include HTML stuff data.
+
+    Returns:
+        A GraphContext configured for testing.
+    """
+    return GraphContext(
+        graph_id=graph_id,
+        parent_node_id=parent_node_id,
+        node_sequence=node_sequence,
+        data_inclusion=make_defaulted_data_inclusion_config(
+            stuff_json_content=stuff_json_content,
+            stuff_text_content=stuff_text_content,
+            stuff_html_content=stuff_html_content,
+        ),
+    )
+
+
+@pytest.fixture
+def data_inclusion_config() -> DataInclusionConfig:
+    """Fixture that provides a default DataInclusionConfig for testing."""
+    return make_defaulted_data_inclusion_config()
 
 
 def make_graph_config(
@@ -24,8 +86,6 @@ def make_graph_config(
         A GraphConfig configured for testing.
     """
     return GraphConfig(
-        max_preview_length=100,
-        max_stack_length=10,
         data_inclusion=DataInclusionConfig(
             stuff_json_content=include_stuff_json,
             stuff_text_content=include_stuff_text,

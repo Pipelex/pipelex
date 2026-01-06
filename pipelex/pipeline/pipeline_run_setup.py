@@ -162,9 +162,9 @@ async def pipeline_run_setup(
         graph_tracer_manager = GraphTracerManager.get_or_create_instance()
         graph_context = graph_tracer_manager.open_tracer(
             graph_id=pipeline_run_id,
+            data_inclusion=execution_config.graph_config.data_inclusion,
             pipeline_ref_domain=pipe.domain_code,
             pipeline_ref_main_pipe=pipe_code,
-            include_full_data=execution_config.graph_config.data_inclusion.stuff_json_content,
         )
 
     working_memory: WorkingMemory | None = None

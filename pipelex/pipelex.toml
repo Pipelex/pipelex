@@ -273,8 +273,6 @@ is_normalize_data_urls_to_storage = true
 is_generate_graph = false
 
 [pipelex.pipeline_execution_config.graph_config]
-max_preview_length = 200
-max_stack_length = 2000
 
 [pipelex.pipeline_execution_config.graph_config.data_inclusion]
 stuff_json_content = true

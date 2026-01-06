@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
@@ -90,17 +91,17 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
     def open_tracer(
         self,
         graph_id: str,
+        data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
-        include_full_data: bool = False,
     ) -> GraphContext:
         """Create and initialize a new tracer for a pipeline run.
 
         Args:
             graph_id: Unique identifier for this pipeline run.
+            data_inclusion: Configuration controlling which data formats to capture in IOSpec fields.
             pipeline_ref_domain: Optional domain name for the pipeline.
             pipeline_ref_main_pipe: Optional main pipe name.
-            include_full_data: If True, capture full serialized content in IOSpec.data field.
 
         Returns:
             Initial GraphContext to pass through JobMetadata.
@@ -117,9 +118,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
         return tracer.setup(
             graph_id=graph_id,
+            data_inclusion=data_inclusion,
             pipeline_ref_domain=pipeline_ref_domain,
             pipeline_ref_main_pipe=pipeline_ref_main_pipe,
-            include_full_data=include_full_data,
         )
 
     def close_tracer(self, graph_id: str) -> GraphSpec | None:

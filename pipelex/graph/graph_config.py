@@ -28,8 +28,6 @@ class GraphsInclusionConfig(ConfigModel):
 class GraphConfig(ConfigModel):
     """Configuration for graph tracing, storage, and rendering."""
 
-    max_preview_length: int
-    max_stack_length: int
     data_inclusion: DataInclusionConfig
     graphs_inclusion: GraphsInclusionConfig
     mermaid_config: MermaidRenderingConfig

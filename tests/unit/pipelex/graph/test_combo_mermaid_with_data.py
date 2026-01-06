@@ -247,3 +247,89 @@ class TestComboMermaidWithData:
         assert len(result.stuff_data) > 0
         data_values = list(result.stuff_data.values())
         assert dict_data in data_values
+
+    def test_stuff_data_text_populated_from_outputs(self) -> None:
+        """Test that stuff_data_text is populated from IOSpec.data_text field."""
+        text_content = "This is pre-rendered ASCII text content"
+        producer_node = {
+            "node_id": "node_1",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "producer",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[],
+                outputs=[IOSpec(name="output", concept="Text", digest="stuff_001", data_text=text_content)],
+            ),
+        }
+        graph = self._make_graph(nodes=[producer_node])
+        graph_config = make_graph_config(include_stuff_text=True)
+        result = graphspec_to_combo_mermaid(graph, graph_config)
+
+        # Should have stuff_data_text with the pre-rendered text
+        assert result.stuff_data_text is not None
+        assert len(result.stuff_data_text) > 0
+        text_values = list(result.stuff_data_text.values())
+        assert text_content in text_values
+
+    def test_stuff_data_html_populated_from_outputs(self) -> None:
+        """Test that stuff_data_html is populated from IOSpec.data_html field."""
+        html_content = "<pre>This is pre-rendered HTML content</pre>"
+        producer_node = {
+            "node_id": "node_1",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "producer",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[],
+                outputs=[IOSpec(name="output", concept="Text", digest="stuff_001", data_html=html_content)],
+            ),
+        }
+        graph = self._make_graph(nodes=[producer_node])
+        graph_config = make_graph_config(include_stuff_html=True)
+        result = graphspec_to_combo_mermaid(graph, graph_config)
+
+        # Should have stuff_data_html with the pre-rendered HTML
+        assert result.stuff_data_html is not None
+        assert len(result.stuff_data_html) > 0
+        html_values = list(result.stuff_data_html.values())
+        assert html_content in html_values
+
+    def test_stuff_data_text_empty_when_field_missing(self) -> None:
+        """Test that stuff_data_text is empty when IOSpec has only data field (no data_text)."""
+        producer_node = {
+            "node_id": "node_1",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "producer",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[],
+                outputs=[IOSpec(name="output", concept="Text", digest="stuff_001", data="json data only")],
+            ),
+        }
+        graph = self._make_graph(nodes=[producer_node])
+        graph_config = make_graph_config(include_stuff_text=True)
+        result = graphspec_to_combo_mermaid(graph, graph_config)
+
+        # stuff_data_text should be empty since data_text=None
+        assert result.stuff_data_text is not None
+        assert len(result.stuff_data_text) == 0
+
+    def test_stuff_data_html_empty_when_field_missing(self) -> None:
+        """Test that stuff_data_html is empty when IOSpec has only data field (no data_html)."""
+        producer_node = {
+            "node_id": "node_1",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "producer",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[],
+                outputs=[IOSpec(name="output", concept="Text", digest="stuff_001", data="json data only")],
+            ),
+        }
+        graph = self._make_graph(nodes=[producer_node])
+        graph_config = make_graph_config(include_stuff_html=True)
+        result = graphspec_to_combo_mermaid(graph, graph_config)
+
+        # stuff_data_html should be empty since data_html=None
+        assert result.stuff_data_html is not None
+        assert len(result.stuff_data_html) == 0

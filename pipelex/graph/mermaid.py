@@ -25,7 +25,6 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.mermaid_utils import escape_mermaid_label, sanitize_mermaid_id
-from pipelex.tools.misc.pretty import PrettyPrinter
 
 
 class MermaidOutput(BaseModel):
@@ -95,18 +94,18 @@ def _collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
     for node in graph.nodes:
         # Note: We include ALL nodes (including controllers) because they may have data
         # on their inputs (pipeline inputs) or outputs (pipeline outputs)
-        log.debug(f"  Processing node: {node.node_id}, outputs={len(node.node_io.outputs)}, inputs={len(node.node_io.inputs)}")
+        log.verbose(f"  Processing node: {node.node_id}, outputs={len(node.node_io.outputs)}, inputs={len(node.node_io.inputs)}")
 
         # Collect data from outputs
         for output_spec in node.node_io.outputs:
-            log.debug(f"    Output: digest={output_spec.digest}, has_data={output_spec.data is not None}")
+            log.verbose(f"    Output: digest={output_spec.digest}, has_data={output_spec.data is not None}")
             if output_spec.digest and output_spec.data is not None:
                 stuff_mermaid_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
                 stuff_data[stuff_mermaid_id] = output_spec.data
 
         # Collect data from inputs (for pipeline inputs without a producer)
         for input_spec in node.node_io.inputs:
-            log.debug(f"    Input: digest={input_spec.digest}, has_data={input_spec.data is not None}")
+            log.verbose(f"    Input: digest={input_spec.digest}, has_data={input_spec.data is not None}")
             if input_spec.digest and input_spec.data is not None:
                 stuff_mermaid_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
                 # Don't overwrite if already captured from output
@@ -118,9 +117,7 @@ def _collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
 
 
 def collect_stuff_data_text(graph: GraphSpec) -> dict[str, str]:
-    """Collect IOSpec.data as ASCII text from all stuff nodes in the graph.
-
-    Uses PrettyPrinter to convert the data to Rich renderables, then exports as plain text.
+    """Collect IOSpec.data_text (pre-rendered ASCII text) from all stuff nodes in the graph.
 
     Note: We collect data from ALL nodes including controllers, because:
     - The root controller has the pipeline inputs with data
@@ -131,34 +128,31 @@ def collect_stuff_data_text(graph: GraphSpec) -> dict[str, str]:
 
     Returns:
         Dict mapping stuff mermaid IDs (s_xxx format) to their text representation.
-        Only includes entries where data is not None.
+        Only includes entries where data_text is not None.
     """
+    log.debug("collecting stuff data text for graph_spec")
     stuff_data_text: dict[str, str] = {}
 
     for node in graph.nodes:
-        # Collect data from outputs
+        # Collect data_text from outputs
         for output_spec in node.node_io.outputs:
-            if output_spec.digest and output_spec.data is not None:
+            if output_spec.digest and output_spec.data_text is not None:
                 stuff_mermaid_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
-                pretty = PrettyPrinter.make_pretty(output_spec.data, depth=0)
-                stuff_data_text[stuff_mermaid_id] = PrettyPrinter.pretty_text(pretty)
+                stuff_data_text[stuff_mermaid_id] = output_spec.data_text
 
-        # Collect data from inputs (for pipeline inputs without a producer)
+        # Collect data_text from inputs (for pipeline inputs without a producer)
         for input_spec in node.node_io.inputs:
-            if input_spec.digest and input_spec.data is not None:
+            if input_spec.digest and input_spec.data_text is not None:
                 stuff_mermaid_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
                 # Don't overwrite if already captured from output
                 if stuff_mermaid_id not in stuff_data_text:
-                    pretty = PrettyPrinter.make_pretty(input_spec.data, depth=0)
-                    stuff_data_text[stuff_mermaid_id] = PrettyPrinter.pretty_text(pretty)
+                    stuff_data_text[stuff_mermaid_id] = input_spec.data_text
 
     return stuff_data_text
 
 
 def collect_stuff_data_html(graph: GraphSpec) -> dict[str, str]:
-    """Collect IOSpec.data as HTML from all stuff nodes in the graph.
-
-    Uses PrettyPrinter to convert the data to Rich renderables, then exports as HTML.
+    """Collect IOSpec.data_html (pre-rendered HTML) from all stuff nodes in the graph.
 
     Note: We collect data from ALL nodes including controllers, because:
     - The root controller has the pipeline inputs with data
@@ -169,26 +163,24 @@ def collect_stuff_data_html(graph: GraphSpec) -> dict[str, str]:
 
     Returns:
         Dict mapping stuff mermaid IDs (s_xxx format) to their HTML representation.
-        Only includes entries where data is not None.
+        Only includes entries where data_html is not None.
     """
     stuff_data_html: dict[str, str] = {}
 
     for node in graph.nodes:
-        # Collect data from outputs
+        # Collect data_html from outputs
         for output_spec in node.node_io.outputs:
-            if output_spec.digest and output_spec.data is not None:
+            if output_spec.digest and output_spec.data_html is not None:
                 stuff_mermaid_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
-                pretty = PrettyPrinter.make_pretty(output_spec.data, depth=0)
-                stuff_data_html[stuff_mermaid_id] = PrettyPrinter.pretty_html(pretty)
+                stuff_data_html[stuff_mermaid_id] = output_spec.data_html
 
-        # Collect data from inputs (for pipeline inputs without a producer)
+        # Collect data_html from inputs (for pipeline inputs without a producer)
         for input_spec in node.node_io.inputs:
-            if input_spec.digest and input_spec.data is not None:
+            if input_spec.digest and input_spec.data_html is not None:
                 stuff_mermaid_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
                 # Don't overwrite if already captured from output
                 if stuff_mermaid_id not in stuff_data_html:
-                    pretty = PrettyPrinter.make_pretty(input_spec.data, depth=0)
-                    stuff_data_html[stuff_mermaid_id] = PrettyPrinter.pretty_html(pretty)
+                    stuff_data_html[stuff_mermaid_id] = input_spec.data_html
 
     return stuff_data_html
 
@@ -726,11 +718,20 @@ def graphspec_to_dataflow_mermaid(
     stuff_data_html: dict[str, str] | None = None
 
     if graph_config.data_inclusion.stuff_json_content:
+        log.debug("collecting stuff data json for graph_spec")
         stuff_data = _collect_stuff_data(graph=graph)
+    else:
+        log.debug("no stuff data json to collect for graph_spec")
     if graph_config.data_inclusion.stuff_text_content:
+        log.debug("collecting stuff data text for graph_spec")
         stuff_data_text = collect_stuff_data_text(graph=graph)
+    else:
+        log.debug("no stuff data text to collect for graph_spec")
     if graph_config.data_inclusion.stuff_html_content:
+        log.debug("collecting stuff data html for graph_spec")
         stuff_data_html = collect_stuff_data_html(graph=graph)
+    else:
+        log.debug("no stuff data html to collect for graph_spec")
 
     return MermaidOutput(
         mermaid_code=mermaid_code,

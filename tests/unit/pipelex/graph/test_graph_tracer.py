@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
+from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 
 class TestGraphTracer:
@@ -12,7 +13,7 @@ class TestGraphTracer:
     def test_setup_returns_initial_context(self) -> None:
         """Test that setup returns a properly initialized GraphContext."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="test-graph-001")
+        context = tracer.setup(graph_id="test-graph-001", data_inclusion=make_defaulted_data_inclusion_config())
 
         assert context.graph_id == "test-graph-001"
         assert context.parent_node_id is None
@@ -23,6 +24,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(
             graph_id="test-graph-002",
+            data_inclusion=make_defaulted_data_inclusion_config(),
             pipeline_ref_domain="test.domain",
             pipeline_ref_main_pipe="main_pipe",
         )
@@ -44,7 +46,7 @@ class TestGraphTracer:
     def test_full_lifecycle_single_node(self) -> None:
         """Test tracking a single pipe execution."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="lifecycle-test")
+        context = tracer.setup(graph_id="lifecycle-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
         node_id, child_context = tracer.on_pipe_start(
@@ -86,7 +88,7 @@ class TestGraphTracer:
     def test_nested_pipe_execution(self) -> None:
         """Test tracking nested pipe execution with containment edges."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="nested-test")
+        context = tracer.setup(graph_id="nested-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         # Start parent (sequence controller)
         started_at = datetime.now(UTC)
@@ -147,7 +149,7 @@ class TestGraphTracer:
     def test_error_tracking(self) -> None:
         """Test tracking failed pipe execution."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="error-test")
+        context = tracer.setup(graph_id="error-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
         node_id, _ = tracer.on_pipe_start(
@@ -179,7 +181,7 @@ class TestGraphTracer:
     def test_running_nodes_marked_canceled_on_teardown(self) -> None:
         """Test that running nodes are marked as canceled on teardown."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="cancel-test")
+        context = tracer.setup(graph_id="cancel-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
         _node_id, _ = tracer.on_pipe_start(
@@ -202,7 +204,7 @@ class TestGraphTracer:
     def test_custom_edges(self) -> None:
         """Test adding custom edges between nodes."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="edge-test")
+        context = tracer.setup(graph_id="edge-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
         node1_id, _ = tracer.on_pipe_start(
@@ -244,7 +246,7 @@ class TestGraphTracer:
     def test_selected_outcome_edge(self) -> None:
         """Test adding selected outcome edge for conditions."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="condition-test")
+        context = tracer.setup(graph_id="condition-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
         condition_id, cond_ctx = tracer.on_pipe_start(
@@ -283,7 +285,7 @@ class TestGraphTracer:
     def test_input_specs_captured(self) -> None:
         """Test that input IOSpecs are captured and stored in node_io."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="io-test")
+        context = tracer.setup(graph_id="io-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         input_specs = [
             IOSpec(name="document", concept="Text", digest="abc12"),
@@ -314,7 +316,7 @@ class TestGraphTracer:
     def test_output_spec_captured(self) -> None:
         """Test that output IOSpec is captured and stored in node_io."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="io-test")
+        context = tracer.setup(graph_id="io-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         output_spec = IOSpec(
             name="summary",
@@ -349,7 +351,7 @@ class TestGraphTracer:
     def test_data_edge_generation_from_stuff_codes(self) -> None:
         """Test that DATA edges are created when stuff_codes match between output and input."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="data-flow-test")
+        context = tracer.setup(graph_id="data-flow-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
 
@@ -393,7 +395,7 @@ class TestGraphTracer:
     def test_data_edge_not_created_for_unknown_producer(self) -> None:
         """Test that no DATA edge is created if the producer is unknown (initial pipeline input)."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="no-producer-test")
+        context = tracer.setup(graph_id="no-producer-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
 
@@ -420,7 +422,7 @@ class TestGraphTracer:
     def test_no_self_loop_data_edges(self) -> None:
         """Test that DATA edges are not created as self-loops."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="no-self-loop-test")
+        context = tracer.setup(graph_id="no-self-loop-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
 
@@ -449,7 +451,7 @@ class TestGraphTracer:
     def test_multiple_consumers_same_stuff(self) -> None:
         """Test DATA edges when multiple pipes consume the same stuff."""
         tracer = GraphTracer()
-        context = tracer.setup(graph_id="multi-consumer-test")
+        context = tracer.setup(graph_id="multi-consumer-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
 

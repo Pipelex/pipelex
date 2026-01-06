@@ -1,9 +1,11 @@
 from pipelex import log
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_class_registry
@@ -17,12 +19,15 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 async def dry_run_pipe_with_graph(
     pipe: PipeAbstract,
     graph_id: str | None = None,
+    data_inclusion: DataInclusionConfig | None = None,
 ) -> GraphSpec:
     """Dry run a pipe while capturing its execution graph.
 
     Args:
         pipe: The pipe to dry run.
         graph_id: Optional graph ID. If not provided, uses the pipe code.
+        data_inclusion: Optional configuration controlling which data formats to capture.
+            If not provided, uses the default from the pipelex config.
 
     Returns:
         GraphSpec containing the execution graph of the dry run.
@@ -33,10 +38,12 @@ async def dry_run_pipe_with_graph(
     # Get or create the graph tracer manager singleton
     manager = GraphTracerManager.get_or_create_instance()
     effective_graph_id = graph_id or f"dry_run_{pipe.code}"
+    effective_data_inclusion = data_inclusion or get_config().pipelex.pipeline_execution_config.graph_config.data_inclusion
 
     try:
         graph_context = manager.open_tracer(
             graph_id=effective_graph_id,
+            data_inclusion=effective_data_inclusion,
             pipeline_ref_domain=pipe.domain_code,
             pipeline_ref_main_pipe=pipe.code,
         )

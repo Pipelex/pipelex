@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
+from pipelex import log
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import graphspec_to_json
 from pipelex.graph.mermaid import (
@@ -159,7 +160,10 @@ async def generate_graph_outputs(
             rf_stuff_data_text: dict[str, str] | None = None
             rf_stuff_data_html: dict[str, str] | None = None
             if graph_config.data_inclusion.stuff_text_content:
+                log.debug("collecting stuff data text for graph_spec")
                 rf_stuff_data_text = collect_stuff_data_text(graph_spec)
+            else:
+                log.debug("no stuff data text to collect for graph_spec")
             if graph_config.data_inclusion.stuff_html_content:
                 rf_stuff_data_html = collect_stuff_data_html(graph_spec)
 

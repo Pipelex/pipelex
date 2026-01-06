@@ -101,6 +101,8 @@ class IOSpec(BaseModel):
     size: int | None = None
     digest: str | None = None
     data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None = None
+    data_text: str | None = None
+    data_html: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("preview", mode="after")

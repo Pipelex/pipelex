@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "graph_id": "17cc7729-bd86-464b-9b4f-ac624912752f",
-  "created_at": "2026-01-05T01:28:12.643386Z",
+  "graph_id": "64f1bff7-d128-4c91-bf9c-a7a371061f40",
+  "created_at": "2026-01-06T00:00:18.142462Z",
   "pipeline_ref": {
     "domain": "cv_job_matching",
     "main_pipe": "cv_job_matcher",
@@ -9,15 +9,15 @@
   },
   "nodes": [
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_0",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_0",
       "kind": "controller",
       "pipe_code": "cv_job_matcher",
       "pipe_type": "PipeSequence",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:12.650633Z",
-        "ended_at": "2026-01-05T01:28:31.833354Z",
-        "duration_ms": 19182
+        "started_at": "2026-01-06T00:00:18.149098Z",
+        "ended_at": "2026-01-06T00:00:18.401910Z",
+        "duration_ms": 252
       },
       "io": {
         "inputs": [
@@ -27,10 +27,12 @@
             "content_type": "PDFContent",
             "preview": null,
             "size": null,
-            "digest": "YUJG4",
+            "digest": "HvvWx",
             "data": {
               "url": "tests/data/documents/John-Doe-CV.pdf"
             },
+            "data_text": "Dummy text for debugging\n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\">Dummy text for debugging\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           },
           {
@@ -39,10 +41,12 @@
             "content_type": "PDFContent",
             "preview": null,
             "size": null,
-            "digest": "5ghii",
+            "digest": "EtcW4",
             "data": {
               "url": "tests/data/documents/Job-Offer.pdf"
             },
+            "data_text": "Dummy text for debugging\n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\">Dummy text for debugging\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -53,37 +57,39 @@
             "content_type": "InterviewSheet",
             "preview": null,
             "size": null,
-            "digest": "9znc7",
+            "digest": "PUDMY",
             "data": {
-              "overall_match_score": 10.0,
-              "matching_skills": "Communication, Leadership, Organizational Skills, Customer Service",
-              "missing_skills": "Experience selling SaaS solutions to Fortune 500 enterprises, Strong executive presence, Strategic thinking, Data-driven decision making, Change management, Cross-functional collaboration, Diversity, equity, and inclusion advocacy, Experience in CRM, cloud infrastructure, or enterprise software markets, Track record of building sales teams, Expertise in account-based selling, Strong analytical skills, History of developing talent, Experience with channel/partner sales models",
-              "experience_alignment": "Candidate has 8.5 years of experience, which is below the 12+ years required for the position.",
-              "areas_of_concern": "Lack of experience in enterprise-level sales and SaaS solutions, which are critical for this role.",
-              "areas_to_explore": "Candidate's approach to leadership and team development, understanding of sales strategies, and ability to adapt to new sales methodologies.",
+              "overall_match_score": -5065183.56853609,
+              "matching_skills": "qbAXiWiuPHWNrDuLdzYp",
+              "missing_skills": "tVshhugPkGtkqvIzLFeN",
+              "experience_alignment": "czPOjDypLmkrNJoYJJBn",
+              "areas_of_concern": "bzfyIidTyHlyrGrwqVqR",
+              "areas_to_explore": "CrQbZhKWKsXfWvmebXMM",
               "questions": [
                 {
-                  "question_text": "Can you describe your experience with leading sales teams, particularly in a SaaS or enterprise environment? What strategies did you employ to ensure their success?",
-                  "purpose": "To assess the candidate's leadership experience and ability to manage and develop high-performing sales teams, particularly in a SaaS context."
+                  "question_text": "mQZivbNgVgFzuUyZShqc",
+                  "purpose": "sHoLAyagwITnIQsnmJCd"
                 },
                 {
-                  "question_text": "How do you approach strategic thinking when developing sales strategies? Can you provide an example of a successful strategy you've implemented?",
-                  "purpose": "To evaluate the candidate's strategic thinking skills and their ability to create effective sales strategies."
+                  "question_text": "zVYLWtcSjDALLWsIdzdU",
+                  "purpose": "detFcGuujuTcVNbFUwfI"
                 },
                 {
-                  "question_text": "What methods do you use to ensure data-driven decision making in your sales processes? Can you share an example of how this has impacted your team's performance?",
-                  "purpose": "To explore the candidate's analytical skills and their experience with data-driven decision making."
+                  "question_text": "zuOLNKpuPEoKumjkZYLX",
+                  "purpose": "tquoBhlwjAFtlBCYVHRa"
                 },
                 {
-                  "question_text": "Can you discuss a time when you had to manage change within a sales team? What challenges did you face and how did you overcome them?",
-                  "purpose": "To assess the candidate's experience with change management and their ability to navigate challenges in a leadership role."
+                  "question_text": "UpLPzFeJRBCrFEfAYZPY",
+                  "purpose": "WoVUBveQmbHRBOPbyuOI"
                 },
                 {
-                  "question_text": "How do you advocate for diversity, equity, and inclusion within your teams? Can you provide examples of initiatives you've led or participated in?",
-                  "purpose": "To investigate the candidate's commitment to diversity, equity, and inclusion, which is important for cultural fit and team dynamics."
+                  "question_text": "zovaivZhfIQUYRywPaPH",
+                  "purpose": "ZRHihMnEiJLYYtNTnMJw"
                 }
               ]
             },
+            "data_text": " Attribute            ┃ Value                                                   \n━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n overall_match_score  │ -5065183.56853609                                       \n──────────────────────┼─────────────────────────────────────────────────────────\n matching_skills      │ qbAXiWiuPHWNrDuLdzYp                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n missing_skills       │ tVshhugPkGtkqvIzLFeN                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n experience_alignment │ czPOjDypLmkrNJoYJJBn                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n areas_of_concern     │ bzfyIidTyHlyrGrwqVqR                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n areas_to_explore     │ CrQbZhKWKsXfWvmebXMM                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n questions            │   1   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ mQZivbNgVgFzuUyZSh  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ sHoLAyagwITnIQsnmJ  \n                      │ ──────┼──────────────────────────────────────────────── \n                      │   2   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ zVYLWtcSjDALLWsIdz  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ detFcGuujuTcVNbFUw  \n                      │ ──────┼──────────────────────────────────────────────── \n                      │   3   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ zuOLNKpuPEoKumjkZY  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ tquoBhlwjAFtlBCYVH  \n                      │ ──────┼──────────────────────────────────────────────── \n                      │   4   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ UpLPzFeJRBCrFEfAYZ  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ WoVUBveQmbHRBOPbyu  \n                      │ ──────┼──────────────────────────────────────────────── \n                      │   5   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ zovaivZhfIQUYRywPa  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ ZRHihMnEiJLYYtNTnM  \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\n.r4 {color: #d0b344; text-decoration-color: #d0b344}\n.r5 {color: #626463; text-decoration-color: #626463}\n.r6 {color: #c5c8c6; text-decoration-color: #c5c8c6; font-weight: bold}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute            </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                                   </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> overall_match_score  </span><span class=\"r2\">│ -5065183.56853609                                       </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> matching_skills      </span><span class=\"r2\">│ qbAXiWiuPHWNrDuLdzYp                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> missing_skills       </span><span class=\"r2\">│ tVshhugPkGtkqvIzLFeN                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> experience_alignment </span><span class=\"r2\">│ czPOjDypLmkrNJoYJJBn                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> areas_of_concern     </span><span class=\"r2\">│ bzfyIidTyHlyrGrwqVqR                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> areas_to_explore     </span><span class=\"r2\">│ CrQbZhKWKsXfWvmebXMM                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> questions            </span><span class=\"r2\">│ </span><span class=\"r4\">  1   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ mQZivbNgVgFzuUyZSh  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ sHoLAyagwITnIQsnmJ  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r5\">──────┼────────────────────────────────────────────────</span><span class=\"r2\"> </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">  2   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ zVYLWtcSjDALLWsIdz  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ detFcGuujuTcVNbFUw  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r5\">──────┼────────────────────────────────────────────────</span><span class=\"r2\"> </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">  3   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ zuOLNKpuPEoKumjkZY  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ tquoBhlwjAFtlBCYVH  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r5\">──────┼────────────────────────────────────────────────</span><span class=\"r2\"> </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">  4   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ UpLPzFeJRBCrFEfAYZ  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ WoVUBveQmbHRBOPbyu  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r5\">──────┼────────────────────────────────────────────────</span><span class=\"r2\"> </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">  5   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ zovaivZhfIQUYRywPa  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ ZRHihMnEiJLYYtNTnM  </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ]
@@ -93,15 +99,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_1",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_1",
       "kind": "controller",
       "pipe_code": "extract_documents",
       "pipe_type": "PipeParallel",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:12.655387Z",
-        "ended_at": "2026-01-05T01:28:21.024930Z",
-        "duration_ms": 8369
+        "started_at": "2026-01-06T00:00:18.158818Z",
+        "ended_at": "2026-01-06T00:00:18.193550Z",
+        "duration_ms": 34
       },
       "io": {
         "inputs": [
@@ -111,10 +117,12 @@
             "content_type": "PDFContent",
             "preview": null,
             "size": null,
-            "digest": "YUJG4",
+            "digest": "HvvWx",
             "data": {
               "url": "tests/data/documents/John-Doe-CV.pdf"
             },
+            "data_text": "Dummy text for debugging\n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\">Dummy text for debugging\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           },
           {
@@ -123,10 +131,12 @@
             "content_type": "PDFContent",
             "preview": null,
             "size": null,
-            "digest": "5ghii",
+            "digest": "EtcW4",
             "data": {
               "url": "tests/data/documents/Job-Offer.pdf"
             },
+            "data_text": "Dummy text for debugging\n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\">Dummy text for debugging\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -137,15 +147,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_2",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_2",
       "kind": "operator",
       "pipe_code": "extract_cv",
       "pipe_type": "PipeExtract",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:12.658782Z",
-        "ended_at": "2026-01-05T01:28:19.547804Z",
-        "duration_ms": 6889
+        "started_at": "2026-01-06T00:00:18.168530Z",
+        "ended_at": "2026-01-06T00:00:18.181212Z",
+        "duration_ms": 12
       },
       "io": {
         "inputs": [
@@ -155,10 +165,12 @@
             "content_type": "PDFContent",
             "preview": null,
             "size": null,
-            "digest": "YUJG4",
+            "digest": "HvvWx",
             "data": {
               "url": "tests/data/documents/John-Doe-CV.pdf"
             },
+            "data_text": "Dummy text for debugging\n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\">Dummy text for debugging\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -169,13 +181,40 @@
             "content_type": "ListContent",
             "preview": null,
             "size": null,
-            "digest": "nCzJs",
+            "digest": "QyxHK",
             "data": {
               "items": [
                 {
                   "text_and_images": {
                     "text": {
-                      "text": "# JOHN DOE\n\n\n## Full Address . City, State, ZIP . Phone Number . E-mail\n\nOBJECTIVE: Design apparel print for an innovative retail company\n\nEDUCATION:\n\nUNIVERSITY OF MINNESOTA\nCollege of Design\n\" Bachelor of Science in Graphic Design\n\n\" Cumulative GPA 3.93, Dean's List\n\n\" Twin cities Iron Range Scholarship\n\nCity, State\nMay 2011\n\nWORK EXPERIENCE:\n\nAMERICAN EAGLE\nSales Associate\n\nCity, State\nJuly 2009 - present\n\n· Collaborated with the store merchandiser creating displays to attract clientele\n\n\" Use my trend awareness to assist customers in their shopping experience\n\n\" Thoroughly scan every piece of merchandise for inventory control\n\n\" Process shipment to increase my product knowledge\n\nPLANET BEACH\nSpa Consultant\nCity, State\nAug. 2008 - present\n\n\" Sell retail and memberships to meet company sales goals\n\n\" Build organizational skills by single handedly running all operating procedures\n\n\" Communicate with clients to fulfill their wants and needs\n\n\" Attend promotional events to market our services\n\n\" Handle cash and deposits during opening and closing\n\n\" Received employee of the month award twice\n\nHEARTBREAKER\nSales Associate\nCity, State\nMay 2008 - Aug. 2008\n\n· Stocked sales floor with fast fashion inventory\n\n· Marked down items allowing me to see unsuccessful merchandise in a retail market\n\n\" Offered advice and assistance to each guest\n\nVICTORIA'S SECRET\nFashion Representative\nCity, State\nJan. 2006 - Feb. 2009\n\n\" Applied my leadership skills by assisting in the training of coworkers\n\n\" Set up mannequins and displays in order to entice future customers\n\n· Provided superior customer service by helping with consumer decisions\n\n\" Took seasonal inventory\n\nVOLUNTEER EXPERIENCE:\n\nTARGET CORPORATION\nBrand Ambassador\n\nCity, State\nAugust 2009\n\n\" Represented Periscope Marketing and Target Inc. at a college event\n\n\" Engaged University of Minnesota freshman in the Target brand experience\n"
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
                     },
                     "images": []
                   },
@@ -183,6 +222,8 @@
                 }
               ]
             },
+            "data_text": "   1    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   2    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   3    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   4    │ DRY RUN: OCR text                                                     \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {color: #d0b344; text-decoration-color: #d0b344}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\">   1    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   2    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   3    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   4    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ]
@@ -192,15 +233,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_3",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_3",
       "kind": "operator",
       "pipe_code": "extract_job_offer",
       "pipe_type": "PipeExtract",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:13.291040Z",
-        "ended_at": "2026-01-05T01:28:21.019288Z",
-        "duration_ms": 7728
+        "started_at": "2026-01-06T00:00:18.182131Z",
+        "ended_at": "2026-01-06T00:00:18.193380Z",
+        "duration_ms": 11
       },
       "io": {
         "inputs": [
@@ -210,10 +251,12 @@
             "content_type": "PDFContent",
             "preview": null,
             "size": null,
-            "digest": "5ghii",
+            "digest": "EtcW4",
             "data": {
               "url": "tests/data/documents/Job-Offer.pdf"
             },
+            "data_text": "Dummy text for debugging\n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\">Dummy text for debugging\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -224,13 +267,13 @@
             "content_type": "ListContent",
             "preview": null,
             "size": null,
-            "digest": "GG2UB",
+            "digest": "ag3xN",
             "data": {
               "items": [
                 {
                   "text_and_images": {
                     "text": {
-                      "text": "# Vice President, Enterprise Sales\n\nACME · San Francisco, CA (Hybrid)\nFull-time . Executive Level\n\n\n## About ACME\n\nACME is the global leader in CRM, empowering companies to connect with their customers in entirely new ways.\nBuilt on our core values of Trust, Customer Success, Innovation, and Equality, we're transforming how businesses\nengage with their customers across sales, service, marketing, and more.\n\n\n## The Opportunity\n\nWe're seeking an exceptional Vice President of Enterprise Sales to lead our North American Enterprise\nsegment and drive the next phase of our growth. This is a high-impact role where you'll build and scale a world-\nclass sales organization, own significant revenue accountability, and work directly with C-suite executives at\nFortune 500 companies.\n\nAs VP of Enterprise Sales, you'll lead 60+ enterprise account executives, own $180M+ in ARR quota, and play a\ncritical role in shaping our go-to-market strategy. This is an opportunity to make your mark at one of the world's\nmost innovative technology companies.\n\n\n## What You'll Do\n\n· Lead & Scale: Build and develop a high-performing team of 60+ enterprise sales professionals across multiple\nregions\n\n· Drive Revenue: Own and deliver $180M+ ARR with full P&L accountability and strategic planning\nresponsibility\n\n· Strategic Execution: Develop and implement sales strategies that accelerate pipeline growth and increase\nwin rates\n\n· Customer Relationships: Build and maintain executive relationships with C-level stakeholders at our largest\naccounts\n\n· Sales Excellence: Drive operational rigor through accurate forecasting, process optimization, and data-driven\ndecision making\n\n· Talent Development: Coach, mentor, and develop the next generation of sales leaders\n\n· Cross-functional Leadership: Partner with Product, Marketing, Customer Success, and Channel teams to\ndeliver integrated solutions\n\n· Innovation: Champion new sales methodologies, tools, and approaches that improve team productivity\n\n\n## What You Bring\n\n\n### Required Qualifications\n\n· 12+ years of progressive B2B sales experience with at least 5 years in VP-level or equivalent leadership roles\n\n· Proven track record of building and scaling enterprise sales teams of 50+ people\n\n· Demonstrated success managing $100M+ ARR quotas and consistently exceeding targets\n\n· Deep expertise in complex, consultative sales with 6-12 month sales cycles\n\n<!-- PageBreak -->\n\n"
+                      "text": "DRY RUN: OCR text"
                     },
                     "images": []
                   },
@@ -239,7 +282,25 @@
                 {
                   "text_and_images": {
                     "text": {
-                      "text": "· Experience selling SaaS solutions to Fortune 500 enterprises\n\n· Strong executive presence with ability to engage C-suite buyers\n\n· Bachelor's degree required; MBA preferred\n\n\n### What Sets You Apart\n\n· Experience in CRM, cloud infrastructure, or enterprise software markets\n\n· Track record of building sales teams from early stage through scale\n\n· Expertise in account-based selling and strategic account management\n\n· Strong analytical skills with proficiency in ACME, sales analytics tools\n\n· History of developing talent - multiple direct reports promoted to leadership roles\n\n· Experience with channel/partner sales models\n\n· Passion for coaching and developing high-performing teams\n\n\n### Leadership Competencies\n\n· Strategic thinking and business acumen\n\n· Exceptional communication and executive presence\n\n· Data-driven decision making\n\n· Change management and organizational development\n\n· Cross-functional collaboration\n\n· Diversity, equity, and inclusion advocacy\n\n\n### Compensation & Benefits\n\n\n#### Total Target Compensation: $975,000\n\n· Base Salary: $325,000\n\n· Variable Compensation: $650,000 (at 100% quota attainment)\n\n· Equity: RSU grant valued at $500,000 (4-year vesting)\n\n· Sign-on Bonus: $100,000\n\n\n#### Comprehensive Benefits Package\n\n\n<table>\n<tr>\n<td>· Premium medical, dental, and vision coverage</td>\n<td>· 401(k) with 6% company match</td>\n</tr>\n<tr>\n<td>· Flexible PTO policy</td>\n<td>· $5,000 annual professional development budget</td>\n</tr>\n<tr>\n<td>· Executive coaching program</td>\n<td>· Wellness reimbursement ($1,200/year)</td>\n</tr>\n<tr>\n<td>· 8 paid volunteer days (VTO)</td>\n<td>· Paid parental leave (26 weeks primary caregiver)</td>\n</tr>\n<tr>\n<td>· Employee stock purchase plan (15% discount)</td>\n<td>· Relocation assistance available</td>\n</tr>\n</table>\n"
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
                     },
                     "images": []
                   },
@@ -247,6 +308,8 @@
                 }
               ]
             },
+            "data_text": "   1    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   2    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   3    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   4    │ DRY RUN: OCR text                                                     \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {color: #d0b344; text-decoration-color: #d0b344}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\">   1    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   2    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   3    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   4    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ]
@@ -256,15 +319,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_4",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_4",
       "kind": "controller",
       "pipe_code": "analyze_documents",
       "pipe_type": "PipeParallel",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:21.026110Z",
-        "ended_at": "2026-01-05T01:28:25.297994Z",
-        "duration_ms": 4271
+        "started_at": "2026-01-06T00:00:18.194835Z",
+        "ended_at": "2026-01-06T00:00:18.254546Z",
+        "duration_ms": 59
       },
       "io": {
         "inputs": [
@@ -274,35 +337,13 @@
             "content_type": "ListContent",
             "preview": null,
             "size": null,
-            "digest": "nCzJs",
+            "digest": "QyxHK",
             "data": {
               "items": [
                 {
                   "text_and_images": {
                     "text": {
-                      "text": "# JOHN DOE\n\n\n## Full Address . City, State, ZIP . Phone Number . E-mail\n\nOBJECTIVE: Design apparel print for an innovative retail company\n\nEDUCATION:\n\nUNIVERSITY OF MINNESOTA\nCollege of Design\n\" Bachelor of Science in Graphic Design\n\n\" Cumulative GPA 3.93, Dean's List\n\n\" Twin cities Iron Range Scholarship\n\nCity, State\nMay 2011\n\nWORK EXPERIENCE:\n\nAMERICAN EAGLE\nSales Associate\n\nCity, State\nJuly 2009 - present\n\n· Collaborated with the store merchandiser creating displays to attract clientele\n\n\" Use my trend awareness to assist customers in their shopping experience\n\n\" Thoroughly scan every piece of merchandise for inventory control\n\n\" Process shipment to increase my product knowledge\n\nPLANET BEACH\nSpa Consultant\nCity, State\nAug. 2008 - present\n\n\" Sell retail and memberships to meet company sales goals\n\n\" Build organizational skills by single handedly running all operating procedures\n\n\" Communicate with clients to fulfill their wants and needs\n\n\" Attend promotional events to market our services\n\n\" Handle cash and deposits during opening and closing\n\n\" Received employee of the month award twice\n\nHEARTBREAKER\nSales Associate\nCity, State\nMay 2008 - Aug. 2008\n\n· Stocked sales floor with fast fashion inventory\n\n· Marked down items allowing me to see unsuccessful merchandise in a retail market\n\n\" Offered advice and assistance to each guest\n\nVICTORIA'S SECRET\nFashion Representative\nCity, State\nJan. 2006 - Feb. 2009\n\n\" Applied my leadership skills by assisting in the training of coworkers\n\n\" Set up mannequins and displays in order to entice future customers\n\n· Provided superior customer service by helping with consumer decisions\n\n\" Took seasonal inventory\n\nVOLUNTEER EXPERIENCE:\n\nTARGET CORPORATION\nBrand Ambassador\n\nCity, State\nAugust 2009\n\n\" Represented Periscope Marketing and Target Inc. at a college event\n\n\" Engaged University of Minnesota freshman in the Target brand experience\n"
-                    },
-                    "images": []
-                  },
-                  "page_view": null
-                }
-              ]
-            },
-            "extra": {}
-          },
-          {
-            "name": "job_offer_pages",
-            "concept": "Page",
-            "content_type": "ListContent",
-            "preview": null,
-            "size": null,
-            "digest": "GG2UB",
-            "data": {
-              "items": [
-                {
-                  "text_and_images": {
-                    "text": {
-                      "text": "# Vice President, Enterprise Sales\n\nACME · San Francisco, CA (Hybrid)\nFull-time . Executive Level\n\n\n## About ACME\n\nACME is the global leader in CRM, empowering companies to connect with their customers in entirely new ways.\nBuilt on our core values of Trust, Customer Success, Innovation, and Equality, we're transforming how businesses\nengage with their customers across sales, service, marketing, and more.\n\n\n## The Opportunity\n\nWe're seeking an exceptional Vice President of Enterprise Sales to lead our North American Enterprise\nsegment and drive the next phase of our growth. This is a high-impact role where you'll build and scale a world-\nclass sales organization, own significant revenue accountability, and work directly with C-suite executives at\nFortune 500 companies.\n\nAs VP of Enterprise Sales, you'll lead 60+ enterprise account executives, own $180M+ in ARR quota, and play a\ncritical role in shaping our go-to-market strategy. This is an opportunity to make your mark at one of the world's\nmost innovative technology companies.\n\n\n## What You'll Do\n\n· Lead & Scale: Build and develop a high-performing team of 60+ enterprise sales professionals across multiple\nregions\n\n· Drive Revenue: Own and deliver $180M+ ARR with full P&L accountability and strategic planning\nresponsibility\n\n· Strategic Execution: Develop and implement sales strategies that accelerate pipeline growth and increase\nwin rates\n\n· Customer Relationships: Build and maintain executive relationships with C-level stakeholders at our largest\naccounts\n\n· Sales Excellence: Drive operational rigor through accurate forecasting, process optimization, and data-driven\ndecision making\n\n· Talent Development: Coach, mentor, and develop the next generation of sales leaders\n\n· Cross-functional Leadership: Partner with Product, Marketing, Customer Success, and Channel teams to\ndeliver integrated solutions\n\n· Innovation: Champion new sales methodologies, tools, and approaches that improve team productivity\n\n\n## What You Bring\n\n\n### Required Qualifications\n\n· 12+ years of progressive B2B sales experience with at least 5 years in VP-level or equivalent leadership roles\n\n· Proven track record of building and scaling enterprise sales teams of 50+ people\n\n· Demonstrated success managing $100M+ ARR quotas and consistently exceeding targets\n\n· Deep expertise in complex, consultative sales with 6-12 month sales cycles\n\n<!-- PageBreak -->\n\n"
+                      "text": "DRY RUN: OCR text"
                     },
                     "images": []
                   },
@@ -311,7 +352,25 @@
                 {
                   "text_and_images": {
                     "text": {
-                      "text": "· Experience selling SaaS solutions to Fortune 500 enterprises\n\n· Strong executive presence with ability to engage C-suite buyers\n\n· Bachelor's degree required; MBA preferred\n\n\n### What Sets You Apart\n\n· Experience in CRM, cloud infrastructure, or enterprise software markets\n\n· Track record of building sales teams from early stage through scale\n\n· Expertise in account-based selling and strategic account management\n\n· Strong analytical skills with proficiency in ACME, sales analytics tools\n\n· History of developing talent - multiple direct reports promoted to leadership roles\n\n· Experience with channel/partner sales models\n\n· Passion for coaching and developing high-performing teams\n\n\n### Leadership Competencies\n\n· Strategic thinking and business acumen\n\n· Exceptional communication and executive presence\n\n· Data-driven decision making\n\n· Change management and organizational development\n\n· Cross-functional collaboration\n\n· Diversity, equity, and inclusion advocacy\n\n\n### Compensation & Benefits\n\n\n#### Total Target Compensation: $975,000\n\n· Base Salary: $325,000\n\n· Variable Compensation: $650,000 (at 100% quota attainment)\n\n· Equity: RSU grant valued at $500,000 (4-year vesting)\n\n· Sign-on Bonus: $100,000\n\n\n#### Comprehensive Benefits Package\n\n\n<table>\n<tr>\n<td>· Premium medical, dental, and vision coverage</td>\n<td>· 401(k) with 6% company match</td>\n</tr>\n<tr>\n<td>· Flexible PTO policy</td>\n<td>· $5,000 annual professional development budget</td>\n</tr>\n<tr>\n<td>· Executive coaching program</td>\n<td>· Wellness reimbursement ($1,200/year)</td>\n</tr>\n<tr>\n<td>· 8 paid volunteer days (VTO)</td>\n<td>· Paid parental leave (26 weeks primary caregiver)</td>\n</tr>\n<tr>\n<td>· Employee stock purchase plan (15% discount)</td>\n<td>· Relocation assistance available</td>\n</tr>\n</table>\n"
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
                     },
                     "images": []
                   },
@@ -319,6 +378,59 @@
                 }
               ]
             },
+            "data_text": "   1    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   2    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   3    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   4    │ DRY RUN: OCR text                                                     \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {color: #d0b344; text-decoration-color: #d0b344}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\">   1    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   2    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   3    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   4    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n</code></pre>\n</body>\n</html>\n",
+            "extra": {}
+          },
+          {
+            "name": "job_offer_pages",
+            "concept": "Page",
+            "content_type": "ListContent",
+            "preview": null,
+            "size": null,
+            "digest": "ag3xN",
+            "data": {
+              "items": [
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                }
+              ]
+            },
+            "data_text": "   1    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   2    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   3    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   4    │ DRY RUN: OCR text                                                     \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {color: #d0b344; text-decoration-color: #d0b344}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\">   1    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   2    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   3    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   4    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -329,15 +441,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_5",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_5",
       "kind": "operator",
       "pipe_code": "analyze_cv",
       "pipe_type": "PipeLLM",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:21.031945Z",
-        "ended_at": "2026-01-05T01:28:23.675919Z",
-        "duration_ms": 2643
+        "started_at": "2026-01-06T00:00:18.208652Z",
+        "ended_at": "2026-01-06T00:00:18.231510Z",
+        "duration_ms": 22
       },
       "io": {
         "inputs": [
@@ -347,13 +459,40 @@
             "content_type": "ListContent",
             "preview": null,
             "size": null,
-            "digest": "nCzJs",
+            "digest": "QyxHK",
             "data": {
               "items": [
                 {
                   "text_and_images": {
                     "text": {
-                      "text": "# JOHN DOE\n\n\n## Full Address . City, State, ZIP . Phone Number . E-mail\n\nOBJECTIVE: Design apparel print for an innovative retail company\n\nEDUCATION:\n\nUNIVERSITY OF MINNESOTA\nCollege of Design\n\" Bachelor of Science in Graphic Design\n\n\" Cumulative GPA 3.93, Dean's List\n\n\" Twin cities Iron Range Scholarship\n\nCity, State\nMay 2011\n\nWORK EXPERIENCE:\n\nAMERICAN EAGLE\nSales Associate\n\nCity, State\nJuly 2009 - present\n\n· Collaborated with the store merchandiser creating displays to attract clientele\n\n\" Use my trend awareness to assist customers in their shopping experience\n\n\" Thoroughly scan every piece of merchandise for inventory control\n\n\" Process shipment to increase my product knowledge\n\nPLANET BEACH\nSpa Consultant\nCity, State\nAug. 2008 - present\n\n\" Sell retail and memberships to meet company sales goals\n\n\" Build organizational skills by single handedly running all operating procedures\n\n\" Communicate with clients to fulfill their wants and needs\n\n\" Attend promotional events to market our services\n\n\" Handle cash and deposits during opening and closing\n\n\" Received employee of the month award twice\n\nHEARTBREAKER\nSales Associate\nCity, State\nMay 2008 - Aug. 2008\n\n· Stocked sales floor with fast fashion inventory\n\n· Marked down items allowing me to see unsuccessful merchandise in a retail market\n\n\" Offered advice and assistance to each guest\n\nVICTORIA'S SECRET\nFashion Representative\nCity, State\nJan. 2006 - Feb. 2009\n\n\" Applied my leadership skills by assisting in the training of coworkers\n\n\" Set up mannequins and displays in order to entice future customers\n\n· Provided superior customer service by helping with consumer decisions\n\n\" Took seasonal inventory\n\nVOLUNTEER EXPERIENCE:\n\nTARGET CORPORATION\nBrand Ambassador\n\nCity, State\nAugust 2009\n\n\" Represented Periscope Marketing and Target Inc. at a college event\n\n\" Engaged University of Minnesota freshman in the Target brand experience\n"
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
                     },
                     "images": []
                   },
@@ -361,6 +500,8 @@
                 }
               ]
             },
+            "data_text": "   1    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   2    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   3    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   4    │ DRY RUN: OCR text                                                     \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {color: #d0b344; text-decoration-color: #d0b344}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\">   1    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   2    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   3    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   4    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -371,14 +512,16 @@
             "content_type": "CVAnalysis",
             "preview": null,
             "size": null,
-            "digest": "3Y94v",
+            "digest": "A7Z8s",
             "data": {
-              "skills": "Graphic Design, Customer Service, Sales, Trend Awareness, Organizational Skills, Leadership, Inventory Control, Communication",
-              "years_of_experience": 8.5,
-              "education": "Bachelor of Science in Graphic Design, University of Minnesota, College of Design, May 2011",
-              "previous_roles": "Sales Associate at American Eagle, Spa Consultant at Planet Beach, Sales Associate at Heartbreaker, Fashion Representative at Victoria's Secret, Brand Ambassador at Target Corporation",
-              "key_achievements": "Received employee of the month award twice at Planet Beach."
+              "skills": "qRhkufJRZPslDJLPxXKm",
+              "years_of_experience": 5093.16360529759,
+              "education": "NEaknAiwOzwlbfvrHRqr",
+              "previous_roles": "AtymWdCbosjpIreemsMa",
+              "key_achievements": "MybuHRVZKuUyInFbJRoe"
             },
+            "data_text": " Attribute                             ┃ Value                                  \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n skills                                │ qRhkufJRZPslDJLPxXKm                   \n───────────────────────────────────────┼────────────────────────────────────────\n years_of_experience                   │ 5093.16360529759                       \n───────────────────────────────────────┼────────────────────────────────────────\n education                             │ NEaknAiwOzwlbfvrHRqr                   \n───────────────────────────────────────┼────────────────────────────────────────\n previous_roles                        │ AtymWdCbosjpIreemsMa                   \n───────────────────────────────────────┼────────────────────────────────────────\n key_achievements                      │ MybuHRVZKuUyInFbJRoe                   \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                             </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                  </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> skills                                </span><span class=\"r2\">│ qRhkufJRZPslDJLPxXKm                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> years_of_experience                   </span><span class=\"r2\">│ 5093.16360529759                       </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> education                             </span><span class=\"r2\">│ NEaknAiwOzwlbfvrHRqr                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> previous_roles                        </span><span class=\"r2\">│ AtymWdCbosjpIreemsMa                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> key_achievements                      </span><span class=\"r2\">│ MybuHRVZKuUyInFbJRoe                   </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ]
@@ -388,15 +531,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_6",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_6",
       "kind": "operator",
       "pipe_code": "analyze_job_offer",
       "pipe_type": "PipeLLM",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:21.093106Z",
-        "ended_at": "2026-01-05T01:28:25.295411Z",
-        "duration_ms": 4202
+        "started_at": "2026-01-06T00:00:18.232494Z",
+        "ended_at": "2026-01-06T00:00:18.254439Z",
+        "duration_ms": 21
       },
       "io": {
         "inputs": [
@@ -406,13 +549,13 @@
             "content_type": "ListContent",
             "preview": null,
             "size": null,
-            "digest": "GG2UB",
+            "digest": "ag3xN",
             "data": {
               "items": [
                 {
                   "text_and_images": {
                     "text": {
-                      "text": "# Vice President, Enterprise Sales\n\nACME · San Francisco, CA (Hybrid)\nFull-time . Executive Level\n\n\n## About ACME\n\nACME is the global leader in CRM, empowering companies to connect with their customers in entirely new ways.\nBuilt on our core values of Trust, Customer Success, Innovation, and Equality, we're transforming how businesses\nengage with their customers across sales, service, marketing, and more.\n\n\n## The Opportunity\n\nWe're seeking an exceptional Vice President of Enterprise Sales to lead our North American Enterprise\nsegment and drive the next phase of our growth. This is a high-impact role where you'll build and scale a world-\nclass sales organization, own significant revenue accountability, and work directly with C-suite executives at\nFortune 500 companies.\n\nAs VP of Enterprise Sales, you'll lead 60+ enterprise account executives, own $180M+ in ARR quota, and play a\ncritical role in shaping our go-to-market strategy. This is an opportunity to make your mark at one of the world's\nmost innovative technology companies.\n\n\n## What You'll Do\n\n· Lead & Scale: Build and develop a high-performing team of 60+ enterprise sales professionals across multiple\nregions\n\n· Drive Revenue: Own and deliver $180M+ ARR with full P&L accountability and strategic planning\nresponsibility\n\n· Strategic Execution: Develop and implement sales strategies that accelerate pipeline growth and increase\nwin rates\n\n· Customer Relationships: Build and maintain executive relationships with C-level stakeholders at our largest\naccounts\n\n· Sales Excellence: Drive operational rigor through accurate forecasting, process optimization, and data-driven\ndecision making\n\n· Talent Development: Coach, mentor, and develop the next generation of sales leaders\n\n· Cross-functional Leadership: Partner with Product, Marketing, Customer Success, and Channel teams to\ndeliver integrated solutions\n\n· Innovation: Champion new sales methodologies, tools, and approaches that improve team productivity\n\n\n## What You Bring\n\n\n### Required Qualifications\n\n· 12+ years of progressive B2B sales experience with at least 5 years in VP-level or equivalent leadership roles\n\n· Proven track record of building and scaling enterprise sales teams of 50+ people\n\n· Demonstrated success managing $100M+ ARR quotas and consistently exceeding targets\n\n· Deep expertise in complex, consultative sales with 6-12 month sales cycles\n\n<!-- PageBreak -->\n\n"
+                      "text": "DRY RUN: OCR text"
                     },
                     "images": []
                   },
@@ -421,7 +564,25 @@
                 {
                   "text_and_images": {
                     "text": {
-                      "text": "· Experience selling SaaS solutions to Fortune 500 enterprises\n\n· Strong executive presence with ability to engage C-suite buyers\n\n· Bachelor's degree required; MBA preferred\n\n\n### What Sets You Apart\n\n· Experience in CRM, cloud infrastructure, or enterprise software markets\n\n· Track record of building sales teams from early stage through scale\n\n· Expertise in account-based selling and strategic account management\n\n· Strong analytical skills with proficiency in ACME, sales analytics tools\n\n· History of developing talent - multiple direct reports promoted to leadership roles\n\n· Experience with channel/partner sales models\n\n· Passion for coaching and developing high-performing teams\n\n\n### Leadership Competencies\n\n· Strategic thinking and business acumen\n\n· Exceptional communication and executive presence\n\n· Data-driven decision making\n\n· Change management and organizational development\n\n· Cross-functional collaboration\n\n· Diversity, equity, and inclusion advocacy\n\n\n### Compensation & Benefits\n\n\n#### Total Target Compensation: $975,000\n\n· Base Salary: $325,000\n\n· Variable Compensation: $650,000 (at 100% quota attainment)\n\n· Equity: RSU grant valued at $500,000 (4-year vesting)\n\n· Sign-on Bonus: $100,000\n\n\n#### Comprehensive Benefits Package\n\n\n<table>\n<tr>\n<td>· Premium medical, dental, and vision coverage</td>\n<td>· 401(k) with 6% company match</td>\n</tr>\n<tr>\n<td>· Flexible PTO policy</td>\n<td>· $5,000 annual professional development budget</td>\n</tr>\n<tr>\n<td>· Executive coaching program</td>\n<td>· Wellness reimbursement ($1,200/year)</td>\n</tr>\n<tr>\n<td>· 8 paid volunteer days (VTO)</td>\n<td>· Paid parental leave (26 weeks primary caregiver)</td>\n</tr>\n<tr>\n<td>· Employee stock purchase plan (15% discount)</td>\n<td>· Relocation assistance available</td>\n</tr>\n</table>\n"
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
+                    },
+                    "images": []
+                  },
+                  "page_view": null
+                },
+                {
+                  "text_and_images": {
+                    "text": {
+                      "text": "DRY RUN: OCR text"
                     },
                     "images": []
                   },
@@ -429,6 +590,8 @@
                 }
               ]
             },
+            "data_text": "   1    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   2    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   3    │ DRY RUN: OCR text                                                     \n────────┼───────────────────────────────────────────────────────────────────────\n   4    │ DRY RUN: OCR text                                                     \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {color: #d0b344; text-decoration-color: #d0b344}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\">   1    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   2    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   3    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   4    </span><span class=\"r2\">│ DRY RUN: OCR text                                                     </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -439,14 +602,16 @@
             "content_type": "JobRequirements",
             "preview": null,
             "size": null,
-            "digest": "3PFYW",
+            "digest": "CYZcT",
             "data": {
-              "required_skills": "Experience selling SaaS solutions to Fortune 500 enterprises; Strong executive presence with ability to engage C-suite buyers; Strategic thinking and business acumen; Exceptional communication and executive presence; Data-driven decision making; Change management and organizational development; Cross-functional collaboration; Diversity, equity, and inclusion advocacy.",
-              "preferred_skills": "Experience in CRM, cloud infrastructure, or enterprise software markets; Track record of building sales teams from early stage through scale; Expertise in account-based selling and strategic account management; Strong analytical skills with proficiency in ACME, sales analytics tools; History of developing talent - multiple direct reports promoted to leadership roles; Experience with channel/partner sales models; Passion for coaching and developing high-performing teams.",
-              "responsibilities": "Lead and develop a high-performing team of 60+ enterprise sales professionals; Own and deliver $180M+ ARR with full P&L accountability; Develop and implement sales strategies that accelerate pipeline growth and increase win rates; Build and maintain executive relationships with C-level stakeholders; Drive operational rigor through accurate forecasting and process optimization; Coach, mentor, and develop the next generation of sales leaders; Partner with Product, Marketing, Customer Success, and Channel teams; Champion new sales methodologies and tools.",
-              "qualifications": "12+ years of experience; Bachelor's degree required; MBA preferred.",
-              "experience_level": "Executive Level"
+              "required_skills": "WXgCmpQerXaMUTbRPMnj",
+              "preferred_skills": "OXUwDGfdNVUxRyMYUNmG",
+              "responsibilities": "LYoBOsbKaiIIJoVBAKgP",
+              "qualifications": "oQegxPfbMkVsjomhdQuE",
+              "experience_level": "IdiuIcISldvbGJbzkjlS"
             },
+            "data_text": " Attribute                          ┃ Value                                     \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n required_skills                    │ WXgCmpQerXaMUTbRPMnj                      \n────────────────────────────────────┼───────────────────────────────────────────\n preferred_skills                   │ OXUwDGfdNVUxRyMYUNmG                      \n────────────────────────────────────┼───────────────────────────────────────────\n responsibilities                   │ LYoBOsbKaiIIJoVBAKgP                      \n────────────────────────────────────┼───────────────────────────────────────────\n qualifications                     │ oQegxPfbMkVsjomhdQuE                      \n────────────────────────────────────┼───────────────────────────────────────────\n experience_level                   │ IdiuIcISldvbGJbzkjlS                      \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                          </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                     </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> required_skills                    </span><span class=\"r2\">│ WXgCmpQerXaMUTbRPMnj                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> preferred_skills                   </span><span class=\"r2\">│ OXUwDGfdNVUxRyMYUNmG                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> responsibilities                   </span><span class=\"r2\">│ LYoBOsbKaiIIJoVBAKgP                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> qualifications                     </span><span class=\"r2\">│ oQegxPfbMkVsjomhdQuE                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> experience_level                   </span><span class=\"r2\">│ IdiuIcISldvbGJbzkjlS                      </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ]
@@ -456,15 +621,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_7",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_7",
       "kind": "operator",
       "pipe_code": "evaluate_match",
       "pipe_type": "PipeLLM",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:25.299099Z",
-        "ended_at": "2026-01-05T01:28:27.902121Z",
-        "duration_ms": 2603
+        "started_at": "2026-01-06T00:00:18.255794Z",
+        "ended_at": "2026-01-06T00:00:18.282283Z",
+        "duration_ms": 26
       },
       "io": {
         "inputs": [
@@ -474,14 +639,16 @@
             "content_type": "CVAnalysis",
             "preview": null,
             "size": null,
-            "digest": "3Y94v",
+            "digest": "A7Z8s",
             "data": {
-              "skills": "Graphic Design, Customer Service, Sales, Trend Awareness, Organizational Skills, Leadership, Inventory Control, Communication",
-              "years_of_experience": 8.5,
-              "education": "Bachelor of Science in Graphic Design, University of Minnesota, College of Design, May 2011",
-              "previous_roles": "Sales Associate at American Eagle, Spa Consultant at Planet Beach, Sales Associate at Heartbreaker, Fashion Representative at Victoria's Secret, Brand Ambassador at Target Corporation",
-              "key_achievements": "Received employee of the month award twice at Planet Beach."
+              "skills": "qRhkufJRZPslDJLPxXKm",
+              "years_of_experience": 5093.16360529759,
+              "education": "NEaknAiwOzwlbfvrHRqr",
+              "previous_roles": "AtymWdCbosjpIreemsMa",
+              "key_achievements": "MybuHRVZKuUyInFbJRoe"
             },
+            "data_text": " Attribute                             ┃ Value                                  \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n skills                                │ qRhkufJRZPslDJLPxXKm                   \n───────────────────────────────────────┼────────────────────────────────────────\n years_of_experience                   │ 5093.16360529759                       \n───────────────────────────────────────┼────────────────────────────────────────\n education                             │ NEaknAiwOzwlbfvrHRqr                   \n───────────────────────────────────────┼────────────────────────────────────────\n previous_roles                        │ AtymWdCbosjpIreemsMa                   \n───────────────────────────────────────┼────────────────────────────────────────\n key_achievements                      │ MybuHRVZKuUyInFbJRoe                   \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                             </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                  </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> skills                                </span><span class=\"r2\">│ qRhkufJRZPslDJLPxXKm                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> years_of_experience                   </span><span class=\"r2\">│ 5093.16360529759                       </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> education                             </span><span class=\"r2\">│ NEaknAiwOzwlbfvrHRqr                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> previous_roles                        </span><span class=\"r2\">│ AtymWdCbosjpIreemsMa                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> key_achievements                      </span><span class=\"r2\">│ MybuHRVZKuUyInFbJRoe                   </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           },
           {
@@ -490,14 +657,16 @@
             "content_type": "JobRequirements",
             "preview": null,
             "size": null,
-            "digest": "3PFYW",
+            "digest": "CYZcT",
             "data": {
-              "required_skills": "Experience selling SaaS solutions to Fortune 500 enterprises; Strong executive presence with ability to engage C-suite buyers; Strategic thinking and business acumen; Exceptional communication and executive presence; Data-driven decision making; Change management and organizational development; Cross-functional collaboration; Diversity, equity, and inclusion advocacy.",
-              "preferred_skills": "Experience in CRM, cloud infrastructure, or enterprise software markets; Track record of building sales teams from early stage through scale; Expertise in account-based selling and strategic account management; Strong analytical skills with proficiency in ACME, sales analytics tools; History of developing talent - multiple direct reports promoted to leadership roles; Experience with channel/partner sales models; Passion for coaching and developing high-performing teams.",
-              "responsibilities": "Lead and develop a high-performing team of 60+ enterprise sales professionals; Own and deliver $180M+ ARR with full P&L accountability; Develop and implement sales strategies that accelerate pipeline growth and increase win rates; Build and maintain executive relationships with C-level stakeholders; Drive operational rigor through accurate forecasting and process optimization; Coach, mentor, and develop the next generation of sales leaders; Partner with Product, Marketing, Customer Success, and Channel teams; Champion new sales methodologies and tools.",
-              "qualifications": "12+ years of experience; Bachelor's degree required; MBA preferred.",
-              "experience_level": "Executive Level"
+              "required_skills": "WXgCmpQerXaMUTbRPMnj",
+              "preferred_skills": "OXUwDGfdNVUxRyMYUNmG",
+              "responsibilities": "LYoBOsbKaiIIJoVBAKgP",
+              "qualifications": "oQegxPfbMkVsjomhdQuE",
+              "experience_level": "IdiuIcISldvbGJbzkjlS"
             },
+            "data_text": " Attribute                          ┃ Value                                     \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n required_skills                    │ WXgCmpQerXaMUTbRPMnj                      \n────────────────────────────────────┼───────────────────────────────────────────\n preferred_skills                   │ OXUwDGfdNVUxRyMYUNmG                      \n────────────────────────────────────┼───────────────────────────────────────────\n responsibilities                   │ LYoBOsbKaiIIJoVBAKgP                      \n────────────────────────────────────┼───────────────────────────────────────────\n qualifications                     │ oQegxPfbMkVsjomhdQuE                      \n────────────────────────────────────┼───────────────────────────────────────────\n experience_level                   │ IdiuIcISldvbGJbzkjlS                      \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                          </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                     </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> required_skills                    </span><span class=\"r2\">│ WXgCmpQerXaMUTbRPMnj                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> preferred_skills                   </span><span class=\"r2\">│ OXUwDGfdNVUxRyMYUNmG                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> responsibilities                   </span><span class=\"r2\">│ LYoBOsbKaiIIJoVBAKgP                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> qualifications                     </span><span class=\"r2\">│ oQegxPfbMkVsjomhdQuE                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> experience_level                   </span><span class=\"r2\">│ IdiuIcISldvbGJbzkjlS                      </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -508,15 +677,17 @@
             "content_type": "MatchAnalysis",
             "preview": null,
             "size": null,
-            "digest": "YGoS7",
+            "digest": "dZdBL",
             "data": {
-              "overall_match_score": 10.0,
-              "matching_skills": "Communication, Leadership, Organizational Skills, Customer Service",
-              "missing_skills": "Experience selling SaaS solutions to Fortune 500 enterprises, Strong executive presence, Strategic thinking, Data-driven decision making, Change management, Cross-functional collaboration, Diversity, equity, and inclusion advocacy, Experience in CRM, cloud infrastructure, or enterprise software markets, Track record of building sales teams, Expertise in account-based selling, Strong analytical skills, History of developing talent, Experience with channel/partner sales models",
-              "experience_alignment": "Candidate has 8.5 years of experience, which is below the 12+ years required for the position.",
-              "areas_of_concern": "Lack of experience in enterprise-level sales and SaaS solutions, which are critical for this role.",
-              "areas_to_explore": "Candidate's approach to leadership and team development, understanding of sales strategies, and ability to adapt to new sales methodologies."
+              "overall_match_score": -5065183.56853609,
+              "matching_skills": "qbAXiWiuPHWNrDuLdzYp",
+              "missing_skills": "tVshhugPkGtkqvIzLFeN",
+              "experience_alignment": "czPOjDypLmkrNJoYJJBn",
+              "areas_of_concern": "bzfyIidTyHlyrGrwqVqR",
+              "areas_to_explore": "CrQbZhKWKsXfWvmebXMM"
             },
+            "data_text": " Attribute                              ┃ Value                                 \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n overall_match_score                    │ -5065183.56853609                     \n────────────────────────────────────────┼───────────────────────────────────────\n matching_skills                        │ qbAXiWiuPHWNrDuLdzYp                  \n────────────────────────────────────────┼───────────────────────────────────────\n missing_skills                         │ tVshhugPkGtkqvIzLFeN                  \n────────────────────────────────────────┼───────────────────────────────────────\n experience_alignment                   │ czPOjDypLmkrNJoYJJBn                  \n────────────────────────────────────────┼───────────────────────────────────────\n areas_of_concern                       │ bzfyIidTyHlyrGrwqVqR                  \n────────────────────────────────────────┼───────────────────────────────────────\n areas_to_explore                       │ CrQbZhKWKsXfWvmebXMM                  \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                              </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                 </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> overall_match_score                    </span><span class=\"r2\">│ -5065183.56853609                     </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> matching_skills                        </span><span class=\"r2\">│ qbAXiWiuPHWNrDuLdzYp                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> missing_skills                         </span><span class=\"r2\">│ tVshhugPkGtkqvIzLFeN                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> experience_alignment                   </span><span class=\"r2\">│ czPOjDypLmkrNJoYJJBn                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> areas_of_concern                       </span><span class=\"r2\">│ bzfyIidTyHlyrGrwqVqR                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> areas_to_explore                       </span><span class=\"r2\">│ CrQbZhKWKsXfWvmebXMM                  </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ]
@@ -526,15 +697,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_8",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_8",
       "kind": "operator",
       "pipe_code": "generate_interview_questions",
       "pipe_type": "PipeLLM",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:27.903251Z",
-        "ended_at": "2026-01-05T01:28:31.786343Z",
-        "duration_ms": 3883
+        "started_at": "2026-01-06T00:00:18.283535Z",
+        "ended_at": "2026-01-06T00:00:18.322743Z",
+        "duration_ms": 39
       },
       "io": {
         "inputs": [
@@ -544,14 +715,16 @@
             "content_type": "CVAnalysis",
             "preview": null,
             "size": null,
-            "digest": "3Y94v",
+            "digest": "A7Z8s",
             "data": {
-              "skills": "Graphic Design, Customer Service, Sales, Trend Awareness, Organizational Skills, Leadership, Inventory Control, Communication",
-              "years_of_experience": 8.5,
-              "education": "Bachelor of Science in Graphic Design, University of Minnesota, College of Design, May 2011",
-              "previous_roles": "Sales Associate at American Eagle, Spa Consultant at Planet Beach, Sales Associate at Heartbreaker, Fashion Representative at Victoria's Secret, Brand Ambassador at Target Corporation",
-              "key_achievements": "Received employee of the month award twice at Planet Beach."
+              "skills": "qRhkufJRZPslDJLPxXKm",
+              "years_of_experience": 5093.16360529759,
+              "education": "NEaknAiwOzwlbfvrHRqr",
+              "previous_roles": "AtymWdCbosjpIreemsMa",
+              "key_achievements": "MybuHRVZKuUyInFbJRoe"
             },
+            "data_text": " Attribute                             ┃ Value                                  \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n skills                                │ qRhkufJRZPslDJLPxXKm                   \n───────────────────────────────────────┼────────────────────────────────────────\n years_of_experience                   │ 5093.16360529759                       \n───────────────────────────────────────┼────────────────────────────────────────\n education                             │ NEaknAiwOzwlbfvrHRqr                   \n───────────────────────────────────────┼────────────────────────────────────────\n previous_roles                        │ AtymWdCbosjpIreemsMa                   \n───────────────────────────────────────┼────────────────────────────────────────\n key_achievements                      │ MybuHRVZKuUyInFbJRoe                   \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                             </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                  </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> skills                                </span><span class=\"r2\">│ qRhkufJRZPslDJLPxXKm                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> years_of_experience                   </span><span class=\"r2\">│ 5093.16360529759                       </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> education                             </span><span class=\"r2\">│ NEaknAiwOzwlbfvrHRqr                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> previous_roles                        </span><span class=\"r2\">│ AtymWdCbosjpIreemsMa                   </span>\n<span class=\"r2\">───────────────────────────────────────┼────────────────────────────────────────</span>\n<span class=\"r3\"> key_achievements                      </span><span class=\"r2\">│ MybuHRVZKuUyInFbJRoe                   </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           },
           {
@@ -560,14 +733,16 @@
             "content_type": "JobRequirements",
             "preview": null,
             "size": null,
-            "digest": "3PFYW",
+            "digest": "CYZcT",
             "data": {
-              "required_skills": "Experience selling SaaS solutions to Fortune 500 enterprises; Strong executive presence with ability to engage C-suite buyers; Strategic thinking and business acumen; Exceptional communication and executive presence; Data-driven decision making; Change management and organizational development; Cross-functional collaboration; Diversity, equity, and inclusion advocacy.",
-              "preferred_skills": "Experience in CRM, cloud infrastructure, or enterprise software markets; Track record of building sales teams from early stage through scale; Expertise in account-based selling and strategic account management; Strong analytical skills with proficiency in ACME, sales analytics tools; History of developing talent - multiple direct reports promoted to leadership roles; Experience with channel/partner sales models; Passion for coaching and developing high-performing teams.",
-              "responsibilities": "Lead and develop a high-performing team of 60+ enterprise sales professionals; Own and deliver $180M+ ARR with full P&L accountability; Develop and implement sales strategies that accelerate pipeline growth and increase win rates; Build and maintain executive relationships with C-level stakeholders; Drive operational rigor through accurate forecasting and process optimization; Coach, mentor, and develop the next generation of sales leaders; Partner with Product, Marketing, Customer Success, and Channel teams; Champion new sales methodologies and tools.",
-              "qualifications": "12+ years of experience; Bachelor's degree required; MBA preferred.",
-              "experience_level": "Executive Level"
+              "required_skills": "WXgCmpQerXaMUTbRPMnj",
+              "preferred_skills": "OXUwDGfdNVUxRyMYUNmG",
+              "responsibilities": "LYoBOsbKaiIIJoVBAKgP",
+              "qualifications": "oQegxPfbMkVsjomhdQuE",
+              "experience_level": "IdiuIcISldvbGJbzkjlS"
             },
+            "data_text": " Attribute                          ┃ Value                                     \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n required_skills                    │ WXgCmpQerXaMUTbRPMnj                      \n────────────────────────────────────┼───────────────────────────────────────────\n preferred_skills                   │ OXUwDGfdNVUxRyMYUNmG                      \n────────────────────────────────────┼───────────────────────────────────────────\n responsibilities                   │ LYoBOsbKaiIIJoVBAKgP                      \n────────────────────────────────────┼───────────────────────────────────────────\n qualifications                     │ oQegxPfbMkVsjomhdQuE                      \n────────────────────────────────────┼───────────────────────────────────────────\n experience_level                   │ IdiuIcISldvbGJbzkjlS                      \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                          </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                     </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> required_skills                    </span><span class=\"r2\">│ WXgCmpQerXaMUTbRPMnj                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> preferred_skills                   </span><span class=\"r2\">│ OXUwDGfdNVUxRyMYUNmG                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> responsibilities                   </span><span class=\"r2\">│ LYoBOsbKaiIIJoVBAKgP                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> qualifications                     </span><span class=\"r2\">│ oQegxPfbMkVsjomhdQuE                      </span>\n<span class=\"r2\">────────────────────────────────────┼───────────────────────────────────────────</span>\n<span class=\"r3\"> experience_level                   </span><span class=\"r2\">│ IdiuIcISldvbGJbzkjlS                      </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           },
           {
@@ -576,15 +751,17 @@
             "content_type": "MatchAnalysis",
             "preview": null,
             "size": null,
-            "digest": "YGoS7",
+            "digest": "dZdBL",
             "data": {
-              "overall_match_score": 10.0,
-              "matching_skills": "Communication, Leadership, Organizational Skills, Customer Service",
-              "missing_skills": "Experience selling SaaS solutions to Fortune 500 enterprises, Strong executive presence, Strategic thinking, Data-driven decision making, Change management, Cross-functional collaboration, Diversity, equity, and inclusion advocacy, Experience in CRM, cloud infrastructure, or enterprise software markets, Track record of building sales teams, Expertise in account-based selling, Strong analytical skills, History of developing talent, Experience with channel/partner sales models",
-              "experience_alignment": "Candidate has 8.5 years of experience, which is below the 12+ years required for the position.",
-              "areas_of_concern": "Lack of experience in enterprise-level sales and SaaS solutions, which are critical for this role.",
-              "areas_to_explore": "Candidate's approach to leadership and team development, understanding of sales strategies, and ability to adapt to new sales methodologies."
+              "overall_match_score": -5065183.56853609,
+              "matching_skills": "qbAXiWiuPHWNrDuLdzYp",
+              "missing_skills": "tVshhugPkGtkqvIzLFeN",
+              "experience_alignment": "czPOjDypLmkrNJoYJJBn",
+              "areas_of_concern": "bzfyIidTyHlyrGrwqVqR",
+              "areas_to_explore": "CrQbZhKWKsXfWvmebXMM"
             },
+            "data_text": " Attribute                              ┃ Value                                 \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n overall_match_score                    │ -5065183.56853609                     \n────────────────────────────────────────┼───────────────────────────────────────\n matching_skills                        │ qbAXiWiuPHWNrDuLdzYp                  \n────────────────────────────────────────┼───────────────────────────────────────\n missing_skills                         │ tVshhugPkGtkqvIzLFeN                  \n────────────────────────────────────────┼───────────────────────────────────────\n experience_alignment                   │ czPOjDypLmkrNJoYJJBn                  \n────────────────────────────────────────┼───────────────────────────────────────\n areas_of_concern                       │ bzfyIidTyHlyrGrwqVqR                  \n────────────────────────────────────────┼───────────────────────────────────────\n areas_to_explore                       │ CrQbZhKWKsXfWvmebXMM                  \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                              </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                 </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> overall_match_score                    </span><span class=\"r2\">│ -5065183.56853609                     </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> matching_skills                        </span><span class=\"r2\">│ qbAXiWiuPHWNrDuLdzYp                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> missing_skills                         </span><span class=\"r2\">│ tVshhugPkGtkqvIzLFeN                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> experience_alignment                   </span><span class=\"r2\">│ czPOjDypLmkrNJoYJJBn                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> areas_of_concern                       </span><span class=\"r2\">│ bzfyIidTyHlyrGrwqVqR                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> areas_to_explore                       </span><span class=\"r2\">│ CrQbZhKWKsXfWvmebXMM                  </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -595,31 +772,33 @@
             "content_type": "ListContent",
             "preview": null,
             "size": null,
-            "digest": "26p22",
+            "digest": "hjcRm",
             "data": {
               "items": [
                 {
-                  "question_text": "Can you describe your experience with leading sales teams, particularly in a SaaS or enterprise environment? What strategies did you employ to ensure their success?",
-                  "purpose": "To assess the candidate's leadership experience and ability to manage and develop high-performing sales teams, particularly in a SaaS context."
+                  "question_text": "mQZivbNgVgFzuUyZShqc",
+                  "purpose": "sHoLAyagwITnIQsnmJCd"
                 },
                 {
-                  "question_text": "How do you approach strategic thinking when developing sales strategies? Can you provide an example of a successful strategy you've implemented?",
-                  "purpose": "To evaluate the candidate's strategic thinking skills and their ability to create effective sales strategies."
+                  "question_text": "zVYLWtcSjDALLWsIdzdU",
+                  "purpose": "detFcGuujuTcVNbFUwfI"
                 },
                 {
-                  "question_text": "What methods do you use to ensure data-driven decision making in your sales processes? Can you share an example of how this has impacted your team's performance?",
-                  "purpose": "To explore the candidate's analytical skills and their experience with data-driven decision making."
+                  "question_text": "zuOLNKpuPEoKumjkZYLX",
+                  "purpose": "tquoBhlwjAFtlBCYVHRa"
                 },
                 {
-                  "question_text": "Can you discuss a time when you had to manage change within a sales team? What challenges did you face and how did you overcome them?",
-                  "purpose": "To assess the candidate's experience with change management and their ability to navigate challenges in a leadership role."
+                  "question_text": "UpLPzFeJRBCrFEfAYZPY",
+                  "purpose": "WoVUBveQmbHRBOPbyuOI"
                 },
                 {
-                  "question_text": "How do you advocate for diversity, equity, and inclusion within your teams? Can you provide examples of initiatives you've led or participated in?",
-                  "purpose": "To investigate the candidate's commitment to diversity, equity, and inclusion, which is important for cultural fit and team dynamics."
+                  "question_text": "zovaivZhfIQUYRywPaPH",
+                  "purpose": "ZRHihMnEiJLYYtNTnMJw"
                 }
               ]
             },
+            "data_text": "   1    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ mQZivbNgVgFzuUyZShqc                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ sHoLAyagwITnIQsnmJCd                   \n────────┼───────────────────────────────────────────────────────────────────────\n   2    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ zVYLWtcSjDALLWsIdzdU                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ detFcGuujuTcVNbFUwfI                   \n────────┼───────────────────────────────────────────────────────────────────────\n   3    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ zuOLNKpuPEoKumjkZYLX                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ tquoBhlwjAFtlBCYVHRa                   \n────────┼───────────────────────────────────────────────────────────────────────\n   4    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ UpLPzFeJRBCrFEfAYZPY                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ WoVUBveQmbHRBOPbyuOI                   \n────────┼───────────────────────────────────────────────────────────────────────\n   5    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ zovaivZhfIQUYRywPaPH                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ ZRHihMnEiJLYYtNTnMJw                   \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {color: #d0b344; text-decoration-color: #d0b344}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #c5c8c6; text-decoration-color: #c5c8c6; font-weight: bold}\n.r4 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\">   1    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ mQZivbNgVgFzuUyZShqc                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ sHoLAyagwITnIQsnmJCd                   </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   2    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ zVYLWtcSjDALLWsIdzdU                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ detFcGuujuTcVNbFUwfI                   </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   3    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ zuOLNKpuPEoKumjkZYLX                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ tquoBhlwjAFtlBCYVHRa                   </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   4    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ UpLPzFeJRBCrFEfAYZPY                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ WoVUBveQmbHRBOPbyuOI                   </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   5    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ zovaivZhfIQUYRywPaPH                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ ZRHihMnEiJLYYtNTnMJw                   </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ]
@@ -629,15 +808,15 @@
       "metrics": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:node_9",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_9",
       "kind": "operator",
       "pipe_code": "compose_interview_sheet",
       "pipe_type": "PipeCompose",
       "status": "succeeded",
       "timing": {
-        "started_at": "2026-01-05T01:28:31.787268Z",
-        "ended_at": "2026-01-05T01:28:31.832568Z",
-        "duration_ms": 45
+        "started_at": "2026-01-06T00:00:18.324212Z",
+        "ended_at": "2026-01-06T00:00:18.387154Z",
+        "duration_ms": 62
       },
       "io": {
         "inputs": [
@@ -647,15 +826,17 @@
             "content_type": "MatchAnalysis",
             "preview": null,
             "size": null,
-            "digest": "YGoS7",
+            "digest": "dZdBL",
             "data": {
-              "overall_match_score": 10.0,
-              "matching_skills": "Communication, Leadership, Organizational Skills, Customer Service",
-              "missing_skills": "Experience selling SaaS solutions to Fortune 500 enterprises, Strong executive presence, Strategic thinking, Data-driven decision making, Change management, Cross-functional collaboration, Diversity, equity, and inclusion advocacy, Experience in CRM, cloud infrastructure, or enterprise software markets, Track record of building sales teams, Expertise in account-based selling, Strong analytical skills, History of developing talent, Experience with channel/partner sales models",
-              "experience_alignment": "Candidate has 8.5 years of experience, which is below the 12+ years required for the position.",
-              "areas_of_concern": "Lack of experience in enterprise-level sales and SaaS solutions, which are critical for this role.",
-              "areas_to_explore": "Candidate's approach to leadership and team development, understanding of sales strategies, and ability to adapt to new sales methodologies."
+              "overall_match_score": -5065183.56853609,
+              "matching_skills": "qbAXiWiuPHWNrDuLdzYp",
+              "missing_skills": "tVshhugPkGtkqvIzLFeN",
+              "experience_alignment": "czPOjDypLmkrNJoYJJBn",
+              "areas_of_concern": "bzfyIidTyHlyrGrwqVqR",
+              "areas_to_explore": "CrQbZhKWKsXfWvmebXMM"
             },
+            "data_text": " Attribute                              ┃ Value                                 \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n overall_match_score                    │ -5065183.56853609                     \n────────────────────────────────────────┼───────────────────────────────────────\n matching_skills                        │ qbAXiWiuPHWNrDuLdzYp                  \n────────────────────────────────────────┼───────────────────────────────────────\n missing_skills                         │ tVshhugPkGtkqvIzLFeN                  \n────────────────────────────────────────┼───────────────────────────────────────\n experience_alignment                   │ czPOjDypLmkrNJoYJJBn                  \n────────────────────────────────────────┼───────────────────────────────────────\n areas_of_concern                       │ bzfyIidTyHlyrGrwqVqR                  \n────────────────────────────────────────┼───────────────────────────────────────\n areas_to_explore                       │ CrQbZhKWKsXfWvmebXMM                  \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute                              </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                 </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> overall_match_score                    </span><span class=\"r2\">│ -5065183.56853609                     </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> matching_skills                        </span><span class=\"r2\">│ qbAXiWiuPHWNrDuLdzYp                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> missing_skills                         </span><span class=\"r2\">│ tVshhugPkGtkqvIzLFeN                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> experience_alignment                   </span><span class=\"r2\">│ czPOjDypLmkrNJoYJJBn                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> areas_of_concern                       </span><span class=\"r2\">│ bzfyIidTyHlyrGrwqVqR                  </span>\n<span class=\"r2\">────────────────────────────────────────┼───────────────────────────────────────</span>\n<span class=\"r3\"> areas_to_explore                       </span><span class=\"r2\">│ CrQbZhKWKsXfWvmebXMM                  </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           },
           {
@@ -664,31 +845,33 @@
             "content_type": "ListContent",
             "preview": null,
             "size": null,
-            "digest": "26p22",
+            "digest": "hjcRm",
             "data": {
               "items": [
                 {
-                  "question_text": "Can you describe your experience with leading sales teams, particularly in a SaaS or enterprise environment? What strategies did you employ to ensure their success?",
-                  "purpose": "To assess the candidate's leadership experience and ability to manage and develop high-performing sales teams, particularly in a SaaS context."
+                  "question_text": "mQZivbNgVgFzuUyZShqc",
+                  "purpose": "sHoLAyagwITnIQsnmJCd"
                 },
                 {
-                  "question_text": "How do you approach strategic thinking when developing sales strategies? Can you provide an example of a successful strategy you've implemented?",
-                  "purpose": "To evaluate the candidate's strategic thinking skills and their ability to create effective sales strategies."
+                  "question_text": "zVYLWtcSjDALLWsIdzdU",
+                  "purpose": "detFcGuujuTcVNbFUwfI"
                 },
                 {
-                  "question_text": "What methods do you use to ensure data-driven decision making in your sales processes? Can you share an example of how this has impacted your team's performance?",
-                  "purpose": "To explore the candidate's analytical skills and their experience with data-driven decision making."
+                  "question_text": "zuOLNKpuPEoKumjkZYLX",
+                  "purpose": "tquoBhlwjAFtlBCYVHRa"
                 },
                 {
-                  "question_text": "Can you discuss a time when you had to manage change within a sales team? What challenges did you face and how did you overcome them?",
-                  "purpose": "To assess the candidate's experience with change management and their ability to navigate challenges in a leadership role."
+                  "question_text": "UpLPzFeJRBCrFEfAYZPY",
+                  "purpose": "WoVUBveQmbHRBOPbyuOI"
                 },
                 {
-                  "question_text": "How do you advocate for diversity, equity, and inclusion within your teams? Can you provide examples of initiatives you've led or participated in?",
-                  "purpose": "To investigate the candidate's commitment to diversity, equity, and inclusion, which is important for cultural fit and team dynamics."
+                  "question_text": "zovaivZhfIQUYRywPaPH",
+                  "purpose": "ZRHihMnEiJLYYtNTnMJw"
                 }
               ]
             },
+            "data_text": "   1    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ mQZivbNgVgFzuUyZShqc                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ sHoLAyagwITnIQsnmJCd                   \n────────┼───────────────────────────────────────────────────────────────────────\n   2    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ zVYLWtcSjDALLWsIdzdU                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ detFcGuujuTcVNbFUwfI                   \n────────┼───────────────────────────────────────────────────────────────────────\n   3    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ zuOLNKpuPEoKumjkZYLX                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ tquoBhlwjAFtlBCYVHRa                   \n────────┼───────────────────────────────────────────────────────────────────────\n   4    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ UpLPzFeJRBCrFEfAYZPY                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ WoVUBveQmbHRBOPbyuOI                   \n────────┼───────────────────────────────────────────────────────────────────────\n   5    │  Attribute                   ┃ Value                                  \n        │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ \n        │  question_text               │ zovaivZhfIQUYRywPaPH                   \n        │ ─────────────────────────────┼─────────────────────────────────────── \n        │  purpose                     │ ZRHihMnEiJLYYtNTnMJw                   \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {color: #d0b344; text-decoration-color: #d0b344}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #c5c8c6; text-decoration-color: #c5c8c6; font-weight: bold}\n.r4 {color: #68a0b3; text-decoration-color: #68a0b3}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\">   1    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ mQZivbNgVgFzuUyZShqc                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ sHoLAyagwITnIQsnmJCd                   </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   2    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ zVYLWtcSjDALLWsIdzdU                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ detFcGuujuTcVNbFUwfI                   </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   3    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ zuOLNKpuPEoKumjkZYLX                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ tquoBhlwjAFtlBCYVHRa                   </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   4    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ UpLPzFeJRBCrFEfAYZPY                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ WoVUBveQmbHRBOPbyuOI                   </span>\n<span class=\"r2\">────────┼───────────────────────────────────────────────────────────────────────</span>\n<span class=\"r1\">   5    </span><span class=\"r2\">│ </span><span class=\"r3\"> Attribute                   </span><span class=\"r2\">┃</span><span class=\"r3\"> Value                                 </span><span class=\"r2\"> </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> question_text               </span><span class=\"r2\">│ zovaivZhfIQUYRywPaPH                   </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ ─────────────────────────────┼─────────────────────────────────────── </span>\n<span class=\"r1\">        </span><span class=\"r2\">│ </span><span class=\"r4\"> purpose                     </span><span class=\"r2\">│ ZRHihMnEiJLYYtNTnMJw                   </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ],
@@ -699,37 +882,39 @@
             "content_type": "InterviewSheet",
             "preview": null,
             "size": null,
-            "digest": "9znc7",
+            "digest": "PUDMY",
             "data": {
-              "overall_match_score": 10.0,
-              "matching_skills": "Communication, Leadership, Organizational Skills, Customer Service",
-              "missing_skills": "Experience selling SaaS solutions to Fortune 500 enterprises, Strong executive presence, Strategic thinking, Data-driven decision making, Change management, Cross-functional collaboration, Diversity, equity, and inclusion advocacy, Experience in CRM, cloud infrastructure, or enterprise software markets, Track record of building sales teams, Expertise in account-based selling, Strong analytical skills, History of developing talent, Experience with channel/partner sales models",
-              "experience_alignment": "Candidate has 8.5 years of experience, which is below the 12+ years required for the position.",
-              "areas_of_concern": "Lack of experience in enterprise-level sales and SaaS solutions, which are critical for this role.",
-              "areas_to_explore": "Candidate's approach to leadership and team development, understanding of sales strategies, and ability to adapt to new sales methodologies.",
+              "overall_match_score": -5065183.56853609,
+              "matching_skills": "qbAXiWiuPHWNrDuLdzYp",
+              "missing_skills": "tVshhugPkGtkqvIzLFeN",
+              "experience_alignment": "czPOjDypLmkrNJoYJJBn",
+              "areas_of_concern": "bzfyIidTyHlyrGrwqVqR",
+              "areas_to_explore": "CrQbZhKWKsXfWvmebXMM",
               "questions": [
                 {
-                  "question_text": "Can you describe your experience with leading sales teams, particularly in a SaaS or enterprise environment? What strategies did you employ to ensure their success?",
-                  "purpose": "To assess the candidate's leadership experience and ability to manage and develop high-performing sales teams, particularly in a SaaS context."
+                  "question_text": "mQZivbNgVgFzuUyZShqc",
+                  "purpose": "sHoLAyagwITnIQsnmJCd"
                 },
                 {
-                  "question_text": "How do you approach strategic thinking when developing sales strategies? Can you provide an example of a successful strategy you've implemented?",
-                  "purpose": "To evaluate the candidate's strategic thinking skills and their ability to create effective sales strategies."
+                  "question_text": "zVYLWtcSjDALLWsIdzdU",
+                  "purpose": "detFcGuujuTcVNbFUwfI"
                 },
                 {
-                  "question_text": "What methods do you use to ensure data-driven decision making in your sales processes? Can you share an example of how this has impacted your team's performance?",
-                  "purpose": "To explore the candidate's analytical skills and their experience with data-driven decision making."
+                  "question_text": "zuOLNKpuPEoKumjkZYLX",
+                  "purpose": "tquoBhlwjAFtlBCYVHRa"
                 },
                 {
-                  "question_text": "Can you discuss a time when you had to manage change within a sales team? What challenges did you face and how did you overcome them?",
-                  "purpose": "To assess the candidate's experience with change management and their ability to navigate challenges in a leadership role."
+                  "question_text": "UpLPzFeJRBCrFEfAYZPY",
+                  "purpose": "WoVUBveQmbHRBOPbyuOI"
                 },
                 {
-                  "question_text": "How do you advocate for diversity, equity, and inclusion within your teams? Can you provide examples of initiatives you've led or participated in?",
-                  "purpose": "To investigate the candidate's commitment to diversity, equity, and inclusion, which is important for cultural fit and team dynamics."
+                  "question_text": "zovaivZhfIQUYRywPaPH",
+                  "purpose": "ZRHihMnEiJLYYtNTnMJw"
                 }
               ]
             },
+            "data_text": " Attribute            ┃ Value                                                   \n━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n overall_match_score  │ -5065183.56853609                                       \n──────────────────────┼─────────────────────────────────────────────────────────\n matching_skills      │ qbAXiWiuPHWNrDuLdzYp                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n missing_skills       │ tVshhugPkGtkqvIzLFeN                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n experience_alignment │ czPOjDypLmkrNJoYJJBn                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n areas_of_concern     │ bzfyIidTyHlyrGrwqVqR                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n areas_to_explore     │ CrQbZhKWKsXfWvmebXMM                                    \n──────────────────────┼─────────────────────────────────────────────────────────\n questions            │   1   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ mQZivbNgVgFzuUyZSh  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ sHoLAyagwITnIQsnmJ  \n                      │ ──────┼──────────────────────────────────────────────── \n                      │   2   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ zVYLWtcSjDALLWsIdz  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ detFcGuujuTcVNbFUw  \n                      │ ──────┼──────────────────────────────────────────────── \n                      │   3   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ zuOLNKpuPEoKumjkZY  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ tquoBhlwjAFtlBCYVH  \n                      │ ──────┼──────────────────────────────────────────────── \n                      │   4   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ UpLPzFeJRBCrFEfAYZ  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ WoVUBveQmbHRBOPbyu  \n                      │ ──────┼──────────────────────────────────────────────── \n                      │   5   │  Attribute                ┃ Value               \n                      │       │ ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  \n                      │       │  question_text            │ zovaivZhfIQUYRywPa  \n                      │       │ ──────────────────────────┼───────────────────  \n                      │       │  purpose                  │ ZRHihMnEiJLYYtNTnM  \n",
+            "data_html": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n<style>\n.r1 {font-weight: bold}\n.r2 {color: #c5c8c6; text-decoration-color: #c5c8c6}\n.r3 {color: #68a0b3; text-decoration-color: #68a0b3}\n.r4 {color: #d0b344; text-decoration-color: #d0b344}\n.r5 {color: #626463; text-decoration-color: #626463}\n.r6 {color: #c5c8c6; text-decoration-color: #c5c8c6; font-weight: bold}\nbody {\n    color: #c5c8c6;\n    background-color: #000000;\n}\n</style>\n</head>\n<body>\n    <pre style=\"font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\"><code style=\"font-family:inherit\"><span class=\"r1\"> Attribute            </span><span class=\"r2\">┃</span><span class=\"r1\"> Value                                                   </span>\n<span class=\"r2\">━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</span>\n<span class=\"r3\"> overall_match_score  </span><span class=\"r2\">│ -5065183.56853609                                       </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> matching_skills      </span><span class=\"r2\">│ qbAXiWiuPHWNrDuLdzYp                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> missing_skills       </span><span class=\"r2\">│ tVshhugPkGtkqvIzLFeN                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> experience_alignment </span><span class=\"r2\">│ czPOjDypLmkrNJoYJJBn                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> areas_of_concern     </span><span class=\"r2\">│ bzfyIidTyHlyrGrwqVqR                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> areas_to_explore     </span><span class=\"r2\">│ CrQbZhKWKsXfWvmebXMM                                    </span>\n<span class=\"r2\">──────────────────────┼─────────────────────────────────────────────────────────</span>\n<span class=\"r3\"> questions            </span><span class=\"r2\">│ </span><span class=\"r4\">  1   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ mQZivbNgVgFzuUyZSh  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ sHoLAyagwITnIQsnmJ  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r5\">──────┼────────────────────────────────────────────────</span><span class=\"r2\"> </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">  2   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ zVYLWtcSjDALLWsIdz  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ detFcGuujuTcVNbFUw  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r5\">──────┼────────────────────────────────────────────────</span><span class=\"r2\"> </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">  3   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ zuOLNKpuPEoKumjkZY  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ tquoBhlwjAFtlBCYVH  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r5\">──────┼────────────────────────────────────────────────</span><span class=\"r2\"> </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">  4   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ UpLPzFeJRBCrFEfAYZ  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ WoVUBveQmbHRBOPbyu  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r5\">──────┼────────────────────────────────────────────────</span><span class=\"r2\"> </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">  5   </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r6\"> Attribute                </span><span class=\"r2\">┃</span><span class=\"r6\"> Value             </span><span class=\"r2\">  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> question_text            </span><span class=\"r2\">│ zovaivZhfIQUYRywPa  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> ──────────────────────────┼───────────────────  </span>\n<span class=\"r3\">                      </span><span class=\"r2\">│ </span><span class=\"r4\">      </span><span class=\"r5\">│</span><span class=\"r2\"> </span><span class=\"r3\"> purpose                  </span><span class=\"r2\">│ ZRHihMnEiJLYYtNTnM  </span>\n</code></pre>\n</body>\n</html>\n",
             "extra": {}
           }
         ]
@@ -741,161 +926,161 @@
   ],
   "edges": [
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_0",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_0",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_1",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_0",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_0",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_1",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_1",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_1",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_2",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_1",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_1",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_2",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_2",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_1",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_3",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_2",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_1",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_3",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_3",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_0",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_4",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_3",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_0",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_4",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_4",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_4",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_5",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_4",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_4",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_5",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_5",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_4",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_6",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_5",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_4",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_6",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_6",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_0",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_7",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_6",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_0",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_7",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_7",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_0",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_8",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_7",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_0",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_8",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_8",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_0",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_9",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_8",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_0",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_9",
       "kind": "contains",
       "label": null,
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_9",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_2",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_4",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_9",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_2",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_4",
       "kind": "data",
       "label": "cv_pages",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_10",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_3",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_4",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_10",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_3",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_4",
       "kind": "data",
       "label": "job_offer_pages",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_11",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_2",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_5",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_11",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_2",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_5",
       "kind": "data",
       "label": "cv_pages",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_12",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_3",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_6",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_12",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_3",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_6",
       "kind": "data",
       "label": "job_offer_pages",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_13",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_5",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_7",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_13",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_5",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_7",
       "kind": "data",
       "label": "cv_analysis",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_14",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_6",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_7",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_14",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_6",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_7",
       "kind": "data",
       "label": "job_requirements",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_15",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_5",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_8",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_15",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_5",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_8",
       "kind": "data",
       "label": "cv_analysis",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_16",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_6",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_8",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_16",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_6",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_8",
       "kind": "data",
       "label": "job_requirements",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_17",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_7",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_8",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_17",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_7",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_8",
       "kind": "data",
       "label": "match_analysis",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_18",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_7",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_9",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_18",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_7",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_9",
       "kind": "data",
       "label": "match_analysis",
       "meta": {}
     },
     {
-      "id": "17cc7729-bd86-464b-9b4f-ac624912752f:edge_19",
-      "source": "17cc7729-bd86-464b-9b4f-ac624912752f:node_8",
-      "target": "17cc7729-bd86-464b-9b4f-ac624912752f:node_9",
+      "id": "64f1bff7-d128-4c91-bf9c-a7a371061f40:edge_19",
+      "source": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_8",
+      "target": "64f1bff7-d128-4c91-bf9c-a7a371061f40:node_9",
       "kind": "data",
       "label": "interview_questions",
       "meta": {}

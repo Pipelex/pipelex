@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer_protocol import GraphTracerNoOp
 from pipelex.graph.graphspec import EdgeKind, NodeKind
+from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 
 class TestGraphTracerNoOp:
@@ -12,14 +13,14 @@ class TestGraphTracerNoOp:
     def test_noop_returns_context(self) -> None:
         """Test that no-op tracer still returns valid context."""
         tracer = GraphTracerNoOp()
-        context = tracer.setup(graph_id="noop-test")
+        context = tracer.setup(graph_id="noop-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         assert context.graph_id == "noop-test"
 
     def test_noop_teardown_returns_none(self) -> None:
         """Test that no-op tracer returns None on teardown."""
         tracer = GraphTracerNoOp()
-        tracer.setup(graph_id="noop-test")
+        tracer.setup(graph_id="noop-test", data_inclusion=make_defaulted_data_inclusion_config())
         result = tracer.teardown()
 
         assert result is None
@@ -27,7 +28,7 @@ class TestGraphTracerNoOp:
     def test_noop_pipe_lifecycle(self) -> None:
         """Test that no-op tracer handles pipe lifecycle without errors."""
         tracer = GraphTracerNoOp()
-        context = tracer.setup(graph_id="noop-test")
+        context = tracer.setup(graph_id="noop-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         started_at = datetime.now(UTC)
         node_id, child_ctx = tracer.on_pipe_start(

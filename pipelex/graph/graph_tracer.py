@@ -1,9 +1,10 @@
-"""GraphTracer implementation that builds GraphSpec during pipe execution."""
+"""GraphTracer implementation that builds GraphSpec during pipeline execution."""
 
 from datetime import UTC, datetime
 
 from typing_extensions import override
 
+from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import (
@@ -114,9 +115,9 @@ class GraphTracer(GraphTracerProtocol):
     def setup(
         self,
         graph_id: str,
+        data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
-        include_full_data: bool = False,
     ) -> GraphContext:
         """Initialize tracing for a new pipeline run."""
         self._is_active = True
@@ -136,7 +137,7 @@ class GraphTracer(GraphTracerProtocol):
             graph_id=graph_id,
             parent_node_id=None,
             node_sequence=0,
-            include_full_data=include_full_data,
+            data_inclusion=data_inclusion,
         )
 
     @override

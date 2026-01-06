@@ -45,9 +45,15 @@ class TestGraphRenderersFromJson:
     """E2E tests for generating all graph renderings from JSON for comparison."""
 
     def _get_graph_config_with_data(self):
-        """Get a graph config with stuff data inclusion enabled."""
+        """Get a graph config with all stuff data inclusion flags enabled."""
         base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
-        new_data_inclusion = base_graph_config.data_inclusion.model_copy(update={"stuff_json_content": True})
+        new_data_inclusion = base_graph_config.data_inclusion.model_copy(
+            update={
+                "stuff_json_content": True,
+                "stuff_text_content": True,
+                "stuff_html_content": True,
+            }
+        )
         return base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
     @pytest.mark.parametrize(
@@ -170,6 +176,24 @@ class TestGraphRenderersFromJson:
             file_path = output_dir / filename
             assert file_path.exists(), f"Expected file not created: {file_path}"
             assert file_path.stat().st_size > 0, f"File is empty: {file_path}"
+
+        # Verify stuff data was properly collected when loading from JSON
+        # The GraphSpec JSON should have `data` fields, and the collection functions
+        # should generate text/html representations from them
+        if graph_config.data_inclusion.stuff_json_content:
+            # Verify that stuff_data is populated in combo output
+            assert combo_output.stuff_data is not None, "stuff_data should be populated when stuff_json_content=True"
+            assert len(combo_output.stuff_data) > 0, "stuff_data should not be empty when graph has stuff with data"
+
+        if graph_config.data_inclusion.stuff_text_content:
+            # Verify that stuff_data_text is populated (either from data_text or fallback from data)
+            assert combo_output.stuff_data_text is not None, "stuff_data_text should be populated when stuff_text_content=True"
+            assert len(combo_output.stuff_data_text) > 0, "stuff_data_text should not be empty when graph has stuff with data"
+
+        if graph_config.data_inclusion.stuff_html_content:
+            # Verify that stuff_data_html is populated (either from data_html or fallback from data)
+            assert combo_output.stuff_data_html is not None, "stuff_data_html should be populated when stuff_html_content=True"
+            assert len(combo_output.stuff_data_html) > 0, "stuff_data_html should not be empty when graph has stuff with data"
 
         # Summary
         log.info(
