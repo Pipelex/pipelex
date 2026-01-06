@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pipelex import log
+from pipelex.hub import get_secrets_provider
 from pipelex.tools.storage.exceptions import StorageConfigError
 from pipelex.tools.storage.gcp_storage_provider import GcpStorageProvider
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
@@ -47,6 +48,6 @@ def make_storage_provider_from_config(storage_config: StorageConfig) -> StorageP
             return GcpStorageProvider(
                 bucket_name=storage_config.gcp.bucket_name,
                 project_id=storage_config.gcp.project_id,
-                credentials_file_path=storage_config.gcp.credentials_file_path,
+                credentials_file_path=get_secrets_provider().get_required_secret(secret_id="GCP_CREDENTIALS_FILE_PATH"),
                 signed_urls_lifespan=storage_config.gcp.signed_urls_lifespan,
             )

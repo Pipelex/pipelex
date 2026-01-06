@@ -41,7 +41,6 @@ class StorageGcpConfig(ConfigModel):
     uri_format: str
     bucket_name: str
     project_id: str
-    credentials_file_path: str
     signed_urls_lifespan_seconds: int | Literal["disabled"]
 
     @property

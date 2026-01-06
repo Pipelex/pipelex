@@ -59,7 +59,6 @@
 # uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 # bucket_name = "your-bucket-name"
 # project_id = "your-project-id"
-# credentials_file_path = "/path/to/service-account-key.json"
 # signed_urls_lifespan_seconds = 3600  # Set to "disabled" for public URLs
 
 [pipelex.scan_config]
