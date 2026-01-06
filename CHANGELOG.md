@@ -55,6 +55,10 @@
 - Validation for Pipelex Bundle concept keys: cannot create a native concept
 - Validation for `PipeSequence`: The multiplicity of the output of the sequence must be the same as the multiplicity of the output of the last step.
 - Validation for `PipeFunc`: The multiplicity of the output of the pipe must be the same as the multiplicity of the output of the function: If the multiplicity is true, the return type of the function must be a subclass of `ListContent`. If the multiplicity is false, the return type of the function must not be a subclass of `ListContent`.
+- **Pipelex Gateway Model Management**: New CLI commands (`pipelex-dev update-gateway-models`, `pipelex-dev check-gateway-models`) and corresponding `make` targets (`ugm`, `cgm`) to generate and verify gateway model catalog. CI now validates this documentation is up-to-date.
+- `pipelex init agreement` command: Allows accepting Gateway terms of service without resetting entire configuration.
+- Test suite pre-flight check: Verifies Gateway terms acceptance before running tests, providing clear error messages.
+- "Gateway Available Models" documentation page: Auto-generated reference of all LLM, Document Extraction, and Image Generation models available through the Gateway.
 
 ### Fixed
 - Fixed a bug with the validation of the multiplicity of the output of the `PipeCondition`.
@@ -99,6 +103,7 @@
 ### Removed
 
 - **`openai_utils` Module**: Removed `pipelex.plugins.openai.openai_utils`; logic now in centralized image preparation utilities.
+- **Pipeline Tracking feature**: Removed entirely, including the `pipelex/pipeline/track` module, `PipelineTracker` components, related configuration, tracker calls in pipe controllers, and associated documentation.
 
 ### Deprecated
 
