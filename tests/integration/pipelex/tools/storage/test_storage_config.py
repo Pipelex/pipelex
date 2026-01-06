@@ -35,3 +35,9 @@ class TestStorageConfigIntegration:
             case StorageMethod.IN_MEMORY:
                 assert storage_config.in_memory is not None
                 assert storage_config.uri_format == storage_config.in_memory.uri_format
+            case StorageMethod.S3:
+                assert storage_config.s3 is not None
+                assert storage_config.uri_format == storage_config.s3.uri_format
+            case StorageMethod.GCP:
+                assert storage_config.gcp is not None
+                assert storage_config.uri_format == storage_config.gcp.uri_format

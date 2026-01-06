@@ -1,32 +1,123 @@
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Generator, Literal, cast
+from unittest.mock import MagicMock
 
 import pytest
+from moto import mock_aws  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.config import get_config
+from pipelex.tools.storage.gcp_storage_provider import GcpStorageProvider
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
+from pipelex.tools.storage.s3_storage_provider import S3StorageProvider
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
-StorageMethodLiteral = Literal["local", "in_memory"]
+StorageMethodLiteral = Literal["local", "in_memory", "s3", "gcp"]
+
+# Constants for S3 mocking
+S3_TEST_BUCKET = "test-pipelex-bucket"
+S3_TEST_REGION = "us-east-1"
+
+# Constants for GCP mocking
+GCP_TEST_BUCKET = "test-gcp-pipelex-bucket"
+GCP_TEST_PROJECT = "test-project"
 
 
-@pytest.fixture(params=["local", "in_memory"])
+@pytest.fixture(params=["local", "in_memory", "s3", "gcp"])
 def storage_method(request: pytest.FixtureRequest) -> StorageMethodLiteral:
     """Parametrized fixture that yields each storage method."""
     return cast("StorageMethodLiteral", request.param)
 
 
 @pytest.fixture
-def storage_provider(storage_method: StorageMethodLiteral, tmp_path: Path) -> StorageProviderAbstract:
+def s3_mock() -> Generator[None, None, None]:
+    """Start moto mock for S3 tests."""
+    with mock_aws():  # pyright: ignore[reportUnknownMemberType]
+        import boto3  # noqa: PLC0415
+
+        # Create the test bucket
+        s3_client = boto3.client("s3", region_name=S3_TEST_REGION)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+        s3_client.create_bucket(Bucket=S3_TEST_BUCKET)  # pyright: ignore[reportUnknownMemberType]
+        yield
+
+
+@pytest.fixture
+def gcp_mock(tmp_path: Path, mocker: MockerFixture) -> dict[str, Any]:
+    """Mock GCP storage for tests.
+
+    Creates a mock that simulates GCS behavior using an in-memory dict.
+    """
+    # Import the module first so it can be patched
+    from google.cloud import storage  # type: ignore[import-untyped]  # noqa: PLC0415
+
+    # Create mock credentials file
+    credentials_path = tmp_path / "gcp_credentials.json"
+    credentials_path.write_text('{"type": "service_account"}')
+
+    # Storage for mock data
+    mock_data_storage: dict[str, bytes] = {}
+
+    # Create mock blob that behaves like a real blob
+    def create_mock_blob(key: str) -> MagicMock:
+        blob = MagicMock()
+        blob.exists.side_effect = lambda: key in mock_data_storage
+        blob.download_as_bytes.side_effect = lambda: mock_data_storage[key]
+        blob.upload_from_string.side_effect = lambda data, content_type=None: mock_data_storage.__setitem__(key, data)  # noqa: ARG005  # pyright: ignore[reportUnknownLambdaType,reportUnknownArgumentType]
+        blob.generate_signed_url.return_value = f"https://storage.googleapis.com/{GCP_TEST_BUCKET}/{key}?signed=true"
+        return blob
+
+    # Create mock bucket
+    mock_bucket = MagicMock()
+    mock_bucket.blob.side_effect = create_mock_blob
+
+    # Create mock client
+    mock_client = MagicMock()
+    mock_client.bucket.return_value = mock_bucket
+
+    # Patch the Client.from_service_account_json method directly
+    mocker.patch.object(
+        storage.Client,
+        "from_service_account_json",
+        return_value=mock_client,
+    )
+
+    return {
+        "credentials_path": str(credentials_path),
+        "storage": mock_data_storage,
+    }
+
+
+@pytest.fixture
+def storage_provider(
+    storage_method: StorageMethodLiteral,
+    tmp_path: Path,
+    request: pytest.FixtureRequest,
+) -> StorageProviderAbstract:
     """Create a storage provider based on the storage method."""
     match storage_method:
         case "local":
             return LocalStorageProvider(root_path=tmp_path)
         case "in_memory":
             return InMemoryStorageProvider()
+        case "s3":
+            # Request the s3_mock fixture to set up moto
+            request.getfixturevalue("s3_mock")
+            return S3StorageProvider(
+                bucket_name=S3_TEST_BUCKET,
+                region=S3_TEST_REGION,
+                signed_urls_lifespan=None,
+            )
+        case "gcp":
+            # Request the gcp_mock fixture to set up mocks
+            gcp_mock_data = request.getfixturevalue("gcp_mock")
+            return GcpStorageProvider(
+                bucket_name=GCP_TEST_BUCKET,
+                project_id=GCP_TEST_PROJECT,
+                credentials_file_path=gcp_mock_data["credentials_path"],
+                signed_urls_lifespan=None,
+            )
 
 
 @pytest.fixture
@@ -40,6 +131,12 @@ def uri_format(storage_method: StorageMethodLiteral) -> str:
         case "in_memory":
             assert storage_config.in_memory is not None
             return storage_config.in_memory.uri_format
+        case "s3":
+            assert storage_config.s3 is not None
+            return storage_config.s3.uri_format
+        case "gcp":
+            assert storage_config.gcp is not None
+            return storage_config.gcp.uri_format
 
 
 @pytest.fixture

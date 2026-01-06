@@ -7,8 +7,8 @@ from rich import box
 from rich.table import Table
 
 from pipelex.cli.exceptions import PipelexCLIError
-from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.config import get_config
+from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.tools.aws.aws_config import AwsCredentialsError

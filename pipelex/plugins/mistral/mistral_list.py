@@ -6,7 +6,7 @@ from typing import Any
 from rich import box
 from rich.table import Table
 
-from pipelex.cogt.exceptions import MissingDependencyError
+from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console
 
 
