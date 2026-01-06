@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from operator import itemgetter
 from typing import TYPE_CHECKING, Any, cast
 
@@ -145,7 +145,7 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
         Complete Markdown content for the reference file.
     """
     models_by_type = extract_reference_data(model_specs)
-    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017
 
     sections = [
         "# Pipelex Gateway - Available Models",
