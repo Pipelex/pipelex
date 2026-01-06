@@ -260,8 +260,8 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             position: fixed;
             top: 57px;
             right: 0;
-            width: 420px;
-            min-width: 300px;
+            width: 40vw;
+            min-width: 360px;
             max-width: 80vw;
             height: calc(100vh - 57px - 41px);
             background: var(--color-surface);
@@ -337,6 +337,27 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
             flex: 1;
             overflow-y: auto;
             padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        .inspector-content > .inspector-section {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+        }
+        #stuff-data-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #stuff-data-content > .inspector-pre,
+        #stuff-data-content.inspector-html-content {
+            flex: 1;
+            max-height: none;
+            min-height: 0;
+            overflow-y: auto;
         }
         .inspector-badges {
             display: flex;
@@ -1134,6 +1155,10 @@ REACTFLOW_HTML_TEMPLATE = """<!DOCTYPE html>
                 const inspectorTitle = document.getElementById('inspector-title');
                 const inspectorSubtitle = document.getElementById('inspector-subtitle');
                 const inspectorHeader = document.getElementById('inspector-header');
+
+                // Reset scroll to top-left when switching nodes (keep tab selection)
+                inspectorContent.scrollTop = 0;
+                inspectorContent.scrollLeft = 0;
 
                 const nodeData = node.data || {};
 
