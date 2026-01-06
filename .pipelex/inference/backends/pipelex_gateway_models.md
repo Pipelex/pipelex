@@ -1,16 +1,14 @@
 # Pipelex Gateway - Available Models
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-06T14:06:21Z
+> Last updated: 2026-01-06T15:14:33Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
 
 This file documents models available through Pipelex Gateway.
 For configuration details, see the [documentation](https://docs.pipelex.com/home/5-setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started).
 
-<!-- --8<-- [start:model_tables] -->
-
-### Language Models (LLM)
+## Language Models (LLM)
 
 | Model | Inputs | Outputs | SDK | Structure Method |
 |-------|--------|---------|-----|------------------|
@@ -54,14 +52,14 @@ For configuration details, see the [documentation](https://docs.pipelex.com/home
 | o4-mini | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
 | qwen3-vl-235b-a22b | text, images | text, structured | gateway_completions | instructor/json |
 
-### Document Extraction Models
+## Document Extraction Models
 
 | Model | Inputs | Outputs | SDK | Structure Method |
 |-------|--------|---------|-----|------------------|
 | azure-document-intelligence | pdf | pages | gateway_extract | instructor/openai_tools |
 | mistral-document-ai-2505 | pdf, image | pages | gateway_extract | instructor/openai_tools |
 
-### Image Generation Models
+## Image Generation Models
 
 | Model | Inputs | Outputs | SDK |
 |-------|--------|---------|-----|
@@ -75,5 +73,3 @@ For configuration details, see the [documentation](https://docs.pipelex.com/home
 | gpt-image-1.5 | text | image | gateway_img_gen |
 | nano-banana | text | image | gateway_completions |
 | nano-banana-pro | text | image | gateway_completions |
-
-<!-- --8<-- [end:model_tables] -->
