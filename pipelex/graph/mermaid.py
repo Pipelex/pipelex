@@ -795,6 +795,7 @@ def graphspec_to_combo_mermaid(
     *,
     direction: FlowchartDirection | None = None,
     show_stuff_codes: bool = False,
+    include_subgraphs: bool = True,
 ) -> MermaidOutput:
     """Convert a GraphSpec to a combined data-flow and orchestration Mermaid flowchart.
 
@@ -802,18 +803,25 @@ def graphspec_to_combo_mermaid(
     - Data flow visualization: Shows Stuff nodes (data items) flowing between pipes
     - Orchestration grouping: PipeControllers rendered as subgraphs containing their children
 
-    The diagram shows:
+    When include_subgraphs is True (default):
     - Controller nodes as subgraphs containing their child pipes
     - Pipe nodes as rectangles inside their controller subgraphs
     - Stuff nodes as pills (stadium shape) inside subgraphs next to their producer pipe
     - Stuff nodes without a producer (pipeline inputs) at top level
-    - Edges from producer pipes to stuff, and from stuff to consumer pipes
+
+    When include_subgraphs is False:
+    - All pipe nodes rendered flat (no hierarchy)
+    - All stuff nodes rendered flat at top level
+    - Only pipes participating in data flow are shown
+
+    Edges from producer pipes to stuff, and from stuff to consumer pipes are always shown.
 
     Args:
         graph: The GraphSpec to convert.
         graph_config: Configuration controlling data inclusion and rendering options.
         direction: Flowchart direction. Defaults to TOP_DOWN if not specified.
         show_stuff_codes: Whether to show stuff_code (digest) in stuff labels.
+        include_subgraphs: Whether to render controller hierarchy as subgraphs.
 
     Returns:
         MermaidOutput containing mermaid code and optional stuff data mapping.
@@ -837,28 +845,11 @@ def graphspec_to_combo_mermaid(
     for digest, stuff_info in analysis.stuff_registry.items():
         stuff_registry[digest] = (stuff_info.name, stuff_info.concept)
 
-    # Will be populated during recursive rendering
+    # Will be populated during rendering
     stuff_id_mapping: dict[str, str] = {}
 
-    # Track subgraph depths for coloring
+    # Track subgraph depths for coloring (only used when include_subgraphs=True)
     subgraph_depths: dict[str, int] = {}
-
-    # Render pipe nodes and their produced stuff within controller subgraphs
-    lines.append("")
-    lines.append("    %% Pipe and stuff nodes within controller subgraphs")
-    for root_node in analysis.root_nodes:
-        node_lines = _render_combo_subgraph_recursive(
-            node_id=root_node.node_id,
-            nodes_by_id=analysis.nodes_by_id,
-            id_mapping=id_mapping,
-            children_map=analysis.containment_tree,
-            stuff_registry=stuff_registry,
-            stuff_producers=analysis.stuff_producers,
-            stuff_id_mapping=stuff_id_mapping,
-            subgraph_depths=subgraph_depths,
-            show_stuff_codes=show_stuff_codes,
-        )
-        lines.extend(node_lines)
 
     # Skip if no data flow information
     if not analysis.has_data_flow_info():
@@ -868,12 +859,64 @@ def graphspec_to_combo_mermaid(
         mermaid_code = "\n".join(lines)
         return MermaidOutput(mermaid_code=mermaid_code, stuff_data=None)
 
-    # Render stuff nodes without a producer (pipeline inputs) at top level
-    orphan_stuffs = [(digest, name, concept) for digest, (name, concept) in stuff_registry.items() if digest not in analysis.stuff_producers]
-    if orphan_stuffs:
+    if include_subgraphs:
+        # Render pipe nodes and their produced stuff within controller subgraphs
         lines.append("")
-        lines.append("    %% Pipeline input stuff nodes (no producer)")
-        for digest, name, concept in sorted(orphan_stuffs, key=operator.itemgetter(1)):
+        lines.append("    %% Pipe and stuff nodes within controller subgraphs")
+        for root_node in analysis.root_nodes:
+            node_lines = _render_combo_subgraph_recursive(
+                node_id=root_node.node_id,
+                nodes_by_id=analysis.nodes_by_id,
+                id_mapping=id_mapping,
+                children_map=analysis.containment_tree,
+                stuff_registry=stuff_registry,
+                stuff_producers=analysis.stuff_producers,
+                stuff_id_mapping=stuff_id_mapping,
+                subgraph_depths=subgraph_depths,
+                show_stuff_codes=show_stuff_codes,
+            )
+            lines.extend(node_lines)
+
+        # Render stuff nodes without a producer (pipeline inputs) at top level
+        orphan_stuffs = [(digest, name, concept) for digest, (name, concept) in stuff_registry.items() if digest not in analysis.stuff_producers]
+        if orphan_stuffs:
+            lines.append("")
+            lines.append("    %% Pipeline input stuff nodes (no producer)")
+            for digest, name, concept in sorted(orphan_stuffs, key=operator.itemgetter(1)):
+                stuff_line = _render_stuff_node(
+                    digest=digest,
+                    name=name,
+                    concept=concept,
+                    stuff_id_mapping=stuff_id_mapping,
+                    show_stuff_codes=show_stuff_codes,
+                    indent="    ",
+                )
+                lines.append(stuff_line)
+    else:
+        # Flat rendering: no subgraphs, only pipes participating in data flow
+        lines.append("")
+        lines.append("    %% Pipe nodes (flat view)")
+
+        # Only render pipes that participate in data flow
+        participating_pipes: set[str] = set(analysis.stuff_producers.values())
+        for consumers in analysis.stuff_consumers.values():
+            participating_pipes.update(consumers)
+
+        for node in sorted(graph.nodes, key=lambda n_iter: (n_iter.pipe_code or "", n_iter.node_id)):
+            if node.node_id not in participating_pipes:
+                continue
+
+            mermaid_id = id_mapping[node.node_id]
+            label = _get_node_label(node)
+            if node.status == NodeStatus.FAILED:
+                lines.append(f'    {mermaid_id}["{label}"]:::pipe_failed')
+            else:
+                lines.append(f'    {mermaid_id}["{label}"]:::pipe')
+
+        # Render all stuff nodes flat at top level
+        lines.append("")
+        lines.append("    %% Stuff nodes (data items)")
+        for digest, (name, concept) in sorted(stuff_registry.items(), key=lambda item: item[1][0]):
             stuff_line = _render_stuff_node(
                 digest=digest,
                 name=name,
@@ -908,16 +951,19 @@ def graphspec_to_combo_mermaid(
     lines.append("")
     lines.append("    %% Style definitions")
     lines.append("    classDef failed fill:#ffcccc,stroke:#cc0000")
-    lines.append("    classDef controller fill:#e6f3ff,stroke:#0066cc")
     lines.append("    classDef stuff fill:#fff3e6,stroke:#cc6600,stroke-width:2px")
-
-    # Apply depth-based colors to subgraphs
-    if subgraph_depths:
-        lines.append("")
-        lines.append("    %% Subgraph depth-based coloring")
-        for subgraph_id, sg_depth in sorted(subgraph_depths.items()):
-            color = SUBGRAPH_DEPTH_COLORS[sg_depth % len(SUBGRAPH_DEPTH_COLORS)]
-            lines.append(f"    style {subgraph_id} fill:{color}")
+    if include_subgraphs:
+        lines.append("    classDef controller fill:#e6f3ff,stroke:#0066cc")
+        # Apply depth-based colors to subgraphs
+        if subgraph_depths:
+            lines.append("")
+            lines.append("    %% Subgraph depth-based coloring")
+            for subgraph_id, sg_depth in sorted(subgraph_depths.items()):
+                color = SUBGRAPH_DEPTH_COLORS[sg_depth % len(SUBGRAPH_DEPTH_COLORS)]
+                lines.append(f"    style {subgraph_id} fill:{color}")
+    else:
+        lines.append("    classDef pipe fill:#e6f3ff,stroke:#0066cc")
+        lines.append("    classDef pipe_failed fill:#ffcccc,stroke:#cc0000")
 
     mermaid_code = "\n".join(lines)
 

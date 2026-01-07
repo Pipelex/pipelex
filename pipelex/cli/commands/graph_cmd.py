@@ -66,6 +66,10 @@ def graph_render_cmd(
         bool,
         typer.Option("--contains-edges/--no-contains-edges", help="Include parent-child (contains) edges in orchestration Mermaid output"),
     ] = False,
+    subgraphs: Annotated[
+        bool,
+        typer.Option("--subgraphs/--no-subgraphs", help="Include controller subgraphs in combo Mermaid output"),
+    ] = True,
     open_browser: Annotated[
         bool,
         typer.Option("--open", help="Open the generated HTML in the default browser"),
@@ -83,6 +87,7 @@ def graph_render_cmd(
         pipelex graph render graph.json --reactflow        # reactflow.html only
         pipelex graph render graph.json --all              # all views
         pipelex graph render graph.json --all --no-data-edges   # all views without data edges
+        pipelex graph render graph.json --mermaid --no-subgraphs  # flat combo view
         pipelex graph render graph.json --open             # open in browser
         pipelex graph render graph.json -o ./output/       # custom output directory
         pipelex graph render tests/data/graphs/cv_matching_graph.json --reactflow -o ./temp/test_outputs/
@@ -178,7 +183,12 @@ def graph_render_cmd(
 
             # Generate combo view (default + --mermaid + --all)
             if generate_mermaid_combo:
-                combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=flow_direction)
+                combo_output = graphspec_to_combo_mermaid(
+                    graph_spec,
+                    graph_config,
+                    direction=flow_direction,
+                    include_subgraphs=subgraphs,
+                )
                 if combo_output.stuff_data:
                     combo_html = await render_mermaid_html_with_data_async(
                         combo_output.mermaid_code,
