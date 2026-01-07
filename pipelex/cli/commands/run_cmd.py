@@ -253,14 +253,14 @@ def run_cmd(
                 typer.secho(f"\n✅ GraphSpec JSON saved to: {graph_output_dir / 'graphspec.json'}", fg=typer.colors.GREEN)
                 saved_count += 1
 
-            if graph_outputs.combo_mmd is not None:
-                (graph_output_dir / "combo.mmd").write_text(graph_outputs.combo_mmd, encoding="utf-8")
-                typer.secho(f"✅ Combo Mermaid saved to: {graph_output_dir / 'combo.mmd'}", fg=typer.colors.GREEN)
+            if graph_outputs.mermaidflow_mmd is not None:
+                (graph_output_dir / "mermaidflow.mmd").write_text(graph_outputs.mermaidflow_mmd, encoding="utf-8")
+                typer.secho(f"✅ Mermaidflow Mermaid saved to: {graph_output_dir / 'mermaidflow.mmd'}", fg=typer.colors.GREEN)
                 saved_count += 1
 
-            if graph_outputs.combo_html is not None:
-                (graph_output_dir / "combo.html").write_text(graph_outputs.combo_html, encoding="utf-8")
-                typer.secho(f"✅ Combo HTML saved to: {graph_output_dir / 'combo.html'}", fg=typer.colors.GREEN)
+            if graph_outputs.mermaidflow_html is not None:
+                (graph_output_dir / "mermaidflow.html").write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
+                typer.secho(f"✅ Mermaidflow HTML saved to: {graph_output_dir / 'mermaidflow.html'}", fg=typer.colors.GREEN)
                 saved_count += 1
 
             if graph_outputs.reactflow_viewspec is not None:

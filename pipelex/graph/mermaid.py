@@ -1,7 +1,7 @@
 """Mermaid flowchart exporter for GraphSpec.
 
-This module converts GraphSpec to Mermaid flowchart syntax, using subgraphs
-to represent controller containment relationships.
+This module converts GraphSpec to Mermaid flowchart syntax (mermaidflow view),
+using subgraphs to represent controller containment relationships.
 
 The module uses GraphAnalysis for pre-computed graph analysis, avoiding
 duplicated analysis logic across different rendering functions.
@@ -25,7 +25,7 @@ from pipelex.tools.mermaid.mermaid_utils import escape_mermaid_label, sanitize_m
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
-class MermaidOutput(BaseModel):
+class MermaidAndStuff(BaseModel):
     """Mermaid code paired with optional stuff data for interactive HTML rendering.
 
     Attributes:
@@ -299,7 +299,7 @@ def _render_stuff_node(
     return f'{indent}{stuff_mermaid_id}(["{label}"]):::stuff'
 
 
-def _render_combo_subgraph_recursive(
+def _render_subgraph_recursive(
     node_id: str,
     nodes_by_id: dict[str, NodeSpec],
     id_mapping: dict[str, str],
@@ -362,7 +362,7 @@ def _render_combo_subgraph_recursive(
         )
 
         for child_id in sorted_children:
-            child_lines = _render_combo_subgraph_recursive(
+            child_lines = _render_subgraph_recursive(
                 node_id=child_id,
                 nodes_by_id=nodes_by_id,
                 id_mapping=id_mapping,
@@ -399,17 +399,17 @@ def _render_combo_subgraph_recursive(
     return lines
 
 
-def graphspec_to_combo_mermaid(
+def graphspec_to_mermaidflow(
     graph: GraphSpec,
     graph_config: GraphConfig,
     *,
     direction: FlowchartDirection | None = None,
     show_stuff_codes: bool = False,
     include_subgraphs: bool = True,
-) -> MermaidOutput:
-    """Convert a GraphSpec to a combined data-flow and orchestration Mermaid flowchart.
+) -> MermaidAndStuff:
+    """Convert a GraphSpec to a mermaidflow Mermaid flowchart.
 
-    This view combines the best of both worlds:
+    This view combines data flow visualization with orchestration grouping:
     - Data flow visualization: Shows Stuff nodes (data items) flowing between pipes
     - Orchestration grouping: PipeControllers rendered as subgraphs containing their children
 
@@ -434,7 +434,7 @@ def graphspec_to_combo_mermaid(
         include_subgraphs: Whether to render controller hierarchy as subgraphs.
 
     Returns:
-        MermaidOutput containing mermaid code and optional stuff data mapping.
+        MermaidAndStuff containing mermaid code and optional stuff data mapping.
     """
     effective_direction = direction or FlowchartDirection.TOP_DOWN
     lines: list[str] = []
@@ -467,14 +467,14 @@ def graphspec_to_combo_mermaid(
         lines.append("    %% No data flow information available")
         lines.append("    note[No IOSpec data captured. Run with data flow tracing enabled.]")
         mermaid_code = "\n".join(lines)
-        return MermaidOutput(mermaid_code=mermaid_code, stuff_data=None)
+        return MermaidAndStuff(mermaid_code=mermaid_code, stuff_data=None)
 
     if include_subgraphs:
         # Render pipe nodes and their produced stuff within controller subgraphs
         lines.append("")
         lines.append("    %% Pipe and stuff nodes within controller subgraphs")
         for root_node in analysis.root_nodes:
-            node_lines = _render_combo_subgraph_recursive(
+            node_lines = _render_subgraph_recursive(
                 node_id=root_node.node_id,
                 nodes_by_id=analysis.nodes_by_id,
                 id_mapping=id_mapping,
@@ -594,7 +594,7 @@ def graphspec_to_combo_mermaid(
     if stuff_data or stuff_data_text or stuff_data_html:
         stuff_metadata = collect_stuff_metadata(graph=graph)
 
-    return MermaidOutput(
+    return MermaidAndStuff(
         mermaid_code=mermaid_code,
         stuff_data=stuff_data,
         stuff_data_text=stuff_data_text,

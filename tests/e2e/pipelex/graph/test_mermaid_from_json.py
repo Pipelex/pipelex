@@ -13,7 +13,7 @@ from pipelex.config import get_config
 from pipelex.graph.graphspec_io import load_graphspec
 from pipelex.graph.mermaid import (
     FlowchartDirection,
-    graphspec_to_combo_mermaid,
+    graphspec_to_mermaidflow,
 )
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
@@ -53,7 +53,7 @@ class TestMermaidFromJson:
         This test:
 
         1. Loads a GraphSpec from JSON
-        2. Generates combo Mermaid diagram
+        2. Generates mermaidflow Mermaid diagram
         3. Renders to HTML (with interactive data where applicable)
         4. Saves outputs to TEST_OUTPUTS_DIR
         5. Verifies the structure of generated diagrams and HTML
@@ -77,58 +77,58 @@ class TestMermaidFromJson:
 
         graph_config = self._get_graph_config_with_data()
 
-        # Generate combo Mermaid with data
-        combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
-        assert combo_output.mermaid_code.startswith("flowchart TD")
+        # Generate mermaidflow Mermaid with data
+        mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+        assert mermaid_flow_and_stuff.mermaid_code.startswith("flowchart TD")
 
-        combo_mmd_path = output_dir / "combo.mmd"
-        combo_mmd_path.write_text(combo_output.mermaid_code, encoding="utf-8")
-        log.info(f"Saved combo.mmd: {combo_mmd_path}")
-        log.info(f"Combo stuff_data count: {len(combo_output.stuff_data) if combo_output.stuff_data else 0}")
+        mermaidflow_mmd_path = output_dir / "mermaidflow.mmd"
+        mermaidflow_mmd_path.write_text(mermaid_flow_and_stuff.mermaid_code, encoding="utf-8")
+        log.info(f"Saved mermaidflow.mmd: {mermaidflow_mmd_path}")
+        log.info(f"Mermaidflow stuff_data count: {len(mermaid_flow_and_stuff.stuff_data) if mermaid_flow_and_stuff.stuff_data else 0}")
 
-        if combo_output.stuff_data:
-            combo_html = await render_mermaid_html_with_data_async(
-                combo_output.mermaid_code,
-                stuff_data=combo_output.stuff_data,
-                stuff_metadata=combo_output.stuff_metadata,
-                title=f"Combo (Interactive): {topic}",
+        if mermaid_flow_and_stuff.stuff_data:
+            mermaidflow_html = await render_mermaid_html_with_data_async(
+                mermaid_flow_and_stuff.mermaid_code,
+                stuff_data=mermaid_flow_and_stuff.stuff_data,
+                stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+                title=f"Mermaidflow (Interactive): {topic}",
             )
         else:
-            combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title=f"Combo: {topic}")
+            mermaidflow_html = await render_mermaid_html_async(mermaid_flow_and_stuff.mermaid_code, title=f"Mermaidflow: {topic}")
 
-        combo_html_path = output_dir / "combo.html"
-        combo_html_path.write_text(combo_html, encoding="utf-8")
-        log.info(f"Saved combo.html: {combo_html_path}")
+        mermaidflow_html_path = output_dir / "mermaidflow.html"
+        mermaidflow_html_path.write_text(mermaidflow_html, encoding="utf-8")
+        log.info(f"Saved mermaidflow.html: {mermaidflow_html_path}")
 
         # Verify all files were saved
-        assert combo_mmd_path.exists()
-        assert combo_html_path.exists()
+        assert mermaidflow_mmd_path.exists()
+        assert mermaidflow_html_path.exists()
 
         # Verify HTML structure
-        html_content = combo_html_path.read_text(encoding="utf-8")
+        html_content = mermaidflow_html_path.read_text(encoding="utf-8")
         assert html_content.startswith("<!DOCTYPE html>")
         assert "mermaid" in html_content
         assert 'class="mermaid"' in html_content
 
-        log.info(f"✅ Mermaid generation complete for '{topic}':\n  - Combo: {combo_mmd_path.stat().st_size} bytes")
+        log.info(f"✅ Mermaid generation complete for '{topic}':\n  - Mermaidflow: {mermaidflow_mmd_path.stat().st_size} bytes")
 
     @pytest.mark.parametrize(
         ("topic", "graph_json_path"),
         GraphTestData.GRAPH_JSON_TEST_CASES,
     )
-    async def test_combo_mermaid_structure(self, topic: str, graph_json_path: str) -> None:
-        """Test that combo Mermaid combines orchestration and dataflow elements."""
+    async def test_mermaidflow_structure(self, topic: str, graph_json_path: str) -> None:
+        """Test that mermaidflow Mermaid combines orchestration and dataflow elements."""
         _ = topic  # Used for test identification
 
         graph_spec = load_graphspec(Path(graph_json_path))
         graph_config = self._get_graph_config_with_data()
-        combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config)
+        mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config)
 
-        mermaid_code = combo_output.mermaid_code
+        mermaid_code = mermaid_flow_and_stuff.mermaid_code
 
-        # Verify combo has both orchestration elements (subgraphs) and dataflow elements (stuff)
+        # Verify mermaidflow has both orchestration elements (subgraphs) and dataflow elements (stuff)
         assert "flowchart" in mermaid_code
         assert "classDef stuff" in mermaid_code
 
-        # Combo should have subgraphs for controllers
+        # Mermaidflow should have subgraphs for controllers
         assert "subgraph" in mermaid_code

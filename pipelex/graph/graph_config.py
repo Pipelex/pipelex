@@ -15,8 +15,8 @@ class GraphsInclusionConfig(ConfigModel):
     """Controls which graph outputs are generated."""
 
     graphspec_json: bool
-    combo_mmd: bool
-    combo_html: bool
+    mermaidflow_mmd: bool
+    mermaidflow_html: bool
     reactflow_viewspec: bool
     reactflow_html: bool
 

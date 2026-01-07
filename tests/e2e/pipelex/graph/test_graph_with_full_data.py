@@ -17,7 +17,7 @@ from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.graphspec_io import save_graphspec
 from pipelex.graph.mermaid import (
     FlowchartDirection,
-    graphspec_to_combo_mermaid,
+    graphspec_to_mermaidflow,
 )
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
@@ -63,31 +63,31 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     log.info(f"Saved graph.json to: {graph_json_path}")
 
     # Generate and save mermaid files
-    # Combo with data
-    combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
-    (output_dir / "combo.mmd").write_text(combo_output.mermaid_code, encoding="utf-8")
+    # Mermaidflow with data
+    mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+    (output_dir / "mermaidflow.mmd").write_text(mermaid_flow_and_stuff.mermaid_code, encoding="utf-8")
 
-    log.info(f"Combo stuff_data keys: {list(combo_output.stuff_data.keys()) if combo_output.stuff_data else []}")
+    log.info(f"Mermaidflow stuff_data keys: {list(mermaid_flow_and_stuff.stuff_data.keys()) if mermaid_flow_and_stuff.stuff_data else []}")
 
-    has_combo_data = combo_output.stuff_data or combo_output.stuff_data_text or combo_output.stuff_data_html
-    if has_combo_data:
-        combo_html = await render_mermaid_html_with_data_async(
-            combo_output.mermaid_code,
-            stuff_data=combo_output.stuff_data,
-            stuff_data_text=combo_output.stuff_data_text,
-            stuff_data_html=combo_output.stuff_data_html,
-            stuff_metadata=combo_output.stuff_metadata,
-            title="Combo (Interactive)",
+    has_mermaidflow_data = mermaid_flow_and_stuff.stuff_data or mermaid_flow_and_stuff.stuff_data_text or mermaid_flow_and_stuff.stuff_data_html
+    if has_mermaidflow_data:
+        mermaidflow_html = await render_mermaid_html_with_data_async(
+            mermaid_flow_and_stuff.mermaid_code,
+            stuff_data=mermaid_flow_and_stuff.stuff_data,
+            stuff_data_text=mermaid_flow_and_stuff.stuff_data_text,
+            stuff_data_html=mermaid_flow_and_stuff.stuff_data_html,
+            stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+            title="Mermaidflow (Interactive)",
             theme=mermaid_theme,
         )
     else:
-        combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title="Combo", theme=mermaid_theme)
-    (output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
+        mermaidflow_html = await render_mermaid_html_async(mermaid_flow_and_stuff.mermaid_code, title="Mermaidflow", theme=mermaid_theme)
+    (output_dir / "mermaidflow.html").write_text(mermaidflow_html, encoding="utf-8")
 
     log.info(f"✅ All graph outputs saved to: {output_dir}")
 
     return {
-        "combo_stuff_data_count": len(combo_output.stuff_data) if combo_output.stuff_data else 0,
+        "mermaidflow_stuff_data_count": len(mermaid_flow_and_stuff.stuff_data) if mermaid_flow_and_stuff.stuff_data else 0,
     }
 
 
@@ -251,8 +251,8 @@ class TestGraphWithFullData:
         stats = await _save_graph_outputs(graph_spec, output_dir)
 
         # Verify stuff_data was collected
-        assert stats["combo_stuff_data_count"] > 0, (
-            f"Combo should have stuff_data extracted from graph. Graph has {inputs_with_data} inputs and {outputs_with_data} outputs with data."
+        assert stats["mermaidflow_stuff_data_count"] > 0, (
+            f"Mermaidflow should have stuff_data extracted from graph. Graph has {inputs_with_data} inputs and {outputs_with_data} outputs with data."
         )
 
         # Generate ReactFlow HTML
@@ -281,6 +281,6 @@ class TestGraphWithFullData:
             f"  - Edges: {len(graph_spec.edges)}\n"
             f"  - Inputs with data: {inputs_with_data}/{total_inputs}\n"
             f"  - Outputs with data: {outputs_with_data}/{total_outputs}\n"
-            f"  - Combo stuff_data entries: {stats['combo_stuff_data_count']}\n"
+            f"  - Mermaidflow stuff_data entries: {stats['mermaidflow_stuff_data_count']}\n"
             f"  - ReactFlow HTML: {reactflow_path.stat().st_size} bytes"
         )

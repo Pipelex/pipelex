@@ -1,4 +1,9 @@
-"""CLI commands to render execution graphs."""
+"""CLI commands to render execution graphs.
+
+Supports two graph view types:
+- mermaidflow: Mermaid-based flowchart visualization
+- reactflow: ReactFlow interactive visualization
+"""
 
 from __future__ import annotations
 
@@ -18,7 +23,7 @@ from pipelex.graph.graphspec_io import load_graphspec
 from pipelex.graph.mermaid import (
     collect_stuff_data_html,
     collect_stuff_data_text,
-    graphspec_to_combo_mermaid,
+    graphspec_to_mermaidflow,
 )
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
@@ -30,7 +35,7 @@ from pipelex.tools.misc.chart_utils import FlowchartDirection
 graph_app = typer.Typer(no_args_is_help=True)
 
 
-@graph_app.command("render", help="Render an existing graph.json file to Mermaid combo.html and/or ReactFlow HTML")
+@graph_app.command("render", help="Render an existing graph.json file to mermaidflow.html and/or reactflow.html")
 def graph_render_cmd(
     input_file: Annotated[
         Path,
@@ -44,17 +49,17 @@ def graph_render_cmd(
         FlowchartDirection | None,
         typer.Option("--direction", help="Flowchart direction (default: TB)"),
     ] = None,
-    mermaid: Annotated[
+    mermaidflow: Annotated[
         bool,
-        typer.Option("--mermaid", "-m", help="Generate Mermaid combo.html only"),
+        typer.Option("--mermaidflow", "-m", help="Generate mermaidflow.html only"),
     ] = False,
     reactflow: Annotated[
         bool,
-        typer.Option("--reactflow", "-r", help="Generate ReactFlow reactflow.html only"),
+        typer.Option("--reactflow", "-r", help="Generate reactflow.html only"),
     ] = False,
     subgraphs: Annotated[
         bool,
-        typer.Option("--subgraphs/--no-subgraphs", help="Include controller subgraphs in combo Mermaid output"),
+        typer.Option("--subgraphs/--no-subgraphs", help="Include controller subgraphs in mermaidflow output"),
     ] = True,
     open_browser: Annotated[
         bool,
@@ -63,16 +68,16 @@ def graph_render_cmd(
 ) -> None:
     """Render an existing graph.json file to HTML visualizations.
 
-    By default generates both combo.html (Mermaid) and reactflow.html.
-    Use --mermaid or --reactflow to generate only one of them.
+    By default generates both mermaidflow.html (Mermaid) and reactflow.html (ReactFlow).
+    Use --mermaidflow or --reactflow to generate only one of them.
 
     Examples:
-        pipelex graph render graph.json                    # combo.html + reactflow.html
-        pipelex graph render graph.json --mermaid          # combo.html only
-        pipelex graph render graph.json --reactflow        # reactflow.html only
-        pipelex graph render graph.json --mermaid --no-subgraphs  # flat combo view (no hierarchy)
-        pipelex graph render graph.json --open             # open in browser
-        pipelex graph render graph.json -o ./output/       # custom output directory
+        pipelex graph render graph.json                        # both mermaidflow.html + reactflow.html
+        pipelex graph render graph.json --mermaidflow          # mermaidflow.html only
+        pipelex graph render graph.json --reactflow            # reactflow.html only
+        pipelex graph render graph.json --mermaidflow --no-subgraphs  # flat mermaidflow (no hierarchy)
+        pipelex graph render graph.json --open                 # open in browser
+        pipelex graph render graph.json -o ./output/           # custom output directory
         pipelex graph render tests/data/graphs/cv_matching_graph.json --reactflow -o ./temp/test_outputs/
     """
     # Validate input file exists
@@ -103,11 +108,11 @@ def graph_render_cmd(
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Determine what to generate:
-        # - Default (no flags): combo.html + reactflow.html
-        # - --mermaid: combo.html only
+        # - Default (no flags): both mermaidflow.html + reactflow.html
+        # - --mermaidflow: mermaidflow.html only
         # - --reactflow: reactflow.html only
-        generate_mermaid_combo = (not mermaid and not reactflow) or mermaid
-        generate_reactflow = (not mermaid and not reactflow) or reactflow
+        generate_mermaidflow = mermaidflow or (not mermaidflow and not reactflow)
+        generate_reactflow = reactflow or (not mermaidflow and not reactflow)
 
         generated_files: list[Path] = []
 
@@ -128,29 +133,29 @@ def graph_render_cmd(
 
             flow_direction = direction or FlowchartDirection.TOP_DOWN
 
-            # Generate combo view (default + --mermaid)
-            if generate_mermaid_combo:
-                combo_output = graphspec_to_combo_mermaid(
+            # Generate mermaidflow view (default + --mermaidflow)
+            if generate_mermaidflow:
+                mermaid_flow_and_stuff = graphspec_to_mermaidflow(
                     graph_spec,
                     graph_config,
                     direction=flow_direction,
                     include_subgraphs=subgraphs,
                 )
-                if combo_output.stuff_data:
-                    combo_html = await render_mermaid_html_with_data_async(
-                        combo_output.mermaid_code,
-                        stuff_data=combo_output.stuff_data,
-                        stuff_data_text=combo_output.stuff_data_text,
-                        stuff_data_html=combo_output.stuff_data_html,
-                        stuff_metadata=combo_output.stuff_metadata,
-                        title=f"Combo: {input_file.stem}",
+                if mermaid_flow_and_stuff.stuff_data:
+                    mermaidflow_html = await render_mermaid_html_with_data_async(
+                        mermaid_flow_and_stuff.mermaid_code,
+                        stuff_data=mermaid_flow_and_stuff.stuff_data,
+                        stuff_data_text=mermaid_flow_and_stuff.stuff_data_text,
+                        stuff_data_html=mermaid_flow_and_stuff.stuff_data_html,
+                        stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+                        title=f"Mermaidflow: {input_file.stem}",
                     )
                 else:
-                    combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title=f"Combo: {input_file.stem}")
-                combo_html_path = output_dir / "combo.html"
-                combo_html_path.write_text(combo_html, encoding="utf-8")
-                generated_files.append(combo_html_path)
-                typer.secho("✅ combo.html", fg=typer.colors.GREEN, err=True)
+                    mermaidflow_html = await render_mermaid_html_async(mermaid_flow_and_stuff.mermaid_code, title=f"Mermaidflow: {input_file.stem}")
+                mermaidflow_html_path = output_dir / "mermaidflow.html"
+                mermaidflow_html_path.write_text(mermaidflow_html, encoding="utf-8")
+                generated_files.append(mermaidflow_html_path)
+                typer.secho("✅ mermaidflow.html", fg=typer.colors.GREEN, err=True)
 
             # Generate ReactFlow view (default + --reactflow)
             if generate_reactflow:

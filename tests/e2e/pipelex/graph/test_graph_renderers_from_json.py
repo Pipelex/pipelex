@@ -16,7 +16,7 @@ from pipelex.graph.mermaid import (
     FlowchartDirection,
     collect_stuff_data_html,
     collect_stuff_data_text,
-    graphspec_to_combo_mermaid,
+    graphspec_to_mermaidflow,
 )
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
@@ -63,7 +63,7 @@ class TestGraphRenderersFromJson:
 
         This test generates:
 
-        - combo.mmd + combo.html (Mermaid combo view)
+        - mermaidflow.mmd + mermaidflow.html (Mermaid mermaidflow view)
         - reactflow.html (ReactFlow interactive view)
         - viewspec.json (ViewSpec used by ReactFlow)
 
@@ -88,22 +88,22 @@ class TestGraphRenderersFromJson:
 
         # ==================== MERMAID OUTPUTS ====================
 
-        # Combo with data
-        combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
-        (output_dir / "combo.mmd").write_text(combo_output.mermaid_code, encoding="utf-8")
-        has_combo_data = combo_output.stuff_data or combo_output.stuff_data_text or combo_output.stuff_data_html
-        if has_combo_data:
-            combo_html = await render_mermaid_html_with_data_async(
-                combo_output.mermaid_code,
-                stuff_data=combo_output.stuff_data,
-                stuff_data_text=combo_output.stuff_data_text,
-                stuff_data_html=combo_output.stuff_data_html,
-                stuff_metadata=combo_output.stuff_metadata,
-                title=f"Combo (Interactive): {topic}",
+        # Mermaidflow with data
+        mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+        (output_dir / "mermaidflow.mmd").write_text(mermaid_flow_and_stuff.mermaid_code, encoding="utf-8")
+        has_mermaidflow_data = mermaid_flow_and_stuff.stuff_data or mermaid_flow_and_stuff.stuff_data_text or mermaid_flow_and_stuff.stuff_data_html
+        if has_mermaidflow_data:
+            mermaidflow_html = await render_mermaid_html_with_data_async(
+                mermaid_flow_and_stuff.mermaid_code,
+                stuff_data=mermaid_flow_and_stuff.stuff_data,
+                stuff_data_text=mermaid_flow_and_stuff.stuff_data_text,
+                stuff_data_html=mermaid_flow_and_stuff.stuff_data_html,
+                stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+                title=f"Mermaidflow (Interactive): {topic}",
             )
         else:
-            combo_html = await render_mermaid_html_async(combo_output.mermaid_code, title=f"Combo: {topic}")
-        (output_dir / "combo.html").write_text(combo_html, encoding="utf-8")
+            mermaidflow_html = await render_mermaid_html_async(mermaid_flow_and_stuff.mermaid_code, title=f"Mermaidflow: {topic}")
+        (output_dir / "mermaidflow.html").write_text(mermaidflow_html, encoding="utf-8")
 
         # ==================== REACTFLOW OUTPUTS ====================
 
@@ -139,8 +139,8 @@ class TestGraphRenderersFromJson:
 
         # Verify all files were created
         expected_files = [
-            "combo.mmd",
-            "combo.html",
+            "mermaidflow.mmd",
+            "mermaidflow.html",
             "viewspec.json",
             "reactflow.html",
         ]
@@ -153,26 +153,26 @@ class TestGraphRenderersFromJson:
         # The GraphSpec JSON should have `data` fields, and the collection functions
         # should generate text/html representations from them
         if graph_config.data_inclusion.stuff_json_content:
-            # Verify that stuff_data is populated in combo output
-            assert combo_output.stuff_data is not None, "stuff_data should be populated when stuff_json_content=True"
-            assert len(combo_output.stuff_data) > 0, "stuff_data should not be empty when graph has stuff with data"
+            # Verify that stuff_data is populated in mermaidflow output
+            assert mermaid_flow_and_stuff.stuff_data is not None, "stuff_data should be populated when stuff_json_content=True"
+            assert len(mermaid_flow_and_stuff.stuff_data) > 0, "stuff_data should not be empty when graph has stuff with data"
 
         if graph_config.data_inclusion.stuff_text_content:
             # Verify that stuff_data_text is populated (either from data_text or fallback from data)
-            assert combo_output.stuff_data_text is not None, "stuff_data_text should be populated when stuff_text_content=True"
-            assert len(combo_output.stuff_data_text) > 0, "stuff_data_text should not be empty when graph has stuff with data"
+            assert mermaid_flow_and_stuff.stuff_data_text is not None, "stuff_data_text should be populated when stuff_text_content=True"
+            assert len(mermaid_flow_and_stuff.stuff_data_text) > 0, "stuff_data_text should not be empty when graph has stuff with data"
 
         if graph_config.data_inclusion.stuff_html_content:
             # Verify that stuff_data_html is populated (either from data_html or fallback from data)
-            assert combo_output.stuff_data_html is not None, "stuff_data_html should be populated when stuff_html_content=True"
-            assert len(combo_output.stuff_data_html) > 0, "stuff_data_html should not be empty when graph has stuff with data"
+            assert mermaid_flow_and_stuff.stuff_data_html is not None, "stuff_data_html should be populated when stuff_html_content=True"
+            assert len(mermaid_flow_and_stuff.stuff_data_html) > 0, "stuff_data_html should not be empty when graph has stuff with data"
 
         # Summary
         log.info(
             f"✅ All renderings generated for '{topic}':\n"
             f"  📁 Output: {output_dir}\n"
             f"  📊 Mermaid:\n"
-            f"     - combo.html\n"
+            f"     - mermaidflow.html\n"
             f"  🔷 ReactFlow:\n"
             f"     - reactflow.html"
         )
