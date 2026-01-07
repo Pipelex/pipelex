@@ -34,4 +34,3 @@ class DocumentContent(StuffContent):
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return f"[{self.url}]({self.url})"
-

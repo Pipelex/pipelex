@@ -95,4 +95,3 @@ class DocumentFormat(StrEnum):
         # This line is unreachable but needed for type checker
         msg = f"Unsupported MIME type: {mime_type}"
         raise ValueError(msg)
-
