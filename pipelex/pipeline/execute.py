@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.client.protocol import PipelineInputs
@@ -19,6 +19,9 @@ from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
+
+if TYPE_CHECKING:
+    from pipelex.pipe_run.pipe_job import PipeJob
 
 
 async def execute_pipeline(
@@ -93,26 +96,31 @@ async def execute_pipeline(
     # Use provided config or get default
     execution_config = execution_config or get_config().pipelex.pipeline_execution_config
 
-    pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
-        execution_config=execution_config,
-        library_id=library_id,
-        library_dirs=library_dirs,
-        pipe_code=pipe_code,
-        plx_content=plx_content,
-        inputs=inputs,
-        output_name=output_name,
-        output_multiplicity=output_multiplicity,
-        dynamic_output_concept_code=dynamic_output_concept_code,
-        pipe_run_mode=pipe_run_mode,
-        search_domain_codes=search_domain_codes,
-        user_id=user_id,
-    )
-
     properties: dict[EventProperty, Any]
     graph_spec_result = None
+    # These variables are set in pipeline_run_setup and needed in finally/except blocks
+    pipeline_run_id: str | None = None
+    library_id_resolved: str | None = None
+    pipe_job: PipeJob | None = None
     try:
+        pipe_job, pipeline_run_id, library_id_resolved = await pipeline_run_setup(
+            execution_config=execution_config,
+            library_id=library_id,
+            library_dirs=library_dirs,
+            pipe_code=pipe_code,
+            plx_content=plx_content,
+            inputs=inputs,
+            output_name=output_name,
+            output_multiplicity=output_multiplicity,
+            dynamic_output_concept_code=dynamic_output_concept_code,
+            pipe_run_mode=pipe_run_mode,
+            search_domain_codes=search_domain_codes,
+            user_id=user_id,
+        )
         pipe_output = await get_pipe_router().run(pipe_job)
     except PipeRouterError as exc:
+        # PipeRouterError can only be raised by get_pipe_router().run(), so pipe_job is guaranteed to exist
+        assert pipe_job is not None  # for type checker
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
@@ -129,6 +137,9 @@ async def execute_pipeline(
     except PipelexError as exc:
         # Catch other Pipelex errors that bypass the router's PipeRunError handling
         # (e.g., PipeRunInputsError raised directly from pipe_abstract.py)
+        # If pipe_job is None, the error occurred during pipeline_run_setup before pipe_job was created
+        if pipe_job is None:
+            raise
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
@@ -144,14 +155,17 @@ async def execute_pipeline(
         ) from exc
     finally:
         # Close graph tracer if it was opened (capture graph even on failure)
-        if execution_config.is_generate_graph:
+        # pipeline_run_id may be None if pipeline_run_setup failed early
+        if execution_config.is_generate_graph and pipeline_run_id is not None:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 graph_spec_result = tracer_manager.close_tracer(pipeline_run_id)
 
-        library = get_library_manager().get_library(library_id=library_id)
-        library.teardown()
-        teardown_current_library()
+        # Only teardown library if it was successfully created
+        if library_id_resolved is not None:
+            library = get_library_manager().get_library(library_id=library_id_resolved)
+            library.teardown()
+            teardown_current_library()
 
     # Assign graph spec to output (only reached on success, when pipe_output is bound)
     if graph_spec_result is not None:
