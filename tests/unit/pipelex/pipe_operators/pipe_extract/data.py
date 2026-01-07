@@ -20,7 +20,7 @@ class PipeExtractInputTestCases:
         "valid_pdf_input",
         PipeExtractBlueprint(
             description="Test case: valid_pdf_input",
-            inputs={"document": "native.PDF"},
+            inputs={"document": "native.Document"},
             output="native.Page[]",
         ),
     )
@@ -39,7 +39,7 @@ class PipeExtractInputTestCases:
         "valid_pdf_with_page_views",
         PipeExtractBlueprint(
             description="Test case: valid_pdf_with_page_views",
-            inputs={"contract": "native.PDF"},
+            inputs={"contract": "native.Document"},
             output="native.Page[]",
             page_views=True,
             page_views_dpi=150,

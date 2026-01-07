@@ -6,14 +6,15 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
-class PDFContent(StuffContent):
+class DocumentContent(StuffContent):
     url: str
+    mime_type: str | None = None
 
     @property
     @override
     def short_desc(self) -> str:
         url_desc = resolve_uri(self.url).kind.desc
-        return f"{url_desc} of a PDF document"
+        return f"{url_desc} of a document"
 
     @override
     def rendered_plain(self) -> str:
@@ -21,7 +22,7 @@ class PDFContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        template_source = '<a href="{{ url|e }}" class="msg-pdf">{{ url|e }}</a>'
+        template_source = '<a href="{{ url|e }}" class="msg-document">{{ url|e }}</a>'
         return render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
@@ -33,3 +34,4 @@ class PDFContent(StuffContent):
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return f"[{self.url}]({self.url})"
+

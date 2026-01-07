@@ -10,7 +10,7 @@ description = "Domain with extract pipe"
 [pipe.extract_text]
 type = "PipeExtract"
 description = "Extract text from document"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Page[]"
 model = "extract_basic_from_pdf"
 """,
@@ -22,7 +22,7 @@ model = "extract_basic_from_pdf"
                 type="PipeExtract",
                 description="Extract text from document",
                 inputs={
-                    "document": NativeConceptCode.PDF,
+                    "document": NativeConceptCode.DOCUMENT,
                 },
                 output=NativeConceptCode.PAGE.as_output_multiple_indeterminate,
                 model="extract_basic_from_pdf",

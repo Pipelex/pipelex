@@ -2,7 +2,7 @@
 
 These tests verify that PipeCompose correctly handles different StuffContent subclasses:
 - ImageContent: image URL and metadata
-- PDFContent: PDF document reference
+- DocumentContent: document reference
 - NumberContent: numeric values
 - MermaidContent: diagram code
 - HtmlContent: HTML fragments
@@ -20,13 +20,13 @@ from pipelex import pretty_print
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_native_concept, get_pipe_router
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
@@ -184,17 +184,17 @@ class TestPipeComposeStuffContentSubclasses:
         load_test_library: Callable[[list[Path]], None],
         test_library_path: list[Path],
     ):
-        """Test composing a StructuredContent with PDFContent fields."""
+        """Test composing a StructuredContent with DocumentContent fields."""
         load_test_library(test_library_path)
 
-        main_pdf = PDFContent(url="https://example.com/docs/contract.pdf")
-        supplement_pdf = PDFContent(url="https://example.com/docs/appendix.pdf")
+        main_pdf = DocumentContent(url="https://example.com/docs/contract.pdf")
+        supplement_pdf = DocumentContent(url="https://example.com/docs/appendix.pdf")
 
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(
             name="main_pdf",
             stuff=StuffFactory.make_stuff(
-                concept=get_native_concept(NativeConceptCode.PDF),
+                concept=get_native_concept(NativeConceptCode.DOCUMENT),
                 content=main_pdf,
                 name="main_pdf",
             ),
@@ -202,7 +202,7 @@ class TestPipeComposeStuffContentSubclasses:
         working_memory.add_new_stuff(
             name="supplement_pdf",
             stuff=StuffFactory.make_stuff(
-                concept=get_native_concept(NativeConceptCode.PDF),
+                concept=get_native_concept(NativeConceptCode.DOCUMENT),
                 content=supplement_pdf,
                 name="supplement_pdf",
             ),
@@ -210,8 +210,8 @@ class TestPipeComposeStuffContentSubclasses:
 
         pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
             {
-                "description": "Compose document archive with PDF content",
-                "inputs": {"main_pdf": "PDF", "supplement_pdf": "PDF"},
+                "description": "Compose document archive with document content",
+                "inputs": {"main_pdf": "Document", "supplement_pdf": "Document"},
                 "construct": StuffContentSubclassTestData.DOCUMENT_ARCHIVE_CONSTRUCT,
                 "output": "compose_structured_test.DocumentArchive",
             }
@@ -236,11 +236,11 @@ class TestPipeComposeStuffContentSubclasses:
 
         archive = main_stuff.content
         assert archive.archive_name == "Legal Documents Archive"  # type: ignore[attr-defined]
-        assert isinstance(archive.main_document, PDFContent)  # type: ignore[attr-defined]
+        assert isinstance(archive.main_document, DocumentContent)  # type: ignore[attr-defined]
         assert archive.main_document.url == "https://example.com/docs/contract.pdf"  # type: ignore[attr-defined]
         assert archive.supplementary_doc.url == "https://example.com/docs/appendix.pdf"  # type: ignore[attr-defined]
 
-        pretty_print(archive, title="DocumentArchive - PDFContent")
+        pretty_print(archive, title="DocumentArchive - DocumentContent")
 
     async def test_compose_number_content(
         self,
@@ -497,7 +497,7 @@ class TestPipeComposeStuffContentSubclasses:
         load_test_library(test_library_path)
 
         cover_image = ImageContent(url="https://example.com/cover.jpg", caption="Report Cover")
-        main_pdf = PDFContent(url="https://example.com/report.pdf")
+        main_pdf = DocumentContent(url="https://example.com/report.pdf")
         view_count = NumberContent(number=1500)
 
         working_memory = WorkingMemory()
@@ -512,7 +512,7 @@ class TestPipeComposeStuffContentSubclasses:
         working_memory.add_new_stuff(
             name="main_pdf",
             stuff=StuffFactory.make_stuff(
-                concept=get_native_concept(NativeConceptCode.PDF),
+                concept=get_native_concept(NativeConceptCode.DOCUMENT),
                 content=main_pdf,
                 name="main_pdf",
             ),
@@ -529,7 +529,7 @@ class TestPipeComposeStuffContentSubclasses:
         pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
             {
                 "description": "Compose mixed media report",
-                "inputs": {"cover": "Image", "main_pdf": "PDF", "primary_metric": "Number"},
+                "inputs": {"cover": "Image", "main_pdf": "Document", "primary_metric": "Number"},
                 "construct": StuffContentSubclassTestData.MIXED_MEDIA_CONSTRUCT,
                 "output": "compose_structured_test.MixedMediaReport",
             }
@@ -555,7 +555,7 @@ class TestPipeComposeStuffContentSubclasses:
         report = main_stuff.content
         assert report.report_title == "Annual Report"  # type: ignore[attr-defined]
         assert isinstance(report.cover_image, ImageContent)  # type: ignore[attr-defined]
-        assert isinstance(report.document, PDFContent)  # type: ignore[attr-defined]
+        assert isinstance(report.document, DocumentContent)  # type: ignore[attr-defined]
         assert isinstance(report.view_count, NumberContent)  # type: ignore[attr-defined]
         assert report.cover_image.url == "https://example.com/cover.jpg"  # type: ignore[attr-defined]
         assert report.document.url == "https://example.com/report.pdf"  # type: ignore[attr-defined]
@@ -633,13 +633,13 @@ class TestPipeComposeStuffContentSubclasses:
         load_test_library: Callable[[list[Path]], None],
         test_library_path: list[Path],
     ):
-        """Test composing a StructuredContent with a list of PDFContent."""
+        """Test composing a StructuredContent with a list of DocumentContent."""
         load_test_library(test_library_path)
 
-        pdf_list = ListContent[PDFContent](
+        pdf_list = ListContent[DocumentContent](
             items=[
-                PDFContent(url="https://example.com/doc1.pdf"),
-                PDFContent(url="https://example.com/doc2.pdf"),
+                DocumentContent(url="https://example.com/doc1.pdf"),
+                DocumentContent(url="https://example.com/doc2.pdf"),
             ]
         )
 
@@ -647,7 +647,7 @@ class TestPipeComposeStuffContentSubclasses:
         working_memory.add_new_stuff(
             name="pdf_list",
             stuff=StuffFactory.make_stuff(
-                concept=get_native_concept(NativeConceptCode.PDF),
+                concept=get_native_concept(NativeConceptCode.DOCUMENT),
                 content=pdf_list,
                 name="pdf_list",
             ),
@@ -656,7 +656,7 @@ class TestPipeComposeStuffContentSubclasses:
         pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
             {
                 "description": "Compose bundle with list of PDFs",
-                "inputs": {"pdf_list": "PDF"},
+                "inputs": {"pdf_list": "Document"},
                 "construct": StuffContentSubclassTestData.DOCUMENT_BUNDLE_CONSTRUCT,
                 "output": "compose_structured_test.DocumentBundle",
             }
@@ -685,4 +685,4 @@ class TestPipeComposeStuffContentSubclasses:
         assert len(bundle.documents) == 2  # type: ignore[attr-defined]
         assert bundle.documents[0].url == "https://example.com/doc1.pdf"  # type: ignore[attr-defined]
 
-        pretty_print(bundle, title="DocumentBundle - List of PDFContent")
+        pretty_print(bundle, title="DocumentBundle - List of DocumentContent")

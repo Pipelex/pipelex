@@ -1,12 +1,12 @@
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
@@ -16,7 +16,7 @@ class NativeConceptCode(StrEnum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
-    PDF = "PDF"
+    DOCUMENT = "Document"
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
     IMG_GEN_PROMPT = "ImgGenPrompt"
@@ -50,8 +50,8 @@ class NativeConceptCode(StrEnum):
                 return TextContent
             case NativeConceptCode.IMAGE:
                 return ImageContent
-            case NativeConceptCode.PDF:
-                return PDFContent
+            case NativeConceptCode.DOCUMENT:
+                return DocumentContent
             case NativeConceptCode.TEXT_AND_IMAGES:
                 return TextAndImagesContent
             case NativeConceptCode.NUMBER:
@@ -107,7 +107,7 @@ class NativeConceptCode(StrEnum):
             case (
                 NativeConceptCode.DYNAMIC
                 | NativeConceptCode.IMAGE
-                | NativeConceptCode.PDF
+                | NativeConceptCode.DOCUMENT
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.IMG_GEN_PROMPT
@@ -128,7 +128,7 @@ class NativeConceptCode(StrEnum):
             case (
                 NativeConceptCode.TEXT
                 | NativeConceptCode.IMAGE
-                | NativeConceptCode.PDF
+                | NativeConceptCode.DOCUMENT
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.IMG_GEN_PROMPT

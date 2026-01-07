@@ -9,11 +9,11 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -41,7 +41,7 @@ class TestWorkingMemoryData:
     # Test cases for different content types
     SINGLE_TEXT_CASE = "single_text"
     SINGLE_IMAGE_CASE = "single_image"
-    SINGLE_PDF_CASE = "single_pdf"
+    SINGLE_DOCUMENT_CASE = "single_document"
     MULTIPLE_STUFF_CASE = "multiple_stuff"
     WITH_ALIASES_CASE = "with_aliases"
     COMPLEX_LIST_CASE = "complex_list"
@@ -52,7 +52,7 @@ class TestWorkingMemoryData:
     TEST_CASES: ClassVar[list[tuple[str, str]]] = [
         ("Single text content", SINGLE_TEXT_CASE),
         ("Single image content", SINGLE_IMAGE_CASE),
-        ("Single PDF content", SINGLE_PDF_CASE),
+        ("Single document content", SINGLE_DOCUMENT_CASE),
         ("Multiple stuff items", MULTIPLE_STUFF_CASE),
         ("WorkingMemory with aliases", WITH_ALIASES_CASE),
         ("Complex list content", COMPLEX_LIST_CASE),
@@ -90,13 +90,13 @@ def single_image_memory() -> WorkingMemory:
 
 
 @pytest.fixture
-def single_pdf_memory() -> WorkingMemory:
-    """Create WorkingMemory with single PDF content."""
+def single_document_memory() -> WorkingMemory:
+    """Create WorkingMemory with single document content."""
     return WorkingMemoryFactory.make_from_single_stuff(
         stuff=StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PDF),
-            name="pdf_document",
-            content=PDFContent(url=TestWorkingMemoryData.SAMPLE_PDF_URL),
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
+            name="document_file",
+            content=DocumentContent(url=TestWorkingMemoryData.SAMPLE_PDF_URL),
         ),
     )
 

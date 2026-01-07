@@ -3,9 +3,9 @@ from typing import ClassVar
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
@@ -56,10 +56,10 @@ class PipeTestCases:
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
     )
-    SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
+    SIMPLE_STUFF_DOCUMENT = StuffFactory.make_stuff(
         name="document",
-        concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PDF),
-        content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
+        concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
+        content=DocumentContent(url=PDFTestCases.DOCUMENT_URLS[0]),
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
         name="complex",

@@ -40,7 +40,9 @@ class TestConcept:
     def test_get_validated_native_concept_ref(self):
         assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.TEXT) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
         assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.IMAGE) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}"
-        assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.PDF) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}"
+        assert (
+            NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.DOCUMENT) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.DOCUMENT}"
+        )
         assert (
             NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.TEXT_AND_IMAGES)
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}"
@@ -59,8 +61,8 @@ class TestConcept:
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}"
         )
         assert (
-            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}")
-            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}"
+            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.DOCUMENT}")
+            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.DOCUMENT}"
         )
         assert (
             NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}")
@@ -75,7 +77,7 @@ class TestConcept:
         with pytest.raises(NativeConceptDefinitionError):
             NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.IMAGE}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.PDF}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.DOCUMENT}")
         with pytest.raises(NativeConceptDefinitionError):
             NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.TEXT_AND_IMAGES}")
         with pytest.raises(NativeConceptDefinitionError):
@@ -131,7 +133,7 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code=NativeConceptCode.PDF,
+                    concept_code=NativeConceptCode.DOCUMENT,
                     domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),

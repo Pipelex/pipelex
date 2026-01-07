@@ -5,13 +5,13 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.exceptions import StuffArtefactReservedFieldError, StuffContentTypeError, StuffContentValidationError
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_artefact import BaseStuffArtefactField, StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -87,8 +87,8 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         return isinstance(self.content, ImageContent)
 
     @property
-    def is_pdf(self) -> bool:
-        return isinstance(self.content, PDFContent)
+    def is_document(self) -> bool:
+        return isinstance(self.content, DocumentContent)
 
     @property
     def is_text(self) -> bool:
@@ -171,9 +171,9 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         return self.content_as(content_type=ImageContent)
 
     @property
-    def as_pdf(self) -> PDFContent:
-        """Get content as PDFContent if applicable."""
-        return self.content_as(content_type=PDFContent)
+    def as_document(self) -> DocumentContent:
+        """Get content as DocumentContent if applicable."""
+        return self.content_as(content_type=DocumentContent)
 
     @property
     def as_text_and_image(self) -> TextAndImagesContent:

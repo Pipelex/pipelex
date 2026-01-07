@@ -28,7 +28,7 @@ class PipeExtractTestCases:
         PipeExtractSpec(
             pipe_code="advanced_extract",
             description="Extract with page options",
-            inputs={"document": "PDF"},
+            inputs={"document": "Document"},
             output="Page[]",
             extract_skill=ExtractSkill.PDF_TEXT_EXTRACTOR,
             page_images=True,
@@ -38,7 +38,7 @@ class PipeExtractTestCases:
         PipeExtractBlueprint(
             source=None,
             description="Extract with page options",
-            inputs={"document": "PDF"},
+            inputs={"document": "Document"},
             output="Page[]",
             model=ExtractSkill.PDF_TEXT_EXTRACTOR,
             page_images=True,
