@@ -4,7 +4,6 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-from google.api_core.exceptions import GoogleAPIError  # type: ignore[import-untyped]
 from typing_extensions import override
 
 from pipelex.system.exceptions import MissingDependencyError
@@ -137,6 +136,8 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         bucket = self._get_bucket()
 
+        from google.api_core.exceptions import GoogleAPIError  # type: ignore[import-untyped]  # noqa: PLC0415 - optional dependency, lazy import
+
         try:
             blob = bucket.blob(key)
             blob.upload_from_string(data, content_type=content_type)
@@ -179,6 +180,8 @@ class GcpStorageProvider(StorageProviderAbstract):
             Signed URL or public URL if signing fails.
         """
         bucket = self._get_bucket()
+
+        from google.api_core.exceptions import GoogleAPIError  # type: ignore[import-untyped]  # noqa: PLC0415 - optional dependency, lazy import
 
         try:
             blob = bucket.blob(key)

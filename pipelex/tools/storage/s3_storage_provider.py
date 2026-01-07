@@ -1,4 +1,5 @@
 import importlib.util
+import inspect
 from typing import Any
 
 from typing_extensions import override
@@ -98,6 +99,12 @@ class S3StorageProvider(StorageProviderAbstract):
             StorageFileNotFoundError: If the object does not exist.
             StorageS3Error: If the S3 operation fails.
         """
+        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            ClientError,
+            EndpointConnectionError,
+            NoCredentialsError,
+        )
+
         session = self._get_session()
         client_config = self._get_client_config()
 
@@ -113,6 +120,16 @@ class S3StorageProvider(StorageProviderAbstract):
             except client.exceptions.NoSuchBucket as exc:
                 msg = f"Bucket not found in S3: '{self._bucket_name}'"
                 raise StorageS3Error(msg) from exc
+            except ClientError as exc:
+                error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
+                if error_code == "NoSuchKey":
+                    msg = f"Object not found in S3: '{key}'"
+                    raise StorageFileNotFoundError(msg) from exc
+                msg = f"S3 ClientError ({error_code}) for key '{key}'"
+                raise StorageS3Error(msg) from exc
+            except (NoCredentialsError, EndpointConnectionError) as exc:
+                msg = f"S3 connectivity/credentials error for key '{key}'"
+                raise StorageS3Error(msg) from exc
 
     @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
@@ -126,6 +143,12 @@ class S3StorageProvider(StorageProviderAbstract):
         Raises:
             StorageS3Error: If the S3 operation fails.
         """
+        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            ClientError,
+            EndpointConnectionError,
+            NoCredentialsError,
+        )
+
         session = self._get_session()
         client_config = self._get_client_config()
 
@@ -141,6 +164,13 @@ class S3StorageProvider(StorageProviderAbstract):
                 await client.put_object(**put_params)
             except client.exceptions.NoSuchBucket as exc:
                 msg = f"Bucket not found in S3: '{self._bucket_name}'"
+                raise StorageS3Error(msg) from exc
+            except ClientError as exc:
+                error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
+                msg = f"S3 ClientError ({error_code}) for key '{key}'"
+                raise StorageS3Error(msg) from exc
+            except (NoCredentialsError, EndpointConnectionError) as exc:
+                msg = f"S3 connectivity/credentials error for key '{key}'"
                 raise StorageS3Error(msg) from exc
 
     def _make_public_url(self, key: str) -> str:
@@ -164,6 +194,8 @@ class S3StorageProvider(StorageProviderAbstract):
         Returns:
             Presigned URL if signed_urls_lifespan is configured, otherwise a public URL.
         """
+        from botocore.exceptions import ClientError  # noqa: PLC0415 - optional dependency, lazy import
+
         key = self._strip_scheme(uri)
 
         if self._signed_urls_lifespan is None:
@@ -174,11 +206,13 @@ class S3StorageProvider(StorageProviderAbstract):
 
         async with session.client(**client_config) as client:  # pyright: ignore[reportUnknownMemberType]
             try:
-                presigned_url: str = await client.generate_presigned_url(
+                # generate_presigned_url may be sync or async depending on aioboto3 version
+                maybe_url = client.generate_presigned_url(
                     "get_object",
                     Params={"Bucket": self._bucket_name, "Key": key},
                     ExpiresIn=self._signed_urls_lifespan,
                 )
+                presigned_url: str = await maybe_url if inspect.isawaitable(maybe_url) else maybe_url
                 return presigned_url
-            except client.exceptions.ClientError:
+            except ClientError:
                 return self._make_public_url(key)
