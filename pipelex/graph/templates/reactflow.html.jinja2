@@ -600,6 +600,82 @@
             display: flex;
             gap: 16px;
         }
+
+        /* Full-screen modal for stuff data */
+        .fullscreen-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--color-bg);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+        }
+        .fullscreen-modal.visible {
+            display: flex;
+        }
+        .fullscreen-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, var(--color-stuff), var(--color-stuff-border));
+            color: white;
+            border-bottom: 1px solid var(--color-border);
+        }
+        .fullscreen-header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .fullscreen-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .fullscreen-subtitle {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .fullscreen-close {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            border-radius: var(--radius-md);
+            font-size: 24px;
+            line-height: 1;
+            transition: background 0.15s;
+        }
+        .fullscreen-close:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .fullscreen-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+        }
+        .fullscreen-content {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+        .fullscreen-content > .inspector-pre,
+        .fullscreen-content.inspector-html-content {
+            flex: 1;
+            max-height: none;
+            min-height: 0;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -632,6 +708,29 @@
     </div>
 
     <div class="top-hint" id="top-hint">Click on nodes to view details</div>
+
+    <!-- Full-screen modal for stuff data -->
+    <div id="fullscreen-modal" class="fullscreen-modal">
+        <div class="fullscreen-header">
+            <div class="fullscreen-header-left">
+                <div id="fullscreen-title" class="fullscreen-title">Data</div>
+                <div id="fullscreen-subtitle" class="fullscreen-subtitle">Data Item</div>
+            </div>
+            <span class="fullscreen-close" onclick="closeFullscreen()">&times;</span>
+        </div>
+        <div class="fullscreen-toolbar">
+            <div class="format-tabs" id="fullscreen-format-tabs"></div>
+            <div class="format-actions">
+                <button class="action-btn" id="fullscreen-copy-btn" onclick="copyStuffContent()" title="Copy">
+                    <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                </button>
+                <button class="action-btn" id="fullscreen-download-btn" onclick="downloadStuffContent()" title="Download">
+                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                </button>
+            </div>
+        </div>
+        <div id="fullscreen-content" class="fullscreen-content"></div>
+    </div>
 
     <footer class="footer">
         <div class="footer-legend">
@@ -1257,6 +1356,10 @@
                         html += `${!hasText ? 'disabled' : ''}>Pretty</button>`;
                         html += '</div>';
                         html += '<div class="format-actions">';
+                        html += '<button class="action-btn" id="fullscreen-open-btn" ';
+                        html += 'onclick="openFullscreen()" title="Fullscreen">';
+                        html += '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+                        html += '</button>';
                         html += '<button class="action-btn" id="copy-btn" ';
                         html += 'onclick="copyStuffContent()" title="Copy">';
                         html += '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z';
@@ -1276,6 +1379,10 @@
                         html += '<div class="format-toolbar">';
                         html += '<div class="format-tabs"></div>';
                         html += '<div class="format-actions">';
+                        html += '<button class="action-btn" id="fullscreen-open-btn" ';
+                        html += 'onclick="openFullscreen()" title="Fullscreen">';
+                        html += '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+                        html += '</button>';
                         html += '<button class="action-btn" id="copy-btn" ';
                         html += 'onclick="copyStuffContent()" title="Copy">';
                         html += '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z';
@@ -1581,19 +1688,33 @@
             if (!data) return;
 
             navigator.clipboard.writeText(data.content).then(() => {
+                // Update both inspector and fullscreen buttons if they exist
                 const btn = document.getElementById('copy-btn');
+                const fullscreenBtn = document.getElementById('fullscreen-copy-btn');
                 const checkIcon = '<svg viewBox="0 0 24 24">' +
                     '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
                 const copyIcon = '<svg viewBox="0 0 24 24">' +
                     '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z' +
                     'm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z' +
                     'm0 16H8V7h11v14z"/></svg>';
-                btn.innerHTML = checkIcon;
-                btn.classList.add('copied');
-                setTimeout(() => {
-                    btn.innerHTML = copyIcon;
-                    btn.classList.remove('copied');
-                }, 1500);
+                
+                if (btn) {
+                    btn.innerHTML = checkIcon;
+                    btn.classList.add('copied');
+                    setTimeout(() => {
+                        btn.innerHTML = copyIcon;
+                        btn.classList.remove('copied');
+                    }, 1500);
+                }
+                
+                if (fullscreenBtn) {
+                    fullscreenBtn.innerHTML = checkIcon;
+                    fullscreenBtn.classList.add('copied');
+                    setTimeout(() => {
+                        fullscreenBtn.innerHTML = copyIcon;
+                        fullscreenBtn.classList.remove('copied');
+                    }, 1500);
+                }
             });
         }
 
@@ -1621,6 +1742,135 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Open fullscreen view
+        function openFullscreen() {
+            const modal = document.getElementById('fullscreen-modal');
+            const fullscreenTitle = document.getElementById('fullscreen-title');
+            const fullscreenSubtitle = document.getElementById('fullscreen-subtitle');
+            const fullscreenContent = document.getElementById('fullscreen-content');
+            const fullscreenFormatTabs = document.getElementById('fullscreen-format-tabs');
+            
+            // Copy title and subtitle from inspector
+            const inspectorTitle = document.getElementById('inspector-title');
+            const inspectorSubtitle = document.getElementById('inspector-subtitle');
+            fullscreenTitle.textContent = inspectorTitle.textContent;
+            fullscreenSubtitle.textContent = inspectorSubtitle.textContent;
+            
+            // Build format tabs if multiple formats available
+            const stuffMermaidId = window.currentStuffMermaidId;
+            const jsonData = window.currentStuffJsonData;
+            const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
+            const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+            const hasJson = !!jsonData;
+            const hasText = !!textData;
+            const hasHtml = !!htmlData;
+            const hasMultipleFormats = [hasJson, hasText, hasHtml].filter(Boolean).length > 1;
+            
+            if (hasMultipleFormats) {
+                const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
+                const textActive = currentStuffFormat === 'text' ? 'active' : '';
+                const htmlActive = currentStuffFormat === 'html' ? 'active' : '';
+                let tabsHtml = '';
+                tabsHtml += `<button class="format-tab ${htmlActive}" data-format="html" `;
+                tabsHtml += `${!hasHtml ? 'disabled' : ''}>HTML</button>`;
+                tabsHtml += `<button class="format-tab ${jsonActive}" data-format="json" `;
+                tabsHtml += `${!hasJson ? 'disabled' : ''}>JSON</button>`;
+                tabsHtml += `<button class="format-tab ${textActive}" data-format="text" `;
+                tabsHtml += `${!hasText ? 'disabled' : ''}>Pretty</button>`;
+                fullscreenFormatTabs.innerHTML = tabsHtml;
+                
+                // Attach format tab handlers
+                fullscreenFormatTabs.querySelectorAll('.format-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        if (tab.disabled) return;
+                        setStuffFormat(tab.dataset.format, true);
+                    });
+                });
+            } else {
+                fullscreenFormatTabs.innerHTML = '';
+            }
+            
+            // Render initial content
+            renderStuffContentFullscreen(currentStuffFormat);
+            
+            // Show modal
+            modal.classList.add('visible');
+            
+            // Disable body scroll
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Close fullscreen view
+        function closeFullscreen() {
+            const modal = document.getElementById('fullscreen-modal');
+            modal.classList.remove('visible');
+            
+            // Re-enable body scroll
+            document.body.style.overflow = '';
+        }
+
+        // Close fullscreen on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('fullscreen-modal');
+                if (modal.classList.contains('visible')) {
+                    closeFullscreen();
+                }
+            }
+        });
+
+        // Update setStuffFormat to handle both inspector and fullscreen
+        const originalSetStuffFormat = setStuffFormat;
+        function setStuffFormat(format, updateFullscreen = false) {
+            currentStuffFormat = format;
+            
+            // Update inspector tabs
+            const inspectorTabs = document.getElementById('stuff-format-tabs');
+            if (inspectorTabs) {
+                inspectorTabs.querySelectorAll('.format-tab').forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.format === format);
+                });
+                renderStuffContent(format);
+            }
+            
+            // Update fullscreen tabs if it's open
+            const modal = document.getElementById('fullscreen-modal');
+            if (modal.classList.contains('visible') || updateFullscreen) {
+                const fullscreenTabs = document.getElementById('fullscreen-format-tabs');
+                if (fullscreenTabs) {
+                    fullscreenTabs.querySelectorAll('.format-tab').forEach(tab => {
+                        tab.classList.toggle('active', tab.dataset.format === format);
+                    });
+                }
+                renderStuffContentFullscreen(format);
+            }
+        }
+
+        // Render stuff content in fullscreen view
+        function renderStuffContentFullscreen(format) {
+            const container = document.getElementById('fullscreen-content');
+            if (!container) return;
+
+            const stuffMermaidId = window.currentStuffMermaidId;
+            const jsonData = window.currentStuffJsonData;
+            const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
+            const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+
+            if (format === 'json') {
+                container.className = 'fullscreen-content';
+                const jsonStr = JSON.stringify(jsonData, null, 2);
+                container.innerHTML = `<pre class="inspector-pre">${escapeHtml(jsonStr)}</pre>`;
+            } else if (format === 'text') {
+                const textContent = textData || 'No text data available';
+                container.className = 'fullscreen-content';
+                container.innerHTML = `<pre class="inspector-pre nowrap">${escapeHtml(textContent)}</pre>`;
+            } else if (format === 'html') {
+                const htmlContent = htmlData || 'No HTML data available';
+                container.className = 'fullscreen-content inspector-html-content';
+                container.innerHTML = htmlContent;
+            }
         }
     </script>
 </body>
