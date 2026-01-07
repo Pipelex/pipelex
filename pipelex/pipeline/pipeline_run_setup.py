@@ -13,6 +13,7 @@ from pipelex.hub import (
     get_required_pipe,
     get_telemetry_manager,
     set_current_library,
+    teardown_current_library,
 )
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -167,71 +168,83 @@ async def pipeline_run_setup(
             pipeline_ref_main_pipe=pipe_code,
         )
 
-    working_memory: WorkingMemory | None = None
+    try:
+        working_memory: WorkingMemory | None = None
 
-    if inputs:
-        if isinstance(inputs, WorkingMemory):
-            working_memory = inputs
-        else:
-            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-                pipeline_inputs=inputs,
-                search_domain_codes=search_domain_codes,
+        if inputs:
+            if isinstance(inputs, WorkingMemory):
+                working_memory = inputs
+            else:
+                working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+                    pipeline_inputs=inputs,
+                    search_domain_codes=search_domain_codes,
+                )
+
+        # Normalize data URLs to pipelex-storage:// URIs if configured
+        if working_memory and execution_config.is_normalize_data_urls_to_storage:
+            working_memory = await normalize_data_urls_to_storage(working_memory)
+
+        # TODO: rethink this, it's not forcing
+        if pipe_run_mode is None:
+            if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
+                pipe_run_mode = PipeRunMode(run_mode_from_env)
+            else:
+                pipe_run_mode = PipeRunMode.LIVE
+
+        get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
+
+        # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
+        # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
+        otel_context: OtelContext | None = None
+        if pipe_run_mode.is_live and get_otel_tracer() is not None:
+            trace_id = OtelFactory.make_trace_id(pipeline_run_id=pipeline_run_id)
+            trace_name, trace_name_redacted = OtelFactory.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
+            otel_context = OtelContext(
+                trace_id=trace_id,
+                trace_name=trace_name,
+                trace_name_redacted=trace_name_redacted,
+                span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
             )
+            # Emit trace start event immediately to establish trace name in PostHog
+            # This must happen before any pipe spans are created/exported
+            get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
-    # Normalize data URLs to pipelex-storage:// URIs if configured
-    if working_memory and execution_config.is_normalize_data_urls_to_storage:
-        working_memory = await normalize_data_urls_to_storage(working_memory)
-
-    # TODO: rethink this, it's not forcing
-    if pipe_run_mode is None:
-        if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
-            pipe_run_mode = PipeRunMode(run_mode_from_env)
-        else:
-            pipe_run_mode = PipeRunMode.LIVE
-
-    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-
-    # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
-    # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
-    otel_context: OtelContext | None = None
-    if pipe_run_mode.is_live and get_otel_tracer() is not None:
-        trace_id = OtelFactory.make_trace_id(pipeline_run_id=pipeline_run_id)
-        trace_name, trace_name_redacted = OtelFactory.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
-        otel_context = OtelContext(
-            trace_id=trace_id,
-            trace_name=trace_name,
-            trace_name_redacted=trace_name_redacted,
-            span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+        job_metadata = JobMetadata(
+            user_id=user_id,
+            pipeline_run_id=pipeline.pipeline_run_id,
+            otel_context=otel_context,
+            graph_context=graph_context,
         )
-        # Emit trace start event immediately to establish trace name in PostHog
-        # This must happen before any pipe spans are created/exported
-        get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
-    job_metadata = JobMetadata(
-        user_id=user_id,
-        pipeline_run_id=pipeline.pipeline_run_id,
-        otel_context=otel_context,
-        graph_context=graph_context,
-    )
+        pipe_run_params = PipeRunParamsFactory.make_run_params(
+            output_multiplicity=output_multiplicity,
+            dynamic_output_concept_code=dynamic_output_concept_code,
+            pipe_run_mode=pipe_run_mode,
+        )
 
-    pipe_run_params = PipeRunParamsFactory.make_run_params(
-        output_multiplicity=output_multiplicity,
-        dynamic_output_concept_code=dynamic_output_concept_code,
-        pipe_run_mode=pipe_run_mode,
-    )
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=pipe,
+            pipe_run_params=pipe_run_params,
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            output_name=output_name,
+        )
 
-    pipe_job = PipeJobFactory.make_pipe_job(
-        pipe=pipe,
-        pipe_run_params=pipe_run_params,
-        job_metadata=job_metadata,
-        working_memory=working_memory,
-        output_name=output_name,
-    )
+        properties = {
+            EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+            EventProperty.PIPE_TYPE: pipe.pipe_type,
+        }
+        get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
 
-    properties = {
-        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
-        EventProperty.PIPE_TYPE: pipe.pipe_type,
-    }
-    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
-
-    return pipe_job, pipeline_run_id, library_id
+        return pipe_job, pipeline_run_id, library_id
+    except Exception:
+        # Cleanup graph tracer if it was opened
+        if graph_context is not None:
+            tracer_manager = GraphTracerManager.get_instance()
+            if tracer_manager is not None:
+                tracer_manager.close_tracer(pipeline_run_id)
+        # Cleanup library
+        library = library_manager.get_library(library_id=library_id)
+        library.teardown()
+        teardown_current_library()
+        raise
