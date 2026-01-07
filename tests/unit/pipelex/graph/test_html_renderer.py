@@ -1,10 +1,31 @@
 """Unit tests for the HTML renderer module."""
 
+import pytest
+
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html
+from pipelex.graph.mermaidflow.template_set import (
+    MERMAID_TEMPLATE_SET_NAME,
+    MERMAID_TEMPLATES,
+    MERMAID_TEMPLATES_PACKAGE,
+)
+from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
+from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
 
 class TestRenderMermaidHtml:
     """Tests for the render_mermaid_html function."""
+
+    @pytest.fixture(autouse=True)
+    def setup_templates(self) -> None:
+        """Ensure Mermaid templates are loaded before tests."""
+        TemplateRegistry.clear()
+        TemplateLoader.reset()
+        TemplateLoader.register_set(
+            name=MERMAID_TEMPLATE_SET_NAME,
+            package=MERMAID_TEMPLATES_PACKAGE,
+            templates=MERMAID_TEMPLATES,
+        )
+        TemplateLoader.load(MERMAID_TEMPLATE_SET_NAME)
 
     SAMPLE_MERMAID_CODE = """flowchart TD
     n_abc123["generate_text"]

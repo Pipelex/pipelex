@@ -31,6 +31,11 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
+from pipelex.graph.mermaidflow.template_set import (
+    MERMAID_TEMPLATE_SET_NAME,
+    MERMAID_TEMPLATES,
+    MERMAID_TEMPLATES_PACKAGE,
+)
 from pipelex.graph.reactflow.template_set import (
     REACTFLOW_TEMPLATE_SET_NAME,
     REACTFLOW_TEMPLATES,
@@ -222,6 +227,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             name=REACTFLOW_TEMPLATE_SET_NAME,
             package=REACTFLOW_TEMPLATES_PACKAGE,
             templates=REACTFLOW_TEMPLATES,
+        )
+        TemplateLoader.register_set(
+            name=MERMAID_TEMPLATE_SET_NAME,
+            package=MERMAID_TEMPLATES_PACKAGE,
+            templates=MERMAID_TEMPLATES,
         )
         TemplateLoader.load_all()
 

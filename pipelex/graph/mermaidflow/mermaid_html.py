@@ -9,12 +9,11 @@ from typing import Any
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
-from pipelex.tools.jinja2.jinja2_template_loader import load_template
+from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
-# Template package and names
-_TEMPLATE_PACKAGE = "pipelex.graph.mermaidflow.templates"
-_PIPELEX_TEMPLATE = "mermaid_pipelex.html.jinja2"
-_INTERACTIVE_TEMPLATE = "mermaid_interactive.html.jinja2"
+# Template registry keys
+_PIPELEX_TEMPLATE_KEY = "mermaid/pipelex.html.jinja2"
+_INTERACTIVE_TEMPLATE_KEY = "mermaid/interactive.html.jinja2"
 
 
 def render_mermaid_html(
@@ -36,7 +35,7 @@ def render_mermaid_html(
     Returns:
         Complete HTML page as a string.
     """
-    template_source = load_template(package=_TEMPLATE_PACKAGE, template_name=_PIPELEX_TEMPLATE)
+    template_source = TemplateRegistry.get(_PIPELEX_TEMPLATE_KEY)
     return render_jinja2_sync(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
@@ -66,7 +65,7 @@ async def render_mermaid_html_async(
     Returns:
         Complete HTML page as a string.
     """
-    template_source = load_template(package=_TEMPLATE_PACKAGE, template_name=_PIPELEX_TEMPLATE)
+    template_source = TemplateRegistry.get(_PIPELEX_TEMPLATE_KEY)
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
@@ -106,7 +105,7 @@ async def render_mermaid_html_with_data_async(
     Returns:
         Complete HTML page as a string with interactive data display.
     """
-    template_source = load_template(package=_TEMPLATE_PACKAGE, template_name=_INTERACTIVE_TEMPLATE)
+    template_source = TemplateRegistry.get(_INTERACTIVE_TEMPLATE_KEY)
     has_data = bool(stuff_data or stuff_data_text or stuff_data_html)
 
     # Pre-serialize the data to JSON for embedding in the template
