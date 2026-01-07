@@ -42,7 +42,7 @@ class StorageS3Config(ConfigModel):
 
         if self.uri_format == "":
             error_msgs.append("- set a value for uri_format")
-        elif "hash" not in self.uri_format:
+        elif "{hash}" not in self.uri_format:
             error_msgs.append("- uri_format must contain a {hash} placeholder")
 
         if self.bucket_name == "":
