@@ -180,7 +180,7 @@ async def pipeline_run_setup(
 
     # Normalize data URLs to pipelex-storage:// URIs if configured
     if working_memory and execution_config.is_normalize_data_urls_to_storage:
-        working_memory = normalize_data_urls_to_storage(working_memory)
+        working_memory = await normalize_data_urls_to_storage(working_memory)
 
     # TODO: rethink this, it's not forcing
     if pipe_run_mode is None:

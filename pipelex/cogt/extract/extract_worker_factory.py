@@ -1,8 +1,8 @@
 import importlib.util
 
-from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol

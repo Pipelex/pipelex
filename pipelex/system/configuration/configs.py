@@ -1,7 +1,7 @@
 from typing import cast
 
 import shortuuid
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
@@ -14,6 +14,7 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.storage.storage_config import StorageConfig
 from pipelex.types import Self, StrEnum
 
 
@@ -33,11 +34,6 @@ class ConfigPaths:
     BASE_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{BASE_DECK_FILE_NAME}"
     OVERRIDES_DECK_FILE_NAME = "overrides.toml"
     OVERRIDES_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{OVERRIDES_DECK_FILE_NAME}"
-
-
-class StorageMethod(StrEnum):
-    LOCAL = "local"
-    IN_MEMORY = "in_memory"
 
 
 class ValidationErrorReaction(StrEnum):
@@ -61,31 +57,6 @@ class ValidationErrorConfig(ConfigModel):
                 value_enum_cls=ValidationErrorReaction,
             ),
         )
-
-
-class StorageConfig(ConfigModel):
-    is_fetch_remote_content_enabled: bool
-    uri_format: str
-    method: StorageMethod = Field(strict=False)
-    local_storage_path: str | None = None
-
-    @model_validator(mode="after")
-    def validate_storage_config(self) -> Self:
-        match self.method:
-            case StorageMethod.LOCAL:
-                if not self.local_storage_path:
-                    msg = "local_storage_path is required when method is local"
-                    raise PipelexConfigError(msg)
-            case StorageMethod.IN_MEMORY:
-                pass
-        return self
-
-    @property
-    def storage_path(self) -> str:
-        if not self.local_storage_path:
-            msg = "local_storage_path is required when method is local"
-            raise PipelexConfigError(msg)
-        return self.local_storage_path
 
 
 class PipeRunConfig(ConfigModel):
@@ -163,8 +134,7 @@ class PipelineExecutionConfig(ConfigModel):
     is_generate_graph: bool
     graph_config: GraphConfig
 
-    # TODO: refactor this, it's awful
-    def with_graph_overrides(
+    def with_graph_config_overrides(
         self,
         generate_graph: bool | None = None,
         include_full_data: bool | None = None,

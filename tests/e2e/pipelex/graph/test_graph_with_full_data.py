@@ -108,7 +108,7 @@ class TestGraphWithFullData:
         4. Verifies interactive rendering works with the captured data
         """
         # Build effective config with graph tracing and full data capture enabled
-        exec_config = get_config().pipelex.pipeline_execution_config.with_graph_overrides(
+        exec_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
             generate_graph=True,
             include_full_data=True,
         )

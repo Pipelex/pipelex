@@ -4,9 +4,26 @@
 
 [pipelex.storage_config]
 is_fetch_remote_content_enabled = true
+method = "in_memory"                   # local, in_memory, s3, gcp
+
+[pipelex.storage_config.local]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
-method = "local"
 local_storage_path = ".pipelex/storage"
+
+[pipelex.storage_config.in_memory]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+
+[pipelex.storage_config.s3]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+bucket_name = ""
+region = ""
+signed_urls_lifespan_seconds = 3600
+
+[pipelex.storage_config.gcp]
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+bucket_name = ""
+project_id = ""
+signed_urls_lifespan_seconds = 3600
 
 [pipelex.observer_config]
 observer_dir = "results/observer"

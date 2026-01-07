@@ -198,7 +198,7 @@ def run_cmd(
         pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
         # Build effective execution config with CLI overrides
-        execution_config = get_config().pipelex.pipeline_execution_config.with_graph_overrides(
+        execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
             generate_graph=graph,
             include_full_data=graph_full_data or None,
         )

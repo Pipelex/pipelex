@@ -164,19 +164,6 @@ class ImgGenGeneratedTypeError(ImgGenGenerationError):
     pass
 
 
-class MissingDependencyError(CogtError):
-    """Raised when a required dependency is not installed."""
-
-    def __init__(self, dependency_name: str, extra_name: str, message: str | None = None):
-        self.dependency_name = dependency_name
-        self.extra_name = extra_name
-        error_msg = f"Required dependency '{dependency_name}' is not installed."
-        if message:
-            error_msg += f" {message}"
-        error_msg += f" Please install it with 'pip install pipelex[{extra_name}]'."
-        super().__init__(error_msg)
-
-
 class ExtractCapabilityError(CogtError):
     pass
 

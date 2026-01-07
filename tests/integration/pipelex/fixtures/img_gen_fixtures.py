@@ -83,7 +83,7 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
         ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
             background=Background.OPAQUE,
-            nb_steps=10,
+            nb_steps=8,
             guidance_scale=2.5,
             is_moderated=None,
             safety_tolerance=1,

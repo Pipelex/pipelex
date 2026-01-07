@@ -75,7 +75,7 @@ async def prepare_prompt_image(
 
                 case ResolvedPipelexStorage():
                     storage = get_storage_provider()
-                    raw_bytes = storage.load(uri=prompt_image.resolved.storage_uri)
+                    raw_bytes = await storage.load(uri=prompt_image.resolved.storage_uri)
                     prepared = PreparedImageBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
@@ -153,7 +153,7 @@ async def prepare_prompt_image_as_base64(prompt_image: PromptImage) -> PreparedI
 
                 case ResolvedPipelexStorage():
                     storage = get_storage_provider()
-                    raw_bytes = storage.load(uri=prompt_image.resolved.storage_uri)
+                    raw_bytes = await storage.load(uri=prompt_image.resolved.storage_uri)
                     return PreparedImageBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),

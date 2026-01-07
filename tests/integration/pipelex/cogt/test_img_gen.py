@@ -30,8 +30,7 @@ class TestImageGeneration:
         generated_content_factory: GeneratedContentFactory,
     ):
         pretty_print(f"Testing image generation with handle '{img_gen_handle}', output format '{img_gen_job_params.output_format}'")
-        pretty_print(positive_text, title="Positive text")
-        pretty_print(negative_text, title="Negative text")
+        pretty_print(f"Positive text: {positive_text}\nNegative text: {negative_text}", title="Prompts")
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=positive_text,
