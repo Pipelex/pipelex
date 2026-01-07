@@ -128,6 +128,9 @@ def graph_render_cmd(
             )
             graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
+            # Get the mermaid theme from config
+            mermaid_theme = graph_config.mermaid_config.style.theme
+
             flow_direction = direction or FlowchartDirection.TOP_DOWN
 
             # Generate mermaidflow view (default + --mermaidflow)
@@ -146,9 +149,14 @@ def graph_render_cmd(
                         stuff_data_html=mermaid_flow_and_stuff.stuff_data_html,
                         stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
                         title=f"Mermaidflow: {input_file.stem}",
+                        theme=mermaid_theme,
                     )
                 else:
-                    mermaidflow_html = await render_mermaid_html_async(mermaid_flow_and_stuff.mermaid_code, title=f"Mermaidflow: {input_file.stem}")
+                    mermaidflow_html = await render_mermaid_html_async(
+                        mermaid_flow_and_stuff.mermaid_code,
+                        title=f"Mermaidflow: {input_file.stem}",
+                        theme=mermaid_theme,
+                    )
                 mermaidflow_html_path = output_dir / "mermaidflow.html"
                 mermaidflow_html_path.write_text(mermaidflow_html, encoding="utf-8")
                 generated_files.append(mermaidflow_html_path)
