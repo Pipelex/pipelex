@@ -1,3 +1,4 @@
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.system.exceptions import ToolError
 
 
@@ -5,7 +6,7 @@ class StorageError(ToolError):
     """Base exception for storage-related errors."""
 
 
-class StorageConfigError(StorageError):
+class StorageConfigError(StorageError, PipelexConfigError):
     """Raised when a storage configuration is invalid."""
 
 

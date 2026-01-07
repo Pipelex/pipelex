@@ -34,6 +34,8 @@ def make_storage_provider_from_config(storage_config: StorageConfig) -> StorageP
             if storage_config.s3 is None:
                 msg = "S3 config is required when method is s3"
                 raise StorageConfigError(msg)
+
+            storage_config.s3.lazy_validate()
             log.verbose(f"Using S3 storage: bucket={storage_config.s3.bucket_name}, region={storage_config.s3.region}")
             return S3StorageProvider(
                 bucket_name=storage_config.s3.bucket_name,
@@ -44,6 +46,7 @@ def make_storage_provider_from_config(storage_config: StorageConfig) -> StorageP
             if storage_config.gcp is None:
                 msg = "GCP config is required when method is gcp"
                 raise StorageConfigError(msg)
+            storage_config.gcp.lazy_validate()
             log.verbose(f"Using GCP storage: bucket={storage_config.gcp.bucket_name}, project={storage_config.gcp.project_id}")
             return GcpStorageProvider(
                 bucket_name=storage_config.gcp.bucket_name,

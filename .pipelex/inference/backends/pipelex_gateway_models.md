@@ -1,7 +1,7 @@
 # Pipelex Gateway - Available Models
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-06T15:33:39Z
+> Last updated: 2026-01-07T00:44:26Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
 
